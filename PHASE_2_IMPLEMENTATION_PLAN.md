@@ -31,23 +31,23 @@ desktop context menu, wallpaper fit modes, audio routing, soft-reboot) are fille
 | # | Milestone | Status |
 |---|---|---|
 | M0 | Plan doc & `components/shell/` conventions | ✅ |
-| M1 | Aero shell materials (glass taskbar/start/windows) + tokenize literals | ⬜ |
-| M2 | Window manager motion (reuse FloatingWindow) | ⬜ |
-| M3 | Taskbar (tray: Quick Settings + Notification bell) | ⬜ |
-| M4 | Start menu (glass, opening anim, in-Start search, shortcuts) | ⬜ |
-| M5 | Global search (extend CommandPalette + recent searches) | ⬜ |
-| M6 | Notification Center + persistent store | ⬜ |
-| M7 | Quick Settings flyout | ⬜ |
-| M8 | Widget framework (verify + Aero glass + doc) | ⬜ |
-| M9 | Desktop right-click context menu | ⬜ |
-| M10 | Wallpaper fit modes + base-layer transition | ⬜ |
-| M11 | Audio event routing (`shellSounds.ts`) | ⬜ |
-| M12 | Persistence for new state | ⬜ |
-| M13 | Accessibility pass | ⬜ |
-| M14 | Performance pass | ⬜ |
-| M15 | Secret Mode soft-reboot | ⬜ |
-| M16 | Future-compat hooks | ⬜ |
-| M17 | Docs (8) + QA audit | ⬜ |
+| M1 | Aero shell materials (glass taskbar/start/windows) + tokenize literals | ✅ |
+| M2 | Window manager motion (reuse FloatingWindow) | ✅ |
+| M3 | Taskbar (tray: Quick Settings + Notification bell) | ✅ |
+| M4 | Start menu (glass, opening anim, in-Start search, shortcuts) | ✅ |
+| M5 | Global search (extend CommandPalette + recent searches) | ✅ |
+| M6 | Notification Center + persistent store | ✅ |
+| M7 | Quick Settings flyout | ✅ |
+| M8 | Widget framework (verify + Aero glass + doc) | ✅ |
+| M9 | Desktop right-click context menu | ✅ |
+| M10 | Wallpaper fit modes + base-layer transition | ✅ |
+| M11 | Audio event routing (`shellSounds.ts`) | ✅ |
+| M12 | Persistence for new state | ✅ |
+| M13 | Accessibility pass | ✅ |
+| M14 | Performance pass | ✅ |
+| M15 | Secret Mode soft-reboot | ✅ |
+| M16 | Future-compat hooks | ✅ |
+| M17 | Docs (8) + QA audit | ✅ |
 
 ## `components/shell/` conventions
 
