@@ -55,6 +55,9 @@ bootOsLook();
 bootDisplayPrefs();
 // Apply the saved performance tier (data-perf) pre-paint (Phase 1 · M9).
 bootPerf();
+// Keep the active theme's asset pack (sounds now; icons/wallpapers hooks) in
+// sync on every theme change — the Anime Edition extension point (Phase 1 · M10).
+installAssetPackSync();
 
 if (!isCompanionHost) {
   bootCustomCss();
