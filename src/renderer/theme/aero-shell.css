@@ -128,6 +128,12 @@
   background: var(--shell-sheen), transparent;
 }
 
+/* ---------- Start menu opening animation (Phase 2 · M4) ------------------ */
+:root[data-materials='aero'] .os-start {
+  animation: aero-scale-in var(--dur-slow) var(--ease-glass) both;
+  transform-origin: bottom left;
+}
+
 /* ---------- Window open/restore motion (Phase 2 · M2) --------------------
    Opacity only — never transform (the drag gesture owns transform). Runs on
    mount/restore; collapses under reduced motion / Battery Saver (global rules).*/

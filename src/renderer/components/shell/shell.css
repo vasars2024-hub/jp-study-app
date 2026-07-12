@@ -100,6 +100,64 @@
 .os-qs-row-label { flex: 1; font-size: var(--font-size-sm); }
 .os-qs-section { font-size: var(--font-size-xs); color: var(--muted); text-transform: uppercase; letter-spacing: var(--letter-spacing-wider); margin: 4px 4px 0; }
 
+/* Start menu: search field + footer shortcuts (Phase 2 · M4) */
+.os-start-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  margin: 0 0 var(--space-sm);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+  cursor: text;
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.os-start-search:hover,
+.os-start-search:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.os-start-search-ph { flex: 1; }
+.os-start-search-kbd {
+  font-size: var(--font-size-2xs);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.os-start-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+.os-start-foot-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.os-start-foot-btn:hover { background: var(--accent-weak); }
+.os-start-foot-btn:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: 2px; }
+.os-start-foot-btn.power:hover { background: color-mix(in srgb, var(--status-error) 18%, transparent); color: var(--status-error); }
+.os-start-foot-spacer { flex: 1; }
+
 /* Taskbar notification bell + unread badge */
 .os-tray-btn-bell { position: relative; }
 .os-tray-badge {

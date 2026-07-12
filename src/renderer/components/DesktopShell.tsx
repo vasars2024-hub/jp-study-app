@@ -1411,6 +1411,21 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 ? 'Drop on the desktop to place the app'
                 : 'Drag apps onto the desktop · click to open · pin to add'}
             </div>
+            <button
+              type="button"
+              className="os-start-search"
+              onClick={() => {
+                setStartOpen(false);
+                window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
+              <span className="os-start-search-ph">Search apps, settings, books…</span>
+              <kbd className="os-start-search-kbd">Ctrl P</kbd>
+            </button>
             <div className="os-start-grid">
               {desktopApps.map((a) => {
                 const pinned = isAppPinned(a.id);
@@ -1472,6 +1487,45 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 </>
               )}
             </div>
+            <div className="os-start-footer">
+              <button type="button" className="os-start-foot-btn" onClick={() => open('settings')}>
+                <Icon name="settings" size={16} />
+                <span>Settings</span>
+              </button>
+              <button
+                type="button"
+                className="os-start-foot-btn"
+                onClick={() => {
+                  setStartOpen(false);
+                  window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <line x1="4" y1="9" x2="20" y2="9" />
+                  <line x1="4" y1="15" x2="20" y2="15" />
+                  <circle cx="9" cy="9" r="2.2" />
+                  <circle cx="15" cy="15" r="2.2" />
+                </svg>
+                <span>Quick</span>
+              </button>
+              <span className="os-start-foot-spacer" />
+              <button
+                type="button"
+                className="os-start-foot-btn power"
+                title="Restart shell"
+                aria-label="Restart shell"
+                onClick={() => {
+                  if (window.confirm('Restart the Study OS shell? Unsaved text in fields may be lost.')) {
+                    window.location.reload();
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 3v9" />
+                  <path d="M6.5 7a8 8 0 1 0 11 0" />
+                </svg>
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -1519,6 +1573,18 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           })}
         </div>
         <div className="os-tray">
+          <button
+            type="button"
+            className="os-tray-btn"
+            title="Search (Ctrl+P)"
+            aria-label="Search"
+            onClick={() => window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }))}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+          </button>
           <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title="Widgets" onClick={() => setGalleryOpen((o) => !o)}>
             <Icon name="app" size={18} />
           </button>
