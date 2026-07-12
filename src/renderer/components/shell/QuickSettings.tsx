@@ -10,6 +10,13 @@ import { Select, Slider, Toggle } from '../ui';
 import { getTheme, listThemes, loadThemeId, onThemeChanged, setTheme } from '../../theme';
 import { DEFAULT_PERF_TIER, loadPerfTier, PERF_TIERS, setPerfTier, type PerfTier } from '../../theme/perf';
 import { soundEngine } from '../../audio/soundEngine';
+import {
+  loadWallpaperFit,
+  setWallpaperFit,
+  WALLPAPER_FIT_LABEL,
+  WALLPAPER_FITS,
+  type WallpaperFit,
+} from '../../wallpaperFit';
 
 const TOGGLE_EVENT = 'shell:toggleQuickSettings';
 
@@ -45,6 +52,7 @@ export default function QuickSettings() {
   const [volume, setVolume] = useState(() => soundEngine.getVolume());
   const [muted, setMuted] = useState(() => soundEngine.isMuted());
   const [reduceMotion, setRM] = useState(isReduceMotion);
+  const [fit, setFit] = useState<WallpaperFit>(() => loadWallpaperFit());
 
   useEffect(() => onThemeChanged(setThemeId), []);
 
@@ -62,6 +70,7 @@ export default function QuickSettings() {
     setVolume(soundEngine.getVolume());
     setMuted(soundEngine.isMuted());
     setRM(isReduceMotion());
+    setFit(loadWallpaperFit());
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -125,6 +134,19 @@ export default function QuickSettings() {
                 const t = (e.currentTarget.value as PerfTier) || DEFAULT_PERF_TIER;
                 setPerf(t);
                 setPerfTier(t);
+              }}
+              style={{ maxWidth: 190 }}
+            />
+          </div>
+          <div className="os-qs-row">
+            <span className="os-qs-row-label">Wallpaper fit</span>
+            <Select
+              value={fit}
+              options={WALLPAPER_FITS.map((f) => ({ value: f, label: WALLPAPER_FIT_LABEL[f] }))}
+              onChange={(e) => {
+                const f = e.currentTarget.value as WallpaperFit;
+                setFit(f);
+                setWallpaperFit(f);
               }}
               style={{ maxWidth: 190 }}
             />

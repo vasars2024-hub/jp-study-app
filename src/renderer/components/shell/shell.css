@@ -6,6 +6,14 @@
    brighten automatically under Aero (via the --glass-* tokens). Additive.
    ============================================================================= */
 
+/* Wallpaper fit (Phase 2 · M10) — --wall-fit is set by wallpaperFit.ts; this
+   overrides the base object-fit:cover so Fit/Fill/Stretch/Center work. */
+.os-wall-image,
+.os-wall-video {
+  object-fit: var(--wall-fit, cover);
+  object-position: center;
+}
+
 /* Click-catching backdrop shared by shell flyouts. */
 .os-panel-backdrop {
   position: fixed;

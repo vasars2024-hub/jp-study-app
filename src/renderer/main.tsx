@@ -38,6 +38,8 @@ import './theme/aero-shell.css';
 import './components/shell/shell.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { installNotificationCapture } from './notificationStore';
+import { bootWallpaperFit } from './wallpaperFit';
+import { installShellSounds } from './shellSounds';
 import { bootPerf } from './theme/perf';
 import { installAssetPackSync } from './theme/assetPacks';
 
@@ -66,6 +68,9 @@ bootPerf();
 installAssetPackSync();
 // Capture transient toasts into the Notification Center history (Phase 2 · M6).
 installNotificationCapture();
+// Wallpaper fit (--wall-fit) pre-paint + shell sound routing (Phase 2 · M10/M11).
+bootWallpaperFit();
+installShellSounds();
 
 if (!isCompanionHost) {
   bootCustomCss();
