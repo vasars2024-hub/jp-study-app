@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type DragEvent as RDragEvent,
+  type MouseEvent as RMouseEvent,
   type PointerEvent as RPointerEvent,
   type ReactNode,
 } from 'react';
@@ -22,6 +23,7 @@ import DesktopSettings, { type WallChoice } from './DesktopSettings';
 import NotificationCenter from './shell/NotificationCenter';
 import NotificationBell from './shell/NotificationBell';
 import QuickSettings from './shell/QuickSettings';
+import { ContextMenu } from './ui';
 import {
   commitLayout,
   getActiveDesktopIndex,
@@ -783,6 +785,23 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   };
   openRef.current = open;
 
+  // Desktop right-click menu (Phase 2 · M9). Opens only on the desktop
+  // background — right-clicks inside windows / taskbar / widgets / panels /
+  // icons / editable fields fall through untouched.
+  const [ctxPos, setCtxPos] = useState<{ x: number; y: number } | null>(null);
+  const onDesktopContextMenu = (e: RMouseEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    if (
+      t.closest(
+        '.fwin, .os-taskbar, .widget-frame, .os-start, .os-flyout, .os-panel-backdrop, .os-start-backdrop, .os-desk-icon, input, textarea, [contenteditable="true"]',
+      )
+    ) {
+      return;
+    }
+    e.preventDefault();
+    setCtxPos({ x: e.clientX, y: e.clientY });
+  };
+
   useEffect(() => {
     const h = (e: Event) => openRef.current((e as CustomEvent<WinSection>).detail);
     window.addEventListener('os:open', h);
@@ -1225,6 +1244,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         e.dataTransfer.dropEffect = 'copy';
       }}
       onDrop={(e) => dropStartAppOnDesktop(e)}
+      onContextMenu={onDesktopContextMenu}
     >
       {hasRasterWall && wallImage && (
         <img
@@ -1622,6 +1642,21 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       </div>
       <QuickSettings />
       <NotificationCenter />
+      <ContextMenu
+        open={!!ctxPos}
+        x={ctxPos?.x ?? 0}
+        y={ctxPos?.y ?? 0}
+        onClose={() => setCtxPos(null)}
+        items={[
+          { id: 'new-note', label: 'New sticky note', onSelect: () => openNote() },
+          { id: 'new-shortcut', label: 'New app shortcut…', onSelect: () => void addShortcut() },
+          { id: 'sep1', separator: true, label: '' },
+          { id: 'widgets', label: 'Widgets…', onSelect: () => setGalleryOpen(true) },
+          { id: 'sep2', separator: true, label: '' },
+          { id: 'personalize', label: 'Personalize…', onSelect: () => open('settings') },
+          { id: 'display', label: 'Desktop & display settings', onSelect: () => open('settings') },
+        ]}
+      />
     </div>
   );
 }
