@@ -27,5 +27,12 @@ export * from './Dialog';
 export * from './Window';
 export * from './Toast';
 export * from './ContextMenu';
+// M5b
+export * from './Sheet';
+export * from './Sidebar';
+export * from './TreeView';
+export * from './Dropdown';
+export * from './Notification';
+export * from './Breadcrumb';
 // Utilities
 export * from './zoom';
