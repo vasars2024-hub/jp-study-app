@@ -1,12 +1,10 @@
 /**
- * Mini View — static, locked “crafting table” window.
- * Apps open inside the frame only (never free-floating OS windows).
- * Resize is uniform scale (size), not independent width/height.
+ * Mini View — compact launcher (“crafting table”).
+ * Pinned apps open as full-size OS pop-out windows, never inside this frame.
+ * Resize is uniform scale only (aspect locked).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { LibraryItem } from '../../shared/types';
 import Icon, { type IconName } from './Icons';
-import AppSection from './AppSection';
 import {
   loadMiniMode,
   onMiniModeChanged,
@@ -29,8 +27,8 @@ import {
 
 /** Base craft window size — height follows from locked aspect ratio. */
 const BASE_W = 352;
-/** Height / width — crafting-table + content feel. */
-const ASPECT = 1.22;
+/** Height / width — launcher grid + chrome only (apps live in pop-outs). */
+const ASPECT = 0.68;
 const SCALE_MIN = 0.72;
 const SCALE_MAX = 1.55;
 const SCALE_KEY = 'jp-mini-frame-scale-v1';
@@ -71,10 +69,8 @@ function craftSlots(apps: MiniAppId[]): (MiniAppId | null)[] {
 }
 
 export default function MiniShell({
-  onOpenBook,
   widgetMode = false,
 }: {
-  onOpenBook?: (item: LibraryItem) => void;
   /** True when running inside the dedicated transparent OS widget window. */
   widgetMode?: boolean;
 }) {
@@ -83,13 +79,19 @@ export default function MiniShell({
   const [addOpen, setAddOpen] = useState(false);
   const [addPick, setAddPick] = useState<MiniAppId | ''>('');
   const [msg, setMsg] = useState('');
-  const [active, setActive] = useState<MiniAppId | null>(null);
+  const [popped, setPopped] = useState<Set<string>>(() => new Set());
   const [scale, setScale] = useState(loadScale);
   const resizing = useRef(false);
   const resizeStart = useRef({ y: 0, scale: 1 });
   const clock = useClock(cfg.showClock);
 
   useEffect(() => onMiniModeChanged(setCfg), []);
+
+  // Track which apps are open in OS pop-out windows (for slot highlight).
+  useEffect(() => {
+    void window.api.popoutListOpen().then((sections) => setPopped(new Set(sections)));
+    return window.api.onPopoutChanged((sections) => setPopped(new Set(sections)));
+  }, []);
 
   /**
    * localfile:// tokens are in-memory only (main process). After restart the
@@ -119,7 +121,17 @@ export default function MiniShell({
     };
   }, [cfg.wallpaperMode, cfg.wallpaperPath]);
 
-  // Auto-open first app once per mini session (inside frame — not OS pop-out)
+  const flash = (text: string) => {
+    setMsg(text);
+    window.setTimeout(() => setMsg(''), 2000);
+  };
+
+  const openApp = (id: MiniAppId) => {
+    void window.api.popOut(id);
+    flash(`Opened ${miniAppLabel(id)}`);
+  };
+
+  // Auto-open first pinned app once per mini session as a pop-out.
   useEffect(() => {
     if (!cfg.enabled || !cfg.autoOpenFirst || !cfg.apps[0]) return;
     const key = 'jp-mini-auto-opened-session';
@@ -129,7 +141,7 @@ export default function MiniShell({
     } catch {
       /* ignore */
     }
-    setActive(cfg.apps[0]!);
+    openApp(cfg.apps[0]!);
   }, [cfg.enabled, cfg.autoOpenFirst, cfg.apps]);
 
   const slots = useMemo(() => craftSlots(cfg.apps), [cfg.apps]);
@@ -146,11 +158,6 @@ export default function MiniShell({
       setAddPick(addChoices[0]!.id);
     }
   }, [addChoices, addPick]);
-
-  // Clear active if app was removed from pins
-  useEffect(() => {
-    if (active && !cfg.apps.includes(active)) setActive(null);
-  }, [cfg.apps, active]);
 
   const frameW = Math.round(BASE_W * scale);
   const frameH = Math.round(BASE_W * ASPECT * scale);
@@ -191,11 +198,6 @@ export default function MiniShell({
     setMiniModeEnabled(false);
   }, []);
 
-  const flash = (text: string) => {
-    setMsg(text);
-    window.setTimeout(() => setMsg(''), 2000);
-  };
-
   const doAddApp = (id?: MiniAppId) => {
     const pick = id ?? (addPick || undefined);
     if (!pick) {
@@ -224,9 +226,9 @@ export default function MiniShell({
 
   const selectSlot = (id: MiniAppId | null) => {
     if (!id) return;
-    setActive(id);
     setPanelOpen(false);
     setAddOpen(false);
+    openApp(id);
   };
 
   // Uniform size drag (corner) — changes scale only, aspect locked
@@ -280,11 +282,6 @@ export default function MiniShell({
         if (panelOpen || addOpen) {
           setPanelOpen(false);
           setAddOpen(false);
-          return;
-        }
-        if (active) {
-          setActive(null);
-          return;
         }
       }
       const n = Number(e.key);
@@ -298,7 +295,7 @@ export default function MiniShell({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cfg.apps, panelOpen, addOpen, active]);
+  }, [cfg.apps, panelOpen, addOpen]);
 
   const densityClass =
     cfg.density === 'compact' ? 'is-compact' : cfg.density === 'spacious' ? 'is-spacious' : '';
@@ -389,7 +386,7 @@ export default function MiniShell({
       )}
 
       <div
-        className={`mini-frame ${densityClass}${active ? ' has-app' : ''}${widgetMode ? ' is-widget-frame' : ''}${
+        className={`mini-frame ${densityClass}${widgetMode ? ' is-widget-frame' : ''}${
           showImageWall || cfg.wallpaperMode === 'icons' ? ' has-wall' : ''
         }`}
         style={
@@ -443,7 +440,7 @@ export default function MiniShell({
             <span className="mini-brand-mark" aria-hidden />
             Mini
           </span>
-          {cfg.showClock && <span className="mini-clock muted">{clock}</span>}
+          {cfg.showClock && <span className="mini-clock">{clock}</span>}
           <div className="mini-frame-tools mini-no-drag">
             <button
               type="button"
@@ -455,7 +452,7 @@ export default function MiniShell({
                 setPanelOpen(true);
               }}
             >
-              <Icon name="plus" size={12} />
+              <Icon name="plus" size={13} />
             </button>
             <button
               type="button"
@@ -466,10 +463,10 @@ export default function MiniShell({
                 if (panelOpen) setAddOpen(false);
               }}
             >
-              <Icon name="settings" size={12} />
+              <Icon name="settings" size={13} />
             </button>
             <button type="button" className="mini-ico-btn" title="Full desktop" onClick={exitToFull}>
-              <Icon name="external" size={12} />
+              <Icon name="external" size={13} />
             </button>
           </div>
         </header>
@@ -501,7 +498,7 @@ export default function MiniShell({
                 );
               }
               const meta = miniAppMeta(id);
-              const on = active === id;
+              const on = popped.has(id);
               return (
                 <button
                   key={id}
@@ -510,7 +507,9 @@ export default function MiniShell({
                   title={`${meta.label} (${i + 1})`}
                   onClick={() => selectSlot(id)}
                 >
-                  <Icon name={meta.icon as IconName} size={scale < 0.9 ? 16 : 20} />
+                  <span className="mini-slot-icon" aria-hidden>
+                    <Icon name={meta.icon as IconName} size={scale < 0.9 ? 16 : 20} />
+                  </span>
                   <span className="mini-slot-label">{meta.label}</span>
                 </button>
               );
@@ -518,32 +517,9 @@ export default function MiniShell({
           </div>
         </div>
 
-        {/* Contained app stage — never leaves this frame */}
-        <div className="mini-stage mini-no-drag">
-          {active ? (
-            <>
-              <div className="mini-stage-bar">
-                <button type="button" className="mini-ico-btn" title="Back to grid" onClick={() => setActive(null)}>
-                  <Icon name="chevron" size={11} style={{ transform: 'rotate(180deg)' }} />
-                </button>
-                <span className="mini-stage-title">{miniAppLabel(active)}</span>
-              </div>
-              <div className="mini-stage-body">
-                <AppSection
-                  section={active}
-                  onOpenBook={(item) => {
-                    onOpenBook?.(item);
-                  }}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="mini-stage-empty muted">
-              <p>Select a slot</p>
-              <p className="mini-stage-empty-sub">Apps stay inside this window</p>
-            </div>
-          )}
-        </div>
+        <footer className="mini-footer mini-no-drag" aria-hidden>
+          <span className="mini-footer-hint">Apps open in their own window</span>
+        </footer>
 
         {/* Uniform size grip — scale only (updates OS window bounds in widget mode) */}
         <button

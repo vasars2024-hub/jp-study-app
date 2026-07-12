@@ -148,18 +148,7 @@ export default function App() {
   if (isMiniWidgetWindow()) {
     return (
       <>
-        <MiniShell
-          widgetMode
-          onOpenBook={(item) => {
-            // Hand books off to the full Study OS window (this frame is too small).
-            try {
-              sessionStorage.setItem('jp-mini-pending-book', JSON.stringify(item));
-            } catch {
-              /* ignore */
-            }
-            void window.api.miniClose();
-          }}
-        />
+        <MiniShell widgetMode />
         <ToastHost />
       </>
     );
