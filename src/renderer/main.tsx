@@ -29,7 +29,10 @@ import './theme/motion.css';
 import './components/ui/ui.css';
 // Accessibility foundation (Phase 1 · M8) — imported late to reinforce.
 import './theme/a11y.css';
+// Performance tiers (Phase 1 · M9).
+import './theme/perf.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
+import { bootPerf } from './theme/perf';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 
@@ -49,6 +52,8 @@ registerFrutigerAero();
 bootTheme();
 bootOsLook();
 bootDisplayPrefs();
+// Apply the saved performance tier (data-perf) pre-paint (Phase 1 · M9).
+bootPerf();
 
 if (!isCompanionHost) {
   bootCustomCss();
