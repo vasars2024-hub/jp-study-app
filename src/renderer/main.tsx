@@ -21,6 +21,10 @@ import './styles.css';
 // styles.css so material utilities and the [data-theme='frutiger-aero'] block win.
 import './theme/materials.css';
 import './theme/frutiger-aero.css';
+// Typography roles, colour helpers, and the reduced-motion-aware motion system
+// (Phase 1 · M4). Additive utility layers.
+import './theme/typography.css';
+import './theme/motion.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);

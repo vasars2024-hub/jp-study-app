@@ -1,0 +1,101 @@
+/* =============================================================================
+   Frutiger Aero Platform — Typography & Colour roles (Phase 1 · M4)
+   -----------------------------------------------------------------------------
+   Reusable role classes mapped entirely onto tokens (M1). Additive utilities —
+   no existing selector is touched. Scaling/accessibility come for free: sizes
+   are rem-based (respect the browser/base font size) and inherit the app zoom.
+   ============================================================================= */
+
+/* ---------- Type roles --------------------------------------------------- */
+.type-display {
+  font-family: var(--font-display);
+  font-size: var(--font-size-display);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+}
+.type-hero {
+  font-family: var(--font-display);
+  font-size: var(--font-size-hero);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+}
+.type-window-title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-semibold);
+}
+.type-section {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-semibold);
+}
+.type-heading {
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-snug);
+  font-weight: var(--font-weight-semibold);
+}
+.type-subheading {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-normal);
+  font-weight: var(--font-weight-medium);
+}
+.type-body {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  font-weight: var(--font-weight-regular);
+}
+.type-caption {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--muted);
+}
+.type-status {
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-wider);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.type-toolbar {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+.type-sidebar {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+.type-button {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+}
+.type-menu {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+}
+.type-mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+}
+
+/* ---------- Colour helpers ----------------------------------------------
+   Shade tokens derived from the active theme's accent (so they follow every
+   theme, including Aero), plus a handful of text/surface utilities. */
+:root {
+  --accent-weak: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-soft: color-mix(in srgb, var(--accent) 40%, transparent);
+  --accent-strong: color-mix(in srgb, var(--accent) 82%, var(--text));
+  --accent-on: var(--glass-highlight); /* readable text over accent fills */
+}
+.text-accent { color: var(--accent); }
+.text-muted { color: var(--muted); }
+.text-default { color: var(--text); }
+.tint-accent { background: var(--accent-weak); }
+.tint-accent-soft { background: var(--accent-soft); }
+.on-accent { background: var(--accent); color: #fff; }

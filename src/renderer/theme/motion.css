@@ -1,0 +1,81 @@
+/* =============================================================================
+   Frutiger Aero Platform — Motion system (Phase 1 · M4)
+   -----------------------------------------------------------------------------
+   Named keyframes + `.anim-*` / `.trans-*` utilities driven by the motion
+   tokens (M1). Motion philosophy: soft, fluid, confident — never abrupt.
+
+   All motion is REDUCED-MOTION AWARE: it collapses under the OS setting
+   (prefers-reduced-motion), the app's `.reduce-motion` class, and the existing
+   `html[data-display-anim='none']` convention. (Formalised further in M8.)
+   ============================================================================= */
+
+@keyframes aero-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aero-scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes aero-slide-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes aero-slide-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes aero-slide-left { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes aero-slide-right { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@keyframes aero-glass-reveal {
+  from { opacity: 0; transform: scale(0.98); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes aero-spin { to { transform: rotate(360deg); } }
+@keyframes aero-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes aero-shimmer { from { background-position: -180% 0; } to { background-position: 180% 0; } }
+
+/* ---------- Enter utilities --------------------------------------------- */
+.anim-fade { animation: aero-fade var(--dur-normal) var(--ease-standard) both; }
+.anim-scale-in { animation: aero-scale-in var(--dur-normal) var(--ease-glass) both; }
+.anim-slide-up { animation: aero-slide-up var(--dur-normal) var(--ease-decelerate) both; }
+.anim-slide-down { animation: aero-slide-down var(--dur-normal) var(--ease-decelerate) both; }
+.anim-slide-left { animation: aero-slide-left var(--dur-normal) var(--ease-decelerate) both; }
+.anim-slide-right { animation: aero-slide-right var(--dur-normal) var(--ease-decelerate) both; }
+.anim-glass-reveal { animation: aero-glass-reveal var(--dur-slow) var(--ease-glass) both; }
+
+/* ---------- Semantic (map named app moments to a curve/duration) -------- */
+.anim-dialog { animation: aero-scale-in var(--dur-slow) var(--ease-glass) both; }
+.anim-window { animation: aero-glass-reveal var(--dur-slow) var(--ease-emphasized) both; }
+.anim-sidebar { animation: aero-slide-right var(--dur-normal) var(--ease-emphasized) both; }
+.anim-notification { animation: aero-slide-left var(--dur-normal) var(--ease-spring) both; }
+.anim-tree-expand,
+.anim-accordion { animation: aero-slide-down var(--dur-fast) var(--ease-decelerate) both; }
+
+/* ---------- Loading ------------------------------------------------------ */
+.anim-spin { animation: aero-spin 900ms linear infinite; }
+.anim-pulse { animation: aero-pulse var(--dur-xslow) var(--ease-standard) infinite; }
+.anim-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--sheen) 45%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 220% 100%;
+  animation: aero-shimmer 1.4s var(--ease-standard) infinite;
+}
+
+/* ---------- Transition helpers ------------------------------------------
+   For hover/selection/toggle states that transition rather than key-frame. */
+.trans-fast { transition: all var(--dur-fast) var(--ease-standard); }
+.trans-normal { transition: all var(--dur-normal) var(--ease-standard); }
+.trans-slow { transition: all var(--dur-slow) var(--ease-standard); }
+.trans-colors { transition: color var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard); }
+.trans-toggle { transition: transform var(--dur-normal) var(--ease-spring), background-color var(--dur-fast) var(--ease-standard); }
+
+/* ---------- Reduced motion (OS + app conventions) ----------------------- */
+@media (prefers-reduced-motion: reduce) {
+  [class*='anim-'] {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  [class*='trans-'] { transition-duration: 0.01ms !important; }
+}
+html.reduce-motion [class*='anim-'],
+html[data-display-anim='none'] [class*='anim-'] {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+html.reduce-motion [class*='trans-'],
+html[data-display-anim='none'] [class*='trans-'] {
+  transition-duration: 0.01ms !important;
+}
