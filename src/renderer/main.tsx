@@ -34,7 +34,10 @@ import './theme/perf.css';
 // Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
 // loaded after styles.css so the shell overrides win. Default shell unchanged.
 import './theme/aero-shell.css';
+// Shell panel styles (Phase 2) — Notification Center, Quick Settings.
+import './components/shell/shell.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
+import { installNotificationCapture } from './notificationStore';
 import { bootPerf } from './theme/perf';
 import { installAssetPackSync } from './theme/assetPacks';
 
@@ -61,6 +64,8 @@ bootPerf();
 // Keep the active theme's asset pack (sounds now; icons/wallpapers hooks) in
 // sync on every theme change — the Anime Edition extension point (Phase 1 · M10).
 installAssetPackSync();
+// Capture transient toasts into the Notification Center history (Phase 2 · M6).
+installNotificationCapture();
 
 if (!isCompanionHost) {
   bootCustomCss();

@@ -1,0 +1,101 @@
+/* =============================================================================
+   Frutiger Aero — Shell panels (Phase 2)
+   -----------------------------------------------------------------------------
+   Shared styling for the new OS flyouts (Notification Center, Quick Settings).
+   Token/material-driven, so they read as frosted glass in every theme and
+   brighten automatically under Aero (via the --glass-* tokens). Additive.
+   ============================================================================= */
+
+/* Click-catching backdrop shared by shell flyouts. */
+.os-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200000;
+  background: transparent;
+}
+
+/* Flyout panel anchored bottom-right, above the taskbar. */
+.os-flyout {
+  position: fixed;
+  right: 10px;
+  bottom: calc(var(--taskbar-h, 48px) + 10px);
+  z-index: 200001;
+  width: 360px;
+  max-width: calc(100vw - 20px);
+  max-height: min(72vh, 640px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-2xl);
+  background: var(--glass-tint-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elevation-5), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--blur-xl)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(1.2);
+  overflow: hidden;
+}
+
+.os-flyout-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--glass-border);
+}
+.os-flyout-title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+}
+.os-flyout-spacer { flex: 1; }
+.os-flyout-body {
+  padding: var(--space-md);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Notification Center */
+.os-notif-empty {
+  text-align: center;
+  padding: var(--space-3xl) var(--space-md);
+  color: var(--muted);
+}
+.os-notif-time { margin-top: 3px; color: var(--muted); }
+
+/* Quick Settings */
+.os-qs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+.os-qs-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: var(--glass-tint);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-standard), filter var(--dur-fast) var(--ease-standard);
+}
+.os-qs-tile:hover { background: var(--glass-tint-strong); filter: brightness(1.04); }
+.os-qs-tile.active { background: color-mix(in srgb, var(--accent) 26%, var(--glass-tint)); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.os-qs-tile:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
+.os-qs-tile-label { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.os-qs-tile-value { font-size: var(--font-size-xs); color: var(--muted); }
+.os-qs-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+}
+.os-qs-row-label { flex: 1; font-size: var(--font-size-sm); }
+.os-qs-section { font-size: var(--font-size-xs); color: var(--muted); text-transform: uppercase; letter-spacing: var(--letter-spacing-wider); margin: 4px 4px 0; }
