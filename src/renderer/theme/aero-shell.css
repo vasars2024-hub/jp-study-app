@@ -1,0 +1,129 @@
+/* =============================================================================
+   Frutiger Aero — Desktop Shell materials (Phase 2 · M1)
+   -----------------------------------------------------------------------------
+   Turns the (deliberately opaque) Study OS chrome into bright frosted Aero glass
+   — but ONLY under the secret theme. Every rule is scoped to
+   `:root[data-materials='aero']` (the Aero theme stamps data-materials="aero"),
+   so the default Study OS shell is byte-for-byte unchanged. No regressions.
+
+   Consumes Phase 1 tokens/materials only (--glass-*, --sheen, --elevation-*,
+   --blur-*, --accent). Loaded after styles.css so these scoped rules win.
+   Perf note: uses the same glass surfaces perf.css targets, so Battery Saver
+   drops the blur automatically.
+   ============================================================================= */
+
+:root[data-materials='aero'] {
+  /* Reflection sheen used by the shell surfaces below. */
+  --shell-sheen: linear-gradient(to bottom, var(--sheen) 0%, transparent 55%);
+}
+
+/* ---------- Taskbar: a glass slab with a bright top edge ------------------ */
+:root[data-materials='aero'] .os-taskbar {
+  background:
+    var(--shell-sheen),
+    var(--glass-tint-strong);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: var(--elevation-4), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+}
+
+/* Start orb → glossy aqua button */
+:root[data-materials='aero'] .os-start-btn {
+  background: linear-gradient(to bottom, var(--sheen), color-mix(in srgb, var(--accent) 70%, #fff)) padding-box,
+    var(--accent) border-box;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, #fff);
+  box-shadow: var(--elevation-2), inset 0 1px 0 var(--glass-highlight);
+}
+:root[data-materials='aero'] .os-start-btn:hover {
+  background: linear-gradient(to bottom, var(--sheen-strong), var(--accent));
+  filter: brightness(1.05);
+}
+
+/* Tray + running-window + desktop-switch buttons → glass chips */
+:root[data-materials='aero'] .os-tray-btn,
+:root[data-materials='aero'] .os-task-win,
+:root[data-materials='aero'] .os-desktop-switch {
+  background: var(--glass-tint);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  transition: background-color var(--dur-fast) var(--ease-standard), filter var(--dur-fast) var(--ease-standard);
+}
+:root[data-materials='aero'] .os-tray-btn:hover,
+:root[data-materials='aero'] .os-task-win:hover,
+:root[data-materials='aero'] .os-desktop-switch:hover {
+  background: var(--glass-tint-strong);
+  filter: brightness(1.05);
+}
+:root[data-materials='aero'] .os-task-win.active,
+:root[data-materials='aero'] .os-desktop-switch.active {
+  background: color-mix(in srgb, var(--accent) 30%, var(--glass-tint-strong));
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+:root[data-materials='aero'] .os-clock { color: var(--text); }
+
+/* ---------- Start menu: a floating glass panel --------------------------- */
+:root[data-materials='aero'] .os-start {
+  background:
+    var(--shell-sheen),
+    var(--glass-tint-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elevation-5), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--blur-xl)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(1.25);
+}
+:root[data-materials='aero'] .os-start-backdrop {
+  background: color-mix(in srgb, var(--bg) 28%, transparent);
+}
+:root[data-materials='aero'] .os-start-tile {
+  background: var(--glass-tint);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  transition: background-color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+}
+:root[data-materials='aero'] .os-start-tile:hover {
+  background: var(--glass-tint-strong);
+  transform: translateY(-1px);
+}
+
+/* ---------- Floating windows: glass with a sheened titlebar --------------- */
+:root[data-materials='aero'] .fwin {
+  background: var(--glass-tint-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elevation-5), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.2);
+}
+:root[data-materials='aero'] .fwin-bar,
+:root[data-materials='aero'] .fwin-drag-strip {
+  background: var(--shell-sheen), var(--glass-tint);
+  border-bottom: 1px solid var(--glass-border);
+}
+/* Keep app content legible: the body is near-opaque frosted glass. */
+:root[data-materials='aero'] .fwin-body,
+:root[data-materials='aero'] .fwin-body-flush {
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+}
+:root[data-materials='aero'] .fwin-b:hover {
+  background: var(--glass-tint-strong);
+}
+
+/* ---------- Desktop icons: readable labels on a bright sky ---------------- */
+:root[data-materials='aero'] .os-desk-icon-label {
+  background: color-mix(in srgb, var(--glass-tint-strong) 70%, transparent);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ---------- Widget frames: follow the glass language --------------------- */
+:root[data-materials='aero'] .widget-frame {
+  background: var(--glass-tint);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elevation-3), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+}
+:root[data-materials='aero'] .widget-bar {
+  background: var(--shell-sheen), transparent;
+}

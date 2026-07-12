@@ -31,6 +31,9 @@ import './components/ui/ui.css';
 import './theme/a11y.css';
 // Performance tiers (Phase 1 · M9).
 import './theme/perf.css';
+// Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
+// loaded after styles.css so the shell overrides win. Default shell unchanged.
+import './theme/aero-shell.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { bootPerf } from './theme/perf';
 import { installAssetPackSync } from './theme/assetPacks';
