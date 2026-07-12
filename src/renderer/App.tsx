@@ -11,6 +11,7 @@ import type { LibraryItem } from '../shared/types';
 import type { DesktopWinSection } from '../shared/desktop';
 import CompanionHostView from './environment/CompanionHostView';
 import PerfOverlay from './components/PerfOverlay';
+import SecretAeroTrigger from './theme/SecretAeroTrigger';
 import {
   loadFocusMode,
   onFocusModeChanged,
@@ -123,6 +124,7 @@ export default function App() {
       <CommandPalette />
       <ClipboardHistoryPanel />
       <PerfOverlay />
+      <SecretAeroTrigger />
     </>
   );
 }

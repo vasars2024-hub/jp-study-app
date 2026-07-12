@@ -17,6 +17,11 @@ import { clearOnExitIfConfigured } from './clipboardHistory';
 // styles.css so the existing :root stays authoritative on any shared name.
 import './theme/tokens.css';
 import './styles.css';
+// Material library + secret Frutiger Aero theme (Phase 1 · M3), loaded AFTER
+// styles.css so material utilities and the [data-theme='frutiger-aero'] block win.
+import './theme/materials.css';
+import './theme/frutiger-aero.css';
+import { registerFrutigerAero } from './theme/frutiger-aero';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 
@@ -30,6 +35,9 @@ const isCompanionHost =
 // the window (no top-left pin / blank void, no clipped taskbar).
 applyZoom(loadZoom());
 installZoomResizeHook();
+// Register the secret Aero theme BEFORE bootTheme() so a persisted 'frutiger-aero'
+// selection is recognised and re-applied on launch.
+registerFrutigerAero();
 bootTheme();
 bootOsLook();
 bootDisplayPrefs();

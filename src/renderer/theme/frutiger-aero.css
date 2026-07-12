@@ -1,0 +1,72 @@
+/* =============================================================================
+   Frutiger Aero — the secret theme (Phase 1 · M3)
+   -----------------------------------------------------------------------------
+   A LIGHT, glass-and-sky palette mapped onto the app's semantic tokens. A theme
+   is the one place literal color values belong; component/material code stays
+   token-driven. Registered HIDDEN (theme/frutiger-aero.ts) and reachable only
+   via the secret activator — never listed in the theme picker. materialSet
+   'aero' stamps data-materials="aero" so the material utilities brighten.
+
+   Imported after styles.css; `:root[data-theme='frutiger-aero']` outranks the
+   base `:root`, so these overrides win.
+   ============================================================================= */
+
+:root[data-theme='frutiger-aero'] {
+  color-scheme: light;
+
+  /* ---- Surfaces — bright sky & glass white ---- */
+  --bg: #bfe6ff;
+  --panel: #eaf6ff;
+  --panel-2: #dcefff;
+  --sidebar: #cbe6fb;
+  --chrome: #eaf6ff;
+  --chrome-elevated: #f6fbff;
+
+  /* ---- Ink — deep ocean ---- */
+  --text: #123a52;
+  --muted: #4d7089;
+  --border: #a9d4ef;
+  --grid-line: rgba(18, 58, 82, 0.1);
+
+  /* ---- Accents — sky/aqua primary + warm-sunlight secondary ----
+     (Study OS uses red for --accent/--red; Aero swaps to sky blue, with warm
+     orange kept on --red so danger/caution controls still read as warm.) */
+  --accent: #17a6df;
+  --accent-2: #63cff2;
+  --red: #ff8a3d;
+  --red-deep: #e8702a;
+
+  /* ---- Controls — frosted white ---- */
+  --control-bg: rgba(255, 255, 255, 0.62);
+  --control-border: rgba(18, 58, 82, 0.18);
+
+  /* ---- Soft, blue-tinted shadows ---- */
+  --shadow-color-weak: rgba(20, 74, 110, 0.1);
+  --shadow-color: rgba(20, 74, 110, 0.16);
+  --shadow-color-strong: rgba(20, 74, 110, 0.24);
+  --shadow-card: 0 2px 12px rgba(20, 74, 110, 0.16);
+  --shadow-toolbar: 0 1px 5px rgba(20, 74, 110, 0.12);
+
+  /* ---- Bright Aero glass (overrides the dark base glass tokens) ---- */
+  --sheen: rgba(255, 255, 255, 0.9);
+  --sheen-strong: rgba(255, 255, 255, 1);
+  --glass-tint: rgba(255, 255, 255, 0.5);
+  --glass-tint-strong: rgba(255, 255, 255, 0.74);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+  --glass-blur: 22px;
+
+  /* ---- Silver chrome / plastic faces for .mat-chrome / .mat-plastic ---- */
+  --mat-metal-top: #ffffff;
+  --mat-metal-mid: #e9f3fb;
+  --mat-metal-bot: #ccdff0;
+  --mat-plastic-face: #eaf6ff;
+  --mat-plastic-top: #ffffff;
+
+  /* ---- Scrollbars follow the sky accent ---- */
+  --scrollbar-thumb: color-mix(in srgb, var(--accent) 50%, #ffffff);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 75%, #ffffff);
+
+  /* ---- Friendly, slightly heavier display face ---- */
+  --font-display: 'Segoe UI Semibold', 'Segoe UI', var(--font-body);
+}
