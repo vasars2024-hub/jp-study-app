@@ -13,6 +13,9 @@ import { initProfileState } from './profileState';
 import { initDesktopState } from './desktopState';
 import { installKeyboardShortcuts } from './keyboardShortcuts';
 import { clearOnExitIfConfigured } from './clipboardHistory';
+// Design-token foundation (Phase 1 · M1) — additive tier layer loaded BEFORE
+// styles.css so the existing :root stays authoritative on any shared name.
+import './theme/tokens.css';
 import './styles.css';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
