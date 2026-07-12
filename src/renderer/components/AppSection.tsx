@@ -19,11 +19,13 @@ import ResourcesView from '../views/ResourcesView';
 import ImmersionView from '../views/ImmersionView';
 import CalendarView from '../views/CalendarView';
 import Icon from './Icons';
+import SettingsApp from './settings/SettingsApp';
+import { WALL_PRESETS } from '../environment/wallCatalog';
 
 // The section → view mapping. Shared by the in-desktop FloatingWindow
 // (DesktopShell) and the pop-out window (App) so an app renders identically
-// whether it lives on the fake desktop or in its own OS window. Note/Settings
-// are intentionally not here: they are desktop-coupled and handled by the shell.
+// whether it lives on the fake desktop or in its own OS window. Notes stay
+// desktop-coupled; Settings can open in a pop-out with safe wall stubs.
 export default function AppSection({
   section,
   onOpenBook,
@@ -32,6 +34,21 @@ export default function AppSection({
   onOpenBook: (item: LibraryItem) => void;
 }) {
   switch (section) {
+    case 'settings':
+      return (
+        <SettingsApp
+          wall={{ kind: 'preset', id: WALL_PRESETS[0]?.id ?? 'void' }}
+          wallPreset={WALL_PRESETS[0]?.id ?? ''}
+          presets={WALL_PRESETS.map((p) => ({ id: p.id, label: p.label, css: p.css, animated: p.animated }))}
+          onWallPreset={() => undefined}
+          onWallImage={() => undefined}
+          onWallVideo={() => undefined}
+          onWallClear={() => undefined}
+          onReset={() => undefined}
+          onOpenVisualizer={() => void window.api.popOut('music')}
+          onOpenMusicWidget={() => void window.api.popOut('musicwidget')}
+        />
+      );
     case 'city':
       return (
         <div className="coming-soon">

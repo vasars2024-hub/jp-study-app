@@ -3,6 +3,7 @@ import { SETTINGS_SEARCH_SUGGESTIONS, searchSettings } from './settingsRegistry'
 import { getRecentQueries, pushRecentQuery } from './settingsRecent';
 import type { SettingsPageId, SettingsRegistryEntry } from './types';
 import Icon from '../Icons';
+import { loadSettingsAdvanced } from '../../settingsAdvanced';
 
 const SettingsSearch = forwardRef<
   HTMLInputElement,
@@ -10,11 +11,20 @@ const SettingsSearch = forwardRef<
     onNavigate: (page: SettingsPageId, settingId?: string) => void;
   }
 >(function SettingsSearch({ onNavigate }, ref) {
+  // Prefer live advanced flag from document class (set by SettingsApp / boot).
+  const advancedMode =
+    typeof document !== 'undefined' && document.documentElement.classList.contains('settings-advanced')
+      ? true
+      : loadSettingsAdvanced();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();
-  const results = useMemo(() => searchSettings(query), [query]);
+  // Recompute when query changes; advanced class is flipped with a full re-render of settings.
+  const results = useMemo(
+    () => searchSettings(query, { advanced: advancedMode }),
+    [query, advancedMode],
+  );
   const recent = useMemo(() => (query.trim() ? [] : getRecentQueries()), [query, open]);
 
   useEffect(() => {

@@ -23,6 +23,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'flame',
     group: 'Personalization',
     description: 'Living layer, particles, lighting',
+    advanced: true,
   },
   {
     id: 'companions',
@@ -30,6 +31,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'heart',
     group: 'Personalization',
     description: 'Desktop pets',
+    advanced: true,
   },
   {
     id: 'desktop-layout',
@@ -44,6 +46,13 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'command',
     group: 'Desktop',
     description: 'Keyboard and mouse bindings',
+  },
+  {
+    id: 'mini',
+    label: 'Mini View',
+    icon: 'widgets',
+    group: 'Desktop',
+    description: 'Reduced launcher with pop-out apps',
   },
   {
     id: 'study',
@@ -65,6 +74,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'caption',
     group: 'Study',
     description: 'Whisper device',
+    advanced: true,
   },
   {
     id: 'visualizer',
@@ -72,6 +82,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'monitor',
     group: 'Media',
     description: 'Music visuals and lyrics',
+    advanced: true,
   },
   {
     id: 'display',
@@ -152,6 +163,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     keywords: ['css', 'custom css', 'advanced', 'sandbox', 'style'],
     pageId: 'appearance',
     group: 'Personalization',
+    advanced: true,
   },
 
   // Wallpaper
@@ -548,12 +560,16 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
 ];
 
-export function searchSettings(query: string): SettingsRegistryEntry[] {
+export function searchSettings(query: string, opts?: { advanced?: boolean }): SettingsRegistryEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
+  const advanced = opts?.advanced ?? false;
   const words = q.split(/\s+/).filter(Boolean);
   const scored: { e: SettingsRegistryEntry; score: number }[] = [];
   for (const e of SETTINGS_REGISTRY) {
+    if (e.advanced && !advanced) continue;
+    const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
+    if (page?.advanced && !advanced) continue;
     const hay = [e.title, e.description, e.group, e.pageId, ...e.keywords].join(' ').toLowerCase();
     let score = 0;
     if (e.title.toLowerCase().includes(q)) score += 40;

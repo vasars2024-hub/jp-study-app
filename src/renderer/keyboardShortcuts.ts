@@ -8,6 +8,7 @@
 
 import { toggleWordHighlight } from './readerSettings';
 import { next as musicNext, prev as musicPrev, toggle as musicToggle, setVolume, getState } from './playerBus';
+import { performUndo, canUndo, peekUndo } from './actionHistory';
 
 export type CommandCategory =
   | 'Navigation'
@@ -40,6 +41,8 @@ export interface AppCommand {
 export type CustomAction =
   | { type: 'openApp'; appId: string }
   | { type: 'runCommand'; commandId: string }
+  /** Run several built-in / custom commands in order (stacked macro). */
+  | { type: 'runCommands'; commandIds: string[] }
   | { type: 'dispatch'; event: string; detail?: string };
 
 export interface CustomCommandDef {
@@ -61,6 +64,14 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'nav.closeWindow', label: 'Close window', category: 'Navigation', defaultKeys: 'Ctrl+W' },
   { id: 'nav.nextWindow', label: 'Next window', category: 'Navigation', defaultKeys: 'Ctrl+Tab' },
   { id: 'nav.prevWindow', label: 'Previous window', category: 'Navigation', defaultKeys: 'Ctrl+Shift+Tab' },
+  {
+    id: 'nav.undo',
+    label: 'Undo last action',
+    category: 'Navigation',
+    defaultKeys: 'Ctrl+Shift+Z',
+    note:
+      'Reverses the last recorded action (e.g. reopening a closed desktop window, removing a just-added Anki note). Not a full text-editor undo.',
+  },
   { id: 'nav.widgets', label: 'Open widget gallery', category: 'Navigation', defaultKeys: '' },
   {
     id: 'settings.focusSearch',
@@ -108,6 +119,15 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'reader.copySentence', label: 'Copy current sentence', category: 'Reader', defaultKeys: 'Ctrl+Shift+C' },
   { id: 'reader.copyWord', label: 'Copy current word', category: 'Reader', defaultKeys: 'Ctrl+Shift+W' },
   { id: 'reader.saveToCollection', label: 'Save selection as flashcard', category: 'Reader', defaultKeys: 'Ctrl+Shift+F' },
+  {
+    id: 'reader.selectSentence',
+    label: 'Select sentence at click',
+    category: 'Reader',
+    defaultKeys: 'Alt+MouseLeft',
+    note:
+      'Hold the chord and click a word to select the full sentence (ends at 。！？ etc., not commas). ' +
+      'Does not open the dictionary popup. Rebind freely — mouse buttons and modifiers supported.',
+  },
   {
     id: 'reader.pageNext',
     label: 'Next page / scroll forward',
@@ -507,6 +527,14 @@ function describeCustomAction(action: CustomAction): string {
     const cmd = COMMAND_CATALOG.find((c) => c.id === action.commandId);
     return `Runs “${cmd?.label ?? action.commandId}”`;
   }
+  if (action.type === 'runCommands') {
+    const labels = action.commandIds.map((id) => {
+      const c = COMMAND_CATALOG.find((x) => x.id === id);
+      const custom = store.customCommands.find((x) => x.id === id);
+      return c?.label ?? custom?.label ?? id;
+    });
+    return `Stack: ${labels.join(' → ')}`;
+  }
   return `Dispatches ${action.event}${action.detail ? ` (${action.detail})` : ''}`;
 }
 
@@ -746,6 +774,10 @@ function openApp(appId: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: appId }));
 }
 
+/** Guard against custom stacks that re-enter themselves. */
+let runDepth = 0;
+const MAX_RUN_DEPTH = 12;
+
 function runCustomAction(action: CustomAction, e: Event): boolean {
   if (action.type === 'openApp') {
     openApp(action.appId);
@@ -753,6 +785,14 @@ function runCustomAction(action: CustomAction, e: Event): boolean {
   }
   if (action.type === 'runCommand') {
     return runCommand(action.commandId);
+  }
+  if (action.type === 'runCommands') {
+    let any = false;
+    for (const id of action.commandIds) {
+      if (!id) continue;
+      if (runCommand(id)) any = true;
+    }
+    return any;
   }
   if (action.type === 'dispatch') {
     window.dispatchEvent(new CustomEvent(action.event, { detail: action.detail }));
@@ -779,6 +819,23 @@ function builtinHandler(id: string): Handler | null {
       return () => void window.dispatchEvent(new CustomEvent('os:cycle-window', { detail: 1 }));
     case 'nav.prevWindow':
       return () => void window.dispatchEvent(new CustomEvent('os:cycle-window', { detail: -1 }));
+    case 'nav.undo':
+      return () => {
+        if (!canUndo()) {
+          window.dispatchEvent(
+            new CustomEvent('os:toast', { detail: { message: 'Nothing to undo', kind: 'muted' } }),
+          );
+          return;
+        }
+        const label = peekUndo()?.label ?? 'action';
+        void performUndo().then((done) => {
+          window.dispatchEvent(
+            new CustomEvent('os:toast', {
+              detail: { message: done ? `Undid: ${done}` : `Undid: ${label}`, kind: 'ok' },
+            }),
+          );
+        });
+      };
     case 'nav.widgets':
       return () => void window.dispatchEvent(new CustomEvent('os:widgets'));
     case 'nav.open.dictionary':
@@ -835,10 +892,16 @@ function builtinHandler(id: string): Handler | null {
 
 /** Run a command by id (used by the command palette). Returns true if handled. */
 export function runCommand(id: string): boolean {
-  const stack = handlers.get(id);
-  const fn = stack && stack.length ? stack[stack.length - 1] : builtinHandler(id);
-  if (!fn) return false;
-  return fn(new KeyboardEvent('keydown')) !== false;
+  if (runDepth >= MAX_RUN_DEPTH) return false;
+  runDepth++;
+  try {
+    const stack = handlers.get(id);
+    const fn = stack && stack.length ? stack[stack.length - 1] : builtinHandler(id);
+    if (!fn) return false;
+    return fn(new KeyboardEvent('keydown')) !== false;
+  } finally {
+    runDepth--;
+  }
 }
 
 /** True when a command currently has something that would respond to it. */

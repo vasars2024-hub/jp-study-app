@@ -17,7 +17,52 @@ import {
   onFocusModeChanged,
   toggleFocusMode,
 } from './focusMode';
+import { loadMiniMode, onMiniModeChanged, type MiniModeSettings } from './miniMode';
+import { applySettingsAdvancedClass } from './settingsAdvanced';
+import MiniShell from './components/MiniShell';
 import { registerCommandHandler } from './keyboardShortcuts';
+
+function ToastHost() {
+  const [toasts, setToasts] = useState<{ id: number; message: string; kind: string }[]>([]);
+  useEffect(() => {
+    let n = 0;
+    const onToast = (e: Event) => {
+      const d = (e as CustomEvent<{ message?: string; kind?: string }>).detail;
+      const message = d?.message?.trim();
+      if (!message) return;
+      const id = ++n;
+      const kind = d?.kind ?? 'ok';
+      setToasts((t) => [...t.slice(-4), { id, message, kind }]);
+      window.setTimeout(() => {
+        setToasts((t) => t.filter((x) => x.id !== id));
+      }, 2800);
+    };
+    window.addEventListener('os:toast', onToast);
+    return () => window.removeEventListener('os:toast', onToast);
+  }, []);
+  if (!toasts.length) return null;
+  return (
+    <div className="os-toast-host" aria-live="polite">
+      {toasts.map((t) => (
+        <div key={t.id} className={`os-toast ${t.kind}`}>
+          {t.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Main window while Mini Widget is active — ensure the floating OS window is open. */
+function MiniMainBridge() {
+  useEffect(() => {
+    void window.api.miniOpen();
+  }, []);
+  return (
+    <div className="mini-main-bridge muted" style={{ padding: 24, fontSize: 13 }}>
+      Mini Widget is open. Close it or choose Full desktop to return here.
+    </div>
+  );
+}
 
 // Sections that may be shown alone in a pop-out window. Mirrors POPOUT_SECTIONS
 // in the main process (src/main.ts). `player`→Media and `city`→Noctis match the
@@ -35,6 +80,7 @@ const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   flashcards: 'Flashcards',
   stats: 'Statistics',
   resources: 'Resources',
+  settings: 'Settings',
   city: 'Noctis',
   immersion: 'Immersion',
   calendar: 'Calendar',
@@ -51,15 +97,39 @@ function isCompanionHostWindow(): boolean {
   return new URLSearchParams(window.location.search).get('companionHost') === '1';
 }
 
+/** Dedicated borderless Mini Widget OS window (`?miniWidget=1`). */
+function isMiniWidgetWindow(): boolean {
+  return new URLSearchParams(window.location.search).get('miniWidget') === '1';
+}
+
 // Study OS: the desktop shell is the whole app. Opening a book/manga takes over
 // the window with the reader; closing it returns to the desktop. A pop-out
 // window (?popout=…) instead shows just one app, full-window.
 export default function App() {
   const [reading, setReading] = useState<LibraryItem | null>(null);
   const [focusMode, setFocusModeState] = useState(loadFocusMode);
+  const [mini, setMini] = useState<MiniModeSettings>(() => loadMiniMode());
   const popout = popoutSection();
 
   useEffect(() => onFocusModeChanged(setFocusModeState), []);
+  useEffect(() => onMiniModeChanged(setMini), []);
+  useEffect(() => {
+    applySettingsAdvancedClass();
+  }, []);
+
+  // Books handed off from the Mini Widget (too small for the reader).
+  useEffect(() => {
+    if (isMiniWidgetWindow()) return;
+    try {
+      const raw = sessionStorage.getItem('jp-mini-pending-book');
+      if (!raw) return;
+      sessionStorage.removeItem('jp-mini-pending-book');
+      const item = JSON.parse(raw) as LibraryItem;
+      if (item && typeof item.id === 'string') setReading(item);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Global toggle — desktop and focus shell both honor this command
   useEffect(() => {
@@ -74,13 +144,48 @@ export default function App() {
     return <CompanionHostView />;
   }
 
+  // Floating Mini Widget window — only the craft panel (transparent OS chrome).
+  if (isMiniWidgetWindow()) {
+    return (
+      <>
+        <MiniShell
+          widgetMode
+          onOpenBook={(item) => {
+            // Hand books off to the full Study OS window (this frame is too small).
+            try {
+              sessionStorage.setItem('jp-mini-pending-book', JSON.stringify(item));
+            } catch {
+              /* ignore */
+            }
+            void window.api.miniClose();
+          }}
+        />
+        <ToastHost />
+      </>
+    );
+  }
+
   // Focus mode: no desktop / living layer / clipboard chrome
   if (focusMode && !popout) {
     return (
-      <FocusShell
-        initialBook={reading}
-        onInitialBookConsumed={() => setReading(null)}
-      />
+      <>
+        <FocusShell
+          initialBook={reading}
+          onInitialBookConsumed={() => setReading(null)}
+        />
+        <ToastHost />
+      </>
+    );
+  }
+
+  // Main window: if Mini is enabled, spawn/focus the widget and stay hidden.
+  // Do not paint MiniShell into the large desktop canvas.
+  if (mini.enabled && !popout && !reading) {
+    return (
+      <>
+        <MiniMainBridge />
+        <ToastHost />
+      </>
     );
   }
 
@@ -95,6 +200,7 @@ export default function App() {
         )}
         <CommandPalette />
         <ClipboardHistoryPanel />
+        <ToastHost />
       </>
     );
   }
@@ -102,7 +208,7 @@ export default function App() {
   if (popout) {
     // The OS window itself is borderless (frame: false), so we supply our own
     // thin drag strip + window buttons — the Noctis-style frameless look.
-    const flush = popout === 'music' || popout === 'city' || popout === 'musicwidget';
+    const flush = popout === 'music' || popout === 'city' || popout === 'musicwidget' || popout === 'settings';
     return (
       <div className="popout-root">
         <PopoutChrome label={POPOUT_LABELS[popout] ?? popout} />
@@ -111,6 +217,7 @@ export default function App() {
         </div>
         <CommandPalette />
         <ClipboardHistoryPanel />
+        <ToastHost />
       </div>
     );
   }
@@ -125,6 +232,7 @@ export default function App() {
       <ClipboardHistoryPanel />
       <PerfOverlay />
       <SecretAeroTrigger />
+      <ToastHost />
     </>
   );
 }

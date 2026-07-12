@@ -676,12 +676,28 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   const patch = (id: string, p: Partial<Win>) =>
     setWins((ws) => ws.map((w) => (w.id === id ? { ...w, ...p } : w)));
   const close = (id: string) => {
+    const closing = winsRef.current.find((w) => w.id === id);
     setWins((ws) => ws.filter((w) => w.id !== id));
     if (id.startsWith('note-')) {
       setNotes((n) => {
         const next = { ...n };
         delete next[id];
         return next;
+      });
+    }
+    // Allow Ctrl+Shift+Z (nav.undo) to reopen the window.
+    if (closing && closing.section && closing.section !== 'note') {
+      const section = closing.section;
+      const label =
+        section === 'music'
+          ? 'Reopen Music'
+          : section === 'player'
+            ? 'Reopen Player'
+            : `Reopen ${section}`;
+      void import('../actionHistory').then(({ pushUndo }) => {
+        pushUndo(label, () => {
+          openRef.current(section);
+        }, 'window');
       });
     }
   };

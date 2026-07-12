@@ -50,7 +50,7 @@ import {
   onQueriesMaybeChanged,
   onSnapshotChanged,
 } from './intervals';
-import { ensureDeck, ensureModel, invalidateAnkiCaches } from './noteTypes';
+import { ensureDeck, ensureDeckName, ensureModel, invalidateAnkiCaches } from './noteTypes';
 
 const KNOWN_WORDS_MAX_AGE_MS = 5 * 60000; // shim refresh threshold (section 6)
 
@@ -240,10 +240,14 @@ async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
 
     const term = typeof req?.term === 'string' ? req.term.trim() : '';
     if (!term) return { ok: false, error: 'term is required' };
+    const targetDeck =
+      typeof req?.deckName === 'string' && req.deckName.trim()
+        ? req.deckName.trim()
+        : profile.anki.deckName;
 
     try {
       // Lazy + cached; the collection is only mutated inside explicit mine calls (A-1).
-      await ensureDeck(profile);
+      await ensureDeckName(targetDeck);
       const model = await ensureModel(profile);
 
       if (req.prebuiltCard) {
@@ -272,7 +276,7 @@ async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
           .concat(req.extraTags ?? []);
         const noteId = await invoke('addNote', {
           note: {
-            deckName: profile.anki.deckName,
+            deckName: targetDeck,
             modelName: profile.anki.modelName,
             fields,
             tags,
@@ -364,7 +368,7 @@ async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
 
     const noteId = await invoke('addNote', {
       note: {
-        deckName: profile.anki.deckName,
+        deckName: targetDeck,
         modelName: profile.anki.modelName,
         fields,
         tags,
@@ -537,6 +541,18 @@ export function registerAnkiIpc(): void {
   // New channels (section 6).
   ipcMain.handle('anki:linkState', () => getLinkStatus());
   ipcMain.handle('anki:mineNote', (_e, req: MineNoteRequest) => mineNote(req));
+  ipcMain.handle('anki:deleteNotes', async (_e, noteIds: unknown): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const ids = Array.isArray(noteIds)
+        ? noteIds.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0)
+        : [];
+      if (!ids.length) return { ok: false, error: 'No note ids.' };
+      await invoke('deleteNotes', { notes: ids });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: toUiError(err) };
+    }
+  });
   // Ordered field names of a note type, for the field-mapping UI (5.4).
   ipcMain.handle(
     'anki:modelFields',

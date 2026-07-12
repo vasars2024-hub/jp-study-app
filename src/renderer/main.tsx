@@ -33,6 +33,7 @@ import './theme/a11y.css';
 import './theme/perf.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { bootPerf } from './theme/perf';
+import { installAssetPackSync } from './theme/assetPacks';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 

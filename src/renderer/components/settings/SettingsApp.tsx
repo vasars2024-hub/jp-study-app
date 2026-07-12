@@ -44,6 +44,19 @@ import TranscriptionPage from './pages/TranscriptionPage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
 import MemoryPage from './pages/MemoryPage';
+import MiniModePage from './pages/MiniModePage';
+import {
+  loadMiniMode,
+  onMiniModeChanged,
+  saveMiniMode,
+  type MiniModeSettings,
+} from '../../miniMode';
+import {
+  applySettingsAdvancedClass,
+  loadSettingsAdvanced,
+  onSettingsAdvancedChanged,
+  setSettingsAdvanced,
+} from '../../settingsAdvanced';
 
 const MOTION_KEY = 'jp-os-reduce-motion';
 
@@ -66,6 +79,8 @@ export default function SettingsApp(props: SettingsWallProps) {
   const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
   const [whisperDevice, setWhisperDeviceState] = useState<WhisperDevice>(loadWhisperDevice);
   const [lyricsSettings, setLyricsSettings] = useState(loadLyricsSettings);
+  const [mini, setMini] = useState<MiniModeSettings>(() => loadMiniMode());
+  const [advancedMode, setAdvancedModeState] = useState(() => loadSettingsAdvanced());
   const searchRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -76,12 +91,17 @@ export default function SettingsApp(props: SettingsWallProps) {
     contentRef.current?.scrollTo({ top: 0 });
   }, []);
 
+  useEffect(() => {
+    applySettingsAdvancedClass();
+  }, []);
   useEffect(() => onZoomChanged(setZoomState), []);
   useEffect(() => onLyricsSettingsChanged(setLyricsSettings), []);
   useEffect(() => onPersonalizationChanged(setLook), []);
   useEffect(() => onDesktopPrefsChanged(setDeskPrefs), []);
   useEffect(() => onEnvironmentChanged(setEnv), []);
   useEffect(() => onCustomCssChanged(setUserCss), []);
+  useEffect(() => onMiniModeChanged(setMini), []);
+  useEffect(() => onSettingsAdvancedChanged(setAdvancedModeState), []);
 
   useEffect(() => {
     return registerCommandHandler('settings.focusSearch', () => {
@@ -159,6 +179,10 @@ export default function SettingsApp(props: SettingsWallProps) {
       setUserCss,
       cssMsg,
       setCssMsg,
+      mini,
+      patchMini: (p) => setMini(saveMiniMode(p)),
+      advancedMode,
+      setAdvancedMode: (on: boolean) => setAdvancedModeState(setSettingsAdvanced(on)),
       seg: (active: boolean) => `btn small ${active ? 'primary' : ''}`,
     }),
     [
@@ -178,20 +202,34 @@ export default function SettingsApp(props: SettingsWallProps) {
       lyricsSettings,
       userCss,
       cssMsg,
+      mini,
+      advancedMode,
     ],
   );
 
   const meta = pageMeta(page);
   const reduceMotion = typeof document !== 'undefined' && document.documentElement.classList.contains('reduce-motion');
 
+  // If user turns Advanced off while on an advanced-only page, bounce home.
+  useEffect(() => {
+    if (!advancedMode && meta?.advanced && page !== 'home') {
+      navigate('home');
+    }
+  }, [advancedMode, meta?.advanced, page, navigate]);
+
   return (
     <SettingsProvider value={ctrl}>
-      <div className="os-settings os-settings-v2">
+      <div className={`os-settings os-settings-v2${advancedMode ? ' is-advanced' : ''}`}>
         <div className="os-set-top">
           <SettingsSearch ref={searchRef} onNavigate={navigate} />
         </div>
         <div className="os-set-body">
-          <SettingsNav page={page} onNavigate={(id) => navigate(id)} />
+          <SettingsNav
+            page={page}
+            onNavigate={(id) => navigate(id)}
+            advancedMode={advancedMode}
+            onToggleAdvanced={() => setAdvancedModeState(setSettingsAdvanced(!advancedMode))}
+          />
           <div
             ref={contentRef}
             className={`os-set-pane-v2${reduceMotion ? '' : ' os-set-pane-anim'}`}
@@ -211,6 +249,7 @@ export default function SettingsApp(props: SettingsWallProps) {
                     </>
                   ) : null}
                   <span>{meta.label}</span>
+                  {meta.advanced && <span className="os-set-adv-badge">Advanced</span>}
                 </p>
                 <h2 className="os-set-page-title">{meta.label}</h2>
                 {meta.description && <p className="os-set-page-intro muted">{meta.description}</p>}
@@ -223,6 +262,7 @@ export default function SettingsApp(props: SettingsWallProps) {
             {page === 'companions' && <CompanionsPage />}
             {page === 'desktop-layout' && <DesktopLayoutPage />}
             {page === 'shortcuts' && <ShortcutsPage />}
+            {page === 'mini' && <MiniModePage />}
             {page === 'study' && <StudyPage />}
             {page === 'reading' && <ReadingPage />}
             {page === 'transcription' && <TranscriptionPage />}

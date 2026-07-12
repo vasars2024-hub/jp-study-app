@@ -1,7 +1,9 @@
 // Local Flashcard Collection inbox for the novel reader.
-// Writes only to flashcardDeck — never auto-mines Anki. Export is explicit.
+// List is primary. Compose opens only when a list row is clicked.
+// Translation prefs are global for the collection until the user changes them.
+// Anki deck target + per-card export status; selective export when auto is off.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addDeckCards,
   loadDeck,
@@ -10,9 +12,13 @@ import {
   updateDeckCard,
   type DeckFlashcard,
 } from '../flashcardDeck';
+import { translateTo, onModelProgress, type TransLang } from '../translator';
+import { pushUndo } from '../actionHistory';
 import Icon from './Icons';
 
 type SortMode = 'newest' | 'oldest' | 'word';
+type TargetLang = 'en' | 'ru' | 'zh';
+type TxStatus = 'idle' | 'loading' | 'translating' | 'done' | 'error';
 
 export interface CollectionAddPayload {
   word: string;
@@ -26,9 +32,68 @@ interface Props {
   bookTitle: string;
   open: boolean;
   onClose: () => void;
-  /** Optional external add (toolbar / shortcuts). */
   pendingAdd?: CollectionAddPayload | null;
   onPendingConsumed?: () => void;
+}
+
+const PREFS_KEY = 'jp-reader-collection-prefs-v1';
+const TARGET_KEY = 'jp-study-translate-target';
+const TARGETS: { id: TargetLang; label: string }[] = [
+  { id: 'en', label: 'EN' },
+  { id: 'ru', label: 'RU' },
+  { id: 'zh', label: 'ZH' },
+];
+
+interface CollectionPrefs {
+  targetLang: TargetLang;
+  swapDefault: boolean;
+  autoFlashcards: boolean;
+  autoAnki: boolean;
+  /** Empty string = use Anki profile default deck. */
+  ankiDeck: string;
+}
+
+function loadPrefs(): CollectionPrefs {
+  let targetLang: TargetLang = 'en';
+  const t = localStorage.getItem(TARGET_KEY);
+  if (t === 'en' || t === 'ru' || t === 'zh') targetLang = t;
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<CollectionPrefs>;
+      if (p.targetLang === 'en' || p.targetLang === 'ru' || p.targetLang === 'zh') {
+        targetLang = p.targetLang;
+      }
+      return {
+        targetLang,
+        swapDefault: !!p.swapDefault,
+        autoFlashcards: p.autoFlashcards !== false,
+        autoAnki: !!p.autoAnki,
+        ankiDeck: typeof p.ankiDeck === 'string' ? p.ankiDeck : '',
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { targetLang, swapDefault: false, autoFlashcards: true, autoAnki: false, ankiDeck: '' };
+}
+
+function savePrefs(prefs: CollectionPrefs): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    localStorage.setItem(TARGET_KEY, prefs.targetLang);
+  } catch {
+    /* ignore */
+  }
+}
+
+interface EditDraft {
+  id: string;
+  front: string;
+  back: string;
+  reading: string;
+  sentence: string;
+  swapped: boolean;
 }
 
 export default function ReaderCollectionPanel({
@@ -43,29 +108,242 @@ export default function ReaderCollectionPanel({
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<SortMode>('newest');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ word: '', reading: '', meaning: '', sentence: '' });
+  const [prefs, setPrefs] = useState<CollectionPrefs>(() => loadPrefs());
+  const [statusMsg, setStatusMsg] = useState('');
+  const [statusKind, setStatusKind] = useState<'idle' | 'busy' | 'ok' | 'error'>('idle');
   const [exportState, setExportState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
   const [exportMsg, setExportMsg] = useState('');
+  const [ankiDecks, setAnkiDecks] = useState<string[]>([]);
+  const [ankiConnected, setAnkiConnected] = useState(false);
+
+  const [edit, setEdit] = useState<EditDraft | null>(null);
+  const [txStatus, setTxStatus] = useState<TxStatus>('idle');
+  const [txMsg, setTxMsg] = useState('');
+  const txReqRef = useRef(0);
+  const addSeqRef = useRef(0);
+  const listRef = useRef<HTMLUListElement>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
 
   useEffect(() => onDeckChanged(() => setCards(loadDeck())), []);
 
+  // Load Anki deck list when panel opens.
+  useEffect(() => {
+    if (!open) return;
+    let dead = false;
+    void window.api.ankiStatus().then((s) => {
+      if (dead) return;
+      setAnkiConnected(!!s.connected);
+      setAnkiDecks(Array.isArray(s.decks) ? s.decks : []);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [open]);
+
+  const patchPrefs = useCallback((partial: Partial<CollectionPrefs>) => {
+    setPrefs((prev) => {
+      const next = { ...prev, ...partial };
+      savePrefs(next);
+      return next;
+    });
+  }, []);
+
+  const runTranslate = useCallback(async (jpText: string, lang: TargetLang) => {
+    const text = jpText.trim();
+    if (!text) {
+      setTxStatus('idle');
+      setTxMsg('');
+      return '';
+    }
+    const id = ++txReqRef.current;
+    setTxStatus('loading');
+    setTxMsg('Loading translator…');
+    onModelProgress((p) => {
+      if (id !== txReqRef.current) return;
+      if (p.status === 'progress' && typeof p.progress === 'number') {
+        setTxMsg(`Loading model… ${Math.round(p.progress)}%`);
+      }
+    });
+    try {
+      const result = await translateTo(text, 'ja' as TransLang, lang, (prog) => {
+        if (id !== txReqRef.current) return;
+        setTxStatus('translating');
+        setTxMsg(`Translating… ${Math.round(prog * 100)}%`);
+      });
+      if (id !== txReqRef.current) return '';
+      setTxStatus('done');
+      setTxMsg('');
+      return result.trim();
+    } catch (e) {
+      if (id !== txReqRef.current) return '';
+      setTxStatus('error');
+      setTxMsg(e instanceof Error ? e.message : String(e));
+      return '';
+    } finally {
+      if (id === txReqRef.current) onModelProgress(null);
+    }
+  }, []);
+
+  /** Mine one card; persists export status on the deck card when id is known. */
+  const sendToAnki = useCallback(
+    async (
+      c: {
+        id?: string;
+        word: string;
+        reading?: string;
+        meaning?: string;
+        sentence?: string;
+      },
+      deckOverride?: string,
+    ): Promise<{ ok: boolean; noteId?: number; error?: string; deck?: string }> => {
+      const deck = (deckOverride ?? prefsRef.current.ankiDeck).trim() || undefined;
+      try {
+        const res = await window.api.ankiMineNote({
+          term: c.word,
+          reading: c.reading || undefined,
+          meaning: c.meaning || undefined,
+          sentence: c.sentence || undefined,
+          deckName: deck,
+        });
+        const ok = res.ok || res.error === 'duplicate';
+        if (c.id) {
+          if (ok) {
+            updateDeckCard(c.id, {
+              ankiExported: true,
+              ankiExportedAt: Date.now(),
+              ankiNoteId: res.noteId,
+              ankiExportError: undefined,
+              ankiDeck: deck,
+            });
+            // Undo can delete the note we just created (AnkiConnect deleteNotes).
+            if (res.noteId && res.ok) {
+              const noteId = res.noteId;
+              const cardId = c.id;
+              const term = c.word;
+              pushUndo(
+                `Anki note “${term.slice(0, 40)}”`,
+                async () => {
+                  await window.api.ankiDeleteNotes([noteId]);
+                  updateDeckCard(cardId, {
+                    ankiExported: false,
+                    ankiNoteId: undefined,
+                    ankiExportError: undefined,
+                  });
+                  setCards(loadDeck());
+                },
+                'anki',
+              );
+            }
+          } else {
+            updateDeckCard(c.id, {
+              ankiExported: false,
+              ankiExportError: res.error ?? 'Export failed',
+              ankiDeck: deck,
+            });
+          }
+          setCards(loadDeck());
+        }
+        return { ok, noteId: res.noteId, error: res.error, deck };
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        if (c.id) {
+          updateDeckCard(c.id, {
+            ankiExported: false,
+            ankiExportError: error,
+            ankiDeck: deck,
+          });
+          setCards(loadDeck());
+        }
+        return { ok: false, error, deck };
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!pendingAdd?.word) return;
-    addDeckCards([
-      {
-        word: pendingAdd.word,
-        reading: pendingAdd.reading ?? '',
-        meaning: pendingAdd.meaning ?? '',
-        sentence: pendingAdd.sentence,
-        source: 'epub',
+    const word = pendingAdd.word.trim();
+    const sentence = (pendingAdd.sentence ?? '').trim();
+    const reading = (pendingAdd.reading ?? '').trim();
+    const seedMeaning = (pendingAdd.meaning ?? '').trim();
+    onPendingConsumed?.();
+    if (!word) return;
+
+    const seq = ++addSeqRef.current;
+    const { targetLang, swapDefault, autoFlashcards, autoAnki, ankiDeck } = prefsRef.current;
+
+    void (async () => {
+      setStatusKind('busy');
+      setStatusMsg(seedMeaning ? 'Saving…' : 'Translating…');
+
+      let meaning = seedMeaning;
+      if (!meaning || meaning === word) {
+        const tx = await runTranslate(word, targetLang);
+        if (seq !== addSeqRef.current) return;
+        if (tx) meaning = tx;
+      }
+
+      let front = word;
+      let back = meaning || word;
+      if (swapDefault && meaning) {
+        front = meaning;
+        back = word;
+      }
+
+      const sentenceVal =
+        sentence && sentence !== word ? sentence : sentence || undefined;
+      const payload = {
+        word: front,
+        reading,
+        meaning: back,
+        sentence: sentenceVal,
+        front,
+        back,
+        source: 'epub' as const,
         bookId,
         bookTitle,
-      },
-    ]);
-    setCards(loadDeck());
-    onPendingConsumed?.();
-  }, [pendingAdd, bookId, bookTitle, onPendingConsumed]);
+      };
+
+      const saveToDeck = autoFlashcards || !autoAnki;
+      let card: DeckFlashcard | undefined;
+      if (saveToDeck) {
+        const created = addDeckCards([payload]);
+        card = created[0];
+        setCards(loadDeck());
+      }
+
+      let ankiOk = false;
+      let ankiFail = false;
+      if (autoAnki) {
+        const res = await sendToAnki(
+          {
+            id: card?.id,
+            word: payload.word,
+            reading: payload.reading,
+            meaning: payload.meaning,
+            sentence: payload.sentence,
+          },
+          ankiDeck,
+        );
+        ankiOk = res.ok;
+        ankiFail = !res.ok;
+      }
+
+      if (seq !== addSeqRef.current) return;
+      setStatusKind(ankiFail ? 'error' : 'ok');
+      const parts: string[] = [];
+      if (saveToDeck) parts.push(autoFlashcards ? 'Flashcards' : 'Collection');
+      if (autoAnki) parts.push(ankiOk ? `Anki${ankiDeck ? ` (${ankiDeck})` : ''}` : 'Anki failed');
+      setStatusMsg(parts.length ? `Saved → ${parts.join(' · ')}` : 'Saved');
+      if (card) {
+        setFlashId(card.id);
+        window.setTimeout(() => setFlashId((id) => (id === card!.id ? null : id)), 1600);
+        listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    })();
+  }, [pendingAdd, onPendingConsumed, bookId, bookTitle, runTranslate, sendToAnki]);
 
   const mine = useMemo(() => {
     let list = cards.filter((c) => c.bookId === bookId || (!c.bookId && c.bookTitle === bookTitle));
@@ -75,7 +353,8 @@ export default function ReaderCollectionPanel({
         (c) =>
           c.word.toLowerCase().includes(needle) ||
           (c.sentence ?? '').toLowerCase().includes(needle) ||
-          (c.meaning ?? '').toLowerCase().includes(needle),
+          (c.meaning ?? '').toLowerCase().includes(needle) ||
+          (c.back ?? '').toLowerCase().includes(needle),
       );
     }
     const sorted = [...list];
@@ -85,30 +364,66 @@ export default function ReaderCollectionPanel({
     return sorted;
   }, [cards, bookId, bookTitle, q, sort]);
 
-  const beginEdit = (c: DeckFlashcard) => {
-    setEditing(c.id);
-    setDraft({
-      word: c.word,
+  const openEdit = useCallback((c: DeckFlashcard) => {
+    setEdit({
+      id: c.id,
+      front: c.word || c.front || '',
+      back: c.meaning || c.back || '',
       reading: c.reading ?? '',
-      meaning: c.meaning ?? '',
       sentence: c.sentence ?? '',
+      swapped: false,
     });
-  };
+    setTxStatus('idle');
+    setTxMsg('');
+  }, []);
 
-  const commitEdit = () => {
-    if (!editing) return;
-    const word = draft.word.trim();
-    if (word) {
-      updateDeckCard(editing, {
-        word,
-        reading: draft.reading.trim(),
-        meaning: draft.meaning.trim(),
-        sentence: draft.sentence.trim() || undefined,
-      });
-      setCards(loadDeck());
-    }
-    setEditing(null);
-  };
+  const closeEdit = useCallback(() => {
+    txReqRef.current++;
+    onModelProgress(null);
+    setEdit(null);
+    setTxStatus('idle');
+    setTxMsg('');
+  }, []);
+
+  const swapEditFaces = useCallback(() => {
+    setEdit((e) => {
+      if (!e) return e;
+      return { ...e, front: e.back, back: e.front, swapped: !e.swapped };
+    });
+  }, []);
+
+  const retranslateEdit = useCallback(async () => {
+    if (!edit) return;
+    const jp = (edit.swapped ? edit.back : edit.front).trim();
+    if (!jp) return;
+    const translated = await runTranslate(jp, prefs.targetLang);
+    if (!translated) return;
+    setEdit((e) => {
+      if (!e) return e;
+      return e.swapped ? { ...e, front: translated } : { ...e, back: translated };
+    });
+  }, [edit, prefs.targetLang, runTranslate]);
+
+  const saveEdit = useCallback(() => {
+    if (!edit) return;
+    const front = edit.front.trim();
+    const back = edit.back.trim();
+    if (!front && !back) return;
+    const word = front || back;
+    const meaning = front && back ? back : back || front;
+    updateDeckCard(edit.id, {
+      word,
+      reading: edit.reading.trim(),
+      meaning,
+      sentence: edit.sentence.trim() || undefined,
+      front: word,
+      back: meaning,
+    });
+    setCards(loadDeck());
+    closeEdit();
+    setStatusKind('ok');
+    setStatusMsg('Card updated');
+  }, [edit, closeEdit]);
 
   const toggle = (id: string) => {
     setSelected((s) => {
@@ -120,149 +435,330 @@ export default function ReaderCollectionPanel({
   };
 
   const selectAll = () => setSelected(new Set(mine.map((c) => c.id)));
+  const selectUnexported = () =>
+    setSelected(new Set(mine.filter((c) => !c.ankiExported).map((c) => c.id)));
   const clearSel = () => setSelected(new Set());
 
   const exportAnki = async () => {
     const targets = mine.filter((c) => selected.has(c.id));
     if (!targets.length) {
-      setExportMsg('Select cards to export.');
+      setExportMsg('Select cards to export (checkboxes).');
       setExportState('error');
       return;
     }
     setExportState('busy');
-    setExportMsg('');
+    setExportMsg(`Exporting ${targets.length}…`);
     let ok = 0;
     let fail = 0;
     for (const c of targets) {
-      try {
-        const res = await window.api.ankiMineNote({
-          term: c.word,
-          reading: c.reading || undefined,
-          meaning: c.meaning || undefined,
-          sentence: c.sentence || undefined,
-        });
-        if (res.ok || res.error === 'duplicate') ok++;
-        else fail++;
-      } catch {
-        fail++;
-      }
+      const res = await sendToAnki(
+        {
+          id: c.id,
+          word: c.word,
+          reading: c.reading,
+          meaning: c.meaning || c.back,
+          sentence: c.sentence,
+        },
+        prefs.ankiDeck,
+      );
+      if (res.ok) ok++;
+      else fail++;
     }
     setExportState(fail && !ok ? 'error' : 'done');
-    setExportMsg(`Exported ${ok}${fail ? `, ${fail} failed` : ''}.`);
+    const deckHint = prefs.ankiDeck ? ` → ${prefs.ankiDeck}` : '';
+    setExportMsg(`Exported ${ok}${deckHint}${fail ? `, ${fail} failed` : ''}.`);
+    setCards(loadDeck());
   };
 
   if (!open) return null;
 
+  const busy = txStatus === 'loading' || txStatus === 'translating' || statusKind === 'busy';
+  const frontLabel = edit?.swapped ? 'Front · translation' : 'Front · Japanese';
+  const backLabel = edit?.swapped ? 'Back · Japanese' : 'Back · translation';
+  const selectedCount = selected.size;
+
   return (
-    <aside className="reader-collection">
+    <aside className="reader-collection" aria-label="Collection">
       <div className="reader-collection-head">
-        <span>Collection</span>
+        <div className="reader-collection-head-text">
+          <span className="reader-collection-title">Collection</span>
+          <span className="reader-collection-count muted">{mine.length}</span>
+        </div>
         <button type="button" className="btn small icon-btn" title="Close" onClick={onClose}>
           <Icon name="close" size={14} />
         </button>
       </div>
-      <p className="muted reader-collection-hint">
-        Local only — use Export to send selected cards to Anki.
-      </p>
-      <input
-        className="reader-collection-search"
-        placeholder="Search…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <div className="reader-collection-actions">
-        <button type="button" className="btn small" onClick={selectAll}>
-          Select all
-        </button>
-        <button type="button" className="btn small" onClick={clearSel}>
-          Clear
-        </button>
-        <select
-          className="reader-collection-sort"
-          title="Sort"
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortMode)}
-        >
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="word">Word A–Z</option>
-        </select>
-        <button
-          type="button"
-          className="btn small primary"
-          disabled={exportState === 'busy' || selected.size === 0}
-          onClick={() => void exportAnki()}
-        >
-          Export → Anki
-        </button>
+
+      <div className="reader-collection-settings">
+        <div className="reader-collection-settings-row">
+          <span className="reader-collection-compose-label">Translate to</span>
+          <div className="reader-collection-lang" role="group" aria-label="Translation language">
+            {TARGETS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`reader-collection-lang-btn${prefs.targetLang === t.id ? ' active' : ''}`}
+                disabled={busy}
+                onClick={() => patchPrefs({ targetLang: t.id })}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <label className="reader-collection-check" title="New cards: translation on front, Japanese on back">
+            <input
+              type="checkbox"
+              checked={prefs.swapDefault}
+              onChange={(e) => patchPrefs({ swapDefault: e.target.checked })}
+            />
+            <span>Swap faces</span>
+          </label>
+        </div>
+
+        <div className="reader-collection-settings-row reader-collection-import-row">
+          <label className="reader-collection-check" title="Save into the Flashcards app deck when collecting">
+            <input
+              type="checkbox"
+              checked={prefs.autoFlashcards}
+              onChange={(e) => patchPrefs({ autoFlashcards: e.target.checked })}
+            />
+            <span>Flashcards</span>
+          </label>
+          <label className="reader-collection-check" title="Also send each new card to Anki">
+            <input
+              type="checkbox"
+              checked={prefs.autoAnki}
+              onChange={(e) => patchPrefs({ autoAnki: e.target.checked })}
+            />
+            <span>Anki</span>
+          </label>
+          <span className="muted reader-collection-settings-hint">Auto on collect</span>
+        </div>
+
+        <div className="reader-collection-settings-row reader-collection-deck-row">
+          <span className="reader-collection-compose-label">Anki deck</span>
+          <select
+            className="reader-collection-deck"
+            title={ankiConnected ? 'Deck for auto/manual Anki export' : 'Connect AnkiConnect to list decks'}
+            value={prefs.ankiDeck}
+            onChange={(e) => patchPrefs({ ankiDeck: e.target.value })}
+          >
+            <option value="">Profile default</option>
+            {prefs.ankiDeck && !ankiDecks.includes(prefs.ankiDeck) && (
+              <option value={prefs.ankiDeck}>{prefs.ankiDeck}</option>
+            )}
+            {ankiDecks.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      {exportMsg && <div className={`reader-collection-msg ${exportState}`}>{exportMsg}</div>}
-      <ul className="reader-collection-list">
-        {mine.length === 0 && <li className="muted">No cards from this book yet.</li>}
-        {mine.map((c) =>
-          editing === c.id ? (
-            <li key={c.id} className="editing">
-              <div className="reader-collection-edit">
-                <input
-                  value={draft.word}
-                  lang="ja"
-                  placeholder="Word"
-                  autoFocus
-                  onChange={(e) => setDraft((d) => ({ ...d, word: e.target.value }))}
-                />
-                <input
-                  value={draft.reading}
-                  lang="ja"
-                  placeholder="Reading"
-                  onChange={(e) => setDraft((d) => ({ ...d, reading: e.target.value }))}
-                />
-                <input
-                  value={draft.meaning}
-                  placeholder="Meaning"
-                  onChange={(e) => setDraft((d) => ({ ...d, meaning: e.target.value }))}
-                />
-                <textarea
-                  value={draft.sentence}
-                  lang="ja"
-                  placeholder="Sentence"
-                  onChange={(e) => setDraft((d) => ({ ...d, sentence: e.target.value }))}
-                />
-                <div className="reader-collection-edit-actions">
-                  <button type="button" className="btn small primary" onClick={commitEdit}>
-                    Save
-                  </button>
-                  <button type="button" className="btn small" onClick={() => setEditing(null)}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </li>
-          ) : (
-            <li key={c.id} className={selected.has(c.id) ? 'sel' : ''}>
-              <label className="reader-collection-row">
+
+      {edit && (
+        <div className="reader-collection-compose">
+          <div className="reader-collection-compose-row">
+            <span className="reader-collection-compose-label">Edit card</span>
+            <button type="button" className="btn small reader-collection-swap" disabled={busy} onClick={swapEditFaces}>
+              Swap faces
+            </button>
+          </div>
+
+          <label className="reader-collection-field">
+            <span className="reader-collection-field-label">{frontLabel}</span>
+            <textarea
+              className="reader-collection-face"
+              lang={edit.swapped ? undefined : 'ja'}
+              value={edit.front}
+              rows={3}
+              onChange={(e) => setEdit((d) => (d ? { ...d, front: e.target.value } : d))}
+            />
+          </label>
+
+          <label className="reader-collection-field">
+            <span className="reader-collection-field-label">{backLabel}</span>
+            <textarea
+              className="reader-collection-face"
+              lang={edit.swapped ? 'ja' : undefined}
+              value={edit.back}
+              rows={3}
+              placeholder={busy ? 'Translating…' : 'Translation'}
+              onChange={(e) => setEdit((d) => (d ? { ...d, back: e.target.value } : d))}
+            />
+          </label>
+
+          <div className="reader-collection-field-grid">
+            <label className="reader-collection-field">
+              <span className="reader-collection-field-label">Reading</span>
+              <input
+                lang="ja"
+                value={edit.reading}
+                placeholder="Optional"
+                onChange={(e) => setEdit((d) => (d ? { ...d, reading: e.target.value } : d))}
+              />
+            </label>
+            <label className="reader-collection-field">
+              <span className="reader-collection-field-label">Sentence</span>
+              <textarea
+                className="reader-collection-sentence"
+                lang="ja"
+                rows={2}
+                value={edit.sentence}
+                placeholder="Context (Japanese)"
+                onChange={(e) => setEdit((d) => (d ? { ...d, sentence: e.target.value } : d))}
+              />
+            </label>
+          </div>
+
+          {txMsg && (
+            <div className={`reader-collection-msg${txStatus === 'error' ? ' error' : ''}`}>{txMsg}</div>
+          )}
+
+          <div className="reader-collection-compose-actions">
+            <button
+              type="button"
+              className="btn small primary reader-collection-save"
+              disabled={busy || (!edit.front.trim() && !edit.back.trim())}
+              onClick={saveEdit}
+            >
+              Save
+            </button>
+            <button type="button" className="btn small" disabled={busy} onClick={() => void retranslateEdit()}>
+              Retranslate
+            </button>
+            <button type="button" className="btn small" onClick={closeEdit}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="reader-collection-toolbar">
+        <input
+          className="reader-collection-search"
+          placeholder="Search collection…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div className="reader-collection-actions">
+          <div className="reader-collection-actions-left">
+            <button type="button" className="btn small" onClick={selectAll}>
+              All
+            </button>
+            <button type="button" className="btn small" onClick={selectUnexported} title="Select cards not yet in Anki">
+              Unexported
+            </button>
+            <button type="button" className="btn small" onClick={clearSel}>
+              Clear
+            </button>
+            <select
+              className="reader-collection-sort"
+              title="Sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortMode)}
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="word">Word A–Z</option>
+            </select>
+          </div>
+          <div className="reader-collection-actions-right">
+            <button
+              type="button"
+              className="btn small primary"
+              disabled={exportState === 'busy' || selectedCount === 0}
+              title={
+                prefs.autoAnki
+                  ? 'Manual export (also runs when auto Anki is on)'
+                  : 'Export selected cards to Anki'
+              }
+              onClick={() => void exportAnki()}
+            >
+              Export{selectedCount ? ` (${selectedCount})` : ''} → Anki
+            </button>
+          </div>
+        </div>
+        {!prefs.autoAnki && (
+          <p className="muted reader-collection-export-hint">
+            Auto Anki is off — tick cards, then Export.
+          </p>
+        )}
+      </div>
+
+      {(statusMsg || exportMsg) && (
+        <div
+          className={`reader-collection-msg${
+            statusKind === 'error' || exportState === 'error' ? ' error' : ''
+          }`}
+        >
+          {statusMsg || exportMsg}
+        </div>
+      )}
+
+      <ul className="reader-collection-list" ref={listRef}>
+        {mine.length === 0 && (
+          <li className="muted reader-collection-empty">
+            No cards yet. Select a word or sentence and press Collect.
+          </li>
+        )}
+        {mine.map((c) => {
+          const exported = !!c.ankiExported;
+          const failed = !exported && !!c.ankiExportError;
+          const badgeTitle = exported
+            ? `Exported to Anki${c.ankiDeck ? ` · ${c.ankiDeck}` : ''}${
+                c.ankiExportedAt ? ` · ${new Date(c.ankiExportedAt).toLocaleString()}` : ''
+              }`
+            : failed
+              ? `Anki export failed: ${c.ankiExportError}`
+              : 'Not exported to Anki';
+          return (
+            <li
+              key={c.id}
+              className={[
+                selected.has(c.id) ? 'sel' : '',
+                edit?.id === c.id ? 'editing-open' : '',
+                flashId === c.id ? 'just-added' : '',
+                exported ? 'anki-ok' : '',
+                failed ? 'anki-fail' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <label className="reader-collection-row" onClick={(e) => e.stopPropagation()}>
                 <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
+              </label>
+              <span
+                className={`reader-collection-anki-dot${
+                  exported ? ' ok' : failed ? ' fail' : ' pending'
+                }`}
+                title={badgeTitle}
+                aria-label={badgeTitle}
+              />
+              <button
+                type="button"
+                className="reader-collection-entry"
+                title="Open to edit"
+                onClick={() => openEdit(c)}
+              >
                 <span className="reader-collection-word" lang="ja">
                   {c.word}
                 </span>
+                {(c.meaning || c.back) && (
+                  <span className="reader-collection-sent">{(c.meaning || c.back || '').slice(0, 100)}</span>
+                )}
                 {c.sentence && (
-                  <span className="reader-collection-sent muted" lang="ja">
-                    {c.sentence.slice(0, 80)}
+                  <span className="reader-collection-sent" lang="ja">
+                    {c.sentence.slice(0, 100)}
                   </span>
                 )}
-              </label>
-              <button
-                type="button"
-                className="btn small icon-btn"
-                title="Edit"
-                onClick={() => beginEdit(c)}
-              >
-                <Icon name="edit" size={12} />
               </button>
               <button
                 type="button"
                 className="btn small icon-btn"
                 title="Remove"
                 onClick={() => {
+                  if (edit?.id === c.id) closeEdit();
                   removeDeckCard(c.id);
                   setCards(loadDeck());
                 }}
@@ -270,8 +766,8 @@ export default function ReaderCollectionPanel({
                 <Icon name="close" size={12} />
               </button>
             </li>
-          ),
-        )}
+          );
+        })}
       </ul>
     </aside>
   );

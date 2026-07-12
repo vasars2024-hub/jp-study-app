@@ -60,9 +60,14 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
   const [customOpen, setCustomOpen] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
   const [customKeys, setCustomKeys] = useState('');
-  const [customActionType, setCustomActionType] = useState<'openApp' | 'runCommand'>('openApp');
+  const [customActionType, setCustomActionType] = useState<'openApp' | 'runCommand' | 'runCommands'>(
+    'openApp',
+  );
   const [customAppId, setCustomAppId] = useState(SHORTCUT_OPEN_APPS[0]?.id ?? 'settings');
   const [customCmdId, setCustomCmdId] = useState(COMMAND_CATALOG[0]?.id ?? 'nav.palette');
+  /** Ordered command ids for stacked macros. */
+  const [customStack, setCustomStack] = useState<string[]>([]);
+  const [stackPick, setStackPick] = useState(COMMAND_CATALOG[0]?.id ?? 'nav.palette');
   const captureRef = useRef<string | null>(null);
   const modeRef = useRef<CaptureMode>('replace');
   captureRef.current = capturing;
@@ -224,10 +229,18 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
   };
 
   const createCustom = () => {
-    const action: CustomAction =
-      customActionType === 'openApp'
-        ? { type: 'openApp', appId: customAppId }
-        : { type: 'runCommand', commandId: customCmdId };
+    let action: CustomAction;
+    if (customActionType === 'openApp') {
+      action = { type: 'openApp', appId: customAppId };
+    } else if (customActionType === 'runCommands') {
+      if (customStack.length < 2) {
+        setMsg('Stack needs at least two commands.');
+        return;
+      }
+      action = { type: 'runCommands', commandIds: [...customStack] };
+    } else {
+      action = { type: 'runCommand', commandId: customCmdId };
+    }
     const res = addCustomCommand({
       label: customLabel,
       keys: customKeys,
@@ -240,6 +253,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     setMsg(`Custom shortcut “${customLabel.trim()}” added.`);
     setCustomLabel('');
     setCustomKeys('');
+    setCustomStack([]);
     setCustomOpen(false);
     if (!customKeys.trim()) {
       startCapture(res.id, 'replace');
@@ -332,10 +346,13 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
               <select
                 className="set-select"
                 value={customActionType}
-                onChange={(e) => setCustomActionType(e.target.value as 'openApp' | 'runCommand')}
+                onChange={(e) =>
+                  setCustomActionType(e.target.value as 'openApp' | 'runCommand' | 'runCommands')
+                }
               >
                 <option value="openApp">Open app / section</option>
                 <option value="runCommand">Run existing command</option>
+                <option value="runCommands">Stack commands (A then B…)</option>
               </select>
             </label>
             {customActionType === 'openApp' ? (
@@ -353,7 +370,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                   ))}
                 </select>
               </label>
-            ) : (
+            ) : customActionType === 'runCommand' ? (
               <label className="sc-field">
                 <span className="muted">Command</span>
                 <select
@@ -368,12 +385,66 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                   ))}
                 </select>
               </label>
+            ) : (
+              <div className="sc-field sc-stack-field">
+                <span className="muted">Command stack (runs in order)</span>
+                <div className="sc-stack-add">
+                  <select
+                    className="set-select"
+                    value={stackPick}
+                    onChange={(e) => setStackPick(e.target.value)}
+                  >
+                    {COMMAND_CATALOG.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.category}: {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn small"
+                    onClick={() => {
+                      if (!stackPick) return;
+                      setCustomStack((s) => [...s, stackPick]);
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                {customStack.length === 0 ? (
+                  <p className="muted sc-stack-empty">Add at least two commands (e.g. open Music + open Dictionary).</p>
+                ) : (
+                  <ol className="sc-stack-list">
+                    {customStack.map((id, i) => {
+                      const c = COMMAND_CATALOG.find((x) => x.id === id);
+                      return (
+                        <li key={`${id}-${i}`}>
+                          <span>
+                            {i + 1}. {c ? `${c.category}: ${c.label}` : id}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn small"
+                            title="Remove"
+                            onClick={() => setCustomStack((s) => s.filter((_, j) => j !== i))}
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </div>
             )}
           </div>
           <button
             type="button"
             className="btn small primary"
-            disabled={!customLabel.trim()}
+            disabled={
+              !customLabel.trim() ||
+              (customActionType === 'runCommands' && customStack.length < 2)
+            }
             onClick={createCustom}
           >
             Create shortcut

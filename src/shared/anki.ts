@@ -45,6 +45,11 @@ export interface MineNoteRequest {
   /** Mining context sentence (reader / subtitle line). */
   sentence?: string;
   /**
+   * Optional Anki deck override. When set, the note is added here instead of
+   * the profile default deck (collection export / auto-import).
+   */
+  deckName?: string;
+  /**
    * The exact surface text as it appears in `sentence` (e.g. the reader
    * selection 食べた for the dictionary form 食べる). Used to locate the word
    * for cloze splitting; falls back to term/reading when absent.

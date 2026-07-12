@@ -249,6 +249,68 @@ function lookupWkSpan(wk: HTMLElement): WordLookupHit | null {
   };
 }
 
+/**
+ * Select the full sentence under a click (ends at 。！？ etc., not commas).
+ * Returns the selected text, or null if nothing resolvable. Does not open dict.
+ */
+export function selectSentenceAtPoint(
+  clientX: number,
+  clientY: number,
+  doc: Document = document,
+): string | null {
+  const caret =
+    doc.caretRangeFromPoint?.(clientX, clientY) ??
+    (() => {
+      const pos = (
+        doc as Document & {
+          caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+        }
+      ).caretPositionFromPoint?.(clientX, clientY);
+      if (!pos) return null;
+      const r = doc.createRange();
+      r.setStart(pos.offsetNode, pos.offset);
+      r.collapse(true);
+      return r;
+    })();
+
+  let node: Node | null = null;
+  let offset = 0;
+  if (caret && 'startContainer' in caret) {
+    node = caret.startContainer;
+    offset = caret.startOffset;
+  }
+  // Fallback: token / text under element
+  if (!node || node.nodeType !== Node.TEXT_NODE) {
+    const el = doc.elementFromPoint(clientX, clientY);
+    const wk = el?.closest?.('span.wk') as HTMLElement | null;
+    if (wk?.firstChild && wk.firstChild.nodeType === Node.TEXT_NODE) {
+      node = wk.firstChild;
+      offset = 0;
+    } else {
+      return null;
+    }
+  }
+
+  const textNode = node as Text;
+  // Prefer novel-part / novel-content so multi-paragraph blocks still work.
+  const block =
+    (textNode.parentElement?.closest('.novel-part, .novel-content, [data-lookup-block]') as Element | null) ??
+    nearestBlock(textNode);
+  if (!block) return null;
+
+  const globalOffset = charOffsetInBlock(block, textNode, offset);
+  const range = detectSentenceRange(block, globalOffset);
+  if (!range) return null;
+
+  const win = doc.defaultView ?? window;
+  const sel = win.getSelection();
+  if (!sel) return null;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  const text = range.toString().trim();
+  return text || null;
+}
+
 /** Resolve one word/expression at viewport coordinates and highlight it. */
 export function lookupWordAtPoint(clientX: number, clientY: number, doc: Document = document): WordLookupHit | null {
   const el = doc.elementFromPoint(clientX, clientY);
