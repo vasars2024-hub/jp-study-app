@@ -40,7 +40,12 @@
 :root[data-perf='battery'] .ui-menu,
 :root[data-perf='battery'] .ui-toast,
 :root[data-perf='battery'] .ui-tooltip,
-:root[data-perf='battery'] .ui-overlay {
+:root[data-perf='battery'] .ui-overlay,
+:root[data-perf='battery'] .os-flyout,
+:root[data-perf='battery'] .os-taskbar,
+:root[data-perf='battery'] .os-start,
+:root[data-perf='battery'] .fwin,
+:root[data-perf='battery'] .widget-frame {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }

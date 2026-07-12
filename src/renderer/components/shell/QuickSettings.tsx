@@ -5,7 +5,7 @@
  * engine) — no duplicated logic. Deeper controls open the full Settings window
  * via `shell:openSettings` (handled by the shell in M3).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Select, Slider, Toggle } from '../ui';
 import { getTheme, listThemes, loadThemeId, onThemeChanged, setTheme } from '../../theme';
 import { DEFAULT_PERF_TIER, loadPerfTier, PERF_TIERS, setPerfTier, type PerfTier } from '../../theme/perf';
@@ -53,6 +53,7 @@ export default function QuickSettings() {
   const [muted, setMuted] = useState(() => soundEngine.isMuted());
   const [reduceMotion, setRM] = useState(isReduceMotion);
   const [fit, setFit] = useState<WallpaperFit>(() => loadWallpaperFit());
+  const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => onThemeChanged(setThemeId), []);
 
@@ -71,6 +72,7 @@ export default function QuickSettings() {
     setMuted(soundEngine.isMuted());
     setRM(isReduceMotion());
     setFit(loadWallpaperFit());
+    panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -94,7 +96,7 @@ export default function QuickSettings() {
   return (
     <>
       <div className="os-panel-backdrop" onMouseDown={() => setOpen(false)} />
-      <aside className="os-flyout anim-slide-up" role="dialog" aria-label="Quick settings">
+      <aside ref={panelRef} tabIndex={-1} className="os-flyout anim-slide-up" role="dialog" aria-label="Quick settings">
         <header className="os-flyout-head">
           <span className="os-flyout-title">Quick settings</span>
           <span className="os-flyout-spacer" />

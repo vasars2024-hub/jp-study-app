@@ -4,7 +4,7 @@
  * bell via the `shell:toggleNotifications` event. Escape / backdrop closes;
  * opening marks all read.
  */
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { Notification, Toggle } from '../ui';
 import {
   clearAll,
@@ -36,6 +36,7 @@ function timeAgo(ts: number): string {
 export default function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [, force] = useReducer((n: number) => n + 1, 0);
+  const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => onNotificationsChanged(force), []);
 
@@ -48,6 +49,7 @@ export default function NotificationCenter() {
   useEffect(() => {
     if (!open) return;
     markAllRead();
+    panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -64,7 +66,7 @@ export default function NotificationCenter() {
   return (
     <>
       <div className="os-panel-backdrop" onMouseDown={() => setOpen(false)} />
-      <aside className="os-flyout anim-slide-up" role="dialog" aria-label="Notifications">
+      <aside ref={panelRef} tabIndex={-1} className="os-flyout anim-slide-up" role="dialog" aria-label="Notifications">
         <header className="os-flyout-head">
           <span className="os-flyout-title">Notifications</span>
           <span className="os-flyout-spacer" />
