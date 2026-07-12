@@ -27,6 +27,8 @@ import './theme/typography.css';
 import './theme/motion.css';
 // UI primitive library styles (Phase 1 · M5).
 import './components/ui/ui.css';
+// Accessibility foundation (Phase 1 · M8) — imported late to reinforce.
+import './theme/a11y.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
