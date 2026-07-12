@@ -99,3 +99,24 @@
 }
 .os-qs-row-label { flex: 1; font-size: var(--font-size-sm); }
 .os-qs-section { font-size: var(--font-size-xs); color: var(--muted); text-transform: uppercase; letter-spacing: var(--letter-spacing-wider); margin: 4px 4px 0; }
+
+/* Taskbar notification bell + unread badge */
+.os-tray-btn-bell { position: relative; }
+.os-tray-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--status-error);
+  color: #fff;
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  box-shadow: var(--elevation-1);
+}

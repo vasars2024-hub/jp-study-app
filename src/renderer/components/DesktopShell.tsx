@@ -19,6 +19,9 @@ import { isPlaying as isMusicPlaying, onPlayingChanged } from '../audioBus';
 import AppSection from './AppSection';
 import Icon, { type IconName } from './Icons';
 import DesktopSettings, { type WallChoice } from './DesktopSettings';
+import NotificationCenter from './shell/NotificationCenter';
+import NotificationBell from './shell/NotificationBell';
+import QuickSettings from './shell/QuickSettings';
 import {
   commitLayout,
   getActiveDesktopIndex,
@@ -1529,6 +1532,21 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           <button className="os-tray-btn" title="Settings" onClick={() => open('settings')}>
             <Icon name="settings" size={18} />
           </button>
+          <button
+            type="button"
+            className="os-tray-btn"
+            title="Quick settings"
+            aria-label="Quick settings"
+            onClick={() => window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'))}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+              <line x1="4" y1="9" x2="20" y2="9" />
+              <line x1="4" y1="15" x2="20" y2="15" />
+              <circle cx="9" cy="9" r="2.2" />
+              <circle cx="15" cy="15" r="2.2" />
+            </svg>
+          </button>
+          <NotificationBell />
           <TaskbarClock
             showSeconds={!!deskPrefs.clockSeconds}
             hour12={!deskPrefs.clock24h}
@@ -1536,6 +1554,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           />
         </div>
       </div>
+      <QuickSettings />
+      <NotificationCenter />
     </div>
   );
 }

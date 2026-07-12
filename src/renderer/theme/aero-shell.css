@@ -127,3 +127,10 @@
 :root[data-materials='aero'] .widget-bar {
   background: var(--shell-sheen), transparent;
 }
+
+/* ---------- Window open/restore motion (Phase 2 · M2) --------------------
+   Opacity only — never transform (the drag gesture owns transform). Runs on
+   mount/restore; collapses under reduced motion / Battery Saver (global rules).*/
+:root[data-materials='aero'] .fwin {
+  animation: aero-fade var(--dur-normal) var(--ease-glass) both;
+}

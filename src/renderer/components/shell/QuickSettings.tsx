@@ -32,8 +32,10 @@ const PERF_LABEL: Record<PerfTier, string> = {
   battery: 'Battery Saver',
 };
 
-function openSettings(page: string): void {
-  window.dispatchEvent(new CustomEvent('shell:openSettings', { detail: { page } }));
+function openSettings(_page: string): void {
+  // Reuse the shell's existing open mechanism. (Deep-linking to a specific
+  // settings page is a future nicety; the Settings window has its own nav.)
+  window.dispatchEvent(new CustomEvent('os:open', { detail: 'settings' }));
 }
 
 export default function QuickSettings() {
