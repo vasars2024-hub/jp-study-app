@@ -35,7 +35,10 @@ export default function SecretAeroTrigger() {
       setFlash('Frutiger Aero — off');
     } else {
       restoreRef.current = current;
-      setTheme(AERO_THEME_ID);
+      // Secret Mode "soft reboot": cover the screen with the Aero boot splash,
+      // switch the theme behind it, then reveal the glass OS (Phase 2 · M15).
+      window.dispatchEvent(new CustomEvent('shell:softReboot'));
+      window.setTimeout(() => setTheme(AERO_THEME_ID), 240);
       setFlash('✨ Frutiger Aero');
     }
   };

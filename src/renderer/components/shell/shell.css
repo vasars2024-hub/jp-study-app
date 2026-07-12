@@ -166,6 +166,62 @@
 .os-start-foot-btn.power:hover { background: color-mix(in srgb, var(--status-error) 18%, transparent); color: var(--status-error); }
 .os-start-foot-spacer { flex: 1; }
 
+/* Secret Mode soft-reboot overlay (Phase 2 · M15) — a branded sky boot splash
+   that plays while the Aero theme switches behind it. Uses fixed brand colours
+   (like BootScreen), since it is the transition INTO the Aero look. */
+.os-aero-boot {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-max, 2147483000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #eaf9ff 0%, #bfe6ff 42%, #8fd0f5 72%, #7bd39a 100%);
+  animation: aero-boot-in 320ms ease both;
+}
+.os-aero-boot.out { animation: aero-boot-out 480ms ease both; }
+@keyframes aero-boot-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aero-boot-out { from { opacity: 1; } to { opacity: 0; } }
+.os-aero-boot-inner {
+  text-align: center;
+  color: #123a52;
+  font-family: 'Segoe UI Semibold', 'Segoe UI', var(--font-display, sans-serif);
+}
+.os-aero-boot-orb {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95), transparent 55%),
+    linear-gradient(160deg, #63cff2, #17a6df);
+  box-shadow: 0 8px 22px rgba(20, 74, 110, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.os-aero-boot-title { font-size: 2.3rem; font-weight: 700; letter-spacing: 0.03em; }
+.os-aero-boot-sub {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-top: 4px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.os-aero-boot-spinner {
+  width: 32px;
+  height: 32px;
+  margin: 24px auto 0;
+  border-radius: 50%;
+  border: 3px solid rgba(18, 58, 82, 0.2);
+  border-top-color: #17a6df;
+  animation: aero-spin 0.9s linear infinite;
+}
+
+/* Extension layer host (Phase 2 · M16) — full-bleed, over the wallpaper. */
+.os-desktop-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 /* Taskbar notification bell + unread badge */
 .os-tray-btn-bell { position: relative; }
 .os-tray-badge {

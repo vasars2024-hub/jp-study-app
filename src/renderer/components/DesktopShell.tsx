@@ -23,6 +23,8 @@ import DesktopSettings, { type WallChoice } from './DesktopSettings';
 import NotificationCenter from './shell/NotificationCenter';
 import NotificationBell from './shell/NotificationBell';
 import QuickSettings from './shell/QuickSettings';
+import AeroBootOverlay from './shell/AeroBootOverlay';
+import DesktopLayerHost from './shell/DesktopLayerHost';
 import { ContextMenu } from './ui';
 import {
   commitLayout,
@@ -1640,8 +1642,10 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           />
         </div>
       </div>
+      <DesktopLayerHost />
       <QuickSettings />
       <NotificationCenter />
+      <AeroBootOverlay />
       <ContextMenu
         open={!!ctxPos}
         x={ctxPos?.x ?? 0}
