@@ -26,6 +26,7 @@ import {
   perfSampleFrame,
   perfSetParticleCount,
 } from '../perf/perfHub';
+import { particlesForWall } from './frameworkBridge';
 
 const FIXED_DT = 1 / 60;
 const MAX_STEPS = 2;
@@ -51,6 +52,12 @@ function isNightish(tags: string[]): boolean {
 
 function resolvePresets(env: EnvironmentSettings): ParticlePresetId[] {
   if (env.matchParticleSuggestions) {
+    // Prefer explicit wallpaper-framework metadata for the active wall
+    // (Phase 3 · M1), else fall back to the tag heuristic.
+    if (env.rotationEnabled) {
+      const fw = particlesForWall(resolveWall(env)?.item.ref);
+      if (fw.length) return fw;
+    }
     return suggestPresetsFromTags(activeTags(env));
   }
   const list = env.particlePresets ?? [];
