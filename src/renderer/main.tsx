@@ -25,6 +25,8 @@ import './theme/frutiger-aero.css';
 // (Phase 1 · M4). Additive utility layers.
 import './theme/typography.css';
 import './theme/motion.css';
+// UI primitive library styles (Phase 1 · M5).
+import './components/ui/ui.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
