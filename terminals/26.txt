@@ -1,0 +1,10 @@
+---
+pid: 22424
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx electron tools/test-nhk-ctu-in.mjs 2>&1"
+started_at: 2026-07-12T05:53:51.165Z
+running_for_ms: 289999   
+---
+
+ctu=in { mainLen: 1178, marker: false, consent: true, step: '1/2' }
+_reload=1&ctu=in { mainLen: 1178, marker: false, consent: true, step: '1/2' }

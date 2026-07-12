@@ -1,0 +1,33 @@
+---
+pid: 1860
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx tsx tools/test-reader-sites.mjs 2>$null"
+started_at: 2026-07-12T05:15:23.435Z
+running_for_ms: 2600006  
+---
+
+=== Japanese sites ===
+PASS | NHK News       |  1145 chars | 960ms
+       イラン“ホルムズ海峡封鎖” 米軍“イランへの攻撃開始” | NHKニュース
+PASS | NHK Easy hub   |   339 chars | 120ms
+       NHKやさしいことばニュース | NEWS WEB EASY
+PASS | Wikipedia JP   | 77981 chars | 2673ms
+       日本 - Wikipedia
+FAIL | Yahoo News JP  |     0 chars | 10138ms
+       fetch failed
+FAIL | Mainichi       |     0 chars | 667ms
+       403 Forbidden
+
+=== Chinese sites ===
+FAIL | BBC Chinese    |     0 chars | 10442ms
+       fetch failed
+PASS | Wikipedia ZH   | 57303 chars | 1656ms
+       中国 - 维基百科，自由的百科全书
+PASS | RFI Chinese    |  1025 chars | 801ms
+       法广 - 时事与新闻直播 - RFI - 法国国际广播电台
+PASS | People Daily   |   189 chars | 844ms
+       人民网_网上的人民日报
+FAIL | Xinhua         |    64 chars | 1852ms
+       新华网_让新闻离你更近
+
+Total: 6/10 passed

@@ -1,0 +1,49 @@
+---
+pid: 38980
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx --yes playwright@1.49.0 install chromium 2>&1"
+started_at: 2026-07-12T05:35:26.131Z
+running_for_ms: 1394999  
+---
+Downloading Chromium 131.0.6778.33 (playwright build v1148) from https://playwright.azureedge.net/builds/chromium/1148/chromium-win64.zip
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ WARNING: It looks like you are running 'npx playwright install' without first ║
+║ installing your project's dependencies.                                       ║
+║                                                                               ║
+║ To avoid unexpected behavior, please install your dependencies first, and     ║
+║ then run Playwright's install command:                                        ║
+║                                                                               ║
+║     npm install                                                               ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+║ If your project does not yet depend on Playwright, first install the          ║
+║ applicable npm package (most commonly @playwright/test), and                  ║
+║ then run Playwright's install command to download the browsers:               ║
+║                                                                               ║
+║     npm install @playwright/test                                              ║
+║     npx playwright install                                                    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+|                                                                                |   0% of 136.9 MiB
+Downloading Chromium 131.0.6778.33 (playwright build v1148) from https://playwright-akamai.azureedge.net/builds/chromium/1148/chromium-win64.zip
+Error: Request to https://playwright.azureedge.net/builds/chromium/1148/chromium-win64.zip timed out after 30000ms
+    at ClientRequest.rejectOnTimeout (C:\Users\Arseniy\AppData\Local\npm-cache\_npx\bbb8a2c4738e2b0c\node_modules\playwright-core\lib\utils\network.js:76:15)
+    at Object.onceWrapper (node:events:630:28)
+    at ClientRequest.emit (node:events:509:28)
+    at TLSSocket.emitRequestTimeout (node:_http_client:948:9)
+    at Object.onceWrapper (node:events:630:28)
+    at TLSSocket.emit (node:events:521:24)
+    at Socket._onTimeout (node:net:610:8)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+|                                                                                |   0% of 136.9 MiB
+|■■■■■■■■                                                                        |  10% of 136.9 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 136.9 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 136.9 MiB

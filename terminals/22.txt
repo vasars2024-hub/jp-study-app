@@ -1,0 +1,11 @@
+---
+pid: 40052
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx electron tools/probe-nhk-network.mjs 2>&1"
+started_at: 2026-07-12T05:47:13.603Z
+running_for_ms: 690003   
+---
+
+main text len 1177 has marker false
+200 api.web.nhk/r8/const.json
+200 api.web.nhk/sokuho/news/sokuho_news.xml

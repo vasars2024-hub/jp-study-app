@@ -1,0 +1,55 @@
+import type { SettingsPageId } from './types';
+
+const KEY = 'jp-os-settings-recent-v1';
+const MAX_PAGES = 8;
+const MAX_QUERIES = 5;
+
+interface RecentStore {
+  pages: SettingsPageId[];
+  queries: string[];
+}
+
+function load(): RecentStore {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return { pages: [], queries: [] };
+    const p = JSON.parse(raw) as Partial<RecentStore>;
+    return {
+      pages: Array.isArray(p.pages) ? (p.pages.filter(Boolean) as SettingsPageId[]) : [],
+      queries: Array.isArray(p.queries) ? p.queries.filter((q) => typeof q === 'string') : [],
+    };
+  } catch {
+    return { pages: [], queries: [] };
+  }
+}
+
+function save(s: RecentStore): void {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getRecentPages(): SettingsPageId[] {
+  return load().pages;
+}
+
+export function getRecentQueries(): string[] {
+  return load().queries;
+}
+
+export function pushRecentPage(id: SettingsPageId): void {
+  if (id === 'home') return;
+  const s = load();
+  s.pages = [id, ...s.pages.filter((p) => p !== id)].slice(0, MAX_PAGES);
+  save(s);
+}
+
+export function pushRecentQuery(q: string): void {
+  const t = q.trim();
+  if (t.length < 2) return;
+  const s = load();
+  s.queries = [t, ...s.queries.filter((x) => x.toLowerCase() !== t.toLowerCase())].slice(0, MAX_QUERIES);
+  save(s);
+}

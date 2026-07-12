@@ -1,0 +1,249 @@
+// Local deck store for EPUB-mined flashcards with user folders and auto book groups.
+
+export type FlashcardSource = 'dictionary' | 'epub' | 'epub-ai' | 'import' | 'csv';
+
+export interface DeckFlashcard {
+  id: string;
+  word: string;
+  reading: string;
+  meaning: string;
+  sentence?: string;
+  front?: string;
+  back?: string;
+  source: FlashcardSource;
+  bookId?: string;
+  bookTitle?: string;
+  folder?: string;
+  /** Persisted study state — marked via review "Got it". */
+  known?: boolean;
+  addedAt: number;
+}
+
+export type DeckFolderFilter = 'all' | 'unfiled' | string;
+
+interface FlashcardDeckStore {
+  folders: string[];
+  cards: DeckFlashcard[];
+}
+
+import { IDB_KEYS, mirrorToIdb } from './storage/storage';
+
+const KEY = 'jp-flashcard-deck';
+const EVENT = 'flashcard-deck-changed';
+
+function newId(): string {
+  return `fc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readStore(): FlashcardDeckStore {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return { folders: [], cards: [] };
+    const parsed = JSON.parse(raw) as Partial<FlashcardDeckStore>;
+    return {
+      folders: Array.isArray(parsed.folders) ? parsed.folders.filter((f) => typeof f === 'string') : [],
+      cards: Array.isArray(parsed.cards) ? parsed.cards.filter((c) => c && typeof c.id === 'string') : [],
+    };
+  } catch {
+    return { folders: [], cards: [] };
+  }
+}
+
+function writeStore(store: FlashcardDeckStore): void {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(store));
+  } catch {
+    /* localStorage full — the IndexedDB mirror below still persists it */
+  }
+  // Write-through to IndexedDB: durable home for deck data. localStorage is
+  // just the synchronous cache (see storage/storage.ts).
+  mirrorToIdb(IDB_KEYS.flashcardDeck, store);
+  window.dispatchEvent(new CustomEvent(EVENT));
+}
+
+export function loadDeck(): DeckFlashcard[] {
+  return readStore().cards;
+}
+
+export function loadDeckFolders(): string[] {
+  return readStore().folders;
+}
+
+export function setDeckFolders(folders: string[]): string[] {
+  const store = readStore();
+  const next = folders.filter((f) => f.trim() && f !== 'all' && f !== 'unfiled');
+  store.folders = next;
+  writeStore(store);
+  return next;
+}
+
+export function createDeckFolder(name: string): string[] {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === 'all' || trimmed === 'unfiled') return loadDeckFolders();
+  const store = readStore();
+  if (store.folders.includes(trimmed)) return store.folders;
+  store.folders = [...store.folders, trimmed];
+  writeStore(store);
+  return store.folders;
+}
+
+export function deleteDeckFolder(name: string): { folders: string[]; cards: DeckFlashcard[] } {
+  const store = readStore();
+  store.folders = store.folders.filter((f) => f !== name);
+  store.cards = store.cards.map((c) => (c.folder === name ? { ...c, folder: undefined } : c));
+  writeStore(store);
+  return { folders: store.folders, cards: store.cards };
+}
+
+export function addDeckCards(entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[]): DeckFlashcard[] {
+  const store = readStore();
+  const now = Date.now();
+  const created = entries.map((entry, index) => ({
+    ...entry,
+    id: newId(),
+    addedAt: now + index,
+  }));
+  store.cards = [...created, ...store.cards];
+  writeStore(store);
+  return store.cards;
+}
+
+export function removeDeckCard(id: string): DeckFlashcard[] {
+  const store = readStore();
+  store.cards = store.cards.filter((c) => c.id !== id);
+  writeStore(store);
+  return store.cards;
+}
+
+/** Patch a card's editable fields in place (word/reading/meaning/sentence…). */
+export function updateDeckCard(
+  id: string,
+  patch: Partial<Pick<DeckFlashcard, 'word' | 'reading' | 'meaning' | 'sentence' | 'front' | 'back'>>,
+): DeckFlashcard[] {
+  const store = readStore();
+  store.cards = store.cards.map((c) => (c.id === id ? { ...c, ...patch } : c));
+  writeStore(store);
+  return store.cards;
+}
+
+export function setDeckCardFolder(id: string, folder: string | null): DeckFlashcard[] {
+  const store = readStore();
+  store.cards = store.cards.map((c) =>
+    c.id === id ? { ...c, folder: folder && folder.trim() ? folder.trim() : undefined } : c,
+  );
+  writeStore(store);
+  return store.cards;
+}
+
+export function setDeckCardKnown(id: string, known: boolean): DeckFlashcard[] {
+  const store = readStore();
+  store.cards = store.cards.map((c) => (c.id === id ? { ...c, known: known || undefined } : c));
+  writeStore(store);
+  return store.cards;
+}
+
+export function setBookGroupFolder(
+  bookId: string,
+  bookTitle: string,
+  folder: string | null,
+): DeckFlashcard[] {
+  const store = readStore();
+  const trimmed = folder?.trim();
+  store.cards = store.cards.map((c) => {
+    const matches =
+      (c.bookId || 'unknown') === bookId && (c.bookTitle || 'Unknown source') === bookTitle;
+    if (!matches) return c;
+    return { ...c, folder: trimmed || undefined };
+  });
+  writeStore(store);
+  return store.cards;
+}
+
+export function filterDeckByBook(cards: DeckFlashcard[], bookKey: string): DeckFlashcard[] {
+  if (bookKey === 'all') return cards;
+  return cards.filter((c) => `${c.bookId || 'unknown'}::${c.bookTitle || 'Unknown source'}` === bookKey);
+}
+
+export function removeBookGroup(bookId: string, bookTitle: string): DeckFlashcard[] {
+  const store = readStore();
+  store.cards = store.cards.filter(
+    (c) =>
+      !(
+        (c.bookId || 'unknown') === bookId &&
+        (c.bookTitle || 'Unknown source') === bookTitle
+      ),
+  );
+  writeStore(store);
+  return store.cards;
+}
+
+export function replaceImportedDeck(
+  bookId: string,
+  bookTitle: string,
+  entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[],
+): DeckFlashcard[] {
+  const store = readStore();
+  store.cards = store.cards.filter(
+    (c) =>
+      !(
+        (c.bookId || 'unknown') === bookId &&
+        (c.bookTitle || 'Unknown source') === bookTitle
+      ),
+  );
+  const now = Date.now();
+  const created = entries.map((entry, index) => ({
+    ...entry,
+    id: newId(),
+    addedAt: now + index,
+  }));
+  store.cards = [...created, ...store.cards];
+  writeStore(store);
+  return store.cards;
+}
+
+import type { ImportDeckEntry } from '../shared/deckImport';
+
+export function importDeckFromEntries(entries: ImportDeckEntry[]): DeckFlashcard[] {
+  if (!entries.length) return loadDeck();
+  const bookId = entries[0].bookId;
+  const bookTitle = entries[0].bookTitle;
+  return replaceImportedDeck(bookId, bookTitle, entries);
+}
+
+export function filterDeckCards(cards: DeckFlashcard[], filter: DeckFolderFilter): DeckFlashcard[] {
+  if (filter === 'all') return cards;
+  if (filter === 'unfiled') return cards.filter((c) => !c.folder);
+  return cards.filter((c) => c.folder === filter);
+}
+
+export interface BookGroup {
+  bookId: string;
+  bookTitle: string;
+  cards: DeckFlashcard[];
+}
+
+export function groupDeckByBook(cards: DeckFlashcard[]): BookGroup[] {
+  const map = new Map<string, BookGroup>();
+  for (const card of cards) {
+    const bookId = card.bookId || 'unknown';
+    const bookTitle = card.bookTitle || 'Unknown source';
+    const key = `${bookId}::${bookTitle}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.cards.push(card);
+    } else {
+      map.set(key, { bookId, bookTitle, cards: [card] });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.bookTitle.localeCompare(b.bookTitle));
+}
+
+export function onDeckChanged(cb: () => void): () => void {
+  const handler = (): void => cb();
+  window.addEventListener(EVENT, handler);
+  window.addEventListener('storage', handler);
+  return () => {
+    window.removeEventListener(EVENT, handler);
+    window.removeEventListener('storage', handler);
+  };
+}

@@ -1,0 +1,195 @@
+import type { CsvTable } from './csvEditor';
+import { normalizeTable } from './csvEditor';
+
+export type ImportDeckSource = 'import' | 'csv';
+
+export interface ImportDeckEntry {
+  word: string;
+  reading: string;
+  meaning: string;
+  sentence?: string;
+  front?: string;
+  back?: string;
+  source: ImportDeckSource;
+  bookId: string;
+  bookTitle: string;
+}
+
+export type DeckFieldKey = 'word' | 'reading' | 'meaning' | 'sentence' | 'front' | 'back' | 'skip';
+
+export const DECK_FIELD_OPTIONS: Array<{ id: DeckFieldKey; label: string }> = [
+  { id: 'word', label: 'Expression / Word' },
+  { id: 'reading', label: 'Reading' },
+  { id: 'meaning', label: 'Meaning / Definition' },
+  { id: 'sentence', label: 'Sentence' },
+  { id: 'front', label: 'Front' },
+  { id: 'back', label: 'Back' },
+  { id: 'skip', label: 'Skip' },
+];
+
+export type DeckColumnMapping = Record<number, DeckFieldKey>;
+
+const HEADER_HINTS: Array<[RegExp, DeckFieldKey]> = [
+  [/^expression$/i, 'word'],
+  [/^word$/i, 'word'],
+  [/^term$/i, 'word'],
+  [/^kanji$/i, 'word'],
+  [/^vocabulary$/i, 'word'],
+  [/^surface$/i, 'word'],
+  [/^reading$/i, 'reading'],
+  [/^kana$/i, 'reading'],
+  [/^furigana$/i, 'reading'],
+  [/^meaning$/i, 'meaning'],
+  [/^definition$/i, 'meaning'],
+  [/^gloss$/i, 'meaning'],
+  [/^translation$/i, 'meaning'],
+  [/^sentence$/i, 'sentence'],
+  [/^example$/i, 'sentence'],
+  [/^context$/i, 'sentence'],
+  [/^front$/i, 'front'],
+  [/^back$/i, 'back'],
+  [/^rear$/i, 'back'],
+];
+
+export function guessColumnMapping(headers: string[]): DeckColumnMapping {
+  const mapping: DeckColumnMapping = {};
+  const used = new Set<DeckFieldKey>();
+  headers.forEach((header, index) => {
+    const trimmed = header.trim();
+    for (const [re, field] of HEADER_HINTS) {
+      if (re.test(trimmed) && !used.has(field)) {
+        mapping[index] = field;
+        used.add(field);
+        return;
+      }
+    }
+  });
+  if (!Object.values(mapping).includes('word') && headers.length > 0) mapping[0] = 'word';
+  if (!Object.values(mapping).includes('reading') && headers.length > 1) {
+    const idx = headers.findIndex((_, i) => !mapping[i]);
+    if (idx >= 0) mapping[idx] = 'reading';
+  }
+  if (!Object.values(mapping).includes('meaning') && headers.length > 2) {
+    const idx = headers.findIndex((_, i) => !mapping[i]);
+    if (idx >= 0) mapping[idx] = 'meaning';
+  }
+  for (let i = 0; i < headers.length; i++) {
+    if (!mapping[i]) mapping[i] = 'skip';
+  }
+  return mapping;
+}
+
+export function deckBookId(deckTitle: string): string {
+  const slug = deckTitle
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  return `import-${slug || 'deck'}`;
+}
+
+export function rowsToDeckEntries(
+  table: CsvTable,
+  mapping: DeckColumnMapping,
+  deckTitle: string,
+  source: ImportDeckSource = 'import',
+): ImportDeckEntry[] {
+  const t = normalizeTable(table);
+  const title = deckTitle.trim() || 'Imported deck';
+  const bookId = deckBookId(title);
+  const out: ImportDeckEntry[] = [];
+
+  for (const row of t.rows) {
+    const fields: Partial<Record<DeckFieldKey, string>> = {};
+    row.forEach((cell, colIndex) => {
+      const key = mapping[colIndex] ?? 'skip';
+      if (key === 'skip') return;
+      const val = cell.trim();
+      if (!val) return;
+      fields[key] = fields[key] ? `${fields[key]}\n${val}` : val;
+    });
+
+    const word = fields.word || fields.front || '';
+    if (!word.trim()) continue;
+
+    const meaning = fields.meaning || fields.back || '';
+    out.push({
+      word: word.trim(),
+      reading: (fields.reading ?? '').trim(),
+      meaning: meaning.trim(),
+      sentence: fields.sentence?.trim() || undefined,
+      front: fields.front?.trim() || undefined,
+      back: fields.back?.trim() || undefined,
+      source,
+      bookId,
+      bookTitle: title,
+    });
+  }
+  return out;
+}
+
+/** Plain text: one word per line, or tab-separated expression / reading / meaning. */
+export function parsePlainTextImport(raw: string, deckTitle: string): ImportDeckEntry[] {
+  const lines = raw
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const bookId = deckBookId(deckTitle);
+  const title = deckTitle.trim() || 'Imported deck';
+  return lines.map((line) => {
+    if (line.includes('\t')) {
+      const parts = line.split('\t').map((p) => p.trim());
+      if (parts.length >= 3) {
+        return {
+          word: parts[0],
+          reading: parts[1],
+          meaning: parts.slice(2).join(' ').trim(),
+          source: 'import' as const,
+          bookId,
+          bookTitle: title,
+        };
+      }
+      return {
+        word: parts[0] ?? '',
+        reading: '',
+        meaning: parts[1] ?? '',
+        source: 'import' as const,
+        bookId,
+        bookTitle: title,
+      };
+    }
+    if (line.includes(',')) {
+      const parts = line.split(',').map((p) => p.trim().replace(/^"|"$/g, ''));
+      if (parts.length >= 3) {
+        return {
+          word: parts[0],
+          reading: parts[1],
+          meaning: parts.slice(2).join(', ').trim(),
+          source: 'import' as const,
+          bookId,
+          bookTitle: title,
+        };
+      }
+      if (parts.length === 2) {
+        return {
+          word: parts[0],
+          reading: '',
+          meaning: parts[1],
+          source: 'import' as const,
+          bookId,
+          bookTitle: title,
+        };
+      }
+    }
+    return {
+      word: line,
+      reading: '',
+      meaning: '',
+      source: 'import' as const,
+      bookId,
+      bookTitle: title,
+    };
+  });
+}

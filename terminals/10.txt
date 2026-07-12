@@ -1,0 +1,142 @@
+---
+pid: 15260
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npm start"
+started_at: 2026-07-12T05:09:37.055Z
+running_for_ms: 2960001  
+---
+
+> jp-study-app@1.0.0 start
+> electron-forge start
+
+> Checking your system
+> Checking package manager version
+√ Found npm@11.13.0
+√ Checking your system
+8:09:40 AM [@electron-forge/plugin-vite] target built src/preload.ts
+8:09:41 AM [@electron-forge/plugin-vite] target built src/main.ts
+
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:09:44 AM [vite] warning: The "??" operator here will always return the left operand
+65 |  
+66 |  export function cycleLevel(word: string): WkLevel {
+67 |    const next = (((getLevel(word) + 1) % 4) as WkLevel) ?? 0;
+   |                                                         ^
+68 |    setLevel(word, next, true);
+69 |    return next;
+
+  Plugin: vite:esbuild
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/knownWords.ts
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [storage] migration failed: [object DOMException]
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+8:10:53 AM [vite] page reload tools/nhk-raw.html
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A11%253A14.324Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A11%253A14.324Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A11%253A14.324Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A11%253A14.324Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A11%253A14.324Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.finishListener (node:electron/js2c/browser_init:2:89717)
+    at WebContents.emit (node:events:521:24) {
+  errno: -3,
+  code: '',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A11%253A14.324Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A12%253A45.324Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A12%253A45.324Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A12%253A45.324Z'
+}
+8:13:26 AM [vite] hmr update /src/renderer/views/LibraryView.tsx, /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+8:13:26 AM [vite] hmr update /src/renderer/views/LibraryView.tsx, /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+8:13:27 AM [vite] hmr update /src/renderer/views/LibraryView.tsx, /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+8:13:31 AM [vite] hmr update /src/renderer/views/LibraryView.tsx, /src/renderer/views/ImmersionView.tsx
+8:13:31 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx
+8:13:31 AM [vite] hmr update /src/renderer/views/LibraryView.tsx, /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+8:13:35 AM [vite] page reload tools/nhk-raw.html
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A13%253A47.323Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A13%253A47.323Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A13%253A47.323Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A14%253A49.335Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A14%253A49.335Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A14%253A49.335Z'
+}
+8:14:55 AM [@electron-forge/plugin-vite] target built src/main.ts
+8:14:56 AM [@electron-forge/plugin-vite] target built src/main.ts

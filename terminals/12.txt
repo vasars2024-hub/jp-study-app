@@ -1,0 +1,769 @@
+---
+pid: 40624
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx tsx tools/test-reader-sites.mjs"
+started_at: 2026-07-12T05:14:21.036Z
+running_for_ms: 2659993  
+---
+JSDOMParser error: Error reading attribute ")&&(ret, expecting '"'
+
+JSDOMParser error: expected '</e;)c=r[t++],cArray=c.split("="),"AD_TR"==cArray[0].trim(">' and got </script>
+<script async="async" src="https://fam.adingo.jp/
+
+JSDOMParser error: Error reading attribute arr, expecting '"'
+
+JSDOMParser error: Error reading attribute ],decode, expecting '"'
+
+JSDOMParser error: Error reading attribute ){var item, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.cookie.split("; ");for(var i, expecting '"'
+
+JSDOMParser error: Error reading attribute ;i<item.length;i++){var data, expecting '"'
+
+JSDOMParser error: Error reading attribute ";if(arr[key]!, expecting '"'
+
+JSDOMParser error: Error reading attribute +arr[key]}return val},setTargeting:function(){var dir, expecting '"'
+
+JSDOMParser error: Error reading attribute his.getDir(),par, expecting '"'
+
+JSDOMParser error: Error reading attribute his.getPar();function randomInt(min,max){return Math.floor(Math.random()*(max+1-min))+min}googletag.pubads().setTargeting("d1d",dir[0]).setTargeting("uri",dir).setTargeting("parameter",par).setTargeting("pageType",this.pageType).setTargeting("tagType",this.tagType).setTargeting("device",this.getDevice()).setTargeting("hostname",location.host).setTargeting("fluct_ad_group",String(randomInt(1,10)));if(document.referrer){googletag.pubads().setTargeting("refHost",document.referrer.split("/")[2])}if("cookieDeprecationLabel"in navigator){navigator.cookieDeprecationLabel.getValue().then(function(label){googletag.pubads().setTargeting("cookieDeprecationLabel",label)})}else{googletag.pubads().setTargeting("cookieDeprecationLabel","none")}},setSlotTargeting:function(){if(document.getElementsByName("yol:feature-name").item(0)){googletag.pubads().setTargeting("listTag",document.getElementsByName("yol:feature-name").item(0).content.split(","))}},setCtTargeting:function(){googletag.pubads().setTargeting("ct_segments",this.ct_obj["segments"]);googletag.pubads().setTargeting("ct_positive_score",this.ct_obj["positive_score"]);googletag.pubads().setTargeting("ct_emotion",this.ct_obj["emotion"])},adsDisplay:function(IgnitionSlots){var HBSlots, expecting '"'
+
+JSDOMParser error: Error reading attribute ],GAMSlots, expecting '"'
+
+JSDOMParser error: Error reading attribute ];for(var key in IgnitionSlots){this.adSlots[key]["Ignition"], expecting '"'
+
+JSDOMParser error: Error reading attribute alse;if(this.adSlots[key]["Type"], expecting '"'
+
+JSDOMParser error: Error reading attribute "HB"){this.dlog("HBSlot "+key+" 発火");HBSlots.push(this.adSlots[key]["Slot"])}else{this.dlog("GAMSlot "+key+" 発火");GAMSlots.push(this.adSlots[key]["Slot"])}}AD3.setSlotTargeting();if(HBSlots.length!, expecting '"'
+
+JSDOMParser error: Error reading attribute ){bsttag.launchAuction(HBSlots)}if(GAMSlots.length!, expecting '"'
+
+JSDOMParser error: Error reading attribute ){googletag.cmd.push(function(){googletag.pubads().refresh(GAMSlots)})}},adWakeUp:function(){this.adDevice, expecting '"'
+
+JSDOMParser error: Error reading attribute his.getDevice();var GroupTag, expecting '"'
+
+JSDOMParser error: Error reading attribute his.adDevice+"_group";var LazyTag, expecting '"'
+
+JSDOMParser error: Error reading attribute his.adDevice+"_lazy";var IgnitionSlots, expecting '"'
+
+JSDOMParser error: Error reading attribute };for(var key in this.adSlots){var margin, expecting '"'
+
+JSDOMParser error: Error reading attribute his.adSlots[key][LazyTag];if(this.adSlots[key]["Ignition"]){if(margin>, expecting '"'
+
+JSDOMParser error: Error reading attribute ){var elem, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.getElementById(key);if(elem!, expecting '"'
+
+JSDOMParser error: Error reading attribute null){var rect;if(elem.style.display, expecting '"'
+
+JSDOMParser error: Error reading attribute ;rect, expecting '"'
+
+JSDOMParser error: Error reading attribute }else{rect, expecting '"'
+
+JSDOMParser error: Error reading attribute lem.getBoundingClientRect()}if(-this.AD_HEIGHT-margin<rect.top&&rect.top<window.innerHeight+margin){IgnitionSlots[key], expecting '"'
+
+JSDOMParser error: Error reading attribute rue;if(this.adSlots[key][GroupTag]){for(var key2 in this.adSlots){if(this.adSlots[key2]["Ignition"]&&this.adSlots[key2][GroupTag], expecting '"'
+
+JSDOMParser error: Error reading attribute this.adSlots[key][GroupTag]&&document.getElementById(key2)!, expecting '"'
+
+JSDOMParser error: Error reading attribute null){IgnitionSlots[key2], expecting '"'
+
+JSDOMParser error: Error reading attribute rue}}}}}}else if(margin, expecting '"'
+
+JSDOMParser error: Error reading attribute -1){IgnitionSlots[key], expecting '"'
+
+JSDOMParser error: Error reading attribute rue}}}if(IgnitionSlots.length!, expecting '"'
+
+JSDOMParser error: Error reading attribute ){this.adsDisplay(IgnitionSlots)}},adsRefresh:function(){this.adDevice, expecting '"'
+
+JSDOMParser error: Error reading attribute his.getDevice();for(var key in this.adSlots){this.adSlots[key]["Ignition"], expecting '"'
+
+JSDOMParser error: Error reading attribute rue}this.adWakeUp()},makeBatsu:function(ov_slotElementId){var iframe_elm, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.getElementById(this.adOverlayDiv).querySelector("iframe[id^, expecting '"'
+
+JSDOMParser error: Error reading attribute oogle_ads_iframe]");ov_width, expecting '"'
+
+JSDOMParser error: Error reading attribute frame_elm.getBoundingClientRect().width;ov_height, expecting '"'
+
+JSDOMParser error: Error reading attribute frame_elm.getBoundingClientRect().height;this.dlog("Batsu Size:"+String(ov_height)+"px ");if(ov_height<50){return}var elm, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.getElementById(ov_slotElementId);var parent, expecting '"'
+
+JSDOMParser error: Error reading attribute ;var batsu_div, expecting '"'
+
+JSDOMParser error: Error reading attribute ;var window_width, expecting '"'
+
+JSDOMParser error: Error reading attribute ;var batsu_bottom, expecting '"'
+
+JSDOMParser error: Error reading attribute ,batsu_height, expecting '"'
+
+JSDOMParser error: Error reading attribute ;if(AD3.getDevice(), expecting '"'
+
+JSDOMParser error: Error reading attribute "PC"){batsu_bottom, expecting '"'
+
+JSDOMParser error: Error reading attribute 30;batsu_height, expecting '"'
+
+JSDOMParser error: Error reading attribute 38}batsu_div.style.bottom, expecting '"'
+
+JSDOMParser error: Error reading attribute v_height+batsu_bottom+"px";batsu_div.style.left, expecting '"'
+
+JSDOMParser error: Error reading attribute window_width-ov_width)/2+batsu_height+"px";var batsu_img, expecting '"'
+
+JSDOMParser error: Error reading attribute ;document.getElementById("batsu").remove()},false);parent.insertBefore(batsu_div,elm);this.adWakeUp()},adSlots:{ad_dfp_banner:{UnitPath:"YOL_banner",Type:"HB",GAMMapping:"mapping1",PC_lazy:-1,SP_lazy:-1,CollapseEmpty:1},ad_dfp_premiumrec:{UnitPath:"YOL_premiumrec",Type:"HB",GAMMapping:"mapping7",PC_lazy:-1,SP_lazy:-1,CollapseEmpty:1},ad_dfp_rec1:{UnitPath:"YOL_rec1",Type:"HB",GAMMapping:"mapping2",PC_lazy:-1,SP_lazy:400,CollapseEmpty:1},"ad_dfp_article-rec1":{UnitPath:"YOL_article-rec1",Type:"HB",GAMMapping:"mapping2",PC_lazy:400,SP_lazy:400,CollapseEmpty:1},"ad_dfp_middle-rec1":{UnitPath:"YOL_middle-rec1",Type:"HB",GAMMapping:"mapping4",PC_lazy:400,SP_lazy:150,CollapseEmpty:1},"ad_dfp_middle-rec2":{UnitPath:"YOL_middle-rec2",Type:"HB",GAMMapping:"mapping5",PC_lazy:400,SP_lazy:-2},"ad_dfp_meiboshita-left":{UnitPath:"YOL_meiboshita-left",Type:"HB",GAMMapping:"mapping8",PC_lazy:400,SP_lazy:400},"ad_dfp_meiboshita-right":{UnitPath:"YOL_meiboshita-right",Type:"HB",GAMMapping:"mapping5",PC_lazy:400,SP_lazy:-2},"ad_gam_sangiin-middle-rec1":{UnitPath:"yol_sangiin-middle-rec1",Type:"HB",GAMMapping:"mapping4",PC_lazy:400,SP_lazy:400},"ad_gam_sangiin-middle-rec2":{UnitPath:"yol_sangiin-middle-rec2",Type:"HB",GAMMapping:"mapping5",PC_lazy:400,SP_lazy:-2},ad_dfp_rec2:{UnitPath:"YOL_rec2",Type:"HB",GAMMapping:"mapping2",PC_lazy:600,SP_lazy:800},ad_dfp_inread:{UnitPath:"YOL_inread",Type:"HB",GAMMapping:"mapping6",PC_lazy:400,SP_lazy:400},"ad_dfp_feature-pr1":{UnitPath:"YOL_feature-pr1",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_feature-pr2":{UnitPath:"YOL_feature-pr2",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_feature-pr3":{UnitPath:"YOL_feature-pr3",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_weekly-pr":{UnitPath:"YOL_weekly-pr",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_topics-pr":{UnitPath:"YOL_topics-pr",Type:"GAM",PC_lazy:-2,SP_lazy:-2},"ad_dfp_news-txt1":{UnitPath:"YOL_news-txt1",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_news-txt2":{UnitPath:"YOL_news-txt2",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_news-txt3":{UnitPath:"YOL_news-txt3",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_news-txt4":{UnitPath:"YOL_news-txt4",Type:"GAM",PC_lazy:-1,SP_lazy:-1},"ad_dfp_thumbnail-txt1":{UnitPath:"YOL_thumbnail-txt1",Type:"GAM",PC_group:"ThumbTxT",SP_group:"ThumbTxT",PC_lazy:100,SP_lazy:100},"ad_dfp_thumbnail-txt2":{UnitPath:"YOL_thumbnail-txt2",Type:"GAM",PC_group:"ThumbTxT",SP_group:"ThumbTxT",PC_lazy:100,SP_lazy:100},"ad_dfp_thumbnail-txt3":{UnitPath:"YOL_thumbnail-txt3",Type:"GAM",PC_group:"ThumbTxT",SP_group:"ThumbTxT",PC_lazy:100,SP_lazy:100},"ad_dfp_thumbnail-txt4":{UnitPath:"YOL_thumbnail-txt4",Type:"GAM",PC_group:"ThumbTxT",SP_group:"ThumbTxT",PC_lazy:100,SP_lazy:100},ad_dfp_overlay:{UnitPath:"YOL_overlay2025",Type:"HB",GAMMapping:"mapping3",PC_lazy:-1,SP_lazy:-2,overlay:"ON"},"ad_dfp_top-infeed1":{UnitPath:"YOL_top-infeed1",Type:"GAM",PC_lazy:600,SP_lazy:400},"ad_dfp_top-infeed7":{UnitPath:"YOL_top-infeed7",Type:"GAM",PC_lazy:600,SP_lazy:400},"ad_dfp_top-infeed8":{UnitPath:"YOL_top-infeed8",Type:"GAM",PC_lazy:600,SP_lazy:-2}},Mapping:{mapping1:[[[583,0],[[970,1],[970,250],[728,90],[970,300]]],[[0,0],[[320,1],[320,50],[320,100],[320,120],[320,180],[1,1]]]],mapping2:[[[583,0],[[300,250],[300,600],[1,1]]],[[336,280],[[300,250],[336,280],[1,1]]],[[0,0],[[300,250],[1,1]]]],mapping3:[[[583,0],[[728,90],[970,90],[728,91],[1,1]]],[[0,0],[[320,70],[320,50],[320,100],[320,120],[1,1]]]],mapping4:[[[583,0],[[300,250],[336,280],[1,1]]],[[336,280],[[300,250],[300,600],[336,280],[1,1]]],[[0,0],[[300,250],[300,600],[1,1]]]],mapping5:[[[583,0],[[300,250],[1,1]]],[[0,0],[]]],mapping6:[[[583,0],[[640,360],[640,1],[1,1],"fluid"]],[[0,0],[[320,180],[320,1],[1,1],"fluid"]]],mapping7:[[[583,0],[[300,250],[300,1]]],[[336,280],[[320,100],[300,250],[336,280],[300,600],[300,1],[1,1],"fluid"]],[[0,0],[[320,100],[300,250],[300,600],[300,1],[1,1],"fluid"]]],mapping8:[[[583,0],[[300,250],[336,280],[1,1]]],[[336,280],[[300,250],[336,280],[1,1]]],[[0,0],[[300,250],[1,1]]]]}};var D_str, expecting '"'
+
+JSDOMParser error: Error reading attribute ];AD3, expecting '"'
+
+JSDOMParser error: Error reading attribute D3||{};window.googletag, expecting '"'
+
+JSDOMParser error: Error reading attribute indow.googletag||{cmd:[]};googletag.cmd.push(function(){var kiji_id, expecting '"'
+
+JSDOMParser error: Error reading attribute D3.getDir().slice(-1)[0];var regex, expecting '"'
+
+JSDOMParser error: Error reading attribute ;if(window.sessionStorage){ct_json, expecting '"'
+
+JSDOMParser error: Error reading attribute essionStorage.getItem(id_prefix+kiji_id);if(ct_json!, expecting '"'
+
+JSDOMParser error: Error reading attribute ull){AD3.ct_obj, expecting '"'
+
+JSDOMParser error: Error reading attribute SON.parse(ct_json);AD3.setCtTargeting()}}if(Object.keys(AD3.ct_obj).length, expecting '"'
+
+JSDOMParser error: Error reading attribute +kiji_id+"/context.json";var xhr, expecting '"'
+
+JSDOMParser error: Error reading attribute ew XMLHttpRequest;xhr.onload, expecting '"'
+
+JSDOMParser error: Error reading attribute unction(){if(xhr.status, expecting '"'
+
+JSDOMParser error: Error reading attribute 200){AD3.ct_obj, expecting '"'
+
+JSDOMParser error: Error reading attribute hr.response;AD3.ct_obj["segments"], expecting '"'
+
+JSDOMParser error: Error reading attribute D3.ct_obj["segments"].map(String);AD3.ct_obj["positive_score"], expecting '"'
+
+JSDOMParser error: Error reading attribute tring(AD3.ct_obj["positive_score"]);AD3.ct_obj["emotion"], expecting '"'
+
+JSDOMParser error: Error reading attribute tring(AD3.ct_obj["emotion"]);AD3.setCtTargeting();if(window.sessionStorage){sessionStorage.setItem(id_prefix+kiji_id,JSON.stringify(AD3.ct_obj))}}};xhr.open("GET",APIurl,true);xhr.timeout, expecting '"'
+
+JSDOMParser error: Error reading attribute e3;xhr.ontimeout, expecting '"'
+
+JSDOMParser error: Error reading attribute ), expecting '"'
+
+JSDOMParser error: Error reading attribute ;xhr.send()}}for(var key in AD3.adSlots){if(AD3.adSlots[key]["UnitPath"].indexOf("/")!, expecting '"'
+
+JSDOMParser error: Error reading attribute 0){AD3.adSlots[key]["UnitPath"], expecting '"'
+
+JSDOMParser error: Error reading attribute D3.adUnitCode+AD3.adSlots[key]["UnitPath"]}var tmpSlot, expecting '"'
+
+JSDOMParser error: Error reading attribute D3.adSlots[key];if(tmpSlot["GAMMapping"]){AD3.adSlots[key]["Slot"], expecting '"'
+
+JSDOMParser error: Error reading attribute oogletag.defineSlot(tmpSlot["UnitPath"],[[1,1]],key).defineSizeMapping(AD3.Mapping[tmpSlot["GAMMapping"]]).addService(googletag.pubads())}else{AD3.adSlots[key]["Slot"], expecting '"'
+
+JSDOMParser error: Error reading attribute oogletag.defineSlot(tmpSlot["UnitPath"],[[1,1],"fluid"],key).addService(googletag.pubads())}if(tmpSlot["CollapseEmpty"]){AD3.adSlots[key]["Slot"], expecting '"'
+
+JSDOMParser error: Error reading attribute D3.adSlots[key]["Slot"].setCollapseEmptyDiv(true)}if(tmpSlot["overlay"]){AD3.adOverlayDiv, expecting '"'
+
+JSDOMParser error: Error reading attribute ey}}if(ad_tr()){googletag.pubads().setPublisherProvidedId(AD3.getCookieValue("one_td_ssc_id"))}googletag.pubads().collapseEmptyDivs(true);googletag.pubads().disableInitialLoad();googletag.pubads().enableSingleRequest();googletag.enableServices();AD3.setTargeting();AD3.adsRefresh();AD3.adWakeUp();googletag.pubads().addEventListener("slotRenderEnded",function(event){if(!event.isEmpty){var slotElementId, expecting '"'
+
+JSDOMParser error: Error reading attribute vent.slot.getSlotElementId();if(slotElementId, expecting '"'
+
+JSDOMParser error: Error reading attribute "ad_dfp_banner"){if(AD3.getDevice(), expecting '"'
+
+JSDOMParser error: Error reading attribute "PC"){AD3.dlog("Banner "+event.size[0]+"x"+event.size[1]);var bnrDiv, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.querySelector("#"+slotElementId);if(event.size[0], expecting '"'
+
+JSDOMParser error: Error reading attribute }}else{var banner_iframe_elm, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.getElementById("ad_dfp_banner").querySelector("iframe[id^, expecting '"'
+
+JSDOMParser error: Error reading attribute oogle_ads_iframe]");banner_iframe_elm.addEventListener("load",function(){var winners, expecting '"'
+
+JSDOMParser error: Error reading attribute ;winners.forEach(function(element){if(element.adUnitCode, expecting '"'
+
+JSDOMParser error: Error reading attribute AD3.adUnitCode+"YOL_banner"){AD3.dlog("BannerHbWin:"+element.bidderCode);winBidderCode, expecting '"'
+
+JSDOMParser error: Error reading attribute lement.bidderCode}});if(winBidderCode, expecting '"'
+
+JSDOMParser error: Error reading attribute ""&&((event.size[0], expecting '"'
+
+JSDOMParser error: Error reading attribute "320"||event.size[0], expecting '"'
+
+JSDOMParser error: Error reading attribute "1")&&event.size[1], expecting '"'
+
+JSDOMParser error: Error reading attribute "1")){AD3.adSlots[AD3.adOverlayDiv]["Ignition"], expecting '"'
+
+JSDOMParser error: Error reading attribute alse}else if(winBidderCode, expecting '"'
+
+JSDOMParser error: Error reading attribute "relaido"||winBidderCode, expecting '"'
+
+JSDOMParser error: Error reading attribute "fluct"){AD3.adSlots[AD3.adOverlayDiv]["Ignition"], expecting '"'
+
+JSDOMParser error: Error reading attribute alse}if(AD3.adSlots[AD3.adOverlayDiv]["Ignition"]){var IgnitionSlots, expecting '"'
+
+JSDOMParser error: Error reading attribute };IgnitionSlots[AD3.adOverlayDiv], expecting '"'
+
+JSDOMParser error: Error reading attribute rue;AD3.adsDisplay(IgnitionSlots)}else{var e, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.querySelector("#ad_dfp_overlay");var p, expecting '"'
+
+JSDOMParser error: Error reading attribute }banner_iframe_elm.removeEventListener("load",arguments.callee)})}}else if(slotElementId, expecting '"'
+
+JSDOMParser error: Error reading attribute }}else if(slotElementId.includes("-infeed")&&event.advertiserId, expecting '"'
+
+JSDOMParser error: Error reading attribute "5221751233"){var infDiv, expecting '"'
+
+JSDOMParser error: Error reading attribute ocument.getElementById(slotElementId);var infParentDiv, expecting '"'
+
+JSDOMParser error: Error reading attribute }}});googletag.pubads().addEventListener("slotOnload",function(event){var slot, expecting '"'
+
+JSDOMParser error: Error reading attribute vent.slot;var response, expecting '"'
+
+JSDOMParser error: Error reading attribute lot.getResponseInformation();slotElementId, expecting '"'
+
+JSDOMParser error: Error reading attribute lot.getSlotElementId();if(slotElementId, expecting '"'
+
+JSDOMParser error: Error reading attribute AD3.adOverlayDiv&&document.getElementById("batsu"), expecting '"'
+
+JSDOMParser error: Error reading attribute null){setTimeout(function(){AD3.makeBatsu(AD3.adOverlayDiv)},2e3)}if(slotElementId, expecting '"'
+
+JSDOMParser error: Error reading attribute "ad_dfp_premiumrec"&&![55902855,5651657649].includes(response.advertiserId)){var ad_position;if(AD3.getDevice(), expecting '"'
+
+JSDOMParser error: Error reading attribute }const ad_div, expecting '"'
+
+JSDOMParser error: expected '</window.innerWidth){return"PC"}else{return"SP"}},getCookie:function(){var>' and got </div>');ad_div.style.cssText="display:flex;flex-flow: column;"}});var AdTi
+
+JSDOMParser error: expected '</script>' and got </div>');
+
+JSDOMParser error: expected '</meta>' and got </div>'
+
+JSDOMParser error: expected '</meta>' and got </div>'
+
+JSDOMParser error: expected '</meta>' and got </div>'
+
+JSDOMParser error: expected '</head>' and got </div>'
+
+JSDOMParser error: expected '</html>' and got </div>'
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </a>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+<
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </nosc
+
+JSDOMParser error: expected '</main>' and got </div>
+
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</body>' and got </main>
+
+JSDOMParser error: expected '</html>' and got </main>
+
+JSDOMParser error: expected '</link>' and got </noscr
+
+JSDOMParser error: expected '</link>' and got </noscr
+
+JSDOMParser error: Error reading attribute ready",supportedAPIs:["2:tcfeuv2","5:tcfcav1","6:uspv1","7:usnat","8:usca","9:usva","10:usco","11:usut","12:usct"],cmpId:"7",sectionList:[],applicableSections:[],gppString:"",parsedSections:{}}},true)}
+        else if(t, expecting '"'
+
+JSDOMParser error: Error reading attribute "hasSection"){p(false,true)}else if(t, expecting '"'
+
+JSDOMParser error: Error reading attribute "getSection"||t, expecting '"'
+
+JSDOMParser error: Error reading attribute "getField"){p(null,true)}else{__gpp.queue.push([].slice.apply(e))}};window.__gpp_msghandler, expecting '"'
+
+JSDOMParser error: Error reading attribute unction(s){var n, expecting '"'
+
+JSDOMParser error: Error reading attribute ypeof s.data, expecting '"'
+
+JSDOMParser error: Error reading attribute "string";try{var e, expecting '"'
+
+JSDOMParser error: Error reading attribute ?JSON.parse(s.data):s.data}catch(t){var e, expecting '"'
+
+JSDOMParser error: Error reading attribute ull}if(typeof e, expecting '"'
+
+JSDOMParser error: Error reading attribute "object"&&e!, expecting '"'
+
+JSDOMParser error: Error reading attribute null&&"__gppCall"in e){var a, expecting '"'
+
+JSDOMParser error: Error reading attribute .__gppCall;window.__gpp(a.command,function(e,t){var p, expecting '"'
+
+JSDOMParser error: Error reading attribute __gppReturn:{returnValue:e,success:t,callId:a.callId}};s.source.postMessage(n?JSON.stringify(p):p,"*")},"parameter"in a?a.parameter:null,"version"in a?a.version:"1.1")}};
+        if(!("__gpp"in window)||typeof window.__gpp!, expecting '"'
+
+JSDOMParser error: Error reading attribute "function"){window.__gpp, expecting '"'
+
+JSDOMParser error: expected '</__gpp.events.length;i++){if(__gpp.events[i].id==s){__gpp.events.splice(i,1);a=true;break}}p({eventName:"listenerRemoved",listenerId:s,data:a,pingData:{gppVersion:"1.1",cmpStatus:"stub",cmpDisplayStatus:"hidden",signalStatus:"not>' and got </script>
+                                        </head>
+
+            <body class="u-header-sticky u-header-with-tag-list u-playlist-enabled"
+                  data-cmp-theme="rfi"
+                              data-site-nav-state
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</div>' and got </a>
+ 
+
+JSDOMParser error: expected '</body>' and got </a>
+  
+
+JSDOMParser error: expected '</html>' and got </a>
+  
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </a>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+<
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </nosc
+
+JSDOMParser error: expected '</main>' and got </div>
+
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</body>' and got </main>
+
+JSDOMParser error: expected '</html>' and got </main>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</img>' and got </a>
+ 
+
+JSDOMParser error: expected '</img>' and got </a>
+ 
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </li><
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </h1><
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: Error reading attribute target, expecting '"'
+
+JSDOMParser error: expected '</h2>' and got </a>
+
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</body>' and got </a>
+</
+
+JSDOMParser error: expected '</html>' and got </a>
+</
+
+JSDOMParser error: expected '</script>' and got 0) {
+    
+
+JSDOMParser error: expected '</link>' and got 0) {
+  
+
+JSDOMParser error: expected '</link>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</link>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</head>' and got 0) {
+  
+
+JSDOMParser error: expected '</html>' and got 0) {
+  
+
+
+=== Japanese sites ===
+PASS | NHK News       |  1145 chars | 886ms
+       イラン“ホルムズ海峡封鎖” 米軍“イランへの攻撃開始” | NHKニュース
+FAIL | NHK Easy       |     0 chars | 585ms
+       404 Not Found
+FAIL | Asahi          |     0 chars | 1619ms
+       404 Not Found
+FAIL | Yomiuri        |     0 chars | 2623ms
+       First argument to Readability constructor should be a document object.
+FAIL | Wikipedia JP   |     0 chars | 855ms
+       First argument to Readability constructor should be a document object.
+
+=== Chinese sites ===
+PASS | BBC Chinese    |   885 chars | 606ms
+       主页 - BBC News 中文
+FAIL | RFI Chinese    |     0 chars | 661ms
+       First argument to Readability constructor should be a document object.
+FAIL | Wikipedia ZH   |     0 chars | 1423ms
+       First argument to Readability constructor should be a document object.
+FAIL | People Daily   |     0 chars | 1052ms
+       First argument to Readability constructor should be a document object.
+FAIL | Xinhua         |     0 chars | 1891ms
+       First argument to Readability constructor should be a document object.
+
+Total: 2/10 passed

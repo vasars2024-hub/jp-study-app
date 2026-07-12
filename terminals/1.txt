@@ -1,0 +1,14 @@
+---
+pid: 30712
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "grok models 2>&1"
+started_at: 2026-07-11T17:32:06.728Z
+running_for_ms: 69995    
+---
+You are logged in with grok.com.
+
+Default model: grok-composer-2.5-fast
+
+Available models:
+  * grok-composer-2.5-fast (default)
+  - grok-build

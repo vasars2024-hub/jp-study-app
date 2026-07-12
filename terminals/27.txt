@@ -1,0 +1,20 @@
+---
+pid: 16600
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx electron tools/test-nhk-cleanup.mjs 2>&1"
+started_at: 2026-07-12T05:55:09.651Z
+running_for_ms: 209999   
+---
+
+App threw an error during load
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\Users\Arseniy\Projects\jp-study-app\src\shared\readabilityClean' imported from C:\Users\Arseniy\Projects\jp-study-app\src\renderer\readabilityArticle.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    at moduleResolve (node:internal/modules/esm/resolve:873:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1000:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)
+    at #resolve (node:internal/modules/esm/loader:679:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:162:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:252:17)

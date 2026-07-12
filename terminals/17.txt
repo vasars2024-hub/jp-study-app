@@ -1,0 +1,12 @@
+---
+pid: 41140
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx tsx tools/probe-nhk-cleanup.mjs"
+started_at: 2026-07-12T05:23:59.592Z
+running_for_ms: 2080011  
+---
+after cleanup 0
+has 注目 false
+has あわせて false
+has 深掘り false
+sample 

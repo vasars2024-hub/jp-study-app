@@ -1,0 +1,530 @@
+---
+pid: 34984
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx tsx tools/test-reader-sites.mjs 2>$null"
+started_at: 2026-07-12T05:14:57.008Z
+running_for_ms: 2625002  
+---
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </a>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+<
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </nosc
+
+JSDOMParser error: expected '</main>' and got </div>
+
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</body>' and got </main>
+
+JSDOMParser error: expected '</html>' and got </main>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </a>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+<
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</input>' and got </div>
+
+
+
+JSDOMParser error: expected '</img>' and got </nosc
+
+JSDOMParser error: expected '</main>' and got </div>
+
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</div>' and got </main
+
+JSDOMParser error: expected '</body>' and got </main>
+
+JSDOMParser error: expected '</html>' and got </main>
+
+JSDOMParser error: expected '</link>' and got </noscr
+
+JSDOMParser error: expected '</link>' and got </noscr
+
+JSDOMParser error: Error reading attribute ready",supportedAPIs:["2:tcfeuv2","5:tcfcav1","6:uspv1","7:usnat","8:usca","9:usva","10:usco","11:usut","12:usct"],cmpId:"7",sectionList:[],applicableSections:[],gppString:"",parsedSections:{}}},true)}
+        else if(t, expecting '"'
+
+JSDOMParser error: Error reading attribute "hasSection"){p(false,true)}else if(t, expecting '"'
+
+JSDOMParser error: Error reading attribute "getSection"||t, expecting '"'
+
+JSDOMParser error: Error reading attribute "getField"){p(null,true)}else{__gpp.queue.push([].slice.apply(e))}};window.__gpp_msghandler, expecting '"'
+
+JSDOMParser error: Error reading attribute unction(s){var n, expecting '"'
+
+JSDOMParser error: Error reading attribute ypeof s.data, expecting '"'
+
+JSDOMParser error: Error reading attribute "string";try{var e, expecting '"'
+
+JSDOMParser error: Error reading attribute ?JSON.parse(s.data):s.data}catch(t){var e, expecting '"'
+
+JSDOMParser error: Error reading attribute ull}if(typeof e, expecting '"'
+
+JSDOMParser error: Error reading attribute "object"&&e!, expecting '"'
+
+JSDOMParser error: Error reading attribute null&&"__gppCall"in e){var a, expecting '"'
+
+JSDOMParser error: Error reading attribute .__gppCall;window.__gpp(a.command,function(e,t){var p, expecting '"'
+
+JSDOMParser error: Error reading attribute __gppReturn:{returnValue:e,success:t,callId:a.callId}};s.source.postMessage(n?JSON.stringify(p):p,"*")},"parameter"in a?a.parameter:null,"version"in a?a.version:"1.1")}};
+        if(!("__gpp"in window)||typeof window.__gpp!, expecting '"'
+
+JSDOMParser error: Error reading attribute "function"){window.__gpp, expecting '"'
+
+JSDOMParser error: expected '</__gpp.events.length;i++){if(__gpp.events[i].id==s){__gpp.events.splice(i,1);a=true;break}}p({eventName:"listenerRemoved",listenerId:s,data:a,pingData:{gppVersion:"1.1",cmpStatus:"stub",cmpDisplayStatus:"hidden",signalStatus:"not>' and got </script>
+                                        </head>
+
+            <body class="u-header-sticky u-header-with-tag-list u-playlist-enabled"
+                  data-cmp-theme="rfi"
+                              data-site-nav-state
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</div>' and got </a>
+ 
+
+JSDOMParser error: expected '</body>' and got </a>
+  
+
+JSDOMParser error: expected '</html>' and got </a>
+  
+
+JSDOMParser error: expected '</link>' and got </head>
+
+JSDOMParser error: expected '</meta>' and got </head>
+
+JSDOMParser error: expected '</img>' and got </a>
+ 
+
+JSDOMParser error: expected '</img>' and got </a>
+ 
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </li><
+
+JSDOMParser error: expected '</img>' and got </span
+
+JSDOMParser error: expected '</img>' and got </h1><
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: expected '</img>' and got </a></
+
+JSDOMParser error: Error reading attribute target, expecting '"'
+
+JSDOMParser error: expected '</h2>' and got </a>
+
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</div>' and got </a>
+<
+
+JSDOMParser error: expected '</body>' and got </a>
+</
+
+JSDOMParser error: expected '</html>' and got </a>
+</
+
+JSDOMParser error: expected '</script>' and got 0) {
+    
+
+JSDOMParser error: expected '</link>' and got 0) {
+  
+
+JSDOMParser error: expected '</link>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</link>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</meta>' and got 0) {
+  
+
+JSDOMParser error: expected '</head>' and got 0) {
+  
+
+JSDOMParser error: expected '</html>' and got 0) {
+  
+
+
+=== Japanese sites ===
+PASS | NHK News       |  1145 chars | 1619ms
+       イラン“ホルムズ海峡封鎖” 米軍“イランへの攻撃開始” | NHKニュース
+PASS | NHK Easy hub   |   339 chars | 150ms
+       NHKやさしいことばニュース | NEWS WEB EASY
+PASS | Wikipedia JP   | 77981 chars | 2423ms
+       日本 - Wikipedia
+FAIL | Yahoo News JP  |     0 chars | 1757ms
+       403 Forbidden
+FAIL | Mainichi       |     0 chars | 481ms
+       403 Forbidden
+
+=== Chinese sites ===
+PASS | BBC Chinese    |   885 chars | 762ms
+       主页 - BBC News 中文
+PASS | Wikipedia ZH   | 57302 chars | 1292ms
+       中國 - 维基百科，自由的百科全书
+PASS | RFI Chinese    |  1025 chars | 921ms
+       法广 - 时事与新闻直播 - RFI - 法国国际广播电台
+PASS | People Daily   |   189 chars | 1218ms
+       人民网_网上的人民日报
+FAIL | Xinhua         |    64 chars | 1007ms
+       新华网_让新闻离你更近
+
+Total: 7/10 passed

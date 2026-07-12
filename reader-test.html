@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reader layout test</title>
+    <style>
+      :root { --bg:#15151b; --fg:#d9d9e3; }
+      * { box-sizing: border-box; }
+      html, body { height:100%; margin:0; background:#0e0e12; color:#eee;
+        font-family:'Yu Gothic','Noto Sans JP',sans-serif; overflow:hidden; }
+      .reader { display:grid; grid-template-rows:auto minmax(0,1fr) auto; height:100%; }
+      .bar { display:flex; gap:10px; align-items:center; padding:8px 14px; background:#15151b;
+        border-bottom:1px solid #333; flex-wrap:wrap; }
+      .bar button, .bar select { background:#2c2d3a; color:#eee; border:1px solid #444;
+        border-radius:6px; padding:6px 10px; cursor:pointer; }
+      .bar button.on { background:#e0556a; border-color:#e0556a; }
+      .stage { position:relative; overflow:hidden; background:var(--bg); }
+      .scroller { position:absolute; inset:0; }
+      .content { box-sizing:border-box; color:var(--fg); font-size:150%; line-height:1.8; margin:0 auto; }
+      .content p { margin:0 0 1em; }
+      .ch { }
+      .foot { display:flex; gap:12px; align-items:center; padding:8px 14px; background:#15151b;
+        border-top:1px solid #333; }
+      .foot input[type=range]{ flex:1; }
+      .pct { min-width:44px; text-align:right; font-variant-numeric:tabular-nums; }
+      .diag { font-size:12px; color:#9a9ab0; white-space:pre; }
+    </style>
+  </head>
+  <body>
+    <div class="reader">
+      <div class="bar">
+        <button id="prev">‹ Prev</button>
+        <button id="next">Next ›</button>
+        <span>Mode:</span>
+        <button data-flow="scroll" class="flowbtn on">Scroll</button>
+        <button data-flow="paged" class="flowbtn">Pages</button>
+        <span>Dir:</span>
+        <button data-dir="horizontal" class="dirbtn on">横 Rows</button>
+        <button data-dir="vertical" class="dirbtn">縦 Tategaki</button>
+        <span class="diag" id="diag"></span>
+      </div>
+      <div class="stage">
+        <div class="scroller" id="scroller">
+          <div class="content" id="content"></div>
+        </div>
+      </div>
+      <div class="foot">
+        <button id="toStart">⏮ start</button>
+        <button id="toEnd">end ⏭</button>
+        <input type="range" id="seek" min="0" max="1000" value="0" />
+        <span class="pct" id="pct">0%</span>
+      </div>
+    </div>
+
+    <script>
+      // ---- generate sample content: several chapters of Japanese text ----
+      const SENT = [
+        'これは縦書きと横書きの両方をテストするためのサンプル文章です。',
+        '吾輩は猫である。名前はまだ無い。どこで生れたか頓と見当がつかぬ。',
+        '国境の長いトンネルを抜けると雪国であった。夜の底が白くなった。',
+        '「よっす」と、ぼくの正面の椅子に、彼女は座った。何かの罰ゲームだろうか。',
+        'メロスは激怒した。必ず、かの邪智暴虐の王を除かなければならぬと決意した。',
+      ];
+      const content = document.getElementById('content');
+      let html = '';
+      for (let c = 0; c < 12; c++) {
+        html += `<div class="ch" id="ch-${c}" data-index="${c}"><h3>第${c + 1}章</h3>`;
+        for (let p = 0; p < 8; p++) {
+          let para = '';
+          for (let s = 0; s < 6; s++) para += SENT[(c + p + s) % SENT.length];
+          html += `<p>${para}</p>`;
+        }
+        html += `</div>`;
+      }
+      content.innerHTML = html;
+
+      // ---- state (initial mode can be set via ?flow=paged&dir=vertical) ----
+      const params = new URLSearchParams(location.search);
+      let flow = params.get('flow') === 'paged' ? 'paged' : 'scroll';
+      let dir = params.get('dir') === 'vertical' ? 'vertical' : 'horizontal';
+      const scroller = document.getElementById('scroller');
+      const stage = scroller.parentElement;
+      const seek = document.getElementById('seek');
+      const pct = document.getElementById('pct');
+      const diag = document.getElementById('diag');
+
+      function vertical() { return dir === 'vertical'; }
+      function paged() { return flow === 'paged'; }
+      function axis() { return !vertical() && !paged() ? 'y' : 'x'; }
+      function rtl() { return vertical(); }
+
+      function applyLayout() {
+        const v = vertical(), pg = paged(), ax = axis();
+        // scroller overflow
+        scroller.style.overflowX = ax === 'x' ? 'auto' : 'hidden';
+        scroller.style.overflowY = ax === 'y' ? 'auto' : 'hidden';
+        // content
+        content.style.writingMode = v ? 'vertical-rl' : 'horizontal-tb';
+        content.style.height = (v || pg) ? '100%' : 'auto';
+        content.style.maxWidth = (!v && !pg) ? '46rem' : 'none';
+        content.style.padding = v ? '4% 24px' : pg ? '28px 0' : '24px 4%';
+        if (pg && !v) {
+          const w = scroller.clientWidth;
+          content.style.columnWidth = w + 'px';
+          content.style.columnGap = '0px';
+          content.style.columnFill = 'auto';
+        } else {
+          content.style.columnWidth = '';
+          content.style.columnGap = '';
+          content.style.columnFill = '';
+        }
+        updateReadout();
+      }
+
+      // CRITICAL: for writing-mode:vertical-rl Chrome's scrollLeft range is
+      // [0, max] where max = START (right/第1章) and 0 = END (left). Reading
+      // forward moves scrollLeft from max toward 0 — so the *fraction* is
+      // inverted (1 - scrollLeft/max), and paging forward decreases scrollLeft.
+      function readFraction() {
+        if (axis() === 'y') {
+          const max = scroller.scrollHeight - scroller.clientHeight;
+          return max > 0 ? scroller.scrollTop / max : 0;
+        }
+        const max = scroller.scrollWidth - scroller.clientWidth;
+        if (max <= 0) return 0;
+        const f = scroller.scrollLeft / max;
+        return rtl() ? 1 - f : f;
+      }
+      function applyFraction(f) {
+        f = Math.min(1, Math.max(0, f));
+        if (axis() === 'y') {
+          scroller.scrollTop = f * (scroller.scrollHeight - scroller.clientHeight);
+        } else {
+          const max = scroller.scrollWidth - scroller.clientWidth;
+          let target = (rtl() ? 1 - f : f) * max;
+          if (paged()) { const pw = scroller.clientWidth; target = Math.round(target / pw) * pw; }
+          scroller.scrollLeft = target;
+        }
+      }
+      function pageBy(d) {
+        if (axis() === 'y') scroller.scrollBy({ top: d * (scroller.clientHeight - 40), behavior: 'smooth' });
+        else scroller.scrollBy({ left: (rtl() ? -1 : 1) * d * (scroller.clientWidth - 40), behavior: 'smooth' });
+      }
+      function updateReadout() {
+        const f = readFraction();
+        seek.value = Math.round(f * 1000);
+        pct.textContent = Math.round(f * 100) + '%';
+        diag.textContent =
+          `axis=${axis()} rtl=${rtl()} sL=${Math.round(scroller.scrollLeft)} sW=${scroller.scrollWidth} cW=${scroller.clientWidth} sT=${Math.round(scroller.scrollTop)} sH=${scroller.scrollHeight}`;
+      }
+
+      // In Pages mode, snap to the nearest page boundary after scrolling stops,
+      // so you never end up straddling two half-pages.
+      let snapT;
+      function snapPage() {
+        if (!paged()) return;
+        const pageW = scroller.clientWidth;
+        const t = Math.round(scroller.scrollLeft / pageW) * pageW;
+        if (Math.abs(t - scroller.scrollLeft) > 2) scroller.scrollTo({ left: t, behavior: 'smooth' });
+      }
+      scroller.addEventListener('scroll', () => {
+        requestAnimationFrame(updateReadout);
+        if (paged()) { clearTimeout(snapT); snapT = setTimeout(snapPage, 120); }
+      }, { passive: true });
+      document.getElementById('prev').onclick = () => pageBy(-1);
+      document.getElementById('next').onclick = () => pageBy(1);
+      document.getElementById('toStart').onclick = () => applyFraction(0);
+      document.getElementById('toEnd').onclick = () => applyFraction(1);
+      seek.oninput = () => applyFraction(seek.value / 1000);
+      document.querySelectorAll('.flowbtn').forEach((b) => (b.onclick = () => {
+        flow = b.dataset.flow;
+        document.querySelectorAll('.flowbtn').forEach((x) => x.classList.toggle('on', x === b));
+        applyLayout(); applyFraction(0);
+      }));
+      document.querySelectorAll('.dirbtn').forEach((b) => (b.onclick = () => {
+        dir = b.dataset.dir;
+        document.querySelectorAll('.dirbtn').forEach((x) => x.classList.toggle('on', x === b));
+        applyLayout(); applyFraction(0);
+      }));
+
+      document.querySelectorAll('.flowbtn').forEach((x) => x.classList.toggle('on', x.dataset.flow === flow));
+      document.querySelectorAll('.dirbtn').forEach((x) => x.classList.toggle('on', x.dataset.dir === dir));
+      applyLayout();
+      // ?pos=0.5 sets the initial scroll fraction, for screenshot-based testing.
+      const pos = parseFloat(params.get('pos') || '0') || 0;
+      requestAnimationFrame(() => requestAnimationFrame(() => applyFraction(pos)));
+      setInterval(updateReadout, 300);
+    </script>
+  </body>
+</html>

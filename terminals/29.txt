@@ -1,0 +1,42 @@
+---
+pid: 30980
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npm start 2>&1"
+started_at: 2026-07-12T05:58:16.862Z
+running_for_ms: 40004    
+---
+
+> jp-study-app@1.0.0 start
+> electron-forge start
+
+> Checking your system
+> Checking package manager version
+√ Found npm@11.13.0
+√ Checking your system
+Port 5173 is in use, trying another one...
+8:58:22 AM [@electron-forge/plugin-vite] target built src/preload.ts
+8:58:22 AM [@electron-forge/plugin-vite] target built src/main.ts
+
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:58:26 AM [vite] warning: The "??" operator here will always return the left operand
+65 |  
+66 |  export function cycleLevel(word: string): WkLevel {
+67 |    const next = (((getLevel(word) + 1) % 4) as WkLevel) ?? 0;
+   |                                                         ^
+68 |    setLevel(word, next, true);
+69 |    return next;
+
+  Plugin: vite:esbuild
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/knownWords.ts
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)

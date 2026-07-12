@@ -1,0 +1,566 @@
+import type { GrammarPoint } from './types';
+
+export const N3: GrammarPoint[] = [
+  {
+    id: 'n3-tokoro',
+    level: 'N3',
+    title: '〜ところだ',
+    meaning: 'about to / in the middle of / just did',
+    structure: 'dictionary + ところ (about to) / ている + ところ (in the middle) / た + ところ (just did)',
+    explanation:
+      'ところ pinpoints a moment relative to an action depending on the verb form before it.',
+    examples: [
+      { jp: 'これから 出かけるところです。', reading: 'これから でかけるところです。', en: "I'm just about to go out." },
+      { jp: '今 食べているところです。', reading: 'いま たべているところです。', en: "I'm in the middle of eating." },
+    ],
+  },
+  {
+    id: 'n3-bakari',
+    level: 'N3',
+    title: '〜たばかり / 〜ばかり',
+    meaning: 'just did ~ / nothing but ~',
+    structure: 'Verb た-form + ばかり / Noun + ばかり',
+    explanation:
+      'After た-form it means an action just finished. After a noun it means "only / nothing but" with a slightly negative tone.',
+    examples: [
+      { jp: '日本に 来たばかりです。', reading: 'にほんに きたばかりです。', en: 'I have just come to Japan.' },
+      { jp: '彼は 文句ばかり 言っている。', reading: 'かれは もんくばかり いっている。', en: 'He does nothing but complain.' },
+    ],
+  },
+  {
+    id: 'n3-you-to-suru',
+    level: 'N3',
+    title: '〜ようとする',
+    meaning: 'try to ~ / be about to ~',
+    structure: 'Volitional form + とする',
+    explanation:
+      'Making an attempt or being on the verge of an action. 〜ようとしない means someone refuses to even try.',
+    examples: [
+      { jp: '出かけようとしたとき、電話が 鳴った。', reading: 'でかけようとしたとき、でんわが なった。', en: 'Just as I was about to leave, the phone rang.' },
+    ],
+  },
+  {
+    id: 'n3-ba-hodo',
+    level: 'N3',
+    title: '〜ば〜ほど',
+    meaning: 'the more ~, the more ~',
+    structure: 'Verb ば-form + dictionary form + ほど',
+    explanation:
+      'Shows that as one thing increases, so does another. With な-adjectives: 〜なら〜なほど.',
+    examples: [
+      { jp: '考えれば 考えるほど 分からなくなる。', reading: 'かんがえれば かんがえるほど わからなくなる。', en: 'The more I think, the less I understand.' },
+    ],
+  },
+  {
+    id: 'n3-mama',
+    level: 'N3',
+    title: '〜まま',
+    meaning: 'as is / leaving ~ unchanged',
+    structure: 'Verb た-form / ない-form / Noun + の / この + まま',
+    explanation:
+      'A state left unchanged while doing (or not doing) something else. "Left as it was."',
+    examples: [
+      { jp: 'テレビを つけたまま 寝てしまった。', reading: 'テレビを つけたまま ねてしまった。', en: 'I fell asleep with the TV left on.' },
+      { jp: 'くつの まま 入らないでください。', reading: 'くつの まま はいらないでください。', en: "Please don't come in with your shoes on." },
+    ],
+  },
+  {
+    id: 'n3-uchi-ni',
+    level: 'N3',
+    title: '〜うちに',
+    meaning: 'while ~ / before ~ changes',
+    structure: 'Verb dictionary / ている / ない-form / Noun + の + うちに',
+    explanation:
+      'Do something within a period before the situation changes. 〜ないうちに = "before it becomes…".',
+    examples: [
+      { jp: '熱い うちに 食べてください。', reading: 'あつい うちに たべてください。', en: 'Please eat it while it\'s hot.' },
+      { jp: '忘れないうちに メモします。', reading: 'わすれないうちに メモします。', en: "I'll jot it down before I forget." },
+    ],
+  },
+  {
+    id: 'n3-aida-ni',
+    level: 'N3',
+    title: '〜間に',
+    meaning: 'during / while ~ (something happens)',
+    structure: 'Verb ている / Noun + の + 間に',
+    explanation:
+      '間に marks a span during which a one-time event occurs. Without に (〜間), it means a continuous action over the whole span.',
+    examples: [
+      { jp: '私が 寝ている間に 地震が あった。', reading: 'わたしが ねているあいだに じしんが あった。', en: 'While I was sleeping, there was an earthquake.' },
+    ],
+  },
+  {
+    id: 'n3-tabi-ni',
+    level: 'N3',
+    title: '〜たびに',
+    meaning: 'every time ~ / whenever ~',
+    structure: 'Verb dictionary form / Noun + の + たびに',
+    explanation: 'Each time one thing happens, another regularly follows.',
+    examples: [
+      { jp: 'この 写真を 見るたびに、母を 思い出す。', reading: 'この しゃしんを みるたびに、ははを おもいだす。', en: 'Every time I see this photo, I remember my mother.' },
+    ],
+  },
+  {
+    id: 'n3-sae-ba',
+    level: 'N3',
+    title: '〜さえ〜ば',
+    meaning: 'if only ~ / as long as ~',
+    structure: 'Noun + さえ + verb ば-form',
+    explanation:
+      'States the single sufficient condition for something. さえ alone means "even".',
+    examples: [
+      { jp: 'あなたさえ いれば、ほかに 何も いらない。', reading: 'あなたさえ いれば、ほかに なにも いらない。', en: 'As long as I have you, I need nothing else.' },
+    ],
+  },
+  {
+    id: 'n3-about-ni-tsuite',
+    level: 'N3',
+    title: '〜について',
+    meaning: 'about ~ / concerning ~',
+    structure: 'Noun + について',
+    explanation: 'Marks the topic or subject matter being discussed, studied, or written about.',
+    examples: [
+      { jp: '日本の 文化について 研究しています。', reading: 'にほんの ぶんかについて けんきゅうしています。', en: 'I am researching Japanese culture.' },
+    ],
+  },
+  {
+    id: 'n3-ni-taishite',
+    level: 'N3',
+    title: '〜に対して',
+    meaning: 'toward / against / in contrast to ~',
+    structure: 'Noun + に対して',
+    explanation:
+      'Marks the target of an attitude or action ("toward"), or a contrast between two things.',
+    examples: [
+      { jp: '彼は 先生に対して 失礼な 態度を とった。', reading: 'かれは せんせいにたいして しつれいな たいどを とった。', en: 'He took a rude attitude toward the teacher.' },
+    ],
+  },
+  {
+    id: 'n3-ni-yotte',
+    level: 'N3',
+    title: '〜によって',
+    meaning: 'by / due to / depending on ~',
+    structure: 'Noun + によって',
+    explanation:
+      'Shows the means/cause ("by"), the agent in passive sentences, or variation ("depending on").',
+    examples: [
+      { jp: '国によって 習慣が 違います。', reading: 'くにによって しゅうかんが ちがいます。', en: 'Customs differ depending on the country.' },
+    ],
+  },
+  {
+    id: 'n3-ni-totte',
+    level: 'N3',
+    title: '〜にとって',
+    meaning: 'for / to (someone)',
+    structure: 'Noun + にとって',
+    explanation:
+      'Presents something from a particular person\'s viewpoint ("for me / from my standpoint").',
+    examples: [
+      { jp: '私にとって 家族が 一番 大切です。', reading: 'わたしにとって かぞくが いちばん たいせつです。', en: 'For me, family is the most important thing.' },
+    ],
+  },
+  {
+    id: 'n3-toshite',
+    level: 'N3',
+    title: '〜として',
+    meaning: 'as ~ / in the role of ~',
+    structure: 'Noun + として',
+    explanation: 'Indicates a role, capacity, or status in which someone or something acts.',
+    examples: [
+      { jp: '彼は 医者として 働いています。', reading: 'かれは いしゃとして はたらいています。', en: 'He works as a doctor.' },
+    ],
+  },
+  {
+    id: 'n3-okage-sei',
+    level: 'N3',
+    title: '〜おかげで / 〜せいで',
+    meaning: 'thanks to ~ / because of ~ (blame)',
+    structure: 'Plain form / Noun + の + おかげで（good）/ せいで（bad）',
+    explanation:
+      'Both give a cause. おかげで credits a good result; せいで blames a bad one.',
+    examples: [
+      { jp: '先生の おかげで 合格できました。', reading: 'せんせいの おかげで ごうかくできました。', en: 'Thanks to my teacher, I passed.' },
+      { jp: '寝坊した せいで 遅刻した。', reading: 'ねぼうした せいで ちこくした。', en: 'I was late because I overslept.' },
+    ],
+  },
+  {
+    id: 'n3-tame-ni',
+    level: 'N3',
+    title: '〜ために',
+    meaning: 'in order to ~ / for the sake of ~',
+    structure: 'Verb dictionary form / Noun + の + ために',
+    explanation:
+      'Expresses purpose or beneficiary. The actor controls the action; for uncontrollable results use ように.',
+    examples: [
+      { jp: '健康の ために 毎朝 走っています。', reading: 'けんこうの ために まいあさ はしっています。', en: 'I run every morning for my health.' },
+    ],
+  },
+  {
+    id: 'n3-temo',
+    level: 'N3',
+    title: '疑問詞 + 〜ても',
+    meaning: 'no matter what/who/how ~',
+    structure: 'Question word + verb て-form + も',
+    explanation:
+      'Pairs a question word with 〜ても to mean "no matter…" (何を食べても, どこへ行っても, だれが来ても).',
+    examples: [
+      { jp: '何を 食べても 太らない。', reading: 'なにを たべても ふとらない。', en: "No matter what I eat, I don't gain weight." },
+    ],
+  },
+  {
+    id: 'n3-wake-da',
+    level: 'N3',
+    title: '〜わけだ',
+    meaning: 'no wonder ~ / that means ~',
+    structure: 'Plain form + わけだ',
+    explanation:
+      'Draws a logical conclusion from given facts ("so that\'s why / it follows that"). Often an "aha" realization.',
+    examples: [
+      { jp: '電気が 消えている。みんな もう 帰ったわけだ。', reading: 'でんきが きえている。みんな もう かえったわけだ。', en: "The lights are off — so everyone's gone home, then." },
+    ],
+  },
+  {
+    id: 'n3-wake-ga-nai',
+    level: 'N3',
+    title: '〜わけがない',
+    meaning: 'there\'s no way that ~',
+    structure: 'Plain form + わけがない',
+    explanation:
+      'Strong denial based on reasoning — "it\'s impossible that…". More logical than はずがない.',
+    examples: [
+      { jp: 'あの 真面目な 人が うそを つくわけがない。', reading: 'あの まじめな ひとが うそを つくわけがない。', en: "There's no way such an honest person would lie." },
+    ],
+  },
+  {
+    id: 'n3-to-iu-koto-da',
+    level: 'N3',
+    title: '〜ということだ',
+    meaning: 'I hear that ~ / it means that ~',
+    structure: 'Plain form + ということだ',
+    explanation:
+      'Reports information (hearsay) or restates/explains what something means or amounts to.',
+    examples: [
+      { jp: '部長は 来週 出張するということです。', reading: 'ぶちょうは らいしゅう しゅっちょうするということです。', en: 'I hear the manager will be on a business trip next week.' },
+    ],
+  },
+  {
+    id: 'n3-bakari-de-naku',
+    level: 'N3',
+    title: '〜ばかりでなく / 〜だけでなく',
+    meaning: 'not only ~ but also ~',
+    structure: 'Plain form / Noun + ばかりでなく / だけでなく',
+    explanation: 'Adds a second, often greater element beyond the first ("not just A, but also B").',
+    examples: [
+      { jp: '彼は 英語だけでなく、中国語も 話せる。', reading: 'かれは えいごだけでなく、ちゅうごくごも はなせる。', en: 'He can speak not only English but also Chinese.' },
+    ],
+  },
+  {
+    id: 'n3-baai',
+    level: 'N3',
+    title: '〜場合は',
+    meaning: 'in the case of ~ / if ~',
+    structure: 'Plain form (な/の after な-adj/noun) + 場合は',
+    explanation: 'Sets up a hypothetical situation and what to do in it. Common in rules and instructions.',
+    examples: [
+      { jp: '地震の 場合は、エレベーターを 使わないでください。', reading: 'じしんの ばあいは、エレベーターを つかわないでください。', en: 'In the case of an earthquake, please don\'t use the elevator.' },
+    ],
+  },
+  {
+    id: 'n3-saichu-ni',
+    level: 'N3',
+    title: '〜最中に',
+    meaning: 'right in the middle of ~',
+    structure: 'Verb ている / Noun + の + 最中に',
+    explanation:
+      'Emphasizes that something interrupts an action at its peak. Stronger than 〜間に.',
+    examples: [
+      { jp: '会議の 最中に 電話が 鳴った。', reading: 'かいぎの さいちゅうに でんわが なった。', en: 'The phone rang right in the middle of the meeting.' },
+    ],
+  },
+  {
+    id: 'n3-toori-ni',
+    level: 'N3',
+    title: '〜とおりに',
+    meaning: 'just as ~ / in the way that ~',
+    structure: 'Verb dictionary / た-form / Noun + の + とおりに',
+    explanation: 'Doing exactly as described, shown, or instructed.',
+    examples: [
+      { jp: '説明書の とおりに 組み立てました。', reading: 'せつめいしょの とおりに くみたてました。', en: 'I assembled it just as the manual said.' },
+    ],
+  },
+  {
+    id: 'n3-marude-you',
+    level: 'N3',
+    title: 'まるで〜ようだ',
+    meaning: 'just like ~ / as if ~',
+    structure: 'まるで + noun + のようだ / verb plain + ようだ',
+    explanation: 'Makes a vivid comparison or simile. まるで strengthens the "as if" feeling.',
+    examples: [
+      { jp: 'まるで 夢の ようだ。', reading: 'まるで ゆめの ようだ。', en: "It's just like a dream." },
+    ],
+  },
+  {
+    id: 'n3-koto-wa-nai',
+    level: 'N3',
+    title: '〜ことはない',
+    meaning: "there's no need to ~",
+    structure: 'Verb dictionary form + ことはない',
+    explanation: 'Reassures someone that an action is unnecessary.',
+    examples: [
+      { jp: 'そんなに 心配することはない。', reading: 'そんなに しんぱいすることはない。', en: "There's no need to worry so much." },
+    ],
+  },
+  {
+    id: 'n3-zu-ni',
+    level: 'N3',
+    title: '〜ずに / 〜ないで',
+    meaning: 'without doing ~',
+    structure: 'Verb ない-form (drop ない) + ずに / Verb ない-form + で',
+    explanation:
+      'Doing something without doing another action. ずに is more formal/written; する → せずに.',
+    examples: [
+      { jp: '朝ごはんを 食べずに 学校へ 行った。', reading: 'あさごはんを たべずに がっこうへ いった。', en: 'I went to school without eating breakfast.' },
+    ],
+  },
+  {
+    id: 'n3-dasu',
+    level: 'N3',
+    title: '〜出す',
+    meaning: 'suddenly start to ~',
+    structure: 'Verb stem + 出す（だす）',
+    explanation: 'Marks the abrupt, often unexpected start of an action.',
+    examples: [
+      { jp: '赤ちゃんが 急に 泣き出した。', reading: 'あかちゃんが きゅうに なきだした。', en: 'The baby suddenly started crying.' },
+    ],
+  },
+  {
+    id: 'n3-hajimeru',
+    level: 'N3',
+    title: '〜始める / 〜終わる',
+    meaning: 'begin to ~ / finish ~ing',
+    structure: 'Verb stem + 始める / 終わる',
+    explanation:
+      '始める marks the beginning of an action (more gradual than 出す), and 終わる its completion.',
+    examples: [
+      { jp: '雨が 降り始めた。', reading: 'あめが ふりはじめた。', en: 'It started to rain.' },
+      { jp: 'この 本を 読み終わりました。', reading: 'この ほんを よみおわりました。', en: 'I finished reading this book.' },
+    ],
+  },
+  {
+    id: 'n3-tsuzukeru',
+    level: 'N3',
+    title: '〜続ける',
+    meaning: 'keep on ~ing',
+    structure: 'Verb stem + 続ける（つづける）',
+    explanation: 'Continuing an action over time without stopping.',
+    examples: [
+      { jp: '彼は 3時間 走り続けた。', reading: 'かれは さんじかん はしりつづけた。', en: 'He kept running for three hours.' },
+    ],
+  },
+  {
+    id: 'n3-kiru',
+    level: 'N3',
+    title: '〜きる / 〜きれない',
+    meaning: 'do completely / can\'t do completely',
+    structure: 'Verb stem + きる / きれない',
+    explanation:
+      'Doing something to the very end/completely. 〜きれない means it can\'t be done fully (too much).',
+    examples: [
+      { jp: '長い 小説を 読みきった。', reading: 'ながい しょうせつを よみきった。', en: 'I read the long novel all the way through.' },
+      { jp: '多すぎて 食べきれない。', reading: 'おおすぎて たべきれない。', en: "It's too much to finish eating." },
+    ],
+  },
+  {
+    id: 'n3-gachi',
+    level: 'N3',
+    title: '〜がち',
+    meaning: 'tend to ~ / prone to ~ (often negative)',
+    structure: 'Verb stem / Noun + がち',
+    explanation: 'Something that happens often, usually an undesirable tendency.',
+    examples: [
+      { jp: '冬は 風邪を ひきがちです。', reading: 'ふゆは かぜを ひきがちです。', en: 'In winter I tend to catch colds.' },
+    ],
+  },
+  {
+    id: 'n3-gimi',
+    level: 'N3',
+    title: '〜気味',
+    meaning: 'a touch of ~ / slightly ~',
+    structure: 'Verb stem / Noun + 気味（ぎみ）',
+    explanation: 'A slight sign or tendency of a (usually unwanted) condition.',
+    examples: [
+      { jp: '最近 ちょっと 疲れ気味です。', reading: 'さいきん ちょっと つかれぎみです。', en: "I've been feeling a bit tired lately." },
+    ],
+  },
+  {
+    id: 'n3-ppoi',
+    level: 'N3',
+    title: '〜っぽい',
+    meaning: '-ish / looks/acts like ~',
+    structure: 'Noun / verb stem / い-adj stem + っぽい',
+    explanation:
+      'A casual suffix meaning something strongly resembles or has the quality of X (子供っぽい = childish).',
+    examples: [
+      { jp: '彼は 怒りっぽい 性格だ。', reading: 'かれは おこりっぽい せいかくだ。', en: 'He has a quick-tempered (irritable) personality.' },
+    ],
+  },
+  {
+    id: 'n3-muke-muki',
+    level: 'N3',
+    title: '〜向け / 〜向き',
+    meaning: 'aimed at ~ / suitable for ~',
+    structure: 'Noun + 向け（むけ）/ 向き（むき）',
+    explanation:
+      '向け = intentionally made for a target group. 向き = naturally suited/oriented for someone.',
+    examples: [
+      { jp: 'これは 子供向けの 本です。', reading: 'これは こどもむけの ほんです。', en: 'This is a book aimed at children.' },
+    ],
+  },
+  {
+    id: 'n3-ue-de',
+    level: 'N3',
+    title: '〜上で',
+    meaning: 'upon / after ~ / in the process of ~',
+    structure: 'Verb た-form / Noun + の + 上で（うえで）',
+    explanation:
+      'Doing B after first doing A as a necessary step ("after / upon doing"). Also "in terms of".',
+    examples: [
+      { jp: 'よく 考えた 上で 返事します。', reading: 'よく かんがえた うえで へんじします。', en: "I'll reply after thinking it over carefully." },
+    ],
+  },
+  {
+    id: 'n3-ippou-da',
+    level: 'N3',
+    title: '〜一方だ',
+    meaning: 'keep ~ing more and more (one-way trend)',
+    structure: 'Verb dictionary form + 一方だ（いっぽうだ）',
+    explanation: 'A situation that continues to change steadily in one direction, usually worsening.',
+    examples: [
+      { jp: '物価は 上がる一方だ。', reading: 'ぶっかは あがるいっぽうだ。', en: 'Prices just keep rising.' },
+    ],
+  },
+  {
+    id: 'n3-kawari-ni',
+    level: 'N3',
+    title: '〜代わりに',
+    meaning: 'instead of ~ / in exchange for ~',
+    structure: 'Plain form / Noun + の + 代わりに（かわりに）',
+    explanation: 'Substituting one thing for another, or a trade-off/compensation.',
+    examples: [
+      { jp: '父の 代わりに 私が 行きます。', reading: 'ちちの かわりに わたしが いきます。', en: "I'll go instead of my father." },
+    ],
+  },
+  {
+    id: 'n3-tsuide-ni',
+    level: 'N3',
+    title: '〜ついでに',
+    meaning: 'while you\'re at it / on the occasion of ~',
+    structure: 'Verb dictionary / た-form / Noun + の + ついでに',
+    explanation: 'Taking the opportunity of doing one thing to also do another.',
+    examples: [
+      { jp: '買い物の ついでに 郵便局に 寄った。', reading: 'かいものの ついでに ゆうびんきょくに よった。', en: 'While shopping, I also stopped by the post office.' },
+    ],
+  },
+  {
+    id: 'n3-to-tomo-ni',
+    level: 'N3',
+    title: '〜とともに',
+    meaning: 'along with ~ / as ~ (changes)',
+    structure: 'Verb dictionary / Noun + とともに',
+    explanation: 'Two things changing or occurring together, or "together with someone".',
+    examples: [
+      { jp: '年を とるとともに、体力が 落ちてきた。', reading: 'としを とるとともに、たいりょくが おちてきた。', en: 'As I get older, my stamina has declined.' },
+    ],
+  },
+  {
+    id: 'n3-shidai',
+    level: 'N3',
+    title: '〜次第',
+    meaning: 'as soon as ~',
+    structure: 'Verb stem + 次第（しだい）',
+    explanation:
+      'Doing something immediately once a precondition is met. Formal; common in business. (次第で = "depending on".)',
+    examples: [
+      { jp: '着き次第、ご連絡します。', reading: 'つきしだい、ごれんらくします。', en: "I'll contact you as soon as I arrive." },
+    ],
+  },
+  {
+    id: 'n3-ba-yokatta',
+    level: 'N3',
+    title: '〜ばよかった',
+    meaning: 'should have ~ / I wish I had ~',
+    structure: 'Verb ば-form + よかった',
+    explanation: 'Expresses regret about something not done (or done). 〜なければよかった = "I wish I hadn\'t".',
+    examples: [
+      { jp: 'もっと 早く 来れば よかった。', reading: 'もっと はやく くれば よかった。', en: 'I should have come earlier.' },
+    ],
+  },
+  {
+    id: 'n3-hodo',
+    level: 'N3',
+    title: '〜ほど',
+    meaning: 'to the extent of ~ / so ~ that',
+    structure: 'Verb dictionary / Noun + ほど',
+    explanation:
+      'Indicates a degree or extent, often an extreme one ("so… that"). Also used in comparisons (〜ほど〜ない).',
+    examples: [
+      { jp: '歩けないほど 疲れた。', reading: 'あるけないほど つかれた。', en: 'I was so tired I could barely walk.' },
+    ],
+  },
+  {
+    id: 'n3-kurai',
+    level: 'N3',
+    title: '〜くらい / 〜ぐらい',
+    meaning: 'about ~ / to the degree of ~',
+    structure: 'Number / plain form + くらい（ぐらい）',
+    explanation:
+      'Gives an approximate amount, or a degree/extent ("about that much / to the point that").',
+    examples: [
+      { jp: '駅まで 10分くらい かかります。', reading: 'えきまで じゅっぷんくらい かかります。', en: 'It takes about 10 minutes to the station.' },
+    ],
+  },
+  {
+    id: 'n3-mitai-ni',
+    level: 'N3',
+    title: '〜みたいに / 〜みたいな',
+    meaning: 'like ~ / similar to ~',
+    structure: 'Noun + みたいに（adverb）/ みたいな（+ noun）',
+    explanation: 'A casual way to compare or give an example ("like X"). Formal equivalent: のように / のような.',
+    examples: [
+      { jp: '彼女は モデルみたいに きれいだ。', reading: 'かのじょは モデルみたいに きれいだ。', en: 'She is beautiful like a model.' },
+    ],
+  },
+  {
+    id: 'n3-koso',
+    level: 'N3',
+    title: '〜こそ',
+    meaning: 'precisely ~ / it is exactly ~',
+    structure: 'Noun + こそ',
+    explanation: 'Emphasizes that this, above all, is the one — "this very one / precisely this".',
+    examples: [
+      { jp: '今年こそ 合格したい。', reading: 'ことしこそ ごうかくしたい。', en: 'This year for sure, I want to pass.' },
+    ],
+  },
+  {
+    id: 'n3-you-ga-nai',
+    level: 'N3',
+    title: '〜ようがない',
+    meaning: 'there is no way to ~',
+    structure: 'Verb stem + ようがない',
+    explanation: 'It is impossible to do something because there is no method or means available.',
+    examples: [
+      { jp: '連絡先が ないから、知らせようがない。', reading: 'れんらくさきが ないから、しらせようがない。', en: "I have no contact info, so there's no way to inform them." },
+    ],
+  },
+  {
+    id: 'n3-temo-kamawanai',
+    level: 'N3',
+    title: '〜てもかまわない',
+    meaning: "it's fine even if ~ / I don't mind if ~",
+    structure: 'Verb て-form + もかまわない',
+    explanation: 'Granting permission or indicating you don\'t mind something — softer than てもいい.',
+    examples: [
+      { jp: '少し 遅れても かまいません。', reading: 'すこし おくれても かまいません。', en: "I don't mind if you're a little late." },
+    ],
+  },
+];

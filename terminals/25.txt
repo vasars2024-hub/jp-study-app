@@ -1,0 +1,111 @@
+---
+pid: 30336
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx electron tools/test-nhk-consent-flow.mjs 2>&1"
+started_at: 2026-07-12T05:52:41.870Z
+running_for_ms: 359996   
+---
+
+before 0 {
+  step: '1/2',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1612,
+  hasMarker: false
+}
+action no-action
+before 1 {
+  step: '1/2',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1612,
+  hasMarker: false
+}
+action no-action
+before 2 {
+  step: '1/2',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1612,
+  hasMarker: false
+}
+action no-action
+before 3 {
+  step: '1/2',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1612,
+  hasMarker: false
+}
+action no-action
+before 4 {
+  step: '1/2',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1612,
+  hasMarker: false
+}
+action no-action
+before 5 {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+}
+action no-action
+before 6 {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+}
+action no-action
+before 7 {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+}
+action no-action
+before 8 {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+}
+action no-action
+before 9 {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+}
+action no-action
+before 10 {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+}
+action no-action
+before 11 {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+}
+action no-action
+final {
+  step: '',
+  checkbox: false,
+  nextDisabled: true,
+  bodyLen: 1721,
+  hasMarker: false
+} mainLen 1178 marker false

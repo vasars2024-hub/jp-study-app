@@ -1,0 +1,1797 @@
+---
+pid: 35688
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npm start"
+started_at: 2026-07-12T05:24:52.829Z
+running_for_ms: 2044986  
+---
+
+> jp-study-app@1.0.0 start
+> electron-forge start
+
+> Checking your system
+> Checking package manager version
+√ Found npm@11.13.0
+√ Checking your system
+8:24:57 AM [@electron-forge/plugin-vite] target built src/preload.ts
+8:24:58 AM [@electron-forge/plugin-vite] target built src/main.ts
+
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:25:01 AM [vite] warning: The "??" operator here will always return the left operand
+65 |  
+66 |  export function cycleLevel(word: string): WkLevel {
+67 |    const next = (((getLevel(word) + 1) % 4) as WkLevel) ?? 0;
+   |                                                         ^
+68 |    setLevel(word, next, true);
+69 |    return next;
+
+  Plugin: vite:esbuild
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/knownWords.ts
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [storage] migration failed: [object DOMException]
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A26%253A20.324Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A26%253A20.324Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A26%253A20.324Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A27%253A23.324Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A27%253A23.324Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A27%253A23.324Z'
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A28%253A36.338Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A28%253A36.338Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A28%253A36.338Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A29%253A40.327Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A29%253A40.327Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A29%253A40.327Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A30%253A53.325Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A30%253A53.325Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A30%253A53.325Z'
+}
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A33%253A09.331Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A33%253A09.331Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A33%253A09.331Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A34%253A12.330Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A34%253A12.330Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A34%253A12.330Z'
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A35%253A15.327Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A35%253A15.327Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A35%253A15.327Z'
+}
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A36%253A18.337Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A36%253A18.337Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A36%253A18.337Z'
+[renderer] Uncaught (in promise) Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb'
+}
+[renderer] Uncaught (in promise) Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.finishListener (node:electron/js2c/browser_init:2:89717)
+    at WebContents.emit (node:events:521:24) {
+  errno: -3,
+  code: '',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A38%253A52.415Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A39%253A55.337Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A39%253A55.337Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A39%253A55.337Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A40%253A58.334Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A40%253A58.334Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A40%253A58.334Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A42%253A00.325Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A42%253A00.325Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A42%253A00.325Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A42%253A00.325Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A42%253A00.325Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.finishListener (node:electron/js2c/browser_init:2:89717)
+    at WebContents.emit (node:events:521:24) {
+  errno: -3,
+  code: '',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A42%253A00.325Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A43%253A23.333Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A43%253A23.333Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A43%253A23.333Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A44%253A26.335Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A44%253A26.335Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A44%253A26.335Z'
+}
+8:44:39 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx, /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+8:44:39 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx, /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+8:44:44 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx
+8:44:44 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A46%253A33.330Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A46%253A33.330Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A46%253A33.330Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A47%253A36.329Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A47%253A36.329Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A47%253A36.329Z'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A48%253A38.324Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A48%253A38.324Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A48%253A38.324Z'
+}
+8:49:30 AM [vite] page reload src/renderer/storage/storage.ts
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [storage] migration failed: [object DOMException]
+8:49:35 AM [vite] page reload src/renderer/storage/storage.ts
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [storage] migration failed: [object DOMException]
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+8:50:50 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx, /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+8:51:01 AM [vite] hmr update /src/renderer/components/Icons.tsx
+[renderer] [vite] hot updated: /src/renderer/components/Icons.tsx
+8:51:07 AM [vite] hmr update /src/renderer/components/Icons.tsx
+[renderer] [vite] hot updated: /src/renderer/components/Icons.tsx
+8:51:10 AM [vite] page reload src/shared/desktop.ts
+8:51:11 AM [@electron-forge/plugin-vite] target built src/main.ts
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [storage] migration failed: [object DOMException]
+8:51:14 AM [@electron-forge/plugin-vite] target built src/main.ts
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+8:51:18 AM [vite] hmr update /src/renderer/components/DesktopShell.tsx
+[renderer] [vite] hot updated: /src/renderer/components/DesktopShell.tsx
+8:51:22 AM [vite] hmr update /src/renderer/components/DesktopShell.tsx
+[renderer] [vite] hot updated: /src/renderer/components/DesktopShell.tsx
+8:51:34 AM [vite] hmr update /src/renderer/components/DesktopShell.tsx
+[renderer] [vite] hot updated: /src/renderer/components/DesktopShell.tsx
+8:51:37 AM [vite] hmr update /src/renderer/components/AppSection.tsx
+[renderer] [vite] hot updated: /src/renderer/components/AppSection.tsx
+8:51:42 AM [vite] hmr update /src/renderer/components/AppSection.tsx
+[renderer] [hmr] Failed to reload /src/renderer/components/AppSection.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+8:51:42 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] [vite] hot updated: /src/renderer/components/AppSection.tsx
+8:51:45 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:51:45 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+8:51:45 AM [vite] hmr update /src/renderer/App.tsx
+[renderer] [hmr] Failed to reload /src/renderer/components/DesktopShell.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[renderer] [hmr] Failed to reload /src/renderer/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[renderer] [vite] hot updated: /src/renderer/App.tsx
+[renderer] [hmr] Failed to reload /src/renderer/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[renderer] [vite] hot updated: /src/renderer/App.tsx
+[renderer] [vite] hot updated: /src/renderer/components/DesktopShell.tsx
+8:51:45 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:51:45 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:51:48 AM [vite] hmr update /src/renderer/App.tsx
+[renderer] [hmr] Failed to reload /src/renderer/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+8:51:48 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] hot updated: /src/renderer/App.tsx
+8:51:52 AM [vite] hmr update /src/renderer/App.tsx
+[renderer] [hmr] Failed to reload /src/renderer/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+8:51:52 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] [vite] hot updated: /src/renderer/App.tsx
+8:51:52 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:51:56 AM [vite] page reload src/renderer/App.tsx
+8:51:56 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:51:56 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:51:56 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:51:56 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:51:59 AM [vite] page reload src/renderer/App.tsx
+[renderer] [vite] connecting...
+8:52:00 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:52:00 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:52:00 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:52:00 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:06 AM [vite] page reload src/renderer/keyboardShortcuts.ts
+[renderer] [vite] connecting...
+8:52:07 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:52:07 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:07 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:07 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:52:07 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:52:10 AM [vite] page reload src/renderer/keyboardShortcuts.ts
+8:52:11 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:52:11 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:11 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [vite] connected.
+8:52:11 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:52:11 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:13 AM [vite] page reload src/renderer/keyboardShortcuts.ts.tmp.33080.19d558976483
+8:52:13 AM [vite] page reload src/renderer/keyboardShortcuts.ts
+[renderer] [vite] connecting...
+8:52:14 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:52:14 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:14 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:14 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] [vite] connected.
+8:52:14 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:17 AM [vite] hmr update /src/renderer/components/CommandPalette.tsx
+[renderer] [vite] connecting...
+8:52:17 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:52:17 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:17 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:52:17 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:52:35 AM [vite] page reload tools/probe-nhk-consent-steps.mjs
+[renderer] [vite] connecting...
+8:52:35 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:52:35 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:35 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:35 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:52:35 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:41 AM [vite] page reload tools/test-nhk-consent-flow.mjs
+[renderer] [vite] connecting...
+8:52:42 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [vite] connected.
+8:52:42 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:42 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:42 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:52:42 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:56 AM [vite] page reload terminals/25.txt
+8:52:57 AM [vite] Pre-transform error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:52:57 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:57 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:52:57 AM [vite] Internal server error: Failed to resolve import "./components/ClipboardHistoryPanel" from "src/renderer/App.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/App.tsx:6:34
+  21 |  import AppSection from "./components/AppSection";
+  22 |  import CommandPalette from "./components/CommandPalette";
+  23 |  import ClipboardHistoryPanel from "./components/ClipboardHistoryPanel";
+     |                                     ^
+  24 |  import NovelReader from "./views/NovelReader";
+  25 |  import MangaReader from "./views/MangaReader";
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 8)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:52:57 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:52:58 AM [vite] page reload src/renderer/components/ClipboardHistoryPanel.tsx
+[renderer] [vite] connecting...
+8:52:59 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:52:59 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:52:59 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:53:18 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:18 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:18 AM [vite] hmr update /src/renderer/views/NovelReader.tsx
+8:53:18 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:53:18 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:26 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:26 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:53:26 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:26 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:53:31 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:31 AM [vite] hmr update /src/renderer/views/NovelReader.tsx
+8:53:31 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:53:31 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:31 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:34 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:34 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:53:34 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:34 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:35 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:35 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:35 AM [vite] hmr update /src/renderer/views/NovelReader.tsx
+8:53:35 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:53:35 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:39 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:39 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:53:39 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:39 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:53:42 AM [vite] hmr update /src/renderer/components/DictionaryResults.tsx
+[renderer] [vite] connecting...
+8:53:42 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:42 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:42 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:53:45 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:46 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:46 AM [vite] hmr update /src/renderer/components/DictionaryResults.tsx
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:53:46 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:46 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:53:46 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:53:46 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:53:46 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:46 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:53:50 AM [vite] hmr update /src/renderer/components/DictionaryResults.tsx
+[renderer] [vite] connecting...
+8:53:50 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:53:50 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:50 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:51 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+[renderer] [vite] connecting...
+8:53:51 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:53:51 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:53:51 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:55 AM [vite] hmr update /src/renderer/widgets/system.tsx
+8:53:55 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:53:55 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:53:55 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:54:04 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:54:04 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:54:04 AM [vite] hmr update /src/renderer/widgets/system.tsx
+8:54:04 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:04 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:54:06 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:54:06 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:54:06 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:06 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:54:10 AM [vite] hmr update /src/renderer/widgets/productivity.tsx
+8:54:10 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:54:10 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:54:10 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:25 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:54:25 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:54:25 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:54:25 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:54:25 AM [vite] hmr update /src/renderer/widgets/productivity.tsx
+8:54:25 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:54:25 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:54:25 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:25 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:30 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:54:30 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:54:30 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:54:30 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:30 AM [vite] hmr update /src/renderer/widgets/productivity.tsx
+8:54:31 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:54:31 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:54:31 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:33 AM [vite] hmr update /src/renderer/widgets/productivity.tsx
+8:54:33 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:54:33 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:34 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:54:35 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:54:35 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:54:35 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:35 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+8:54:42 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:54:42 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+8:54:42 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:54:42 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] [vite] connected.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:54:50 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx, /src/renderer/views/LibraryView.tsx
+8:54:50 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:54:50 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:54:50 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:55:09 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+[renderer] [vite] connecting...
+8:55:09 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connected.
+8:55:09 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:55:09 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:55:24 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+8:55:24 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:55:24 AM [vite] Pre-transform error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+8:55:24 AM [vite] Internal server error: Failed to resolve import "../views/CalendarView" from "src/renderer/components/AppSection.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/components/AppSection.tsx:20:25
+  33 |  import ResourcesView from "../views/ResourcesView";
+  34 |  import ImmersionView from "../views/ImmersionView";
+  35 |  import CalendarView from "../views/CalendarView";
+     |                            ^
+  36 |  import Icon from "./Icons";
+  37 |  export default function AppSection({
+      at TransformPluginContext._formatError (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 20)
+      at async TransformPluginContext.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+8:55:26 AM [vite] hmr update /src/renderer/App.tsx, /src/renderer/components/DesktopShell.tsx
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+8:55:30 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx, /src/renderer/views/LibraryView.tsx
+[renderer] [storage] migration failed: [object DOMException]
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+8:55:33 AM [vite] page reload src/renderer/main.tsx
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [storage] migration failed: [object DOMException]
+8:55:38 AM [vite] hmr update /src/renderer/views/SettingsView.tsx
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+[renderer] [vite] hot updated: /src/renderer/views/SettingsView.tsx
+8:55:48 AM [vite] hmr update /src/renderer/views/SettingsView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/SettingsView.tsx
+8:55:51 AM [vite] hmr update /src/renderer/views/SettingsView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/SettingsView.tsx
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+8:56:13 AM [vite] hmr update /src/renderer/components/ShortcutSettings.tsx
+[renderer] [vite] hot updated: /src/renderer/components/ShortcutSettings.tsx
+8:56:57 AM [vite] hmr update /src/renderer/styles.css
+[renderer] [vite] hot updated: /src/renderer/styles.css
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A57%253A13.327Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A57%253A13.327Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T05%253A57%253A13.327Z'
+}
+[renderer] [vite] server connection lost. Polling for restart...
+
+An unhandled rejection has occurred inside Forge:
+Error: EBUSY: resource busy or locked, watch 'C:\Users\Arseniy\Projects\jp-study-app\dist\models\Xenova\opus-mt-en-ru\onnx\decoder_model_merged.onnx'
+at FSWatcher.<computed> (node:internal/fs/watchers:321:19)
+    at Object.watch (node:fs:2548:36)
+    at createFsWatchInstance (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:42780:17)
+    at setFsWatchListener (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:42827:15)
+    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:42982:14)
+    at NodeFsHandler._handleFile (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:43046:23)
+    at NodeFsHandler._addToNodeFs (file:///C:/Users/Arseniy/Projects/jp-study-app/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:43288:21)

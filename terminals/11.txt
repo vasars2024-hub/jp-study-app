@@ -1,0 +1,91 @@
+---
+pid: 19052
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npm start"
+started_at: 2026-07-12T05:14:18.299Z
+running_for_ms: 2680000  
+---
+
+> jp-study-app@1.0.0 start
+> electron-forge start
+
+> Checking your system
+> Checking package manager version
+√ Found npm@11.13.0
+√ Checking your system
+Port 5173 is in use, trying another one...
+8:14:21 AM [@electron-forge/plugin-vite] target built src/preload.ts
+8:14:22 AM [@electron-forge/plugin-vite] target built src/main.ts
+
+[17232:0712/081424.240:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[17232:0712/081424.242:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[17232:0712/081424.243:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[17232:0712/081424.251:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17232:0712/081424.251:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+[17232:0712/081424.252:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17232:0712/081424.252:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+[17232:0712/081424.252:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17232:0712/081424.252:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+8:14:26 AM [vite] warning: The "??" operator here will always return the left operand
+65 |  
+66 |  export function cycleLevel(word: string): WkLevel {
+67 |    const next = (((getLevel(word) + 1) % 4) as WkLevel) ?? 0;
+   |                                                         ^
+68 |    setLevel(word, next, true);
+69 |    return next;
+
+  Plugin: vite:esbuild
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/knownWords.ts
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[17232:0712/081428.701:ERROR:storage\browser\quota\quota_database.cc:989] Could not open the quota database, resetting.
+[17232:0712/081431.651:ERROR:storage\browser\quota\quota_database.cc:989] Could not open the quota database, resetting.
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+[renderer] [storage] migration failed: [object DOMException]
+[17232:0712/081434.570:ERROR:storage\browser\quota\quota_database.cc:994] Failed to reset the quota database.
+[17232:0712/081434.570:ERROR:storage\browser\quota\quota_database.cc:994] Failed to reset the quota database.
+[17232:0712/081438.869:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[17232:0712/081438.869:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17232:0712/081438.869:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+[17232:0712/081438.871:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[17232:0712/081438.871:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17232:0712/081438.871:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+[17232:0712/081438.872:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[17232:0712/081438.872:ERROR:net\disk_cache\disk_cache.cc:284] Unable to create cache
+[17232:0712/081438.872:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+[17232:0712/081441.883:ERROR:components\services\storage\service_worker\service_worker_storage.cc:1814] Failed to delete the database: Database IO error
+[renderer] Uncaught (in promise) Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error:  (-3) loading 'https://news.web.nhk/newsweb'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.finishListener (node:electron/js2c/browser_init:2:89717)
+    at WebContents.emit (node:events:521:24) {
+  errno: -3,
+  code: '',
+  url: 'https://news.web.nhk/newsweb'
+}
+8:14:55 AM [@electron-forge/plugin-vite] target built src/main.ts
+8:14:56 AM [@electron-forge/plugin-vite] target built src/main.ts
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}

@@ -1,0 +1,543 @@
+import type { GrammarPoint } from './types';
+
+export const N2: GrammarPoint[] = [
+  {
+    id: 'n2-ni-chigai-nai',
+    level: 'N2',
+    title: '〜に違いない',
+    meaning: 'must be ~ / no doubt that ~',
+    structure: 'Plain form (drop だ for noun/な-adj) + に違いない',
+    explanation:
+      'A strong conviction based on evidence — "I\'m sure / there\'s no doubt". More written than はずだ.',
+    examples: [
+      { jp: '電気が 消えている。もう 寝たに違いない。', reading: 'でんきが きえている。もう ねたにちがいない。', en: 'The lights are off — they must have gone to bed.' },
+    ],
+  },
+  {
+    id: 'n2-wake-dewa-nai',
+    level: 'N2',
+    title: '〜わけではない',
+    meaning: "it doesn't mean that ~ / not necessarily ~",
+    structure: 'Plain form + わけではない',
+    explanation: 'Partially denies a likely conclusion — "it\'s not that…". A softening qualifier.',
+    examples: [
+      { jp: '嫌いな わけではないが、あまり 食べない。', reading: 'きらいな わけではないが、あまり たべない。', en: "It's not that I dislike it, but I don't eat much." },
+    ],
+  },
+  {
+    id: 'n2-zaru-o-enai',
+    level: 'N2',
+    title: '〜ざるを得ない',
+    meaning: 'have no choice but to ~',
+    structure: 'Verb ない-form (drop ない) + ざるを得ない（する→せざるを得ない）',
+    explanation: 'Formal: being compelled to do something against your will, with no alternative.',
+    examples: [
+      { jp: '台風で 試合を 中止せざるを得なかった。', reading: 'たいふうで しあいを ちゅうしせざるをえなかった。', en: 'Due to the typhoon, we had no choice but to cancel.' },
+    ],
+  },
+  {
+    id: 'n2-dokoro-ka',
+    level: 'N2',
+    title: '〜どころか',
+    meaning: 'far from ~ / let alone ~',
+    structure: 'Noun / plain form + どころか',
+    explanation: 'Reality is the opposite of, or far beyond, what was assumed.',
+    examples: [
+      { jp: '彼は 漢字どころか、ひらがなも 読めない。', reading: 'かれは かんじどころか、ひらがなも よめない。', en: "Far from kanji, he can't even read hiragana." },
+    ],
+  },
+  {
+    id: 'n2-ni-motozuite',
+    level: 'N2',
+    title: '〜に基づいて',
+    meaning: 'based on ~',
+    structure: 'Noun + に基づいて',
+    explanation: 'The foundation or basis on which something is done. Formal.',
+    examples: [
+      { jp: 'この 映画は 実話に基づいています。', reading: 'この えいがは じつわに もとづいています。', en: 'This movie is based on a true story.' },
+    ],
+  },
+  {
+    id: 'n2-nimo-kakawarazu',
+    level: 'N2',
+    title: '〜にもかかわらず',
+    meaning: 'despite ~ / in spite of ~',
+    structure: 'Plain form / Noun + にもかかわらず',
+    explanation: 'A formal "although" — a result that goes against what the first clause would suggest.',
+    examples: [
+      { jp: '雨にもかかわらず、試合は 行われた。', reading: 'あめにもかかわらず、しあいは おこなわれた。', en: 'Despite the rain, the match was held.' },
+    ],
+  },
+  {
+    id: 'n2-tsutsu-aru',
+    level: 'N2',
+    title: '〜つつある',
+    meaning: 'be in the process of ~ing',
+    structure: 'Verb stem + つつある',
+    explanation: 'A gradual, ongoing change toward a state. More formal/written than 〜ている.',
+    examples: [
+      { jp: '景気は 回復しつつある。', reading: 'けいきは かいふくしつつある。', en: 'The economy is gradually recovering.' },
+    ],
+  },
+  {
+    id: 'n2-tsutsu',
+    level: 'N2',
+    title: '〜つつ / 〜つつも',
+    meaning: 'while ~ / even though ~',
+    structure: 'Verb stem + つつ（も）',
+    explanation:
+      'Formal "while doing". With も it means "even though" — doing something despite knowing better.',
+    examples: [
+      { jp: '悪いと 知りつつ、うそを ついた。', reading: 'わるいと しりつつ、うそを ついた。', en: 'Even though I knew it was wrong, I told a lie.' },
+    ],
+  },
+  {
+    id: 'n2-ippou-de',
+    level: 'N2',
+    title: '〜一方で',
+    meaning: 'on the other hand / while ~',
+    structure: 'Plain form + 一方で（いっぽうで）',
+    explanation: 'Contrasts two coexisting aspects or simultaneous situations.',
+    examples: [
+      { jp: '都会は 便利な 一方で、家賃が 高い。', reading: 'とかいは べんりな いっぽうで、やちんが たかい。', en: 'Cities are convenient, but on the other hand rent is high.' },
+    ],
+  },
+  {
+    id: 'n2-hanmen',
+    level: 'N2',
+    title: '〜反面',
+    meaning: 'on the other hand / while also ~',
+    structure: 'Plain form (な/である after な-adj) + 反面（はんめん）',
+    explanation: 'Points out two opposite sides of the same thing or person.',
+    examples: [
+      { jp: 'この 仕事は 大変な 反面、やりがいが ある。', reading: 'この しごとは たいへんな はんめん、やりがいが ある。', en: 'This job is tough, but on the other hand it\'s rewarding.' },
+    ],
+  },
+  {
+    id: 'n2-ni-kanshite',
+    level: 'N2',
+    title: '〜に関して',
+    meaning: 'regarding ~ / concerning ~',
+    structure: 'Noun + に関して（かんして）',
+    explanation: 'A formal "about / concerning", common in writing and academic contexts (cf. について).',
+    examples: [
+      { jp: 'この 問題に関して 意見を 述べてください。', reading: 'この もんだいにかんして いけんを のべてください。', en: 'Please state your opinion regarding this issue.' },
+    ],
+  },
+  {
+    id: 'n2-o-tsujite',
+    level: 'N2',
+    title: '〜を通じて / 〜を通して',
+    meaning: 'through ~ / throughout ~',
+    structure: 'Noun + を通じて（つうじて）/ を通して（とおして）',
+    explanation: 'A means/medium ("through"), or an extent of time/space ("throughout").',
+    examples: [
+      { jp: '友人を 通じて 彼を 知った。', reading: 'ゆうじんを つうじて かれを しった。', en: 'I got to know him through a friend.' },
+    ],
+  },
+  {
+    id: 'n2-o-hajime',
+    level: 'N2',
+    title: '〜をはじめ',
+    meaning: 'starting with ~ / ~ and others',
+    structure: 'Noun + をはじめ（として）',
+    explanation: 'Gives a leading representative example, implying many others follow.',
+    examples: [
+      { jp: '東京を はじめ、日本には 大きな 都市が 多い。', reading: 'とうきょうを はじめ、にほんには おおきな としが おおい。', en: 'Japan has many big cities, starting with Tokyo.' },
+    ],
+  },
+  {
+    id: 'n2-o-megutte',
+    level: 'N2',
+    title: '〜をめぐって',
+    meaning: 'concerning ~ / surrounding ~ (a dispute)',
+    structure: 'Noun + をめぐって',
+    explanation: 'A central issue around which debate, conflict, or various opinions revolve.',
+    examples: [
+      { jp: 'その 法律を めぐって 議論が 続いている。', reading: 'その ほうりつを めぐって ぎろんが つづいている。', en: 'Debate continues surrounding that law.' },
+    ],
+  },
+  {
+    id: 'n2-ni-oujite',
+    level: 'N2',
+    title: '〜に応じて',
+    meaning: 'in accordance with ~ / depending on ~',
+    structure: 'Noun + に応じて（おうじて）',
+    explanation: 'Changing flexibly to match a varying condition.',
+    examples: [
+      { jp: '収入に 応じて 税金を 払う。', reading: 'しゅうにゅうに おうじて ぜいきんを はらう。', en: 'You pay taxes in accordance with your income.' },
+    ],
+  },
+  {
+    id: 'n2-ni-tomonatte',
+    level: 'N2',
+    title: '〜に伴って',
+    meaning: 'along with ~ / as ~ (changes)',
+    structure: 'Verb dictionary / Noun + に伴って（ともなって）',
+    explanation: 'As one thing changes, another changes with it. Formal.',
+    examples: [
+      { jp: '人口の 増加に 伴って、住宅が 不足している。', reading: 'じんこうの ぞうかに ともなって、じゅうたくが ふそくしている。', en: 'Along with population growth, housing is in short supply.' },
+    ],
+  },
+  {
+    id: 'n2-ni-shitagatte',
+    level: 'N2',
+    title: '〜にしたがって',
+    meaning: 'as ~ / in accordance with ~',
+    structure: 'Verb dictionary / Noun + にしたがって',
+    explanation: 'A gradual parallel change ("as A progresses, B does too"), or following a rule/instruction.',
+    examples: [
+      { jp: '山を 登るに したがって、寒くなってきた。', reading: 'やまを のぼるに したがって、さむくなってきた。', en: 'As I climbed the mountain, it got colder.' },
+    ],
+  },
+  {
+    id: 'n2-ni-tsurete',
+    level: 'N2',
+    title: '〜につれて',
+    meaning: 'as ~ changes, ~ also changes',
+    structure: 'Verb dictionary / Noun + につれて',
+    explanation: 'Two things changing in proportion together. Natural, gradual change.',
+    examples: [
+      { jp: '時間が 経つに つれて、悲しみは 薄れた。', reading: 'じかんが たつに つれて、かなしみは うすれた。', en: 'As time passed, the sadness faded.' },
+    ],
+  },
+  {
+    id: 'n2-amari',
+    level: 'N2',
+    title: '〜あまり',
+    meaning: 'so much ~ that / out of excessive ~',
+    structure: 'Verb dictionary / Noun + の + あまり',
+    explanation: 'An extreme degree of emotion or action that causes a (often negative) result.',
+    examples: [
+      { jp: '心配の あまり、夜も 眠れなかった。', reading: 'しんぱいの あまり、よるも ねむれなかった。', en: 'I was so worried that I couldn\'t sleep at night.' },
+    ],
+  },
+  {
+    id: 'n2-ageku',
+    level: 'N2',
+    title: '〜あげく',
+    meaning: 'after ~ (in the end, often bad)',
+    structure: 'Verb た-form / Noun + の + あげく',
+    explanation: 'After a long or troublesome process, a (usually negative) final result.',
+    examples: [
+      { jp: '長時間 悩んだ あげく、留学を やめた。', reading: 'ちょうじかん なやんだ あげく、りゅうがくを やめた。', en: 'After agonizing for hours, I gave up on studying abroad.' },
+    ],
+  },
+  {
+    id: 'n2-sue-ni',
+    level: 'N2',
+    title: '〜末に',
+    meaning: 'after ~ (much effort), finally ~',
+    structure: 'Verb た-form / Noun + の + 末に（すえに）',
+    explanation: 'A final result reached after a long process of effort or deliberation (often neutral/positive).',
+    examples: [
+      { jp: 'よく 考えた 末に、決めました。', reading: 'よく かんがえた すえに、きめました。', en: 'After much thought, I decided.' },
+    ],
+  },
+  {
+    id: 'n2-ijou-wa',
+    level: 'N2',
+    title: '〜以上は',
+    meaning: 'now that ~ / since ~',
+    structure: 'Plain form + 以上は（いじょうは）',
+    explanation: 'Since a fact is established, a natural obligation or conclusion follows.',
+    examples: [
+      { jp: '約束した 以上は、守るべきだ。', reading: 'やくそくした いじょうは、まもるべきだ。', en: 'Now that you\'ve promised, you should keep it.' },
+    ],
+  },
+  {
+    id: 'n2-kagiri',
+    level: 'N2',
+    title: '〜限り',
+    meaning: 'as long as / as far as ~',
+    structure: 'Verb dictionary / ている / Noun + の + 限り（かぎり）',
+    explanation:
+      'A condition or limit ("as long as"), or the extent of one\'s knowledge/ability ("as far as I know").',
+    examples: [
+      { jp: '私が 知っている 限り、彼は 正直だ。', reading: 'わたしが しっている かぎり、かれは しょうじきだ。', en: 'As far as I know, he is honest.' },
+    ],
+  },
+  {
+    id: 'n2-uru-enai',
+    level: 'N2',
+    title: '〜得る / 〜得ない',
+    meaning: 'can possibly ~ / cannot possibly ~',
+    structure: 'Verb stem + 得る（える/うる）/ 得ない（えない）',
+    explanation: 'Expresses possibility or impossibility in principle. Formal/written.',
+    examples: [
+      { jp: 'それは 十分 あり得る ことだ。', reading: 'それは じゅうぶん ありうる ことだ。', en: 'That is entirely possible.' },
+    ],
+  },
+  {
+    id: 'n2-kaneru',
+    level: 'N2',
+    title: '〜かねる / 〜かねない',
+    meaning: 'unable to ~ (かねる) / might (badly) ~ (かねない)',
+    structure: 'Verb stem + かねる / かねない',
+    explanation:
+      'かねる = cannot (politely decline). かねない = there\'s a risk it could happen (something bad).',
+    examples: [
+      { jp: 'その ご質問には お答えしかねます。', reading: 'その ごしつもんには おこたえしかねます。', en: "I'm unable to answer that question." },
+      { jp: '無理を すると、病気に なりかねない。', reading: 'むりを すると、びょうきに なりかねない。', en: 'If you overdo it, you could end up sick.' },
+    ],
+  },
+  {
+    id: 'n2-mono-da',
+    level: 'N2',
+    title: '〜ものだ',
+    meaning: 'used to ~ / should ~ / it\'s natural that ~',
+    structure: 'Plain form + ものだ',
+    explanation:
+      'Expresses a general truth, common sense, strong advice (should), or nostalgic recollection (used to).',
+    examples: [
+      { jp: '子供の ころ、よく ここで 遊んだものだ。', reading: 'こどもの ころ、よく ここで あそんだものだ。', en: 'As a child, I used to play here a lot.' },
+      { jp: '約束は 守るものだ。', reading: 'やくそくは まもるものだ。', en: 'One should keep promises.' },
+    ],
+  },
+  {
+    id: 'n2-mono-no',
+    level: 'N2',
+    title: '〜ものの',
+    meaning: 'although ~ / even though ~',
+    structure: 'Plain form + ものの',
+    explanation: 'Concedes a fact, then states a contrasting reality. Formal "although".',
+    examples: [
+      { jp: '免許は 取った ものの、車が ない。', reading: 'めんきょは とった ものの、くるまが ない。', en: 'Although I got my license, I have no car.' },
+    ],
+  },
+  {
+    id: 'n2-koto-da',
+    level: 'N2',
+    title: '〜ことだ',
+    meaning: 'should ~ / the best thing is to ~',
+    structure: 'Verb dictionary / ない-form + ことだ',
+    explanation: 'Strong advice or a recommendation about what someone ought to do.',
+    examples: [
+      { jp: '上手に なりたければ、毎日 練習することだ。', reading: 'じょうずに なりたければ、まいにち れんしゅうすることだ。', en: 'If you want to improve, you should practice every day.' },
+    ],
+  },
+  {
+    id: 'n2-koto-ka',
+    level: 'N2',
+    title: '〜ことか',
+    meaning: 'how ~! (exclamation)',
+    structure: 'Question word (どんなに / なんと) + plain form + ことか',
+    explanation: 'An emotional exclamation emphasizing a great degree of feeling.',
+    examples: [
+      { jp: 'この 日を どんなに 待っていた ことか。', reading: 'この ひを どんなに まっていた ことか。', en: 'How long I have waited for this day!' },
+    ],
+  },
+  {
+    id: 'n2-koto-naku',
+    level: 'N2',
+    title: '〜ことなく',
+    meaning: 'without ~ing',
+    structure: 'Verb dictionary form + ことなく',
+    explanation: 'A formal "without doing", emphasizing that an action never occurred.',
+    examples: [
+      { jp: '彼は 休むことなく 働き続けた。', reading: 'かれは やすむことなく はたらきつづけた。', en: 'He kept working without resting.' },
+    ],
+  },
+  {
+    id: 'n2-nai-koto-ni-wa',
+    level: 'N2',
+    title: '〜ないことには',
+    meaning: 'unless ~ / without ~ first',
+    structure: 'Verb ない-form + ことには',
+    explanation: 'Unless the first condition is met, the second (often negative) can\'t happen.',
+    examples: [
+      { jp: '実際に 見ないことには、判断できない。', reading: 'じっさいに みないことには、はんだんできない。', en: "Unless I see it in person, I can't judge." },
+    ],
+  },
+  {
+    id: 'n2-towa-kagiranai',
+    level: 'N2',
+    title: '〜とは限らない',
+    meaning: 'not necessarily ~',
+    structure: 'Plain form + とは限らない（かぎらない）',
+    explanation: 'Denies that something is always true — there are exceptions.',
+    examples: [
+      { jp: '高い ものが いいとは 限らない。', reading: 'たかい ものが いいとは かぎらない。', en: "Expensive things aren't necessarily good." },
+    ],
+  },
+  {
+    id: 'n2-wake-ni-wa-ikanai',
+    level: 'N2',
+    title: '〜わけにはいかない',
+    meaning: "can't afford to ~ / can't just ~",
+    structure: 'Verb dictionary / ない-form + わけにはいかない',
+    explanation:
+      'Cannot do something due to social, moral, or practical reasons (not physical inability).',
+    examples: [
+      { jp: '大事な 会議だから、休むわけには いかない。', reading: 'だいじな かいぎだから、やすむわけには いかない。', en: "It's an important meeting, so I can't just skip it." },
+    ],
+  },
+  {
+    id: 'n2-yori-hoka-nai',
+    level: 'N2',
+    title: '〜ほか（は）ない / 〜よりほかない',
+    meaning: 'have no choice but to ~',
+    structure: 'Verb dictionary form + ほか（は）ない / よりほかない',
+    explanation: 'The only remaining option ("there\'s nothing to do but…"). Similar to ざるを得ない.',
+    examples: [
+      { jp: '終電が ないので、歩いて 帰るほか ない。', reading: 'しゅうでんが ないので、あるいて かえるほか ない。', en: "There's no last train, so I have no choice but to walk home." },
+    ],
+  },
+  {
+    id: 'n2-beki',
+    level: 'N2',
+    title: '〜べきだ',
+    meaning: 'should ~ / ought to ~',
+    structure: 'Verb dictionary form + べきだ（する→すべき）',
+    explanation:
+      'A moral or logical "should". 〜べきではない = "shouldn\'t". Stronger and more formal than ほうがいい.',
+    examples: [
+      { jp: '学生は もっと 勉強すべきだ。', reading: 'がくせいは もっと べんきょうすべきだ。', en: 'Students should study more.' },
+    ],
+  },
+  {
+    id: 'n2-mai',
+    level: 'N2',
+    title: '〜まい',
+    meaning: 'will not ~ / probably not ~',
+    structure: 'Verb dictionary form + まい（する→するまい/すまい）',
+    explanation:
+      'A formal negative volition ("I won\'t / I\'ll never") or negative guess ("probably not").',
+    examples: [
+      { jp: '二度と あんな 店には 行くまい。', reading: 'にどと あんな みせには いくまい。', en: "I'll never go to that shop again." },
+    ],
+  },
+  {
+    id: 'n2-dake-atte',
+    level: 'N2',
+    title: '〜だけあって',
+    meaning: 'as expected of ~ / fitting for ~',
+    structure: 'Plain form / Noun + だけあって',
+    explanation:
+      'A good result that lives up to a reason or reputation ("as you\'d expect, given X").',
+    examples: [
+      { jp: 'プロだけ あって、演奏が すばらしい。', reading: 'プロだけ あって、えんそうが すばらしい。', en: 'As you\'d expect of a pro, the performance is wonderful.' },
+    ],
+  },
+  {
+    id: 'n2-dake-ni',
+    level: 'N2',
+    title: '〜だけに',
+    meaning: 'precisely because ~ (all the more)',
+    structure: 'Plain form / Noun + だけに',
+    explanation: 'Because of a particular reason, the result is all the greater or more fitting.',
+    examples: [
+      { jp: '期待していた だけに、結果が 残念だった。', reading: 'きたいしていた だけに、けっかが ざんねんだった。', en: 'Precisely because I had high hopes, the result was disappointing.' },
+    ],
+  },
+  {
+    id: 'n2-kuse-ni',
+    level: 'N2',
+    title: '〜くせに',
+    meaning: 'even though ~ (with reproach)',
+    structure: 'Plain form (の after noun, な after な-adj) + くせに',
+    explanation: 'Like のに but more critical or accusatory — expressing contempt or complaint.',
+    examples: [
+      { jp: '知っている くせに、教えてくれない。', reading: 'しっている くせに、おしえてくれない。', en: "Even though he knows, he won't tell me." },
+    ],
+  },
+  {
+    id: 'n2-furi-o-suru',
+    level: 'N2',
+    title: '〜ふりをする',
+    meaning: 'pretend to ~',
+    structure: 'Plain form / Noun + の + ふりをする',
+    explanation: 'Acting as if something is true when it isn\'t.',
+    examples: [
+      { jp: '彼は 聞こえない ふりを した。', reading: 'かれは きこえない ふりを した。', en: 'He pretended not to hear.' },
+    ],
+  },
+  {
+    id: 'n2-totan',
+    level: 'N2',
+    title: '〜たとたん（に）',
+    meaning: 'the moment ~ / just as ~',
+    structure: 'Verb た-form + とたん（に）',
+    explanation: 'The instant one action finishes, an unexpected event immediately follows.',
+    examples: [
+      { jp: '立ち上がった とたん、めまいが した。', reading: 'たちあがった とたん、めまいが した。', en: 'The moment I stood up, I felt dizzy.' },
+    ],
+  },
+  {
+    id: 'n2-ka-to-omou-to',
+    level: 'N2',
+    title: '〜かと思うと / 〜かと思ったら',
+    meaning: 'just when ~ / no sooner than ~',
+    structure: 'Verb た-form + かと思うと / かと思ったら',
+    explanation: 'One thing happens and immediately, surprisingly, another follows.',
+    examples: [
+      { jp: '泣いた かと思うと、もう 笑っている。', reading: 'ないた かとおもうと、もう わらっている。', en: 'Just when he was crying, he\'s already laughing.' },
+    ],
+  },
+  {
+    id: 'n2-ka-nai-ka-no-uchi-ni',
+    level: 'N2',
+    title: '〜か〜ないかのうちに',
+    meaning: 'almost as soon as ~',
+    structure: 'Verb dictionary form + か + verb ない-form + かのうちに',
+    explanation: 'Before one action is even fully complete, the next begins.',
+    examples: [
+      { jp: 'ベルが 鳴るか 鳴らないかの うちに、彼は 教室を 出た。', reading: 'ベルが なるか ならないかの うちに、かれは きょうしつを でた。', en: 'Almost before the bell rang, he left the classroom.' },
+    ],
+  },
+  {
+    id: 'n2-sai-ni',
+    level: 'N2',
+    title: '〜際に',
+    meaning: 'on the occasion of ~ / when ~',
+    structure: 'Verb dictionary / た-form / Noun + の + 際に（さいに）',
+    explanation: 'A formal "when / at the time of", used for special occasions. Common in announcements.',
+    examples: [
+      { jp: 'お降りの 際は、足元に ご注意ください。', reading: 'おおりの さいは、あしもとに ごちゅういください。', en: 'When getting off, please watch your step.' },
+    ],
+  },
+  {
+    id: 'n2-ni-oite',
+    level: 'N2',
+    title: '〜において',
+    meaning: 'in / at / on ~ (formal)',
+    structure: 'Noun + において',
+    explanation: 'A formal marker of place, time, or field/context. Written equivalent of で.',
+    examples: [
+      { jp: '会議は 大ホールに おいて 行われます。', reading: 'かいぎは だいホールに おいて おこなわれます。', en: 'The meeting will be held in the main hall.' },
+    ],
+  },
+  {
+    id: 'n2-ni-kakete-wa',
+    level: 'N2',
+    title: '〜にかけては',
+    meaning: 'when it comes to ~ (no one beats)',
+    structure: 'Noun + にかけては',
+    explanation: 'Highlighting an area in which someone excels above all.',
+    examples: [
+      { jp: '料理に かけては、母に かなわない。', reading: 'りょうりに かけては、ははに かなわない。', en: "When it comes to cooking, I'm no match for my mother." },
+    ],
+  },
+  {
+    id: 'n2-kkonai',
+    level: 'N2',
+    title: '〜っこない',
+    meaning: 'there\'s no way ~ (casual)',
+    structure: 'Verb stem + っこない',
+    explanation: 'A casual, emphatic "definitely won\'t / can\'t possibly".',
+    examples: [
+      { jp: 'そんな 難しい 問題、できっこない。', reading: 'そんな むずかしい もんだい、できっこない。', en: "There's no way I can solve such a hard problem." },
+    ],
+  },
+  {
+    id: 'n2-yara-yara',
+    level: 'N2',
+    title: '〜やら〜やら',
+    meaning: 'what with ~ and ~ (and so on)',
+    structure: 'Noun / plain form + やら + ... + やら',
+    explanation: 'Lists representative things in a messy or overwhelming situation.',
+    examples: [
+      { jp: '引っ越しで、荷造りやら 掃除やら 忙しい。', reading: 'ひっこしで、にづくりやら そうじやら いそがしい。', en: "With the move, I'm busy with packing, cleaning, and all." },
+    ],
+  },
+];

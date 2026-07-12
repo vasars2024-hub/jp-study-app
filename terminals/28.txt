@@ -1,0 +1,13 @@
+---
+pid: 4668
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx electron tools/test-nhk-electron.mjs 2>&1"
+started_at: 2026-07-12T05:55:34.492Z
+running_for_ms: 185011   
+---
+
+(node:38404) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Arseniy/Projects/jp-study-app/src/renderer/nhkWebviewScript.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Arseniy\Projects\jp-study-app\package.json.
+(Use `electron --trace-warnings ...` to show where the warning was created)
+result { ready: false, consent: undefined, source: undefined, textLen: 3078 }

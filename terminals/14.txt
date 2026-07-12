@@ -1,0 +1,33 @@
+---
+pid: 31848
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "Get-Process -Name electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npm start"
+started_at: 2026-07-12T05:15:23.435Z
+running_for_ms: 2615015  
+---
+
+> jp-study-app@1.0.0 start
+> electron-forge start
+
+> Checking your system
+> Checking package manager version
+√ Found npm@11.13.0
+√ Checking your system
+8:15:29 AM [@electron-forge/plugin-vite] target built src/preload.ts
+8:15:30 AM [@electron-forge/plugin-vite] target built src/main.ts
+
+App threw an error during load
+Error: Could not resolve "canvas" imported by "linkedom". Is it installed?
+    at Object.<anonymous> (C:\Users\Arseniy\Projects\jp-study-app\.vite\build\main-BKInyYkt.js:11099:7)
+    at Module._compile (node:internal/modules/cjs/loader:1838:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1971:10)
+    at Module.load (node:internal/modules/cjs/loader:1560:32)
+    at Module._load (node:internal/modules/cjs/loader:1362:12)
+    at c._load (node:electron/js2c/node_init:2:18095)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:262:19)
+    at Module.require (node:internal/modules/cjs/loader:1583:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (C:\Users\Arseniy\Projects\jp-study-app\.vite\build\main.js:5:1)
+8:16:40 AM [@electron-forge/plugin-vite] target built src/main.ts
+[35904:0712/081640.431:ERROR:content\browser\network_service_instance_impl.cc:703] Network service crashed or was terminated, restarting service.
+[35904:0712/081640.431:ERROR:content\browser\gpu\gpu_process_host.cc:999] GPU process exited unexpectedly: exit_code=-1

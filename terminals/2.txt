@@ -1,0 +1,106 @@
+---
+pid: 11368
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npm start"
+started_at: 2026-07-12T04:42:37.001Z
+running_for_ms: 4580013  
+---
+
+> jp-study-app@1.0.0 start
+> electron-forge start
+
+> Checking your system
+> Checking package manager version
+√ Found npm@11.13.0
+√ Checking your system
+7:42:40 AM [@electron-forge/plugin-vite] target built src/preload.ts
+7:42:41 AM [@electron-forge/plugin-vite] target built src/main.ts
+
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+7:42:45 AM [vite] warning: The "??" operator here will always return the left operand
+65 |  
+66 |  export function cycleLevel(word: string): WkLevel {
+67 |    const next = (((getLevel(word) + 1) % 4) as WkLevel) ?? 0;
+   |                                                         ^
+68 |    setLevel(word, next, true);
+69 |    return next;
+
+  Plugin: vite:esbuild
+  File: C:/Users/Arseniy/Projects/jp-study-app/src/renderer/knownWords.ts
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [storage] migration failed: [object DOMException]
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+[node-llama-cpp] load: control-looking token: 128247 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000'
+}
+[renderer] Unexpected error while loading URL Error: Error invoking remote method 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T04%253A44%253A50.015Z'
+Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL': Error: ERR_ABORTED (-3) loading 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T04%253A44%253A50.015Z'
+    at rejectAndCleanup (node:electron/js2c/browser_init:2:89555)
+    at WebContents.navigationListener (node:electron/js2c/browser_init:2:89835)
+    at WebContents.emit (node:events:521:24)
+    at b.loadURL (node:electron/js2c/browser_init:2:94583)
+    at node:electron/js2c/browser_init:2:111755
+    at node:electron/js2c/browser_init:2:110935
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:116067)
+    at Session.emit (node:events:509:28) {
+  errno: -3,
+  code: 'ERR_ABORTED',
+  url: 'https://news.web.nhk/newsweb/na/na-k10015174811000?_reload=2026-07-12T04%253A44%253A50.015Z'
+}
+[renderer] [vite] connecting...
+[renderer] [vite] connected.
+[renderer] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[renderer] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+[renderer] [tokenizer] SELFTEST OK: 食べ→食べる, まし→ます, た→た
+[renderer] [storage] migration failed: [object DOMException]
+[renderer] [highlight] SELFTEST spans=4: 昨日(wk wk-1) 美味しい(wk wk-1) 寿司(wk wk-1) 食べ(wk wk-2)
+7:48:53 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx, /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+7:49:00 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx
+7:49:00 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+7:49:12 AM [vite] hmr update /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+7:49:28 AM [vite] hmr update /src/renderer/views/LibraryView.tsx
+7:49:28 AM [vite] hmr update /src/renderer/views/ImmersionView.tsx, /src/renderer/views/LibraryView.tsx
+7:49:28 AM [vite] hmr update /src/renderer/styles.css
+[renderer] [vite] hot updated: /src/renderer/styles.css
+[renderer] [vite] hot updated: /src/renderer/views/ImmersionView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+[renderer] [vite] hot updated: /src/renderer/views/LibraryView.tsx
+7:49:31 AM [vite] hmr update /src/renderer/styles.css
+[renderer] [vite] hot updated: /src/renderer/styles.css
+[renderer] [vite] server connection lost. Polling for restart...
+[22248:0712/075017.878:ERROR:content\browser\network_service_instance_impl.cc:703] Network service crashed or was terminated, restarting service.
+[renderer] The AudioContext encountered an error from the audio device or the WebAudio renderer.

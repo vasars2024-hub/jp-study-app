@@ -1,0 +1,95 @@
+---
+pid: 33708
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx electron tools/probe-nhk-network2.mjs 2>&1"
+started_at: 2026-07-12T05:48:23.545Z
+running_for_ms: 620002   
+---
+
+t+5s len 1177 marker false
+t+10s len 1177 marker false
+t+15s len 1177 marker false
+t+20s len 1177 marker false
+t+25s len 1177 marker false
+t+30s len 1177 marker false
+
+all nhk requests 79
+200 news.web.nhk/newsweb/na/na-k10015174811000
+200 imgu.web.nhk/news/u/news/html/20260712/K10015174811_2607121217_0712122421_01_03.jpg
+200 news.web.nhk/_next/static/css/133efd08120dacc0.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/9214aa35ebf5e70e.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/7bbe6152fcd6e518.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/da661f88672035f8.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/d21fb4bf7ea493c6.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/ef923b9eacb47602.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/9deabefe7aff03b3.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/6db9654b981d5259.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/43a468c3aaa3d006.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/1b76f3e47484a4fe.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/fdaff48d04a4b634.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/8263b0eb97407b72.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/d9636764fe0676fc.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/ab7ef4cd5c1f8703.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/b884339242a1b907.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/c96bf2b9ed9f1ba2.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/363f72ed5f70511a.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/79767caf33ad1f6b.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/c7adf318c437daec.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/6866144173ca5475.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/d4479128d7fddfc8.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/acaf22cd09630da7.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/0845320919f64a19.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/b5a12205adb22968.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/7bbb3030e8606968.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/3d1827cbea67969d.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/7ab16af97635b968.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/1d3b4187088b9754.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/ee229214fa739de8.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/3871f73eb190bc40.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/f0d0d721310e766d.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/57ecdeba611a4ba0.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/0ddb29e012b6e527.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/fc4f3d47d8685c66.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/ac4186f94a8f3320.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/066c65a9277d2642.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/383de52cbc38fc9f.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/4d194cd4479f43d6.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/a6764cd5eab9e3d8.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/css/1ed765b32b26c02d.css?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 imgu.web.nhk/news/u/news/html/20260712/K10015174631_2607121347_0712135112_01_03.jpg
+200 news.web.nhk/_next/static/chunks/webpack-7ce3bf2d9a82320a.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/main-app-afca85de823cd3b7.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/2457-7615a65e1c1d9a51.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/app/global-error-fb7f00469f62c43f.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/3843-3de6817d98653b58.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/6a26cd15-f5ab033cdc3f9ed3.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/b9168777-15b636c775a22ded.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/4702-1e790c954b917797.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/6b5bb80a-a0823606441eec9e.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/3722-068636126f50f38e.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/674-6a1e8fb8bd63774e.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/9435-84fbb4254a29e972.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/1748-9be20a0e983065f0.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/2028-8af6111cf3cfd47a.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/4788-b18606c716529b34.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/1483-34379330c70db254.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/68-a90faf60b0707807.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/app/newsweb/na/%5Bid%5D/page-424872bba7896ae4.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/1462-7599b515972bd95d.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/app/error-345356b5b8809259.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/_next/static/chunks/app/not-found-72105ad1cc880208.js?dpl=0a1c385152e104fd52892325c328faf5c461996a
+200 news.web.nhk/weather/tenki/tenki_01.jpg
+200 news.web.nhk/assets/ogp/nhk-one-news.png
+200 news.web.nhk/assets/conf/dms/v1/default.json
+200 apps.web.nhk/ops/api/v1/CommonHeader1/index.json
+200 news.web.nhk/assets/conf/dms/v1/header/hamburgerMenu.json
+200 news.web.nhk/assets/conf/dms/v1/header/serviceMenu.json
+200 apps.web.nhk/ops/api/v1/common/consentToUse.json
+200 api.web.nhk/sokuho/news/sokuho_news.xml
+200 news.web.nhk/assets/conf/dms/v1/footer/ja/footerContents.json
+200 location.tools.nhk/geoip/area.json
+200 api.web.nhk/r8/const.json
+200 apps.web.nhk/ops/api/v1/common/enforcementSettings.json
+200 apps.web.nhk/ops/api/v1/common/emergencyMode.json
+200 apps.web.nhk/ops/api/v1/common/emergencyMessages.json
+200 apps.web.nhk/ops/api/v1/common/default.json

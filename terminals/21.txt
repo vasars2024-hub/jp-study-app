@@ -1,0 +1,14 @@
+---
+pid: 26816
+cwd: "C:\Users\Arseniy\Projects\jp-study-app"
+command: "cd \"C:\\Users\\Arseniy\\Projects\\jp-study-app\"; npx electron tools/test-nhk-electron.mjs 2>&1"
+started_at: 2026-07-12T05:45:25.695Z
+running_for_ms: 795013   
+---
+
+(node:21416) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/Arseniy/Projects/jp-study-app/src/renderer/nhkWebviewScript.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\Arseniy\Projects\jp-study-app\package.json.
+(Use `electron --trace-warnings ...` to show where the warning was created)
+(electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+result { ready: false, source: undefined, textLen: 1177, title: undefined }

@@ -1,0 +1,1900 @@
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
+import type { LibraryItem } from '../../shared/types';
+import ReaderSettingsPanel from '../components/ReaderSettingsPanel';
+import DictionaryPopup from '../components/DictionaryPopup';
+import Icon from '../components/Icons';
+import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
+import {
+  buildNovelCss,
+  clampFontSize,
+  loadSettings,
+  onReaderSettingsChanged,
+  saveSettings,
+  THEMES,
+  type ReaderSettings,
+} from '../readerSettings';
+import { addBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../bookmarks';
+import { recordReading } from '../stats';
+import { loadEpub, type LoadedEpub } from '../epubLoader';
+import { loadPdf } from '../pdfLoader';
+import { getTokenizer, tokenizerReady } from '../tokenizer';
+import { highlightEl, recolorEl, resetHighlightRoot } from '../wordHighlight';
+import { onKnowledgeChanged } from '../knownWords';
+import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
+import {
+  ANNO_COLORS,
+  addAnnotation,
+  applyAnnotationsToRoot,
+  flushAnnotationsMirror,
+  loadAnnotations,
+  type AnnoColor,
+  type Annotation,
+} from '../annotations';
+import { detectSentenceBounds, sentenceAt } from '../../shared/sentenceBounds';
+import { registerCommandHandler } from '../keyboardShortcuts';
+import { recordReaderCopy } from '../clipboardHistory';
+import ReaderCollectionPanel, {
+  type CollectionAddPayload,
+} from '../components/ReaderCollectionPanel';
+
+interface Props {
+  item: LibraryItem;
+  onClose: () => void;
+}
+
+// A PDF file starts with the bytes "%PDF".
+function isPdf(buf: ArrayBuffer): boolean {
+  const b = new Uint8Array(buf, 0, Math.min(5, buf.byteLength));
+  return b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+}
+
+const GUTTER = 24;
+
+// Stable empty-HTML object for out-of-range parts (see chapterHtml below).
+const EMPTY_HTML = { __html: '' };
+
+// Saved-position format: "p:<partIndex>:<fractionWithinPart>". Older saves were
+// a bare number (fraction of the whole book) — both are handled on restore.
+function parseLoc(loc: string | undefined): { part: number; frac: number } | null {
+  if (!loc) return null;
+  const m = /^p:(\d+):([\d.]+)$/.exec(loc);
+  if (!m) return null;
+  const frac = Number(m[2]);
+  return { part: Number(m[1]), frac: Math.min(1, Math.max(0, Number.isFinite(frac) ? frac : 0)) };
+}
+
+/**
+ * The custom novel reader.
+ *
+ * The loader pre-splits the book into small "parts". Pages mode renders ONE
+ * part at a time on an exact page grid (state-driven flips — the wheel can't
+ * drift mid-page). Scroll modes render a SLIDING WINDOW of parts (current ±1,
+ * growing as you approach an edge, trimmed when it gets long) inside a single
+ * scroll container — so scrolling is endless across the whole book while the
+ * DOM stays small enough that huge books never freeze.
+ */
+export default function NovelReader({ item, onClose }: Props) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const [loaded, setLoaded] = useState<LoadedEpub | null>(null);
+  const [title, setTitle] = useState(item.title);
+  const [loading, setLoading] = useState(true);
+  const [pdfProgress, setPdfProgress] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<ReaderSettings>(loadSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => loadBookmarks(item.id));
+  const [part, setPart] = useState(0);
+  const [page, setPage] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  /** Parts currently mounted in scroll modes (inclusive range). */
+  const [win, setWin] = useState({ start: 0, end: 0 });
+  const [progress, setProgress] = useState(item.progress?.percent ?? 0);
+  const [seek, setSeek] = useState<number | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [popup, setPopup] = useState<
+    { query: string; x: number; y: number; kind: 'dict' | 'translate'; context?: string } | null
+  >(null);
+  const [collectionOpen, setCollectionOpen] = useState(false);
+  const [annoColor, setAnnoColor] = useState<AnnoColor>('yellow');
+  const [annotations, setAnnotations] = useState<Annotation[]>(() => loadAnnotations(item.id));
+  const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
+  const [pendingAdd, setPendingAdd] = useState<CollectionAddPayload | null>(null);
+
+  // Reload from storage when switching books; flush durable mirror on exit.
+  useEffect(() => {
+    setAnnotations(loadAnnotations(item.id));
+    return () => {
+      const list = annotationsRef.current;
+      if (list.length) {
+        try {
+          localStorage.setItem(`jp-annotations:${item.id}`, JSON.stringify(list));
+        } catch {
+          /* ignore */
+        }
+      }
+      flushAnnotationsMirror();
+    };
+  }, [item.id]);
+
+  // ----- layout mode -----
+  const vertical =
+    settings.writingMode === 'vertical' ||
+    (settings.writingMode === 'auto' && loaded?.direction === 'rtl');
+  const paged = settings.flow === 'paginated';
+  // Horizontal + Scroll is the only mode that scrolls vertically; everything
+  // else moves along the horizontal axis (vertical text flows right-to-left).
+  const axis: 'x' | 'y' = !vertical && !paged ? 'y' : 'x';
+  const rtl = vertical;
+
+  // ----- refs mirrored for stable handlers -----
+  const layoutRef = useRef({ axis, rtl, paged, vertical });
+  layoutRef.current = { axis, rtl, paged, vertical };
+  const loadedRef = useRef(loaded);
+  loadedRef.current = loaded;
+  const partRef = useRef(part);
+  partRef.current = part;
+  const winRef = useRef(win);
+  winRef.current = win;
+  const popupRef = useRef(popup);
+  popupRef.current = popup;
+  const titleRef = useRef(title);
+  titleRef.current = title;
+
+  const pageRef = useRef(0);
+  const pageCountRef = useRef(1);
+  const stepRef = useRef(0);
+  /** Paged mode: where to land (0..1) after the next part/layout pass. */
+  const pendingPosRef = useRef<number | null>(null);
+  /** Scroll modes: part + fraction to land on after the next window pass. */
+  const pendingTargetRef = useRef<{ pi: number; lf: number } | null>(null);
+  /** Scroll modes: keep this part visually fixed across a window mutation. */
+  const anchorRef = useRef<{ pi: number; old: number } | null>(null);
+  /** Cached part geometry so the scroll handler avoids layout reads every frame. */
+  const partGeomRef = useRef<{ startIdx: number; starts: number[]; extents: number[] } | null>(
+    null,
+  );
+  /** Defer word-highlight DOM work while the user is actively scrolling. */
+  const scrollingRef = useRef(false);
+  const scrollEndTimerRef = useRef(0);
+  /** Window grow/trim queued while scrolling — applied once scroll settles. */
+  const pendingWinRef = useRef<{ start: number; end: number } | null>(null);
+  /** Last typography key used for localFrac reflow (font size etc.). */
+  const typoKeyRef = useRef('');
+  /** Current position within the current part (0..1). */
+  const localFracRef = useRef(0);
+
+  // stats + progress
+  const totalCharsRef = useRef(0);
+  const curGlobalRef = useRef(progress);
+  const maxGlobalRef = useRef<number | null>(null);
+  const pendingCharsRef = useRef(0);
+  const readStartRef = useRef(Date.now());
+  const activeReadingRef = useRef(true);
+
+  const bumpFont = useCallback((delta: number) => {
+    setSettings((s) => ({ ...s, fontSize: clampFontSize(s.fontSize + delta) }));
+  }, []);
+
+  // ----- char-weighted progress across parts -----
+  const weights = useMemo(() => {
+    const w = (loaded?.chapters ?? []).map((c) => Math.max(c.chars, 1));
+    const cum: number[] = [];
+    let t = 0;
+    for (const x of w) {
+      cum.push(t);
+      t += x;
+    }
+    return { w, cum, total: Math.max(t, 1) };
+  }, [loaded]);
+
+  // Stable dangerouslySetInnerHTML objects — one per chapter, memoized so their
+  // reference never changes between renders. React 19 diffs this prop by object
+  // identity (not by the HTML string), so passing a fresh `{ __html }` literal
+  // every render makes React re-set innerHTML on every re-render — which wipes
+  // the word-highlight <span>s the highlighter injects into this DOM by hand.
+  // A constant reference lets React skip the node, so the highlights survive
+  // scrolling, paging, and every other state change.
+  const chapterHtml = useMemo(
+    () => (loaded?.chapters ?? []).map((c) => ({ __html: c.html ?? '' })),
+    [loaded],
+  );
+
+  const globalFor = useCallback(
+    (p: number, lf: number): number => {
+      if (!weights.w.length) return 0;
+      const i = Math.min(Math.max(p, 0), weights.w.length - 1);
+      return Math.min(1, (weights.cum[i] + lf * weights.w[i]) / weights.total);
+    },
+    [weights],
+  );
+
+  const mapGlobal = useCallback(
+    (f: number): { pi: number; lf: number } => {
+      if (!weights.w.length) return { pi: 0, lf: 0 };
+      const target = Math.min(1, Math.max(0, f)) * weights.total;
+      let pi = 0;
+      for (let i = weights.w.length - 1; i >= 0; i--) {
+        if (weights.cum[i] <= target) {
+          pi = i;
+          break;
+        }
+      }
+      const lf = Math.min(1, Math.max(0, (target - weights.cum[pi]) / weights.w[pi]));
+      return { pi, lf };
+    },
+    [weights],
+  );
+
+  const updateGlobal = useCallback((g: number) => {
+    curGlobalRef.current = g;
+    if (maxGlobalRef.current == null) {
+      maxGlobalRef.current = g;
+    } else if (g > maxGlobalRef.current && totalCharsRef.current > 0) {
+      pendingCharsRef.current += Math.round((g - maxGlobalRef.current) * totalCharsRef.current);
+      maxGlobalRef.current = g;
+    }
+  }, []);
+
+  const saveNow = useCallback(
+    (g: number, lf: number) => {
+      window.api.setProgress(item.id, {
+        location: `p:${partRef.current}:${lf.toFixed(4)}`,
+        percent: g,
+      });
+    },
+    [item.id],
+  );
+
+  // ----- offset helpers (abstract over axis + RTL sign) -----
+  const axisMax = useCallback((): number => {
+    const el = scrollerRef.current;
+    if (!el) return 0;
+    return layoutRef.current.axis === 'y'
+      ? el.scrollHeight - el.clientHeight
+      : el.scrollWidth - el.clientWidth;
+  }, []);
+
+  const getOffsetPx = useCallback((): number => {
+    const el = scrollerRef.current;
+    if (!el) return 0;
+    // vertical-rl scrollers use negative scrollLeft in Chromium; abs() covers both.
+    return layoutRef.current.axis === 'y' ? el.scrollTop : Math.abs(el.scrollLeft);
+  }, []);
+
+  const setOffsetPx = useCallback((px: number, smooth = false): void => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const L = layoutRef.current;
+    const behavior = smooth ? ('smooth' as const) : ('auto' as const);
+    if (L.axis === 'y') el.scrollTo({ top: px, behavior });
+    else el.scrollTo({ left: L.rtl ? -px : px, behavior });
+  }, []);
+
+  // ----- part-element geometry (scroll modes) -----
+  const partEl = useCallback(
+    (i: number): HTMLElement | null =>
+      contentRef.current?.querySelector<HTMLElement>(`[data-pi="${i}"]`) ?? null,
+    [],
+  );
+
+  /** A part's start offset along the reading axis (layout px from content origin). */
+  const startOffset = useCallback((el: HTMLElement): number => {
+    const L = layoutRef.current;
+    // offsetTop/Left is stable during scroll; getBoundingClientRect is not.
+    return L.axis === 'y' ? el.offsetTop : el.offsetLeft;
+  }, []);
+
+  const extentOf = useCallback((el: HTMLElement): number => {
+    const L = layoutRef.current;
+    return Math.max(1, L.axis === 'y' ? el.offsetHeight : el.offsetWidth);
+  }, []);
+
+  const measureWin = useCallback((): void => {
+    const w = winRef.current;
+    const starts: number[] = [];
+    const extents: number[] = [];
+    for (let i = w.start; i <= w.end; i++) {
+      const pe = partEl(i);
+      if (!pe) continue;
+      starts.push(startOffset(pe));
+      extents.push(extentOf(pe));
+    }
+    partGeomRef.current = starts.length ? { startIdx: w.start, starts, extents } : null;
+  }, [partEl, startOffset, extentOf]);
+
+  /** Grow/shrink the window while keeping the current part visually fixed. */
+  const mutateWin = useCallback(
+    (next: { start: number; end: number }) => {
+      if (anchorRef.current || pendingTargetRef.current) return; // one change at a time
+      const cur = winRef.current;
+      if (next.start === cur.start && next.end === cur.end) return;
+      partGeomRef.current = null;
+      const keep = Math.min(Math.max(partRef.current, next.start), next.end);
+      const pe = partEl(keep);
+      anchorRef.current = pe ? { pi: keep, old: startOffset(pe) } : null;
+      setWin(next);
+    },
+    [partEl, startOffset],
+  );
+
+  const flushPendingWin = useCallback(() => {
+    const next = pendingWinRef.current;
+    if (!next) return;
+    pendingWinRef.current = null;
+    mutateWin(next);
+  }, [mutateWin]);
+
+  /** Queue a window change. All mutations wait until scroll settles (or bottom pinch). */
+  const queueWinMutation = useCallback(
+    (next: { start: number; end: number }) => {
+      const cur = winRef.current;
+      if (next.start === cur.start && next.end === cur.end) return;
+      pendingWinRef.current = next;
+      if (!scrollingRef.current) flushPendingWin();
+    },
+    [flushPendingWin],
+  );
+
+  // ----- load the book -----
+  useEffect(() => {
+    let dead = false;
+    let handle: LoadedEpub | null = null;
+    setLoading(true);
+    setError(null);
+    (async () => {
+      try {
+        const buf = (await window.api.readBook(item.id)) as ArrayBuffer;
+        if (dead) return;
+        if (!buf) throw new Error('The book file is missing from the library.');
+        if (isPdf(buf)) {
+          setPdfProgress(0);
+          handle = await loadPdf(buf, (f) => {
+            if (!dead) setPdfProgress(f);
+          });
+        } else {
+          handle = await loadEpub(buf);
+        }
+        if (dead) {
+          handle.destroy();
+          return;
+        }
+        setPdfProgress(null);
+        totalCharsRef.current = handle.totalChars;
+        if (handle.title) setTitle(handle.title);
+
+        // Restore the reading position: exact part+fraction when available,
+        // else map an old global fraction; a ~100% stale save restarts fresh.
+        const savedLoc = parseLoc(item.progress?.location);
+        let pi = 0;
+        let lf = 0;
+        if (savedLoc && savedLoc.part < handle.chapters.length) {
+          pi = savedLoc.part;
+          lf = savedLoc.frac;
+        } else {
+          let pct = item.progress?.percent ?? 0;
+          const asNum = Number(item.progress?.location);
+          if (Number.isFinite(asNum) && asNum > 0 && asNum <= 1) pct = asNum;
+          if (!Number.isFinite(pct) || pct > 0.995 || pct < 0) pct = 0;
+          const weightsL = handle.chapters.map((c) => Math.max(c.chars, 1));
+          const totalL = Math.max(
+            weightsL.reduce((a, b) => a + b, 0),
+            1,
+          );
+          let acc = 0;
+          const target = pct * totalL;
+          for (let i = 0; i < weightsL.length; i++) {
+            if (acc + weightsL[i] >= target) {
+              pi = i;
+              lf = Math.min(1, Math.max(0, (target - acc) / weightsL[i]));
+              break;
+            }
+            acc += weightsL[i];
+          }
+        }
+        maxGlobalRef.current = null;
+        localFracRef.current = lf;
+        partRef.current = pi;
+        pendingPosRef.current = lf; // consumed by paged layout
+        pendingTargetRef.current = { pi, lf }; // consumed by scroll layout
+        setPart(pi);
+        setLoaded(handle);
+        setLoading(false);
+      } catch (err) {
+        if (dead) return;
+        console.error(err);
+        setError(`Could not open this book.\n${err instanceof Error ? err.message : String(err)}`);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      dead = true;
+      handle?.destroy();
+      // Final position save on close.
+      window.api.setProgress(item.id, {
+        location: `p:${partRef.current}:${localFracRef.current.toFixed(4)}`,
+        percent: curGlobalRef.current,
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
+
+  // ----- track the viewport size -----
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loaded]);
+
+  // ----- persist settings -----
+  useEffect(() => {
+    saveSettings(settings);
+  }, [settings]);
+
+  useEffect(() => onReaderSettingsChanged(setSettings), []);
+
+  // ----- word-knowledge highlighting -----
+  const [hlTick, setHlTick] = useState(0);
+  // Build the tokenizer lazily the first time highlighting is turned on.
+  useEffect(() => {
+    if (!settings.wordHighlight || tokenizerReady()) return;
+    let dead = false;
+    getTokenizer()
+      .then(() => !dead && setHlTick((t) => t + 1))
+      .catch(() => {});
+    return () => {
+      dead = true;
+    };
+  }, [settings.wordHighlight]);
+  // Re-process when highlighting is turned back on (roots are marked done after first pass).
+  useEffect(() => {
+    if (!settings.wordHighlight || !contentRef.current) return;
+    const root = contentRef.current;
+    const els = paged
+      ? [root]
+      : Array.from(root.querySelectorAll<HTMLElement>('.novel-part'));
+    for (const el of els.length ? els : [root]) resetHighlightRoot(el);
+    setHlTick((t) => t + 1);
+  }, [settings.wordHighlight, paged]);
+  // Wrap content words after each part/window renders (post-paint; inline spans
+  // don't shift layout so the page grid stays correct). Deferred while scrolling
+  // so kuromoji work doesn't fight the sliding-window anchor corrections.
+  // Personal annotations always re-apply — independent of vocabulary colors.
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content || !loaded) return;
+    if (scrollingRef.current) return;
+    const run = () => {
+      if (scrollingRef.current || !contentRef.current) return;
+      const root = contentRef.current;
+      const els = paged
+        ? [root]
+        : Array.from(root.querySelectorAll<HTMLElement>('.novel-part'));
+      for (const el of els.length ? els : [root]) {
+        if (settings.wordHighlight && tokenizerReady()) highlightEl(el);
+        // Personal H-key highlights (annotations) — always, even if vocab colors off.
+        const pi = el.dataset.pi != null ? Number(el.dataset.pi) : paged ? partRef.current : undefined;
+        applyAnnotationsToRoot(el, annotations, pi);
+      }
+    };
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number })
+      .requestIdleCallback;
+    if (idle) {
+      const id = idle(run, { timeout: 400 });
+      return () => {
+        (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id);
+      };
+    }
+    const t = window.setTimeout(run, 0);
+    return () => window.clearTimeout(t);
+  }, [loaded, win, paged, settings.wordHighlight, hlTick, size.w, annotations]);
+  // Recolour when a word's level changes elsewhere (e.g. graded in a popup).
+  useEffect(() => onKnowledgeChanged((words) => {
+    recolorEl(document, words.length ? new Set(words) : undefined);
+  }), []);
+
+  // ----- (re)build the scroll window when entering a scroll mode / new book -----
+  useEffect(() => {
+    if (!loaded || paged) return;
+    const last = loaded.chapters.length - 1;
+    const cp = Math.min(Math.max(partRef.current, 0), last);
+    if (!pendingTargetRef.current) {
+      pendingTargetRef.current = { pi: cp, lf: localFracRef.current };
+    }
+    anchorRef.current = null;
+    partGeomRef.current = null;
+    // Mount a wide slice up front — avoids grow/trim churn on image-heavy openings.
+    setWin({ start: Math.max(0, cp - 2), end: Math.min(last, cp + 8) });
+  }, [loaded, paged, vertical]);
+
+  // ----- PAGED layout: page grid + position (runs after the part is committed) -----
+  useLayoutEffect(() => {
+    if (!paged) return;
+    const el = scrollerRef.current;
+    const content = contentRef.current;
+    if (!el || !content || !loaded) return;
+
+    const W = el.clientWidth;
+    const H = el.clientHeight;
+    // Assert the FULL base padding every pass. (Mutating only paddingLeft, as
+    // the previous version did, permanently erased the React-set shorthand —
+    // the page grid shifted and words were cut off at the right edge.)
+    const vmPx = Math.round((H * settings.sideMargin) / 100);
+    const hmPx = Math.round((W * settings.sideMargin) / 100);
+    const g = GUTTER + hmPx;
+    content.style.padding = vertical ? `${GUTTER + vmPx}px 0px` : `${GUTTER}px ${g}px`;
+
+    let step = 0;
+    let pages = 1;
+    if (W > 0) {
+      if (vertical) {
+        // Quantize the page step to whole text lines so a flip never slices a
+        // line of tategaki down the middle.
+        const cs = getComputedStyle(content);
+        let advance = parseFloat(cs.lineHeight);
+        if (!Number.isFinite(advance) || advance <= 4) {
+          advance = (parseFloat(cs.fontSize) || 16) * 1.8;
+        }
+        step = Math.max(advance, Math.floor(W / advance) * advance);
+        const natural = el.scrollWidth;
+        pages = natural <= W + 1 ? 1 : Math.ceil((natural - W) / step) + 1;
+        // Pad the far edge so even the last page lands exactly on the grid.
+        const pad = (pages - 1) * step + W - natural;
+        if (pad > 0.5) content.style.paddingLeft = `${pad}px`;
+      } else {
+        // Horizontal pages are CSS columns sized so scrollWidth = pages × W.
+        step = W;
+        pages = Math.max(1, Math.round(el.scrollWidth / W));
+      }
+    }
+    stepRef.current = step;
+    pageCountRef.current = pages;
+    setPageCount(pages);
+
+    const target = pendingPosRef.current ?? localFracRef.current;
+    pendingPosRef.current = null;
+    const frac = Number.isFinite(target) ? Math.min(1, Math.max(0, target)) : 0;
+    const p = Math.min(pages - 1, Math.max(0, Math.round(frac * (pages - 1))));
+    pageRef.current = p;
+    setPage(p);
+    setOffsetPx(p * step, false);
+    localFracRef.current = pages > 1 ? p / (pages - 1) : 0;
+    const g2 = globalFor(partRef.current, localFracRef.current);
+    updateGlobal(g2);
+    setProgress(g2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, part, size.w, size.h, paged, vertical, settings]);
+
+  // ----- SCROLL layout: window anchoring + explicit targets -----
+  useLayoutEffect(() => {
+    if (paged || !loaded) return;
+    const el = scrollerRef.current;
+    const content = contentRef.current;
+    if (!el || !content) return;
+
+    // 1) A window mutation (grow/trim) — keep the anchored part where it was.
+    const a = anchorRef.current;
+    anchorRef.current = null;
+    if (a) {
+      const pe = partEl(a.pi);
+      if (pe) {
+        const d = startOffset(pe) - a.old;
+        if (Math.abs(d) > 0.5) setOffsetPx(getOffsetPx() + d);
+      }
+      measureWin();
+      return;
+    }
+
+    // 2) An explicit destination (restore / seek / chapter jump / mode switch).
+    const t = pendingTargetRef.current;
+    if (t) {
+      pendingTargetRef.current = null;
+      const pe = partEl(t.pi);
+      if (pe) {
+        const off = Math.min(Math.max(startOffset(pe) + t.lf * extentOf(pe), 0), axisMax());
+        setOffsetPx(off);
+        partRef.current = t.pi;
+        localFracRef.current = t.lf;
+        const g = globalFor(t.pi, t.lf);
+        updateGlobal(g);
+        setProgress(g);
+        saveNow(g, t.lf);
+      }
+      measureWin();
+      return;
+    }
+
+    // 3) Bare rerun (font / margins / resize reflowed the text).
+    if (scrollingRef.current) {
+      measureWin();
+      return;
+    }
+    const typoKey = `${settings.fontSize}|${settings.lineHeight}|${settings.sideMargin}|${settings.fontWeight}`;
+    const typoReflow = typoKeyRef.current !== typoKey;
+    typoKeyRef.current = typoKey;
+    if (typoReflow) {
+      const pe = partEl(partRef.current);
+      if (pe) {
+        const off = Math.min(
+          Math.max(startOffset(pe) + localFracRef.current * extentOf(pe), 0),
+          axisMax(),
+        );
+        setOffsetPx(off);
+      }
+    } else {
+      // Image load / resize: keep the same scroll pixel — don't recompute from
+      // localFrac (extent changes make that jump backward through images).
+      const off = getOffsetPx();
+      const max = axisMax();
+      if (off > max) setOffsetPx(max);
+    }
+    measureWin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [win, loaded, paged, vertical, size.w, size.h, settings]);
+
+  // Remeasure part geometry when content height changes (e.g. images finishing
+  // load). Never reposition — the browser's scroll anchor handles the rest.
+  useEffect(() => {
+    if (paged || !loaded) return;
+    const root = contentRef.current;
+    if (!root) return;
+    let prev = root.offsetHeight;
+    let timer = 0;
+    const ro = new ResizeObserver(() => {
+      const h = root.offsetHeight;
+      if (Math.abs(h - prev) < 2) return;
+      prev = h;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        partGeomRef.current = null;
+        measureWin();
+      }, 150);
+    });
+    ro.observe(root);
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [loaded, paged, win, measureWin]);
+
+  // ----- page / screen navigation -----
+  const flip = useCallback(
+    (dir: 1 | -1) => {
+      const book = loadedRef.current;
+      const el = scrollerRef.current;
+      if (!book || !el) return;
+      setPopup(null);
+      const L = layoutRef.current;
+      const lastPart = book.chapters.length - 1;
+
+      if (L.paged) {
+        const next = pageRef.current + dir;
+        if (next < 0) {
+          if (partRef.current > 0) {
+            pendingPosRef.current = 1;
+            const pi = partRef.current - 1;
+            partRef.current = pi;
+            setPart(pi);
+          }
+          return;
+        }
+        if (next >= pageCountRef.current) {
+          if (partRef.current < lastPart) {
+            pendingPosRef.current = 0;
+            const pi = partRef.current + 1;
+            partRef.current = pi;
+            setPart(pi);
+          }
+          return;
+        }
+        pageRef.current = next;
+        setPage(next);
+        setOffsetPx(next * stepRef.current, true);
+        const lf = pageCountRef.current > 1 ? next / (pageCountRef.current - 1) : 0;
+        localFracRef.current = lf;
+        const g = globalFor(partRef.current, lf);
+        updateGlobal(g);
+        setProgress(g);
+        saveNow(g, lf);
+        return;
+      }
+
+      // Scroll modes: move ~a screen. The sliding window supplies more book as
+      // the scroll approaches either edge, so no part-jumps are needed here.
+      const max = axisMax();
+      const cur = getOffsetPx();
+      const screen = (L.axis === 'y' ? el.clientHeight : el.clientWidth) - 40;
+      setOffsetPx(Math.min(max, Math.max(0, cur + dir * screen)), true);
+    },
+    [axisMax, getOffsetPx, setOffsetPx, globalFor, updateGlobal, saveNow],
+  );
+  const flipRef = useRef(flip);
+  flipRef.current = flip;
+
+  /** Paged mode: jump within the current part (0..1). */
+  const applyLocal = useCallback(
+    (lf: number) => {
+      setPopup(null);
+      const pages = pageCountRef.current;
+      const p = Math.min(pages - 1, Math.max(0, Math.round(lf * (pages - 1))));
+      pageRef.current = p;
+      setPage(p);
+      setOffsetPx(p * stepRef.current, false);
+      localFracRef.current = pages > 1 ? p / (pages - 1) : 0;
+      const g = globalFor(partRef.current, localFracRef.current);
+      updateGlobal(g);
+      setProgress(g);
+      saveNow(g, localFracRef.current);
+    },
+    [setOffsetPx, globalFor, updateGlobal, saveNow],
+  );
+
+  const goTo = useCallback(
+    (piRaw: number, lf: number) => {
+      const book = loadedRef.current;
+      if (!book) return;
+      const last = book.chapters.length - 1;
+      const pi = Math.min(Math.max(piRaw, 0), last);
+      setPopup(null);
+
+      if (layoutRef.current.paged) {
+        if (pi === partRef.current) {
+          applyLocal(lf);
+          return;
+        }
+        pendingPosRef.current = lf;
+        partRef.current = pi;
+        setPart(pi);
+        return;
+      }
+
+      partRef.current = pi;
+      setPart(pi);
+      const w = winRef.current;
+      if (pi < w.start || pi > w.end) {
+        // Jump outside the mounted window: rebuild it around the destination.
+        anchorRef.current = null;
+        pendingTargetRef.current = { pi, lf };
+        partGeomRef.current = null;
+        setWin({ start: Math.max(0, pi - 2), end: Math.min(last, pi + 3) });
+      } else {
+        const pe = partEl(pi);
+        if (pe) {
+          const off = Math.min(Math.max(startOffset(pe) + lf * extentOf(pe), 0), axisMax());
+          setOffsetPx(off);
+          localFracRef.current = lf;
+          const g = globalFor(pi, lf);
+          updateGlobal(g);
+          setProgress(g);
+          saveNow(g, lf);
+        }
+      }
+    },
+    [applyLocal, partEl, startOffset, extentOf, axisMax, setOffsetPx, globalFor, updateGlobal, saveNow],
+  );
+
+  const seekGlobal = useCallback(
+    (f: number) => {
+      const { pi, lf } = mapGlobal(f);
+      goTo(pi, lf);
+    },
+    [mapGlobal, goTo],
+  );
+
+  // ----- wheel -----
+  // Pages mode: the wheel flips whole pages. Vertical scroll mode: the wheel
+  // is mapped onto the right-to-left axis. Horizontal scroll mode: native.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || !loaded) return;
+    let acc = 0;
+    let lastFlip = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        bumpFont(e.deltaY < 0 ? 10 : -10);
+        return;
+      }
+      const L = layoutRef.current;
+      if (L.paged) {
+        e.preventDefault();
+        const now = performance.now();
+        acc += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        if (Math.abs(acc) >= 45 && now - lastFlip > 140) {
+          flipRef.current(acc > 0 ? 1 : -1);
+          acc = 0;
+          lastFlip = now;
+        }
+        return;
+      }
+      if (L.vertical) {
+        // Advance = leftward. scrollLeft is ≤ 0 in a vertical-rl scroller; the
+        // browser clamps at both ends and the window keeps feeding new parts.
+        e.preventDefault();
+        const d = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        el.scrollLeft -= d;
+      }
+      // horizontal scroll mode: let the browser scroll natively
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [loaded, bumpFont]);
+
+  // ----- scroll → progress + sliding-window upkeep (scroll modes only) -----
+  useEffect(() => {
+    if (paged || !loaded) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    let raf = 0;
+    let lastUi = 0;
+    let lastSave = 0;
+    const onScroll = () => {
+      scrollingRef.current = true;
+      window.clearTimeout(scrollEndTimerRef.current);
+      scrollEndTimerRef.current = window.setTimeout(() => {
+        scrollingRef.current = false;
+        setHlTick((t) => t + 1);
+        flushPendingWin();
+        measureWin();
+      }, 320);
+
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const book = loadedRef.current;
+        if (!book) return;
+        const off = getOffsetPx();
+        const w = winRef.current;
+
+        // Which mounted part is at the viewport start, and how far through it?
+        let cp = w.start;
+        let tf = 0;
+        const geom = partGeomRef.current;
+        if (geom && geom.startIdx === w.start && geom.starts.length === w.end - w.start + 1) {
+          for (let j = 0; j < geom.starts.length; j++) {
+            const s = geom.starts[j];
+            if (s <= off + 4) {
+              cp = w.start + j;
+              tf = Math.min(1, Math.max(0, (off - s) / geom.extents[j]));
+            } else {
+              break;
+            }
+          }
+        } else {
+          for (let i = w.start; i <= w.end; i++) {
+            const pe = partEl(i);
+            if (!pe) continue;
+            const s = startOffset(pe);
+            if (s <= off + 4) {
+              cp = i;
+              tf = Math.min(1, Math.max(0, (off - s) / extentOf(pe)));
+            } else {
+              break;
+            }
+          }
+        }
+        partRef.current = cp;
+        localFracRef.current = tf;
+        const g = globalFor(cp, tf);
+        updateGlobal(g);
+
+        const now = performance.now();
+        if (now - lastUi > 200) {
+          lastUi = now;
+          setProgress(g);
+          setPart((p) => (p === cp ? p : cp));
+          if (popupRef.current) setPopup(null);
+        }
+        if (now - lastSave > 1000) {
+          lastSave = now;
+          saveNow(g, tf);
+        }
+
+        // Sliding window: extend toward the edge being approached; trim when
+        // the window gets long. All changes are queued until scroll settles,
+        // except a pinch-grow when the reader is physically stuck at the bottom.
+        if (!anchorRef.current && !pendingTargetRef.current) {
+          const last = book.chapters.length - 1;
+          const view = layoutRef.current.axis === 'y' ? el.clientHeight : el.clientWidth;
+          const max = axisMax();
+          const edge = Math.min(view * 2, max * 0.35);
+          const stuckAtBottom = max > 8 && off >= max - 4;
+          if (stuckAtBottom && pendingWinRef.current) flushPendingWin();
+          if (max > view * 1.1 && w.end < last && off > max - edge) {
+            queueWinMutation({ start: w.start, end: Math.min(last, w.end + 2) });
+          } else if (w.start > 0 && off < edge) {
+            queueWinMutation({ start: Math.max(0, w.start - 2), end: w.end });
+          } else if (w.end - w.start >= 12) {
+            const s = Math.max(0, cp - 4);
+            const e2 = Math.min(last, cp + 4);
+            if (s > w.start || e2 < w.end) queueWinMutation({ start: s, end: e2 });
+          }
+        }
+      });
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      window.clearTimeout(scrollEndTimerRef.current);
+    };
+  }, [
+    paged,
+    loaded,
+    getOffsetPx,
+    partEl,
+    startOffset,
+    extentOf,
+    globalFor,
+    updateGlobal,
+    saveNow,
+    axisMax,
+    queueWinMutation,
+    flushPendingWin,
+    measureWin,
+  ]);
+
+  // ----- keyboard (page turns via shortcut manager; Escape local) -----
+  useEffect(() => {
+    const offs = [
+      registerCommandHandler('reader.pageNext', (e) => {
+        // Vertical layout: ArrowLeft is forward (RTL-style); manager may send ArrowRight.
+        // Always flip forward for the registered pageNext binding.
+        void e;
+        flipRef.current(1);
+      }),
+      registerCommandHandler('reader.pagePrev', (e) => {
+        void e;
+        flipRef.current(-1);
+      }),
+    ];
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (popupRef.current) setPopup(null);
+        else onClose();
+        return;
+      }
+      // Layout-aware horizontal arrows (not in the global defaults as L/R).
+      const v = layoutRef.current.vertical;
+      if (v && e.key === 'ArrowLeft' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        flipRef.current(1);
+      } else if (v && e.key === 'ArrowRight' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        flipRef.current(-1);
+      } else if (!v && e.key === 'ArrowRight' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // Covered by reader.pageNext defaults only if ArrowRight is bound — keep fallback
+        // when user unbound pageNext but still expects arrows in reader.
+        // Handled by manager when bound; no double-fire: manager preventDefaults first.
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      offs.forEach((off) => off());
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  // ----- reading time + characters → statistics -----
+  useEffect(() => {
+    const flush = () => {
+      const now = Date.now();
+      let secs = (now - readStartRef.current) / 1000;
+      readStartRef.current = now;
+      if (!activeReadingRef.current || secs < 0 || secs > 3600) secs = 0;
+      const chars = pendingCharsRef.current;
+      pendingCharsRef.current = 0;
+      if (secs > 0 || chars > 0) recordReading(item.id, titleRef.current, secs, chars);
+    };
+    const setActive = (on: boolean) => {
+      if (on) {
+        activeReadingRef.current = true;
+        readStartRef.current = Date.now();
+      } else {
+        flush();
+        activeReadingRef.current = false;
+      }
+    };
+    activeReadingRef.current = true;
+    readStartRef.current = Date.now();
+    const iv = window.setInterval(flush, 20000);
+    const onFocus = () => setActive(true);
+    const onBlur = () => setActive(false);
+    const onVis = () => setActive(!document.hidden);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(iv);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVis);
+      flush();
+    };
+  }, [item.id]);
+
+  const popupOpenOnDownRef = useRef(false);
+  /** Last pointer over the reader (for H when no selection / click target). */
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Precise offsets for the last clicked/looked-up word, relative to its
+   * annotation block (.novel-part / .novel-content). Survives selection clear.
+   */
+  const lastAnnoTargetRef = useRef<{
+    start: number;
+    end: number;
+    text: string;
+    pi?: number;
+  } | null>(null);
+
+  type AnnoTarget = { text: string; start: number; end: number; block: HTMLElement };
+
+  const annoBlockOf = useCallback((el: Element | null, root: HTMLElement): HTMLElement => {
+    return (
+      (el?.closest('.novel-part, .novel-content') as HTMLElement | null) ?? root
+    );
+  }, []);
+
+  /** Offsets of a DOM Range inside an annotation block (textContent model). */
+  const offsetsFromRange = useCallback(
+    (block: HTMLElement, range: Range): AnnoTarget | null => {
+      try {
+        if (!block.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== block) {
+          // Still allow if start is inside block
+          if (!block.contains(range.startContainer)) return null;
+        }
+        const pre = document.createRange();
+        pre.selectNodeContents(block);
+        pre.setEnd(range.startContainer, range.startOffset);
+        const start = pre.toString().length;
+        const raw = range.toString();
+        const end = start + raw.length;
+        if (end <= start) return null;
+        const text = (raw.trim() || raw).slice(0, 200);
+        return { text, start, end, block };
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  /** Offsets spanning one or more consecutive elements inside a block. */
+  const offsetsFromElements = useCallback(
+    (block: HTMLElement, els: HTMLElement[]): AnnoTarget | null => {
+      if (!els.length) return null;
+      const first = els[0]!;
+      const last = els[els.length - 1]!;
+      if (!block.contains(first) || !block.contains(last)) return null;
+      try {
+        const pre = document.createRange();
+        pre.selectNodeContents(block);
+        pre.setEndBefore(first);
+        const start = pre.toString().length;
+        const mid = document.createRange();
+        mid.setStartBefore(first);
+        mid.setEndAfter(last);
+        const raw = mid.toString();
+        const end = start + raw.length;
+        if (end <= start) return null;
+        const text = (raw.trim() || raw).slice(0, 200);
+        return { text, start, end, block };
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  /** Capture the currently marked lookup (.lookup-active / mark.lookup-mark). */
+  const captureLookupAnnoTarget = useCallback(
+    (root: HTMLElement): AnnoTarget | null => {
+      const actives = Array.from(
+        root.querySelectorAll<HTMLElement>('span.wk.lookup-active, mark.lookup-mark'),
+      );
+      if (!actives.length) return null;
+      const block = annoBlockOf(actives[0]!, root);
+      return offsetsFromElements(block, actives);
+    },
+    [annoBlockOf, offsetsFromElements],
+  );
+
+  /** Resolve a word at viewport coords (hover / last pointer). */
+  const resolveWordAtPoint = useCallback(
+    (root: HTMLElement, clientX: number, clientY: number): AnnoTarget | null => {
+      const el = document.elementFromPoint(clientX, clientY);
+      if (!el || !root.contains(el)) return null;
+
+      const wk = el.closest('span.wk') as HTMLElement | null;
+      if (wk && root.contains(wk)) {
+        const block = annoBlockOf(wk, root);
+        return offsetsFromElements(block, [wk]);
+      }
+
+      const doc = root.ownerDocument;
+      const caret =
+        doc.caretRangeFromPoint?.(clientX, clientY) ??
+        (() => {
+          const pos = (
+            doc as Document & {
+              caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+            }
+          ).caretPositionFromPoint?.(clientX, clientY);
+          if (!pos) return null;
+          const r = doc.createRange();
+          r.setStart(pos.offsetNode, pos.offset);
+          r.collapse(true);
+          return r;
+        })();
+      if (!caret) return null;
+      const node = caret.startContainer;
+      if (node.nodeType !== Node.TEXT_NODE) return null;
+      const block = annoBlockOf(node.parentElement, root);
+      if (!block.contains(node)) return null;
+      const text = node.textContent ?? '';
+      const off = caret.startOffset;
+      const isWord = (ch: string) => /[一-龯ぁ-ゖァ-ヺー々ゝゞa-zA-Z0-9]/.test(ch);
+      let a = off;
+      let b = off;
+      while (a > 0 && isWord(text[a - 1]!)) a--;
+      while (b < text.length && isWord(text[b]!)) b++;
+      if (b <= a) return null;
+      try {
+        const range = doc.createRange();
+        range.setStart(node, a);
+        range.setEnd(node, b);
+        return offsetsFromRange(block, range);
+      } catch {
+        return null;
+      }
+    },
+    [annoBlockOf, offsetsFromRange],
+  );
+
+  const rememberAnnoTarget = useCallback(
+    (t: AnnoTarget | null) => {
+      if (!t || t.end <= t.start) {
+        lastAnnoTargetRef.current = null;
+        return;
+      }
+      const partEl = t.block.closest?.('[data-pi]') as HTMLElement | null;
+      const pi =
+        partEl?.dataset.pi != null
+          ? Number(partEl.dataset.pi)
+          : paged
+            ? partRef.current
+            : undefined;
+      lastAnnoTargetRef.current = {
+        start: t.start,
+        end: t.end,
+        text: t.text,
+        pi,
+      };
+    },
+    [paged],
+  );
+
+  const onMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+      const dismissOnly = popupOpenOnDownRef.current && isLookupClick(e);
+      const hit = lookupWordFromMouseUp(e);
+      if (hit) {
+        // Capture exact offsets NOW (before any later DOM/selection clear).
+        const root = contentRef.current;
+        if (root && !hit.translate) {
+          const captured = captureLookupAnnoTarget(root) ?? resolveWordAtPoint(root, e.clientX, e.clientY);
+          rememberAnnoTarget(captured);
+        }
+        setPopup({
+          kind: hit.translate ? 'translate' : 'dict',
+          query: hit.query,
+          x: hit.x,
+          y: hit.y,
+          context: hit.context,
+        });
+        return;
+      }
+      if (dismissOnly) {
+        lastAnnoTargetRef.current = null;
+        setPopup(null);
+      }
+    },
+    [captureLookupAnnoTarget, resolveWordAtPoint, rememberAnnoTarget],
+  );
+
+  /** Current selection or popup query → local collection (never Anki). */
+  const addSelectionToCollection = useCallback(
+    (mode: 'word' | 'sentence' | 'selection') => {
+      const sel = window.getSelection()?.toString().trim() ?? '';
+      let word = '';
+      let sentence = '';
+      if (mode === 'selection' && sel) {
+        word = sel.slice(0, 80);
+        sentence = sel.slice(0, 200);
+      } else if (popupRef.current?.kind === 'dict') {
+        word = popupRef.current.query;
+        sentence = popupRef.current.context ?? '';
+      } else if (sel) {
+        word = sel.slice(0, 40);
+        sentence = mode === 'sentence' ? sentenceAt(sel, 0, 200) : sel.slice(0, 200);
+      } else {
+        return;
+      }
+      if (!word) return;
+      setPendingAdd({ word, sentence: sentence || undefined });
+      setCollectionOpen(true);
+    },
+    [],
+  );
+
+  /**
+   * Personal color highlight (annotations) — not vocabulary levels.
+   * Priority: selection → last clicked word → live lookup mark → caret →
+   * word under last pointer → popup query (surface search in correct part).
+   */
+  const highlightSelectionAsAnno = useCallback(() => {
+    const root = contentRef.current;
+    if (!root) return;
+
+    let target: AnnoTarget | null = null;
+
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      const text = sel.toString().trim();
+      if (text) {
+        const range = sel.getRangeAt(0);
+        const block = annoBlockOf(
+          range.startContainer.nodeType === Node.TEXT_NODE
+            ? range.startContainer.parentElement
+            : (range.startContainer as Element),
+          root,
+        );
+        target = offsetsFromRange(block, range);
+        if (!target) {
+          const full = block.textContent ?? '';
+          const idx = full.indexOf(text);
+          if (idx >= 0) {
+            target = {
+              text: text.slice(0, 200),
+              start: idx,
+              end: idx + text.length,
+              block,
+            };
+          }
+        }
+      }
+    }
+
+    // Remembered click (selection is usually cleared by click-to-lookup)
+    if (!target && lastAnnoTargetRef.current) {
+      const mem = lastAnnoTargetRef.current;
+      let block: HTMLElement | null = null;
+      if (mem.pi != null) {
+        block = root.querySelector<HTMLElement>(`[data-pi="${mem.pi}"]`);
+      }
+      if (!block) {
+        block = root.querySelector('.novel-part, .novel-content') ?? root;
+      }
+      // Prefer live lookup mark if it still matches the same surface form
+      const live = captureLookupAnnoTarget(root);
+      if (live && live.text === mem.text) {
+        target = live;
+      } else if (mem.end > mem.start) {
+        target = {
+          text: mem.text,
+          start: mem.start,
+          end: mem.end,
+          block,
+        };
+      }
+    }
+
+    // Live lookup highlight (click mark still visible)
+    if (!target) {
+      target = captureLookupAnnoTarget(root);
+    }
+
+    // Hovered .wk (mouse still over word)
+    if (!target) {
+      const hovered = root.querySelector<HTMLElement>('span.wk:hover');
+      if (hovered) {
+        target = offsetsFromElements(annoBlockOf(hovered, root), [hovered]);
+      }
+    }
+
+    // Collapsed caret → expand to Japanese/word under caret
+    if (!target && sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer;
+      const block = annoBlockOf(
+        node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element),
+        root,
+      );
+      const wk =
+        (node.nodeType === Node.TEXT_NODE
+          ? node.parentElement
+          : (node as Element)
+        )?.closest?.('span.wk') as HTMLElement | null;
+      if (wk && block.contains(wk)) {
+        target = offsetsFromElements(block, [wk]);
+      } else if (node.nodeType === Node.TEXT_NODE && block.contains(node)) {
+        const text = node.textContent ?? '';
+        const off = range.startOffset;
+        const isWord = (ch: string) => /[一-龯ぁ-ゖァ-ヺー々ゝゞa-zA-Z0-9]/.test(ch);
+        let a = off;
+        let b = off;
+        while (a > 0 && isWord(text[a - 1]!)) a--;
+        while (b < text.length && isWord(text[b]!)) b++;
+        if (b > a) {
+          try {
+            const r = document.createRange();
+            r.setStart(node, a);
+            r.setEnd(node, b);
+            target = offsetsFromRange(block, r);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+
+    // Word under last pointer position (hover without click)
+    if (!target && lastPointerRef.current) {
+      const { x, y } = lastPointerRef.current;
+      target = resolveWordAtPoint(root, x, y);
+    }
+
+    // Popup query — search the part that had the click, use surface text only
+    if (!target && popupRef.current?.kind === 'dict' && popupRef.current.query) {
+      const q = popupRef.current.query.trim();
+      const memPi = lastAnnoTargetRef.current?.pi;
+      const candidates: HTMLElement[] = [];
+      if (memPi != null) {
+        const pe = root.querySelector<HTMLElement>(`[data-pi="${memPi}"]`);
+        if (pe) candidates.push(pe);
+      }
+      root.querySelectorAll<HTMLElement>('.novel-part, .novel-content').forEach((el) => {
+        if (!candidates.includes(el)) candidates.push(el);
+      });
+      if (!candidates.length) candidates.push(root);
+      for (const block of candidates) {
+        // Prefer surface of last mark if lemma ≠ surface
+        const needle = lastAnnoTargetRef.current?.text || q;
+        const full = block.textContent ?? '';
+        const idx = full.indexOf(needle);
+        if (idx >= 0) {
+          target = {
+            text: needle.slice(0, 200),
+            start: idx,
+            end: idx + needle.length,
+            block,
+          };
+          break;
+        }
+        if (needle !== q) {
+          const idx2 = full.indexOf(q);
+          if (idx2 >= 0) {
+            target = { text: q.slice(0, 200), start: idx2, end: idx2 + q.length, block };
+            break;
+          }
+        }
+      }
+    }
+
+    if (!target || target.end <= target.start) return;
+
+    const partEl = target.block.closest?.('[data-pi]') as HTMLElement | null;
+    const pi =
+      partEl?.dataset.pi != null
+        ? Number(partEl.dataset.pi)
+        : paged
+          ? partRef.current
+          : undefined;
+
+    // Keep last target in sync so repeated H is stable
+    rememberAnnoTarget(target);
+
+    setAnnotations(
+      addAnnotation(item.id, {
+        part: pi,
+        startOffset: target.start,
+        endOffset: target.end,
+        text: target.text,
+        color: annoColor,
+      }),
+    );
+  }, [
+    item.id,
+    annoColor,
+    paged,
+    annoBlockOf,
+    offsetsFromRange,
+    offsetsFromElements,
+    captureLookupAnnoTarget,
+    resolveWordAtPoint,
+    rememberAnnoTarget,
+  ]);
+
+  /** Locate the selection inside its reader block: block text + start offset. */
+  const selectionInBlock = useCallback((): {
+    full: string;
+    start: number;
+    text: string;
+    pi?: number;
+  } | null => {
+    const selObj = window.getSelection();
+    if (!selObj || selObj.rangeCount === 0 || selObj.isCollapsed) return null;
+    const text = selObj.toString().trim();
+    if (!text) return null;
+    const range = selObj.getRangeAt(0);
+    const block =
+      (range.startContainer.nodeType === Node.TEXT_NODE
+        ? range.startContainer.parentElement
+        : (range.startContainer as Element)
+      )?.closest('.novel-part, .novel-content') ?? contentRef.current;
+    if (!block) return null;
+    const full = block.textContent ?? '';
+    const start = full.indexOf(text);
+    if (start < 0) return null;
+    const partEl = (block as HTMLElement).closest?.('[data-pi]') as HTMLElement | null;
+    const pi =
+      partEl?.dataset.pi != null ? Number(partEl.dataset.pi) : paged ? partRef.current : undefined;
+    return { full, start, text, pi };
+  }, [paged]);
+
+  const annotateSentenceAroundSelection = useCallback(() => {
+    const info = selectionInBlock();
+    if (!info) return;
+    const b = detectSentenceBounds(info.full, info.start);
+    if (b.end <= b.start) return;
+    setAnnotations(
+      addAnnotation(item.id, {
+        part: info.pi,
+        startOffset: b.start,
+        endOffset: b.end,
+        text: info.full.slice(b.start, b.end).slice(0, 200),
+        color: annoColor,
+      }),
+    );
+  }, [selectionInBlock, item.id, annoColor]);
+
+  /** Full sentence around the selection (or the popup's context sentence). */
+  const currentSentence = useCallback((): string => {
+    const info = selectionInBlock();
+    if (info) {
+      const b = detectSentenceBounds(info.full, info.start);
+      return info.full.slice(b.start, b.end).trim();
+    }
+    return popupRef.current?.kind === 'dict' ? popupRef.current.context ?? '' : '';
+  }, [selectionInBlock]);
+
+  const currentWord = useCallback((): string => {
+    const sel = window.getSelection()?.toString().trim() ?? '';
+    return sel || (popupRef.current?.kind === 'dict' ? popupRef.current.query : '');
+  }, []);
+
+  const openPopupFromSelection = useCallback(
+    (kind: 'dict' | 'translate') => {
+      const selObj = window.getSelection();
+      if (!selObj || selObj.rangeCount === 0 || selObj.isCollapsed) return;
+      const text = selObj.toString().trim();
+      if (!text) return;
+      const r = selObj.getRangeAt(0).getBoundingClientRect();
+      setPopup({
+        kind,
+        query: kind === 'dict' ? text.slice(0, 40) : text.slice(0, 500),
+        x: r.left,
+        y: r.bottom,
+        context: kind === 'dict' ? currentSentence() || undefined : undefined,
+      });
+    },
+    [currentSentence],
+  );
+
+  // Metadata attached to clipboard-history entries copied from this reader
+  // (book/chapter/position/language) — shown in the entry's expandable
+  // "Reader details" section rather than cluttering the main card.
+  const readerMetaNow = useCallback((): { book?: string; chapter?: string; position?: string } => {
+    const toc = loaded?.toc ?? [];
+    const chapter = [...toc].reverse().find((t) => t.chapterIndex <= partRef.current)?.label;
+    return {
+      book: title,
+      chapter,
+      position: `${Math.round(curGlobalRef.current * 100)}%`,
+    };
+  }, [loaded, title]);
+
+  // Reader commands — registered with the central shortcut manager so every
+  // binding is user-configurable (clipboard-only copy; collection never Anki).
+  useEffect(() => {
+    const offs = [
+      registerCommandHandler('reader.copySentence', () => {
+        const s = currentSentence();
+        if (s) {
+          void navigator.clipboard.writeText(s);
+          recordReaderCopy(s, 'sentence', readerMetaNow());
+        }
+      }),
+      registerCommandHandler('reader.copyWord', () => {
+        const w = currentWord();
+        if (w) {
+          void navigator.clipboard.writeText(w);
+          recordReaderCopy(w, 'word', readerMetaNow());
+        }
+      }),
+      registerCommandHandler('reader.highlightWord', () => highlightSelectionAsAnno()),
+      registerCommandHandler('reader.highlightSentence', () => annotateSentenceAroundSelection()),
+      registerCommandHandler('reader.saveToCollection', () => addSelectionToCollection('selection')),
+      registerCommandHandler('reader.dictLookup', () => openPopupFromSelection('dict')),
+      registerCommandHandler('reader.translateSel', () => openPopupFromSelection('translate')),
+      registerCommandHandler('reader.fontUp', () => bumpFont(10)),
+      registerCommandHandler('reader.fontDown', () => bumpFont(-10)),
+      registerCommandHandler('reader.zoomReset', () =>
+        setSettings((s) => ({ ...s, fontSize: clampFontSize(100) })),
+      ),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [
+    currentSentence,
+    currentWord,
+    highlightSelectionAsAnno,
+    annotateSentenceAroundSelection,
+    addSelectionToCollection,
+    openPopupFromSelection,
+    bumpFont,
+    readerMetaNow,
+  ]);
+
+  // Ctrl+H "Return home" → close the reader back to the desktop.
+  useEffect(() => {
+    const h = () => onClose();
+    window.addEventListener('os:home', h);
+    return () => window.removeEventListener('os:home', h);
+  }, [onClose]);
+
+  const wkClass = settings.wordHighlight ? 'wk-on' : 'wk-off';
+
+  // ----- bookmarks -----
+  const addCurrent = useCallback(() => {
+    const lf = localFracRef.current;
+    const g = curGlobalRef.current;
+    let snippet = '';
+    try {
+      const el = scrollerRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const caret = document.caretRangeFromPoint?.(r.left + r.width / 2, r.top + r.height / 2);
+        snippet = (caret?.startContainer?.textContent ?? '').replace(/\s+/g, '').slice(0, 30);
+      }
+    } catch {
+      /* fall back to % */
+    }
+    const label = snippet || `${Math.round(g * 100)}%`;
+    setBookmarks(
+      addBookmark(item.id, {
+        cfi: `p:${partRef.current}:${lf.toFixed(4)}`,
+        label,
+        percent: g,
+        createdAt: Date.now(),
+      }),
+    );
+  }, [item.id]);
+
+  const jumpTo = useCallback(
+    (cfi: string) => {
+      setBookmarksOpen(false);
+      const t = parseLoc(cfi);
+      if (t) {
+        goTo(t.part, t.frac);
+        return;
+      }
+      const f = Number(cfi);
+      if (Number.isFinite(f)) seekGlobal(Math.min(1, Math.max(0, f)));
+    },
+    [goTo, seekGlobal],
+  );
+  const removeAt = useCallback(
+    (cfi: string) => setBookmarks(removeBookmark(item.id, cfi)),
+    [item.id],
+  );
+
+  // ----- styles -----
+  const theme = THEMES[settings.theme] ?? THEMES.light;
+  const injectedCss = useMemo(() => {
+    const imgCap = size.h > 0 ? `${Math.max(120, size.h - 2 * GUTTER - 48)}px` : '85vh';
+    return [
+      buildNovelCss(settings),
+      `.novel-content a { color: ${theme.link} !important; }`,
+      `.novel-content img, .novel-content svg, .novel-content image { max-height: ${imgCap}; }`,
+      '.novel-content ::selection { background: #6c7bff; color: #fff; }',
+    ].join('\n');
+  }, [settings, theme.link, size.h]);
+
+  const vm = Math.round(((size.h || 0) * settings.sideMargin) / 100); // vertical modes: top/bottom
+  const hm = Math.round(((size.w || 0) * settings.sideMargin) / 100); // horizontal paged: sides
+
+  let contentStyle: CSSProperties = {
+    color: theme.fg,
+    fontSize: `${settings.fontSize}%`,
+    boxSizing: 'border-box',
+  };
+  if (vertical) {
+    contentStyle = {
+      ...contentStyle,
+      writingMode: 'vertical-rl',
+      height: '100%',
+      // Paged: padding is owned by the layout effect (page-grid math).
+      ...(paged ? {} : { padding: `${GUTTER + vm}px 16px` }),
+    };
+  } else if (paged) {
+    const g = GUTTER + hm;
+    contentStyle = {
+      ...contentStyle,
+      height: '100%',
+      // padding owned by the layout effect; columns sized to match it.
+      ...(size.w > 0
+        ? { columnWidth: `${size.w - 2 * g}px`, columnGap: `${2 * g}px`, columnFill: 'auto' }
+        : {}),
+    };
+  } else {
+    contentStyle = {
+      ...contentStyle,
+      maxWidth: '46rem',
+      margin: '0 auto',
+      padding: `${GUTTER}px calc(${settings.sideMargin}% + ${GUTTER}px)`,
+    };
+  }
+
+  const scrollerStyle: CSSProperties = {
+    background: theme.bg,
+    // The writing mode lives on the SCROLLER so the browser lays the overflow
+    // out right-to-left: position 0 is the book's beginning (right edge).
+    writingMode: vertical ? 'vertical-rl' : undefined,
+    overflowX: paged ? 'hidden' : axis === 'x' ? 'auto' : 'hidden',
+    overflowY: paged ? 'hidden' : axis === 'y' ? 'auto' : 'hidden',
+  };
+
+  const chapters = loaded?.chapters ?? [];
+  const winParts: number[] = [];
+  if (!paged && loaded) {
+    for (let i = Math.max(0, win.start); i <= Math.min(chapters.length - 1, win.end); i++) {
+      winParts.push(i);
+    }
+  }
+
+  return (
+    <div className="reader">
+      <style>{injectedCss}</style>
+      <div className="reader-bar">
+        <button className="btn" onClick={onClose}>
+          <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
+          Library
+        </button>
+        <div className="reader-title">{title}</div>
+        <div className="reader-controls">
+          <button className="btn" onClick={() => flip(-1)}>
+            ‹ Prev
+          </button>
+          <button className="btn" onClick={() => flip(1)}>
+            Next ›
+          </button>
+          <div className="settings-anchor">
+            <button
+              className={`btn ${bookmarksOpen ? 'active' : ''}`}
+              title="Bookmarks"
+              onClick={() => setBookmarksOpen((o) => !o)}
+            >
+              <Icon name="bookmark" size={14} />
+            </button>
+            {bookmarksOpen && (
+              <>
+                <div className="panel-backdrop" onClick={() => setBookmarksOpen(false)} />
+                <div className="settings-panel bookmarks-panel">
+                  <div className="bm-head">
+                    <span>Bookmarks</span>
+                    <button className="btn small primary" onClick={addCurrent}>
+                      + Add here
+                    </button>
+                  </div>
+                  {bookmarks.length === 0 ? (
+                    <div className="bm-empty">
+                      No bookmarks yet. “+ Add here” saves your spot so you can jump back later.
+                    </div>
+                  ) : (
+                    <ul className="bm-list">
+                      {bookmarks.map((b) => (
+                        <li key={b.cfi} className="bm-row">
+                          <button className="bm-jump" title="Jump here" onClick={() => jumpTo(b.cfi)}>
+                            <span className="bm-pct">{Math.round(b.percent * 100)}%</span>
+                            <span className="bm-label">{b.label}</span>
+                          </button>
+                          <button className="bm-del" title="Remove" onClick={() => removeAt(b.cfi)}>
+                            <Icon name="close" size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="settings-anchor">
+            <button
+              className={`btn ${settingsOpen ? 'active' : ''}`}
+              title="Reading settings"
+              onClick={() => setSettingsOpen((o) => !o)}
+            >
+              Aa
+            </button>
+            {settingsOpen && (
+              <>
+                <div className="panel-backdrop" onClick={() => setSettingsOpen(false)} />
+                <ReaderSettingsPanel settings={settings} onChange={setSettings} />
+              </>
+            )}
+          </div>
+          <div className="reader-anno-swatches" title="Personal highlight color — press H on a word or selection">
+            {ANNO_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`reader-anno-swatch anno-${c}${annoColor === c ? ' active' : ''}`}
+                title={c}
+                onClick={() => setAnnoColor(c)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="btn small"
+            title="Add selection to collection (Ctrl+Shift+S)"
+            onClick={() => addSelectionToCollection('selection')}
+          >
+            Collect
+          </button>
+          <button
+            type="button"
+            className={`btn ${collectionOpen ? 'active' : ''}`}
+            title="Flashcard collection"
+            onClick={() => setCollectionOpen((o) => !o)}
+          >
+            <Icon name="flashcards" size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div className="reader-stage" style={{ background: theme.bg }}>
+        {loading && (
+          <div className="reader-msg">
+            {pdfProgress != null
+              ? `Reading PDF… ${Math.round(pdfProgress * 100)}%`
+              : 'Opening book…'}
+          </div>
+        )}
+        {error && <div className="reader-msg error">{error}</div>}
+        <div
+          ref={scrollerRef}
+          className="novel-scroller"
+          style={scrollerStyle}
+          onMouseDown={(e) => {
+            popupOpenOnDownRef.current = !!popupRef.current;
+            noteLookupPointerDown(e);
+            lastPointerRef.current = { x: e.clientX, y: e.clientY };
+          }}
+          onMouseMove={(e) => {
+            lastPointerRef.current = { x: e.clientX, y: e.clientY };
+          }}
+          onMouseUp={onMouseUp}
+        >
+          {paged ? (
+            <div
+              key={`p${part}`}
+              ref={contentRef}
+              className={`novel-content ${wkClass}`}
+              style={contentStyle}
+              lang="ja"
+              dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
+            />
+          ) : (
+            <div key="scrollwin" ref={contentRef} className={`novel-content ${wkClass}`} style={contentStyle} lang="ja">
+              {winParts.map((i) => (
+                <div
+                  key={i}
+                  className="novel-part"
+                  data-pi={i}
+                  dangerouslySetInnerHTML={chapterHtml[i] ?? EMPTY_HTML}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="reader-footer">
+        <select
+          className="chapter-select"
+          value=""
+          title="Jump to chapter"
+          onChange={(e) => e.target.value !== '' && goTo(Number(e.target.value), 0)}
+        >
+          <option value="" disabled>
+            {loaded?.toc.length ? 'Jump to chapter…' : 'Chapters'}
+          </option>
+          {loaded?.toc.map((t, i) => (
+            <option key={i} value={t.chapterIndex}>
+              {'　'.repeat(t.depth)}
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <input
+          className="reader-seek"
+          type="range"
+          min={0}
+          max={1000}
+          value={Math.round((seek ?? progress) * 1000)}
+          disabled={!loaded}
+          title="Seek through the book"
+          onChange={(e) => setSeek(Number(e.target.value) / 1000)}
+          onPointerUp={() => {
+            if (seek != null) {
+              seekGlobal(seek);
+              setSeek(null);
+            }
+          }}
+          onKeyUp={() => {
+            if (seek != null) {
+              seekGlobal(seek);
+              setSeek(null);
+            }
+          }}
+        />
+        {paged && pageCount > 1 && (
+          <span className="reader-pagecount muted">
+            {page + 1}/{pageCount}
+          </span>
+        )}
+        <span className="reader-pct muted">{Math.round((seek ?? progress) * 100)}%</span>
+      </div>
+
+      <ReaderCollectionPanel
+        bookId={item.id}
+        bookTitle={title}
+        open={collectionOpen}
+        onClose={() => setCollectionOpen(false)}
+        pendingAdd={pendingAdd}
+        onPendingConsumed={() => setPendingAdd(null)}
+      />
+
+      {popup &&
+        (popup.kind === 'translate' ? (
+          <SentenceTranslatePopup text={popup.query} onClose={() => setPopup(null)} />
+        ) : (
+          <DictionaryPopup
+            query={popup.query}
+            x={popup.x}
+            y={popup.y}
+            context={popup.context}
+            onClose={() => setPopup(null)}
+          />
+        ))}
+    </div>
+  );
+}

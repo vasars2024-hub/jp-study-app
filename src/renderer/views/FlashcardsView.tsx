@@ -1,0 +1,1085 @@
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import Icon from '../components/Icons';
+import EpubMiningPanel from '../components/EpubMiningPanel';
+import EpubMiningSimplePanel from '../components/EpubMiningSimplePanel';
+import DeckActionMenu from '../components/DeckActionMenu';
+import AiCardStudio from '../components/AiCardStudio';
+import CsvEditorPanel from '../components/CsvEditorPanel';
+import DeckImportPanel from '../components/DeckImportPanel';
+import {
+  createDeckFolder,
+  deleteDeckFolder,
+  filterDeckCards,
+  filterDeckByBook,
+  groupDeckByBook,
+  loadDeck,
+  loadDeckFolders,
+  onDeckChanged,
+  removeDeckCard,
+  removeBookGroup,
+  setBookGroupFolder,
+  setDeckCardFolder,
+  setDeckCardKnown,
+  setDeckFolders,
+  type DeckFlashcard,
+  type DeckFolderFilter,
+  type BookGroup,
+} from '../flashcardDeck';
+import { deckCardsToCsv } from '../deckExport';
+import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../savedWords';
+import { registerCommandHandler } from '../keyboardShortcuts';
+
+type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
+type OverviewTab = 'dictionary' | 'epub';
+
+interface ReviewCard {
+  id: string;
+  word: string;
+  reading: string;
+  meaning: string;
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+type EpubMiningUi = 'simple' | 'advanced';
+
+export default function FlashcardsView() {
+  const [saved, setSaved] = useState<SavedWord[]>(() => loadSaved());
+  const [deck, setDeck] = useState<DeckFlashcard[]>(() => loadDeck());
+  const [folders, setFolders] = useState<string[]>(() => loadDeckFolders());
+  const [mode, setMode] = useState<Mode>('overview');
+  const [overviewTab, setOverviewTab] = useState<OverviewTab>('epub');
+  const [folderFilter, setFolderFilter] = useState<DeckFolderFilter>('all');
+  const [collapsedBooks, setCollapsedBooks] = useState<Record<string, boolean>>({});
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [folderErr, setFolderErr] = useState('');
+  const [dropHover, setDropHover] = useState<string | null>(null);
+  const [fileMenu, setFileMenu] = useState<string | null>(null);
+
+  const [sessionCards, setSessionCards] = useState<ReviewCard[]>([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [masteredIds, setMasteredIds] = useState<Set<string>>(() => new Set());
+  const [exploredIds, setExploredIds] = useState<Set<string>>(() => new Set());
+  const [flipped, setFlipped] = useState(false);
+  const [reviewed, setReviewed] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [reviewSource, setReviewSource] = useState<'dictionary' | 'epub'>('dictionary');
+  const [reviewBookKey, setReviewBookKey] = useState<string>('all');
+  const [reviewUnknownOnly, setReviewUnknownOnly] = useState(true);
+  const [bookFolderMenu, setBookFolderMenu] = useState<string | null>(null);
+  const [deckMenuGroup, setDeckMenuGroup] = useState<BookGroup | null>(null);
+  const [epubMiningUi, setEpubMiningUi] = useState<EpubMiningUi>('simple');
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => onSavedChanged(() => setSaved(loadSaved())), []);
+  useEffect(
+    () =>
+      onDeckChanged(() => {
+        setDeck(loadDeck());
+        setFolders(loadDeckFolders());
+      }),
+    [],
+  );
+
+  const epubCards = useMemo(
+    () => deck.filter((c) => c.source === 'epub' || c.source === 'epub-ai' || c.source === 'import' || c.source === 'csv'),
+    [deck],
+  );
+  const recentStrip = useMemo(() => epubCards.slice(0, 24), [epubCards]);
+  const filteredDeck = useMemo(() => filterDeckCards(epubCards, folderFilter), [epubCards, folderFilter]);
+  const bookGroups = useMemo(() => groupDeckByBook(filteredDeck), [filteredDeck]);
+  const epubReviewBooks = useMemo(() => groupDeckByBook(epubCards), [epubCards]);
+  const epubReviewCandidates = useMemo(() => {
+    const pool = filterDeckByBook(filterDeckCards(epubCards, folderFilter), reviewBookKey);
+    if (!reviewUnknownOnly) return pool;
+    return pool.filter((c) => !c.known);
+  }, [epubCards, folderFilter, reviewBookKey, reviewUnknownOnly]);
+
+  const unknownReviewCards = useMemo(
+    () => sessionCards.filter((c) => !masteredIds.has(c.id)),
+    [sessionCards, masteredIds],
+  );
+  const knownReviewCards = useMemo(
+    () => sessionCards.filter((c) => masteredIds.has(c.id)),
+    [sessionCards, masteredIds],
+  );
+
+  const current = sessionCards[reviewIndex] ?? null;
+  const sessionComplete = sessionCards.length > 0 && masteredIds.size >= sessionCards.length;
+
+  function savedToReviewCards(words: SavedWord[]): ReviewCard[] {
+    return words.map((w) => ({
+      id: `dict:${w.word}`,
+      word: w.word,
+      reading: w.reading,
+      meaning: w.meaning,
+    }));
+  }
+
+  function deckToReviewCards(cards: DeckFlashcard[]): ReviewCard[] {
+    return cards.map((c) => ({
+      id: c.id,
+      word: c.word,
+      reading: c.reading,
+      meaning: c.meaning || c.back || '',
+    }));
+  }
+
+  function markExplored(id: string): void {
+    setExploredIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
+  function orderReviewCards(cards: ReviewCard[], initialMastered: Set<string>): ReviewCard[] {
+    const unknown = shuffle(cards.filter((c) => !initialMastered.has(c.id)));
+    const known = cards.filter((c) => initialMastered.has(c.id));
+    return [...unknown, ...known];
+  }
+
+  function startReviewSession(
+    cards: ReviewCard[],
+    source: 'dictionary' | 'epub',
+    initialMastered: Set<string> = new Set(),
+  ): void {
+    if (!cards.length) return;
+    const ordered = orderReviewCards(cards, initialMastered);
+    setReviewSource(source);
+    setSessionCards(ordered);
+    setReviewIndex(0);
+    setMasteredIds(new Set(initialMastered));
+    setExploredIds(new Set(ordered[0] ? [ordered[0].id] : []));
+    setTotal(ordered.length);
+    setReviewed(initialMastered.size);
+    setFlipped(false);
+    setMode('review');
+  }
+
+  function startReview(): void {
+    startReviewSession(savedToReviewCards(loadSaved()), 'dictionary');
+  }
+
+  function startEpubReview(): void {
+    const pool = epubReviewCandidates;
+    const initialMastered = reviewUnknownOnly
+      ? new Set<string>()
+      : new Set(pool.filter((c) => c.known).map((c) => c.id));
+    startReviewSession(deckToReviewCards(pool), 'epub', initialMastered);
+  }
+
+  function restartReview(): void {
+    if (reviewSource === 'epub') {
+      const pool = epubReviewCandidates;
+      const initialMastered = reviewUnknownOnly
+        ? new Set<string>()
+        : new Set(pool.filter((c) => c.known).map((c) => c.id));
+      startReviewSession(deckToReviewCards(pool), 'epub', initialMastered);
+      return;
+    }
+    startReviewSession(savedToReviewCards(loadSaved()), 'dictionary');
+  }
+
+  function endReview(): void {
+    setMode('overview');
+    setSessionCards([]);
+    setReviewIndex(0);
+    setMasteredIds(new Set());
+    setExploredIds(new Set());
+    setFlipped(false);
+  }
+
+  function goToReviewIndex(index: number): void {
+    if (!sessionCards.length) return;
+    const next = Math.max(0, Math.min(index, sessionCards.length - 1));
+    setReviewIndex(next);
+    const card = sessionCards[next];
+    if (card) markExplored(card.id);
+    setFlipped(false);
+  }
+
+  function shuffleReview(): void {
+    if (sessionCards.length < 2) return;
+    const next = orderReviewCards(sessionCards, masteredIds);
+    setSessionCards(next);
+    setReviewIndex(0);
+    setFlipped(false);
+    if (next[0]) setExploredIds(new Set([next[0].id]));
+  }
+
+  function flip(): void {
+    setFlipped((f) => !f);
+  }
+
+  function gotIt(): void {
+    const card = sessionCards[reviewIndex];
+    if (!card || masteredIds.has(card.id)) return;
+    const nextMastered = new Set(masteredIds);
+    nextMastered.add(card.id);
+    setMasteredIds(nextMastered);
+    setReviewed((n) => n + 1);
+    setFlipped(false);
+    if (reviewSource === 'epub') setDeck(setDeckCardKnown(card.id, true));
+    setSessionCards((cards) => {
+      const unknown = cards.filter((c) => !nextMastered.has(c.id));
+      const known = cards.filter((c) => nextMastered.has(c.id));
+      return [...unknown, ...known];
+    });
+    if (nextMastered.size >= sessionCards.length) return;
+    setReviewIndex(0);
+    const firstUnknown = sessionCards.find((c) => !nextMastered.has(c.id));
+    if (firstUnknown) markExplored(firstUnknown.id);
+  }
+
+  function again(): void {
+    const card = sessionCards[reviewIndex];
+    if (!card || sessionCards.length < 2) return;
+    if (masteredIds.has(card.id)) {
+      const nextMastered = new Set(masteredIds);
+      nextMastered.delete(card.id);
+      setMasteredIds(nextMastered);
+      setReviewed((n) => Math.max(0, n - 1));
+      if (reviewSource === 'epub') setDeck(setDeckCardKnown(card.id, false));
+      setSessionCards((cards) => {
+        const unknown = cards.filter((c) => !nextMastered.has(c.id));
+        const known = cards.filter((c) => nextMastered.has(c.id));
+        return [...unknown, ...known];
+      });
+    } else {
+      setSessionCards((cards) => {
+        const next = [...cards];
+        const [picked] = next.splice(reviewIndex, 1);
+        const knownStart = next.findIndex((c) => masteredIds.has(c.id));
+        const insertAt = knownStart === -1 ? next.length : knownStart;
+        next.splice(insertAt, 0, picked);
+        return next;
+      });
+    }
+    setFlipped(false);
+  }
+
+  function openEpubMining(ui: EpubMiningUi): void {
+    setEpubMiningUi(ui);
+    setMode('epub-mining');
+  }
+
+  function toggleBookGroup(key: string): void {
+    setCollapsedBooks((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function createFolder(): void {
+    const name = newFolderName.trim();
+    if (!name) {
+      setCreatingFolder(false);
+      setNewFolderName('');
+      setFolderErr('');
+      return;
+    }
+    if (name.toLowerCase() === 'all' || name.toLowerCase() === 'unfiled') {
+      setFolderErr('That name is reserved.');
+      return;
+    }
+    if (folders.includes(name)) {
+      setFolderFilter(name);
+      setCreatingFolder(false);
+      setNewFolderName('');
+      setFolderErr('');
+      return;
+    }
+    setFolders(createDeckFolder(name));
+    setFolderFilter(name);
+    setCreatingFolder(false);
+    setNewFolderName('');
+    setFolderErr('');
+  }
+
+  function removeFolder(name: string): void {
+    const result = deleteDeckFolder(name);
+    setFolders(result.folders);
+    setDeck(result.cards);
+    if (folderFilter === name) setFolderFilter('all');
+  }
+
+  function reorderFolder(dragged: string, target: string): void {
+    if (dragged === target || !folders.includes(dragged)) return;
+    const next = folders.filter((f) => f !== dragged);
+    const idx = next.indexOf(target);
+    next.splice(idx === -1 ? next.length : idx, 0, dragged);
+    setFolders(setDeckFolders(next));
+  }
+
+  function onCardDragStart(e: DragEvent, cardId: string): void {
+    e.dataTransfer.setData('app/flashcard', cardId);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onBookGroupDragStart(e: DragEvent, bookId: string, bookTitle: string): void {
+    e.dataTransfer.setData('app/flash-book', `${bookId}::${bookTitle}`);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onFolderDrop(e: DragEvent, folder: string | null): void {
+    e.preventDefault();
+    setDropHover(null);
+    const bookKey = e.dataTransfer.getData('app/flash-book');
+    if (bookKey) {
+      const sep = bookKey.indexOf('::');
+      const bookId = sep >= 0 ? bookKey.slice(0, sep) : 'unknown';
+      const bookTitle = sep >= 0 ? bookKey.slice(sep + 2) : 'Unknown source';
+      setDeck(setBookGroupFolder(bookId, bookTitle, folder));
+      return;
+    }
+    const cardId = e.dataTransfer.getData('app/flashcard');
+    if (!cardId) return;
+    setDeck(setDeckCardFolder(cardId, folder));
+  }
+
+  function startReviewForGroup(group: BookGroup): void {
+    setReviewBookKey(`${group.bookId}::${group.bookTitle}`);
+    setReviewUnknownOnly(false);
+    const initialMastered = new Set(group.cards.filter((c) => c.known).map((c) => c.id));
+    startReviewSession(deckToReviewCards(group.cards), 'epub', initialMastered);
+    setDeckMenuGroup(null);
+    setMode('review');
+  }
+
+  async function saveGroupCsv(group: BookGroup): Promise<void> {
+    const csv = deckCardsToCsv(group.cards);
+    const safe = group.bookTitle.replace(/[^\w -]+/g, '').trim() || 'deck';
+    const res = await window.api.miningSaveEpubDeckFile(csv, safe, 'csv');
+    if (res.ok && res.path) setDeckMenuGroup(null);
+  }
+
+  function removeBookDeck(bookId: string, bookTitle: string): void {
+    if (!window.confirm(`Delete all ${bookTitle} cards from flashcards? This cannot be undone.`)) return;
+    setDeck(removeBookGroup(bookId, bookTitle));
+    setBookFolderMenu(null);
+  }
+
+  function moveBookToFolder(bookId: string, bookTitle: string, folder: string | null): void {
+    setDeck(setBookGroupFolder(bookId, bookTitle, folder));
+    setBookFolderMenu(null);
+  }
+
+  function reviewStripCard(card: ReviewCard, mastered: boolean): JSX.Element {
+    const i = sessionCards.findIndex((c) => c.id === card.id);
+    const active = i === reviewIndex;
+    return (
+      <button
+        key={card.id}
+        type="button"
+        role="listitem"
+        data-review-active={active ? 'true' : undefined}
+        className={`flash-strip-card flash-review-strip-card${active ? ' active' : ''}${mastered ? ' mastered' : ''}`}
+        onClick={() => goToReviewIndex(i)}
+        title={card.word}
+      >
+        <span className="flash-strip-word" lang="ja">
+          {card.word}
+        </span>
+        {card.reading && card.reading !== card.word && (
+          <span className="flash-strip-reading" lang="ja">
+            {card.reading}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  useEffect(() => {
+    if (mode !== 'review') return;
+    const el = stripRef.current?.querySelector<HTMLElement>('[data-review-active="true"]');
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [mode, reviewIndex, sessionCards.length]);
+
+  // Review shortcuts — central manager (Settings → Shortcuts rebindable).
+  useEffect(() => {
+    if (mode !== 'review') return;
+    const offs = [
+      registerCommandHandler('flashcards.flip', () => {
+        flip();
+      }),
+      registerCommandHandler('flashcards.end', () => {
+        endReview();
+      }),
+      registerCommandHandler('flashcards.prev', () => {
+        goToReviewIndex(reviewIndex - 1);
+      }),
+      registerCommandHandler('flashcards.next', () => {
+        goToReviewIndex(reviewIndex + 1);
+      }),
+      registerCommandHandler('flashcards.again', () => {
+        if (flipped) again();
+        else return false;
+      }),
+      registerCommandHandler('flashcards.gotIt', () => {
+        if (flipped) gotIt();
+        else return false;
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [mode, flipped, reviewIndex, sessionCards, masteredIds]);
+
+  if (mode === 'review') {
+    if (sessionComplete || !current) {
+      return (
+        <div className="flash-view">
+          <div className="flash-done">
+            <div className="flash-done-emoji">
+              <Icon name="confetti" size={44} />
+            </div>
+            <h2>Session complete</h2>
+            <p className="muted">
+              You reviewed {total} {total === 1 ? 'card' : 'cards'}.
+            </p>
+            <div className="flash-done-actions">
+              <button className="btn primary" onClick={restartReview}>
+                Review again
+              </button>
+              <button className="btn" onClick={endReview}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const pct = total ? (reviewed / total) * 100 : 0;
+    const reviewTitle =
+      reviewSource === 'epub' && reviewBookKey !== 'all'
+        ? epubReviewBooks.find((g) => `${g.bookId}::${g.bookTitle}` === reviewBookKey)?.bookTitle
+        : null;
+    return (
+      <div className="flash-view review">
+        <div className="flash-review-shell">
+          <div className="flash-review-top">
+            <button className="btn small" onClick={endReview}>
+              <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
+              Exit
+            </button>
+            {reviewTitle && <span className="flash-review-source muted">{reviewTitle}</span>}
+            <div className="flash-progress">
+              <div className="flash-progress-bar">
+                <span style={{ width: `${pct}%` }} />
+              </div>
+              <span className="flash-progress-text">
+                {reviewed} / {total}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn small flash-review-shuffle"
+              onClick={shuffleReview}
+              disabled={sessionCards.length < 2}
+              title="Shuffle unknown cards"
+            >
+              <Icon name="shuffle" size={14} />
+              Shuffle
+            </button>
+          </div>
+
+          <p className="flash-review-explored">
+            Flashcards explored: {exploredIds.size} / {sessionCards.length}
+          </p>
+
+          <div className="flash-review-nav" ref={stripRef}>
+            {unknownReviewCards.length > 0 && (
+              <div className="flash-review-group flash-review-group-unknown">
+                <span className="flash-review-group-label">
+                  Don&apos;t know ({unknownReviewCards.length})
+                </span>
+                <div className="flash-strip flash-review-strip" role="list">
+                  {unknownReviewCards.map((card) => reviewStripCard(card, false))}
+                </div>
+              </div>
+            )}
+            {knownReviewCards.length > 0 && (
+              <div className="flash-review-group flash-review-group-known">
+                <span className="flash-review-group-label">Know ({knownReviewCards.length})</span>
+                <div className="flash-strip flash-review-strip" role="list">
+                  {knownReviewCards.map((card) => reviewStripCard(card, true))}
+                </div>
+              </div>
+            )}
+            {sessionCards.length > 1 && (
+              <label className="flash-review-slider">
+                <span className="muted">Slide to card</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={sessionCards.length - 1}
+                  value={reviewIndex}
+                  onChange={(e) => goToReviewIndex(Number(e.target.value))}
+                />
+                <span className="flash-review-slider-pos">
+                  {reviewIndex + 1} / {sessionCards.length}
+                </span>
+              </label>
+            )}
+          </div>
+
+          <div className="flash-card" onClick={flipped ? undefined : flip}>
+          <span className="flash-word" lang="ja">
+            {current.word}
+          </span>
+          {flipped ? (
+            <div className="flash-answer">
+              {current.reading && current.reading !== current.word && (
+                <span className="flash-reading" lang="ja">
+                  {current.reading}
+                </span>
+              )}
+              <span className="flash-meaning">{current.meaning || 'No meaning saved.'}</span>
+            </div>
+          ) : (
+            <span className="flash-tap-hint">Tap or press Space to reveal</span>
+          )}
+        </div>
+
+        {flipped ? (
+          <div className="flash-actions">
+            <button className="btn flash-again" onClick={again}>
+              Don&apos;t know
+            </button>
+            <button className="btn primary flash-got" onClick={gotIt}>
+              Know
+            </button>
+          </div>
+        ) : (
+          <div className="flash-actions">
+            <button className="btn primary" onClick={flip}>
+              Show answer
+            </button>
+          </div>
+        )}
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'epub-mining') {
+    return (
+      <div className="flash-view flash-view-mining">
+        <div className="view-head">
+          <p className="muted">Mine vocabulary from a library EPUB into flashcards.</p>
+          <div className="actions">
+            <button className="btn" onClick={() => setMode('overview')}>
+              Back to decks
+            </button>
+            <button className="btn" onClick={() => setMode('ai-studio')}>
+              AI card studio
+            </button>
+          </div>
+        </div>
+
+        <div className="flash-tabs epub-mining-mode-tabs">
+          <button
+            type="button"
+            className={`flash-tab${epubMiningUi === 'simple' ? ' active' : ''}`}
+            onClick={() => setEpubMiningUi('simple')}
+          >
+            Simple
+          </button>
+          <button
+            type="button"
+            className={`flash-tab${epubMiningUi === 'advanced' ? ' active' : ''}`}
+            onClick={() => setEpubMiningUi('advanced')}
+          >
+            Advanced
+          </button>
+        </div>
+
+        <p className="epub-mining-mode-lead muted">
+          {epubMiningUi === 'simple'
+            ? 'English meaning + Japanese sentence & definition — two frequency filters only.'
+            : 'Full control: all languages, export formats, translation engines.'}
+        </p>
+
+        {epubMiningUi === 'simple' ? (
+          <EpubMiningSimplePanel onDeckSaved={() => { setMode('overview'); setOverviewTab('epub'); }} />
+        ) : (
+          <EpubMiningPanel onDeckSaved={() => { setMode('overview'); setOverviewTab('epub'); }} />
+        )}
+      </div>
+    );
+  }
+
+  if (mode === 'csv-tool') {
+    return (
+      <div className="flash-view flash-view-mining">
+        <div className="view-head">
+          <p className="muted">Paste CSV/TSV, edit in a spreadsheet grid, or import TXT lists — auto-syncs to flashcards.</p>
+          <div className="actions">
+            <button className="btn" onClick={() => setMode('overview')}>
+              Back to decks
+            </button>
+            <button className="btn" onClick={() => openEpubMining('advanced')}>
+              EPUB mining
+            </button>
+          </div>
+        </div>
+        <CsvEditorPanel onDeckImported={() => { setMode('overview'); setOverviewTab('epub'); }} />
+      </div>
+    );
+  }
+
+  if (mode === 'ai-studio') {
+    return (
+      <div className="flash-view flash-view-mining">
+        <div className="view-head">
+          <p className="muted">Configure preset and field mapping above, then generate cards from saved dictionary words.</p>
+          <div className="actions">
+            <button className="btn" onClick={() => setMode('overview')}>
+              Back to decks
+            </button>
+            <button className="btn" onClick={() => openEpubMining('advanced')}>
+              EPUB mining
+            </button>
+          </div>
+        </div>
+        <AiCardStudio onDeckImported={() => { setDeck(loadDeck()); setMode('overview'); setOverviewTab('epub'); }} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flash-view flash-view-decks">
+      <div className="view-head">
+        <p className="muted">Dictionary saves, EPUB deck strip, and folder explorer.</p>
+        <div className="actions">
+          <button className="btn primary" onClick={() => openEpubMining('simple')}>
+            Simple EPUB mining
+          </button>
+          <button className="btn" onClick={() => openEpubMining('advanced')}>
+            Advanced EPUB
+          </button>
+          <button className="btn" onClick={() => setMode('csv-tool')}>
+            CSV tool
+          </button>
+          <button className="btn" onClick={() => setMode('ai-studio')}>
+            AI card studio
+          </button>
+          <button className="btn primary" onClick={startReview} disabled={saved.length === 0}>
+            {saved.length ? `Review dictionary (${saved.length})` : 'Review dictionary'}
+          </button>
+        </div>
+      </div>
+
+      <div className="flash-tabs">
+        <button
+          type="button"
+          className={`flash-tab ${overviewTab === 'epub' ? 'active' : ''}`}
+          onClick={() => setOverviewTab('epub')}
+        >
+          EPUB decks ({epubCards.length})
+        </button>
+        <button
+          type="button"
+          className={`flash-tab ${overviewTab === 'dictionary' ? 'active' : ''}`}
+          onClick={() => setOverviewTab('dictionary')}
+        >
+          Dictionary ({saved.length})
+        </button>
+      </div>
+
+      <DeckImportPanel onImported={() => setDeck(loadDeck())} />
+
+      {overviewTab === 'epub' ? (
+        <>
+          <section className="anki-card epub-mine-promo">
+            <div className="flash-strip-head">
+              <h2 className="flash-section-title">Mine from EPUB</h2>
+              <span className="muted">Lean 3-step flow — English + Japanese only</span>
+            </div>
+            <p className="epub-mine-promo-text">
+              Pick a book, filter by frequency in the book or in the dictionary, then save cards to flashcards.
+            </p>
+            <button type="button" className="btn primary epub-mine-promo-btn" onClick={() => openEpubMining('simple')}>
+              Open Simple EPUB mining
+            </button>
+          </section>
+
+          <section className="anki-card flash-review-setup">
+            <div className="flash-strip-head">
+              <h2 className="flash-section-title">Study session</h2>
+              <span className="muted">Pick an EPUB source, then start reviewing</span>
+            </div>
+            <div className="flash-review-setup-grid">
+              <label>
+                EPUB source
+                <select value={reviewBookKey} onChange={(e) => setReviewBookKey(e.target.value)}>
+                  <option value="all">All in current folder ({filteredDeck.length})</option>
+                  {epubReviewBooks.map((group) => {
+                    const key = `${group.bookId}::${group.bookTitle}`;
+                    const inFolder = filterDeckByBook(filteredDeck, key).length;
+                    return (
+                      <option key={key} value={key}>
+                        {group.bookTitle} ({inFolder || group.cards.length})
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <label className="flash-review-setup-check">
+                <input
+                  type="checkbox"
+                  checked={reviewUnknownOnly}
+                  onChange={(e) => setReviewUnknownOnly(e.target.checked)}
+                />
+                Unknown cards only
+              </label>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={epubReviewCandidates.length === 0}
+                onClick={startEpubReview}
+              >
+                {epubReviewCandidates.length
+                  ? `Start review (${epubReviewCandidates.length})`
+                  : 'Start review'}
+              </button>
+            </div>
+          </section>
+
+          <section className="flash-strip-section anki-card">
+            <div className="flash-strip-head">
+              <h2 className="flash-section-title">Recent EPUB cards</h2>
+              <span className="muted">Left to right — newest first</span>
+            </div>
+            {recentStrip.length === 0 ? (
+              <p className="muted flash-strip-empty">
+                Mine cards in EPUB mining to fill this strip.
+              </p>
+            ) : (
+              <div className="flash-strip" role="list">
+                {recentStrip.map((card) => (
+                  <article key={card.id} className="flash-strip-card" role="listitem">
+                    <span className="flash-strip-word" lang="ja">
+                      {card.word}
+                    </span>
+                    {card.reading && card.reading !== card.word && (
+                      <span className="flash-strip-reading" lang="ja">
+                        {card.reading}
+                      </span>
+                    )}
+                    <span className="flash-strip-meaning">{card.meaning || card.back || '—'}</span>
+                    {card.bookTitle && <span className="flash-strip-source muted">{card.bookTitle}</span>}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="flash-explorer anki-card">
+            <div className="flash-explorer-head">
+              <h2 className="flash-section-title">Deck explorer</h2>
+              <span className="muted">Folders and EPUB source groups</span>
+            </div>
+
+            <div className="lib-folders flash-folders">
+              <button
+                type="button"
+                className={`lib-folder-chip ${folderFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setFolderFilter('all')}
+              >
+                All
+                <span className="lib-chip-count">{epubCards.length}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFolderFilter('unfiled')}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDropHover('unfiled');
+                }}
+                onDragLeave={() => setDropHover(null)}
+                onDrop={(e) => onFolderDrop(e, null)}
+                className={`lib-folder-chip ${folderFilter === 'unfiled' ? 'active' : ''} ${dropHover === 'unfiled' ? 'dragover' : ''}`}
+              >
+                Unfiled
+                <span className="lib-chip-count">{epubCards.filter((c) => !c.folder).length}</span>
+              </button>
+              {folders.map((folder) => (
+                <button
+                  key={folder}
+                  type="button"
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData('app/flash-folder', folder)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDropHover(folder);
+                  }}
+                  onDragLeave={() => setDropHover(null)}
+                  onDrop={(e) => {
+                    const draggedFolder = e.dataTransfer.getData('app/flash-folder');
+                    if (draggedFolder && draggedFolder !== folder) {
+                      void reorderFolder(draggedFolder, folder);
+                      return;
+                    }
+                    onFolderDrop(e, folder);
+                  }}
+                  className={`lib-folder-chip ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
+                  onClick={() => setFolderFilter(folder)}
+                >
+                  {folder}
+                  <span className="lib-chip-count">{epubCards.filter((c) => c.folder === folder).length}</span>
+                  <span
+                    className="lib-chip-del"
+                    role="button"
+                    tabIndex={0}
+                    title="Delete folder"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFolder(folder);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation();
+                        removeFolder(folder);
+                      }
+                    }}
+                  >
+                    ×
+                  </span>
+                </button>
+              ))}
+              {creatingFolder ? (
+                <span className="lib-folder-chip lib-folder-editor">
+                  <input
+                    className="lib-folder-input"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') createFolder();
+                      if (e.key === 'Escape') {
+                        setCreatingFolder(false);
+                        setNewFolderName('');
+                        setFolderErr('');
+                      }
+                    }}
+                    placeholder="Folder name"
+                    autoFocus
+                  />
+                  <button type="button" className="btn small" onClick={createFolder}>
+                    Add
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="lib-folder-chip lib-folder-new" onClick={() => setCreatingFolder(true)}>
+                  + New folder
+                </button>
+              )}
+            </div>
+            {folderErr && <div className="lib-folder-err">{folderErr}</div>}
+
+            {filteredDeck.length === 0 ? (
+              <p className="muted">No cards in this view. Mine from an EPUB or switch folder filters.</p>
+            ) : (
+              <div className="flash-groups">
+                {bookGroups.map((group) => {
+                  const groupKey = `${group.bookId}::${group.bookTitle}`;
+                  const collapsed = collapsedBooks[groupKey] ?? false;
+                  return (
+                    <div key={groupKey} className="flash-group">
+                      <div
+                        className="flash-group-head flash-group-head-row"
+                        draggable
+                        onDragStart={(e) => onBookGroupDragStart(e, group.bookId, group.bookTitle)}
+                      >
+                        <div
+                          className="flash-group-head-toggle"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleBookGroup(groupKey)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') toggleBookGroup(groupKey);
+                          }}
+                          aria-expanded={!collapsed}
+                        >
+                          <span className="flash-group-chevron" aria-hidden />
+                          <span
+                            className="flash-group-title flash-group-title-btn"
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeckMenuGroup(group);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                setDeckMenuGroup(group);
+                              }
+                            }}
+                          >
+                            {group.bookTitle}
+                          </span>
+                          <span className="muted flash-group-count">{group.cards.length} cards</span>
+                          <span className="muted flash-group-known">
+                            {group.cards.filter((c) => c.known).length} known
+                          </span>
+                        </div>
+                        <div className="flash-group-head-actions">
+                          <button
+                            type="button"
+                            className="btn small"
+                            onClick={() => setDeckMenuGroup(group)}
+                          >
+                            Options
+                          </button>
+                          <button
+                            type="button"
+                            className="btn small flash-group-delete"
+                            onClick={() => removeBookDeck(group.bookId, group.bookTitle)}
+                          >
+                            Delete deck
+                          </button>
+                          {bookFolderMenu === groupKey && (
+                            <div className="flash-file-menu flash-book-folder-menu">
+                              <button type="button" onClick={() => moveBookToFolder(group.bookId, group.bookTitle, null)}>
+                                Unfiled
+                              </button>
+                              {folders.map((folder) => (
+                                <button
+                                  key={folder}
+                                  type="button"
+                                  onClick={() => moveBookToFolder(group.bookId, group.bookTitle, folder)}
+                                >
+                                  {folder}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {!collapsed && (
+                        <div className="flash-group-body">
+                          {group.cards.map((card) => (
+                            <div
+                              key={card.id}
+                              className="flash-row flash-row-draggable"
+                              draggable
+                              onDragStart={(e) => onCardDragStart(e, card.id)}
+                            >
+                              <div className="flash-row-main">
+                                <span className="flash-row-word" lang="ja">
+                                  {card.word}
+                                </span>
+                                {card.reading && card.reading !== card.word && (
+                                  <span className="flash-row-reading" lang="ja">
+                                    {card.reading}
+                                  </span>
+                                )}
+                                <span className="flash-row-meaning">{card.meaning || card.back || '—'}</span>
+                                {card.sentence && <span className="flash-row-sentence muted">{card.sentence}</span>}
+                                {card.folder && <span className="flash-row-folder muted">{card.folder}</span>}
+                              </div>
+                              <div className="flash-row-actions">
+                                <button
+                                  type="button"
+                                  className="btn small"
+                                  onClick={() => setFileMenu(fileMenu === card.id ? null : card.id)}
+                                >
+                                  File
+                                </button>
+                                {fileMenu === card.id && (
+                                  <div className="flash-file-menu">
+                                    <button type="button" onClick={() => { setDeck(setDeckCardFolder(card.id, null)); setFileMenu(null); }}>
+                                      Unfiled
+                                    </button>
+                                    {folders.map((folder) => (
+                                      <button
+                                        key={folder}
+                                        type="button"
+                                        onClick={() => {
+                                          setDeck(setDeckCardFolder(card.id, folder));
+                                          setFileMenu(null);
+                                        }}
+                                      >
+                                        {folder}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                <button
+                                  className="flash-row-x"
+                                  title="Remove"
+                                  onClick={() => setDeck(removeDeckCard(card.id))}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : saved.length === 0 ? (
+        <div className="flash-empty">
+          <div className="flash-empty-emoji">
+            <Icon name="flashcards" size={40} />
+          </div>
+          <h2>No saved words yet</h2>
+          <p className="muted">
+            Open the Dictionary (or highlight a word while reading) and tap the star icon on a result to save it here.
+          </p>
+        </div>
+      ) : (
+        <div className="flash-list">
+          {saved.map((w) => (
+            <div className="flash-row" key={w.word}>
+              <div className="flash-row-main">
+                <span className="flash-row-word" lang="ja">
+                  {w.word}
+                </span>
+                {w.reading && w.reading !== w.word && (
+                  <span className="flash-row-reading" lang="ja">
+                    {w.reading}
+                  </span>
+                )}
+                <span className="flash-row-meaning">{w.meaning}</span>
+              </div>
+              <button className="flash-row-x" title="Remove" onClick={() => removeSaved(w.word)}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {deckMenuGroup && (
+        <DeckActionMenu
+          group={deckMenuGroup}
+          folders={folders}
+          onClose={() => setDeckMenuGroup(null)}
+          onReview={() => startReviewForGroup(deckMenuGroup)}
+          onSaveCsv={() => void saveGroupCsv(deckMenuGroup)}
+          onMoveFolder={(folder) => {
+            setDeck(setBookGroupFolder(deckMenuGroup.bookId, deckMenuGroup.bookTitle, folder));
+            setDeckMenuGroup(null);
+          }}
+          onDelete={() => {
+            removeBookDeck(deckMenuGroup.bookId, deckMenuGroup.bookTitle);
+            setDeckMenuGroup(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}

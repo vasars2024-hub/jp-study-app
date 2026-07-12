@@ -1,0 +1,530 @@
+/**
+ * Storage service — the one place that knows where every piece of user data
+ * lives, split by weight:
+ *
+ *   IndexedDB (durable, async, big):   flashcard deck store, CSV editor
+ *                                      draft, clipboard, calendar.
+ *   localStorage (sync, tiny, UI):     theme, env (particles/companions/walls),
+ *                                      display, shortcuts, study prefs.
+ *   Host (main process):               mining config, AI config, desktop layout,
+ *                                      study profiles.
+ *
+ * Memory & storage inventories domains via settingsCatalog and export/import
+ * includes all three tiers (format 2).
+ */
+
+import { kvClear, kvDelete, kvEntries, kvGet, kvSet } from './db';
+import {
+  collectLocalStorageSnapshot,
+  domainById,
+  enrichDomainInventory,
+  listDomainInventoryLocal,
+  removeKeysForDomain,
+  SETTINGS_DOMAINS,
+  type DomainInventoryItem,
+  type HostBlobKey,
+} from './settingsCatalog';
+import { DEFAULT_TRADITIONAL_MINING_CONFIG } from '../../shared/mining';
+import { DEFAULT_ENVIRONMENT, buildDefaultDayCyclePlaylist, buildDefaultRules } from '../environment/types';
+
+/** IndexedDB keys for heavy data. */
+export const IDB_KEYS = {
+  flashcardDeck: 'flashcard-deck',
+  csvEditor: 'csv-editor',
+  clipboardHistory: 'clipboard-history',
+  calendarEvents: 'calendar-events',
+  /** Map of bookId → personal highlight annotations (H-key marks). */
+  annotations: 'reading-annotations',
+  /** Map of bookId → bookmarks. */
+  bookmarks: 'reading-bookmarks',
+} as const;
+
+/** localStorage keys that hold the matching hot-path caches. */
+export const LS_KEYS = {
+  flashcardDeck: 'jp-flashcard-deck',
+  csvEditor: 'jp-study-csv-editor-v1',
+  clipboardHistory: 'jp-clipboard-history',
+  calendarEvents: 'jp-calendar-events',
+} as const;
+
+/** localStorage keys that are pure UI state (kept out of IndexedDB). */
+export const UI_STATE_KEYS = [
+  'jp-os-theme',
+  'jp-os-accent',
+  'jp-os-reduce-motion',
+  'jp-app-zoom',
+] as const;
+
+/** Fire-and-forget mirror of a heavy value into IndexedDB. */
+export function mirrorToIdb(key: string, value: unknown): void {
+  void kvSet(key, value).catch((err) => {
+    console.error(`[storage] IndexedDB mirror failed for ${key}:`, err);
+  });
+}
+
+export interface StoredItemInfo {
+  key: string;
+  label: string;
+  tier?: 'indexeddb' | 'localStorage' | 'host' | 'mixed';
+  category?: string;
+  count?: number;
+  modifiedAt?: number;
+  bytes: number;
+  detail?: string;
+  clearable?: boolean;
+  domainId?: string;
+}
+
+function estimateBytes(value: unknown): number {
+  try {
+    return new Blob([JSON.stringify(value) ?? '']).size;
+  } catch {
+    return 0;
+  }
+}
+
+export function formatBytes(bytes: number): string {
+  const n = Math.max(0, Number(bytes) || 0);
+  if (n < 1024) return `${Math.round(n)} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+async function collectIdbSnapshot(): Promise<Record<string, unknown>> {
+  const idb: Record<string, unknown> = {};
+  try {
+    for (const [key, value] of await kvEntries()) idb[key] = value;
+  } catch (err) {
+    console.warn(
+      '[storage] IndexedDB snapshot failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  return idb;
+}
+
+async function collectHostSnapshot(): Promise<Partial<Record<HostBlobKey, unknown>>> {
+  const host: Partial<Record<HostBlobKey, unknown>> = {};
+  const api = typeof window !== 'undefined' ? window.api : null;
+  if (!api) return host;
+  try {
+    host.mining = await api.miningGetConfig();
+  } catch {
+    /* ignore */
+  }
+  try {
+    host.ai = await api.aiGetConfig();
+  } catch {
+    /* ignore */
+  }
+  try {
+    host.desktopLayout = await api.desktopGetLayout();
+  } catch {
+    /* ignore */
+  }
+  try {
+    host.profiles = await api.profileList();
+  } catch {
+    /* ignore */
+  }
+  return host;
+}
+
+/** Domain-aware inventory for Memory & storage UI. */
+export async function listSettingsDomains(): Promise<DomainInventoryItem[]> {
+  const base = listDomainInventoryLocal();
+  const idb = await collectIdbSnapshot();
+  const host = await collectHostSnapshot();
+  return enrichDomainInventory(base, { idb, host });
+}
+
+/** Flat inventory (domains + any leftover raw keys). */
+export async function listStoredItems(): Promise<StoredItemInfo[]> {
+  const domains = await listSettingsDomains();
+  const fromDomains: StoredItemInfo[] = domains
+    .filter((d) => d.present || d.bytes > 0)
+    .map((d) => ({
+      key: `domain:${d.id}`,
+      domainId: d.id,
+      label: d.label,
+      tier:
+        d.tier === 'host'
+          ? 'host'
+          : d.tier === 'durable'
+            ? 'indexeddb'
+            : d.tier === 'mixed'
+              ? 'mixed'
+              : 'localStorage',
+      category: d.category,
+      count: d.count,
+      bytes: d.bytes,
+      detail: d.detail,
+      clearable: d.clearable,
+    }));
+
+  // Surface orphan localStorage keys not claimed by any domain
+  const claimed = new Set<string>();
+  for (const def of SETTINGS_DOMAINS) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (def.lsKeys?.includes(k) || def.lsPrefixes?.some((p) => k.startsWith(p))) {
+          if (!(def.id === 'lyrics-cache' && k === 'jp-lyrics-settings')) claimed.add(k);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const orphans: StoredItemInfo[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || claimed.has(k)) continue;
+      const v = localStorage.getItem(k);
+      if (v == null) continue;
+      orphans.push({
+        key: `orphan:${k}`,
+        label: k,
+        tier: 'localStorage',
+        category: 'Other',
+        bytes: estimateBytes(v) + estimateBytes(k),
+        count: 1,
+        detail: 'Uncategorized local key',
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return [...fromDomains, ...orphans].sort(
+    (a, b) => b.bytes - a.bytes || a.label.localeCompare(b.label),
+  );
+}
+
+export interface StorageBackup {
+  app: 'jp-study-app';
+  /** 1 = LS+IDB only; 2 = + host configs + domain manifest */
+  format: 1 | 2;
+  exportedAt: number;
+  localStorage: Record<string, string>;
+  indexedDb: Record<string, unknown>;
+  host?: Partial<Record<HostBlobKey, unknown>>;
+  domains?: Array<{ id: string; label: string; bytes: number; detail: string }>;
+}
+
+/** Full backup of localStorage, IndexedDB, and host settings. */
+export async function exportAllData(): Promise<StorageBackup> {
+  // Ensure reading highlights / bookmarks are mirrored into IDB before snapshot.
+  try {
+    const { collectAllAnnotationsMap } = await import('../annotations');
+    const { collectAllBookmarksMap } = await import('../bookmarks');
+    await kvSet(IDB_KEYS.annotations, collectAllAnnotationsMap());
+    await kvSet(IDB_KEYS.bookmarks, collectAllBookmarksMap());
+  } catch {
+    /* ignore — LS still exported */
+  }
+  const ls = collectLocalStorageSnapshot();
+  const idb = await collectIdbSnapshot();
+  const host = await collectHostSnapshot();
+  const domains = await listSettingsDomains();
+  return {
+    app: 'jp-study-app',
+    format: 2,
+    exportedAt: Date.now(),
+    localStorage: ls,
+    indexedDb: idb,
+    host,
+    domains: domains
+      .filter((d) => d.present || d.bytes > 0)
+      .map((d) => ({ id: d.id, label: d.label, bytes: d.bytes, detail: d.detail })),
+  };
+}
+
+async function restoreHost(host: Partial<Record<HostBlobKey, unknown>> | undefined): Promise<void> {
+  if (!host) return;
+  const api = window.api;
+  if (!api) return;
+
+  if (host.mining && typeof host.mining === 'object') {
+    try {
+      await api.miningSetConfig(host.mining as Parameters<typeof api.miningSetConfig>[0]);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (host.ai && typeof host.ai === 'object') {
+    const ai = host.ai as {
+      providerId?: string;
+      selectedPresetId?: string;
+      selectedFormatId?: string;
+      outputFormat?: 'anki' | 'csv';
+      cardCount?: number;
+    };
+    try {
+      if (ai.providerId) await api.aiSetProvider(ai.providerId as Parameters<typeof api.aiSetProvider>[0]);
+    } catch {
+      /* ignore */
+    }
+    try {
+      if (ai.selectedPresetId) await api.aiSelectPreset(ai.selectedPresetId);
+    } catch {
+      /* ignore */
+    }
+    try {
+      if (typeof ai.selectedFormatId === 'string' && ai.selectedFormatId) {
+        await api.aiSetFormat({
+          formatId: ai.selectedFormatId,
+          outputFormat: ai.outputFormat,
+          cardCount: ai.cardCount,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (host.desktopLayout && typeof host.desktopLayout === 'object') {
+    const snap = host.desktopLayout as {
+      viewports?: Array<{ desktopIndex: number; [k: string]: unknown }>;
+      activeDesktopIndex?: number;
+    };
+    if (Array.isArray(snap.viewports)) {
+      for (const vp of snap.viewports) {
+        try {
+          await api.desktopCommitLayout(
+            vp.desktopIndex as Parameters<typeof api.desktopCommitLayout>[0],
+            vp as Parameters<typeof api.desktopCommitLayout>[1],
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (typeof snap.activeDesktopIndex === 'number') {
+      try {
+        await api.desktopSwitch(
+          snap.activeDesktopIndex as Parameters<typeof api.desktopSwitch>[0],
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  if (Array.isArray(host.profiles)) {
+    for (const p of host.profiles) {
+      if (!p || typeof p !== 'object') continue;
+      const prof = p as { id?: string; name?: string; [k: string]: unknown };
+      if (typeof prof.id !== 'string') continue;
+      try {
+        await api.profileUpdate(prof.id as Parameters<typeof api.profileUpdate>[0], prof);
+      } catch {
+        // Profile may not exist — try create then update
+        try {
+          if (typeof prof.name === 'string') {
+            await api.profileCreate(prof.name);
+            await api.profileUpdate(prof.id as Parameters<typeof api.profileUpdate>[0], prof);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+}
+
+/** Restore a backup (format 1 or 2). Returns an error string on bad input. */
+export async function importAllData(raw: string): Promise<string | null> {
+  let parsed: StorageBackup;
+  try {
+    parsed = JSON.parse(raw) as StorageBackup;
+  } catch {
+    return 'Not a valid JSON file.';
+  }
+  if (parsed?.app !== 'jp-study-app' || !parsed.localStorage || !parsed.indexedDb) {
+    return 'This file is not a jp-study-app backup.';
+  }
+
+  // Clear then restore so deleted keys don't linger
+  try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
+  }
+  try {
+    await kvClear();
+  } catch {
+    /* ignore */
+  }
+
+  for (const [key, value] of Object.entries(parsed.localStorage)) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* quota */
+    }
+  }
+  for (const [key, value] of Object.entries(parsed.indexedDb)) {
+    try {
+      await kvSet(key, value);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (parsed.format >= 2 && parsed.host) {
+    await restoreHost(parsed.host);
+  }
+
+  // Rehydrate per-book highlights/bookmarks from durable IDB maps if LS missed any.
+  try {
+    const { restoreAnnotationsFromIdb } = await import('../annotations');
+    const { restoreBookmarksFromIdb } = await import('../bookmarks');
+    await restoreAnnotationsFromIdb();
+    await restoreBookmarksFromIdb();
+  } catch {
+    /* ignore */
+  }
+
+  return null;
+}
+
+function dispatchMany(events: string[]): void {
+  for (const name of events) {
+    try {
+      window.dispatchEvent(new CustomEvent(name));
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Clear one settings domain (local + idb + known host). */
+export async function clearSettingsDomain(domainId: string): Promise<string | null> {
+  const def = domainById(domainId);
+  if (!def) return 'Unknown settings domain.';
+  if (!def.clearable) return 'This domain cannot be cleared from here.';
+
+  removeKeysForDomain(def);
+
+  if (def.idbKeys) {
+    for (const k of def.idbKeys) {
+      try {
+        await kvDelete(k);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // Domain-specific restore to defaults / events
+  switch (domainId) {
+    case 'environment': {
+      const next = {
+        ...DEFAULT_ENVIRONMENT,
+        playlists: [buildDefaultDayCyclePlaylist()],
+        rules: buildDefaultRules(),
+      };
+      try {
+        localStorage.setItem('jp-os-environment-v1', JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      try {
+        window.dispatchEvent(
+          new CustomEvent('jp-os-environment-changed', { detail: next }),
+        );
+      } catch {
+        /* ignore */
+      }
+      break;
+    }
+    case 'appearance':
+      dispatchMany(['jp-os-personalization-changed', 'jp-os-custom-css-changed']);
+      break;
+    case 'display':
+      dispatchMany(['jp-os-display-prefs-changed', 'app-zoom-changed']);
+      break;
+    case 'desktop-prefs':
+      dispatchMany(['jp-os-desktop-prefs-changed']);
+      break;
+    case 'shortcuts':
+      dispatchMany(['shortcuts-changed']);
+      break;
+    case 'flashcards':
+      dispatchMany(['flashcard-deck-changed']);
+      break;
+    case 'clipboard':
+      dispatchMany(['clipboard-history-changed']);
+      break;
+    case 'calendar':
+      dispatchMany(['calendar-events-changed']);
+      break;
+    case 'lookups':
+      dispatchMany(['lookup-history-changed']);
+      break;
+    case 'study-progress':
+      dispatchMany(['word-knowledge-changed', 'level-lists-changed']);
+      break;
+    case 'mining':
+      try {
+        await window.api.miningSetConfig(DEFAULT_TRADITIONAL_MINING_CONFIG);
+      } catch {
+        /* ignore */
+      }
+      break;
+    default:
+      break;
+  }
+
+  return null;
+}
+
+/** Delete only the CSV editor draft (grid contents), nothing else. */
+export async function clearCsvGrid(): Promise<void> {
+  await clearSettingsDomain('csv');
+}
+
+/** Delete flashcard decks (cards + folders). */
+export async function clearFlashcardDecks(): Promise<void> {
+  await clearSettingsDomain('flashcards');
+}
+
+/** Delete the clipboard history (pinned entries included). */
+export async function clearClipboardHistoryStore(): Promise<void> {
+  await clearSettingsDomain('clipboard');
+}
+
+/** Delete calendar events (list + IndexedDB mirror). */
+export async function clearCalendarEventsStore(): Promise<void> {
+  await clearSettingsDomain('calendar');
+}
+
+/** Drop cached lyrics JSON under jp-lyrics-*. */
+export function clearLyricsCacheStore(): void {
+  void clearSettingsDomain('lyrics-cache');
+}
+
+/** Drop dictionary lookup history ring buffer. */
+export function clearLookupHistoryStore(): void {
+  void clearSettingsDomain('lookups');
+}
+
+/** Read a heavy value, preferring the localStorage cache, falling back to IndexedDB. */
+export async function readHeavy<T>(lsKey: string, idbKey: string): Promise<T | null> {
+  try {
+    const cached = localStorage.getItem(lsKey);
+    if (cached) return JSON.parse(cached) as T;
+  } catch {
+    /* fall through to IndexedDB */
+  }
+  const stored = await kvGet<T>(idbKey);
+  return stored ?? null;
+}
+
+export type { DomainInventoryItem };
