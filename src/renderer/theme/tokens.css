@@ -137,4 +137,10 @@
   --focus-ring-color: color-mix(in srgb, var(--accent) 70%, transparent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  /* ---------- Status colours (semantic; themeable) --------------------- */
+  --status-success: #38b26b;
+  --status-warning: #e0a53a;
+  --status-error: var(--red);
+  --status-info: var(--accent);
 }
