@@ -37,8 +37,9 @@ import './theme/perf.css';
 import './theme/aero-shell.css';
 // Shell panel styles (Phase 2) — Notification Center, Quick Settings.
 import './components/shell/shell.css';
-// Living-desktop weather overlays (Phase 3 · M3).
+// Living-desktop weather overlays (Phase 3 · M3) + atmosphere polish (M5/M6).
 import './environment/weather.css';
+import './environment/atmosphere.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { installNotificationCapture } from './notificationStore';
 import { bootWallpaperFit } from './wallpaperFit';
