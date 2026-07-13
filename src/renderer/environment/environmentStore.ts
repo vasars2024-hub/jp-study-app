@@ -157,6 +157,8 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
           : DEFAULT_ENVIRONMENT.ambientAudio.volume,
       ),
     },
+    environmentPresetId:
+      typeof partial.environmentPresetId === 'string' ? partial.environmentPresetId : undefined,
   };
 }
 

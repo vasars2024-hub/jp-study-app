@@ -120,6 +120,10 @@ export interface EnvironmentSettings {
 
   // ---- Ambient audio (Phase 3 · M4) ----
   ambientAudio: AmbientAudioSettings;
+
+  // ---- Environment presets (Phase 3 · M2) ----
+  /** Active cohesive preset id, if one was applied. */
+  environmentPresetId?: string;
 }
 
 export const DAY_CYCLE_PLAYLIST_ID = 'day-cycle';
