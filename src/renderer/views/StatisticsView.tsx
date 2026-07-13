@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { confirmDialog } from '../components/ui';
 import Icon from '../components/Icons';
 import { getSummary, resetStats, formatDuration, formatNumber, type StatsSummary } from '../stats';
 import { knowledgeCounts, onKnowledgeChanged } from '../knownWords';
@@ -88,8 +89,14 @@ export default function StatisticsView() {
           <div className="actions">
             <button
               className="btn"
-              onClick={() => {
-                if (confirm('Reset all reading statistics? This cannot be undone.')) {
+              onClick={async () => {
+                const ok = await confirmDialog({
+                  title: 'Reset statistics',
+                  message: 'Reset all reading statistics? This cannot be undone.',
+                  confirmLabel: 'Reset',
+                  danger: true,
+                });
+                if (ok) {
                   resetStats();
                   setNonce((n) => n + 1);
                 }

@@ -1,4 +1,5 @@
 import SettingsCard from '../SettingsCard';
+import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { THEMES } from '../../../theme';
 import {
@@ -203,8 +204,14 @@ export default function AppearancePage() {
               <button
                 type="button"
                 className="btn small"
-                onClick={() => {
-                  if (!confirm('Reset theme-related look settings and clear custom CSS?')) return;
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: 'Reset look',
+                    message: 'Reset theme-related look settings and clear custom CSS?',
+                    confirmLabel: 'Reset',
+                    danger: true,
+                  });
+                  if (!ok) return;
                   resetLook();
                   setUserCss('');
                   setCssMsg('Look reset.');

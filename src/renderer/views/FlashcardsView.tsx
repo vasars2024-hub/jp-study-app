@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { confirmDialog } from '../components/ui';
 import Icon from '../components/Icons';
 import EpubMiningPanel from '../components/EpubMiningPanel';
 import EpubMiningSimplePanel from '../components/EpubMiningSimplePanel';
@@ -360,8 +361,14 @@ export default function FlashcardsView() {
     if (res.ok && res.path) setDeckMenuGroup(null);
   }
 
-  function removeBookDeck(bookId: string, bookTitle: string): void {
-    if (!window.confirm(`Delete all ${bookTitle} cards from flashcards? This cannot be undone.`)) return;
+  async function removeBookDeck(bookId: string, bookTitle: string): Promise<void> {
+    const ok = await confirmDialog({
+      title: 'Delete book deck',
+      message: `Delete all ${bookTitle} cards from flashcards? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setDeck(removeBookGroup(bookId, bookTitle));
     setBookFolderMenu(null);
   }

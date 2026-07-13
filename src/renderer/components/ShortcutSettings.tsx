@@ -3,6 +3,7 @@
 // alternative chords, custom user shortcuts, profiles, import/export.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { confirmDialog, promptDialog } from './ui';
 import {
   addCustomCommand,
   addShortcutProfile,
@@ -202,8 +203,11 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     }
   };
 
-  const addProfile = () => {
-    const name = window.prompt('Name for the new shortcut profile (copies the current one):');
+  const addProfile = async () => {
+    const name = await promptDialog({
+      title: 'New shortcut profile',
+      message: 'Name for the new shortcut profile (copies the current one):',
+    });
     if (name) addShortcutProfile(name);
   };
 
@@ -310,8 +314,14 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
         <button
           type="button"
           className="btn small"
-          onClick={() => {
-            if (window.confirm('Reset every shortcut in this profile to its default?')) {
+          onClick={async () => {
+            const ok = await confirmDialog({
+              title: 'Reset shortcuts',
+              message: 'Reset every shortcut in this profile to its default?',
+              confirmLabel: 'Reset',
+              danger: true,
+            });
+            if (ok) {
               resetAllBindings();
               setMsg('All shortcuts reset.');
             }
@@ -531,8 +541,14 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                       type="button"
                       className="btn small"
                       title="Delete this custom shortcut"
-                      onClick={() => {
-                        if (window.confirm(`Delete custom shortcut “${r.label}”?`)) {
+                      onClick={async () => {
+                        const ok = await confirmDialog({
+                          title: 'Delete shortcut',
+                          message: `Delete custom shortcut “${r.label}”?`,
+                          confirmLabel: 'Delete',
+                          danger: true,
+                        });
+                        if (ok) {
                           removeCustomCommand(r.id);
                           setMsg('Custom shortcut deleted.');
                         }

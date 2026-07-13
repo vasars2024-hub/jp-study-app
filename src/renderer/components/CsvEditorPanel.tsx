@@ -46,6 +46,7 @@ import {
   type DeckColumnMapping,
   type DeckFieldKey,
 } from '../../shared/deckImport';
+import { promptDialog } from './ui';
 import { importDeckFromEntries } from '../flashcardDeck';
 import { parseCsvTextAsync } from '../csvParseAsync';
 import { clampToViewport, toLayoutPoint } from '../zoomCoords';
@@ -466,27 +467,27 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     });
   }
 
-  function handleSplitColumn(): void {
+  async function handleSplitColumn(): Promise<void> {
     const col = selectedCols.size === 1 ? [...selectedCols][0] : null;
     if (col === null || col === undefined) {
       setStatus('Select exactly one column to split.');
       return;
     }
-    const delim = window.prompt('Split delimiter (e.g. : or ;)', ':');
+    const delim = await promptDialog({ title: 'Split column', message: 'Split delimiter (e.g. : or ;)', defaultValue: ':' });
     if (delim === null) return;
     updateTable(splitColumn(table, col, delim));
     setMapping((m) => remapMappingOnSplit(m, col));
   }
 
-  function handleMergeColumns(): void {
+  async function handleMergeColumns(): Promise<void> {
     if (selectedCols.size < 2) {
       setStatus('Select two or more columns to merge.');
       return;
     }
-    const sep = window.prompt('Merge separator', ' ');
+    const sep = await promptDialog({ title: 'Merge columns', message: 'Merge separator', defaultValue: ' ' });
     if (sep === null) return;
     const cols = [...selectedCols].sort((a, b) => a - b);
-    const header = window.prompt('Merged column header (optional)') ?? undefined;
+    const header = (await promptDialog({ title: 'Merge columns', message: 'Merged column header (optional)' })) ?? undefined;
     const next = mergeColumns(table, cols, sep, header);
     updateTable(next);
     setMapping((prev) => refreshMapping(next.headers, prev));
@@ -500,15 +501,16 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     updateTable(next, `Removed ${before - next.rows.length} duplicate row(s).`);
   }
 
-  function handleTagColumn(): void {
-    const header = window.prompt('Tag column header', 'Tag') ?? 'Tag';
-    const value = window.prompt('Tag value for all rows', 'Vocabulary Set 1') ?? '';
+  async function handleTagColumn(): Promise<void> {
+    const header = (await promptDialog({ title: 'Tag column', message: 'Tag column header', defaultValue: 'Tag' })) ?? 'Tag';
+    const value =
+      (await promptDialog({ title: 'Tag column', message: 'Tag value for all rows', defaultValue: 'Vocabulary Set 1' })) ?? '';
     updateTable(addTagColumn(table, header, value));
     setMapping((prev) => refreshMapping(table.headers, prev));
   }
 
-  function handleAutoNumber(): void {
-    const header = window.prompt('ID column header', 'ID') ?? 'ID';
+  async function handleAutoNumber(): Promise<void> {
+    const header = (await promptDialog({ title: 'Auto-number', message: 'ID column header', defaultValue: 'ID' })) ?? 'ID';
     updateTable(addAutoNumberColumn(table, header));
     setMapping((m) => remapMappingOnInsert(m, 0));
   }

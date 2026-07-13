@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import {
   COMPANION_DEFS,
@@ -133,9 +134,15 @@ export default function CompanionsPage() {
     setEditId(id);
   };
 
-  const deleteRoutine = () => {
+  const deleteRoutine = async () => {
     if (!editing || editing.builtin) return;
-    if (!window.confirm(`Delete routine “${editing.name}”?`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete routine',
+      message: `Delete routine “${editing.name}”?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const next = routines.filter((r) => r.id !== editing.id);
     setRoutines(next);
     setEditId(next[0]?.id ?? '');
@@ -332,9 +339,14 @@ export default function CompanionsPage() {
           <button
             type="button"
             className="btn small"
-            onClick={() => {
-              if (!window.confirm('Reset all built-in routines to defaults? Custom routines are kept.'))
-                return;
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: 'Reset built-in routines',
+                message: 'Reset all built-in routines to defaults? Custom routines are kept.',
+                confirmLabel: 'Reset',
+                danger: true,
+              });
+              if (!ok) return;
               setRoutines(resetBuiltinRoutines(routines));
             }}
           >

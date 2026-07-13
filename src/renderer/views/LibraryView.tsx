@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from 'react';
+import { confirmDialog } from '../components/ui';
 import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
@@ -93,7 +94,13 @@ export default function LibraryView({ onOpen }: Props) {
 
   async function remove(e: MouseEvent, id: string) {
     e.stopPropagation();
-    if (confirm('Remove this item from your library? The imported copy will be deleted.')) {
+    const ok = await confirmDialog({
+      title: 'Remove from library',
+      message: 'Remove this item from your library? The imported copy will be deleted.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (ok) {
       setItems(await window.api.removeItem(id));
     }
   }
@@ -251,9 +258,13 @@ export default function LibraryView({ onOpen }: Props) {
   }
 
   async function deleteFolder(name: string) {
-    if (!confirm(`Delete the folder “${name}”? The books inside stay in your library (unfiled).`)) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: 'Delete folder',
+      message: `Delete the folder “${name}”? The books inside stay in your library (unfiled).`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const res = await window.api.setLibraryFolders(folders.filter((f) => f !== name));
     setFolders(res.folders);
     setItems(res.items);

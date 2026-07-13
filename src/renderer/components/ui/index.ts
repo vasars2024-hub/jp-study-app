@@ -40,5 +40,7 @@ export * from './StatusBar';
 export * from './SplitPane';
 export * from './FormRow';
 export * from './AppChrome';
+// Phase 4 · M2 — promise-based dialogs (confirm() replacement)
+export * from './dialogService';
 // Utilities
 export * from './zoom';
