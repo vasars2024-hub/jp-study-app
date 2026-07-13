@@ -264,3 +264,42 @@
 
 /* Settings rows → compact property rows (label left, control right). */
 :root[data-materials='aero'] .set-row { gap: 12px; min-height: var(--app-row-h); }
+
+/* ---------- Settings → XP–Aero Control Center (Phase 4 · M5) ----------------
+   The shell is already a nav-rail + detail-pane (Control-Panel structure); here
+   we give it XP density and a glassy category rail. Search / registry / deep-
+   linking / a11y all preserved (presentation only). Scoped to Aero. */
+:root[data-materials='aero'] .os-set-top {
+  padding: 5px 8px;
+  background: var(--app-chrome-sheen), var(--glass-tint);
+  border-bottom: 1px solid var(--glass-border);
+}
+/* Category rail: narrower, glassy left panel with dense rows. */
+:root[data-materials='aero'] .os-set-nav-v2 {
+  min-width: 176px;
+  width: 176px;
+  padding: 4px;
+  gap: 1px;
+  background: var(--app-chrome-sheen), var(--glass-tint);
+  border-right: 1px solid var(--glass-border);
+}
+:root[data-materials='aero'] .os-set-nav-item {
+  min-height: var(--app-row-h);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  gap: 7px;
+}
+:root[data-materials='aero'] .os-set-nav-item.active {
+  background: var(--app-selection);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+:root[data-materials='aero'] .os-set-nav-group { margin-top: 6px; }
+:root[data-materials='aero'] .os-set-nav-group-label {
+  padding: 2px 8px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+:root[data-materials='aero'] .os-set-nav-list { gap: 1px; }
