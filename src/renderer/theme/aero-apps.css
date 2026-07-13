@@ -188,3 +188,11 @@
 :root[data-materials='aero'] .ui-split__divider:focus-visible {
   background: color-mix(in srgb, var(--accent) 65%, var(--glass-border));
 }
+
+/* ---------- Flashcards → Study Deck Studio (Phase 4 · M6) ------------------
+   The AppChrome menu bar now carries the deck commands, so the redundant
+   header action buttons are hidden under Aero; the header collapses to its
+   caption. Default Study OS keeps the buttons (AppChrome is pass-through). */
+:root[data-materials='aero'] .flash-view-decks > .view-head .actions { display: none; }
+:root[data-materials='aero'] .flash-view-decks > .view-head { padding-bottom: 4px; }
+:root[data-materials='aero'] .flash-view-decks { padding: 10px 12px; }

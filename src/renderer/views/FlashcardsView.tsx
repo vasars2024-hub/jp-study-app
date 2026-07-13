@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { confirmDialog } from '../components/ui';
+import { confirmDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import Icon from '../components/Icons';
 import EpubMiningPanel from '../components/EpubMiningPanel';
 import EpubMiningSimplePanel from '../components/EpubMiningSimplePanel';
@@ -361,6 +361,13 @@ export default function FlashcardsView() {
     if (res.ok && res.path) setDeckMenuGroup(null);
   }
 
+  // File → Export: all EPUB cards in the current folder filter, as one CSV.
+  async function exportAllEpubCsv(): Promise<void> {
+    if (!filteredDeck.length) return;
+    const csv = deckCardsToCsv(filteredDeck);
+    await window.api.miningSaveEpubDeckFile(csv, 'flashcards-deck', 'csv');
+  }
+
   async function removeBookDeck(bookId: string, bookTitle: string): Promise<void> {
     const ok = await confirmDialog({
       title: 'Delete book deck',
@@ -660,7 +667,60 @@ export default function FlashcardsView() {
     );
   }
 
+  // Native menu bar + status bar (Study Deck Studio). Rendered by AppChrome only
+  // under the Aero material set; pass-through (no chrome) in the default theme.
+  // Every item drives an existing handler — no behavior forked by theme.
+  const deckMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'export-epub', label: 'Export EPUB deck (CSV)…', disabled: filteredDeck.length === 0, onSelect: () => void exportAllEpubCsv() },
+      ],
+    },
+    {
+      id: 'deck',
+      label: 'Deck',
+      items: [
+        { id: 'new-folder', label: 'New folder…', onSelect: () => setCreatingFolder(true) },
+        { separator: true, label: '' },
+        { id: 'view-epub', label: `EPUB decks (${epubCards.length})`, onSelect: () => setOverviewTab('epub') },
+        { id: 'view-dict', label: `Dictionary (${saved.length})`, onSelect: () => setOverviewTab('dictionary') },
+      ],
+    },
+    {
+      id: 'study',
+      label: 'Study',
+      items: [
+        { id: 'study-epub', label: `Start EPUB review (${epubReviewCandidates.length})`, disabled: epubReviewCandidates.length === 0, onSelect: startEpubReview },
+        { id: 'study-dict', label: `Review dictionary (${saved.length})`, disabled: saved.length === 0, onSelect: startReview },
+      ],
+    },
+    {
+      id: 'tools',
+      label: 'Tools',
+      items: [
+        { id: 'mine-simple', label: 'Simple EPUB mining', onSelect: () => openEpubMining('simple') },
+        { id: 'mine-advanced', label: 'Advanced EPUB mining', onSelect: () => openEpubMining('advanced') },
+        { separator: true, label: '' },
+        { id: 'csv-tool', label: 'CSV tool', onSelect: () => setMode('csv-tool') },
+        { id: 'ai-studio', label: 'AI card studio', onSelect: () => setMode('ai-studio') },
+      ],
+    },
+  ];
+
+  const deckStatus = (
+    <>
+      <StatusBarField>{epubCards.length} EPUB cards</StatusBarField>
+      <StatusBarField>{saved.length} dictionary</StatusBarField>
+      {folderFilter !== 'all' && <StatusBarField>Folder: {String(folderFilter)}</StatusBarField>}
+      <StatusBarSpacer />
+      <StatusBarField live>{epubReviewCandidates.length} ready to review</StatusBarField>
+    </>
+  );
+
   return (
+    <AppChrome menus={deckMenus} status={deckStatus}>
     <div className="flash-view flash-view-decks">
       <div className="view-head">
         <p className="muted">Dictionary saves, EPUB deck strip, and folder explorer.</p>
@@ -1088,5 +1148,6 @@ export default function FlashcardsView() {
         />
       )}
     </div>
+    </AppChrome>
   );
 }
