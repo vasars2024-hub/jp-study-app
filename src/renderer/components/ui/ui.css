@@ -452,6 +452,110 @@
 .ui-notification__msg { font-size: var(--font-size-xs); color: var(--muted); margin-top: 2px; }
 .ui-notification__actions { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); }
 
+/* =============================================================================
+   Phase 4 · M1 — application-chrome primitives (MenuBar / StatusBar / SplitPane
+   / FormRow / AppChrome). Theme-neutral, token-driven base styles; the XP–Aero
+   density + material grammar lives in theme/aero-apps.css (scoped to
+   [data-materials='aero']). Additive — nothing above this line changed.
+   ============================================================================= */
+
+/* ---------- Menu bar (Phase 4 · M1) --------------------------------------- */
+.ui-menubar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 4px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.ui-menubar__wrap { position: relative; display: inline-flex; }
+.ui-menubar__btn {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.ui-menubar__btn:hover { background: var(--accent-weak); }
+.ui-menubar__btn--open { background: var(--accent-soft); }
+.ui-menubar__btn:disabled { opacity: var(--alpha-disabled); pointer-events: none; }
+.ui-menubar__btn:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: -2px; }
+/* Dropdown reuses .ui-menu visuals but anchors under its button. */
+.ui-menubar__pop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+}
+.ui-menubar__end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-sm); }
+
+/* ---------- Status bar (Phase 4 · M1) ------------------------------------- */
+.ui-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  user-select: none;
+}
+.ui-statusbar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-statusbar__spacer { flex: 1; }
+
+/* ---------- Split pane (Phase 4 · M1) ------------------------------------- */
+.ui-split { display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.ui-split--row { flex-direction: row; }
+.ui-split--column { flex-direction: column; }
+.ui-split__pane { min-width: 0; min-height: 0; overflow: auto; }
+.ui-split__pane--first { flex: none; }
+.ui-split__pane--second { flex: 1; }
+.ui-split__divider {
+  flex: none;
+  background: var(--border);
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.ui-split--row > .ui-split__divider { width: 5px; cursor: col-resize; }
+.ui-split--column > .ui-split__divider { height: 5px; cursor: row-resize; }
+.ui-split__divider:hover, .ui-split__divider:focus-visible { background: var(--accent); }
+.ui-split__divider:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: -1px; }
+
+/* ---------- Compact form row (Phase 4 · M1) ------------------------------- */
+.ui-form-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  padding: 4px 0;
+}
+.ui-form-row__label {
+  flex: none;
+  width: 160px;
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+.ui-form-row__control { flex: 1; min-width: 0; }
+.ui-form-row__hint { font-size: var(--font-size-xs); color: var(--muted); margin-top: 2px; }
+
+/* ---------- App chrome host (Phase 4 · M1) --------------------------------
+   Only ever rendered while data-materials='aero' (AppChrome gates in JS); the
+   default theme gets the app's children with no wrapper at all. */
+.ui-app-chrome { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
+.ui-app-chrome__body { flex: 1; min-height: 0; overflow: auto; }
+
 /* ---------- Breadcrumb (M5b) --------------------------------------------- */
 .ui-breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: var(--font-size-sm); }
 .ui-breadcrumb__item {

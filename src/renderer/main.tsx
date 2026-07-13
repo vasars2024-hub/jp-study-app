@@ -35,6 +35,9 @@ import './theme/perf.css';
 // Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
 // loaded after styles.css so the shell overrides win. Default shell unchanged.
 import './theme/aero-shell.css';
+// XP–Aero application grammar (Phase 4 · M1) — scoped to [data-materials='aero'],
+// loaded after ui.css so the density/material overrides win. Default apps unchanged.
+import './theme/aero-apps.css';
 // Shell panel styles (Phase 2) — Notification Center, Quick Settings.
 import './components/shell/shell.css';
 // Living-desktop weather overlays (Phase 3 · M3) + atmosphere polish (M5/M6).

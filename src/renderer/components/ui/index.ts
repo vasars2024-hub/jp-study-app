@@ -34,5 +34,11 @@ export * from './TreeView';
 export * from './Dropdown';
 export * from './Notification';
 export * from './Breadcrumb';
+// Phase 4 · M1 — XP–Aero application chrome
+export * from './MenuBar';
+export * from './StatusBar';
+export * from './SplitPane';
+export * from './FormRow';
+export * from './AppChrome';
 // Utilities
 export * from './zoom';

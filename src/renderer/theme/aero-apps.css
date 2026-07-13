@@ -1,0 +1,190 @@
+/* =============================================================================
+   Frutiger Aero — XP–Aero application grammar (Phase 4 · M1)
+   -----------------------------------------------------------------------------
+   Turns the ui-primitive layer into native mid-2000s desktop software — compact
+   menu bars, glossy toolbars, sunken status fields, dense rows, tactile
+   controls — but ONLY under the secret theme. Every rule is scoped to
+   `:root[data-materials='aero']`, so the default Study OS (and all 13 base
+   themes) render byte-for-byte unchanged.
+
+   Consumes Phase 1 tokens only (--glass-*, --sheen, --accent, --radius-*,
+   --dur-*, --elevation-*). Loaded after ui.css so these scoped rules win.
+   Principles (see docs/frutiger-aero/XP_AERO_APPLICATION_LANGUAGE.md):
+   glass belongs to chrome; work surfaces stay solid; corners get smaller as
+   elements get denser; compact, never cramped.
+   ============================================================================= */
+
+:root[data-materials='aero'] {
+  /* Density metrics — the app grammar reads these, apps never hardcode them. */
+  --app-menubar-h: 26px;
+  --app-toolbar-h: 34px;
+  --app-statusbar-h: 24px;
+  --app-row-h: 26px;
+  --app-tree-indent: 14px;
+  /* Aqua selection gradient shared by rows, tabs and open menu buttons. */
+  --app-selection: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 26%, transparent),
+    color-mix(in srgb, var(--accent) 42%, transparent)
+  );
+  --app-chrome-sheen: linear-gradient(to bottom, var(--sheen) 0%, transparent 60%);
+}
+
+/* ---------- App chrome host: solid, readable work surface ----------------- */
+:root[data-materials='aero'] .ui-app-chrome__body {
+  background: var(--panel);
+}
+
+/* ---------- Menu bar: Vista chrome, XP ergonomics -------------------------- */
+:root[data-materials='aero'] .ui-menubar {
+  min-height: var(--app-menubar-h);
+  padding: 1px 4px;
+  background: var(--app-chrome-sheen), var(--glass-tint);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+:root[data-materials='aero'] .ui-menubar__btn {
+  padding: 3px 9px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-sm);
+}
+:root[data-materials='aero'] .ui-menubar__btn:hover {
+  background: var(--glass-tint-strong);
+  border-color: var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+:root[data-materials='aero'] .ui-menubar__btn--open {
+  background: var(--app-selection);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ---------- Status bar: sunken fields on a glass strip --------------------- */
+:root[data-materials='aero'] .ui-statusbar {
+  min-height: var(--app-statusbar-h);
+  padding: 2px 4px;
+  background: var(--app-chrome-sheen), var(--glass-tint);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+:root[data-materials='aero'] .ui-statusbar__field {
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 70%, transparent);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--bg) 25%, transparent);
+}
+
+/* ---------- Toolbar: compact command surface with restrained gloss --------- */
+:root[data-materials='aero'] .ui-toolbar {
+  min-height: var(--app-toolbar-h);
+  gap: 4px;
+  padding: 3px 6px;
+  background: var(--app-chrome-sheen), var(--glass-tint);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ---------- Buttons: smaller, tactile, lightly bevelled -------------------- */
+:root[data-materials='aero'] .ui-btn {
+  padding: 4px 11px;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: normal;
+  box-shadow: var(--elevation-1), inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 color-mix(in srgb, var(--bg) 14%, transparent);
+}
+:root[data-materials='aero'] .ui-btn:active {
+  transform: none;
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--bg) 30%, transparent);
+}
+:root[data-materials='aero'] .ui-btn--sm { padding: 2px 8px; }
+:root[data-materials='aero'] .ui-icon-btn { width: 28px; height: 28px; border-radius: var(--radius-sm); }
+
+/* ---------- Form controls: shorter rows, small radii ----------------------- */
+:root[data-materials='aero'] .ui-input,
+:root[data-materials='aero'] .ui-textarea,
+:root[data-materials='aero'] .ui-select {
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+:root[data-materials='aero'] .ui-search .ui-input { padding-left: 30px; }
+:root[data-materials='aero'] .ui-form-row { padding: 2px 0; gap: var(--space-sm); }
+:root[data-materials='aero'] .ui-form-row__label { width: 150px; font-size: var(--font-size-sm); }
+
+/* ---------- Tabs: XP tab-strip treatment ----------------------------------- */
+:root[data-materials='aero'] .ui-tabs { gap: 1px; border-bottom: 1px solid var(--glass-border); }
+:root[data-materials='aero'] .ui-tab {
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-weight: var(--font-weight-medium);
+}
+:root[data-materials='aero'] .ui-tab:hover { background: var(--glass-tint); color: var(--text); }
+:root[data-materials='aero'] .ui-tab[aria-selected='true'] {
+  background: var(--app-chrome-sheen), var(--panel);
+  border-color: var(--glass-border);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  margin-bottom: -1px;
+}
+
+/* ---------- Trees + sidebars: dense navigation rows ------------------------ */
+:root[data-materials='aero'] .ui-tree__row {
+  min-height: var(--app-row-h);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  gap: 4px;
+}
+:root[data-materials='aero'] .ui-tree__row[aria-selected='true'],
+:root[data-materials='aero'] .ui-sidebar__item[aria-current='true'] {
+  background: var(--app-selection);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+:root[data-materials='aero'] .ui-sidebar__item {
+  min-height: var(--app-row-h);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  font-weight: var(--font-weight-regular);
+}
+
+/* ---------- Menus: tighter, squarer, still glass ---------------------------- */
+:root[data-materials='aero'] .ui-menu {
+  min-width: 170px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+}
+:root[data-materials='aero'] .ui-menu__item {
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-sm);
+}
+:root[data-materials='aero'] .ui-menu__item:hover,
+:root[data-materials='aero'] .ui-menu__item:focus-visible {
+  background: var(--app-selection);
+}
+:root[data-materials='aero'] .ui-menu__sep { margin: 3px 6px; }
+
+/* ---------- Dialogs: property-sheet posture, solid body --------------------- */
+:root[data-materials='aero'] .ui-dialog { border-radius: var(--radius-lg); }
+:root[data-materials='aero'] .ui-dialog__head {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--app-chrome-sheen), transparent;
+}
+:root[data-materials='aero'] .ui-dialog__title { font-size: var(--font-size-md); }
+:root[data-materials='aero'] .ui-dialog__body {
+  padding: var(--space-md);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+}
+:root[data-materials='aero'] .ui-dialog__foot { padding: var(--space-sm) var(--space-md); }
+
+/* ---------- Split pane: glass divider with an accent grip ------------------- */
+:root[data-materials='aero'] .ui-split__divider {
+  background: var(--glass-border);
+}
+:root[data-materials='aero'] .ui-split__divider:hover,
+:root[data-materials='aero'] .ui-split__divider:focus-visible {
+  background: color-mix(in srgb, var(--accent) 65%, var(--glass-border));
+}
