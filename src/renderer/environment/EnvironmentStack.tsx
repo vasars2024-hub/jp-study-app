@@ -9,6 +9,7 @@ import WallpaperStage from './WallpaperStage';
 import ParticleLayer from './ParticleLayer';
 import CompanionLayer from './CompanionLayer';
 import DayCycleLighting from './DayCycleLightingLayer';
+import WeatherLayer from './WeatherLayer';
 import { pulseCalendarCompanions } from './schedules';
 import { onCalendarChanged } from '../calendar';
 
@@ -66,9 +67,11 @@ export default function EnvironmentStack({
       data-companions={env.companionsEnabled ? '1' : '0'}
       data-rotation={env.rotationEnabled ? '1' : '0'}
       data-lighting={env.dayCycleLighting ? '1' : '0'}
+      data-weather={env.weather?.mode && env.weather.mode !== 'off' ? env.weather.mode : '0'}
     >
       {env.rotationEnabled && <WallpaperStage onActiveChange={handleActive} />}
       {env.dayCycleLighting && <DayCycleLighting env={env} />}
+      {env.weather?.mode !== 'off' && env.performanceTier !== 'off' && <WeatherLayer env={env} />}
       {env.particlesEnabled && env.performanceTier !== 'off' && <ParticleLayer env={env} />}
       {env.companionsEnabled && <CompanionLayer env={env} />}
     </div>

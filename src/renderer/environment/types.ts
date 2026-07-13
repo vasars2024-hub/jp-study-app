@@ -51,6 +51,16 @@ export type ParticlePresetId =
   | 'stars'
   | 'magic';
 
+// ---- Weather (Phase 3 · M3) ----
+export type WeatherKind = 'clear' | 'rain' | 'snow' | 'fog' | 'clouds';
+/** off = none; auto = derive from the active wallpaper; else a fixed kind. */
+export type WeatherMode = 'off' | 'auto' | WeatherKind;
+export interface WeatherSettings {
+  mode: WeatherMode;
+  /** 0–1 strength of the atmospheric overlay. */
+  intensity: number;
+}
+
 export interface EnvironmentSettings {
   /** Master switch for the living desktop layer. Default false. */
   enabled: boolean;
@@ -97,6 +107,9 @@ export interface EnvironmentSettings {
   lightingIntensity: number;
   /** Emit companion celebrations for streaks / daily volume. */
   achievementCelebrations: boolean;
+
+  // ---- Weather (Phase 3 · M3) ----
+  weather: WeatherSettings;
 }
 
 export const DAY_CYCLE_PLAYLIST_ID = 'day-cycle';
@@ -160,6 +173,7 @@ export const DEFAULT_ENVIRONMENT: EnvironmentSettings = {
   dayCycleLighting: false,
   lightingIntensity: 0.45,
   achievementCelebrations: true,
+  weather: { mode: 'off', intensity: 0.5 },
 };
 
 /** Resolved surface the stage paints. */

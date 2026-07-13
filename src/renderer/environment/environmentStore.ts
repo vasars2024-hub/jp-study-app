@@ -95,6 +95,12 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
   const companions = Array.isArray(partial.companions) ? partial.companions : DEFAULT_ENVIRONMENT.companions;
   const buddyRoutines = mergeBuddyRoutines(partial.buddyRoutines);
 
+  const WEATHER_MODES = ['off', 'auto', 'clear', 'rain', 'snow', 'fog', 'clouds'];
+  const weatherMode =
+    partial.weather && WEATHER_MODES.includes(partial.weather.mode)
+      ? partial.weather.mode
+      : DEFAULT_ENVIRONMENT.weather.mode;
+
   return {
     ...DEFAULT_ENVIRONMENT,
     ...partial,
@@ -135,6 +141,14 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
         : DEFAULT_ENVIRONMENT.lightingIntensity,
     ),
     achievementCelebrations: partial.achievementCelebrations !== false,
+    weather: {
+      mode: weatherMode,
+      intensity: clamp01(
+        typeof partial.weather?.intensity === 'number'
+          ? partial.weather.intensity
+          : DEFAULT_ENVIRONMENT.weather.intensity,
+      ),
+    },
   };
 }
 
