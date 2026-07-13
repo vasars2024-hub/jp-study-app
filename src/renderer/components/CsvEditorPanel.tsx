@@ -46,7 +46,7 @@ import {
   type DeckColumnMapping,
   type DeckFieldKey,
 } from '../../shared/deckImport';
-import { promptDialog } from './ui';
+import { promptDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from './ui';
 import { importDeckFromEntries } from '../flashcardDeck';
 import { parseCsvTextAsync } from '../csvParseAsync';
 import { clampToViewport, toLayoutPoint } from '../zoomCoords';
@@ -538,7 +538,61 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     if (colIndex !== null) toggleColSelection(colIndex, e.ctrlKey || e.metaKey);
   }
 
+  // Native menu bar + status bar (Future Spreadsheet). AppChrome renders them
+  // only under Aero; pass-through in the default theme. Items drive existing
+  // handlers only — no ribbon, no behavior forked by theme.
+  const csvMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'open', label: 'Open file…', onSelect: () => fileRef.current?.click() },
+        { id: 'download', label: table.delimiter === '\t' ? 'Download TSV' : 'Download CSV', disabled: saving, onSelect: () => void downloadCsv() },
+        { separator: true, label: '' },
+        { id: 'import', label: 'Import to flashcards', onSelect: manualImport },
+      ],
+    },
+    {
+      id: 'edit',
+      label: 'Edit',
+      items: [
+        { id: 'undo', label: 'Undo', disabled: !canUndo(history), onSelect: () => setHistory((h) => undoHistory(h) ?? h) },
+        { id: 'redo', label: 'Redo', disabled: !canRedo(history), onSelect: () => setHistory((h) => redoHistory(h) ?? h) },
+        { separator: true, label: '' },
+        { id: 'find', label: 'Find and replace…', onSelect: () => setShowFindReplace(true) },
+      ],
+    },
+    {
+      id: 'data',
+      label: 'Data',
+      items: [
+        { id: 'split', label: 'Split column…', disabled: selectedCols.size !== 1, onSelect: () => void handleSplitColumn() },
+        { id: 'merge', label: 'Merge columns…', disabled: selectedCols.size < 2, onSelect: () => void handleMergeColumns() },
+        { id: 'dedup', label: 'Remove duplicate rows', onSelect: handleDeduplicate },
+        { separator: true, label: '' },
+        { id: 'tag', label: 'Add tag column…', onSelect: () => void handleTagColumn() },
+        { id: 'autonum', label: 'Add auto-number column…', onSelect: () => void handleAutoNumber() },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [{ id: 'preview', label: showPreview ? 'Hide card preview' : 'Show card preview', onSelect: () => setShowPreview((v) => !v) }],
+    },
+  ];
+
+  const csvStatus = (
+    <>
+      <StatusBarField>{table.rows.length} rows</StatusBarField>
+      <StatusBarField>{table.headers.length} cols</StatusBarField>
+      {selectedCols.size > 0 && <StatusBarField>{selectedCols.size} selected</StatusBarField>}
+      <StatusBarSpacer />
+      {dirty && <StatusBarField live>Unsaved changes</StatusBarField>}
+    </>
+  );
+
   return (
+    <AppChrome menus={csvMenus} status={csvStatus}>
     <section className="anki-card csv-editor">
       <p className="muted csv-editor-lead">
         Spreadsheet editor for CSV / TSV decks. Paste or open a file, edit with power tools, then import to flashcards.
@@ -913,5 +967,6 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
         </div>
       )}
     </section>
+    </AppChrome>
   );
 }
