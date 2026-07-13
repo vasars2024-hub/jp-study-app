@@ -18,10 +18,27 @@ Read `PHASE_4_AUDIT.md` and `PHASE_4_IMPLEMENTATION_PLAN.md` first.
 | M9 | `f34591a` | Calendar → Life Organizer |
 | M11 | `9bf2346` | Dictionary + Anki light chrome; remaining-app triage |
 
-Deferred (blocked by uncommitted concurrent work in the working tree):
-**M5 Settings**, **M7 EPUB**, **M10 Notes sticky skin**, the **M3 Native-Fill
-toggle**, and **DesktopShell's own M2 dialog edits**. See the entanglement map
-in `PHASE_4_AUDIT.md` / the guide.
+Second pass (concurrent work resolved — resumed):
+
+| Milestone | Commit | Summary |
+|---|---|---|
+| Interior grammar | `0bd8c72` | Flat compact groupboxes — the core interior fix behind every app |
+| M5 | `6d27c34` | Settings XP Control-Center density (glassy rail, dense nav) |
+| M7 | `8334b68` | EPUB Digital Library (LibraryView) + reader glass chrome |
+| M2 tail | `de0772f` | DesktopShell native dialogs → dialogService (staged by hunk) |
+| M10 | `e672152` | Aero sticky-note glass-paper skin |
+
+**Correction recorded (was the key gap):** M6/M8/M9/M11 originally shipped
+*chrome only* — menu/status bars over unchanged SaaS card bodies. A menu bar is
+**not** a transformation. The interior density grammar (`0bd8c72`) fixed that by
+re-casting the shared body containers into flat compact groupboxes across every
+app at once. See the guide.
+
+Still deferred to Phase 5: the **Native-Fill toggle** (a viewport display
+option, not an app transformation; needs the concurrent-work-entangled
+`App.tsx`). The concurrent Lockscreen/viewport work itself remains uncommitted
+in the working tree by design — Phase 4 never staged it (DesktopShell dialog
+edits were staged by filtered hunk, verified 0 concurrent markers).
 
 ## Verification method (every milestone)
 
