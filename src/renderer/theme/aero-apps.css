@@ -209,3 +209,58 @@
    toggle and tighten the header. Default theme keeps the toggle. */
 :root[data-materials='aero'] .dict-view .dict-lang-toggle { display: none; }
 :root[data-materials='aero'] .dict-view { padding: 8px 10px; }
+
+/* =============================================================================
+   Interior density grammar (Phase 4 · M-INT) — the core "app interior" fix.
+   -----------------------------------------------------------------------------
+   The application bodies still used a modern-web card grammar (floating white
+   cards, 24px padding, big radii, drop shadows, generous section gaps). Under
+   Aero we re-cast those SAME containers as flat, compact XP–Vista groupboxes:
+   solid work surface, hairline border, small radius, tight padding, no float.
+   No DOM changes — the class names are the seam — so the default Study OS keeps
+   its Fluent card look. This is what makes interiors read as native desktop
+   software rather than a website in a nostalgic window.
+   ============================================================================= */
+
+/* Cards → flat groupboxes (Flashcards, CSV, Anki bodies + generic sections). */
+:root[data-materials='aero'] .anki-card,
+:root[data-materials='aero'] .set-section {
+  padding: 9px 11px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--panel);
+  box-shadow: none;
+}
+:root[data-materials='aero'] .anki-card.anki-card-flush { padding: 0; border: none; }
+
+/* Settings page cards → compact property groupboxes. */
+:root[data-materials='aero'] .os-set-card {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border-color: var(--glass-border);
+}
+:root[data-materials='aero'] .os-set-card-head { margin-bottom: 6px; }
+:root[data-materials='aero'] .os-set-card-body { gap: 5px; }
+:root[data-materials='aero'] .os-set-card-title,
+:root[data-materials='aero'] .flash-section-title { font-size: var(--font-size-sm); }
+
+/* Section headings inside bodies → smaller, tighter. */
+:root[data-materials='aero'] .anki-card h2,
+:root[data-materials='aero'] .anki-card h3 {
+  font-size: var(--font-size-md);
+  margin: 0 0 4px;
+}
+
+/* View headers → tight (they mostly carry a caption once the menu bar exists). */
+:root[data-materials='aero'] .view-head { margin-bottom: 8px; gap: 10px; }
+
+/* Settings page head → compact; the big title/intro shrink to a status-like
+   caption since the nav rail + breadcrumb already establish location. */
+:root[data-materials='aero'] .os-set-page-title { font-size: var(--font-size-lg); letter-spacing: normal; }
+:root[data-materials='aero'] .os-set-page-intro { font-size: var(--font-size-xs); }
+:root[data-materials='aero'] .os-set-pane-v2 { padding: 8px 10px; }
+
+/* Settings rows → compact property rows (label left, control right). */
+:root[data-materials='aero'] .set-row { gap: 12px; min-height: var(--app-row-h); }
