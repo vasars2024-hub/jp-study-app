@@ -9,6 +9,7 @@ import {
 import { DEFAULT_CARD_CSS } from '../../shared/kinomotoCard';
 import type { StudyProfile } from '../../shared/profiles';
 import type { AnkiStatus } from '../../shared/types';
+import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import AnkiCardPreview, { type MappingPreviewState } from '../components/AnkiCardPreview';
 import AnkiSetup from '../components/AnkiSetup';
 import CollapsibleSection from '../components/CollapsibleSection';
@@ -209,7 +210,30 @@ export default function AnkiView() {
 
   const waitingCollection = Boolean(link?.waitingCollection);
 
+  const ankiMenus: MenuBarMenu[] = [
+    {
+      id: 'anki',
+      label: 'Anki',
+      items: [{ id: 'recheck', label: 'Recheck connection', disabled: loading, onSelect: check }],
+    },
+  ];
+  const connLabel = loading
+    ? 'Checking…'
+    : status?.connected
+      ? 'Connected'
+      : waitingCollection
+        ? 'Waiting for collection'
+        : 'Not connected';
+  const ankiStatus = (
+    <>
+      <StatusBarField live>{connLabel}</StatusBarField>
+      <StatusBarSpacer />
+      {active.label && <StatusBarField>Profile: {active.label}</StatusBarField>}
+    </>
+  );
+
   return (
+    <AppChrome menus={ankiMenus} status={ankiStatus}>
     <div className="anki-view">
       <ProfileSettingsSection />
 
@@ -424,5 +448,6 @@ export default function AnkiView() {
         </div>
       )}
     </div>
+    </AppChrome>
   );
 }

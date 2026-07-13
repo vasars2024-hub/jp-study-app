@@ -203,3 +203,9 @@
    and keep the view/nav toolbar as the command bar. Default theme unchanged. */
 :root[data-materials='aero'] .calendar-view > .view-head { display: none; }
 :root[data-materials='aero'] .calendar-view { padding: 8px 10px; }
+
+/* ---------- Dictionary (Phase 4 · M11) -------------------------------------
+   Language switch moves to the View menu under Aero; hide the redundant inline
+   toggle and tighten the header. Default theme keeps the toggle. */
+:root[data-materials='aero'] .dict-view .dict-lang-toggle { display: none; }
+:root[data-materials='aero'] .dict-view { padding: 8px 10px; }
