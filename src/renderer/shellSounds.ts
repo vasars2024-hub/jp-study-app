@@ -26,4 +26,11 @@ export function installShellSounds(): void {
 
   // Notifications (fires from the existing toast bus).
   window.addEventListener('os:toast', () => void playSound('notification', 'notify'));
+
+  // Secret-Mode startup chime (Phase 4 · M4) — dispatched by AeroBootOverlay as
+  // the emblem settles. `system` category = startup/shutdown.
+  window.addEventListener('shell:startup', () => void playSound('system', 'startup'));
+
+  // Dialogs open (Phase 4 · M4) — dispatched by the promise-based dialogService.
+  window.addEventListener('shell:dialogOpen', () => void playSound('ui', 'dialog'));
 }

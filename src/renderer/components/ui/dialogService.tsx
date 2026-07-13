@@ -159,6 +159,8 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
   return new Promise((resolve) => {
     const host = document.createElement('div');
     document.body.appendChild(host);
+    // Semantic sound event (Phase 4 · M4) — routed by shellSounds → soundEngine.
+    window.dispatchEvent(new CustomEvent('shell:dialogOpen'));
     const root = createRoot(host);
     let settled = false;
     const done = (ok: boolean): void => {
@@ -180,6 +182,8 @@ export function alertDialog(opts: AlertOptions): Promise<void> {
   return new Promise((resolve) => {
     const host = document.createElement('div');
     document.body.appendChild(host);
+    // Semantic sound event (Phase 4 · M4) — routed by shellSounds → soundEngine.
+    window.dispatchEvent(new CustomEvent('shell:dialogOpen'));
     const root = createRoot(host);
     let settled = false;
     const done = (): void => {
@@ -200,6 +204,8 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
   return new Promise((resolve) => {
     const host = document.createElement('div');
     document.body.appendChild(host);
+    // Semantic sound event (Phase 4 · M4) — routed by shellSounds → soundEngine.
+    window.dispatchEvent(new CustomEvent('shell:dialogOpen'));
     const root = createRoot(host);
     let settled = false;
     const done = (value: string | null): void => {

@@ -182,6 +182,35 @@
 .os-aero-boot.out { animation: aero-boot-out 480ms ease both; }
 @keyframes aero-boot-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes aero-boot-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* Aurora layer (Phase 4 · M4) — soft luminous bands forming behind the emblem.
+   Pointer-inert, decorative; motion collapses under the global reduced-motion
+   rule (animation-duration → ~0). */
+.os-aero-boot-aurora {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 80%;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 30% 20%, rgba(123, 211, 154, 0.5), transparent 70%),
+    radial-gradient(55% 50% at 72% 15%, rgba(99, 207, 242, 0.55), transparent 72%),
+    radial-gradient(50% 60% at 50% 0%, rgba(255, 255, 255, 0.6), transparent 68%);
+  filter: blur(8px);
+  opacity: 0.9;
+  animation: aero-boot-aurora 3.2s ease-in-out infinite alternate;
+}
+@keyframes aero-boot-aurora {
+  from { transform: translate3d(-2%, 0, 0) scale(1); opacity: 0.75; }
+  to { transform: translate3d(2%, 1.5%, 0) scale(1.05); opacity: 1; }
+}
+/* Welcome state — the emblem lifts and brightens as the desktop is about to
+   resolve. */
+.os-aero-boot.welcome .os-aero-boot-orb {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 12px 30px rgba(20, 74, 110, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transition: transform 420ms var(--ease-glass, ease), box-shadow 420ms ease;
+}
+.os-aero-boot.welcome .os-aero-boot-sub { color: #0f6b4e; opacity: 0.95; }
 .os-aero-boot-inner {
   text-align: center;
   color: #123a52;
