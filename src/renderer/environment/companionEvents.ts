@@ -10,7 +10,8 @@ export type CompanionEventKind =
   | 'tick'
   | 'streak'
   | 'achievement'
-  | 'calendar';
+  | 'calendar'
+  | 'environment';
 
 export interface CompanionEventDetail {
   kind: CompanionEventKind;

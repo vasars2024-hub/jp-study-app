@@ -422,6 +422,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
             mood = 'curious';
             status = 'Night ecology awake';
           }
+        } else if (kind === 'environment') {
+          // The world shifted (preset / weather change) — a gentle acknowledgement.
+          mood = 'curious';
+          status = note ? `Exploring · ${note}` : 'The world shifts';
         }
         return mood === c.mood && status === c.status ? c : { ...c, mood, status };
       });

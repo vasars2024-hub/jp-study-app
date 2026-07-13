@@ -8,6 +8,7 @@ import {
   type PerformanceTier,
 } from '../../../environment';
 import { ENVIRONMENT_PRESETS, getEnvironmentPreset, presetPatch } from '../../../environment/environmentPresets';
+import { emitCompanionEvent } from '../../../environment/companionEvents';
 import type { WeatherMode } from '../../../environment/types';
 
 export default function AtmospherePage() {
@@ -68,7 +69,10 @@ export default function AtmospherePage() {
               type="button"
               className={seg(env.environmentPresetId === p.id)}
               title={p.description}
-              onClick={() => patchEnv({ ...presetPatch(p.id), enabled: true })}
+              onClick={() => {
+                patchEnv({ ...presetPatch(p.id), enabled: true });
+                emitCompanionEvent('environment', p.label);
+              }}
             >
               {p.label}
             </button>
