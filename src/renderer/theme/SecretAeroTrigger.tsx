@@ -13,6 +13,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_THEME_ID, loadThemeId, setTheme } from './engine';
 import { AERO_THEME_ID } from './frutiger-aero';
+import { loadEnvironment, saveEnvironment } from '../environment/environmentStore';
+import { presetPatch } from '../environment/environmentPresets';
+import type { EnvironmentSettings } from '../environment/types';
+
+// Prior living-desktop state, remembered while Aero is active so it restores on
+// exit (Phase 3 · M8).
+let aeroPrevEnv: EnvironmentSettings | null = null;
 
 const SEQUENCE = 'aero';
 
@@ -32,9 +39,22 @@ export default function SecretAeroTrigger() {
     if (current === AERO_THEME_ID) {
       const back = restoreRef.current !== AERO_THEME_ID ? restoreRef.current : DEFAULT_THEME_ID;
       setTheme(back);
+      // Restore the living desktop to its pre-Aero state (Phase 3 · M8).
+      if (aeroPrevEnv) {
+        saveEnvironment(aeroPrevEnv);
+        aeroPrevEnv = null;
+      }
       setFlash('Frutiger Aero — off');
     } else {
       restoreRef.current = current;
+      // Living desktop: entering Aero brings the world to life. Remember the prior
+      // state; only auto-configure a gentle preset if the layer was off, so a user
+      // who already tuned their atmosphere keeps it (Phase 3 · M8).
+      const prevEnv = loadEnvironment();
+      aeroPrevEnv = prevEnv;
+      if (!prevEnv.enabled) {
+        saveEnvironment({ enabled: true, ...(presetPatch('floating-islands') ?? {}) });
+      }
       // Secret Mode "soft reboot": cover the screen with the Aero boot splash,
       // switch the theme behind it, then reveal the glass OS (Phase 2 · M15).
       window.dispatchEvent(new CustomEvent('shell:softReboot'));

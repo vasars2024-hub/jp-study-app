@@ -7,6 +7,8 @@ import {
   type ParticlePresetId,
   type PerformanceTier,
 } from '../../../environment';
+import { ENVIRONMENT_PRESETS, getEnvironmentPreset, presetPatch } from '../../../environment/environmentPresets';
+import type { WeatherMode } from '../../../environment/types';
 
 export default function AtmospherePage() {
   const s = useSettings();
@@ -51,6 +53,30 @@ export default function AtmospherePage() {
             </button>
           ))}
         </div>
+      </SettingsCard>
+
+      <SettingsCard
+        id="environment-preset"
+        title="Environment"
+        description="Cohesive places that set particles, weather, lighting, and ambience together in one click."
+        highlight={focusSettingId === 'environment-preset'}
+      >
+        <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
+          {ENVIRONMENT_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={seg(env.environmentPresetId === p.id)}
+              title={p.description}
+              onClick={() => patchEnv({ ...presetPatch(p.id), enabled: true })}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {env.environmentPresetId && (
+          <p className="muted os-set-hint">{getEnvironmentPreset(env.environmentPresetId)?.description}</p>
+        )}
       </SettingsCard>
 
       <SettingsCard
@@ -225,6 +251,82 @@ export default function AtmospherePage() {
           />
           <span>Snow accumulation (piles on the desk edge)</span>
         </label>
+      </SettingsCard>
+
+      <SettingsCard
+        id="weather"
+        title="Weather"
+        description="Atmospheric fog, clouds, and precipitation over the desktop. Auto follows the wallpaper."
+        highlight={focusSettingId === 'weather'}
+      >
+        <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
+          <span className="os-viz-label muted">Mode</span>
+          {([
+            ['off', 'Off'],
+            ['auto', 'Auto'],
+            ['clouds', 'Clouds'],
+            ['fog', 'Fog'],
+            ['rain', 'Rain'],
+            ['snow', 'Snow'],
+          ] as [WeatherMode, string][]).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={seg((env.weather?.mode ?? 'off') === id)}
+              disabled={!env.enabled}
+              onClick={() => patchEnv({ weather: { mode: id, intensity: env.weather?.intensity ?? 0.5 } })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="os-viz-row">
+          <span className="os-viz-label muted">Intensity</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={env.weather?.intensity ?? 0.5}
+            disabled={!env.enabled || (env.weather?.mode ?? 'off') === 'off'}
+            onChange={(e) => patchEnv({ weather: { mode: env.weather?.mode ?? 'off', intensity: Number(e.target.value) } })}
+          />
+          <span className="muted">{Math.round((env.weather?.intensity ?? 0.5) * 100)}%</span>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        id="ambient-audio"
+        title="Ambient audio"
+        description="Looping soundscapes matched to the environment."
+        highlight={focusSettingId === 'ambient-audio'}
+        trailing={
+          <label className="os-toggle os-toggle-compact">
+            <input
+              type="checkbox"
+              checked={env.ambientAudio?.enabled ?? false}
+              disabled={!env.enabled}
+              onChange={(e) => patchEnv({ ambientAudio: { enabled: e.target.checked, volume: env.ambientAudio?.volume ?? 0.5 } })}
+              aria-label="Enable ambient audio"
+            />
+            <span>{env.ambientAudio?.enabled ? 'On' : 'Off'}</span>
+          </label>
+        }
+      >
+        <div className="os-viz-row">
+          <span className="os-viz-label muted">Volume</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={env.ambientAudio?.volume ?? 0.5}
+            disabled={!env.enabled || !env.ambientAudio?.enabled}
+            onChange={(e) => patchEnv({ ambientAudio: { enabled: env.ambientAudio?.enabled ?? false, volume: Number(e.target.value) } })}
+          />
+          <span className="muted">{Math.round((env.ambientAudio?.volume ?? 0.5) * 100)}%</span>
+        </div>
+        <p className="muted os-set-hint">Ships silent — add a sound pack to hear environment ambience.</p>
       </SettingsCard>
 
       <SettingsCard
