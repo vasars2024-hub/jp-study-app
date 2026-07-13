@@ -149,6 +149,14 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
           : DEFAULT_ENVIRONMENT.weather.intensity,
       ),
     },
+    ambientAudio: {
+      enabled: partial.ambientAudio?.enabled === true,
+      volume: clamp01(
+        typeof partial.ambientAudio?.volume === 'number'
+          ? partial.ambientAudio.volume
+          : DEFAULT_ENVIRONMENT.ambientAudio.volume,
+      ),
+    },
   };
 }
 

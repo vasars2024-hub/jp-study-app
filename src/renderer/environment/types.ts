@@ -61,6 +61,13 @@ export interface WeatherSettings {
   intensity: number;
 }
 
+// ---- Ambient audio (Phase 3 · M4) ----
+export interface AmbientAudioSettings {
+  enabled: boolean;
+  /** 0–1 ambient soundscape volume. */
+  volume: number;
+}
+
 export interface EnvironmentSettings {
   /** Master switch for the living desktop layer. Default false. */
   enabled: boolean;
@@ -110,6 +117,9 @@ export interface EnvironmentSettings {
 
   // ---- Weather (Phase 3 · M3) ----
   weather: WeatherSettings;
+
+  // ---- Ambient audio (Phase 3 · M4) ----
+  ambientAudio: AmbientAudioSettings;
 }
 
 export const DAY_CYCLE_PLAYLIST_ID = 'day-cycle';
@@ -174,6 +184,7 @@ export const DEFAULT_ENVIRONMENT: EnvironmentSettings = {
   lightingIntensity: 0.45,
   achievementCelebrations: true,
   weather: { mode: 'off', intensity: 0.5 },
+  ambientAudio: { enabled: false, volume: 0.5 },
 };
 
 /** Resolved surface the stage paints. */

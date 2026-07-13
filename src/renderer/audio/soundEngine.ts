@@ -33,6 +33,13 @@ export interface PlayOptions {
   rate?: number;
 }
 
+/** Handle for a looping bed (ambient soundscapes). */
+export interface LoopHandle {
+  stop(): void;
+  setVolume(v: number): void;
+  fadeTo(v: number, ms: number): void;
+}
+
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -191,6 +198,61 @@ class SoundEngine {
     g.gain.cancelScheduledValues(now);
     g.gain.linearRampToValueAtTime(to, now + ms / 2000);
     g.gain.linearRampToValueAtTime(1, now + ms / 1000);
+  }
+
+  /**
+   * Start a looping bed on a category; returns a handle to fade/stop it. Returns
+   * a silent no-op handle if disabled/muted/perf-gated or the sound is missing
+   * (e.g. the default silent pack). Used by the environment ambient-audio layer.
+   */
+  async playLoop(category: SoundCategory, name: string, opts?: { volume?: number }): Promise<LoopHandle> {
+    const silent: LoopHandle = { stop() {}, setVolume() {}, fadeTo() {} };
+    if (!this.enabled || this.muted) return silent;
+    if (!this.perfAllows(category)) return silent;
+    const url = this.packs.get(this.activePackId)?.sounds?.[category]?.[name];
+    if (!url) return silent;
+    const ctx = this.ensureCtx();
+    if (!ctx) return silent;
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+      } catch {
+        /* needs a user gesture */
+      }
+    }
+    const buf = await this.load(url);
+    if (!buf) return silent;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const g = ctx.createGain();
+    g.gain.value = opts?.volume ?? 1;
+    src.connect(g);
+    g.connect(this.catGain.get(category) ?? this.master!);
+    src.start();
+    let stopped = false;
+    return {
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        try {
+          src.stop();
+        } catch {
+          /* already stopped */
+        }
+        src.disconnect();
+        g.disconnect();
+      },
+      setVolume(v: number) {
+        g.gain.value = Math.min(1, Math.max(0, v));
+      },
+      fadeTo(v: number, ms: number) {
+        const now = ctx.currentTime;
+        g.gain.cancelScheduledValues(now);
+        g.gain.setValueAtTime(g.gain.value, now);
+        g.gain.linearRampToValueAtTime(Math.min(1, Math.max(0, v)), now + ms / 1000);
+      },
+    };
   }
 }
 

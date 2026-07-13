@@ -7,6 +7,7 @@ import { bootOsLook } from './components/DesktopSettings';
 import { bootDisplayPrefs } from './displayPrefs';
 import { bootTheme } from './theme';
 import { bootEnvironment } from './environment';
+import { installAmbientAudio } from './environment/ambientAudio';
 import { bootCustomCss } from './customCss';
 import { runStorageMigrations } from './storage/migrationRunner';
 import { initProfileState } from './profileState';
@@ -77,6 +78,9 @@ installShellSounds();
 if (!isCompanionHost) {
   bootCustomCss();
   bootEnvironment();
+  // Per-environment ambient soundscapes (Phase 3 · M4) — silent until a sound
+  // pack is added; dormant while the living layer is disabled.
+  installAmbientAudio();
   // Move legacy localStorage data into IndexedDB (versioned, one-way, safe to
   // re-run). Fire-and-forget: readers fall back to localStorage until done.
   // Errors are handled inside the runner (warn + continue); keep a safety net.
