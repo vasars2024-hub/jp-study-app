@@ -25,7 +25,7 @@ import NotificationBell from './shell/NotificationBell';
 import QuickSettings from './shell/QuickSettings';
 import AeroBootOverlay from './shell/AeroBootOverlay';
 import DesktopLayerHost from './shell/DesktopLayerHost';
-import { ContextMenu } from './ui';
+import { ContextMenu, confirmDialog, alertDialog } from './ui';
 import {
   commitLayout,
   getActiveDesktopIndex,
@@ -956,7 +956,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         (await window.api.setWallpaperFromPath(entry.path)) ??
         (await window.api.getWallpaper());
       if (!url) {
-        alert('Could not open that image. It may have been moved or deleted.');
+        await alertDialog({ title: 'Wallpaper', message: 'Could not open that image. It may have been moved or deleted.' });
         return;
       }
       // Set image URL after wall kind so we never flash "black bg + no img".
@@ -970,7 +970,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     }
     const url = await window.api.mediaFileUrl(entry.path);
     if (!url) {
-      alert('Could not open that video. It may have been moved or deleted.');
+      await alertDialog({ title: 'Wallpaper', message: 'Could not open that video. It may have been moved or deleted.' });
       return;
     }
     setWallImage(null);
@@ -992,7 +992,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     const r = await window.api.pickWallpaperFolder();
     if (!r) return;
     if (!r.images.length) {
-      alert('No images found in that folder (.jpg, .png, .webp, .gif).');
+      await alertDialog({ title: 'Slideshow', message: 'No images found in that folder (.jpg, .png, .webp, .gif).' });
       return;
     }
     releaseEnvWallpaper();
@@ -1039,8 +1039,14 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     setWall({ kind: 'preset', id: 'crimsonveil' });
   };
 
-  const resetDesktop = () => {
-    if (!confirm('Reset the desktop — close all windows, clear icons and wallpaper?')) return;
+  const resetDesktop = async () => {
+    const ok = await confirmDialog({
+      title: 'Reset desktop',
+      message: 'Reset the desktop — close all windows, clear icons and wallpaper?',
+      confirmLabel: 'Reset',
+      danger: true,
+    });
+    if (!ok) return;
     setWins([]);
     setIcons(defaultIcons(activeDesktop));
     setNotes({});
@@ -1052,7 +1058,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     if (ic.kind === 'app' && ic.section) open(ic.section);
     else if (ic.kind === 'shortcut' && ic.target) {
       const err = await window.api.launchTarget(ic.target);
-      if (err) alert(err);
+      if (err) await alertDialog({ title: 'Could not open', message: err });
     } else if (ic.kind === 'action') {
       if (ic.action === 'note') openNote();
       else if (ic.action === 'addapp') addShortcut();
@@ -1536,10 +1542,13 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 className="os-start-foot-btn power"
                 title="Restart shell"
                 aria-label="Restart shell"
-                onClick={() => {
-                  if (window.confirm('Restart the Study OS shell? Unsaved text in fields may be lost.')) {
-                    window.location.reload();
-                  }
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: 'Restart shell',
+                    message: 'Restart the Study OS shell? Unsaved text in fields may be lost.',
+                    confirmLabel: 'Restart',
+                  });
+                  if (ok) window.location.reload();
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
