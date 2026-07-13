@@ -196,3 +196,10 @@
 :root[data-materials='aero'] .flash-view-decks > .view-head .actions { display: none; }
 :root[data-materials='aero'] .flash-view-decks > .view-head { padding-bottom: 4px; }
 :root[data-materials='aero'] .flash-view-decks { padding: 10px 12px; }
+
+/* ---------- Calendar → Future Life Organizer (Phase 4 · M9) ----------------
+   The menu bar + taskbar identity make the large in-app "Calendar" title
+   redundant (CLAUDE.md window minimalism); hide the header caption under Aero
+   and keep the view/nav toolbar as the command bar. Default theme unchanged. */
+:root[data-materials='aero'] .calendar-view > .view-head { display: none; }
+:root[data-materials='aero'] .calendar-view { padding: 8px 10px; }

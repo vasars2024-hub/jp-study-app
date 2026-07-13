@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../components/Icons';
+import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import {
   addEvent,
   CATEGORY_COLORS,
@@ -324,7 +325,46 @@ export default function CalendarView() {
       recurrenceEndDate: ev.recurrenceEndDate ?? '',
     });
 
+  // Native menu bar + status bar (Future Life Organizer). AppChrome renders them
+  // only under Aero; pass-through in the default theme. Items drive existing
+  // handlers only — the same calendar engine, no behavior forked by theme.
+  const calMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [{ id: 'new', label: 'New event…', onSelect: () => openNew(toKey(cursor)) }],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: (['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => ({
+        id: m,
+        label: m[0].toUpperCase() + m.slice(1),
+        onSelect: () => setMode(m),
+      })),
+    },
+    {
+      id: 'go',
+      label: 'Go',
+      items: [
+        { id: 'today', label: 'Today', onSelect: goToday },
+        { id: 'prev', label: 'Previous', disabled: mode === 'agenda', onSelect: () => shift(-1) },
+        { id: 'next', label: 'Next', disabled: mode === 'agenda', onSelect: () => shift(1) },
+      ],
+    },
+  ];
+
+  const calStatus = (
+    <>
+      <StatusBarField>{headerLabel}</StatusBarField>
+      <StatusBarField>{events.length} events</StatusBarField>
+      <StatusBarSpacer />
+      {agendaOverdue.length > 0 && <StatusBarField live>{agendaOverdue.length} overdue</StatusBarField>}
+    </>
+  );
+
   return (
+    <AppChrome menus={calMenus} status={calStatus}>
     <div className="calendar-view">
       <div className="view-head">
         <div>
@@ -478,5 +518,6 @@ export default function CalendarView() {
 
       {modal && <EventModal initial={modal} onClose={() => setModal(null)} />}
     </div>
+    </AppChrome>
   );
 }
