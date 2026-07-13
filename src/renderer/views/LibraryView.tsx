@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from 'react';
-import { confirmDialog } from '../components/ui';
+import { confirmDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
@@ -293,7 +293,32 @@ export default function LibraryView({ onOpen }: Props) {
     return items.filter((it) => it.folder === active);
   }, [items, active, folders]);
 
+  // Digital Library chrome — Aero only (AppChrome pass-through in default theme).
+  // File menu drives the existing import handlers; status bar shows the shelf.
+  const libMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'import-files', label: 'Import file(s)…', disabled: busy, onSelect: importFiles },
+        { id: 'import-folder', label: 'Import image folder…', disabled: busy, onSelect: importFolder },
+        { separator: true, label: '' },
+        { id: 'import-web', label: 'Import from web…', disabled: busy, onSelect: () => setImportOpen(true) },
+        { id: 'import-wiki', label: 'Random Wikipedia…', disabled: busy, onSelect: () => setWikiOpen(true) },
+      ],
+    },
+  ];
+  const libStatus = (
+    <>
+      <StatusBarField>{items.length} items</StatusBarField>
+      {active !== 'all' && <StatusBarField>Folder: {String(active)}</StatusBarField>}
+      <StatusBarSpacer />
+      {visible.length !== items.length && <StatusBarField>{visible.length} shown</StatusBarField>}
+    </>
+  );
+
   return (
+    <AppChrome menus={libMenus} status={libStatus}>
     <div className="library" onClick={() => setFileMenu(null)}>
       <header className="view-head">
         <p className="muted">Your books and manga. Import files to start reading.</p>
@@ -635,6 +660,7 @@ export default function LibraryView({ onOpen }: Props) {
         </div>
       )}
     </div>
+    </AppChrome>
   );
 }
 

@@ -303,3 +303,26 @@
   opacity: 0.7;
 }
 :root[data-materials='aero'] .os-set-nav-list { gap: 1px; }
+
+/* ---------- EPUB → Digital Library + Reader (Phase 4 · M7) -----------------
+   Library: the File menu carries imports, so hide the header action row and
+   tighten the shelf. Reader: give the reader's own chrome (toolbars, side
+   panels, controls) Aero density WITHOUT touching the reading text surface,
+   which must stay solid and highly legible. Scoped to Aero; reader TSX
+   untouched (only its class names are targeted here). */
+:root[data-materials='aero'] .library > .view-head .actions { display: none; }
+:root[data-materials='aero'] .library { padding: 8px 10px; }
+:root[data-materials='aero'] .nov-view { padding: 8px 10px; }
+
+/* Reader chrome — top bar, controls and footer become compact glass rails.
+   The reading surface (.reader-stage, which carries the reader theme's own
+   background) is deliberately NOT targeted: text stays solid and legible. */
+:root[data-materials='aero'] .reader-bar,
+:root[data-materials='aero'] .reader-footer {
+  background: var(--app-chrome-sheen), var(--glass-tint);
+  border-color: var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+}
+:root[data-materials='aero'] .reader-controls { gap: 4px; }
