@@ -20,14 +20,22 @@ export default function WeatherLayer({ env }: { env: EnvironmentSettings }) {
     return () => window.clearInterval(id);
   }, []);
 
+  // Pause the drift animation while the tab is hidden (perf parity with particles).
+  const [hidden, setHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
+  useEffect(() => {
+    const onVis = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
   const ref = env.rotationEnabled ? resolveWall(env)?.item.ref : undefined;
   const weather = resolveWeather(env, ref);
   if (weather.intensity <= 0 || weather.kind === 'clear') return null;
 
-  const reduce = document.documentElement.classList.contains('reduce-motion');
+  const still = hidden || document.documentElement.classList.contains('reduce-motion');
   return (
     <div
-      className={`os-weather os-weather-${weather.kind}${reduce ? ' os-weather-still' : ''}`}
+      className={`os-weather os-weather-${weather.kind}${still ? ' os-weather-still' : ''}`}
       style={{ '--weather-intensity': String(weather.intensity) } as CSSProperties}
       aria-hidden
     />
