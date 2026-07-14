@@ -10,6 +10,8 @@ import { Select, Slider, Toggle } from '../ui';
 import { getTheme, listThemes, loadThemeId, onThemeChanged, setTheme } from '../../theme';
 import { DEFAULT_PERF_TIER, loadPerfTier, PERF_TIERS, setPerfTier, type PerfTier } from '../../theme/perf';
 import { soundEngine } from '../../audio/soundEngine';
+import { setVolume as setMusicVolume } from '../../playerBus';
+import type { SoundCategory } from '../../audio/soundPack';
 import {
   loadWallpaperFit,
   setWallpaperFit,
@@ -39,7 +41,26 @@ const PERF_LABEL: Record<PerfTier, string> = {
   battery: 'Battery Saver',
 };
 
-function openSettings(_page: string): void {
+const SOUND_MIXERS: { category: SoundCategory; label: string }[] = [
+  { category: 'system', label: 'System' },
+  { category: 'notification', label: 'Alerts' },
+  { category: 'ui', label: 'Controls' },
+  { category: 'environment', label: 'Ambient' },
+  { category: 'companion', label: 'Companions' },
+];
+
+function readCategoryVolumes(): Record<SoundCategory, number> {
+  return {
+    system: soundEngine.getCategoryVolume('system'),
+    notification: soundEngine.getCategoryVolume('notification'),
+    ui: soundEngine.getCategoryVolume('ui'),
+    environment: soundEngine.getCategoryVolume('environment'),
+    companion: soundEngine.getCategoryVolume('companion'),
+    achievement: soundEngine.getCategoryVolume('achievement'),
+  };
+}
+
+function openSettings(): void {
   // Reuse the shell's existing open mechanism. (Deep-linking to a specific
   // settings page is a future nicety; the Settings window has its own nav.)
   window.dispatchEvent(new CustomEvent('os:open', { detail: 'settings' }));
@@ -50,6 +71,7 @@ export default function QuickSettings() {
   const [themeId, setThemeId] = useState(() => loadThemeId());
   const [perf, setPerf] = useState<PerfTier>(() => loadPerfTier());
   const [volume, setVolume] = useState(() => soundEngine.getVolume());
+  const [categoryVolumes, setCategoryVolumes] = useState<Record<SoundCategory, number>>(readCategoryVolumes);
   const [muted, setMuted] = useState(() => soundEngine.isMuted());
   const [reduceMotion, setRM] = useState(isReduceMotion);
   const [fit, setFit] = useState<WallpaperFit>(() => loadWallpaperFit());
@@ -69,6 +91,7 @@ export default function QuickSettings() {
     setThemeId(loadThemeId());
     setPerf(loadPerfTier());
     setVolume(soundEngine.getVolume());
+    setCategoryVolumes(readCategoryVolumes());
     setMuted(soundEngine.isMuted());
     setRM(isReduceMotion());
     setFit(loadWallpaperFit());
@@ -96,7 +119,7 @@ export default function QuickSettings() {
   return (
     <>
       <div className="os-panel-backdrop" onMouseDown={() => setOpen(false)} />
-      <aside ref={panelRef} tabIndex={-1} className="os-flyout anim-slide-up" role="dialog" aria-label="Quick settings">
+      <aside ref={panelRef} tabIndex={-1} className="os-flyout os-flyout--quick anim-slide-up" role="dialog" aria-label="Quick settings">
         <header className="os-flyout-head">
           <span className="os-flyout-title">Quick settings</span>
           <span className="os-flyout-spacer" />
@@ -104,7 +127,7 @@ export default function QuickSettings() {
             type="button"
             className="ui-btn ui-btn--sm ui-btn--ghost ui-focusable"
             onClick={() => {
-              openSettings('home');
+              openSettings();
               setOpen(false);
             }}
           >
@@ -167,10 +190,29 @@ export default function QuickSettings() {
                 const v = Number(e.currentTarget.value);
                 setVolume(v);
                 soundEngine.setVolume(v);
+                setMusicVolume(v);
               }}
               style={{ maxWidth: 150 }}
             />
           </div>
+          {SOUND_MIXERS.map(({ category, label }) => (
+            <div className="os-qs-row" key={category}>
+              <span className="os-qs-row-label">{label}</span>
+              <Slider
+                min={0}
+                max={1}
+                step={0.05}
+                value={categoryVolumes[category]}
+                disabled={muted}
+                onChange={(e) => {
+                  const v = Number(e.currentTarget.value);
+                  setCategoryVolumes((prev) => ({ ...prev, [category]: v }));
+                  soundEngine.setCategoryVolume(category, v);
+                }}
+                style={{ maxWidth: 150 }}
+              />
+            </div>
+          ))}
           <div className="os-qs-row">
             <Toggle
               checked={muted}
@@ -178,9 +220,21 @@ export default function QuickSettings() {
                 const m = e.currentTarget.checked;
                 setMuted(m);
                 soundEngine.setMuted(m);
+                setMusicVolume(m ? 0 : volume);
               }}
               label="Mute"
             />
+          </div>
+          <div className="os-qs-row">
+            <span className="os-qs-row-label">Preview</span>
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--ghost ui-focusable"
+              disabled={muted}
+              onClick={() => void soundEngine.play('ui', 'confirm', { volume: 0.72 })}
+            >
+              Play
+            </button>
           </div>
 
           <div className="os-qs-section">Accessibility</div>
@@ -197,11 +251,11 @@ export default function QuickSettings() {
           </div>
 
           <div className="os-qs-grid">
-            <button type="button" className="os-qs-tile ui-focusable" onClick={() => { openSettings('wallpaper'); setOpen(false); }}>
+            <button type="button" className="os-qs-tile ui-focusable" onClick={() => { openSettings(); setOpen(false); }}>
               <span className="os-qs-tile-label">Wallpaper</span>
               <span className="os-qs-tile-value">Change background</span>
             </button>
-            <button type="button" className="os-qs-tile ui-focusable" onClick={() => { openSettings('display'); setOpen(false); }}>
+            <button type="button" className="os-qs-tile ui-focusable" onClick={() => { openSettings(); setOpen(false); }}>
               <span className="os-qs-tile-label">Accessibility</span>
               <span className="os-qs-tile-value">Zoom, contrast, text</span>
             </button>

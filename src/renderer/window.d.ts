@@ -182,6 +182,11 @@ declare global {
       miniSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
       miniIsOpen(): Promise<boolean>;
       miniFocusMain(): Promise<void>;
+      lockscreenOpen(size?: { width?: number; height?: number }): Promise<{ ok: boolean }>;
+      lockscreenUnlock(): Promise<{ ok: boolean }>;
+      lockscreenSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
+      lockscreenIsOpen(): Promise<boolean>;
+      onLockscreenUnlocked(cb: () => void): () => void;
       companionHostSetEnabled(enabled: boolean, span?: 'primary' | 'all'): Promise<{ ok: boolean }>;
       companionHostSetSpan(span: 'primary' | 'all'): Promise<{ ok: boolean }>;
       companionHostIsOpen(): Promise<boolean>;

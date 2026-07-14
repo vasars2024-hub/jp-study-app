@@ -21,6 +21,14 @@ import CalendarView from '../views/CalendarView';
 import Icon from './Icons';
 import SettingsApp from './settings/SettingsApp';
 import { WALL_PRESETS } from '../environment/wallCatalog';
+import {
+  AppChrome,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from './ui';
 
 // The section → view mapping. Shared by the in-desktop FloatingWindow
 // (DesktopShell) and the pop-out window (App) so an app renders identically
@@ -50,25 +58,7 @@ export default function AppSection({
         />
       );
     case 'city':
-      return (
-        <div className="coming-soon">
-          <div className="cs-emoji">
-            <Icon name="stats" size={40} />
-          </div>
-          <h1>Noctis</h1>
-          <p className="muted">
-            Civilization module — implementation lives in <code>src/main/city</code>.
-          </p>
-          <div className="cs-card">
-            <div className="cs-tag">Scaffolding phase</div>
-            <ul>
-              <li>Read the canon docs in src/main/city/docs/</li>
-              <li>Build service, engine, ipc, rendering, and ui under src/main/city/</li>
-              <li>Observational 2D civilization — not a grid builder or CP economy</li>
-            </ul>
-          </div>
-        </div>
-      );
+      return <NoctisPlaceholder />;
     case 'library':
       return <LibraryView onOpen={onOpenBook} />;
     case 'novels':
@@ -102,6 +92,102 @@ export default function AppSection({
     default:
       return null;
   }
+}
+
+function NoctisPlaceholder() {
+  const aero = useAeroMaterials();
+  const menus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        {
+          id: 'open-docs',
+          label: 'Show canon path',
+          onSelect: () => {
+            window.dispatchEvent(new CustomEvent('os:toast', { detail: { message: 'Noctis canon: src/main/city/docs', kind: 'ok' } }));
+          },
+        },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        { id: 'overview', label: 'Overview', onSelect: () => undefined },
+      ],
+    },
+  ];
+
+  if (aero) {
+    return (
+      <AppChrome
+        menus={menus}
+        status={
+          <>
+            <StatusBarField>Scaffolding phase</StatusBarField>
+            <StatusBarSpacer />
+            <StatusBarField>Noctis canon linked</StatusBarField>
+          </>
+        }
+        className="aero-noctis-chrome"
+      >
+        <div className="aero-noctis-placeholder">
+          <Toolbar className="aero-noctis-toolbar" aria-label="Noctis commands">
+            <span>Noctis Civilization Module</span>
+          </Toolbar>
+          <div className="aero-noctis-workbench">
+            <aside className="aero-noctis-nav" aria-label="Noctis sections">
+              <button className="active">Overview</button>
+              <button disabled>Canon</button>
+              <button disabled>Engine</button>
+              <button disabled>Renderer</button>
+            </aside>
+            <main className="aero-noctis-main">
+              <section className="aero-noctis-panel">
+                <header>
+                  <Icon name="stats" size={15} />
+                  Noctis
+                </header>
+                <p>
+                  Civilization module scaffolding is present under <code>src/main/city</code>. The final
+                  app should become an observational 2D civilization surface, not a grid builder or CP economy.
+                </p>
+              </section>
+              <section className="aero-noctis-panel">
+                <header>Implementation checklist</header>
+                <ul>
+                  <li>Read the canon docs in <code>src/main/city/docs</code>.</li>
+                  <li>Build service, engine, IPC, rendering, and UI under <code>src/main/city</code>.</li>
+                  <li>Keep the current placeholder quiet until the module is real.</li>
+                </ul>
+              </section>
+            </main>
+          </div>
+        </div>
+      </AppChrome>
+    );
+  }
+
+  return (
+    <div className="coming-soon">
+      <div className="cs-emoji">
+        <Icon name="stats" size={40} />
+      </div>
+      <h1>Noctis</h1>
+      <p className="muted">
+        Civilization module — implementation lives in <code>src/main/city</code>.
+      </p>
+      <div className="cs-card">
+        <div className="cs-tag">Scaffolding phase</div>
+        <ul>
+          <li>Read the canon docs in src/main/city/docs/</li>
+          <li>Build service, engine, ipc, rendering, and ui under src/main/city/</li>
+          <li>Observational 2D civilization — not a grid builder or CP economy</li>
+        </ul>
+      </div>
+    </div>
+  );
 }
 
 export function VisualizerWidget() {

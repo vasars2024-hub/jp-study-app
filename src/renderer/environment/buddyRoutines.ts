@@ -156,6 +156,28 @@ export function getDefaultBuddyRoutines(): BuddyRoutine[] {
         { type: 'notify', title: 'Noctis', body: 'Dictionary open' },
       ],
     },
+    {
+      id: 'br-miko-climb',
+      name: 'Climb show',
+      forType: 'miko-shimeji',
+      builtin: true,
+      steps: [
+        { type: 'setMood', mood: 'curious', status: 'Scaling the desktop frame' },
+        { type: 'wait', ms: 1200 },
+        { type: 'setMood', mood: 'happy', status: 'Still climbing' },
+      ],
+    },
+    {
+      id: 'br-miko-cheer',
+      name: 'Cheer',
+      forType: 'miko-shimeji',
+      builtin: true,
+      steps: [
+        { type: 'setMood', mood: 'celebrate', status: 'Secret OS discovered' },
+        { type: 'wait', ms: 1400 },
+        { type: 'setMood', mood: 'curious', status: 'Climbing the frame' },
+      ],
+    },
   ];
 }
 
@@ -182,6 +204,8 @@ export function defaultRoutineIdsForType(typeId: CompanionTypeId): {
       return { primary: 'br-time-calendar', secondary: 'br-time-stats', menu: ['br-time-calendar', 'br-time-stats'] };
     case 'noctis':
       return { primary: 'br-noctis-city', secondary: 'br-noctis-study', menu: ['br-noctis-city', 'br-noctis-study'] };
+    case 'miko-shimeji':
+      return { primary: 'br-miko-climb', secondary: 'br-miko-cheer', menu: ['br-miko-climb', 'br-miko-cheer'] };
     default:
       return { primary: 'br-buddy-review', secondary: 'br-buddy-focus', menu: [] };
   }
@@ -271,7 +295,8 @@ export function sanitizeRoutine(raw: unknown): BuddyRoutine | null {
     r.forType === 'study-buddy' ||
     r.forType === 'critter' ||
     r.forType === 'timekeeper' ||
-    r.forType === 'noctis'
+    r.forType === 'noctis' ||
+    r.forType === 'miko-shimeji'
       ? r.forType
       : undefined;
   return {

@@ -175,7 +175,7 @@ export default function DesktopLayoutPage() {
         </p>
       </SettingsCard>
 
-      <SettingsCard title="Reset desktop" description="Clears icons, windows, notes and widgets on this desktop.">
+      <SettingsCard title="Reset desktop" description="Clears icons, windows, notes and widgets on the active desktop only. Desktop 1 and Desktop 2 keep separate layouts.">
         <button type="button" className="btn" onClick={onReset}>
           Reset desktop layout & windows
         </button>

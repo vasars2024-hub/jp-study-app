@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { WidgetSnapshot } from '../../shared/desktop';
 import { WIDGETS, getWidgetDef } from '../widgets/registry';
 import { WIDGET_CATEGORIES, type WidgetCategory } from '../widgets/types';
+import Icon from './Icons';
 
 // Persist favorites + recently-used across sessions (small UI state → localStorage).
 const GKEY = 'jp-widget-gallery';
@@ -101,7 +102,7 @@ export default function WidgetGallery({ onAdd, onResetLayout, hiddenWidgets, onR
                   title={prefs.favorites.includes(w.type) ? 'Unfavorite' : 'Favorite'}
                   onClick={() => toggleFav(w.type)}
                 >
-                  ★
+                  <Icon name="star" size={14} fill />
                 </button>
               </div>
               <div className="widget-card-cat">{w.category}</div>

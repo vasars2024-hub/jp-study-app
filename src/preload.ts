@@ -288,6 +288,19 @@ const api = {
   miniIsOpen: (): Promise<boolean> => ipcRenderer.invoke('mini:isOpen'),
   miniFocusMain: (): Promise<void> => ipcRenderer.invoke('mini:focusMain'),
 
+  /** Floating lock widget — frameless, transparent, no OS shadow. */
+  lockscreenOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('lockscreen:open', size),
+  lockscreenUnlock: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('lockscreen:unlock'),
+  lockscreenSetSize: (size: { width: number; height: number }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('lockscreen:setSize', size),
+  lockscreenIsOpen: (): Promise<boolean> => ipcRenderer.invoke('lockscreen:isOpen'),
+  onLockscreenUnlocked: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('lockscreen:unlocked', handler);
+    return () => ipcRenderer.removeListener('lockscreen:unlocked', handler);
+  },
+
   // L4 — transparent OS companion host over the real desktop
   companionHostSetEnabled: (
     enabled: boolean,

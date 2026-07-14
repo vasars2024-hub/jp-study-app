@@ -1,6 +1,15 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import Icon from '../components/Icons';
 import {
+  AppChrome,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarSpacer,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from '../components/ui';
+import {
   NOVELS,
   NOVEL_TYPES,
   DIFFICULTY_ORDER,
@@ -39,7 +48,7 @@ function savePlanned(s: Set<string>): void {
 }
 
 // A stable two-tone gradient per title, so each card reads as its own "cover".
-function coverStyle(seed: string): React.CSSProperties {
+function coverStyle(seed: string): CSSProperties {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
   const h2 = (h + 40) % 360;
@@ -62,6 +71,7 @@ const DIFFICULTY_CLASS: Record<Difficulty, string> = {
 };
 
 export default function NovelsView() {
+  const aero = useAeroMaterials();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<TypeFilter>('All');
   const [diff, setDiff] = useState<DiffFilter>('All');
@@ -110,6 +120,156 @@ export default function NovelsView() {
     });
     return sorted;
   }, [query, type, diff, genre, sort, planOnly, planned]);
+
+  const selectedNovel = selected ?? list[0] ?? null;
+  const menus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'clear-search', label: 'Clear search', disabled: !query, onSelect: () => setQuery('') },
+        { id: 'show-all', label: 'Show all titles', onSelect: () => { setType('All'); setDiff('All'); setGenre('All'); setPlanOnly(false); } },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        { id: 'planned', label: planOnly ? 'Show full catalogue' : 'Show plan to read', onSelect: () => setPlanOnly((v) => !v) },
+        { id: 'sort-difficulty', label: 'Sort by difficulty', onSelect: () => setSort('difficulty') },
+        { id: 'sort-title', label: 'Sort by title', onSelect: () => setSort('title') },
+        { id: 'sort-year', label: 'Sort by year', onSelect: () => setSort('year') },
+      ],
+    },
+  ];
+
+  if (aero) {
+    return (
+      <AppChrome
+        menus={menus}
+        status={
+          <>
+            <StatusBarField>{list.length} titles</StatusBarField>
+            <StatusBarField>{planned.size} planned</StatusBarField>
+            <StatusBarSpacer />
+            <StatusBarField>{selectedNovel?.titleJp ?? 'No selection'}</StatusBarField>
+          </>
+        }
+        className="aero-novels-chrome"
+      >
+        <div className="aero-novels">
+          <Toolbar className="aero-novels-toolbar" aria-label="Novel catalogue commands">
+            <input
+              className="aero-novels-search"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find title, author, or theme..."
+              lang="ja"
+            />
+            <label>
+              Genre
+              <select value={genre} onChange={(e) => setGenre(e.target.value as GenreFilter)}>
+                <option value="All">All</option>
+                {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </label>
+            <label>
+              Sort
+              <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+                <option value="difficulty">Difficulty</option>
+                <option value="title">Title</option>
+                <option value="year">Year</option>
+                <option value="author">Author</option>
+              </select>
+            </label>
+            <ToolbarSpacer />
+            <button className={`aero-novels-command ${planOnly ? 'active' : ''}`} onClick={() => setPlanOnly((v) => !v)}>
+              Plan {planned.size > 0 ? `(${planned.size})` : ''}
+            </button>
+          </Toolbar>
+
+          <div className="aero-novels-workbench">
+            <aside className="aero-novels-tree" aria-label="Novel filters">
+              <div className="aero-novels-tree-group">
+                <b>Type</b>
+                <button className={type === 'All' ? 'active' : ''} onClick={() => setType('All')}>All types</button>
+                {NOVEL_TYPES.map((t) => (
+                  <button key={t} className={type === t ? 'active' : ''} onClick={() => setType(t)}>{t}</button>
+                ))}
+              </div>
+              <div className="aero-novels-tree-group">
+                <b>Difficulty</b>
+                <button className={diff === 'All' ? 'active' : ''} onClick={() => setDiff('All')}>Any level</button>
+                {DIFFICULTY_ORDER.map((d) => (
+                  <button key={d} className={diff === d ? 'active' : ''} onClick={() => setDiff(d)}>{d}</button>
+                ))}
+              </div>
+            </aside>
+
+            <main className="aero-novels-list" aria-label="Novel titles">
+              <div className="aero-novel-row aero-novel-row-head">
+                <span>Title</span>
+                <span>Author</span>
+                <span>Type</span>
+                <span>Level</span>
+                <span>Year</span>
+              </div>
+              {list.length === 0 ? (
+                <div className="aero-novels-empty">No titles match those filters.</div>
+              ) : (
+                list.map((nv) => (
+                  <button
+                    key={nv.id}
+                    className={`aero-novel-row ${selectedNovel?.id === nv.id ? 'active' : ''}`}
+                    onClick={() => setSelected(nv)}
+                  >
+                    <span lang="ja">{nv.titleJp}</span>
+                    <span>{nv.authorEn ?? nv.author}</span>
+                    <span>{nv.type}</span>
+                    <span>{nv.difficulty}{nv.jlpt ? ` / ${nv.jlpt}` : ''}</span>
+                    <span>{nv.year ?? '-'}</span>
+                  </button>
+                ))
+              )}
+            </main>
+
+            <aside className="aero-novels-inspector" aria-label="Novel details">
+              {selectedNovel ? (
+                <>
+                  <div className="aero-novel-cover" style={coverStyle(selectedNovel.id)}>
+                    <span lang="ja">{selectedNovel.titleJp}</span>
+                  </div>
+                  {selectedNovel.titleEn && <h2>{selectedNovel.titleEn}</h2>}
+                  <dl>
+                    <div><dt>Author</dt><dd>{selectedNovel.author}</dd></div>
+                    <div><dt>Type</dt><dd>{selectedNovel.type}</dd></div>
+                    <div><dt>Difficulty</dt><dd>{selectedNovel.difficulty}{selectedNovel.jlpt ? ` / ${selectedNovel.jlpt}` : ''}</dd></div>
+                    {selectedNovel.year && <div><dt>Year</dt><dd>{selectedNovel.year}</dd></div>}
+                  </dl>
+                  <p>{selectedNovel.synopsis}</p>
+                  <div className="aero-novel-inspector-actions">
+                    <button onClick={() => togglePlanned(selectedNovel.id)}>
+                      <Icon name="star" size={13} fill={planned.has(selectedNovel.id)} />
+                      {planned.has(selectedNovel.id) ? 'Remove from plan' : 'Plan to read'}
+                    </button>
+                    {selectedNovel.links.map((l) => (
+                      <button key={l.url} onClick={() => openLink(l.url)}>
+                        {l.label}
+                        <Icon name="external" size={11} />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="aero-novels-empty">No selection.</div>
+              )}
+            </aside>
+          </div>
+        </div>
+      </AppChrome>
+    );
+  }
 
   return (
     <div className="nov-view">

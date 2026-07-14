@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import Icon, { type IconName } from '../../Icons';
+import { useAeroMaterials } from '../../ui';
 import {
   MINI_APP_CATALOG,
   MINI_MAX_APPS,
   MINI_MIN_APPS,
+  MINI_THEME_TINTS,
   setMiniModeEnabled,
   addMiniApp,
   removeMiniApp,
@@ -14,7 +16,6 @@ import {
   miniAppLabel,
   type MiniAppId,
   type MiniDensity,
-  type MiniThemeTint,
   type MiniWallpaperMode,
 } from '../../../miniMode';
 
@@ -49,6 +50,7 @@ function MiniWallPreview({ path, blur }: { path: string; blur: number }) {
 
 export default function MiniModePage() {
   const { mini, patchMini, focusSettingId } = useSettings();
+  const aeroMini = useAeroMaterials();
   const [addPick, setAddPick] = useState<MiniAppId | ''>('');
   const [note, setNote] = useState('');
 
@@ -245,23 +247,17 @@ export default function MiniModePage() {
             </button>
           ))}
         </div>
-        <div className="os-viz-row">
+        <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
           <span className="os-viz-label muted">Tint</span>
-          {(
-            [
-              ['neutral', 'Neutral'],
-              ['ember', 'Ember'],
-              ['slate', 'Slate'],
-              ['moss', 'Moss'],
-            ] as [MiniThemeTint, string][]
-          ).map(([id, label]) => (
+          {MINI_THEME_TINTS.map((id) => (
             <button
               key={id}
               type="button"
               className={`btn small${mini.tint === id ? ' primary' : ''}`}
               onClick={() => patchMini({ tint: id })}
+              title={id}
             >
-              {label}
+              {id.charAt(0).toUpperCase() + id.slice(1)}
             </button>
           ))}
         </div>
@@ -281,21 +277,32 @@ export default function MiniModePage() {
           />
           <span>Auto-open first app when Mini starts</span>
         </label>
+        {!aeroMini && (
+          <label className="os-check-row">
+            <input
+              type="checkbox"
+              checked={mini.monoMode}
+              onChange={(e) => patchMini({ monoMode: e.target.checked })}
+            />
+            <span>Dark mono — black &amp; white (modern mini only)</span>
+          </label>
+        )}
       </SettingsCard>
 
       <SettingsCard
         id="mini-wallpaper"
         title="Mini wallpaper"
-        description="Backdrop behind the craft window. Use app-icon mosaic, a custom image, and blur for depth."
+        description="Backdrop behind the craft window. Match your Study desktop wallpaper, use app-icon mosaic, or a custom image."
         highlight={focusSettingId === 'mini-wallpaper'}
       >
-        <div className="os-viz-row">
+        <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
           <span className="os-viz-label muted">Mode</span>
           {(
             [
               ['none', 'Off'],
               ['icons', 'App icons'],
               ['image', 'Image'],
+              ['desktop', 'Match desktop'],
             ] as [MiniWallpaperMode, string][]
           ).map(([id, label]) => (
             <button

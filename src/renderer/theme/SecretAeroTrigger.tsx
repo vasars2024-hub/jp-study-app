@@ -10,18 +10,20 @@
  * OFF, so discovering Aero never loses the user's real theme choice.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_THEME_ID, loadThemeId, setTheme } from './engine';
 import { AERO_THEME_ID } from './frutiger-aero';
-import { loadEnvironment, saveEnvironment } from '../environment/environmentStore';
-import { presetPatch } from '../environment/environmentPresets';
-import type { EnvironmentSettings } from '../environment/types';
+import { requestSecretLifecycleShutdown } from '../secretLifecycle';
+import { soundEngine } from '../audio/soundEngine';
+import { markAeroDiscovered } from '../aeroDiscovery';
+import { applyAeroEnvironment, restoreStudyEnvironmentAfterAero } from '../aeroEnvironment';
+import { armLockscreenOnSecretEntry, AERO_ENTRY_LOCKED_EVENT } from '../lockscreenSettings';
 
-// Prior living-desktop state, remembered while Aero is active so it restores on
-// exit (Phase 3 · M8).
-let aeroPrevEnv: EnvironmentSettings | null = null;
+let aeroRestoreThemeId = DEFAULT_THEME_ID;
 
 const SEQUENCE = 'aero';
+const AERO_SHUTDOWN_THEME_DELAY = 820;
+const STUDY_OS_REBOOT_EVENT = 'shell:studyOsReboot';
 
 function isTypingTarget(el: EventTarget | null): boolean {
   const n = el as HTMLElement | null;
@@ -29,39 +31,43 @@ function isTypingTarget(el: EventTarget | null): boolean {
   return n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.isContentEditable === true;
 }
 
+export function exitSecretAero(): void {
+  const back = aeroRestoreThemeId !== AERO_THEME_ID ? aeroRestoreThemeId : DEFAULT_THEME_ID;
+  requestSecretLifecycleShutdown();
+  window.setTimeout(() => {
+    setTheme(back);
+    soundEngine.stopAll();
+    restoreStudyEnvironmentAfterAero();
+    window.dispatchEvent(new CustomEvent(STUDY_OS_REBOOT_EVENT));
+  }, AERO_SHUTDOWN_THEME_DELAY);
+}
+
 export default function SecretAeroTrigger() {
-  const restoreRef = useRef<string>(DEFAULT_THEME_ID);
   const bufRef = useRef<string>('');
   const [flash, setFlash] = useState<string | null>(null);
 
-  const toggle = (): void => {
+  const toggle = useCallback((): void => {
     const current = loadThemeId();
     if (current === AERO_THEME_ID) {
-      const back = restoreRef.current !== AERO_THEME_ID ? restoreRef.current : DEFAULT_THEME_ID;
-      setTheme(back);
-      // Restore the living desktop to its pre-Aero state (Phase 3 · M8).
-      if (aeroPrevEnv) {
-        saveEnvironment(aeroPrevEnv);
-        aeroPrevEnv = null;
-      }
-      setFlash('Frutiger Aero — off');
+      exitSecretAero();
+      window.setTimeout(() => {
+        setFlash('Frutiger Aero - off');
+      }, AERO_SHUTDOWN_THEME_DELAY + 40);
     } else {
-      restoreRef.current = current;
-      // Living desktop: entering Aero brings the world to life. Remember the prior
-      // state; only auto-configure a gentle preset if the layer was off, so a user
-      // who already tuned their atmosphere keeps it (Phase 3 · M8).
-      const prevEnv = loadEnvironment();
-      aeroPrevEnv = prevEnv;
-      if (!prevEnv.enabled) {
-        saveEnvironment({ enabled: true, ...(presetPatch('floating-islands') ?? {}) });
+      aeroRestoreThemeId = current !== AERO_THEME_ID ? current : DEFAULT_THEME_ID;
+      const firstDiscovery = markAeroDiscovered();
+      applyAeroEnvironment(firstDiscovery);
+      const needsLock = armLockscreenOnSecretEntry();
+      if (needsLock) {
+        setTheme(AERO_THEME_ID);
+        window.dispatchEvent(new CustomEvent(AERO_ENTRY_LOCKED_EVENT));
+      } else {
+        window.dispatchEvent(new CustomEvent('shell:softReboot'));
+        window.setTimeout(() => setTheme(AERO_THEME_ID), 240);
       }
-      // Secret Mode "soft reboot": cover the screen with the Aero boot splash,
-      // switch the theme behind it, then reveal the glass OS (Phase 2 · M15).
-      window.dispatchEvent(new CustomEvent('shell:softReboot'));
-      window.setTimeout(() => setTheme(AERO_THEME_ID), 240);
-      setFlash('✨ Frutiger Aero');
+      setFlash('Frutiger Aero');
     }
-  };
+  }, []);
 
   // Typed "aero" Easter egg (ignored while typing in a field).
   useEffect(() => {
@@ -79,9 +85,7 @@ export default function SecretAeroTrigger() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-    // toggle is stable enough for this lifetime; deps intentionally empty.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [toggle]);
 
   // Auto-dismiss the confirmation flash.
   useEffect(() => {

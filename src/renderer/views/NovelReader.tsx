@@ -13,6 +13,13 @@ import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
 import {
+  AppChrome,
+  StatusBarField,
+  StatusBarSpacer,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from '../components/ui';
+import {
   buildNovelCss,
   clampFontSize,
   loadSettings,
@@ -40,6 +47,7 @@ import {
   applyAnnotationsToRoot,
   flushAnnotationsMirror,
   loadAnnotations,
+  removeAnnotation,
   type AnnoColor,
   type Annotation,
 } from '../annotations';
@@ -94,6 +102,7 @@ function parseLoc(loc: string | undefined): { part: number; frac: number } | nul
  * DOM stays small enough that huge books never freeze.
  */
 export default function NovelReader({ item, onClose }: Props) {
+  const aero = useAeroMaterials();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -1120,7 +1129,12 @@ export default function NovelReader({ item, onClose }: Props) {
         pre.setEnd(range.startContainer, range.startOffset);
         const start = pre.toString().length;
         const raw = range.toString();
-        const end = start + raw.length;
+        const blockLen = (block.textContent ?? '').length;
+        // A selection that runs past this block's own text (e.g. a long
+        // sentence spanning two windowed .novel-part chunks) would otherwise
+        // compute an out-of-range end and silently fail to render — clamp to
+        // what this block actually contains.
+        const end = Math.min(start + raw.length, blockLen);
         if (end <= start) return null;
         const text = (raw.trim() || raw).slice(0, 200);
         return { text, start, end, block };
@@ -1642,6 +1656,19 @@ export default function NovelReader({ item, onClose }: Props) {
     // Keep last target in sync so repeated H is stable
     rememberAnnoTarget(target);
 
+    // Toggle: pressing H again over an already-highlighted spot removes it,
+    // instead of silently no-op'ing (the old dedup in addAnnotation) or
+    // stacking a duplicate highlight underneath.
+    const overlapping = annotations.filter(
+      (a) => a.part === pi && a.startOffset < target!.end && a.endOffset > target!.start,
+    );
+    if (overlapping.length) {
+      let list = annotations;
+      for (const a of overlapping) list = removeAnnotation(item.id, a.id);
+      setAnnotations(list);
+      return;
+    }
+
     setAnnotations(
       addAnnotation(item.id, {
         part: pi,
@@ -1654,6 +1681,7 @@ export default function NovelReader({ item, onClose }: Props) {
   }, [
     item.id,
     annoColor,
+    annotations,
     paged,
     annoBlockOf,
     offsetsFromRange,
@@ -1915,8 +1943,105 @@ export default function NovelReader({ item, onClose }: Props) {
     }
   }
 
+  const readerMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'library', label: 'Return to library', icon: <Icon name="library" size={14} />, onSelect: onClose },
+        {
+          id: 'book',
+          label: 'Back to book',
+          icon: <Icon name="novels" size={14} />,
+          disabled: !linkView,
+          onSelect: exitLinkViewToBook,
+        },
+      ],
+    },
+    {
+      id: 'navigate',
+      label: 'Navigate',
+      items: [
+        {
+          id: 'previous',
+          label: 'Previous',
+          icon: <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />,
+          disabled: !!linkView || !loaded,
+          onSelect: () => flip(-1),
+        },
+        {
+          id: 'next',
+          label: 'Next',
+          icon: <Icon name="chevron" size={14} />,
+          disabled: !!linkView || !loaded,
+          onSelect: () => flip(1),
+        },
+        {
+          id: 'back-link',
+          label: 'Back through article history',
+          disabled: !linkView && !canLinkBack,
+          onSelect: leaveLinkView,
+        },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        {
+          id: 'settings',
+          label: settingsOpen ? 'Hide reading settings' : 'Reading settings',
+          icon: <Icon name="settings" size={14} />,
+          onSelect: () => setSettingsOpen((o) => !o),
+        },
+        {
+          id: 'bookmarks',
+          label: bookmarksOpen ? 'Hide bookmarks' : 'Bookmarks',
+          icon: <Icon name="bookmark" size={14} />,
+          onSelect: () => setBookmarksOpen((o) => !o),
+        },
+        {
+          id: 'collection',
+          label: collectionOpen ? 'Hide collection' : 'Flashcard collection',
+          icon: <Icon name="flashcards" size={14} />,
+          onSelect: () => setCollectionOpen((o) => !o),
+        },
+      ],
+    },
+    {
+      id: 'study',
+      label: 'Study',
+      items: [
+        {
+          id: 'bookmark-current',
+          label: 'Bookmark current position',
+          icon: <Icon name="bookmark" size={14} />,
+          disabled: !loaded || !!linkView,
+          onSelect: addCurrent,
+        },
+        {
+          id: 'collect-selection',
+          label: 'Collect selection',
+          icon: <Icon name="flashcards" size={14} />,
+          onSelect: () => addSelectionToCollection('selection'),
+        },
+      ],
+    },
+  ];
+  const readerStatus = (
+    <>
+      <StatusBarField>{linkView ? 'Article view' : loaded ? 'Book view' : 'Loading'}</StatusBarField>
+      <StatusBarField>{vertical ? 'Vertical' : 'Horizontal'}</StatusBarField>
+      <StatusBarField>{paged ? 'Pages' : 'Scroll'}</StatusBarField>
+      <StatusBarSpacer />
+      {paged && pageCount > 1 && <StatusBarField>{page + 1}/{pageCount}</StatusBarField>}
+      <StatusBarField>{Math.round((seek ?? progress) * 100)}%</StatusBarField>
+    </>
+  );
+
   return (
-    <div className="reader">
+    <AppChrome menus={readerMenus} status={readerStatus} className="aero-reader-chrome">
+    <div className={`reader${aero ? ' aero-reader' : ''}`}>
       <style>{injectedCss}</style>
       <div className="reader-bar">
         <button className="btn" onClick={onClose} title="Return to library">
@@ -2187,5 +2312,6 @@ export default function NovelReader({ item, onClose }: Props) {
           />
         ))}
     </div>
+    </AppChrome>
   );
 }

@@ -55,6 +55,13 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     description: 'Reduced launcher with pop-out apps',
   },
   {
+    id: 'lockscreen',
+    label: 'Lockscreen',
+    icon: 'lock',
+    group: 'Desktop',
+    description: 'PIN gate on app launch',
+  },
+  {
     id: 'study',
     label: 'Profile & dictionary',
     icon: 'dictionary',
@@ -327,6 +334,32 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     description: 'Rebind keys, mouse buttons, and profiles',
     keywords: ['shortcut', 'keybind', 'hotkey', 'keyboard', 'mouse', 'ctrl', 'binding'],
     pageId: 'shortcuts',
+    group: 'Desktop',
+  },
+
+  // Lockscreen
+  {
+    id: 'lockscreen-enable',
+    title: 'Lockscreen',
+    description: 'Require a passcode when Study OS launches',
+    keywords: ['lock', 'lockscreen', 'pin', 'passcode', 'password', 'security', 'login'],
+    pageId: 'lockscreen',
+    group: 'Desktop',
+  },
+  {
+    id: 'lockscreen-pin',
+    title: 'Lockscreen passcode',
+    description: 'Set or change the 4-digit PIN',
+    keywords: ['pin', 'passcode', 'password', '4 digit', 'lock'],
+    pageId: 'lockscreen',
+    group: 'Desktop',
+  },
+  {
+    id: 'lockscreen-tint',
+    title: 'Lockscreen look',
+    description: 'Tint behind the PIN panel',
+    keywords: ['lockscreen', 'tint', 'look', 'theme'],
+    pageId: 'lockscreen',
     group: 'Desktop',
   },
 

@@ -211,6 +211,8 @@ function wrapRange(
   let endNode: Text | null = null;
   let endOff = 0;
   let n = walker.nextNode() as Text | null;
+  let lastNode: Text | null = null;
+  let lastLen = 0;
   while (n) {
     const len = (n.textContent ?? '').length;
     if (!startNode && pos + len > start) {
@@ -223,7 +225,16 @@ function wrapRange(
       break;
     }
     pos += len;
+    lastNode = n;
+    lastLen = len;
     n = walker.nextNode() as Text | null;
+  }
+  // `end` came from a selection that ran past this block's own text (e.g. a
+  // sentence spanning two windowed .novel-part chunks) — clamp to whatever
+  // text this block actually has instead of dropping the highlight entirely.
+  if (!endNode && lastNode) {
+    endNode = lastNode;
+    endOff = lastLen;
   }
   if (!startNode || !endNode) return;
   try {

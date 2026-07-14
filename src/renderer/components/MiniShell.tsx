@@ -17,18 +17,28 @@ import {
   moveMiniApp,
   availableMiniApps,
   miniAppMeta,
+  miniAppLaunch,
+  isMiniSlotActive,
+  resolveMiniDesktopWallpaper,
+  onMiniDesktopWallpaperChanged,
+  MINI_THEME_TINTS,
   type MiniAppId,
   type MiniDensity,
   type MiniModeSettings,
-  type MiniThemeTint,
   type MiniWallpaperMode,
+  type MiniInlineWidget,
+  type MiniDesktopWall,
   miniAppLabel,
 } from '../miniMode';
+import { ClipboardWidget } from '../widgets/system';
+import { useAeroMaterials } from './ui';
 
 /** Base craft window size — height follows from locked aspect ratio. */
 const BASE_W = 352;
-/** Height / width — launcher grid + chrome only (apps live in pop-outs). */
-const ASPECT = 0.68;
+/** Height / width — launcher grid + chrome (tighter to reduce empty space). */
+const ASPECT_GRID = 0.56;
+/** Extra height when an inline widget panel is open. */
+const ASPECT_INLINE = 0.4;
 const SCALE_MIN = 0.72;
 const SCALE_MAX = 1.55;
 const SCALE_KEY = 'jp-mini-frame-scale-v1';
@@ -80,10 +90,13 @@ export default function MiniShell({
   const [addPick, setAddPick] = useState<MiniAppId | ''>('');
   const [msg, setMsg] = useState('');
   const [popped, setPopped] = useState<Set<string>>(() => new Set());
+  const [activeInline, setActiveInline] = useState<MiniInlineWidget | null>(null);
+  const [desktopWall, setDesktopWall] = useState<MiniDesktopWall>({ kind: 'none' });
   const [scale, setScale] = useState(loadScale);
   const resizing = useRef(false);
   const resizeStart = useRef({ y: 0, scale: 1 });
   const clock = useClock(cfg.showClock);
+  const aeroMini = useAeroMaterials();
 
   useEffect(() => onMiniModeChanged(setCfg), []);
 
@@ -121,14 +134,41 @@ export default function MiniShell({
     };
   }, [cfg.wallpaperMode, cfg.wallpaperPath]);
 
+  /** Sync mini backdrop with the Study desktop wallpaper when requested. */
+  useEffect(() => {
+    if (cfg.wallpaperMode !== 'desktop') {
+      setDesktopWall({ kind: 'none' });
+      return;
+    }
+    let dead = false;
+    const load = async () => {
+      const next = await resolveMiniDesktopWallpaper();
+      if (!dead) setDesktopWall(next);
+    };
+    void load();
+    return onMiniDesktopWallpaperChanged(() => {
+      void load();
+    });
+  }, [cfg.wallpaperMode]);
+
   const flash = (text: string) => {
     setMsg(text);
     window.setTimeout(() => setMsg(''), 2000);
   };
 
   const openApp = (id: MiniAppId) => {
-    void window.api.popOut(id);
-    flash(`Opened ${miniAppLabel(id)}`);
+    const target = miniAppLaunch(id);
+    if (target.kind === 'inline') {
+      setActiveInline((cur) => {
+        const next = cur === target.widget ? null : target.widget;
+        flash(next ? 'Opened clipboard' : 'Closed clipboard');
+        return next;
+      });
+      return;
+    }
+    void window.api.popOut(target.section);
+    const label = id === 'music' ? 'Music widget' : miniAppLabel(id);
+    flash(`Opened ${label}`);
   };
 
   // Auto-open first pinned app once per mini session as a pop-out.
@@ -160,13 +200,14 @@ export default function MiniShell({
   }, [addChoices, addPick]);
 
   const frameW = Math.round(BASE_W * scale);
-  const frameH = Math.round(BASE_W * ASPECT * scale);
+  const aspect = ASPECT_GRID + (activeInline ? ASPECT_INLINE : 0);
+  const frameH = Math.round(BASE_W * aspect * scale);
 
   // Keep the OS widget window tightly wrapped around the craft panel.
   useEffect(() => {
     if (!widgetMode) return;
     void window.api.miniSetSize({ width: frameW + 4, height: frameH + 4 });
-  }, [widgetMode, frameW, frameH]);
+  }, [widgetMode, frameW, frameH, activeInline]);
 
   // Mark document for transparent root CSS (no solid body fill).
   // Reset app zoom so the widget fills the OS window without letterboxing.
@@ -196,6 +237,7 @@ export default function MiniShell({
       /* ignore */
     }
     setMiniModeEnabled(false);
+    void window.api?.miniFocusMain?.();
   }, []);
 
   const doAddApp = (id?: MiniAppId) => {
@@ -338,12 +380,21 @@ export default function MiniShell({
   };
 
   const wallBlur = Math.max(0, Math.min(40, cfg.wallpaperBlur ?? 0));
-  const showImageWall = cfg.wallpaperMode === 'image' && !!(wallSrc || cfg.wallpaperUrl);
-  const imageSrc = wallSrc || cfg.wallpaperUrl;
+  const showImageWall =
+    (cfg.wallpaperMode === 'image' && !!(wallSrc || cfg.wallpaperUrl)) ||
+    (cfg.wallpaperMode === 'desktop' && desktopWall.kind === 'image');
+  const showPresetWall = cfg.wallpaperMode === 'desktop' && desktopWall.kind === 'preset';
+  const imageSrc =
+    cfg.wallpaperMode === 'desktop' && desktopWall.kind === 'image'
+      ? desktopWall.url
+      : wallSrc || cfg.wallpaperUrl;
+  const slotIconSize = aeroMini ? Math.round(18 + scale * 9) : Math.round(16 + scale * 7);
 
   return (
     <div
-      className={`mini-shell mini-tint-${cfg.tint}${widgetMode ? ' is-widget' : ''}`}
+      className={`mini-shell mini-tint-${cfg.tint}${widgetMode ? ' is-widget' : ''}${
+        aeroMini ? ' is-aero-mini' : ' is-modern-mini'
+      }${cfg.monoMode && !aeroMini ? ' mini-mono' : ''}`}
       data-mini="1"
       data-widget={widgetMode ? '1' : undefined}
     >
@@ -351,6 +402,16 @@ export default function MiniShell({
           Widget mode: OS window is transparent — wallpaper fills the craft frame only. */}
       {!widgetMode && (
         <div className="mini-backdrop" aria-hidden>
+          {showPresetWall ? (
+            <div
+              className="mini-wall-layer mini-wall-preset"
+              style={{
+                background: desktopWall.css,
+                filter: wallBlur > 0 ? `blur(${wallBlur}px)` : undefined,
+                transform: wallBlur > 0 ? 'scale(1.08)' : undefined,
+              }}
+            />
+          ) : null}
           {showImageWall && imageSrc ? (
             <div
               className="mini-wall-layer mini-wall-image"
@@ -387,19 +448,29 @@ export default function MiniShell({
 
       <div
         className={`mini-frame ${densityClass}${widgetMode ? ' is-widget-frame' : ''}${
-          showImageWall || cfg.wallpaperMode === 'icons' ? ' has-wall' : ''
+          showImageWall || cfg.wallpaperMode === 'icons' || showPresetWall ? ' has-wall' : ''
         }`}
         style={
           widgetMode
-            ? { width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }
-            : { width: frameW, height: frameH }
+            ? { width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', ['--mini-scale' as string]: scale }
+            : { width: frameW, height: frameH, ['--mini-scale' as string]: scale }
         }
         role="dialog"
         aria-label="Mini view"
       >
         {/* Wallpaper inside the rounded frame (widget + non-widget when image/icons). */}
-        {(showImageWall || cfg.wallpaperMode === 'icons') && (
+        {(showImageWall || cfg.wallpaperMode === 'icons' || showPresetWall) && (
           <div className="mini-frame-wall" aria-hidden>
+            {showPresetWall ? (
+              <div
+                className="mini-wall-layer mini-wall-preset"
+                style={{
+                  background: desktopWall.css,
+                  filter: wallBlur > 0 ? `blur(${wallBlur}px)` : undefined,
+                  transform: wallBlur > 0 ? 'scale(1.1)' : undefined,
+                }}
+              />
+            ) : null}
             {showImageWall && imageSrc ? (
               <div
                 className="mini-wall-layer mini-wall-image"
@@ -498,7 +569,7 @@ export default function MiniShell({
                 );
               }
               const meta = miniAppMeta(id);
-              const on = popped.has(id);
+              const on = isMiniSlotActive(id, popped, activeInline);
               return (
                 <button
                   key={id}
@@ -507,8 +578,8 @@ export default function MiniShell({
                   title={`${meta.label} (${i + 1})`}
                   onClick={() => selectSlot(id)}
                 >
-                  <span className="mini-slot-icon" aria-hidden>
-                    <Icon name={meta.icon as IconName} size={scale < 0.9 ? 16 : 20} />
+                  <span className={`mini-slot-icon app-${id}`} aria-hidden>
+                    <Icon name={meta.icon as IconName} size={slotIconSize} />
                   </span>
                   <span className="mini-slot-label">{meta.label}</span>
                 </button>
@@ -517,9 +588,30 @@ export default function MiniShell({
           </div>
         </div>
 
-        <footer className="mini-footer mini-no-drag" aria-hidden>
-          <span className="mini-footer-hint">Apps open in their own window</span>
-        </footer>
+        {activeInline === 'clipboard' && (
+          <section className="mini-stage mini-no-drag" aria-label="Clipboard">
+            <div className="mini-stage-bar">
+              <span className="mini-stage-title">Clipboard</span>
+              <button
+                type="button"
+                className="mini-ico-btn"
+                title="Close"
+                onClick={() => setActiveInline(null)}
+              >
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+            <div className="mini-stage-body">
+              <ClipboardWidget />
+            </div>
+          </section>
+        )}
+
+        {!widgetMode && !activeInline && (
+          <footer className="mini-footer mini-no-drag" aria-hidden>
+            <span className="mini-footer-hint">Slots open widgets or pop-out apps</span>
+          </footer>
+        )}
 
         {/* Uniform size grip — scale only (updates OS window bounds in widget mode) */}
         <button
@@ -592,15 +684,8 @@ export default function MiniShell({
                   </button>
                 ))}
               </div>
-              <div className="mini-seg">
-                {(
-                  [
-                    ['neutral', 'N'],
-                    ['ember', 'E'],
-                    ['slate', 'S'],
-                    ['moss', 'M'],
-                  ] as [MiniThemeTint, string][]
-                ).map(([id, label]) => (
+              <div className="mini-seg mini-seg-wrap">
+                {MINI_THEME_TINTS.map((id) => (
                   <button
                     key={id}
                     type="button"
@@ -608,7 +693,7 @@ export default function MiniShell({
                     onClick={() => setCfg(saveMiniMode({ tint: id }))}
                     title={id}
                   >
-                    {label}
+                    {id.slice(0, 1).toUpperCase()}
                   </button>
                 ))}
               </div>
@@ -628,6 +713,16 @@ export default function MiniShell({
                 />
                 <span>Auto-open first</span>
               </label>
+              {!aeroMini && (
+                <label className="mini-check">
+                  <input
+                    type="checkbox"
+                    checked={cfg.monoMode}
+                    onChange={(e) => setCfg(saveMiniMode({ monoMode: e.target.checked }))}
+                  />
+                  <span>Dark mono (B&amp;W)</span>
+                </label>
+              )}
             </section>
 
             <section className="mini-panel-block">
@@ -638,6 +733,7 @@ export default function MiniShell({
                     ['none', 'Off'],
                     ['icons', 'Icons'],
                     ['image', 'Image'],
+                    ['desktop', 'Desktop'],
                   ] as [MiniWallpaperMode, string][]
                 ).map(([id, label]) => (
                   <button
@@ -651,7 +747,7 @@ export default function MiniShell({
                 ))}
               </div>
               <p className="muted mini-panel-note">
-                Icons = mosaic of your pinned apps. Image = custom photo.
+                Icons = mosaic of pinned apps. Image = custom photo. Desktop = match Study wallpaper.
               </p>
               <div className="mini-seg" style={{ marginTop: 6 }}>
                 <button type="button" className="mini-chip" onClick={() => void pickWallpaper()}>

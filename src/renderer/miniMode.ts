@@ -4,6 +4,9 @@
  */
 
 import type { DesktopWinSection } from '../shared/desktop';
+import { DESKTOP_STUDY } from '../shared/desktop';
+import { getDesktopLayout, onDesktopChanged } from './desktopState';
+import { WALL_PRESETS } from './environment/wallCatalog';
 
 /** Apps that can be pinned in Mini (must be pop-out capable). */
 export type MiniAppId =
@@ -14,6 +17,8 @@ export type MiniAppId =
   | 'translate'
   | 'player'
   | 'music'
+  | 'musicwidget'
+  | 'clipboard'
   | 'anki'
   | 'flashcards'
   | 'stats'
@@ -23,9 +28,33 @@ export type MiniAppId =
   | 'settings';
 
 export type MiniDensity = 'compact' | 'comfortable' | 'spacious';
-export type MiniThemeTint = 'neutral' | 'ember' | 'slate' | 'moss';
+
+export const MINI_THEME_TINTS = [
+  'neutral',
+  'ember',
+  'slate',
+  'moss',
+  'ocean',
+  'violet',
+  'sand',
+  'crimson',
+  'frost',
+] as const;
+export type MiniThemeTint = (typeof MINI_THEME_TINTS)[number];
+
 /** Backdrop behind the craft frame. */
-export type MiniWallpaperMode = 'none' | 'image' | 'icons';
+export type MiniWallpaperMode = 'none' | 'image' | 'icons' | 'desktop';
+
+export type MiniInlineWidget = 'clipboard';
+
+export type MiniLaunchTarget =
+  | { kind: 'popout'; section: DesktopWinSection }
+  | { kind: 'inline'; widget: MiniInlineWidget };
+
+export type MiniDesktopWall =
+  | { kind: 'none' }
+  | { kind: 'image'; url: string }
+  | { kind: 'preset'; css: string };
 
 export interface MiniModeSettings {
   /** When true, App mounts MiniShell instead of DesktopShell. */
@@ -52,6 +81,8 @@ export interface MiniModeSettings {
   wallpaperUrl: string;
   /** Gaussian blur on the wallpaper layer, 0–40 px. */
   wallpaperBlur: number;
+  /** Black & white high-contrast look — modern Study mini only (ignored in Aero). */
+  monoMode: boolean;
 }
 
 const KEY = 'jp-study-mini-mode-v1';
@@ -63,6 +94,8 @@ export const MINI_APP_CATALOG: { id: MiniAppId; label: string; icon: string }[] 
   { id: 'flashcards', label: 'Flashcards', icon: 'flashcards' },
   { id: 'anki', label: 'Anki', icon: 'anki' },
   { id: 'music', label: 'Music', icon: 'music' },
+  { id: 'musicwidget', label: 'Music Widget', icon: 'music' },
+  { id: 'clipboard', label: 'Clipboard', icon: 'clipboard' },
   { id: 'player', label: 'Media', icon: 'player' },
   { id: 'novels', label: 'Novels', icon: 'novels' },
   { id: 'translate', label: 'Translate', icon: 'translate' },
@@ -97,6 +130,7 @@ const DEFAULTS: MiniModeSettings = {
   wallpaperPath: '',
   wallpaperUrl: '',
   wallpaperBlur: 12,
+  monoMode: false,
 };
 
 function clampBlur(n: unknown): number {
@@ -180,18 +214,21 @@ export function loadMiniMode(): MiniModeSettings {
           ? p.density
           : DEFAULTS.density,
       showClock: p.showClock !== false,
-      tint:
-        p.tint === 'ember' || p.tint === 'slate' || p.tint === 'moss' || p.tint === 'neutral'
-          ? p.tint
-          : DEFAULTS.tint,
+      tint: MINI_THEME_TINTS.includes(p.tint as MiniThemeTint)
+        ? (p.tint as MiniThemeTint)
+        : DEFAULTS.tint,
       autoOpenFirst: !!p.autoOpenFirst,
       wallpaperMode:
-        p.wallpaperMode === 'none' || p.wallpaperMode === 'image' || p.wallpaperMode === 'icons'
+        p.wallpaperMode === 'none' ||
+        p.wallpaperMode === 'image' ||
+        p.wallpaperMode === 'icons' ||
+        p.wallpaperMode === 'desktop'
           ? p.wallpaperMode
           : DEFAULTS.wallpaperMode,
       wallpaperPath: typeof p.wallpaperPath === 'string' ? p.wallpaperPath : '',
       wallpaperUrl: typeof p.wallpaperUrl === 'string' ? p.wallpaperUrl : '',
       wallpaperBlur: clampBlur(p.wallpaperBlur ?? DEFAULTS.wallpaperBlur),
+      monoMode: !!p.monoMode,
     };
   } catch {
     return { ...DEFAULTS, apps: [...DEFAULT_APPS] };
@@ -244,8 +281,15 @@ export function onMiniModeChanged(cb: (s: MiniModeSettings) => void): () => void
     const d = (e as CustomEvent<MiniModeSettings>).detail;
     cb(d && typeof d === 'object' && Array.isArray((d as MiniModeSettings).apps) ? d : loadMiniMode());
   };
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === KEY) h(new CustomEvent(EVENT, { detail: loadMiniMode() }));
+  };
   window.addEventListener(EVENT, h);
-  return () => window.removeEventListener(EVENT, h);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(EVENT, h);
+    window.removeEventListener('storage', onStorage);
+  };
 }
 
 export function miniAppMeta(id: MiniAppId): { id: MiniAppId; label: string; icon: string } {
@@ -254,4 +298,63 @@ export function miniAppMeta(id: MiniAppId): { id: MiniAppId; label: string; icon
 
 export function miniAppLabel(id: MiniAppId): string {
   return miniAppMeta(id).label;
+}
+
+/** How a pinned mini slot opens when clicked. */
+export function miniAppLaunch(id: MiniAppId): MiniLaunchTarget {
+  switch (id) {
+    case 'music':
+    case 'musicwidget':
+      return { kind: 'popout', section: 'musicwidget' };
+    case 'clipboard':
+      return { kind: 'inline', widget: 'clipboard' };
+    default:
+      return { kind: 'popout', section: id as DesktopWinSection };
+  }
+}
+
+/** Pop-out section used for slot highlight (music → musicwidget). */
+export function miniPopoutSection(id: MiniAppId): DesktopWinSection | null {
+  const target = miniAppLaunch(id);
+  return target.kind === 'popout' ? target.section : null;
+}
+
+export function isMiniSlotActive(id: MiniAppId, popped: Set<string>, inline: MiniInlineWidget | null): boolean {
+  const target = miniAppLaunch(id);
+  if (target.kind === 'inline') return inline === target.widget;
+  return popped.has(target.section);
+}
+
+/** Match the Study desktop wallpaper for mini backdrop. */
+export async function resolveMiniDesktopWallpaper(): Promise<MiniDesktopWall> {
+  const wall = getDesktopLayout(DESKTOP_STUDY).wallpaper;
+  try {
+    if (wall.kind === 'image' && wall.path) {
+      const url =
+        (await window.api.imageFileUrl(wall.path)) ??
+        (await window.api.setWallpaperFromPath(wall.path));
+      if (url) return { kind: 'image', url };
+    }
+    if (wall.kind === 'slideshow' && wall.folder) {
+      const paths = await window.api.listWallpaperFolder(wall.folder);
+      const first = paths[0];
+      if (first) {
+        const url = await window.api.imageFileUrl(first);
+        if (url) return { kind: 'image', url };
+      }
+    }
+    if (wall.kind === 'preset' && wall.id) {
+      const preset = WALL_PRESETS.find((p) => p.id === wall.id);
+      if (preset) return { kind: 'preset', css: preset.css };
+    }
+    const fallback = await window.api.getWallpaper();
+    if (fallback) return { kind: 'image', url: fallback };
+  } catch {
+    /* ignore */
+  }
+  return { kind: 'none' };
+}
+
+export function onMiniDesktopWallpaperChanged(cb: () => void): () => void {
+  return onDesktopChanged(() => cb());
 }

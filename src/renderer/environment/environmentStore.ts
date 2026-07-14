@@ -88,7 +88,7 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
 
   const companionTypes = Array.isArray(partial.companionTypes)
     ? (partial.companionTypes.filter((t) =>
-        t === 'study-buddy' || t === 'critter' || t === 'timekeeper' || t === 'noctis',
+        t === 'study-buddy' || t === 'critter' || t === 'timekeeper' || t === 'noctis' || t === 'miko-shimeji',
       ) as EnvironmentSettings['companionTypes'])
     : DEFAULT_ENVIRONMENT.companionTypes;
 

@@ -65,6 +65,27 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'nav.nextWindow', label: 'Next window', category: 'Navigation', defaultKeys: 'Ctrl+Tab' },
   { id: 'nav.prevWindow', label: 'Previous window', category: 'Navigation', defaultKeys: 'Ctrl+Shift+Tab' },
   {
+    id: 'nav.nextAppFullscreen',
+    label: 'Next app (full screen)',
+    category: 'Navigation',
+    defaultKeys: 'F11',
+    note: 'Cycles through open apps and switches to full screen.',
+  },
+  {
+    id: 'nav.nextDesktop',
+    label: 'Switch to next desktop',
+    category: 'Navigation',
+    defaultKeys: 'Meta+Ctrl+ArrowRight',
+    note: 'Cycles Desktop 1 → Desktop 2. Saves the current layout before switching.',
+  },
+  {
+    id: 'nav.prevDesktop',
+    label: 'Switch to previous desktop',
+    category: 'Navigation',
+    defaultKeys: 'Meta+Ctrl+ArrowLeft',
+    note: 'Cycles Desktop 2 → Desktop 1. Saves the current layout before switching.',
+  },
+  {
     id: 'nav.undo',
     label: 'Undo last action',
     category: 'Navigation',
@@ -819,6 +840,12 @@ function builtinHandler(id: string): Handler | null {
       return () => void window.dispatchEvent(new CustomEvent('os:cycle-window', { detail: 1 }));
     case 'nav.prevWindow':
       return () => void window.dispatchEvent(new CustomEvent('os:cycle-window', { detail: -1 }));
+    case 'nav.nextAppFullscreen':
+      return () => void window.dispatchEvent(new CustomEvent('os:cycle-app-fullscreen', { detail: 1 }));
+    case 'nav.nextDesktop':
+      return () => void window.dispatchEvent(new CustomEvent('os:switch-desktop', { detail: 1 }));
+    case 'nav.prevDesktop':
+      return () => void window.dispatchEvent(new CustomEvent('os:switch-desktop', { detail: -1 }));
     case 'nav.undo':
       return () => {
         if (!canUndo()) {

@@ -8,6 +8,7 @@
  */
 
 import { registerTheme, type Theme } from './engine';
+import { AERO_PROOF_SOUND_PACK_ID } from '../audio/aeroProofPack';
 
 export const AERO_THEME_ID = 'frutiger-aero';
 
@@ -19,6 +20,7 @@ export const FRUTIGER_AERO_THEME: Theme = {
   light: true,
   version: 1,
   materialSet: 'aero',
+  assetPack: { id: 'frutiger-aero-assets', sounds: AERO_PROOF_SOUND_PACK_ID },
   swatch: { bg: '#bfe6ff', text: '#123a52', border: '#a9d4ef' },
 };
 

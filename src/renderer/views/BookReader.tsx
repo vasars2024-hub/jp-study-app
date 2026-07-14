@@ -502,11 +502,11 @@ export default function BookReader({ item, onClose }: Props) {
     // or sentence opens the auto-translation popup.
     rendition.on('selected', (_cfiRange: string, contents: any) => {
       try {
-        epubLookupHandledRef.current = true;
         const win = contents?.window as Window | undefined;
         if (!win) return;
         const hit = lookupWordFromSelection(win);
         if (!hit) return;
+        epubLookupHandledRef.current = true;
         const base = viewerRef.current?.getBoundingClientRect();
         setPopup({
           kind: hit.translate ? 'translate' : 'dict',

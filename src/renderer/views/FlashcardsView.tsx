@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { confirmDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import {
+  confirmDialog,
+  AppChrome,
+  Button,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarSpacer,
+  useAeroMaterials,
+  type MenuBarMenu,
+} from '../components/ui';
 import Icon from '../components/Icons';
 import EpubMiningPanel from '../components/EpubMiningPanel';
 import EpubMiningSimplePanel from '../components/EpubMiningSimplePanel';
@@ -52,6 +62,7 @@ function shuffle<T>(arr: T[]): T[] {
 type EpubMiningUi = 'simple' | 'advanced';
 
 export default function FlashcardsView() {
+  const aero = useAeroMaterials();
   const [saved, setSaved] = useState<SavedWord[]>(() => loadSaved());
   const [deck, setDeck] = useState<DeckFlashcard[]>(() => loadDeck());
   const [folders, setFolders] = useState<string[]>(() => loadDeckFolders());
@@ -718,6 +729,427 @@ export default function FlashcardsView() {
       <StatusBarField live>{epubReviewCandidates.length} ready to review</StatusBarField>
     </>
   );
+
+  if (aero) {
+    const knownEpubCount = epubCards.filter((card) => card.known).length;
+    const unfiledCount = epubCards.filter((card) => !card.folder).length;
+    const activeFolderLabel =
+      folderFilter === 'all' ? 'All cards' : folderFilter === 'unfiled' ? 'Unfiled' : String(folderFilter);
+
+    return (
+      <AppChrome menus={deckMenus} status={deckStatus} className="aero-flash-chrome">
+        <div className="aero-flash">
+          <Toolbar className="aero-flash-toolbar">
+            <Button
+              size="sm"
+              variant="primary"
+              leftIcon={<Icon name="flashcards" size={14} />}
+              disabled={epubReviewCandidates.length === 0}
+              onClick={startEpubReview}
+            >
+              Review
+            </Button>
+            <Button size="sm" leftIcon={<Icon name="library" size={14} />} onClick={() => openEpubMining('simple')}>
+              Mine
+            </Button>
+            <Button size="sm" leftIcon={<Icon name="scan" size={14} />} onClick={() => openEpubMining('advanced')}>
+              Advanced
+            </Button>
+            <Button size="sm" leftIcon={<Icon name="clipboard" size={14} />} onClick={() => setMode('csv-tool')}>
+              CSV
+            </Button>
+            <Button size="sm" leftIcon={<Icon name="sparkle" size={14} />} onClick={() => setMode('ai-studio')}>
+              Studio
+            </Button>
+            <ToolbarSpacer />
+            <Button
+              size="sm"
+              leftIcon={<Icon name="dictionary" size={14} />}
+              disabled={saved.length === 0}
+              onClick={startReview}
+            >
+              Dictionary review
+            </Button>
+          </Toolbar>
+
+          <div className="aero-flash-layout">
+            <aside className="aero-flash-nav">
+              <div className="aero-flash-nav-group">
+                <div className="aero-flash-nav-title">Sources</div>
+                <button
+                  type="button"
+                  className={`aero-flash-source ${overviewTab === 'epub' ? 'active' : ''}`}
+                  onClick={() => setOverviewTab('epub')}
+                >
+                  <Icon name="library" size={16} />
+                  <span>EPUB decks</span>
+                  <strong>{epubCards.length}</strong>
+                </button>
+                <button
+                  type="button"
+                  className={`aero-flash-source ${overviewTab === 'dictionary' ? 'active' : ''}`}
+                  onClick={() => setOverviewTab('dictionary')}
+                >
+                  <Icon name="dictionary" size={16} />
+                  <span>Dictionary</span>
+                  <strong>{saved.length}</strong>
+                </button>
+              </div>
+
+              <div className="aero-flash-nav-group">
+                <div className="aero-flash-nav-title">Folders</div>
+                <button
+                  type="button"
+                  className={`aero-flash-folder ${folderFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setFolderFilter('all')}
+                >
+                  <span>All cards</span>
+                  <strong>{epubCards.length}</strong>
+                </button>
+                <button
+                  type="button"
+                  className={`aero-flash-folder ${folderFilter === 'unfiled' ? 'active' : ''} ${dropHover === 'unfiled' ? 'dragover' : ''}`}
+                  onClick={() => setFolderFilter('unfiled')}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDropHover('unfiled');
+                  }}
+                  onDragLeave={() => setDropHover(null)}
+                  onDrop={(e) => onFolderDrop(e, null)}
+                >
+                  <span>Unfiled</span>
+                  <strong>{unfiledCount}</strong>
+                </button>
+                {folders.map((folder) => (
+                  <button
+                    key={folder}
+                    type="button"
+                    draggable
+                    className={`aero-flash-folder ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
+                    onClick={() => setFolderFilter(folder)}
+                    onDragStart={(e) => e.dataTransfer.setData('app/flash-folder', folder)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDropHover(folder);
+                    }}
+                    onDragLeave={() => setDropHover(null)}
+                    onDrop={(e) => {
+                      const draggedFolder = e.dataTransfer.getData('app/flash-folder');
+                      if (draggedFolder && draggedFolder !== folder) {
+                        void reorderFolder(draggedFolder, folder);
+                        return;
+                      }
+                      onFolderDrop(e, folder);
+                    }}
+                  >
+                    <span>{folder}</span>
+                    <strong>{epubCards.filter((card) => card.folder === folder).length}</strong>
+                    <span
+                      className="aero-flash-folder-x"
+                      role="button"
+                      tabIndex={0}
+                      title="Delete folder"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFolder(folder);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.stopPropagation();
+                          removeFolder(folder);
+                        }
+                      }}
+                    >
+                      x
+                    </span>
+                  </button>
+                ))}
+                {creatingFolder ? (
+                  <div className="aero-flash-folder-edit">
+                    <input
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') createFolder();
+                        if (e.key === 'Escape') {
+                          setCreatingFolder(false);
+                          setNewFolderName('');
+                          setFolderErr('');
+                        }
+                      }}
+                      placeholder="Folder name"
+                      autoFocus
+                    />
+                    <Button size="sm" onClick={createFolder}>
+                      Add
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="aero-flash-folder-add"
+                    leftIcon={<Icon name="plus" size={13} />}
+                    onClick={() => setCreatingFolder(true)}
+                  >
+                    Folder
+                  </Button>
+                )}
+                {folderErr && <div className="aero-flash-error">{folderErr}</div>}
+              </div>
+            </aside>
+
+            <main className="aero-flash-work">
+              <div className="aero-flash-head">
+                <div>
+                  <div className="aero-flash-kicker">{overviewTab === 'epub' ? activeFolderLabel : 'Saved words'}</div>
+                  <h2>{overviewTab === 'epub' ? 'Deck catalog' : 'Dictionary deck'}</h2>
+                </div>
+                <div className="aero-flash-meters">
+                  <span>
+                    <strong>{filteredDeck.length}</strong>
+                    visible
+                  </span>
+                  <span>
+                    <strong>{knownEpubCount}</strong>
+                    known
+                  </span>
+                  <span>
+                    <strong>{epubReviewCandidates.length}</strong>
+                    due
+                  </span>
+                </div>
+              </div>
+
+              {overviewTab === 'epub' ? (
+                filteredDeck.length === 0 ? (
+                  <div className="aero-flash-empty">
+                    No cards in this view. Mine from an EPUB or switch folder filters.
+                  </div>
+                ) : (
+                  <div className="aero-flash-table" role="table" aria-label="EPUB deck catalog">
+                    <div className="aero-flash-table-head" role="row">
+                      <span>Source</span>
+                      <span>Cards</span>
+                      <span>Known</span>
+                      <span>Folder</span>
+                      <span>Actions</span>
+                    </div>
+                    <div className="aero-flash-groups">
+                      {bookGroups.map((group) => {
+                        const groupKey = `${group.bookId}::${group.bookTitle}`;
+                        const collapsed = collapsedBooks[groupKey] ?? false;
+                        const knownCount = group.cards.filter((card) => card.known).length;
+                        return (
+                          <section key={groupKey} className="aero-flash-group">
+                            <div
+                              className="aero-flash-group-row"
+                              draggable
+                              onDragStart={(e) => onBookGroupDragStart(e, group.bookId, group.bookTitle)}
+                            >
+                              <button
+                                type="button"
+                                className="aero-flash-group-main"
+                                onClick={() => toggleBookGroup(groupKey)}
+                                aria-expanded={!collapsed}
+                              >
+                                <span className="aero-flash-chevron" aria-hidden />
+                                <span className="aero-flash-group-title">{group.bookTitle}</span>
+                              </button>
+                              <span>{group.cards.length}</span>
+                              <span>{knownCount}</span>
+                              <span className="aero-flash-folder-tag">{group.cards[0]?.folder ?? 'Unfiled'}</span>
+                              <span className="aero-flash-row-actions">
+                                <Button size="sm" onClick={() => startReviewForGroup(group)}>
+                                  Review
+                                </Button>
+                                <Button size="sm" onClick={() => setDeckMenuGroup(group)}>
+                                  Options
+                                </Button>
+                                <button
+                                  type="button"
+                                  className="aero-flash-row-x"
+                                  title="Delete deck"
+                                  onClick={() => removeBookDeck(group.bookId, group.bookTitle)}
+                                >
+                                  x
+                                </button>
+                              </span>
+                            </div>
+                            {!collapsed && (
+                              <div className="aero-flash-card-rows">
+                                {group.cards.slice(0, 80).map((card) => (
+                                  <div
+                                    key={card.id}
+                                    className="aero-flash-card-row"
+                                    draggable
+                                    onDragStart={(e) => onCardDragStart(e, card.id)}
+                                  >
+                                    <span className="aero-flash-word" lang="ja">
+                                      {card.word}
+                                    </span>
+                                    <span className="aero-flash-reading" lang="ja">
+                                      {card.reading && card.reading !== card.word ? card.reading : ''}
+                                    </span>
+                                    <span className="aero-flash-meaning">{card.meaning || card.back || '-'}</span>
+                                    <span className="aero-flash-row-actions">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => setFileMenu(fileMenu === card.id ? null : card.id)}
+                                      >
+                                        File
+                                      </Button>
+                                      {fileMenu === card.id && (
+                                        <div className="flash-file-menu aero-flash-file-menu">
+                                          <button type="button" onClick={() => { setDeck(setDeckCardFolder(card.id, null)); setFileMenu(null); }}>
+                                            Unfiled
+                                          </button>
+                                          {folders.map((folder) => (
+                                            <button
+                                              key={folder}
+                                              type="button"
+                                              onClick={() => {
+                                                setDeck(setDeckCardFolder(card.id, folder));
+                                                setFileMenu(null);
+                                              }}
+                                            >
+                                              {folder}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                      <button
+                                        type="button"
+                                        className="aero-flash-row-x"
+                                        title="Remove"
+                                        onClick={() => setDeck(removeDeckCard(card.id))}
+                                      >
+                                        x
+                                      </button>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              ) : saved.length === 0 ? (
+                <div className="aero-flash-empty">
+                  No saved words yet. Open Dictionary or highlight a word while reading to save it here.
+                </div>
+              ) : (
+                <div className="aero-flash-dict-list" role="list">
+                  {saved.map((word) => (
+                    <div className="aero-flash-dict-row" key={word.word} role="listitem">
+                      <span className="aero-flash-word" lang="ja">
+                        {word.word}
+                      </span>
+                      <span className="aero-flash-reading" lang="ja">
+                        {word.reading && word.reading !== word.word ? word.reading : ''}
+                      </span>
+                      <span className="aero-flash-meaning">{word.meaning}</span>
+                      <button className="aero-flash-row-x" title="Remove" onClick={() => removeSaved(word.word)}>
+                        x
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </main>
+
+            <aside className="aero-flash-inspector">
+              <section className="aero-flash-panel aero-flash-session">
+                <div className="aero-flash-panel-head">
+                  <h3>Study session</h3>
+                  <span>{epubReviewCandidates.length} ready</span>
+                </div>
+                <label>
+                  EPUB source
+                  <select value={reviewBookKey} onChange={(e) => setReviewBookKey(e.target.value)}>
+                    <option value="all">All in current folder ({filteredDeck.length})</option>
+                    {epubReviewBooks.map((group) => {
+                      const key = `${group.bookId}::${group.bookTitle}`;
+                      const inFolder = filterDeckByBook(filteredDeck, key).length;
+                      return (
+                        <option key={key} value={key}>
+                          {group.bookTitle} ({inFolder || group.cards.length})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+                <label className="aero-flash-check">
+                  <input
+                    type="checkbox"
+                    checked={reviewUnknownOnly}
+                    onChange={(e) => setReviewUnknownOnly(e.target.checked)}
+                  />
+                  Unknown cards only
+                </label>
+                <Button
+                  variant="primary"
+                  block
+                  disabled={epubReviewCandidates.length === 0}
+                  onClick={startEpubReview}
+                  leftIcon={<Icon name="flashcards" size={15} />}
+                >
+                  Start review
+                </Button>
+              </section>
+
+              <section className="aero-flash-panel aero-flash-import">
+                <div className="aero-flash-panel-head">
+                  <h3>Import</h3>
+                  <span>CSV, TSV, TXT</span>
+                </div>
+                <DeckImportPanel onImported={() => setDeck(loadDeck())} />
+              </section>
+
+              <section className="aero-flash-panel">
+                <div className="aero-flash-panel-head">
+                  <h3>Recent cards</h3>
+                  <span>Newest</span>
+                </div>
+                <div className="aero-flash-recent">
+                  {recentStrip.length === 0 ? (
+                    <p>No recent cards.</p>
+                  ) : (
+                    recentStrip.slice(0, 8).map((card) => (
+                      <div key={card.id} className="aero-flash-recent-card">
+                        <span lang="ja">{card.word}</span>
+                        <small>{card.reading && card.reading !== card.word ? card.reading : card.meaning || card.back}</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            </aside>
+          </div>
+
+          {deckMenuGroup && (
+            <DeckActionMenu
+              group={deckMenuGroup}
+              folders={folders}
+              onClose={() => setDeckMenuGroup(null)}
+              onReview={() => startReviewForGroup(deckMenuGroup)}
+              onSaveCsv={() => void saveGroupCsv(deckMenuGroup)}
+              onMoveFolder={(folder) => {
+                setDeck(setBookGroupFolder(deckMenuGroup.bookId, deckMenuGroup.bookTitle, folder));
+                setDeckMenuGroup(null);
+              }}
+              onDelete={() => {
+                removeBookDeck(deckMenuGroup.bookId, deckMenuGroup.bookTitle);
+                setDeckMenuGroup(null);
+              }}
+            />
+          )}
+        </div>
+      </AppChrome>
+    );
+  }
 
   return (
     <AppChrome menus={deckMenus} status={deckStatus}>

@@ -52,7 +52,7 @@ export default function DisplayPage() {
             onChange={(e) => setZoomValue(Number(e.target.value))}
           />
           <button type="button" className="btn small" onClick={() => bumpZoomBy(0.1)} disabled={zoom >= ZOOM_MAX}>
-            ＋
+            +
           </button>
           <span className="muted os-zoom-val">{Math.round(zoom * 100)}%</span>
         </div>

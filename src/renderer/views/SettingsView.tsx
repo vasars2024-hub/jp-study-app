@@ -589,7 +589,7 @@ export default function SettingsView() {
               disabled={atMax}
               aria-label="Increase app zoom"
             >
-              ＋
+              +
             </button>
             <button
               className="btn small"

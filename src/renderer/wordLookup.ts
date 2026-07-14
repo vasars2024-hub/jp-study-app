@@ -2,7 +2,7 @@
 // kuromoji when available), highlight it in the text, and return popup coords.
 
 import { tokenizeSync, tokenizerReady, type JpToken } from './tokenizer';
-import { detectSentenceBounds, sentenceAt } from '../shared/sentenceBounds';
+import { detectSentenceBounds, isSentencePunct, sentenceAt } from '../shared/sentenceBounds';
 
 export interface WordLookupHit {
   /** Surface form shown in the popup title. */
@@ -18,6 +18,8 @@ export interface WordLookupHit {
 const BLOCK_SEL =
   'p, li, blockquote, h1, h2, h3, h4, .immersion-reader, .music-line, .media-subtitle, .media-subtrans, .ocr-text, [data-lookup-block]';
 const CLICK_MAX_PX = 8;
+/** Reject caretRangeFromPoint hits that snap to text far from the pointer (common in EPUB margins). */
+const LOOKUP_PROXIMITY_PX = 24;
 const MARK_CLASS = 'lookup-mark';
 const ACTIVE_CLASS = 'lookup-active';
 
@@ -33,6 +35,25 @@ export function isLookupClick(e: { clientX: number; clientY: number }): boolean 
   const dx = e.clientX - downX;
   const dy = e.clientY - downY;
   return dx * dx + dy * dy <= CLICK_MAX_PX * CLICK_MAX_PX;
+}
+
+function distanceToRect(x: number, y: number, r: DOMRectReadOnly): number {
+  const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+  const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+  return Math.hypot(dx, dy);
+}
+
+function pointNearRange(x: number, y: number, range: Range, maxPx = LOOKUP_PROXIMITY_PX): boolean {
+  const rects = range.getClientRects();
+  if (rects.length > 0) {
+    for (let i = 0; i < rects.length; i++) {
+      if (distanceToRect(x, y, rects[i]!) <= maxPx) return true;
+    }
+    return false;
+  }
+  const box = range.getBoundingClientRect();
+  if (box.width === 0 && box.height === 0) return false;
+  return distanceToRect(x, y, box) <= maxPx;
 }
 
 /** Remove click-to-lookup styling (called only when a different word is chosen). */
@@ -161,12 +182,23 @@ function applyLookupHighlight(range: Range, block: Element, doc: Document): DOMR
   return rect.width || rect.height ? rect : null;
 }
 
-function expandExpression(tokens: JpToken[], idx: number): [number, number] {
-  let start = idx;
-  let end = idx + 1;
-  if (idx >= 2 && tokens[idx - 1].surface === 'の' && tokens[idx - 2].content) start = idx - 2;
-  if (end + 1 < tokens.length && tokens[end].surface === 'の' && tokens[end + 1].content) end += 2;
-  return [start, end];
+// Re-tokenizing the whole block synchronously on every click is the main cost
+// of click-to-lookup; cache per block so repeat clicks (and clicks racing the
+// async word-highlight pass) don't redo it while the text hasn't changed.
+const tokenCache = new WeakMap<Element, { text: string; tokens: JpToken[] }>();
+
+// Common particles/auxiliaries/copulas — excluded from the kana-fragment glue
+// below even though they're pure hiragana, so gluing a fragmented unknown
+// word never eats into a real grammatical particle beside it.
+const PARTICLE_LIKE = new Set([
+  'を', 'が', 'は', 'に', 'で', 'と', 'も', 'の', 'へ', 'や', 'から', 'まで', 'より', 'ながら',
+  'たり', 'し', 'て', 'で', 'た', 'ます', 'です', 'ない', 'ん', 'ね', 'よ', 'か', 'わ', 'ぞ', 'ぜ',
+  'な', 'ば', 'けど', 'けれど', 'ので', 'のに', 'こそ', 'さえ', 'すら', 'でも', 'しか', 'だけ', 'ほど',
+  'くらい', 'ぐらい', 'など', 'よう', 'まし', 'たら', 'たい', 'せ', 'させ', 'られ', 'れ', 'ろ',
+]);
+
+function isGluableKanaFragment(t: JpToken): boolean {
+  return t.surface.length > 0 && /^[ぁ-ゖー]+$/.test(t.surface) && !PARTICLE_LIKE.has(t.surface);
 }
 
 function tokenSpanAt(block: Element, globalOffset: number): { start: number; end: number; query: string } | null {
@@ -174,7 +206,9 @@ function tokenSpanAt(block: Element, globalOffset: number): { start: number; end
   if (!text) return null;
 
   if (tokenizerReady() && /[぀-ヿ㐀-鿿]/.test(text)) {
-    const tokens = tokenizeSync(text);
+    const cached = tokenCache.get(block);
+    const tokens = cached && cached.text === text ? cached.tokens : tokenizeSync(text);
+    if (!cached || cached.text !== text) tokenCache.set(block, { text, tokens });
     let pos = 0;
     for (let i = 0; i < tokens.length; i++) {
       const tk = tokens[i];
@@ -182,10 +216,30 @@ function tokenSpanAt(block: Element, globalOffset: number): { start: number; end
       if (globalOffset >= pos && globalOffset < tkEnd) {
         let idx = i;
         if (!tk.content) {
-          const next = tokens.findIndex((t, j) => j >= i && t.content);
-          if (next >= 0) idx = next;
+          // Clicked a particle/auxiliary (を、が、した…) rather than the word
+          // itself. Attach to whichever neighbor is the actual content word —
+          // almost always the one right before it (particles trail their
+          // word) — but only the immediate neighbor: scanning further out
+          // used to walk clean past several non-content tokens and land on
+          // an unrelated word later in the sentence.
+          if (i > 0 && tokens[i - 1]!.content) idx = i - 1;
+          else if (i + 1 < tokens.length && tokens[i + 1]!.content) idx = i + 1;
         }
-        const [s, e] = expandExpression(tokens, idx);
+        let [s, e] = [idx, idx + 1];
+        // Words not in the dictionary (e.g. うがい written in plain kana) can
+        // come back from kuromoji split into several adjacent kana "unknown
+        // word" tokens instead of one — a click then only grabs one piece
+        // (う, then separately がい), and kuromoji's classification of those
+        // fragments as content/non-content is unreliable (it may tag "う" as
+        // a non-content interjection). Ignore the content flag here and glue
+        // by script + a particle/auxiliary blocklist instead: real words are
+        // almost never placed directly next to each other with no particle
+        // between them, so a contiguous run of non-particle hiragana tokens
+        // is almost always one fragmented word.
+        if (isGluableKanaFragment(tokens[idx]!)) {
+          while (s > 0 && isGluableKanaFragment(tokens[s - 1]!)) s--;
+          while (e < tokens.length && isGluableKanaFragment(tokens[e]!)) e++;
+        }
         const start = tokens.slice(0, s).reduce((a, t) => a + t.surface.length, 0);
         const end = tokens.slice(0, e).reduce((a, t) => a + t.surface.length, 0);
         const query = tokens
@@ -330,16 +384,82 @@ export function lookupWordAtPoint(clientX: number, clientY: number, doc: Documen
     node = caret.offsetNode;
     offset = caret.offset;
   }
-  if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+  // caretRangeFromPoint can miss (return null, or snap to unrelated text) when
+  // the pointer lands right on a glyph edge / span boundary. Fall back to the
+  // first text node under the element the pointer is actually over, rather
+  // than silently doing nothing and forcing the user to click repeatedly.
+  if (!node || node.nodeType !== Node.TEXT_NODE) {
+    const fallback = firstTextNodeIn(el);
+    if (!fallback) return null;
+    node = fallback;
+    offset = 0;
+  }
 
-  const textNode = node as Text;
-  const block = nearestBlock(textNode);
+  let textNode = node as Text;
+  let block = nearestBlock(textNode);
   if (!block) return null;
 
+  const caretRange = doc.createRange();
+  caretRange.setStart(textNode, offset);
+  caretRange.collapse(true);
+  if (!pointNearRange(clientX, clientY, caretRange)) {
+    const fallback = firstTextNodeIn(el);
+    if (!fallback || fallback === textNode) return null;
+    textNode = fallback;
+    offset = 0;
+    block = nearestBlock(textNode);
+    if (!block) return null;
+  }
+
   const globalOffset = charOffsetInBlock(block, textNode, offset);
+
+  // Punctuation isn't a word to look up — a closing ender/quote/bracket (。」』)
+  // belongs to the sentence that ends there, an opening one (「『（() opens
+  // the sentence that follows it. Select that sentence instead of failing or
+  // (worse) treating the punctuation glyph itself as the dictionary query.
+  const punct = punctuationSentenceHit(block, globalOffset, doc, clientX, clientY);
+  if (punct) return punct;
+
   const span = tokenSpanAt(block, globalOffset);
   if (!span) return null;
   return hitFromSpan(block, span, doc, clientX, clientY);
+}
+
+function punctuationSentenceHit(
+  block: Element,
+  globalOffset: number,
+  doc: Document,
+  fallbackX: number,
+  fallbackY: number,
+): WordLookupHit | null {
+  const text = block.textContent ?? '';
+  const ch = text[globalOffset];
+  if (!ch || !isSentencePunct(ch)) return null;
+
+  const range = detectSentenceRange(block, globalOffset);
+  if (!range) return null;
+  const query = range.toString().trim();
+  if (!query) return null;
+
+  const rect = applyLookupHighlight(range, block, doc);
+  return {
+    query: query.slice(0, 240),
+    x: rect?.left ?? fallbackX,
+    y: rect ? rect.bottom : fallbackY + 14,
+    translate: true,
+  };
+}
+
+/** First text node inside `el` with non-whitespace content, if any. */
+function firstTextNodeIn(el: Element | null): Text | null {
+  if (!el) return null;
+  const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let n = walker.nextNode() as Text | null;
+  while (n) {
+    if ((n.textContent ?? '').trim()) return n;
+    n = walker.nextNode() as Text | null;
+  }
+  return null;
 }
 
 function selectionHit(text: string, rect: DOMRect, block: Element | null): WordLookupHit {
@@ -377,13 +497,26 @@ export function lookupWordFromSelection(win: Window): WordLookupHit | null {
   const sel = win.getSelection();
   if (!sel || sel.rangeCount === 0) return null;
   const selected = sel.toString().trim();
+  if (!selected) return null;
   const range = sel.getRangeAt(0);
   const rect = range.getBoundingClientRect();
   const doc = win.document;
   const block = nearestBlock(range.startContainer);
 
+  // Ignore stale selections when the user clicked/dragged away from the highlighted text.
+  if (!pointNearRange(downX, downY, range)) return null;
+
   if (selected && isLikelySentence(selected)) {
     return { query: selected.slice(0, 240), x: rect.left, y: rect.bottom, translate: true };
+  }
+
+  if (selected.length === 1 && isSentencePunct(selected) && block) {
+    const node = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const globalOffset = charOffsetInBlock(block, node as Text, range.startOffset);
+      const punct = punctuationSentenceHit(block, globalOffset, doc, rect.left, rect.bottom);
+      if (punct) return punct;
+    }
   }
 
   if (selected && selected.length <= 12 && !isLikelySentence(selected)) {

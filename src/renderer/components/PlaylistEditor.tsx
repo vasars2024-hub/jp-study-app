@@ -24,8 +24,23 @@ const CAL_CATS: { id: CalendarCategory; label: string }[] = [
   { id: 'personal', label: 'Personal' },
 ];
 
-function uid(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+function isDirectMediaRef(ref: string): boolean {
+  return /^(app:|data:|blob:|file:|https?:|\/)/i.test(ref);
+}
+
+function itemSwatchStyle(it: WallpaperItem): { background?: string; backgroundImage?: string; backgroundSize?: string; backgroundPosition?: string } {
+  if (it.kind === 'preset') {
+    return { background: WALL_PRESETS.find((p) => p.id === it.ref)?.css ?? '#222' };
+  }
+  if (it.kind === 'image' && it.ref && isDirectMediaRef(it.ref)) {
+    return {
+      background: '#2a2830',
+      backgroundImage: `url("${it.ref}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    };
+  }
+  return { background: '#2a2830' };
 }
 
 function itemLabel(it: WallpaperItem): string {
@@ -334,11 +349,7 @@ export default function PlaylistEditor({
           <li key={it.id} className="pl-item">
             <div
               className="pl-swatch"
-              style={
-                it.kind === 'preset'
-                  ? { background: WALL_PRESETS.find((p) => p.id === it.ref)?.css ?? '#222' }
-                  : { background: '#2a2830' }
-              }
+              style={itemSwatchStyle(it)}
               title={it.kind}
             />
             <div className="pl-item-meta">

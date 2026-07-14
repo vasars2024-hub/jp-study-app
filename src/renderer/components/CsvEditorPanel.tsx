@@ -592,7 +592,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   );
 
   return (
-    <AppChrome menus={csvMenus} status={csvStatus}>
+    <AppChrome menus={csvMenus} status={csvStatus} className="aero-csv-chrome">
     <section className="anki-card csv-editor">
       <p className="muted csv-editor-lead">
         Spreadsheet editor for CSV / TSV decks. Paste or open a file, edit with power tools, then import to flashcards.

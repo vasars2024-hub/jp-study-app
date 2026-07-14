@@ -26,6 +26,7 @@ const LS_KEY = 'jp-os-notifications-v1';
 const LS_DND = 'jp-os-dnd';
 const CAP = 100;
 const EVENT = 'shell:notifications-changed';
+const SOUND_EVENT = 'shell:notification';
 
 function load(): ShellNotification[] {
   try {
@@ -91,6 +92,9 @@ export function notify(input: NotifyInput): ShellNotification {
   };
   items = [item, ...items].slice(0, CAP);
   persist();
+  if (!isDnd()) {
+    window.dispatchEvent(new CustomEvent<ShellNotification>(SOUND_EVENT, { detail: item }));
+  }
   return item;
 }
 

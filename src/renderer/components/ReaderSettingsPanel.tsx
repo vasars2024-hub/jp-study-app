@@ -86,7 +86,7 @@ function Stepper(props: {
         </button>
         <span className="sp-value">{props.value}</span>
         <button className="btn small" disabled={props.incDisabled} onClick={props.onInc}>
-          ＋
+          +
         </button>
       </div>
     </div>

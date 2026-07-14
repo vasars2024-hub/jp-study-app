@@ -14,6 +14,8 @@ import { resolveWall } from './schedules';
 import { wallDefinition } from './frameworkBridge';
 import type { EnvironmentSettings } from './types';
 import type { WallpaperCategory } from './wallpaperFramework';
+import { isMiniMode, onMiniModeChanged } from '../miniMode';
+import { onThemeChanged } from '../theme/engine';
 
 const CATEGORY_BED: Record<WallpaperCategory, string> = {
   nature: 'forest',
@@ -31,7 +33,18 @@ export function bedForCategory(cat: WallpaperCategory | undefined): string {
   return cat ? CATEGORY_BED[cat] ?? 'ambient' : 'ambient';
 }
 
+function isAeroActive(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.getAttribute('data-materials') === 'aero';
+}
+
+/** Secret OS mini widget — silence living-layer ambience beds. */
+function atmosphereSuppressed(): boolean {
+  return isAeroActive() && isMiniMode();
+}
+
 function desiredBed(env: EnvironmentSettings): string | null {
+  if (atmosphereSuppressed()) return null;
   if (!env.enabled || !env.ambientAudio?.enabled) return null;
   if (env.performanceTier === 'off') return null;
   if (document.documentElement.getAttribute('data-perf') === 'battery') return null;
@@ -85,7 +98,10 @@ async function sync(env: EnvironmentSettings): Promise<void> {
 export function installAmbientAudio(): void {
   if (installed) return;
   installed = true;
+  const resync = () => void sync(loadEnvironment());
   void sync(loadEnvironment());
   onEnvironmentChanged((env) => void sync(env));
-  window.addEventListener('jp-perf-changed', () => void sync(loadEnvironment()));
+  onMiniModeChanged(resync);
+  onThemeChanged(resync);
+  window.addEventListener('jp-perf-changed', resync);
 }

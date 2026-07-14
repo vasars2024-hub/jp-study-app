@@ -176,72 +176,480 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, #eaf9ff 0%, #bfe6ff 42%, #8fd0f5 72%, #7bd39a 100%);
-  animation: aero-boot-in 320ms ease both;
+  overflow: hidden;
+  background: #071f3a;
+  animation: aero-boot-in 360ms ease both;
+  isolation: isolate;
 }
-.os-aero-boot.out { animation: aero-boot-out 480ms ease both; }
+.os-aero-boot.out { animation: aero-boot-out 720ms var(--ease-glass, ease) both; }
 @keyframes aero-boot-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes aero-boot-out { from { opacity: 1; } to { opacity: 0; } }
 
-/* Aurora layer (Phase 4 · M4) — soft luminous bands forming behind the emblem.
-   Pointer-inert, decorative; motion collapses under the global reduced-motion
-   rule (animation-duration → ~0). */
+.os-aero-boot-scene,
+.os-aero-boot-sky,
+.os-aero-boot-clouds,
+.os-aero-boot-horizon,
+.os-aero-boot-water,
+.os-aero-boot-shore {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.os-aero-boot-scene {
+  z-index: -3;
+  background:
+    linear-gradient(180deg, #062043 0%, #0f5d8c 36%, #61c6e6 58%, #dffdf4 100%);
+}
+.os-aero-boot-sky {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.22), transparent 34%),
+    radial-gradient(42% 28% at 50% 18%, rgba(255,255,255,0.72), transparent 70%);
+}
+.os-aero-boot-clouds {
+  inset: 4% -8% auto -8%;
+  height: 34%;
+  background:
+    radial-gradient(24% 42% at 18% 48%, rgba(255,255,255,0.46), transparent 70%),
+    radial-gradient(32% 48% at 42% 24%, rgba(255,255,255,0.38), transparent 72%),
+    radial-gradient(24% 42% at 78% 42%, rgba(255,255,255,0.42), transparent 72%);
+  filter: blur(10px);
+  opacity: 0.78;
+  animation: aero-boot-clouds 7s ease-in-out infinite alternate;
+}
+.os-aero-boot-horizon {
+  top: auto;
+  height: 48%;
+  background:
+    linear-gradient(180deg, rgba(213,255,244,0.82), rgba(71,192,220,0.26) 18%, transparent 42%),
+    linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.54) 36%, rgba(255,255,255,0.72) 52%, transparent 76%);
+  transform: translateY(4%);
+}
+.os-aero-boot-water {
+  top: 50%;
+  background:
+    repeating-linear-gradient(172deg, rgba(255,255,255,0.2) 0 2px, transparent 2px 22px),
+    linear-gradient(180deg, rgba(59,203,222,0.7), rgba(6,75,116,0.86));
+  clip-path: polygon(0 10%, 100% 0, 100% 100%, 0 100%);
+  animation: aero-boot-water 4.8s ease-in-out infinite alternate;
+}
+.os-aero-boot-shore {
+  top: 70%;
+  background:
+    linear-gradient(102deg, transparent 0 18%, rgba(240,255,244,0.88) 18% 34%, rgba(114,215,144,0.76) 34% 42%, transparent 42%),
+    linear-gradient(86deg, transparent 0 56%, rgba(240,255,244,0.92) 56% 66%, rgba(119,218,148,0.74) 66% 74%, transparent 74%);
+  filter: drop-shadow(0 -8px 18px rgba(205,255,243,0.34));
+}
+@keyframes aero-boot-clouds {
+  from { transform: translate3d(-1.5%, 0, 0); }
+  to { transform: translate3d(1.5%, 1%, 0); }
+}
+@keyframes aero-boot-water {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, -1.4%, 0); }
+}
+
+/* Aurora layer — soft luminous bands behind the emblem, not a wallpaper. */
 .os-aero-boot-aurora {
   position: absolute;
-  inset: -20% -10% auto -10%;
-  height: 80%;
+  inset: -16% -8% auto -8%;
+  z-index: -2;
+  height: 70%;
   pointer-events: none;
   background:
-    radial-gradient(60% 55% at 30% 20%, rgba(123, 211, 154, 0.5), transparent 70%),
-    radial-gradient(55% 50% at 72% 15%, rgba(99, 207, 242, 0.55), transparent 72%),
-    radial-gradient(50% 60% at 50% 0%, rgba(255, 255, 255, 0.6), transparent 68%);
-  filter: blur(8px);
-  opacity: 0.9;
+    radial-gradient(42% 52% at 32% 26%, rgba(127, 235, 180, 0.48), transparent 70%),
+    radial-gradient(46% 48% at 68% 24%, rgba(97, 218, 242, 0.5), transparent 72%),
+    radial-gradient(50% 56% at 50% 0%, rgba(255, 255, 255, 0.58), transparent 68%);
+  filter: blur(12px);
+  opacity: 0.86;
   animation: aero-boot-aurora 3.2s ease-in-out infinite alternate;
 }
 @keyframes aero-boot-aurora {
   from { transform: translate3d(-2%, 0, 0) scale(1); opacity: 0.75; }
   to { transform: translate3d(2%, 1.5%, 0) scale(1.05); opacity: 1; }
 }
-/* Welcome state — the emblem lifts and brightens as the desktop is about to
-   resolve. */
-.os-aero-boot.welcome .os-aero-boot-orb {
-  transform: translateY(-2px) scale(1.06);
-  box-shadow: 0 12px 30px rgba(20, 74, 110, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  transition: transform 420ms var(--ease-glass, ease), box-shadow 420ms ease;
+.os-aero-boot.phase-shutting-down {
+  background: #061421;
 }
-.os-aero-boot.welcome .os-aero-boot-sub { color: #0f6b4e; opacity: 0.95; }
+.os-aero-boot.phase-sleeping {
+  background: #061427;
+}
+.os-aero-boot.phase-safe-fallback {
+  background: #d9f2fb;
+}
+.os-aero-boot.phase-sleeping .os-aero-boot-scene,
+.os-aero-boot.phase-shutting-down .os-aero-boot-scene {
+  filter: saturate(0.64) brightness(0.58);
+}
+.os-aero-boot.phase-sleeping .os-aero-boot-aurora {
+  opacity: 0.28;
+  filter: blur(18px) saturate(0.72);
+}
+.os-aero-boot.phase-shutting-down .os-aero-boot-aurora {
+  opacity: 0.16;
+  filter: blur(22px) saturate(0.5);
+}
+.os-aero-boot.phase-waking .os-aero-boot-aurora {
+  animation-duration: 1.8s;
+}
+.os-aero-boot.phase-shutting-down .os-aero-boot-orb,
+.os-aero-boot.phase-sleeping .os-aero-boot-orb {
+  filter: saturate(0.72) brightness(0.92);
+}
+.os-aero-boot.phase-shutting-down .os-aero-boot-rings span,
+.os-aero-boot.phase-sleeping .os-aero-boot-rings span {
+  opacity: 0.32;
+  animation-duration: 4.4s;
+}
 .os-aero-boot-inner {
+  position: relative;
+  min-width: min(440px, calc(100vw - 32px));
+  padding: 28px 34px 24px;
+  border: 1px solid rgba(224, 255, 250, 0.46);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.44), rgba(226,248,248,0.2)),
+    rgba(214, 246, 248, 0.18);
+  box-shadow:
+    0 24px 80px rgba(0, 39, 66, 0.38),
+    inset 0 1px 0 rgba(255,255,255,0.72);
+  backdrop-filter: blur(16px) saturate(1.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
   text-align: center;
-  color: #123a52;
+  color: #07344c;
   font-family: 'Segoe UI Semibold', 'Segoe UI', var(--font-display, sans-serif);
 }
+.os-aero-boot.phase-sleeping .os-aero-boot-inner,
+.os-aero-boot.phase-shutting-down .os-aero-boot-inner {
+  background:
+    linear-gradient(180deg, rgba(229, 248, 250, 0.32), rgba(61, 103, 129, 0.16)),
+    rgba(9, 30, 47, 0.38);
+  border-color: rgba(207, 239, 247, 0.28);
+  color: #dff9ff;
+  box-shadow:
+    0 30px 92px rgba(0, 10, 20, 0.56),
+    inset 0 1px 0 rgba(255,255,255,0.34);
+}
+.os-aero-boot.phase-sleeping .os-aero-boot-kicker,
+.os-aero-boot.phase-sleeping .os-aero-boot-edition,
+.os-aero-boot.phase-shutting-down .os-aero-boot-kicker,
+.os-aero-boot.phase-shutting-down .os-aero-boot-edition {
+  color: rgba(224, 249, 255, 0.72);
+}
+.os-aero-boot.phase-sleeping .os-aero-boot-sub,
+.os-aero-boot.phase-shutting-down .os-aero-boot-sub {
+  color: rgba(181, 237, 250, 0.9);
+}
+.os-aero-boot-emblem {
+  position: relative;
+  width: 134px;
+  height: 112px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+}
+.os-aero-boot-rings,
+.os-aero-boot-rings span,
+.os-aero-boot-bubbles,
+.os-aero-boot-bubbles span {
+  position: absolute;
+  pointer-events: none;
+}
+.os-aero-boot-rings {
+  inset: 14px 0 0;
+}
+.os-aero-boot-rings span {
+  left: 50%;
+  top: 50%;
+  width: 94px;
+  height: 32px;
+  border: 1px solid rgba(221, 255, 251, 0.7);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 12px rgba(96, 224, 220, 0.34);
+  animation: aero-boot-ring 2.8s ease-in-out infinite;
+}
+.os-aero-boot-rings span:nth-child(2) {
+  width: 118px;
+  height: 42px;
+  animation-delay: 240ms;
+  opacity: 0.72;
+}
+.os-aero-boot-rings span:nth-child(3) {
+  width: 140px;
+  height: 52px;
+  animation-delay: 520ms;
+  opacity: 0.52;
+}
 .os-aero-boot-orb {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 18px;
+  position: relative;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95), transparent 55%),
-    linear-gradient(160deg, #63cff2, #17a6df);
-  box-shadow: 0 8px 22px rgba(20, 74, 110, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    radial-gradient(circle at 34% 25%, rgba(255,255,255,0.98), rgba(255,255,255,0.28) 32%, transparent 52%),
+    linear-gradient(150deg, #9be15d, #15d4c7 48%, #1599e6);
+  box-shadow:
+    0 18px 36px rgba(4, 62, 98, 0.34),
+    0 0 26px rgba(114, 235, 211, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -10px 18px rgba(11, 91, 128, 0.22);
+  animation: aero-boot-emblem 2.8s ease-in-out infinite alternate;
 }
-.os-aero-boot-title { font-size: 2.3rem; font-weight: 700; letter-spacing: 0.03em; }
-.os-aero-boot-sub {
-  font-size: 0.85rem;
-  opacity: 0.75;
-  margin-top: 4px;
-  letter-spacing: 0.24em;
+.os-aero-boot-leaf {
+  position: absolute;
+  left: 25px;
+  top: 18px;
+  width: 25px;
+  height: 37px;
+  border-radius: 70% 18% 70% 18%;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,255,255,0.12) 28%, transparent 34%),
+    linear-gradient(145deg, #d8ffe7, #44deae 58%, #0aaed1);
+  transform: rotate(42deg);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.72),
+    0 0 10px rgba(205,255,231,0.64);
+}
+.os-aero-boot-leaf::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 5px;
+  width: 1px;
+  height: 28px;
+  background: rgba(255,255,255,0.66);
+  transform: rotate(-8deg);
+}
+.os-aero-boot-bubbles {
+  inset: 0;
+}
+.os-aero-boot-bubbles span {
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(234,255,252,0.74);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.16);
+  box-shadow: 0 0 10px rgba(183,255,248,0.5);
+  animation: aero-boot-bubble 3.4s ease-in-out infinite;
+}
+.os-aero-boot-bubbles span:nth-child(1) { left: 20px; top: 66px; }
+.os-aero-boot-bubbles span:nth-child(2) { right: 22px; top: 72px; animation-delay: 420ms; }
+.os-aero-boot-bubbles span:nth-child(3) { left: 38px; top: 18px; width: 5px; height: 5px; animation-delay: 760ms; }
+.os-aero-boot-bubbles span:nth-child(4) { right: 42px; top: 24px; width: 5px; height: 5px; animation-delay: 1120ms; }
+@keyframes aero-boot-ring {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.42; }
+  45% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.92; }
+}
+@keyframes aero-boot-emblem {
+  from { transform: translateY(2px); }
+  to { transform: translateY(-3px); }
+}
+@keyframes aero-boot-bubble {
+  0%, 100% { transform: translateY(8px); opacity: 0.26; }
+  50% { transform: translateY(-8px); opacity: 0.86; }
+}
+.os-aero-boot.welcome .os-aero-boot-orb {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow:
+    0 18px 42px rgba(4, 62, 98, 0.4),
+    0 0 34px rgba(167, 255, 222, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.os-aero-boot-kicker {
+  margin-bottom: 4px;
+  color: rgba(7, 52, 76, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
-.os-aero-boot-spinner {
-  width: 32px;
-  height: 32px;
-  margin: 24px auto 0;
-  border-radius: 50%;
-  border: 3px solid rgba(18, 58, 82, 0.2);
-  border-top-color: #17a6df;
-  animation: aero-spin 0.9s linear infinite;
+.os-aero-boot-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.os-aero-boot-edition {
+  margin-top: 2px;
+  color: rgba(7, 52, 76, 0.72);
+  font-size: 13px;
+  font-weight: 600;
+}
+.os-aero-boot-sub {
+  min-height: 20px;
+  margin-top: 9px;
+  color: #0a5f7a;
+  font-size: 0.86rem;
+  letter-spacing: 0;
+}
+.os-aero-boot-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  width: min(260px, 80%);
+  margin: 20px auto 0;
+}
+.os-aero-boot-steps span {
+  height: 5px;
+  border-radius: 2px;
+  background: rgba(10, 78, 105, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
+}
+.os-aero-boot-steps span.done,
+.os-aero-boot-steps span.active {
+  background:
+    linear-gradient(90deg, rgba(153,233,125,0.94), rgba(48,215,204,0.96)),
+    #35d2c5;
+}
+.os-aero-boot-steps span.active {
+  box-shadow:
+    0 0 12px rgba(53,210,197,0.56),
+    inset 0 1px 0 rgba(255,255,255,0.74);
+}
+.os-aero-boot-welcome {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 6px 9px;
+  border: 1px solid rgba(12, 96, 118, 0.18);
+  border-radius: 5px;
+  background: rgba(237, 255, 251, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.62);
+  color: #07344c;
+  font-size: 12px;
+}
+.os-aero-boot-welcome strong {
+  color: #075b65;
+  font-variant-numeric: tabular-nums;
+}
+.os-aero-boot-welcome-panel {
+  width: min(380px, 100%);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  text-align: left;
+}
+.os-aero-boot-welcome-panel div {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid rgba(12, 96, 118, 0.14);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.24);
+}
+.os-aero-boot-welcome-panel span,
+.os-aero-boot-resume-panel span {
+  display: block;
+  color: rgba(7, 52, 76, 0.68);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.os-aero-boot-welcome-panel strong,
+.os-aero-boot-resume-panel strong {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  color: #07344c;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.os-aero-boot-resume-panel {
+  grid-template-columns: auto auto;
+}
+.os-aero-boot-sleep-card {
+  width: min(360px, 100%);
+  margin: 16px auto 0;
+  padding: 9px 11px 10px;
+  border: 1px solid rgba(210, 244, 252, 0.26);
+  border-radius: 5px;
+  background: rgba(7, 35, 55, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+  color: rgba(226, 250, 255, 0.84);
+  font-size: 12px;
+  text-align: left;
+}
+.os-aero-boot-sleep-card strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #f2feff;
+  font-size: 13px;
+}
+.os-aero-boot-sleep-card span:last-child {
+  display: block;
+  line-height: 1.4;
+}
+.os-aero-boot-sleep-line {
+  float: left;
+  width: 4px;
+  height: 36px;
+  margin: 1px 9px 0 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #9be15d, #30d7cc, #179fe1);
+  box-shadow: 0 0 12px rgba(69, 218, 206, 0.42);
+}
+.os-aero-boot-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.os-aero-boot-controls button {
+  min-width: 72px;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid rgba(19, 78, 107, 0.26);
+  border-radius: 4px;
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.62), rgba(220, 240, 248, 0.56)),
+    rgba(255, 255, 255, 0.28);
+  color: #123a52;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.os-aero-boot-controls button:nth-child(3) {
+  min-width: 112px;
+}
+.os-aero-boot-controls button:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+.os-aero-boot-controls button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+html.reduce-motion .os-aero-boot *,
+html.reduce-motion .os-aero-boot *::before,
+html.reduce-motion .os-aero-boot *::after,
+.os-aero-boot.reduced *,
+.os-aero-boot.reduced *::before,
+.os-aero-boot.reduced *::after {
+  animation: none !important;
+  transition: none !important;
+}
+@media (max-width: 700px) {
+  .os-aero-boot-inner {
+    min-width: calc(100vw - 24px);
+    padding: 22px 18px 20px;
+  }
+  .os-aero-boot-title {
+    font-size: 1.75rem;
+  }
+  .os-aero-boot-welcome-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+html.secret-lifecycle-suspended .os-env-stack,
+html.secret-lifecycle-suspended .os-wall-visualizer,
+html.secret-lifecycle-suspended .os-weather {
+  animation-play-state: paused !important;
+}
+html.secret-lifecycle-suspended .os-particle-canvas {
+  opacity: 0;
 }
 
 /* Extension layer host (Phase 2 · M16) — full-bleed, over the wallpaper. */

@@ -44,7 +44,7 @@ export default function DictionaryView() {
   );
 
   return (
-    <AppChrome menus={dictMenus} status={dictStatus}>
+    <AppChrome menus={dictMenus} status={dictStatus} className="aero-dict-chrome">
     <div className="dict-view">
       <div className="view-head">
         <p className="muted">

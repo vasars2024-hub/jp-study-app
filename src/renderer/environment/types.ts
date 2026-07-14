@@ -89,7 +89,7 @@ export interface EnvironmentSettings {
   /** Experimental: companions on the real Windows desktop (not implemented in L0). */
   companionsOnOsDesktop: boolean;
   /** Which companion types are active. */
-  companionTypes: Array<'study-buddy' | 'critter' | 'timekeeper' | 'noctis'>;
+  companionTypes: Array<'study-buddy' | 'critter' | 'timekeeper' | 'noctis' | 'miko-shimeji'>;
   companionReactivity: 'quiet' | 'normal' | 'playful';
   companionCelebrate: boolean;
   companionPauseWhenStudying: boolean;

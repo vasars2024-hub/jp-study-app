@@ -66,7 +66,7 @@ export default function NotificationCenter() {
   return (
     <>
       <div className="os-panel-backdrop" onMouseDown={() => setOpen(false)} />
-      <aside ref={panelRef} tabIndex={-1} className="os-flyout anim-slide-up" role="dialog" aria-label="Notifications">
+      <aside ref={panelRef} tabIndex={-1} className="os-flyout os-flyout--notifications anim-slide-up" role="dialog" aria-label="Notifications">
         <header className="os-flyout-head">
           <span className="os-flyout-title">Notifications</span>
           <span className="os-flyout-spacer" />

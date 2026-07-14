@@ -32,23 +32,25 @@ import './components/ui/ui.css';
 import './theme/a11y.css';
 // Performance tiers (Phase 1 · M9).
 import './theme/perf.css';
+// Shell panel base styles (Phase 2) — Notification Center, Quick Settings.
+import './components/shell/shell.css';
 // Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
-// loaded after styles.css so the shell overrides win. Default shell unchanged.
+// loaded after shell.css so Aero flyout/palette corrections win over base shell styles.
 import './theme/aero-shell.css';
 // XP–Aero application grammar (Phase 4 · M1) — scoped to [data-materials='aero'],
 // loaded after ui.css so the density/material overrides win. Default apps unchanged.
 import './theme/aero-apps.css';
-// Shell panel styles (Phase 2) — Notification Center, Quick Settings.
-import './components/shell/shell.css';
 // Living-desktop weather overlays (Phase 3 · M3) + atmosphere polish (M5/M6).
 import './environment/weather.css';
 import './environment/atmosphere.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { installNotificationCapture } from './notificationStore';
 import { bootWallpaperFit } from './wallpaperFit';
+import { bootAppBorderSettings } from './appBorderSettings';
 import { installShellSounds } from './shellSounds';
 import { bootPerf } from './theme/perf';
 import { installAssetPackSync } from './theme/assetPacks';
+import { registerAeroProofSoundPack } from './audio/aeroProofPack';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 
@@ -70,6 +72,9 @@ bootOsLook();
 bootDisplayPrefs();
 // Apply the saved performance tier (data-perf) pre-paint (Phase 1 · M9).
 bootPerf();
+// Register the original source-generated Aero proof sounds before themes resolve
+// their asset packs (Phase 5 · M4).
+registerAeroProofSoundPack();
 // Keep the active theme's asset pack (sounds now; icons/wallpapers hooks) in
 // sync on every theme change — the Anime Edition extension point (Phase 1 · M10).
 installAssetPackSync();
@@ -77,6 +82,7 @@ installAssetPackSync();
 installNotificationCapture();
 // Wallpaper fit (--wall-fit) pre-paint + shell sound routing (Phase 2 · M10/M11).
 bootWallpaperFit();
+bootAppBorderSettings();
 installShellSounds();
 
 if (!isCompanionHost) {

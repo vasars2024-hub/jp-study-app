@@ -30,10 +30,17 @@ export default function DictionaryPopup({ query, x, y, context, onClose }: Props
     const lx = x / z;
     const ly = y / z;
     const left = Math.max(8, Math.min(lx, vw - POPUP_W - 8));
-    const placeAbove = ly > vh - 280;
+    const margin = 8;
+    const spaceBelow = vh - ly - 18 - margin;
+    const spaceAbove = ly - 18 - margin;
+    // Prefer opening below the click; only flip above when there's genuinely
+    // more room up there, and always cap height to whatever room actually
+    // exists in the chosen direction so the popup can't run off-screen.
+    const placeAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(120, Math.min(placeAbove ? spaceAbove : spaceBelow, 0.7 * vh));
     return placeAbove
-      ? { left, bottom: Math.max(8, vh - ly + 18), width: POPUP_W }
-      : { left, top: Math.min(ly + 12, vh - 120), width: POPUP_W };
+      ? { left, bottom: Math.max(margin, vh - ly + 18), width: POPUP_W, maxHeight }
+      : { left, top: Math.min(ly + 12, vh - 120), width: POPUP_W, maxHeight };
   }, [x, y]);
 
   const lang = (localStorage.getItem('jp-study-dict-lang') as DictLang) || 'ja';
@@ -99,14 +106,16 @@ export default function DictionaryPopup({ query, x, y, context, onClose }: Props
           ×
         </button>
       </div>
-      <div className="wk-grade" title="How well do you know this word?">
+      <div className="wk-grade">
         {WK_LEVELS.map((label, i) => (
           <button
             key={label}
             className={`wk-grade-btn wk-g-${i} ${level === i ? 'active' : ''}`}
+            title={label}
+            aria-label={label}
             onClick={() => grade(i as WkLevel)}
           >
-            {label}
+            {label[0]}
           </button>
         ))}
       </div>

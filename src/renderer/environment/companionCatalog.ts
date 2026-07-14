@@ -1,6 +1,9 @@
-export type CompanionTypeId = 'study-buddy' | 'critter' | 'timekeeper' | 'noctis';
+import { hasDiscoveredAero } from '../aeroDiscovery';
+
+export type CompanionTypeId = 'study-buddy' | 'critter' | 'timekeeper' | 'noctis' | 'miko-shimeji';
 export type CompanionMood = 'calm' | 'happy' | 'sleepy' | 'curious' | 'celebrate';
 export type CompanionReactivity = 'quiet' | 'normal' | 'playful';
+export type CompanionMotion = 'stand' | 'walk' | 'sit' | 'wall' | 'ceiling' | 'fall' | 'drag' | 'celebrate';
 
 export interface CompanionDef {
   id: CompanionTypeId;
@@ -11,9 +14,13 @@ export interface CompanionDef {
   accent: string;
   /** Extra class for silhouette variants. */
   variant?: string;
+  /** Sprite renderer instead of the CSS-drawn blob body. */
+  sprite?: 'miko-shimeji';
+  /** Secret: only available after Aero discovery. */
+  secret?: boolean;
 }
 
-export const COMPANION_DEFS: CompanionDef[] = [
+const ALL_COMPANION_DEFS: CompanionDef[] = [
   {
     id: 'study-buddy',
     label: 'Study buddy',
@@ -43,7 +50,21 @@ export const COMPANION_DEFS: CompanionDef[] = [
     accent: '#c4b5fd',
     variant: 'noctis',
   },
+  {
+    id: 'miko-shimeji',
+    label: 'Hatsune Miko',
+    blurb: 'Secret OS Shimeji pet. Walks, falls, and climbs the desktop frame.',
+    color: '#4bd6cf',
+    accent: '#d4fff8',
+    variant: 'shimeji',
+    sprite: 'miko-shimeji',
+    secret: true,
+  },
 ];
+
+export function COMPANION_DEFS(): CompanionDef[] {
+  return ALL_COMPANION_DEFS.filter((d) => !d.secret || hasDiscoveredAero());
+}
 
 export interface CompanionInstance {
   id: string;
@@ -60,6 +81,11 @@ export interface CompanionInstance {
   primaryRoutineId?: string;
   secondaryRoutineId?: string;
   menuRoutineIds?: string[];
+  /** Sprite movement state for Shimeji-style companions. */
+  motion?: CompanionMotion;
+  motionTargetX?: number;
+  motionTargetY?: number;
+  motionSide?: 'left' | 'right';
 }
 
 export function defaultCompanions(w = 900, h = 500): CompanionInstance[] {
@@ -100,9 +126,23 @@ export function defaultCompanions(w = 900, h = 500): CompanionInstance[] {
       mood: 'calm',
       status: 'Listening for light',
     },
+    {
+      id: 'c-miko',
+      typeId: 'miko-shimeji',
+      x: Math.max(40, w * 0.72),
+      y: Math.max(80, h - 112),
+      facing: -1,
+      mood: 'curious',
+      status: 'Find my treasure…',
+      motion: 'walk',
+      motionTargetX: Math.max(40, w * 0.22),
+    },
   ];
 }
 
 export function defFor(typeId: CompanionTypeId): CompanionDef {
-  return COMPANION_DEFS.find((d) => d.id === typeId) ?? COMPANION_DEFS[0];
+  const defs = COMPANION_DEFS();
+  const hit = defs.find((d) => d.id === typeId);
+  if (hit) return hit;
+  return ALL_COMPANION_DEFS.find((d) => d.id === typeId) ?? defs[0] ?? ALL_COMPANION_DEFS[0]!;
 }

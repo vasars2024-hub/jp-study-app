@@ -27,6 +27,7 @@ export type SettingsPageId =
   | 'desktop-layout'
   | 'shortcuts'
   | 'mini'
+  | 'lockscreen'
   | 'study'
   | 'reading'
   | 'transcription'

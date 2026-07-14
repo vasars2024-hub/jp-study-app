@@ -31,6 +31,7 @@ export type IconName =
   | 'volume'
   | 'window'
   | 'refresh'
+  | 'power'
   | 'download'
   | 'image'
   | 'video'
@@ -60,6 +61,7 @@ export type IconName =
   | 'clipboard'
   | 'pin'
   | 'plus'
+  | 'lock'
   | 'city'
   | 'widgets';
 
@@ -94,6 +96,7 @@ const P: Record<IconName, string> = {
   volume: 'M4 9v6h4l5 4V5L8 9z M16.5 8a5 5 0 0 1 0 8 M19 5.5a9 9 0 0 1 0 13',
   window: 'M4 5h16v14H4z M4 9h16',
   refresh: 'M4 12a8 8 0 0 1 14-5.3 M20 4v5h-5 M20 12a8 8 0 0 1-14 5.3 M4 20v-5h5',
+  power: 'M12 3v9 M6.5 7a8 8 0 1 0 11 0',
   download: 'M12 4v10 M8 10l4 4 4-4 M4 18h16',
   image:
     'M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z M9 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M4 17l5-5 4 4 3-3 4 4',
@@ -130,6 +133,7 @@ const P: Record<IconName, string> = {
   clipboard: 'M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z M6 5h12v16H6z M9 10h6 M9 13h6 M9 16h4',
   pin: 'M12 2v6 M8 8h8l1 4H7z M12 12v10 M9 12h6',
   plus: 'M12 5v14 M5 12h14',
+  lock: 'M7 11V8a5 5 0 0 1 10 0v3 M6 11h12v10H6z',
 };
 
 export default function Icon({

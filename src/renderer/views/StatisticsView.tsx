@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { confirmDialog } from '../components/ui';
+import {
+  AppChrome,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarSpacer,
+  confirmDialog,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from '../components/ui';
 import Icon from '../components/Icons';
 import { getSummary, resetStats, formatDuration, formatNumber, type StatsSummary } from '../stats';
 import { knowledgeCounts, onKnowledgeChanged } from '../knownWords';
@@ -72,12 +81,146 @@ function dayLabel(isoDate: string): string {
 }
 
 export default function StatisticsView() {
+  const aero = useAeroMaterials();
   // A counter we bump to recompute after a reset.
   const [nonce, setNonce] = useState(0);
   const s: StatsSummary = useMemo(() => getSummary(), [nonce]);
 
   const peak = Math.max(1, ...s.recent.map((d) => d.seconds));
   const hasData = s.totalSeconds > 0 || s.totalChars > 0;
+
+  async function resetAllStats() {
+    const ok = await confirmDialog({
+      title: 'Reset statistics',
+      message: 'Reset all reading statistics? This cannot be undone.',
+      confirmLabel: 'Reset',
+      danger: true,
+    });
+    if (ok) {
+      resetStats();
+      setNonce((n) => n + 1);
+    }
+  }
+
+  const menus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'reset', label: 'Reset statistics', disabled: !hasData, onSelect: () => void resetAllStats() },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        { id: 'refresh', label: 'Refresh', onSelect: () => setNonce((n) => n + 1) },
+      ],
+    },
+  ];
+
+  if (aero) {
+    return (
+      <AppChrome
+        menus={menus}
+        status={
+          <>
+            <StatusBarField>{formatDuration(s.totalSeconds)} total</StatusBarField>
+            <StatusBarField>{formatNumber(s.totalChars)} chars</StatusBarField>
+            <StatusBarSpacer />
+            <StatusBarField>{s.daysActive} active days</StatusBarField>
+          </>
+        }
+        className="aero-stats-chrome"
+      >
+        <div className="aero-stats">
+          <Toolbar className="aero-stats-toolbar" aria-label="Statistics commands">
+            <button className="aero-stat-command" onClick={() => setNonce((n) => n + 1)}>
+              <Icon name="refresh" size={13} />
+              Refresh
+            </button>
+            <button className="aero-stat-command danger" disabled={!hasData} onClick={() => void resetAllStats()}>
+              Reset
+            </button>
+            <ToolbarSpacer />
+            <span className="aero-stat-toolbar-note">Reading activity monitor</span>
+          </Toolbar>
+
+          <div className="aero-stats-workbench">
+            <aside className="aero-stats-summary" aria-label="Reading summary">
+              <h2>Summary</h2>
+              <dl>
+                <div>
+                  <dt>Today</dt>
+                  <dd>{formatDuration(s.todaySeconds)}</dd>
+                </div>
+                <div>
+                  <dt>Characters today</dt>
+                  <dd>{formatNumber(s.todayChars)}</dd>
+                </div>
+                <div>
+                  <dt>Streak</dt>
+                  <dd>{s.streak} days</dd>
+                </div>
+                <div>
+                  <dt>Total time</dt>
+                  <dd>{formatDuration(s.totalSeconds)}</dd>
+                </div>
+                <div>
+                  <dt>Total chars</dt>
+                  <dd>{formatNumber(s.totalChars)}</dd>
+                </div>
+              </dl>
+            </aside>
+
+            <main className="aero-stats-main">
+              <section className="aero-stats-panel">
+                <header>Last 14 days</header>
+                {hasData ? (
+                  <div className="aero-stats-chart">
+                    {s.recent.map((d) => (
+                      <div key={d.date} className="aero-stats-bar" title={`${d.date}: ${formatDuration(d.seconds)}, ${formatNumber(d.chars)} chars`}>
+                        <span style={{ height: `${Math.round((d.seconds / peak) * 100)}%` }} />
+                        <b>{dayLabel(d.date)}</b>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="aero-stats-empty">No reading samples recorded yet.</div>
+                )}
+              </section>
+
+              <section className="aero-stats-panel aero-stats-books-panel">
+                <header>Books</header>
+                {s.books.length > 0 ? (
+                  <div className="aero-stats-table">
+                    <div className="aero-stats-book-row aero-stats-book-head">
+                      <span>Title</span>
+                      <span>Time</span>
+                      <span>Chars</span>
+                    </div>
+                    {s.books.map((b) => (
+                      <div key={b.id} className="aero-stats-book-row">
+                        <span lang="ja">{b.title}</span>
+                        <span>{formatDuration(b.seconds)}</span>
+                        <span>{formatNumber(b.chars)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="aero-stats-empty">No book totals yet.</div>
+                )}
+              </section>
+            </main>
+
+            <aside className="aero-stats-knowledge">
+              <WordKnowledge />
+            </aside>
+          </div>
+        </div>
+      </AppChrome>
+    );
+  }
 
   return (
     <div className="stats-view">
@@ -89,18 +232,7 @@ export default function StatisticsView() {
           <div className="actions">
             <button
               className="btn"
-              onClick={async () => {
-                const ok = await confirmDialog({
-                  title: 'Reset statistics',
-                  message: 'Reset all reading statistics? This cannot be undone.',
-                  confirmLabel: 'Reset',
-                  danger: true,
-                });
-                if (ok) {
-                  resetStats();
-                  setNonce((n) => n + 1);
-                }
-              }}
+              onClick={() => void resetAllStats()}
             >
               Reset
             </button>

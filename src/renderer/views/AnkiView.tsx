@@ -200,7 +200,7 @@ export default function AnkiView() {
     pitch: '',
     frequency: '',
     audio: '',
-    image: attachImage ? '🖼 (clipboard image)' : '',
+    image: attachImage ? '[clipboard image]' : '',
   };
   const preview = usingTemplates
     ? fields
@@ -233,7 +233,7 @@ export default function AnkiView() {
   );
 
   return (
-    <AppChrome menus={ankiMenus} status={ankiStatus}>
+    <AppChrome menus={ankiMenus} status={ankiStatus} className="aero-anki-chrome">
     <div className="anki-view">
       <ProfileSettingsSection />
 

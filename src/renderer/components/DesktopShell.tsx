@@ -42,12 +42,15 @@ import {
   TASKBAR_HEIGHT,
   type DesktopPrefs,
 } from '../desktopPrefs';
+import { requestSecretLifecycleRestart, requestSecretLifecycleSleep } from '../secretLifecycle';
+import { exitSecretAero } from '../theme/SecretAeroTrigger';
 import { EnvironmentStack, WALL_PRESETS, loadEnvironment, saveEnvironment } from '../environment';
 import BuddyToast from '../environment/BuddyToast';
 import { startCompanionOsBridge, stopCompanionOsBridge } from '../environment/companionOsBridge';
 import { startAchievementWatcher } from '../environment/achievements';
 import { startNoctisLightBridge } from '../environment/noctisLightBridge';
 import { loadPersonalization, onPersonalizationChanged } from '../osPersonalization';
+import { syncPillarboxWallImage } from '../pillarboxSettings';
 import { getZoomFactor } from '../appZoom';
 import {
   addUserWallpaper,
@@ -106,6 +109,25 @@ const APPS: { id: WinSection; label: string; glyph: IconName }[] = [
   { id: 'city', label: 'Noctis', glyph: 'city' },
 ];
 
+const START_PRIMARY_SECTIONS: WinSection[] = ['immersion', 'dictionary', 'grammar', 'flashcards', 'anki', 'player'];
+const START_HINTS: Partial<Record<WinSection, string>> = {
+  player: 'Japanese subtitle desk',
+  music: 'Listening room',
+  dictionary: 'Lookup and pitch',
+  immersion: 'Live reader browser',
+  library: 'Local files',
+  novels: 'Reading shelf',
+  translate: 'Sentence tools',
+  grammar: 'JLPT patterns',
+  anki: 'Card export',
+  flashcards: 'Review queues',
+  stats: 'Progress charts',
+  calendar: 'Study schedule',
+  resources: 'Reference hub',
+  settings: 'Control panel',
+  city: 'Night desktop',
+};
+
 const WALLPAPERS = WALL_PRESETS;
 
 const NOTE_COLORS = ['#fff3a3', '#ffd6a5', '#ffb3ba', '#c9f2c7', '#cfe0ff'];
@@ -124,6 +146,26 @@ type AppMeta = { id: WinSection; label: string; glyph: IconName };
 
 function zoomFactor(): number {
   return getZoomFactor();
+}
+
+function desktopPointerScale(desk: HTMLElement | null): number {
+  if (!desk) return zoomFactor();
+  const rect = desk.getBoundingClientRect();
+  const sx = rect.width / Math.max(1, desk.clientWidth);
+  const sy = rect.height / Math.max(1, desk.clientHeight);
+  const scale = Math.max(sx, sy);
+  return Number.isFinite(scale) && scale > 0.05 ? scale : zoomFactor();
+}
+
+function isAeroViewportActive(): boolean {
+  return document.documentElement.getAttribute('data-materials') === 'aero';
+}
+
+function clampAeroContextMenuPoint(point: { x: number; y: number }, desk: HTMLElement): { x: number; y: number } {
+  return {
+    x: Math.min(point.x, Math.max(4, desk.clientWidth - 236)),
+    y: Math.min(point.y, Math.max(4, desk.clientHeight - 308)),
+  };
 }
 
 function iconMetrics(prefs: DesktopPrefs) {
@@ -194,8 +236,8 @@ function parseStartAppDrag(dt: DataTransfer | null | undefined): AppMeta | null 
   }
 }
 
-function appListForDesktop(desktopIndex: DesktopIndex): { id: WinSection; label: string; glyph: IconName }[] {
-  if (desktopIndex === 1) return [];
+/** Both desktops share the same app catalog; layouts (pins / windows) stay independent. */
+function appListForDesktop(_desktopIndex: DesktopIndex): { id: WinSection; label: string; glyph: IconName }[] {
   return APPS;
 }
 
@@ -286,15 +328,6 @@ function iconToSnapshot(icon: DeskIcon): IconSnapshot {
   };
 }
 
-function iconsForDesktop(saved: DeskIcon[], desktopIndex: DesktopIndex): DeskIcon[] {
-  if (desktopIndex === 1) {
-    return saved.filter(
-      (icon) => icon.section !== 'city' && icon.action !== 'city' && icon.id !== 'app-city' && icon.id !== 'app-noctis',
-    );
-  }
-  return saved;
-}
-
 function hydrateLayout(layout: DesktopLayout): {
   wins: Win[];
   icons: DeskIcon[];
@@ -304,11 +337,8 @@ function hydrateLayout(layout: DesktopLayout): {
 } {
   // Icons are exactly what the user pinned — never auto-seed missing apps.
   // Empty is valid and is the default for a fresh desktop.
-  const icons = iconsForDesktop(layout.icons.map(iconFromSnapshot), layout.desktopIndex);
-  let wins =
-    layout.desktopIndex === 1
-      ? layout.windows.map(winFromSnapshot).filter((win) => win.section !== 'city')
-      : layout.windows.map(winFromSnapshot);
+  const icons = layout.icons.map(iconFromSnapshot);
+  let wins = layout.windows.map(winFromSnapshot);
   // Session restore: optional clean desk (icons/widgets stay; app windows do not).
   try {
     const prefs = loadDesktopPrefs();
@@ -607,6 +637,11 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     };
   }, [wall.kind, wall.path, wall.id, wall.folder]);
 
+  useEffect(() => {
+    if (wallFromEnv) return;
+    syncPillarboxWallImage(wallImage);
+  }, [wallImage, wallFromEnv]);
+
   // Slideshow timer — Windows-style interval cycle
   useEffect(() => {
     if (wallFromEnv || wall.kind !== 'slideshow' || slidePaths.length < 2) return;
@@ -684,6 +719,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     setWins((ws) => ws.map((w) => (w.id === id ? { ...w, ...p } : w)));
   const close = (id: string) => {
     const closing = winsRef.current.find((w) => w.id === id);
+    window.dispatchEvent(new CustomEvent('shell:windowClose'));
     setWins((ws) => ws.filter((w) => w.id !== id));
     if (id.startsWith('note-')) {
       setNotes((n) => {
@@ -707,6 +743,10 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         }, 'window');
       });
     }
+  };
+  const minimize = (id: string) => {
+    window.dispatchEvent(new CustomEvent('shell:windowMinimize'));
+    patch(id, { min: true });
   };
 
   // ----- Home Workspace widgets -----
@@ -801,7 +841,14 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       return;
     }
     e.preventDefault();
-    setCtxPos({ x: e.clientX, y: e.clientY });
+    const desk = deskRef.current;
+    if (isAeroViewportActive() && desk) {
+      const local = clampAeroContextMenuPoint(clientToDeskLocal(desk, e.clientX, e.clientY), desk);
+      const z = zoomFactor();
+      setCtxPos({ x: local.x * z, y: local.y * z });
+    } else {
+      setCtxPos({ x: e.clientX, y: e.clientY });
+    }
   };
 
   useEffect(() => {
@@ -815,6 +862,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   // effect binds once.
   const addWidgetRef = useRef(addWidget);
   addWidgetRef.current = addWidget;
+  const switchDesktopRef = useRef<(target: DesktopIndex) => Promise<void>>(async () => {});
+
   useEffect(() => {
     const onWidgets = () => setGalleryOpen((o) => !o);
     const onAddWidget = (e: Event) => addWidgetRef.current((e as CustomEvent<string>).detail);
@@ -837,17 +886,48 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         patch(top.id, { z: ws[0].z - 1, min: false });
       }
     };
+    const onSwitchDesktop = (e: Event) => {
+      const dir = ((e as CustomEvent<number>).detail ?? 1) >= 0 ? 1 : -1;
+      const current = activeDesktopRef.current;
+      const target = (dir >= 0 ? (current === 0 ? 1 : 0) : current === 1 ? 0 : 1) as DesktopIndex;
+      void switchDesktopRef.current(target);
+    };
+    const onCycleAppFullscreen = (e: Event) => {
+      const dir = ((e as CustomEvent<number>).detail ?? 1) >= 0 ? 1 : -1;
+      const ws = [...winsRef.current].sort((a, b) => a.z - b.z);
+      if (ws.length < 1) return;
+      // Find currently focused window (highest z that's not minimized)
+      const currentFocused = ws.filter((w) => !w.min).reduce((a, b) => (b.z > a.z ? b : a), ws[0]);
+      if (dir === 1) {
+        // Forward: cycle to next window and maximize it
+        const currentIdx = ws.findIndex((w) => w.id === currentFocused.id);
+        const nextIdx = (currentIdx + 1) % ws.length;
+        const next = ws[nextIdx];
+        focus(next.id);
+        patch(next.id, { max: true, min: false });
+      } else {
+        // Backward: cycle to previous window and maximize it
+        const currentIdx = ws.findIndex((w) => w.id === currentFocused.id);
+        const prevIdx = currentIdx <= 0 ? ws.length - 1 : currentIdx - 1;
+        const prev = ws[prevIdx];
+        focus(prev.id);
+        patch(prev.id, { max: true, min: false });
+      }
+    };
     window.addEventListener('os:widgets', onWidgets);
     window.addEventListener('os:add-widget', onAddWidget);
     window.addEventListener('os:close-window', onCloseWin);
     window.addEventListener('os:cycle-window', onCycle);
+    window.addEventListener('os:switch-desktop', onSwitchDesktop);
+    window.addEventListener('os:cycle-app-fullscreen', onCycleAppFullscreen);
     return () => {
       window.removeEventListener('os:widgets', onWidgets);
       window.removeEventListener('os:add-widget', onAddWidget);
       window.removeEventListener('os:close-window', onCloseWin);
       window.removeEventListener('os:cycle-window', onCycle);
+      window.removeEventListener('os:switch-desktop', onSwitchDesktop);
+      window.removeEventListener('os:cycle-app-fullscreen', onCycleAppFullscreen);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -855,7 +935,6 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
     };
     const onDrop = (e: DragEvent) => {
-      if (activeDesktop !== 0) return;
       const files = Array.from(e.dataTransfer?.files ?? []);
       if (!files.length) return;
       e.preventDefault();
@@ -900,7 +979,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   const taskClick = (w: Win) => {
     const isTop = w.z === Math.max(...wins.map((x) => x.z));
     if (w.min) focus(w.id);
-    else if (isTop) patch(w.id, { min: true });
+    else if (isTop) minimize(w.id);
     else focus(w.id);
   };
 
@@ -1126,7 +1205,6 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   };
 
   const addShortcut = async () => {
-    if (activeDesktop !== 0) return;
     const r = await window.api.pickShortcut();
     if (!r) return;
     setIcons((prev) => {
@@ -1218,6 +1296,47 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   const visibleWidgets = widgets.filter((w) => !w.hidden);
   const hiddenWidgets = widgets.filter((w) => w.hidden);
   const topWidgetZ = visibleWidgets.length ? Math.max(...visibleWidgets.map((w) => w.z)) : 0;
+  const startPrimaryApps = START_PRIMARY_SECTIONS
+    .map((id) => desktopApps.find((app) => app.id === id))
+    .filter((app): app is AppMeta => !!app);
+  const startPlaceApps = desktopApps.filter((app) => !START_PRIMARY_SECTIONS.includes(app.id));
+
+  const renderAeroStartApp = (app: AppMeta, tone: 'program' | 'place') => {
+    const pinned = isAppPinned(app.id);
+    return (
+      <div
+        key={app.id}
+        className={`os-start-aero-row ${tone}${pinned ? ' pinned' : ''}${startAppDragging === app.id ? ' drag-source' : ''}`}
+      >
+        <button
+          type="button"
+          className="os-start-aero-app"
+          draggable
+          title={pinned ? 'Drag to move on desktop - click to open' : 'Drag to desktop - click to open'}
+          onDragStart={(e) => beginStartAppDrag(app, e)}
+          onDragEnd={endStartAppDrag}
+          onClick={() => open(app.id)}
+        >
+          <span className={`os-start-aero-ic app-${app.id}`}>
+            <Icon name={app.glyph} size={tone === 'program' ? 22 : 18} />
+          </span>
+          <span className="os-start-aero-copy">
+            <span className="os-start-aero-name">{app.label}</span>
+            <span className="os-start-aero-hint">{START_HINTS[app.id] ?? 'Study app'}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`os-start-aero-pin${pinned ? ' on' : ''}`}
+          title={pinned ? 'Remove from desktop' : 'Add to desktop'}
+          draggable={false}
+          onClick={() => togglePinApp(app)}
+        >
+          <Icon name="pin" size={12} />
+        </button>
+      </div>
+    );
+  };
 
   const switchDesktop = async (target: DesktopIndex) => {
     if (target === activeDesktop) return;
@@ -1239,6 +1358,34 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       console.error('[desktopState] switch failed:', err);
       hydrating.current = false;
     }
+  };
+  switchDesktopRef.current = switchDesktop;
+
+  const sleepSecretOs = () => {
+    setStartOpen(false);
+    requestSecretLifecycleSleep();
+  };
+
+  const restartSecretOs = async () => {
+    const ok = await confirmDialog({
+      title: 'Restart Secret OS',
+      message: 'Restart the Secret OS desktop sequence? Open apps and desktop layout stay in place.',
+      confirmLabel: 'Restart',
+    });
+    if (!ok) return;
+    setStartOpen(false);
+    requestSecretLifecycleRestart();
+  };
+
+  const shutdownSecretOs = async () => {
+    const ok = await confirmDialog({
+      title: 'Shut down Secret OS',
+      message: 'Return to the previous Study OS theme and restore the pre-Aero desktop atmosphere?',
+      confirmLabel: 'Shut down',
+    });
+    if (!ok) return;
+    setStartOpen(false);
+    exitSecretAero();
   };
 
   return (
@@ -1308,7 +1455,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           }}
           title={ic.kind === 'shortcut' ? ic.target : `Open ${ic.name}`}
         >
-          <div className={`os-desk-icon-img${ic.kind === 'action' ? ' action' : ''}${ic.action === 'addapp' ? ' tone-add' : ''}`}>
+          <div className={`os-desk-icon-img${ic.kind === 'action' ? ' action' : ''}${ic.action === 'addapp' ? ' tone-add' : ''}${ic.section ? ` app-${ic.section}` : ''}${ic.action ? ` action-${ic.action}` : ''}`}>
             {ic.icon ? (
               <img src={ic.icon} alt="" />
             ) : (
@@ -1340,7 +1487,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           noteColor={w.section === 'note' ? notes[w.id]?.color : undefined}
           onFocus={() => focus(w.id)}
           onClose={() => close(w.id)}
-          onMinimize={() => patch(w.id, { min: true })}
+          onMinimize={() => minimize(w.id)}
           onMaximize={() => toggleMax(w.id)}
           onPopOut={() => {
             void window.api.popOut(w.section);
@@ -1421,7 +1568,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
             onDrop={(e) => dropStartAppOnDesktop(e)}
           />
           <div
-            className="os-start"
+            className="os-start os-start-legacy"
             onDragOver={(e) => {
               // Keep drops on the panel itself from landing on the desktop.
               e.preventDefault();
@@ -1471,7 +1618,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                       onDragEnd={endStartAppDrag}
                       onClick={() => open(a.id)}
                     >
-                      <span className="os-start-app-ic">
+                      <span className={`os-start-app-ic app-${a.id}`}>
                         <Icon name={a.glyph} size={24} />
                       </span>
                       {a.label}
@@ -1498,22 +1645,18 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 </span>
                 Widgets
               </button>
-              {activeDesktop === 0 && (
-                <>
-                  <button type="button" className="os-start-app special" onClick={openNote}>
-                    <span className="os-start-app-ic tone-note">
-                      <Icon name="note" size={24} />
-                    </span>
-                    Sticky note
-                  </button>
-                  <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
-                    <span className="os-start-app-ic tone-add">
-                      <Icon name="plus" size={24} />
-                    </span>
-                    Add app…
-                  </button>
-                </>
-              )}
+              <button type="button" className="os-start-app special" onClick={openNote}>
+                <span className="os-start-app-ic tone-note">
+                  <Icon name="note" size={24} />
+                </span>
+                Sticky note
+              </button>
+              <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
+                <span className="os-start-app-ic tone-add">
+                  <Icon name="plus" size={24} />
+                </span>
+                Add app…
+              </button>
             </div>
             <div className="os-start-footer">
               <button type="button" className="os-start-foot-btn" onClick={() => open('settings')}>
@@ -1558,6 +1701,135 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
               </button>
             </div>
           </div>
+          <div
+            className="os-start os-start-aero-menu"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = 'none';
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <div className="os-start-aero-head">
+              <span className="os-start-aero-avatar" aria-hidden="true">
+                <Icon name="logo" size={24} />
+              </span>
+              <div className="os-start-aero-id">
+                <div className="os-start-aero-title">Secret Study OS</div>
+                <div className="os-start-aero-sub">
+                  {startAppDragging ? 'Drop on the desktop to place the app' : 'Personal study desktop'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="os-start-aero-search"
+                title="Search"
+                aria-label="Search"
+                onClick={() => {
+                  setStartOpen(false);
+                  window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+                }}
+              >
+                <Icon name="search" size={17} />
+              </button>
+            </div>
+
+            <div className="os-start-aero-columns">
+              <section className="os-start-aero-main" aria-label="Study programs">
+                <div className="os-start-aero-label">Study programs</div>
+                <div className="os-start-aero-programs">
+                  {startPrimaryApps.map((app) => renderAeroStartApp(app, 'program'))}
+                </div>
+                <button
+                  type="button"
+                  className="os-start-aero-all"
+                  onClick={() => {
+                    setStartOpen(false);
+                    window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+                  }}
+                >
+                  <span>All programs</span>
+                  <Icon name="chevron" size={14} />
+                </button>
+              </section>
+
+              <aside className="os-start-aero-side" aria-label="Places and tools">
+                <div className="os-start-aero-label">Places</div>
+                <div className="os-start-aero-places">
+                  {startPlaceApps.map((app) => renderAeroStartApp(app, 'place'))}
+                </div>
+                <div className="os-start-aero-label">Tools</div>
+                <div className="os-start-aero-tools">
+                  <button
+                    type="button"
+                    className="os-start-aero-tool"
+                    onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
+                  >
+                    <Icon name="widgets" size={17} />
+                    <span>Widgets</span>
+                  </button>
+                  <button type="button" className="os-start-aero-tool" onClick={openNote}>
+                    <Icon name="note" size={17} />
+                    <span>Sticky note</span>
+                  </button>
+                  <button type="button" className="os-start-aero-tool" onClick={() => void addShortcut()}>
+                    <Icon name="plus" size={17} />
+                    <span>Add app...</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="os-start-aero-tool"
+                    onClick={() => {
+                      setStartOpen(false);
+                      window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
+                    }}
+                  >
+                    <Icon name="wrench" size={17} />
+                    <span>Quick settings</span>
+                  </button>
+                </div>
+              </aside>
+            </div>
+
+            <div className="os-start-aero-footer">
+              <button type="button" className="os-start-aero-footer-btn" onClick={() => open('settings')}>
+                <Icon name="settings" size={16} />
+                <span>Control panel</span>
+              </button>
+              <div className="os-start-aero-power-cluster" aria-label="Secret OS power">
+                <button
+                  type="button"
+                  className="os-start-aero-power"
+                  title="Sleep Secret OS"
+                  aria-label="Sleep Secret OS"
+                  onClick={sleepSecretOs}
+                >
+                  <Icon name="pause" size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="os-start-aero-power"
+                  title="Restart Secret OS"
+                  aria-label="Restart Secret OS"
+                  onClick={() => void restartSecretOs()}
+                >
+                  <Icon name="refresh" size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="os-start-aero-power shutdown"
+                  title="Shut down Secret OS"
+                  aria-label="Shut down Secret OS"
+                  onClick={() => void shutdownSecretOs()}
+                >
+                  <Icon name="power" size={15} />
+                </button>
+              </div>
+            </div>
+          </div>
         </>
       )}
 
@@ -1593,7 +1865,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
             return (
               <button
                 key={w.id}
-                className={`os-task-win ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''}`}
+                className={`os-task-win app-${w.section} ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''}`}
                 title={label}
                 onClick={() => taskClick(w)}
               >
@@ -1753,9 +2025,9 @@ const FloatingWindow = memo(function FloatingWindow({
     onFocus();
     const el = e.currentTarget;
     el.setPointerCapture(e.pointerId);
-    const z = zoomFactor();
-    const sx = e.clientX, sy = e.clientY, ox = win.x, oy = win.y;
     const desk = deskRef.current;
+    const z = desktopPointerScale(desk);
+    const sx = e.clientX, sy = e.clientY, ox = win.x, oy = win.y;
     const dw = desk?.clientWidth ?? 1200;
     const dh = (desk?.clientHeight ?? 720) - TASKBAR_HEIGHT.normal;
     let curX = ox, curY = oy;
@@ -1815,9 +2087,9 @@ const FloatingWindow = memo(function FloatingWindow({
     if (win.max) onPatch({ max: false });
     const el = e.currentTarget;
     el.setPointerCapture(e.pointerId);
-    const z = zoomFactor();
-    const sx = e.clientX, sy = e.clientY, ow = win.w, oh = win.h;
     const desk = deskRef.current;
+    const z = desktopPointerScale(desk);
+    const sx = e.clientX, sy = e.clientY, ow = win.w, oh = win.h;
     const dw = desk?.clientWidth ?? 1200;
     const dh = (desk?.clientHeight ?? 720) - TASKBAR_HEIGHT.normal;
     const maxW = Math.max(MIN_W, dw - win.x - 2);

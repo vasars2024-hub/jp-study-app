@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
@@ -18,6 +18,7 @@ import {
   type BuddyStep,
 } from '../../../environment/buddyRoutines';
 import { COMMAND_CATALOG, SHORTCUT_OPEN_APPS } from '../../../keyboardShortcuts';
+import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
 
 const STEP_TYPES: { id: BuddyStep['type']; label: string }[] = [
   { id: 'openApp', label: 'Open app' },
@@ -65,10 +66,13 @@ function blankStep(type: BuddyStep['type']): BuddyStep {
 
 export default function CompanionsPage() {
   const { env, patchEnv, deskPrefs, patchDesk, seg, focusSettingId } = useSettings();
+  const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
+  useEffect(() => onAeroDiscoveryChanged(setAeroDiscovered), []);
+  const companionDefs = useMemo(() => COMPANION_DEFS(), [aeroDiscovered]);
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
   const [editId, setEditId] = useState<string>(routines[0]?.id ?? '');
   const [testMsg, setTestMsg] = useState('');
-  const selectedType = COMPANION_DEFS.find((d) => d.id === 'study-buddy')?.id ?? 'study-buddy';
+  const selectedType = companionDefs.find((d) => d.id === 'study-buddy')?.id ?? 'study-buddy';
   const [assignType, setAssignType] = useState<CompanionTypeId>(selectedType);
 
   const editing = useMemo(
@@ -200,7 +204,7 @@ export default function CompanionsPage() {
       >
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
           <span className="os-viz-label muted">Who</span>
-          {COMPANION_DEFS.map((d) => {
+          {companionDefs.map((d) => {
             const on = env.companionTypes.includes(d.id);
             return (
               <button
@@ -276,7 +280,7 @@ export default function CompanionsPage() {
               value={assignType}
               onChange={(e) => setAssignType(e.target.value as CompanionTypeId)}
             >
-              {COMPANION_DEFS.map((d) => (
+              {companionDefs.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.label}
                 </option>
@@ -384,7 +388,7 @@ export default function CompanionsPage() {
                   }
                 >
                   <option value="*">Any</option>
-                  {COMPANION_DEFS.map((d) => (
+                  {companionDefs.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.label}
                     </option>

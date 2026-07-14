@@ -166,6 +166,7 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
     const done = (ok: boolean): void => {
       if (settled) return;
       settled = true;
+      window.dispatchEvent(new CustomEvent('shell:dialogResolve', { detail: { ok } }));
       resolve(ok);
       // Unmount outside the event/render cycle that triggered us.
       window.setTimeout(() => {
@@ -189,6 +190,7 @@ export function alertDialog(opts: AlertOptions): Promise<void> {
     const done = (): void => {
       if (settled) return;
       settled = true;
+      window.dispatchEvent(new CustomEvent('shell:dialogResolve', { detail: { ok: true } }));
       resolve();
       window.setTimeout(() => {
         root.unmount();
@@ -211,6 +213,7 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
     const done = (value: string | null): void => {
       if (settled) return;
       settled = true;
+      window.dispatchEvent(new CustomEvent('shell:dialogResolve', { detail: { ok: value !== null } }));
       resolve(value);
       window.setTimeout(() => {
         root.unmount();

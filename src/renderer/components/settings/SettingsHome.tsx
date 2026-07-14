@@ -8,6 +8,7 @@ import type { SettingsPageId } from './types';
 const QUICK: { page: SettingsPageId; label: string; icon: (typeof SETTINGS_NAV)[0]['icon']; settingId?: string }[] = [
   { page: 'wallpaper', label: 'Change wallpaper', icon: 'image' },
   { page: 'shortcuts', label: 'Manage shortcuts', icon: 'command' },
+  { page: 'lockscreen', label: 'Lockscreen & PIN', icon: 'lock', settingId: 'lockscreen-enable' },
   { page: 'appearance', label: 'Customize theme', icon: 'sparkle', settingId: 'theme' },
   { page: 'companions', label: 'Companion settings', icon: 'heart' },
   { page: 'atmosphere', label: 'Particles & atmosphere', icon: 'flame', settingId: 'particles' },

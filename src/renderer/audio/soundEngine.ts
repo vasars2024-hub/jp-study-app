@@ -25,6 +25,16 @@ import {
 const LS_ENABLED = 'jp-os-sound-enabled';
 const LS_VOLUME = 'jp-os-sound-volume';
 const LS_MUTED = 'jp-os-sound-muted';
+const LS_CATEGORY_VOLUME = 'jp-os-sound-category-volume';
+
+const DEFAULT_CATEGORY_VOLUME: Record<SoundCategory, number> = {
+  system: 1,
+  ui: 0.82,
+  environment: 0.74,
+  companion: 0.76,
+  achievement: 0.86,
+  notification: 0.84,
+};
 
 export interface PlayOptions {
   /** Per-shot gain 0–1 (default 1). */
@@ -47,10 +57,14 @@ class SoundEngine {
   private buffers = new Map<string, AudioBuffer | null>();
   private packs = new Map<string, SoundPackManifest>();
   private activePackId: string = SILENT_PACK.id;
+  private activeSources = new Set<AudioBufferSourceNode>();
 
   private enabled = true;
   private muted = false;
   private volume = 0.7;
+  private categoryVolume = new Map<SoundCategory, number>(
+    SOUND_CATEGORIES.map((category) => [category, DEFAULT_CATEGORY_VOLUME[category]]),
+  );
 
   constructor() {
     this.packs.set(SILENT_PACK.id, SILENT_PACK);
@@ -59,6 +73,13 @@ class SoundEngine {
       this.muted = localStorage.getItem(LS_MUTED) === '1';
       const v = Number.parseFloat(localStorage.getItem(LS_VOLUME) ?? '');
       if (Number.isFinite(v)) this.volume = Math.min(1, Math.max(0, v));
+      const rawCategories = JSON.parse(localStorage.getItem(LS_CATEGORY_VOLUME) ?? '{}') as Partial<Record<SoundCategory, number>>;
+      for (const category of SOUND_CATEGORIES) {
+        const cv = rawCategories[category];
+        if (typeof cv === 'number' && Number.isFinite(cv)) {
+          this.categoryVolume.set(category, Math.min(1, Math.max(0, cv)));
+        }
+      }
     } catch {
       /* storage unavailable */
     }
@@ -76,6 +97,24 @@ class SoundEngine {
   }
   getActivePackId(): string {
     return this.activePackId;
+  }
+  /** Stop one-shots and loops that are already playing. Useful when a theme
+      exits to a silent/default sound pack: the pack switch prevents future
+      sounds, while this silences sounds that started before the switch. */
+  stopAll(): void {
+    for (const src of [...this.activeSources]) {
+      try {
+        src.stop();
+      } catch {
+        /* already stopped */
+      }
+      try {
+        src.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+      this.activeSources.delete(src);
+    }
   }
 
   /* ---- Prefs ---- */
@@ -114,6 +153,21 @@ class SoundEngine {
       /* ignore */
     }
   }
+  getCategoryVolume(category: SoundCategory): number {
+    return this.categoryVolume.get(category) ?? DEFAULT_CATEGORY_VOLUME[category];
+  }
+  setCategoryVolume(category: SoundCategory, v: number): void {
+    const next = Math.min(1, Math.max(0, v));
+    this.categoryVolume.set(category, next);
+    const g = this.catGain.get(category);
+    if (g) g.gain.value = next;
+    try {
+      const data = Object.fromEntries(SOUND_CATEGORIES.map((c) => [c, this.getCategoryVolume(c)]));
+      localStorage.setItem(LS_CATEGORY_VOLUME, JSON.stringify(data));
+    } catch {
+      /* ignore */
+    }
+  }
 
   /* ---- Internals ---- */
   private ensureCtx(): AudioContext | null {
@@ -127,7 +181,7 @@ class SoundEngine {
     master.connect(ctx.destination);
     for (const c of SOUND_CATEGORIES) {
       const g = ctx.createGain();
-      g.gain.value = 1;
+      g.gain.value = this.getCategoryVolume(c);
       g.connect(master);
       this.catGain.set(c, g);
     }
@@ -141,6 +195,20 @@ class SoundEngine {
     const perf = document.documentElement.getAttribute('data-perf') ?? 'balanced';
     if (perf === 'battery') return category !== 'environment' && category !== 'companion';
     return true;
+  }
+
+  private reducedSensoryGain(category: SoundCategory): number {
+    if (typeof document === 'undefined') return 1;
+    const root = document.documentElement;
+    const reduced =
+      root.classList.contains('reduce-motion') ||
+      root.dataset.displayAnim === 'reduced' ||
+      root.dataset.displayAnim === 'none';
+    if (!reduced) return 1;
+    if (category === 'environment' || category === 'companion') return 0.48;
+    if (category === 'notification' || category === 'achievement') return 0.58;
+    if (category === 'ui') return 0.64;
+    return 0.82;
   }
 
   private async load(url: string): Promise<AudioBuffer | null> {
@@ -184,9 +252,21 @@ class SoundEngine {
     src.buffer = buf;
     src.playbackRate.value = opts?.rate ?? 1;
     const g = ctx.createGain();
-    g.gain.value = opts?.volume ?? 1;
+    g.gain.value = (opts?.volume ?? 1) * this.reducedSensoryGain(category);
     src.connect(g);
-    g.connect(this.catGain.get(category) ?? this.master!);
+    const destination = this.catGain.get(category) ?? this.master;
+    if (!destination) return;
+    g.connect(destination);
+    this.activeSources.add(src);
+    src.onended = () => {
+      this.activeSources.delete(src);
+      try {
+        src.disconnect();
+        g.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+    };
     src.start();
   }
 
@@ -206,7 +286,11 @@ class SoundEngine {
    * (e.g. the default silent pack). Used by the environment ambient-audio layer.
    */
   async playLoop(category: SoundCategory, name: string, opts?: { volume?: number }): Promise<LoopHandle> {
-    const silent: LoopHandle = { stop() {}, setVolume() {}, fadeTo() {} };
+    const silent: LoopHandle = {
+      stop: () => undefined,
+      setVolume: () => undefined,
+      fadeTo: () => undefined,
+    };
     if (!this.enabled || this.muted) return silent;
     if (!this.perfAllows(category)) return silent;
     const url = this.packs.get(this.activePackId)?.sounds?.[category]?.[name];
@@ -226,9 +310,12 @@ class SoundEngine {
     src.buffer = buf;
     src.loop = true;
     const g = ctx.createGain();
-    g.gain.value = opts?.volume ?? 1;
+    g.gain.value = (opts?.volume ?? 1) * this.reducedSensoryGain(category);
     src.connect(g);
-    g.connect(this.catGain.get(category) ?? this.master!);
+    const destination = this.catGain.get(category) ?? this.master;
+    if (!destination) return silent;
+    g.connect(destination);
+    this.activeSources.add(src);
     src.start();
     let stopped = false;
     return {
@@ -240,6 +327,7 @@ class SoundEngine {
         } catch {
           /* already stopped */
         }
+        soundEngine.activeSources.delete(src);
         src.disconnect();
         g.disconnect();
       },

@@ -12,6 +12,15 @@ import DayCycleLighting from './DayCycleLightingLayer';
 import WeatherLayer from './WeatherLayer';
 import { pulseCalendarCompanions } from './schedules';
 import { onCalendarChanged } from '../calendar';
+import { hasDiscoveredAero } from '../aeroDiscovery';
+
+const TREASURE_MIKO_ENV = (base: EnvironmentSettings): EnvironmentSettings => ({
+  ...base,
+  enabled: true,
+  companionsEnabled: true,
+  companionTypes: ['miko-shimeji'],
+  companions: (base.companions ?? []).filter((c) => c.typeId === 'miko-shimeji'),
+});
 
 export default function EnvironmentStack({
   onRotationActive,
@@ -56,7 +65,16 @@ export default function EnvironmentStack({
     if (!active) onRotationActive?.(false);
   }, [env.enabled, env.rotationEnabled, onRotationActive]);
 
-  if (!env.enabled) return null;
+  if (!env.enabled) {
+    if (hasDiscoveredAero()) return null;
+    return (
+      <div className="os-env-stack os-env-stack-treasure" aria-hidden={false} data-companions="1">
+        <CompanionLayer env={TREASURE_MIKO_ENV(env)} />
+      </div>
+    );
+  }
+
+  const showTreasureMiko = !hasDiscoveredAero() && !env.companionsEnabled;
 
   return (
     <div
@@ -64,7 +82,7 @@ export default function EnvironmentStack({
       aria-hidden={false}
       data-env-tier={env.performanceTier}
       data-particles={env.particlesEnabled ? '1' : '0'}
-      data-companions={env.companionsEnabled ? '1' : '0'}
+      data-companions={env.companionsEnabled || showTreasureMiko ? '1' : '0'}
       data-rotation={env.rotationEnabled ? '1' : '0'}
       data-lighting={env.dayCycleLighting ? '1' : '0'}
       data-weather={env.weather?.mode && env.weather.mode !== 'off' ? env.weather.mode : '0'}
@@ -73,7 +91,9 @@ export default function EnvironmentStack({
       {env.dayCycleLighting && <DayCycleLighting env={env} />}
       {env.weather?.mode !== 'off' && env.performanceTier !== 'off' && <WeatherLayer env={env} />}
       {env.particlesEnabled && env.performanceTier !== 'off' && <ParticleLayer env={env} />}
-      {env.companionsEnabled && <CompanionLayer env={env} />}
+      {(env.companionsEnabled || showTreasureMiko) && (
+        <CompanionLayer env={showTreasureMiko ? TREASURE_MIKO_ENV(env) : env} />
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../components/Icons';
-import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu, useAeroMaterials } from '../components/ui';
 import {
   addEvent,
   CATEGORY_COLORS,
@@ -228,6 +228,7 @@ function EventChip({ ev, onClick }: { ev: EventOccurrence; onClick: () => void }
 }
 
 export default function CalendarView() {
+  const aero = useAeroMaterials();
   const [events, setEvents] = useState<CalendarEvent[]>(() => loadEvents());
   useEffect(() => onCalendarChanged(() => setEvents(loadEvents())), []);
 
@@ -364,8 +365,8 @@ export default function CalendarView() {
   );
 
   return (
-    <AppChrome menus={calMenus} status={calStatus}>
-    <div className="calendar-view">
+    <AppChrome menus={calMenus} status={calStatus} className="aero-calendar-chrome">
+    <div className={`calendar-view${aero ? ' aero-calendar' : ''}`}>
       <div className="view-head">
         <div>
           <h1>Calendar</h1>
@@ -375,6 +376,43 @@ export default function CalendarView() {
           <Icon name="plus" size={14} /> New event
         </button>
       </div>
+
+      {aero && (
+        <aside className="aero-cal-sidebar" aria-label="Calendar navigator">
+          <div className="aero-cal-date-card">
+            <span>{today.toLocaleDateString([], { weekday: 'short' })}</span>
+            <strong>{today.getDate()}</strong>
+            <small>{today.toLocaleDateString([], { month: 'long', year: 'numeric' })}</small>
+          </div>
+          <button type="button" className="aero-cal-nav-row" onClick={goToday}>
+            <Icon name="calendar" size={15} />
+            <span>Today</span>
+            <strong>{agendaToday.length}</strong>
+          </button>
+          <button type="button" className="aero-cal-nav-row" onClick={() => openNew(toKey(cursor))}>
+            <Icon name="plus" size={15} />
+            <span>New event</span>
+          </button>
+          <div className="aero-cal-pane-title">Views</div>
+          {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`aero-cal-nav-row ${mode === m ? 'active' : ''}`}
+              onClick={() => setMode(m)}
+            >
+              <Icon name={m === 'agenda' ? 'clipboard' : 'calendar'} size={15} />
+              <span>{m[0].toUpperCase() + m.slice(1)}</span>
+            </button>
+          ))}
+          <div className="aero-cal-pane-title">Reminders</div>
+          <button type="button" className={`aero-cal-nav-row ${agendaOverdue.length ? 'urgent' : ''}`} onClick={() => setMode('agenda')}>
+            <Icon name="bookmark" size={15} />
+            <span>Overdue</span>
+            <strong>{agendaOverdue.length}</strong>
+          </button>
+        </aside>
+      )}
 
       <div className="cal-toolbar">
         <div className="cal-modes">
@@ -514,6 +552,48 @@ export default function CalendarView() {
             )}
           </section>
         </div>
+      )}
+
+      {aero && (
+        <aside className="aero-cal-inspector" aria-label="Schedule inspector">
+          <div className="aero-cal-pane-title">Today</div>
+          {agendaToday.length === 0 ? (
+            <p className="muted">Nothing today.</p>
+          ) : (
+            <ul className="aero-cal-list">
+              {agendaToday.slice(0, 5).map((ev) => (
+                <li key={`today-${ev.id}-${ev.occurrenceDate}`}>
+                  <EventChip ev={ev} onClick={() => openEdit(ev)} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="aero-cal-pane-title">Upcoming</div>
+          {agendaUpcoming.length === 0 ? (
+            <p className="muted">Nothing scheduled.</p>
+          ) : (
+            <ul className="aero-cal-list">
+              {agendaUpcoming.slice(0, 8).map((ev) => (
+                <li key={`upcoming-${ev.id}-${ev.occurrenceDate}`}>
+                  <span className="aero-cal-date">{new Date(ev.occurrenceDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                  <EventChip ev={ev} onClick={() => openEdit(ev)} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="aero-cal-pane-title">Overdue</div>
+          {agendaOverdue.length === 0 ? (
+            <p className="muted">None.</p>
+          ) : (
+            <ul className="aero-cal-list">
+              {agendaOverdue.slice(0, 5).map((ev) => (
+                <li key={`overdue-${ev.id}-${ev.occurrenceDate}`}>
+                  <EventChip ev={ev} onClick={() => openEdit(ev)} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </aside>
       )}
 
       {modal && <EventModal initial={modal} onClose={() => setModal(null)} />}

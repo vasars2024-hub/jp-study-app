@@ -2,7 +2,7 @@
 // broadcast to live listeners (DesktopShell wallpaper layer, widgets, Settings).
 
 export type VizMode = 'wallpaper' | 'widget' | 'both';
-export type VizStyle = 'spectrum' | 'wave' | 'particles';
+export type VizStyle = 'spectrum' | 'wave' | 'particles' | 'xp-classic' | 'vista-aero';
 export type FreqTarget = 'full' | 'bass';
 export type ColorTheme = 'accent' | 'album' | 'custom';
 
@@ -42,7 +42,7 @@ export function loadVizSettings(): VizSettings {
     const saved = JSON.parse(raw) as Partial<VizSettings> & { style?: string };
     // Migrate the first version's style name.
     if (saved.style === 'bars') saved.style = 'spectrum';
-    if (!['spectrum', 'wave', 'particles'].includes(saved.style ?? '')) delete saved.style;
+    if (!['spectrum', 'wave', 'particles', 'xp-classic', 'vista-aero'].includes(saved.style ?? '')) delete saved.style;
     return { ...DEFAULTS, ...(saved as Partial<VizSettings>) };
   } catch {
     return { ...DEFAULTS };

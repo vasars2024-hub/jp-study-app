@@ -105,7 +105,7 @@ Science / engineering work   -> circulation and instrumentation
                                 (distribution reach, routing, research pressure)
 ```
 
-The first three mappings are the brief forms; the fourth is canon and must never be dropped: `NOCTIS_ECOLOGICAL_ENGINE.md` section 5 and `GAME_DESIGN.md` Section 2 assign science and engineering to the luciferin pathway's infrastructure register. Science routes the catalysts; art teaches them new colors.
+The first three mappings are the brief forms; the fourth is canon and must never be dropped: `NOCTIS_ECOLOGICAL_ENGINE.md` section 5 and `GAME_DESIGN.md` Section 2 assign science and engineering to the luciferin pathway's infrastructure register. Science routes the catalysts; art teaches them new colors. These four are **symbolic tendencies, not one-to-one unlock equations**: subject classification contributes to an interpreted learning profile that shapes the ecology together with the whole state, and no single academic subject is guaranteed to produce one exact ecological outcome (`SIMULATION_SYSTEMS.md` Section 7).
 
 ### What The Ecology Is For
 
@@ -316,9 +316,9 @@ Canopy activity ─ sheds ───────> spore-fall
 
 ### The Feedback Law
 
-Relationships form loops across time, and the loops are lawful because of one rule inherited from `SIMULATION_SYSTEMS.md` Section 11: within a single evaluation, influence flows strictly downward through the dependency strata; where a relationship feeds back — fertility multiplying growth, moth acceleration speeding pending transformations, lattice mass damping decay — the downstream value is read from the *previous* state and applied as a constant. Feedback across evaluations is ecology; feedback within an evaluation would be circular definition, and is forbidden. Every relationship in this document is therefore a directed edge in an acyclic per-evaluation graph, and every apparent cycle is a recurrence across time steps.
+Relationships form loops across time, and the loops are lawful because of one rule inherited from `SIMULATION_SYSTEMS.md` Section 13: within a single evaluation, influence flows strictly downward through the dependency strata; where a relationship feeds back — fertility multiplying growth, moth acceleration speeding pending transformations, lattice mass damping decay — the downstream value is read from the *previous* state and applied as a constant. Feedback across evaluations is ecology; feedback within an evaluation would be circular definition, and is forbidden. Every relationship in this document is therefore a directed edge in an acyclic per-evaluation graph, and every apparent cycle is a recurrence across time steps.
 
-Two structural prohibitions repeat here because they are ecological as much as architectural: population produces nothing (citizens are consequence, never source), and no relationship may ever mint value from nothing (Conservation, Law 2 — every gain traces to metabolized learning, transformation at efficiency at most one, or recycling at efficiency strictly less than one).
+Two structural prohibitions repeat here because they are ecological as much as architectural: no ecological process and no citizen mints *primary* value — no learning-derived input, accumulated knowledge, or metabolic energy from nothing — though citizens may observe, tend, maintain, and interact with the ecology within the agency boundary of `SIMULATION_SYSTEMS.md` Section 8; and no relationship may ever mint value from nothing (Conservation, `SIMULATION_SYSTEMS.md` Section 9 — every gain traces to metabolized learning, transformation at efficiency at most one, or recycling at efficiency strictly less than one).
 
 ---
 
@@ -330,11 +330,11 @@ Every structure that ever grows in Noctis anchors into root or lattice (`NOCTIS_
 
 The network functions as three systems at once:
 
-**Nervous system.** The mycelium is the world's substrate-level communication fabric: nutrient state, growth signals, and ecological condition propagate along the root mats between districts. In later eras this biological connectivity is what the civilization's own technology grows into — the living mycelial computing of the `OPTOGENETIC_CIRCUIT` era is cultivated *on* this network, never grown apart from it (`SIMULATION_SYSTEMS.md` Section 9).
+**Nervous system.** The mycelium is the world's substrate-level communication fabric: nutrient state, growth signals, and ecological condition propagate along the root mats between districts. In later eras this biological connectivity is what the civilization's own technology grows into — the living mycelial computing of the `OPTOGENETIC_CIRCUIT` era is cultivated *on* this network, never grown apart from it (`SIMULATION_SYSTEMS.md` Section 15).
 
-**Archive system.** Expansion is directional in meaning: outward expansion enables new anchored growth; downward expansion probes the buried strata. Each crossing of a depth threshold `θ_vault(i)` breaches an ancestral shale vault and appends a permanent discovery to Memory State — historical data shards, rare decorative spores, blueprint schemas (`SIMULATION_SYSTEMS.md` Section 7; yield richness and entry generation are the territory of `MEMORY_SYSTEM.md`). The thresholds are a fixed, strictly increasing function of `X_myc`: discovery is earned and lawful, never random.
+**Archive system.** Expansion is directional in meaning: outward expansion enables new anchored growth; downward expansion probes the buried strata. Each crossing of a depth threshold `θ_vault(i)` breaches an ancestral shale vault and appends a permanent discovery to Memory State — historical data shards, rare decorative spores, recovered blueprint schemas. A recovered schema is *exposed possibility*, never automatic capability: `MEMORY_SYSTEM.md` owns whether the record persists, and `TECHNOLOGY_SYSTEM.md` owns whether the civilization can actually reproduce or use what the schema describes (`SIMULATION_SYSTEMS.md` Sections 16 and 21, the capability distinction). Yield richness and entry generation remain the territory of `MEMORY_SYSTEM.md`. The thresholds are a fixed, strictly increasing function of `X_myc`: discovery is earned and lawful, never random.
 
-**Civilization memory system.** The network never shrinks. `X_myc` is cumulative living infrastructure — root laid down by a season of language review remains forever, holding districts, paths, and archives in a continuous living record. What the user rooted, absence cannot uproot (Law 4).
+**Civilization memory system.** The network's cumulative record never shrinks. `X_myc` is cumulative living infrastructure — root laid down by a season of language review remains part of the permanent record forever, holding districts, paths, and archives in a continuous living history. What the user rooted, absence cannot uproot (`SIMULATION_SYSTEMS.md` Section 10, Law 5). Where the *active form* of a habitat later transforms through internal ecological causality — a channel rerouting, an old canopy yielding to its successor — that is living change over active state (Law 8), never a subtraction from the legacy the record holds and never a consequence of user absence.
 
 ### What The Mycelium Is Not
 
@@ -488,23 +488,23 @@ EcologicalState
                               establishment           (projects fauna state)
   ecosystemHealth             composite activity reading: circulation,
                               stability, illumination (projects Φ, σ, L)
-  successionStage             the Section 5 stage, monotone
+  successionStage             the Section 5 stage (monotone legacy)
 }
 ```
 
-Two laws bind any future refinement of this projection. First, every category must remain derivable from canonical state — the projection adds vocabulary, never hidden variables. Second, the monotone/renewable split is preserved exactly: `substrateDevelopment`, `mycelialNetwork`, `crystalDevelopment`, and `successionStage` never decrease; `ecosystemHealth` and the activity components of the others are renewable and may breathe with presence and absence.
+Two laws bind any future refinement of this projection. First, every category must remain derivable from canonical state — the projection adds vocabulary, never hidden variables. Second, the legacy/active split of `SIMULATION_SYSTEMS.md` Section 10 is preserved exactly: the *cumulative legacy record* of `substrateDevelopment`, `mycelialNetwork`, `crystalDevelopment`, and `successionStage` never decreases and is never touched by user absence (Law 5); their *active form* may still transform through internal ecological causality (living change, Law 8); and `ecosystemHealth` and the activity components of the others are renewable and may breathe with presence and absence. No decrease anywhere is ever caused by the user stepping away.
 
 ---
 
 ## SECTION 13 — INTERACTION WITH OTHER SYSTEMS
 
-The ecology's external edges follow the dependency topology of `SIMULATION_SYSTEMS.md` Section 11 — ecology sits downstream of metabolic conversion and upstream of civilization expression, and all feedback crosses time steps, never evaluations.
+The ecology's external edges follow the dependency topology of `SIMULATION_SYSTEMS.md` Section 13 — ecology sits downstream of metabolic conversion and upstream of civilization expression, and all feedback crosses time steps, never evaluations.
 
 **Ecology → Citizens (`CITIZEN_SYSTEM.md`).** The environment is the condition of civic life: canopy expansion and substrate fertility drive population prosperity; illumination and energy sustain activity expression `A_P`. Citizens adapt to the environment; they never operate it.
 
-**Ecology → Culture (`CULTURE_SYSTEM.md`).** Biological communication is culture's raw material: photophore diversity sets the expressive range of semaphore dialects; district ecological character seeds district custom; the moth seasons and vault processions become ritual.
+**Ecology → Culture (`CULTURE_SYSTEM.md`).** Biological communication is culture's raw material, but ecology only ever emits environmental *conditions*; it never fixes cultural meaning. Photophore diversity, district ecological character, and the moth seasons and vault processions are conditions offered upward; `CULTURE_SYSTEM.md` owns how they are interpreted into expressive dialect range, district custom, and ritual (`SIMULATION_SYSTEMS.md` Section 17).
 
-**Ecology → Technology (`TECHNOLOGY_SYSTEM.md`).** Natural systems are the inspiration and substrate of every era's technique: lattice becomes memory and instrument, mycelium becomes computation, circulation becomes routing. Technology grows out of ecology and returns efficiency to it across time steps — never energy from nothing.
+**Ecology → Technology (`TECHNOLOGY_SYSTEM.md`).** Natural systems are the inspiration and substrate of every era's technique: lattice becomes memory and instrument, mycelium becomes computation, circulation becomes routing. Technology grows out of ecology and returns efficiency to it across time steps — never energy from nothing. Ecology provides substrate and *possibility*; `TECHNOLOGY_SYSTEM.md` owns which capabilities are actually realized, reproduced, and maintained (`SIMULATION_SYSTEMS.md` Section 16).
 
 **Ecology → Memory (`MEMORY_SYSTEM.md`).** The environment records civilization history: vault breaches, boundary discoveries, deep-strata emergence, growth strata, and monuments' anchoring sites all originate as ecological facts and persist as permanent Memory State.
 
