@@ -8,6 +8,7 @@ import {
   setVolume,
   type PlayerState,
 } from '../playerBus';
+import Icon from '../components/Icons';
 
 function fmt(t: number): string {
   if (!Number.isFinite(t) || t <= 0) return '0:00';
@@ -31,14 +32,20 @@ export function MiniPlayer() {
         <span>{fmt(st.duration)}</span>
       </div>
       <div className="wgt-row wgt-player-ctrls">
-        <button className="wgt-btn-icon" title="Previous" onClick={() => prev()}>⏮</button>
-        <button className="wgt-btn-icon lg" title={st.playing ? 'Pause' : 'Play'} onClick={() => toggle()}>
-          {st.playing ? '⏸' : '⏵'}
+        <button className="wgt-btn-icon" title="Previous" onClick={() => prev()}>
+          <Icon name="skip-back" size={14} />
         </button>
-        <button className="wgt-btn-icon" title="Next" onClick={() => next()}>⏭</button>
+        <button className="wgt-btn-icon lg" title={st.playing ? 'Pause' : 'Play'} onClick={() => toggle()}>
+          <Icon name={st.playing ? 'pause' : 'player'} size={15} />
+        </button>
+        <button className="wgt-btn-icon" title="Next" onClick={() => next()}>
+          <Icon name="skip-forward" size={14} />
+        </button>
       </div>
       <div className="wgt-row wgt-player-vol">
-        <span className="wgt-vol-ic" aria-hidden>♪</span>
+        <span className="wgt-vol-ic" aria-hidden>
+          <Icon name="volume" size={13} />
+        </span>
         <input
           type="range"
           min={0}

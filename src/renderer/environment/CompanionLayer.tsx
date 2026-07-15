@@ -16,11 +16,14 @@ import {
   COMPANION_DEFS,
   defaultCompanions,
   defFor,
+  type CompanionMotion,
   type CompanionInstance,
   type CompanionMood,
   type CompanionReactivity,
   type CompanionTypeId,
 } from './companionCatalog';
+import ShimejiSprite from './ShimejiSprite';
+import { hasDiscoveredAero } from '../aeroDiscovery';
 import { onCompanionEvent, type CompanionEventDetail } from './companionEvents';
 import { onPlayingChanged, isPlaying as musicIsPlaying } from '../audioBus';
 import { READING_RECORDED_EVENT } from '../stats';
@@ -37,6 +40,7 @@ import {
 } from './buddyRoutines';
 
 const SIZE = 52;
+const SHIMEJI_SIZE = 96;
 const DRAG_THRESHOLD = 6;
 
 /** Avoid re-firing morning/night on every CompanionLayer remount within the same period. */
@@ -45,6 +49,101 @@ let lastHourPulseDay = '';
 
 function clamp(n: number, a: number, b: number) {
   return Math.min(b, Math.max(a, n));
+}
+
+function companionSize(c: Pick<CompanionInstance, 'typeId'>): number {
+  return c.typeId === 'miko-shimeji' ? SHIMEJI_SIZE : SIZE;
+}
+
+function isShimeji(c: CompanionInstance): boolean {
+  return c.typeId === 'miko-shimeji';
+}
+
+function setMotion(c: CompanionInstance, motion: CompanionMotion): boolean {
+  if (c.motion === motion) return false;
+  c.motion = motion;
+  return true;
+}
+
+function updateShimejiMotion(c: CompanionInstance, w: number, h: number, dt: number, speed: number): boolean {
+  const size = companionSize(c);
+  const pad = 8;
+  const floorY = Math.max(pad, h - size - pad);
+  const rightX = Math.max(pad, w - size - pad);
+  let changed = false;
+  const moveSpeed = Math.max(speed, 26);
+
+  if (!c.motion || c.motion === 'stand' || c.motion === 'sit' || c.motion === 'drag' || c.motion === 'celebrate') {
+    changed = setMotion(c, 'walk') || changed;
+  }
+
+  if (c.motion === 'fall') {
+    c.y = clamp(c.y + moveSpeed * 2.4 * dt, pad, floorY);
+    if (c.y >= floorY - 1) {
+      c.y = floorY;
+      c.motionTargetX = c.facing === 1 ? rightX : pad;
+      changed = setMotion(c, 'walk') || changed;
+    }
+    return changed;
+  }
+
+  if (c.motion === 'wall') {
+    const side = c.motionSide ?? (c.x < w / 2 ? 'left' : 'right');
+    c.motionSide = side;
+    c.x = side === 'left' ? pad : rightX;
+    c.facing = side === 'left' ? -1 : 1;
+    const targetY = clamp(c.motionTargetY ?? pad, pad, floorY);
+    const dir = targetY < c.y ? -1 : 1;
+    c.y = clamp(c.y + dir * moveSpeed * 0.82 * dt, pad, floorY);
+    if (Math.abs(c.y - targetY) <= 2) {
+      c.y = targetY;
+      if (targetY <= pad + 1) {
+        c.motionTargetX = side === 'left' ? rightX : pad;
+        changed = setMotion(c, 'ceiling') || changed;
+      } else {
+        c.motionTargetX = side === 'left' ? rightX : pad;
+        c.facing = side === 'left' ? 1 : -1;
+        changed = setMotion(c, 'walk') || changed;
+      }
+    }
+    return changed;
+  }
+
+  if (c.motion === 'ceiling') {
+    c.y = pad;
+    const targetX = clamp(c.motionTargetX ?? (c.facing === 1 ? rightX : pad), pad, rightX);
+    const dir = targetX >= c.x ? 1 : -1;
+    c.facing = dir === 1 ? 1 : -1;
+    c.x = clamp(c.x + dir * moveSpeed * 0.72 * dt, pad, rightX);
+    if (Math.abs(c.x - targetX) <= 2 || c.x <= pad + 1 || c.x >= rightX - 1) {
+      c.x = clamp(targetX, pad, rightX);
+      c.motionSide = c.x < w / 2 ? 'left' : 'right';
+      c.motionTargetY = Math.random() < 0.35 ? floorY : pad + Math.random() * Math.max(40, floorY - pad);
+      changed = setMotion(c, 'wall') || changed;
+    } else if (Math.random() < dt * 0.035) {
+      c.motionTargetY = undefined;
+      c.motionSide = undefined;
+      changed = setMotion(c, 'fall') || changed;
+    }
+    return changed;
+  }
+
+  c.y = floorY;
+  changed = setMotion(c, 'walk') || changed;
+  if (typeof c.motionTargetX !== 'number') c.motionTargetX = c.facing === 1 ? rightX : pad;
+  const targetX = clamp(c.motionTargetX, pad, rightX);
+  const dir = targetX >= c.x ? 1 : -1;
+  c.facing = dir === 1 ? 1 : -1;
+  c.x = clamp(c.x + dir * moveSpeed * dt, pad, rightX);
+  if (Math.abs(c.x - targetX) <= 2 || c.x <= pad + 1 || c.x >= rightX - 1) {
+    c.x = clamp(targetX, pad, rightX);
+    c.motionSide = c.x < w / 2 ? 'left' : 'right';
+    c.motionTargetY = pad;
+    changed = setMotion(c, 'wall') || changed;
+  } else if (Math.random() < dt * 0.025) {
+    c.motionTargetX = c.facing === 1 ? pad + Math.random() * rightX * 0.42 : rightX - Math.random() * rightX * 0.42;
+  }
+  return changed;
 }
 
 function wanderSpeed(reactivity: CompanionReactivity): number {
@@ -65,15 +164,16 @@ function seedOrLoad(env: EnvironmentSettings, w: number, h: number): CompanionIn
   const active = new Set<CompanionTypeId>(
     env.companionTypes?.length
       ? (env.companionTypes as CompanionTypeId[])
-      : COMPANION_DEFS.map((d) => d.id),
+      : COMPANION_DEFS().map((d) => d.id),
   );
+  active.add('miko-shimeji');
   const saved = (env.companions ?? [])
     .filter((c) => active.has(c.typeId))
     .filter((c) => !c.hiddenUntil || c.hiddenUntil < now)
     .map((c) => ({
       ...c,
-      x: clamp(c.x, 8, Math.max(8, w - SIZE)),
-      y: clamp(c.y, 8, Math.max(8, h - SIZE)),
+      x: clamp(c.x, 8, Math.max(8, w - companionSize(c))),
+      y: clamp(c.y, 8, Math.max(8, h - companionSize(c))),
     }));
 
   const have = new Set(saved.map((c) => c.typeId));
@@ -87,10 +187,22 @@ function applyDomPos(el: HTMLElement | null, c: CompanionInstance): void {
   el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scaleX(${c.facing})`;
 }
 
+function secretLifecycleSuspended(): boolean {
+  return document.documentElement.classList.contains('secret-lifecycle-suspended');
+}
+
+const TREASURE_MSG = 'You have to first find my treasure.';
+
+function isTreasureLockedMiko(c: CompanionInstance): boolean {
+  return c.typeId === 'miko-shimeji' && !hasDiscoveredAero();
+}
+
 export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [list, setList] = useState<CompanionInstance[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [shakeId, setShakeId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const listRef = useRef<CompanionInstance[]>([]);
   const envRef = useRef(env);
   const dragRef = useRef<{
@@ -118,6 +230,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
   const runRoutine = useCallback(
     (c: CompanionInstance, routineId: string) => {
+      if (isTreasureLockedMiko(c)) return;
       void runBuddyRoutine(routineId, {
         companionId: c.id,
         typeId: c.typeId,
@@ -189,7 +302,6 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     listRef.current = next;
     setList(next);
     dirtyRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [env.enabled, env.companionsEnabled, env.companionTypes?.join(',')]);
 
   // Wander: DOM-only motion. Disk persist is rare (was every 2s → UI freezes).
@@ -200,8 +312,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     let raf = 0;
     let last = performance.now();
     let lastPersist = performance.now();
+    let lastReactSync = performance.now();
     let frameN = 0;
-    let running = !document.hidden;
+    let running = !document.hidden && !secretLifecycleSuspended();
     /** Cache companion nodes — querySelector every frame was expensive. */
     const elCache = new Map<string, HTMLElement | null>();
 
@@ -253,6 +366,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       }
 
       let moved = false;
+      let needsReact = false;
       for (const c of prev) {
         if (c.locked || (c.hiddenUntil && c.hiddenUntil > Date.now())) continue;
         if (dragRef.current?.id === c.id) continue;
@@ -261,6 +375,14 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
         let nx = c.x;
         let ny = c.y;
         let facing = c.facing;
+
+        if (isShimeji(c)) {
+          const motionChanged = updateShimejiMotion(c, w, h, dt, speed);
+          moved = true;
+          needsReact = needsReact || motionChanged;
+          applyDomPos(elFor(root, c.id), c);
+          continue;
+        }
 
         if (Math.random() < dt * 0.28) {
           const tx = clamp(c.x + (Math.random() - 0.5) * 120, 8, w - SIZE);
@@ -287,6 +409,12 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       }
 
       if (moved) dirtyRef.current = true;
+      if (needsReact && now - lastReactSync > 180) {
+        lastReactSync = now;
+        const snapshot = listRef.current.map((c) => ({ ...c }));
+        listRef.current = snapshot;
+        setList(snapshot);
+      }
 
       // Persist at most every 12s — full env JSON to disk every 2s was the hitch.
       if (now - lastPersist > 12_000 && dirtyRef.current) {
@@ -298,7 +426,8 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     };
 
     const onVis = () => {
-      if (document.hidden) {
+      const shouldRun = !document.hidden && !secretLifecycleSuspended();
+      if (!shouldRun) {
         running = false;
         cancelAnimationFrame(raf);
         if (dirtyRef.current && listRef.current.length) {
@@ -312,12 +441,14 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       }
     };
     document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('secret:lifecycle', onVis);
 
     if (running) raf = requestAnimationFrame(frame);
     return () => {
       running = false;
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('secret:lifecycle', onVis);
       elCache.clear();
       // One disk flush on unmount if positions moved
       if (dirtyRef.current && listRef.current.length) {
@@ -422,6 +553,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
             mood = 'curious';
             status = 'Night ecology awake';
           }
+        } else if (kind === 'environment') {
+          // The world shifted (preset / weather change) — a gentle acknowledgement.
+          mood = 'curious';
+          status = note ? `Exploring · ${note}` : 'The world shifts';
         }
         return mood === c.mood && status === c.status ? c : { ...c, mood, status };
       });
@@ -490,15 +625,32 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   useEffect(() => {
     if (!env.enabled || !env.companionsEnabled) return;
     if (musicIsPlaying()) react('music-play');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [env.enabled, env.companionsEnabled]);
+
+  const rejectTreasureMiko = useCallback(
+    (c: CompanionInstance) => {
+      setShakeId(c.id);
+      window.setTimeout(() => setShakeId((id) => (id === c.id ? null : id)), 420);
+      patchCompanion(c.id, { mood: 'curious', status: 'Find my treasure…' });
+      window.dispatchEvent(
+        new CustomEvent('os:toast', { detail: { message: TREASURE_MSG, kind: 'warn' } }),
+      );
+    },
+    [patchCompanion],
+  );
 
   const onPointerDown = (c: CompanionInstance) => (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    if (isTreasureLockedMiko(c)) {
+      e.stopPropagation();
+      rejectTreasureMiko(c);
+      return;
+    }
     if (c.locked) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = { id: c.id, ox: c.x, oy: c.y, sx: e.clientX, sy: e.clientY, moved: false };
+    setDraggingId(c.id);
   };
 
   useEffect(() => {
@@ -513,12 +665,14 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       const root = rootRef.current;
       const w = root?.clientWidth ?? 900;
       const h = root?.clientHeight ?? 500;
-      const nx = clamp(d.ox + dx, 8, w - SIZE);
-      const ny = clamp(d.oy + dy, 8, h - SIZE);
       const cur = listRef.current.find((c) => c.id === d.id);
+      const size = cur ? companionSize(cur) : SIZE;
+      const nx = clamp(d.ox + dx, 8, w - size);
+      const ny = clamp(d.oy + dy, 8, h - size);
       if (cur) {
         cur.x = nx;
         cur.y = ny;
+        cur.motion = 'drag';
         const el = root?.querySelector(`[data-companion-id="${d.id}"]`) as HTMLElement | null;
         applyDomPos(el, cur);
       }
@@ -527,8 +681,11 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       const d = dragRef.current;
       if (!d) return;
       dragRef.current = null;
+      setDraggingId(null);
       if (d.moved) {
-        const snapshot = listRef.current.map((c) => ({ ...c }));
+        const snapshot = listRef.current.map((c) =>
+          c.id === d.id && c.typeId === 'miko-shimeji' ? { ...c, motion: 'fall' as CompanionMotion } : { ...c },
+        );
         listRef.current = snapshot;
         setList(snapshot);
         persist(snapshot);
@@ -544,6 +701,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
   const onBuddyClick = (c: CompanionInstance) => (e: RMouseEvent) => {
     e.stopPropagation();
+    if (isTreasureLockedMiko(c)) {
+      rejectTreasureMiko(c);
+      return;
+    }
     if (dragRef.current?.moved) return;
     // Ignore click that completed a drag
     const d = dragRef.current;
@@ -565,6 +726,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const onBuddyContext = (c: CompanionInstance) => (e: RMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isTreasureLockedMiko(c)) {
+      rejectTreasureMiko(c);
+      return;
+    }
     setMenuId((id) => (id === c.id ? null : c.id));
   };
 
@@ -577,30 +742,43 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     <div ref={rootRef} className="os-companion-layer">
       {visible.map((c) => {
         const def = defFor(c.typeId);
+        const size = companionSize(c);
         const menuRoutines = resolveMenuRoutineIds(c, routines);
+        const lockedTreasure = isTreasureLockedMiko(c);
         return (
           <div
             key={c.id}
             data-companion-id={c.id}
-            className={`os-companion mood-${c.mood}${c.locked ? ' locked' : ''}${def.variant ? ` variant-${def.variant}` : ''}`}
+            className={`os-companion mood-${c.mood}${c.locked ? ' locked' : ''}${lockedTreasure ? ' is-treasure-locked' : ''}${shakeId === c.id ? ' is-treasure-shake' : ''}${def.variant ? ` variant-${def.variant}` : ''}`}
             style={{
               left: 0,
               top: 0,
+              width: size,
+              height: size,
               transform: `translate3d(${c.x}px, ${c.y}px, 0) scaleX(${c.facing})`,
               ['--c-body' as string]: def.color,
               ['--c-accent' as string]: def.accent,
             }}
-            title={`${def.label}${c.status ? ` — ${c.status}` : ''} · Click: run · Right-click: menu`}
+            title={
+              lockedTreasure
+                ? `${def.label} — ${TREASURE_MSG}`
+                : `${def.label}${c.status ? ` — ${c.status}` : ''} · Click: run · Right-click: menu`
+            }
             onPointerDown={onPointerDown(c)}
             onClick={onBuddyClick(c)}
             onContextMenu={onBuddyContext(c)}
           >
-            <div className="os-companion-body">
-              <span className="os-companion-eye" />
-              <span className="os-companion-eye" />
-              <span className={`os-companion-mouth mood-${c.mood}`} />
-            </div>
+            {def.sprite === 'miko-shimeji' ? (
+              <ShimejiSprite motion={c.motion} mood={c.mood} dragging={draggingId === c.id} />
+            ) : (
+              <div className="os-companion-body">
+                <span className="os-companion-eye" />
+                <span className="os-companion-eye" />
+                <span className={`os-companion-mouth mood-${c.mood}`} />
+              </div>
+            )}
             {c.mood === 'celebrate' && <span className="os-companion-spark" />}
+            {!lockedTreasure && (
             <button
               type="button"
               className="os-companion-menu-btn"
@@ -614,7 +792,8 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
             >
               ···
             </button>
-            {menuId === c.id && (
+            )}
+            {menuId === c.id && !lockedTreasure && (
               <div
                 className="os-companion-menu"
                 style={{ transform: `translateX(-50%) scaleX(${c.facing === -1 ? -1 : 1})` }}

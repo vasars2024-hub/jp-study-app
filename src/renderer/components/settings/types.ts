@@ -6,6 +6,7 @@ import type { VizSettings } from '../../visualizerSettings';
 import type { ReaderSettings } from '../../readerSettings';
 import type { WhisperDevice } from '../../whisperSettings';
 import type { LyricsSettings } from '../../lyricsSettings';
+import type { MiniModeSettings } from '../../miniMode';
 
 export interface WallChoice {
   kind: 'preset' | 'image' | 'video' | 'slideshow';
@@ -25,6 +26,8 @@ export type SettingsPageId =
   | 'companions'
   | 'desktop-layout'
   | 'shortcuts'
+  | 'mini'
+  | 'lockscreen'
   | 'study'
   | 'reading'
   | 'transcription'
@@ -41,6 +44,8 @@ export interface SettingsNavPage {
   group: string;
   /** i18n catalog key — resolve with t() at render time, never read directly. */
   descKey?: string;
+  /** Only listed when Settings Advanced Mode is on (features still run when hidden). */
+  advanced?: boolean;
 }
 
 export interface SettingsRegistryEntry {
@@ -57,6 +62,7 @@ export interface SettingsRegistryEntry {
   keywords: string[];
   pageId: SettingsPageId;
   group: string;
+  advanced?: boolean;
 }
 
 export interface UserWallThumb {
@@ -120,5 +126,9 @@ export interface SettingsController extends SettingsWallProps {
   setUserCss: (v: string) => void;
   cssMsg: string | null;
   setCssMsg: (v: string | null) => void;
+  mini: MiniModeSettings;
+  patchMini: (p: Partial<MiniModeSettings>) => void;
+  advancedMode: boolean;
+  setAdvancedMode: (on: boolean) => void;
   seg: (active: boolean) => string;
 }

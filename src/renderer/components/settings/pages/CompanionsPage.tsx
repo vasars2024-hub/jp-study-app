@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import {
   COMPANION_DEFS,
@@ -18,6 +19,7 @@ import {
 } from '../../../environment/buddyRoutines';
 import { COMMAND_CATALOG, SHORTCUT_OPEN_APPS } from '../../../keyboardShortcuts';
 import { useT } from '../../../i18n';
+import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
 
 function blankStep(type: BuddyStep['type']): BuddyStep {
   switch (type) {
@@ -51,10 +53,13 @@ function blankStep(type: BuddyStep['type']): BuddyStep {
 export default function CompanionsPage() {
   const { t } = useT();
   const { env, patchEnv, deskPrefs, patchDesk, seg, focusSettingId } = useSettings();
+  const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
+  useEffect(() => onAeroDiscoveryChanged(setAeroDiscovered), []);
+  const companionDefs = useMemo(() => COMPANION_DEFS(), [aeroDiscovered]);
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
   const [editId, setEditId] = useState<string>(routines[0]?.id ?? '');
   const [testMsg, setTestMsg] = useState('');
-  const selectedType = COMPANION_DEFS.find((d) => d.id === 'study-buddy')?.id ?? 'study-buddy';
+  const selectedType = companionDefs.find((d) => d.id === 'study-buddy')?.id ?? 'study-buddy';
   const [assignType, setAssignType] = useState<CompanionTypeId>(selectedType);
 
   const STEP_TYPES: { id: BuddyStep['type']; label: string }[] = [
@@ -135,9 +140,14 @@ export default function CompanionsPage() {
     setEditId(id);
   };
 
-  const deleteRoutine = () => {
+  const deleteRoutine = async () => {
     if (!editing || editing.builtin) return;
-    if (!window.confirm(t('settings.companions.deleteRoutineConfirm', { name: editing.name }))) return;
+    const ok = await confirmDialog({
+      message: t('settings.companions.deleteRoutineConfirm', { name: editing.name }),
+      confirmLabel: t('common.remove'),
+      danger: true,
+    });
+    if (!ok) return;
     const next = routines.filter((r) => r.id !== editing.id);
     setRoutines(next);
     setEditId(next[0]?.id ?? '');
@@ -195,7 +205,7 @@ export default function CompanionsPage() {
       >
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
           <span className="os-viz-label muted">{t('settings.companions.who')}</span>
-          {COMPANION_DEFS.map((d) => {
+          {companionDefs.map((d) => {
             const on = env.companionTypes.includes(d.id);
             return (
               <button
@@ -271,7 +281,7 @@ export default function CompanionsPage() {
               value={assignType}
               onChange={(e) => setAssignType(e.target.value as CompanionTypeId)}
             >
-              {COMPANION_DEFS.map((d) => (
+              {companionDefs.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.label}
                 </option>
@@ -334,9 +344,13 @@ export default function CompanionsPage() {
           <button
             type="button"
             className="btn small"
-            onClick={() => {
-              if (!window.confirm(t('settings.companions.resetBuiltinsConfirm')))
-                return;
+            onClick={async () => {
+              const ok = await confirmDialog({
+                message: t('settings.companions.resetBuiltinsConfirm'),
+                confirmLabel: t('settings.companions.resetBuiltins'),
+                danger: true,
+              });
+              if (!ok) return;
               setRoutines(resetBuiltinRoutines(routines));
             }}
           >
@@ -374,7 +388,7 @@ export default function CompanionsPage() {
                   }
                 >
                   <option value="*">{t('settings.companions.any')}</option>
-                  {COMPANION_DEFS.map((d) => (
+                  {companionDefs.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.label}
                     </option>

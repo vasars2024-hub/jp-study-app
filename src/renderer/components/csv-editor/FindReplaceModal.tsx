@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Button } from '../ui';
+import { Dialog } from '../ui/Dialog';
 
 type Props = {
   columnHeaders: string[];
@@ -30,16 +32,19 @@ export default function FindReplaceModal({ columnHeaders, onClose, onApply }: Pr
   }
 
   return (
-    <div className="csv-editor-modal-backdrop" onClick={onClose} role="presentation">
-      <div
-        className="csv-editor-modal"
-        role="dialog"
-        aria-labelledby="csv-fr-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 id="csv-fr-title" className="csv-editor-modal-title">
-          Find and replace
-        </h3>
+    <Dialog
+      open
+      onClose={onClose}
+      title="Find and replace"
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={handleApply} disabled={!find.trim()}>
+            Replace all
+          </Button>
+        </>
+      }
+    >
         <label className="csv-editor-field">
           <span>Find</span>
           <input type="text" value={find} onChange={(e) => setFind(e.target.value)} autoFocus />
@@ -87,15 +92,6 @@ export default function FindReplaceModal({ columnHeaders, onClose, onApply }: Pr
             ))}
           </div>
         )}
-        <div className="csv-editor-modal-actions">
-          <button type="button" className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn primary" onClick={handleApply} disabled={!find.trim()}>
-            Replace all
-          </button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

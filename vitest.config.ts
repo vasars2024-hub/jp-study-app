@@ -10,6 +10,8 @@ export default defineConfig({
       'src/main/__tests__/**/*.test.ts',
       // Noctis engine purity proofs — pure TS, no electron stubbing needed.
       'src/main/city/engine/tests/**/*.test.ts',
+      // Phase 3: node-safe pure-logic tests for the living-environment layer.
+      'src/renderer/environment/**/*.test.ts',
     ],
     environment: 'node',
     testTimeout: 20000,

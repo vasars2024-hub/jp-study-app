@@ -16,7 +16,9 @@ depends_on:
 
 ## Document Status And Authority
 
-This document is the physics specification of the Noctis civilization simulation: the complete deterministic mathematical model from which every engine behavior derives. It defines what the civilization state *is*, how real-world learning transmutes into ecological change, how time acts on the world, and which laws no future system may break.
+This document is the physics specification of the Noctis civilization simulation: the shared, deterministic model from which every domain behavior derives. It defines what the civilization state *is*, how real-world learning becomes civilizational change, how time acts on the world, how domains propose and commit change without contradiction, and which laws no future system may break.
+
+It is a **shared-physics** document, not a domain design. Tier 6 defines the platform; the Tier 7 blueprints (`CITIZEN_SYSTEM.md`, `ECOLOGY_SYSTEM.md`, `TECHNOLOGY_SYSTEM.md`, `CULTURE_SYSTEM.md`, `MEMORY_SYSTEM.md`, and the reserved `ECONOMY_SYSTEM.md`, `LEARNING_INTEGRATION.md`, `ERA_PROGRESSION.md`) specialize it. Where an earlier draft of this file pre-authored domain-specific rules, this revision replaces them with a shared constraint or a deferred domain contract, so that each Tier 7 domain can develop correctly without contradiction.
 
 It sits beneath the full canon and the technical architecture, and may never contradict them:
 
@@ -30,253 +32,172 @@ ARCHITECTURE.md                Tier 5 — Technical Architecture
 SIMULATION_SYSTEMS.md          Tier 6 — Simulation Physics (this file)
 ```
 
-The authority chain continues downward: the Tier 7 domain blueprints (`CITIZEN_SYSTEM.md`, `ECOLOGY_SYSTEM.md`, `CULTURE_SYSTEM.md`, `TECHNOLOGY_SYSTEM.md`, `MEMORY_SYSTEM.md`) specialize the physics written here into domain formulas and bound coefficient values, each value carrying a canon citation, exactly as `ARCHITECTURE.md` prescribes.
+The authority chain continues downward: the Tier 7 domain blueprints specialize the physics written here into domain formulas, coefficient values, life-cycle models, and lifecycle stages, each value carrying a canon citation, exactly as `ARCHITECTURE.md` prescribes. A Tier 7 rule that contradicts Tier 5 or this document is invalid; a rule *this* document once stated that contradicts the intent of Tiers 1–5 has been corrected here rather than preserved out of deference.
 
 ### What This Document Binds — And What It Refuses To Bind
 
-**Binds:** the state categories and their conceptual variables; the state transition structure and its evaluation order; the functional forms of transmutation, saturation, decay, and dormancy; the resource metabolism and its priority laws; the ecological system relationships; the population law; the era progression structure; the deterministic event conditions; the system dependency topology; the mathematical integrity laws.
+**Binds:** the state-machine philosophy and the snapshot model; the extensible state *families* and their conceptual variables; the input contract and the interpreted-learning-profile shape; the elapsed-time contract and the classes of time behavior; the offline cushion/decay/dormancy structure and ordering; the evaluation lifecycle and the domain proposal/resolution model; the citizen-agency conservation boundary; the determinism-with-seeded-variation rule; conservation-by-domain; the legacy/active-possession distinction; the transition-and-event semantics; the cross-domain dependency and ownership rules; the integrity laws.
 
-**Refuses to bind:** every numeric coefficient, rate, multiplier, and threshold *value* (written as named symbolic constants here; bound in the Tier 7 domain blueprints under the calibration constraints stated in this file); the exact field identifiers of the state schema; any code structure, module layout, class, or function; any visual, animation, asset, or UI behavior. Exactly three numeric anchors appear in this document, because the canon itself locks them: the three-consecutive-day consistency trigger, the five-day absence horizon, and the ten-minute reawakening session (`NOCTIS_ECOLOGICAL_ENGINE.md` section 7).
+**Refuses to bind:** every numeric coefficient, rate, multiplier, and threshold *value* (written as named symbolic constants here; bound in the Tier 7 blueprints under the calibration constraints stated in this file); the exact field identifiers of the state schema; any code structure, module layout, class, or function; any visual, animation, asset, or UI behavior; and — the correction that defines this revision — **any complete Tier 7 domain model**: the citizen life cycle, the invention lifecycle, the internal model of culture, the economic mechanics, the memory model, the final era-transition formula, and the raw study-interpretation taxonomy all belong to their owning domains. Tier 6 gives each a contract, not a design.
+
+Exactly three numeric anchors appear in this document, because the canon itself locks them: the three-consecutive-day consistency trigger, the five-day absence horizon, and the ten-minute reawakening session (`NOCTIS_ECOLOGICAL_ENGINE.md` section 7). All other day-scale or rate values are calibration questions bound at Tier 7, never fabricated here as law.
 
 ### Notation
 
-Mathematics is written in plain text. `S` is a civilization state snapshot; `I` is a learning input; `Δt` is elapsed real time; `e^(−λ·Δt)` is exponential decay; `[0, 1]` is a closed unit interval. Named constants are written as symbols such as `θ_dormancy` or `δ_discharge`; their values bind at Tier 7. Time is measured in real-world minutes; day-scale anchors are expressed as canonical day counts.
+Mathematics is written in plain text. `S` is a committed civilization state snapshot; `I` is an interpreted learning input; `Δt` is elapsed real time; `e^(−λ·Δt)` is exponential decay; `[0, 1]` is a closed unit interval. Named constants are written as symbols such as `θ_dormancy` or `δ_discharge`; their values bind at Tier 7. Time is measured in real-world minutes; day-scale anchors are expressed as canonical day counts. Domain-specific quantities (illumination `L`, circulation `Φ`, stability `σ`, accumulated knowledge `K_total`, consistency `k`, momentum `m`, population `P`, population activity `A_P`, mycelial expansion `X_myc`, crystal mass `X_cry`, research readiness `R`, energy reserve `E`, storage capacity `C_E`) are introduced where first used; each is owned by the domain that specializes it and is named here only to state the shared law it obeys.
 
 ---
 
-## SECTION 1 — SIMULATION PHILOSOPHY AND STATE MODEL
+## SECTION 1 — SIMULATION PHILOSOPHY AND THE STATE MACHINE
 
 ### The Civilization Is A Deterministic State Machine
 
-Noctis is not a running world. It is a lawful mathematical object: a civilization state, and a transition function that maps one state to the next. The world does not "happen" between the user's actions; it is *evaluated* whenever a meaningful event occurs. Everything the user ever witnesses — growth, dimming, migration, era change — is the difference between two snapshots of the same deterministic system.
-
-A civilization state `S` contains, and only contains:
-
-- **Measurable resources** — the metabolic stocks of Section 6.
-- **Environmental conditions** — illumination, nutrient reservoirs, circulation, atmospheric stability.
-- **Biological conditions** — population, network expansion, fauna activity.
-- **Technological state** — era designation, research maturity, information-storage stage.
-- **Memory of previous achievements** — milestones, discoveries, monuments, historical record.
-
-The state contains no timestamps, no clocks, no pending timers, no references to presentation. Wall-clock time lives outside the simulation, in the persistence envelope owned by the application layer (`ARCHITECTURE.md` Section 3). The simulation is time-blind: time reaches it only as a number.
+Noctis is not a running world. It is a lawful mathematical object: a committed civilization state, and a transition function that maps one committed state to the next. The world does not "happen" between the user's actions; it is *evaluated* whenever a meaningful event occurs. Everything the user ever witnesses — growth, dimming, migration, invention, era change — is the difference between two committed snapshots of the same deterministic system.
 
 ### The State Transition
 
 The engine follows one master relationship:
 
 ```
-Previous State + Real-world learning input + Elapsed time
+Previous committed state
+  + interpreted real-world learning input
+  + elapsed-time context
+  + stable simulation context (civilization seed, prior history)
         |
         v
-              New State
+              New committed state
+            + domain transition records
 
 S(t+1) = F( S(t), I, Δt )
 ```
 
-`F` decomposes into two ordered evaluations, matching the two processing regimes of `ARCHITECTURE.md` Section 5:
+`F` is evaluated through the ordered lifecycle of Section 6. Its two load-bearing sub-evaluations, matching the two processing regimes of `ARCHITECTURE.md` Section 5, are:
 
 ```
-S'  = D( S, Δt )       Elapsed-time evaluation: energy cushion discharge,
-                       environmental decay, dormancy transition (Section 4).
+S'  = D( S, Δt )       Elapsed-time evaluation: energy-cushion discharge,
+                       renewable decay, dormancy transition (Section 5).
 
-S'' = T( S', I )       Transmutation evaluation: nutrient synthesis, resource
-                       metabolism, ecological growth, era progression
-                       (Sections 5 through 9). Applied only when a learning
-                       input is present.
+S'' = T( S', I )       Learning evaluation: interpretation, domain proposal
+                       generation, conflict resolution, committed mutation
+                       (Sections 6 through 9). Applied when learning input
+                       is present; citizen and institutional action, where a
+                       domain defines it, resolves in the same evaluation
+                       under the agency boundary of Section 8.
 
-flags = E( I or none, S, S'' )
-                       Event observation on the before/after pair (Section 10).
+transitions = E( I or none, S, S'' )
+                       Transition observation on the before/after pair
+                       (Section 12).
 ```
 
-Both `D` and `T` are pure functions: they read a snapshot and return a freshly constructed snapshot, never modifying their input (the repo-wide immutability invariant of `ARCHITECTURE.md` Section 2).
+Both `D` and `T` are pure functions of their arguments and the stable simulation context: they read committed state and return a freshly constructed committed state, never modifying their input (the repo-wide immutability invariant of `ARCHITECTURE.md` Section 2).
 
-### The Four Prohibitions
+### The Prohibitions
 
-**Same input produces same output.** Given identical `S`, `I`, and `Δt`, the engine must produce an identical `S(t+1)` and an identical flag list, on every machine, on every run, forever. This is what makes the world's mystery trustworthy (`GAME_DESIGN.md` Section 8): a user who patiently observes the city can derive true laws from it, because the laws never waver.
+**Same input produces same output.** Given identical committed state `S`, interpreted input `I`, elapsed time `Δt`, and stable simulation context, the engine produces an identical `S(t+1)` and an identical transition list, on every machine, on every run, forever. This is what makes the world's mystery trustworthy (`GAME_DESIGN.md` Section 8): a user who patiently observes the city can derive true laws from it, because the laws never waver. Reproducibility is a law; mechanical *sameness of expression* is not — variation among causally qualified outcomes is permitted and defined in Section 11.
 
-**Randomness is forbidden.** No random number generation exists anywhere in the simulation. Where the canon permits variety of *expression* — which ridge a crystal grows on, which path a citizen walks — that variety is either a deterministic function of existing state or a presentation choice made entirely inside the rendering layer. Randomness may never vary a simulation *fact*. Mathematics always grows crystal; consistency always drives circulation; the same week of study always produces the same world.
+**Nondeterminism is forbidden.** No hardware randomness, wall-clock read, or uncontrolled entropy enters the engine (`ARCHITECTURE.md` Sections 1–2, 6). Every variation the world exhibits is a deterministic function of committed state, the civilization seed, and prior history — *seeded* variation, not random variation (Section 11). Nondeterminism may never decide a simulation *fact*.
 
-**Hidden timers are forbidden.** Nothing in the simulation waits, ticks, counts down, or schedules. There are no background loops and no accumulating clocks (`ARCHITECTURE.md` Sections 3 and 5). Duration enters the system exactly once per evaluation, as the argument `Δt`, computed outside the engine from the persistence envelope. A civilization left alone is not "running slowly"; it is a constant, waiting to be evaluated.
+**Hidden timers are forbidden.** Nothing in the simulation waits, ticks, counts down, or schedules. There are no background loops and no accumulating clocks (`ARCHITECTURE.md` Sections 3 and 5). Duration enters the system exactly once per evaluation, as the argument `Δt`, computed outside the engine from the persistence envelope. A civilization left alone is not "running slowly"; it is a committed state, waiting to be evaluated.
 
-**The simulation cannot depend on rendering.** No state variable, transition, or event condition may read anything from the presentation layer: not visibility, not window state, not animation progress, not viewport. The dependency points one way only (Section 11). The world's physics are self-contained and lawful regardless of who observes them — the structural expression of the constraint-engine discipline of `NOCTIS_ECOLOGICAL_ENGINE.md`.
+**The simulation cannot depend on rendering.** No state variable, transition, or observation may read anything from the presentation layer: not visibility, not window state, not animation progress, not viewport, not sprite or particle state. The dependency points one way only (Section 13). The world's physics are self-contained and lawful regardless of who observes them.
 
 ### State Invariants
 
-Every state the simulation produces or accepts satisfies, at all times:
+Every committed state the simulation produces or accepts satisfies, at all times (enforced by the runtime Trope Guard of `ARCHITECTURE.md`):
 
 - All numeric quantities are finite; no undefined or unrepresentable values.
-- All resource stocks are non-negative.
+- All resource and energy stocks are non-negative.
 - Population is a non-negative integer.
 - Illumination lies strictly within the heatless, non-glare waveband `[0, 1]` (`NOCTIS_ECOLOGICAL_ENGINE.md` section 4, Rule 1).
-- The era designation is one of the five canonical eras (Section 9).
+- The era designation is one of the five canonical eras (Section 15).
 - The hibernation status entails zero illumination.
 
-These invariants are enforced structurally by the runtime validation guard specified in `ARCHITECTURE.md` (Final Architectural Guardrails); this document defines them as physics, so that no lawful transition can ever leave the valid region.
+These invariants are physics, so that no lawful transition can ever leave the valid region.
 
 ---
 
-## SECTION 2 — GLOBAL CIVILIZATION STATE
+## SECTION 2 — THE STATE SNAPSHOT AND ITS FAMILIES
 
-The state divides into five conceptual categories. These are abstract variables of the world model — not programming objects, not schema fields. Their exact representations bind at implementation time under the laws of this file.
+The committed state is the single source of truth about the civilization. An earlier draft asserted that the state "contains, and only contains" a fixed, narrow list of variables. That claim is withdrawn: it prematurely foreclosed the domains this document exists to serve. The state is instead an **extensible composition of conceptual state families**, each owned by exactly one domain, each free to grow its own internal structure under the laws here. These are conceptual families, not code schemas; exact representations bind at implementation under `ARCHITECTURE.md`.
 
-### Environmental State
+### The State Families
 
-**Illumination `L ∈ [0, 1]`** — the civilization's current metabolic light output: the normalized intensity of active bioluminescent life across the visible world.
-- *Purpose:* the single clearest expression of how recently and steadily the user's mind has fed the world; the variable whose threshold defines dormancy.
-- *How generated:* driven upward by nutrient uptake and learning momentum during transmutation, saturating toward 1.
-- *How consumed:* decays exponentially during unshielded offline intervals; set to exactly 0 by the hibernation transition.
-- *How it affects future states:* falling below the dormancy threshold triggers hibernation; its level scales ecological activity and population activity expression.
+**Learning-derived input state.** The interpreted signals most recently supplied by learning, and the lifetime measures that accumulate from them — accumulated knowledge `K_total`, consistency `k`, learning momentum `m`. *Owned by:* Learning Integration (interpretation) and this document (the accumulation laws). The sole external source of civilizational possibility.
 
-**Nutrient reservoirs `(brine, glucans, catalysts)`** — the current stocks of the three canonical metabolic nutrients (Section 5): piezo-electric brine, chemosynthetic glucans, luciferin catalysts.
-- *Purpose:* the chemical intermediary between cognition and ecology; different studies fill different vessels.
-- *How generated:* synthesized from learning input along the canonical pathways.
-- *How consumed:* drawn down by ecological growth (lattice expansion, root growth, photophore mutation), by innovation blooms, and by the daily metabolic need of living systems.
-- *How it affects future states:* their relative balance steers which networks expand, which discoveries surface, and which register of culture deepens.
+**Environmental / ecological state.** Renewable conditions (illumination `L`, circulation `Φ`, atmospheric stability `σ`, nutrient reservoirs), accumulated ecological structures (mycelial expansion `X_myc`, crystal mass `X_cry`), local habitats, and ecological pressures. *Owned by:* Ecology.
 
-**Ecological activity / circulation `Φ ∈ [0, 1]`** — the speed and reach of the civilization's distribution systems: the liquid-light currents, canopy pulse rhythm, and nutrient transport efficiency.
-- *Purpose:* models the canon rule that consistency improves distribution and stability (`VISION.md`, Light Economy).
-- *How generated:* a saturating, monotone function of the consistency state; boosted while the spore-moth network is active.
-- *How consumed:* relaxes downward during decay phases; settles to stillness in hibernation.
-- *How it affects future states:* multiplies the effective reach of nutrients (outer districts receive growth only at high circulation) and the completion rate of pending transformations.
+**Citizen / population state.** Population existence and count `P`, activity expression `A_P`, and — as the Citizen domain defines them — life-cycle context, skills, roles, institutions, and agent-level references. *Owned by:* Citizen. Tier 6 defines no citizen schema.
 
-**Atmospheric stability `σ ∈ [0, 1]`** — the barometric calm of the world; the inverse of cognitive pressure.
-- *Purpose:* gives difficulty and failure an honest, non-punitive physical channel: pressure, not punishment.
-- *How generated:* rests at 1; depressed transiently by high difficulty/failure signals in learning input; relaxes deterministically back toward 1 across subsequent evaluations.
-- *How consumed:* read by the event system — a downward crossing of the shock threshold is the Barometric Shock Wave.
-- *How it affects future states:* while depressed, the world enters its fortification posture: reserve drawdown pauses and endurance memory accumulates (Section 10). Stability never destroys stock, structure, or memory.
+**Knowledge and capability state.** What the civilization knows, understands, can currently practice, can reproduce, transmits institutionally, and can technically act upon — held distinctly from raw learning input (Section 10, the capability distinction). *Owned by:* shared between Technology (technical capability) and Citizen/Culture (practice and transmission).
 
-### Cognitive State
+**Technology state.** Technological possibility, experiments, prototypes, active technologies, infrastructure, dependencies, maintenance condition, standards, and technical heritage. *Owned by:* Technology.
 
-**Accumulated knowledge `K_total`** — the lifetime integral of metabolized comprehension: everything the user's study has ever fed into the world.
-- *Purpose:* the deep measure of civilization capability; the quantity that "enables civilization complexity."
-- *How generated:* increases with every metabolized session, weighted by duration, depth, and recall quality.
-- *How consumed:* never. `K_total` is monotone non-decreasing for the lifetime of a civilization. (Spendable stocks are the nutrient reservoirs and the energy reserve — Section 6.)
-- *How it affects future states:* parametrizes era maturity, institutional sophistication, and the ceiling of ecological complexity.
+**Culture and social state.** Values, practices, legitimacy, prestige, trust, traditions, taboos, identities, institutions, and interpretation. *Owned by:* Culture. Not a single monotone stock (Section 17).
 
-**Consistency `k`** — the current consecutive-day study count, mirrored into state from the learning input.
-- *Purpose:* the physical carrier of rhythm; the canon's "seasons."
-- *How generated:* supplied with each learning input (computed by the application layer from real session history).
-- *How consumed:* read by circulation and by the pheromone/moth activation condition.
-- *How it affects future states:* `k ≥ K_PLUME` (canonically three consecutive days) activates the spore-moth season and its world-wide acceleration.
+**Economy and allocation state.** Production, distribution, scarcity, exchange, ownership, and allocation, under the canon caution that Noctis has no coin, market, or user-facing spending (Section 20). *Owned by:* Economy.
 
-**Learning momentum `m`** — a deterministically smoothed measure of recent study velocity.
-- *Purpose:* distinguishes a world fed steadily from a world fed in rare bursts, without ever punishing either.
-- *How generated:* exponential smoothing of uptake across evaluations: `m' = α·uptake + (1 − α)·m` (form bound here; `α` binds at Tier 7).
-- *How consumed:* contributes to illumination level and to era-maturity weighting.
-- *How it affects future states:* high momentum makes the world visibly quicker and brighter; zero momentum simply lets the environmental variables rest.
+**Memory and history state.** Recorded milestones, discovered historical facts, monuments, public narratives, distortions, and forgotten knowledge. *Owned by:* Memory. The one family whose entire meaning is permanence (Section 10).
 
-### Biological State
+**Era and progression state.** The current era designation and the broad civilizational developmental context. *Owned by:* Era Progression. Research readiness `R` is a contributing signal (Sections 15–16), never the whole of it.
 
-**Population `P`** — the count of Noctae citizens, a non-negative integer.
-- *Purpose:* the visible density of civilization; growth made legible as life.
-- *How generated:* increases only through ecological prosperity (Section 8).
-- *How consumed:* never consumed, never reduced. `P` is a monotone ratchet.
-- *How it affects future states:* higher population raises visible activity capacity and the completion rate of pending transformations; it produces nothing else (Section 11).
+**Transition state.** The committed changes of the most recent evaluation that downstream presentation and Memory may interpret (Section 12). Transient in transport, durable only where a domain records them.
 
-**Population activity `A_P ∈ [0, 1]`** — the expression level of the population: how much of the citizenry is out, working, gathering, and signaling.
-- *Purpose:* reconciles the two canon truths that population never drops and that a quiet world grows sparse: the *count* is preserved; the *activity* dims.
-- *How generated:* scales with illumination and energy availability.
-- *How consumed:* read by the rendering layer as the density of visible civic life.
-- *How it affects future states:* none beyond its own recovery — activity is an expression variable, never a producer.
-
-**Mycelial network expansion `X_myc`** — the extent, thickness, and depth of the subterranean root mats.
-- *Purpose:* the civilization's structural foundation; every structure anchors into it or into crystal (`NOCTIS_ECOLOGICAL_ENGINE.md` section 4, Rule 3).
-- *How generated:* grows when chemosynthetic glucans are metabolized; accelerated by substrate fertility and by moth cross-pollination.
-- *How consumed:* never shrinks; expansion is cumulative living infrastructure.
-- *How it affects future states:* crossing depth thresholds breaches ancestral vaults (deterministic discovery events feeding Memory State); expansion enables new anchored growth and supports population prosperity.
-
-**Crystal lattice mass `X_cry`** — the accumulated geometric crystal grown by the mathematics pathway.
-- *Purpose:* the civilization's memory-battery infrastructure.
-- *How generated:* grows when piezo-electric brine is metabolized.
-- *How consumed:* never shrinks.
-- *How it affects future states:* sets energy storage capacity and damps the offline decay rate of surrounding systems (Section 4) — the canonical offline benefit of the mathematics pathway.
-
-**Fauna activity `(survey, moths, detritivores)`** — the state of the three ecological fauna networks (Section 7): survey coverage of the chiroptera flights, activation of the spore-moth season, and the fertility output of the detritivore cycle.
-- *Purpose:* makes the ecology a living system of loops rather than a warehouse of objects.
-- *How generated:* survey coverage advances with each new session; moth season follows consistency; detritivore fertility follows canopy activity.
-- *How consumed:* fertility is consumed by fungal growth; survey coverage is consumed by discovery; moth acceleration is consumed by pending transformations.
-- *How it affects future states:* each loop feeds the ecological variables above it — never the reverse.
-
-### Technological State
-
-**Era designation** — exactly one of the five canonical eras (Section 9): `SPORE_HEARTH`, `CRYSTAL_INSCRIPTION`, `PHONONIC_SUBTERRANEAN`, `OPTOGENETIC_CIRCUIT`, `COSMIC_STELLAR`.
-- *Purpose:* the civilization's current relationship to knowledge, memory, and night.
-- *How generated:* advances when era maturity crosses the next era threshold.
-- *How consumed:* read by every domain as the ambient sophistication level.
-- *How it affects future states:* monotone — eras never regress; each era raises the ambient efficiency of metabolism and unlocks new classes of ecological expression.
-
-**Research maturity `R`** — accumulated innovation pressure: the civilization's readiness for its next technological step.
-- *Purpose:* the gating quantity for era evolution.
-- *How generated:* fed by difficulty, breakthroughs, and completions; blooms convert reserve stocks into permanent maturity.
-- *How consumed:* never decays; holds through any absence.
-- *How it affects future states:* crossing maturity thresholds (lowered by cultural breadth) fires blooms and, at era boundaries, era transitions.
-
-**Information-storage stage** — the civilization's current memory technology, an era-linked designation: tactile knot cords, fiber scrolls and crystal lattices, phononic sound-vaults, living mycelial boards, entangled lattice pairs.
-- *Purpose:* expresses how the civilization remembers, per era.
-- *How generated:* derived deterministically from era designation.
-- *How consumed:* read by the memory and culture domains for the *form* new records take.
-- *How it affects future states:* raises the yield richness of vault discoveries and cultural records in later eras.
-
-### Memory State
-
-**Historical achievements** — the permanent ledger of milestones: completed long projects, era transitions, monument grants.
-**Unlocked discoveries** — vault shards unearthed by root expansion, survey-revealed regions, earned sensory-overlay access.
-**User milestones** — the dated record of real study accomplishments the world has honored.
-
-For all Memory State variables together:
-- *Purpose:* the civilization as a personal historical record — the one category whose entire meaning is permanence.
-- *How generated:* appended by deterministic threshold crossings (vault breaches, era transitions, completion inputs).
-- *How consumed:* never consumed, never decayed, never overwritten, never deleted (`GAME_DESIGN.md` Section 9, Rules of Memory).
-- *How it affects future states:* discoveries can permanently raise capability (a recovered blueprint schema deepens future growth); achievements anchor monuments whose presence is read by rendering; nothing in memory is ever spent.
+Two laws bind every family. First, **single-writer ownership**: each state mutation has exactly one owning domain, and no domain silently writes another's family (Section 14). Second, **legacy protection**: the legacy projection of every family (Section 10) is preserved across absence regardless of how its active portion behaves.
 
 ---
 
-## SECTION 3 — TIME SIMULATION MODEL
+## SECTION 3 — INPUT CONTRACT
+
+Learning reaches the simulation as an **interpreted learning input** `I`, not as raw study telemetry. The raw session — its subject strings, its timing, its recall events — is interpreted by `LEARNING_INTEGRATION.md` before it crosses into the engine, exactly as the focus block of `ARCHITECTURE.md` Section 4 prescribes. Tier 6 binds only the *shape* of what arrives, never the subject taxonomy or the telemetry, which belong to Learning Integration.
+
+The interpreted input carries semantic signals such as:
+
+| Signal | Meaning |
+|---|---|
+| Focus duration `d` | Real focused minutes of the session |
+| Interpreted learning profile | Already-interpreted dimensions: conceptual depth, retained understanding, revision strength, disciplinary exposure, interdisciplinary connection, sustained attention, mastery, curiosity, conceptual novelty |
+| Difficulty `f` | Difficulty/failure signal of the session, when available |
+| Consistency `k` | Consecutive-day study count, computed from real session history |
+| Completion `b` | Breakthrough marker: milestone reached, long project finished |
+
+The interpreted learning profile is the general input all domains read. **No single academic subject determines one exact ecological, technological, or cultural outcome.** Subject classification contributes to the profile; it does not act as an unlock equation (Section 7). Tier 6 fixes the profile as an open vector of interpreted dimensions; Learning Integration binds the dimensions and their derivation, and may extend them, provided each remains an already-interpreted signal and never raw telemetry.
+
+---
+
+## SECTION 4 — TIME MODEL AND ELAPSED-TIME CONTRACT
 
 Noctis has exactly two time regimes. Both reach the simulation as plain numbers through a single door — the state-owning application layer — and neither involves a running loop anywhere (`ARCHITECTURE.md` Section 5).
 
-### Active Time
+**Active time** occurs while the application is open and study events are recorded. There is no continuous ticking and no background loop. The engine is a reflex: it evaluates only when a meaningful event arrives (a completed study activity produces `I`, and `F` is evaluated). Between events the committed state simply *is*; ambient motion on screen is presentation over a constant state.
 
-Active time occurs while the application is open and study events are being recorded.
+**Offline time** occurs when the application is closed and the user returns later. At each checkpoint (launch, mandatorily; optionally after long idleness, per `ARCHITECTURE.md` Section 3), the application layer computes `Δt = current timestamp − saved timestamp` from the persistence envelope, outside the state, and the engine evaluates `D(S, Δt)` exactly once for the whole interval.
 
-There is **no continuous ticking**. There is **no background simulation loop**. The engine is not a heartbeat; it is a reflex. It evaluates only when a meaningful event arrives:
+### Composability
 
-- A completed study activity produces a learning input `I`, and the engine evaluates `T(S, I)`.
-- Nothing else happens. Between events, the state simply *is*. Ambient motion on screen during quiet minutes is presentation, not simulation — the diorama breathing is the rendering layer's interpretation of a constant state.
+Offline evaluation is a mathematical evaluation, not a running world: five days of absence are one closed-form evaluation over `Δt`, not five days of computation. Every time-dependent process must therefore be **composable** — evaluating it over `Δt` must equal evaluating it over any partition of `Δt` into consecutive sub-intervals — so that lazy checkpoint evaluation is exact, not approximate.
 
-This is the physics of the study-first pillar: a simulation that only reacts to meaningful events can never compete with the work that produces them.
+### Classes Of Time Behavior
 
-### Offline Time
+Not every process is one exponential curve. Each time-dependent process declares, as part of its domain contract, which class it belongs to and answers five questions: is it evaluated lazily? is it composable over `Δt`? does it affect legacy or only active capability? may user absence cause it? which domain owns the result?
 
-Offline time occurs when the application is closed and the user returns later.
+- **Preserved legacy** — unaffected by absence (Section 10). Recorded learning history, dated milestones, secured historical facts, era history, achievements, cumulative record.
+- **Renewable expression** — may dim or fall dormant with absence and recover with presence (illumination, circulation, activity expression, reservoirs).
+- **Maintenance-sensitive active systems** — active technologies, infrastructure, and institutions that may become degraded, unavailable, or dormant according to their domain's rules, but **never through ordinary user absence** as a punishment (Sections 9, 16).
+- **Life-cycle state** — citizen demographic progression, if and only if `CITIZEN_SYSTEM.md` defines it; it advances by narrative/biological rule, never as a consequence of user neglect (Section 19).
+- **Institutional and cultural continuity** — may persist, change, or become inactive by their own contracts (Sections 17, 19), with recorded history preserved regardless.
+- **Historical recording** — always preserves what has already been validly recorded, subject to Memory-system rules on distortion, access, and interpretation (Section 21).
 
-At each evaluation checkpoint (application launch, mandatorily; optionally after long in-app idleness, per `ARCHITECTURE.md` Section 3), the application layer computes:
-
-```
-Δt = current timestamp − saved timestamp
-```
-
-Both timestamps live in the persistence envelope, outside the simulation state. The engine receives only `Δt`, and evaluates the decay model of Section 4 exactly once for the whole interval:
-
-```
-S' = D( S, Δt )
-```
-
-**Offline simulation is a mathematical evaluation, not a running world.** Five days of absence are not five days of computation; they are one closed-form evaluation over `Δt`. This is only possible because the decay model is built from integrable forms (linear discharge, exponential decay) whose value at any horizon can be computed directly. Nothing about the outcome depends on when, or how often, the evaluation runs: evaluating `D` over `Δt` must equal evaluating it over any partition of `Δt` into consecutive sub-intervals. This *composability law* is what makes lazy checkpoint evaluation lawful.
+Tier 6 does not prescribe one decay formula for every system. It prescribes only that each declare its class and obey composability and non-punishment.
 
 ---
 
-## SECTION 4 — OFFLINE DECAY MODEL
+## SECTION 5 — OFFLINE EVALUATION: CUSHION, DECAY, DORMANCY
 
-Noctis never punishes absence. Absence is dormancy: the wise conservation strategy of an ecology whose single energy source has gone quiet. The decay model exists to make return graceful, not to make leaving costly.
-
-The elapsed-time evaluation `D(S, Δt)` proceeds through three ordered phases. The ordering is law (`ARCHITECTURE.md` Section 5): cushion before decay, dormancy last.
+Noctis never punishes absence. Absence is dormancy: the wise conservation strategy of an ecology whose single energy source has gone quiet. The elapsed-time evaluation `D(S, Δt)` proceeds through three ordered phases, and the ordering is law (`ARCHITECTURE.md` Section 5): cushion before decay, dormancy last. `D` acts on the **renewable expression** class only; it never touches legacy, and it never drives the maintenance-sensitive, life-cycle, or institutional classes into loss (those follow their own domain contracts under non-punishment).
 
 ### Phase 1 — The Energy Cushion
 
-Stored cognitive energy protects the civilization first.
-
-The energy reserve `E` — surplus focus banked in the crystal lattices (Section 6) — discharges at a linear rate `δ_discharge` and, **while any reserve remains, completely absorbs environmental decay**. No dimming of any kind begins while the lattices still hold charge.
+Stored cognitive energy protects the civilization first. The energy reserve `E` — surplus focus banked in the crystal lattices (Section 9) — discharges at a linear rate `δ_discharge` and, while any reserve remains, completely absorbs environmental decay:
 
 ```
 t_shielded = min( Δt, E / δ_discharge )
@@ -284,280 +205,283 @@ E'         = E − δ_discharge · t_shielded
 Δt_decay   = Δt − t_shielded
 ```
 
-During `t_shielded`, every environmental variable passes through unchanged. This is the canonical offline benefit of the mathematics pathway made physical: a user who has studied deeply builds a civilization that weathers their absence on stored focus. The discharge is linear because a battery drains by supplying a constant need — the dim hearth-glow and essential circulation of a quiet city — not in proportion to what remains.
+During `t_shielded`, every renewable variable passes through unchanged — the mathematics-pathway offline benefit made physical (`NOCTIS_ECOLOGICAL_ENGINE.md` section 5). Discharge is linear because a battery drains by supplying a constant need — the dim hearth-glow and essential circulation of a quiet city — not in proportion to what remains.
 
-### Phase 2 — Environmental Decay
+### Phase 2 — Renewable Decay
 
 After the cushion is exhausted, the renewable environmental variables diminish exponentially over the remaining interval:
 
 ```
-V' = V · e^( −λ_V · Δt_decay )        for V in { L, Φ, nutrient reservoirs, A_P }
+V' = V · e^( −λ_V · Δt_decay )        for V in the renewable-expression class
+                                       { L, Φ, nutrient reservoirs, A_P, ... }
 ```
 
-Each variable carries its own nominal rate `λ_V`, damped by protective infrastructure:
+Each variable carries its own nominal rate `λ_V`, damped by protective structure and memory-oriented modifiers:
 
 ```
-λ_V_effective = λ_V · ( 1 − damp(X_cry, culture modifiers) ),   0 ≤ damp < 1
+λ_V_effective = λ_V · ( 1 − damp(X_cry, cultural preservation, ...) ),   0 ≤ damp < 1
 ```
 
-Crystal lattice mass and memory-oriented cultural modifiers reduce the decay rate — never to zero, or absence would become consequence-free and the light economy dishonest.
-
-**Why exponential decay represents biological dormancy.** A dormant ecology does not lose a fixed amount of life per day; it slows in proportion to how much activity remains. Metabolic processes damp each other as they quiet: dimmer light means slower circulation means lower consumption means slower dimming. Exponential decay is the unique memoryless law with this property — the rate of loss is always proportional to the current level, the curve is steepest at first and ever gentler afterward, and the value approaches rest asymptotically without ever crashing through it. There is no cliff, no collapse, no moment where the world is suddenly gone. The city dims the way breathing slows in sleep.
-
-Decay touches **only** the renewable environmental variables listed above. It never touches accumulated knowledge, culture, innovation, population count, era, network mass, or any Memory State variable. What the user built is not what fades; only the *activity level* fades.
+Exponential decay is the unique memoryless law whose rate of loss is always proportional to the current level: steepest at first, ever gentler after, approaching rest asymptotically without ever crashing through it. The city dims the way breathing slows in sleep. Decay touches **only** the renewable-expression class; accumulated knowledge, culture's recorded history, research readiness, era, network mass, population count, and every Memory entry are untouched (Law 5).
 
 ### Phase 3 — The Hibernation State
 
 When illumination falls beneath the dormancy threshold — `L < θ_dormancy` — the civilization performs a single structural transition into hibernation.
 
-**Calibration constraint (binds Tier 7 values):** with an empty energy cushion and nominal decay rates, illumination must cross `θ_dormancy` at approximately the canonical five-day absence horizon (`NOCTIS_ECOLOGICAL_ENGINE.md` section 7, the Abyssal Douse row). Deep energy reserves lengthen this horizon; that lengthening is earned, lawful, and intended.
+**Calibration constraint (binds Tier 7 values):** with an empty cushion and nominal decay rates, illumination must cross `θ_dormancy` at approximately the canonical five-day absence horizon (`NOCTIS_ECOLOGICAL_ENGINE.md` section 7). Deep energy reserves lengthen this horizon; that lengthening is earned, lawful, and intended.
 
-In hibernation:
-
-- **Population is preserved.** The count `P` does not drop by even one citizen. Activity `A_P` rests at its dormant floor — the citizens are indoors, tending memory; they are never gone.
-- **Achievements are preserved.** Every Memory State variable is untouched.
-- **Eras are preserved.** Era designation, research maturity, culture, accumulated knowledge, and network mass hold exactly.
-- **No loss of history. No punishment.** Nothing is subtracted anywhere, ever, because the user was away.
-- Illumination is exactly 0 (the state invariant of Section 1), and circulation is still. The metabolic light of the world is out; the world itself is intact.
-
-**Hibernation is a fixed point of decay:**
+In hibernation: population count is preserved; every Memory entry is untouched; era, research readiness, culture's record, accumulated knowledge, and network mass hold exactly; illumination is exactly 0 and circulation is still. **Hibernation is a fixed point of decay:**
 
 ```
 D( S_hibernating, Δt ) = S_hibernating        for every Δt
 ```
 
-A dormant state passes through elapsed-time evaluation unchanged, so dormancy never compounds, never deepens, and never accrues debt. Five days of absence and five hundred days of absence produce the same sleeping city. This is the canon rule "progression pauses, no penalties" enforced by mathematical shape rather than by tuning (`ARCHITECTURE.md` Section 3).
+A dormant state passes through elapsed-time evaluation unchanged, so dormancy never compounds, never deepens, and never accrues debt. Five days and five hundred days of absence produce the same sleeping city.
 
-**Reawakening.** The first study session of canonical reawakening length — ten focus minutes — processed while hibernating transitions the status back to active before transmutation applies; nutrients then flow normally and the world relights from its preserved structure. A shorter session is still honored — its nutrients are banked quietly into reserves, nothing is wasted — but the structural wake transition awaits the canonical ten-minute session, so that the city does not flicker awake at a stray half-minute of attention.
+**Reawakening.** The first study session of the canonical reawakening length — ten focus minutes — processed while hibernating transitions the status back to active before the learning evaluation applies; the world then relights from its preserved structure. A shorter session is honored — its influence banks quietly into reserves — but the structural wake transition awaits the canonical ten-minute session, so the city does not flicker awake at a stray half-minute of attention.
 
-Hibernation is conservation, not failure. The design intention, stated as physics: **the difference between presence and absence is luminosity, never legacy.**
+The design intention, stated as physics: **the difference between presence and absence is luminosity and active vitality, never legacy.**
 
 ---
 
-## SECTION 5 — LEARNING TRANSMUTATION SYSTEM
+## SECTION 6 — EVALUATION LIFECYCLE AND THE DOMAIN PROPOSAL MODEL
 
-Transmutation is the heart of the model: the lawful conversion of human cognitive effort into ecological consequence. It answers the simulation's single governing question — *how does human cognitive effort transform into a living dark-adapted civilization?* — with a metabolic chain:
+`F` is a single ordered pass. The earlier draft fixed a narrow six-stratum topology that admitted no citizen or institutional agency; this revision generalizes it into a **domain proposal and resolution model** that supports genuine agency while forbidding same-step circular calculation. The sequence is conceptual, not implementation pseudocode:
 
 ```
-Human cognition
-      |
-      v
-Metabolic nutrients        (synthesis: this section)
-      |
-      v
-Ecological changes         (consumption: Section 7)
-      |
-      v
-Civilization evolution     (accumulation: Sections 6, 8, 9)
+1.  Input normalization        Interpreted learning input and Δt are validated
+                               and brought into canonical form.
+2.  Elapsed-time & dormancy    D(S, Δt): cushion, renewable decay, dormancy
+                               (Section 5). Wakes a hibernating world if the
+                               canonical session is present.
+3.  Learning interpretation    The interpreted profile is read into the
+                               learning-derived family; K_total, k, m update.
+4.  Environment & resources    Ecological synthesis and resource metabolism
+                               evaluate on the post-decay state (Section 7).
+5.  Citizen perception &       Which citizens and institutions are *eligible*
+    action eligibility         to act is derived from committed state and the
+                               agency boundary (Section 8).
+6.  Domain proposal generation Each domain proposes mutations to its own family
+                               — growth, invention steps, cultural drift,
+                               life-cycle events, records — reading only
+                               committed prior-state values of other families.
+7.  Conflict & dependency      Proposals are resolved in a stable order
+    resolution                 (Section 13); dependencies read prior committed
+                               state; no proposal reads another's same-step
+                               result.
+8.  Committed state mutation   The resolved proposals are applied, producing the
+                               new committed state. Each mutation is attributed
+                               to its owning domain.
+9.  Memory / history recording Durable consequences are recorded into Memory
+                               state by the Memory-owning path (Section 21).
+10. Transition observation     E compares before/after committed states and
+                               emits transition records and the four canonical
+                               world-event flags (Section 12).
+11. Rendering handoff          The committed snapshot and transitions are
+                               published; presentation interprets them
+                               (Section 23). Simulation is already complete.
 ```
 
-### Input Variables
+Ownership of each mutation is explicit (step 8). Feedback is lawful **across** committed evaluations and forbidden **within** one: any downstream value a proposal needs — fertility multiplying growth, culture conditioning adoption, infrastructure efficiency routing nutrients — is read from the *previous* committed state `S(t)` and applied as a constant while computing `S(t+1)`. This single rule keeps every evaluation a finite, ordered, deterministic pass with no undefined circular dependency.
 
-A learning input `I` carries five semantic quantities (exact encodings bind at implementation under `ARCHITECTURE.md` Section 4):
+---
 
-| Variable | Meaning |
-|---|---|
-| Focus duration `d` | Real focused minutes of the session |
-| Subject category `c` | The studied domain, resolved through the canonical cognitive-pathway taxonomy |
-| Consistency `k` | Consecutive-day study count, computed from real session history |
-| Difficulty `f` | Difficulty/failure-rate signal of the session, when available |
-| Completion `b` | Breakthrough marker: milestone reached, long project finished |
+## SECTION 7 — LEARNING TRANSMUTATION AND THE INTERPRETED PROFILE
 
-### Nutrient Synthesis
-
-Every subject category resolves deterministically to a weight vector `w(c) = (w_brine, w_glucans, w_catalysts)` over the three canonical nutrients — pure categories map to a dominant nutrient, interdisciplinary categories to a blend. The category table binds at Tier 7; the pathway identities are canon and fixed:
+Transmutation is the conversion of interpreted cognitive effort into civilizational consequence. Its ecological specialization is canon and unchanged: the three metabolic nutrient pathways of `NOCTIS_ECOLOGICAL_ENGINE.md` section 5 remain the **symbolic ecological tendencies** by which learning feeds the environment.
 
 ```
 +------------------------------------------------------------------------+
-|                     CANONICAL METABOLIC PATHWAYS                        |
+|            CANONICAL METABOLIC PATHWAYS (ecological tendency)           |
 |                (NOCTIS_ECOLOGICAL_ENGINE.md section 5)                  |
 +------------------------------------------------------------------------+
-| Mathematics / Logic    ->  Piezo-electric brine                         |
-|                              (crystalline energy: lattice growth,       |
-|                               storage capacity, decay damping)          |
-| History / Languages    ->  Chemosynthetic glucans                       |
-|                              (carbon-rich sugars: mycelial expansion,   |
-|                               vault breaches, cultural rooting)         |
-| Creative Arts          ->  Luciferin catalysts (pigment register)       |
-|                              (photophore mutation, dialect complexity,  |
-|                               expressive culture)                       |
-| Science / Engineering  ->  Luciferin catalysts (infrastructure          |
-|                              register: aqueduct routing, instrument     |
-|                              efficiency, research pressure)             |
+| Mathematics / Logic    ->  Piezo-electric brine   -> crystalline order  |
+| History / Languages    ->  Chemosynthetic glucans -> mycelial reach     |
+| Creative Arts          ->  Luciferin (pigment)     -> expressive light   |
+| Science / Engineering  ->  Luciferin (infrastructure) -> circulation     |
 +------------------------------------------------------------------------+
 ```
 
-Science routes the catalysts; art teaches them new colors (`GAME_DESIGN.md` Section 2) — one nutrient chemistry, two registers of consequence.
+These pathways are **tendencies at the ecological layer**, not unlock equations for every domain. The boundary is law:
 
-Session yield is monotone in genuine effort and weighted by quality:
+> Subject classification contributes to the interpreted learning profile. It does not, by itself, determine one exact ecological, technological, or cultural outcome. No academic subject unlocks one fixed technology, culture, or ecology branch.
 
-```
-n(I) = d · q(f, recall) · w(c)         nutrient vector produced
-U(I) = uptake( n(I), saturation )      amount the ecology can metabolize now
-```
+Ecology consumes the nutrient tendencies to grow its own family. Technology, Culture, Citizen, and Economy consume the **interpreted profile** — conceptual depth, retention, interdisciplinary connection, mastery, curiosity, difficulty, completion, novelty — and specialize it under their own contracts. A mathematics-heavy month tends to grow crystalline ecology (Tier 3 canon); whether it also enables a particular instrument, standard, or institution is a path-dependent Technology decision reading the whole profile and the whole state, never a direct subject→artifact grant.
 
-`q` weights depth and recall performance; it never inverts effort (more honest minutes never yield less). `uptake` applies **metabolic saturation**: the ecology can only digest so much in one interval. Yield beyond current metabolic need is not lost — it banks into the energy reserve up to lattice capacity (Section 6); only overflow beyond storage capacity dissipates as transient luminous expression. Saturation is a physical law with a design purpose: a genuine daily learning life outperforms any binge, not because binging is punished, but because a living system metabolizes at the pace of life.
-
-### The Modulating Inputs
-
-**Consistency `k` is circulation.** Circulation follows a monotone, saturating function of the consecutive-day count. At `k ≥ K_PLUME` (canonically three consecutive days) the spore-moth season activates: cross-pollination accelerates every pending transformation in the world. Subject choice decides *what* grows; showing up daily decides *how fast everything* grows.
-
-**Difficulty `f` is pressure.** High difficulty and failure rates depress atmospheric stability and feed research maturity. Struggle is metabolized as innovation pressure and endurance — never as loss. A failure-heavy week leaves the civilization more fortified and closer to breakthrough, which is the model's honest reading of what hard study actually does to a mind.
-
-**Completion `b` is charge.** Milestones and long-project completions inject innovation charge directly. When research maturity crosses its emergence threshold, the Benthic Bloom fires (Section 10): reserves surge toward the civic core, are consumed, and become permanent research maturity — possibility made structure.
-
-### Why Different Knowledge Creates Different Worlds
-
-The pathways are not flavor; they are the ecological mirror (`GAME_DESIGN.md` Section 5) made mechanical. Each family of cognition has a distinct character — structure-building, memory-rooting, expression-mutating, infrastructure-routing — and each is assigned the ecological system whose growth *is* that character:
-
-- Mathematics builds lawful structure, so it grows the lattice: geometric, load-bearing, energy-storing.
-- History and language root the present in the past, so they thicken the mycelium downward into buried strata, surfacing what was forgotten.
-- Creative work changes how a culture expresses itself, so it mutates pigment, dialect, and theme.
-- Science and engineering change what a culture can *do*, so they upgrade the routing of light itself.
-
-No two users study alike, so no two civilizations can ever converge: the state trajectory is the biography.
+Session influence is monotone in genuine effort and weighted by quality (`q` weights depth and recall; it never inverts effort — more honest minutes never yield less), and it saturates: the ecology and the civilization metabolize at the pace of life, so a genuine daily learning practice strictly dominates any binge without the binge ever being punished. Surplus above current metabolic need banks into the energy reserve up to lattice capacity; overflow beyond storage dissipates as transient luminous expression. Nothing appears from nowhere, and nothing vanishes silently (Section 9).
 
 ---
 
-## SECTION 6 — RESOURCE METABOLISM
+## SECTION 8 — CITIZEN AGENCY CONTRACT
 
-Resources in Noctis are metabolic states, not currencies (`GAME_DESIGN.md` Section 6). Nothing is spent in a shop; nothing is allocated from a menu. Each resource is a different way of remembering the user's effort — as chemistry, habit, possibility, reserve, and life.
+The earlier draft declared that "population produces nothing" and that "citizens are consequence, never source." That wording is too broad: it reduces a living people to decorative density and starves every domain that depends on citizens as actors — most of all Technology. This revision replaces it with a narrower, exact conservation boundary.
 
-### Knowledge
+### The Boundary
 
-- **Meaning:** accumulated cognitive progress — the lifetime stock `K_total`, plus the circulating nutrient reservoirs it arrives through.
-- **Creation:** study activity, exclusively. Knowledge is the sole external energy input to the entire system; there is no photosynthesis in eternal night, no free calorie anywhere in the model.
-- **Transformation:** repetition settles it into Culture; difficulty and completion pressurize it into Innovation; surplus above metabolic need banks into Energy; the reservoirs feed all ecological growth.
-- **Consumption:** the reservoirs are consumed by ecology and blooms. `K_total` itself is never consumed and never decays.
-- **Dependencies:** none upstream — it is the source. Everything downstream depends on it.
-- **Long-term effect:** enables civilization complexity: era maturity, institutional depth, and the ceiling of every other system scale with it.
+> Citizens cannot create primary learning-derived input, accumulated user knowledge `K_total`, or metabolic energy from nothing. Citizens and institutions **may** observe, think, experiment, invent, teach, learn, maintain, repair, operate, organize, transmit, preserve, interpret, adapt, and sometimes lose capabilities that learning, ecology, materials, institutions, culture, technology, and prior history already support.
 
-### Culture
+Citizens are therefore genuine simulation actors. They may recombine existing supported capabilities into new arrangements and inventions (informational novelty), they may keep infrastructure alive through maintenance, and they may carry knowledge forward or let it lapse. What they may **not** do is manufacture the primary external input — the user's real learning, its metabolic energy, or lifetime knowledge — from within the world.
 
-- **Meaning:** language, history, and communication evolution — semaphore dialect complexity, ritual formation, district character.
-- **Creation:** generated by the glucan pathway and the catalysts' pigment register: linguistic, historical, artistic, and literary study; deepened by topical persistence (repeated attention to the same subjects is what makes a custom).
-- **Transformation:** cultural breadth lowers innovation emergence thresholds (a cross-pollinated civilization invents sooner); cultural depth enriches vault discovery yield (a literate civilization writes richer history from the same shard).
-- **Consumption:** never consumed. Culture never decays; it is frozen intact through any dormancy and resumes where it paused.
-- **Dependencies:** knowledge inflow along its pathways; information-storage stage for the form its records take.
-- **Long-term effect:** changes civilization expression — the drifting dialects, deepening rituals, and district personalities that make the world legible as a society rather than a diagram.
+### Six Value Kinds
 
-### Innovation
+To keep agency honest, the model distinguishes:
 
-- **Meaning:** long-term technological pressure — research maturity `R`, the civilization's accumulated readiness to become something new.
-- **Creation:** achieved through focus breakthroughs: sustained high-difficulty work, milestone completions, long-project finishes.
-- **Transformation:** at emergence thresholds (lowered by cultural breadth), pressure converts reserve stocks into permanent maturity — the bloom. Accumulated maturity is the quantity that crosses era boundaries.
-- **Consumption:** blooms consume nutrient reserves (the visible surge toward the civic core). Maturity itself never decays and holds through any absence.
-- **Dependencies:** knowledge reserves to consume; cultural breadth for its cheapest thresholds.
-- **Long-term effect:** allows era transitions; each permanent step raises the ambient efficiency of every other loop (better infrastructure routes nutrients further, better instruments deepen culture).
+- **Primary external input** — learning-derived energy, `K_total`, metabolic substrate. Source: real user study, only.
+- **Internal transformation** — converting a supported capability into another form (at efficiency ≤ 1). Permitted.
+- **Maintenance and reproduction** — sustaining or duplicating an existing active capability (consuming metabolic energy that traces to learning). Permitted.
+- **Emergent combination** — a novel arrangement of existing ideas or techniques. Permitted; novelty is not energy from nothing.
+- **Self-sustaining civilization activity** — the world remaining alive and busy between learning milestones. Permitted and desired.
+- **Forbidden infinite generation** — any loop that mints unlimited primary energy, knowledge, or material value without a learning-derived foundation. Forbidden (Law 7).
 
-### Energy
+The intended feel: Noctis is alive between major learning milestones — citizens invent, teach, maintain, and gather — without ever becoming a self-feeding idle game that renders the user's learning irrelevant. Every unit of *primary* value still traces to the user's mind; everything the citizens *do* with it is theirs.
 
-- **Meaning:** stored metabolic reserve — surplus bio-light banked as charge in the crystal lattices.
-- **Creation:** automatic banking of uptake beyond current metabolic need, up to capacity `C_E = capacity(X_cry)` — mathematics study literally enlarges the battery.
-- **Transformation:** none; energy is the one resource whose entire purpose is to be *held* and then *given back* during absence.
-- **Consumption:** linear discharge during offline intervals, fully shielding the environment while any charge remains (Section 4).
-- **Dependencies:** lattice mass for capacity; cultural memory-modifiers damp its discharge draw.
-- **Long-term effect:** protects against decay: deep reserves make absences graceful and lengthen the horizon to dormancy. **Metabolic priority law:** when the user returns, living systems are fed before storage is recharged — the world always spends on life before saving for later.
-
-### Population
-
-- **Meaning:** visible civilization activity — the walking consequence of flourishing.
-- **Creation:** grows only through ecological prosperity (Section 8).
-- **Transformation / Consumption:** none. Population is not a management resource. **No starvation. No deaths. No manual assignment.** Not ever, in any era, under any state.
-- **Dependencies:** canopy expansion and substrate fertility for growth; energy and illumination sustain its activity expression during quiet periods.
-- **Long-term effect:** raises the completion rate of pending transformations and the density of observable civic life; deliberately produces nothing else, so it can never become an optimization target.
-
-### The Metabolic Ledger
-
-```
-study minutes ──> nutrient synthesis ──> uptake (saturating)
-                                           |── living systems first
-                                           |     (illumination, circulation,
-                                           |      ecological growth)
-                                           |── then reserve banking (energy,
-                                           |      up to lattice capacity)
-                                           └── overflow dissipates as
-                                                 transient light
-```
-
-Every unit that enters the system is accounted for: metabolized, banked, or visibly dissipated. Nothing appears from nowhere; nothing vanishes silently (Section 12, Conservation).
+The citizen contribution reaches other families only across committed evaluations (Section 6): citizen action proposed this evaluation reads prior committed state, and its consequences are read by other domains on the *next* evaluation. There is no same-step edge from population to primary input.
 
 ---
 
-## SECTION 7 — ECOLOGICAL SIMULATION
+## SECTION 9 — CONSERVATION BY DOMAIN
 
-The ecology is a set of coupled living systems, not a collection of objects. Each system has a source, a function, and a consumer; each is powered — directly or through recycling — by metabolized learning, because nothing else in eternal night carries energy.
+Conservation is retained, but stated by domain rather than forced into one metabolic ledger. Every output must have a causal source appropriate to its kind:
 
-### The Mycelial Network
+- **External learning-derived value** must trace to real user learning. This is the anti-idle guarantee: the civilization's energy budget is bounded by the user's mind.
+- **Physical and ecological transformation** must trace to existing materials, energy, organisms, or environmental processes, at efficiency ≤ 1 (recycling strictly < 1). Ecology owns this ledger.
+- **Informational recombination** — a new technique or arrangement combined from existing ideas — is lawful without violating physical conservation. Novelty is not the creation of energy. Its *construction and operation* still draw metabolic energy that traces to learning.
+- **Social and cultural emergence** — meaning, identity, trust, prestige, tradition, conflict — emerges from interaction and is **not** a material stock; it must not be forced into a material conservation equation. Culture owns its own accounting.
+- **Economic value** may change through scarcity, allocation, labor, ownership, and exchange; Economy owns those rules (under the no-currency caution of Section 20).
+- **Historical meaning** may expand through interpretation even when no physical stock is created; Memory owns that expansion.
 
-- **Role:** the civilization's foundation. Every structure that ever grows anchors into root or lattice (`NOCTIS_ECOLOGICAL_ENGINE.md` section 4, Rule 3); the mycelium is the living half of that law.
-- **Powered by:** history and language learning — the chemosynthetic glucan pathway.
-- **Physics:** expansion `X_myc` grows monotonically with glucan uptake, multiplied by substrate fertility (detritivore output) and by moth-season acceleration. Growth is directional in meaning: outward expansion enables new anchored structures; downward expansion probes the buried strata of the world.
-- **Deterministic discovery:** each crossing of a depth threshold breaches an ancestral shale vault, appending a discovery to Memory State — historical data shards, rare decorative spores, blueprint schemas. Thresholds are fixed functions of expansion, so discovery is earned and repeatable-in-law: a week of steady language review always excavates, though what it excavates depends on how deep the roots have already gone.
-
-### The Crystal Network
-
-- **Role:** energy and information infrastructure — the civilization's memory batteries and, in later eras, the physical substrate of its records and instruments.
-- **Powered by:** mathematics and logic learning — the piezo-electric brine pathway.
-- **Physics:** lattice mass `X_cry` grows monotonically with brine uptake. Mass determines energy capacity `C_E` and the decay-damping factor of Section 4. Lattice geometry order (an expression attribute read by rendering) sharpens with the depth and rigor of the logical study that grew it.
-- **Systemic meaning:** the crystal network is why mathematics protects the world during absence — structure studied becomes structure that endures.
-
-### The Fauna Networks
-
-Fauna are ecological processes with population-like expression — never units, never collectibles, never assignable.
-
-**Chiroptera survey organisms.** Each new study session dispatches the dual-frequency echolocation flocks. Survey coverage advances toward the current frontier of the unexploited world, expanding the mapped-boundary state and enabling boundary discoveries. Survey is the ecology's cartography of the unknown: the more the user shows up, the more of the dark acquires shape.
-
-**Spore-moth networks.** The pollinator season. Activation is driven by the consistency state (`k ≥ K_PLUME`); while active, a global acceleration multiplier applies to every pending transformation — construction completing, mutations resolving, growth finishing. Deactivation follows loss of the consistency condition, without any penalty beyond the return to base speed.
-
-**Detritivore cycles.** The recycling loop. Canopy activity sheds spore-fall in proportion to ecological activity; the detritivore colonies convert spore-fall into substrate fertility at a fixed efficiency strictly less than one; fertility multiplies fungal growth and feeds population prosperity. The loop is bounded by its input — recycling amplifies living activity, it can never substitute for it — so the cycle obeys conservation and dies back gracefully as the world quiets.
-
-```
-learning uptake ──> canopy activity ──> spore-fall ──> detritivore conversion
-                        ^                                     (efficiency < 1)
-                        |                                          |
-                        └────────────── substrate fertility <─────┘
-```
-
-The loop's purpose is textural honesty: a well-fed world does not merely grow, it *cycles* — and the cycling itself is downstream of the user's mind.
+The metabolic reserve ledger of the environmental layer still balances at every evaluation (uptake → living systems first, then reserve banking up to capacity, then transient dissipation). What changes is the recognition that not every domain is a metabolic stock, and that pretending otherwise is what made the earlier draft too rigid.
 
 ---
 
-## SECTION 8 — POPULATION DYNAMICS
+## SECTION 10 — LEGACY AND ACTIVE-POSSESSION DISTINCTION
 
-### The Law
+The earlier draft made many systems permanently non-decreasing. Monotonicity is retained **only for true legacy**; living systems are freed to change.
 
-Population is an indicator of civilization flourishing — a reading on the ecology's prosperity, not a workforce, not a mouth-count, not a target.
+**Legacy preservation** — the civilization *remembers that something existed or was achieved*. Monotone, never decreasing, never erased by absence:
 
-```
-P(t+1) = P(t) + growth( π(t) )        growth ≥ 0 always
+- verified user learning history and accumulated knowledge `K_total`;
+- dated milestones and user achievements;
+- discovered historical facts, once securely recorded;
+- major era history (the sequence of eras reached);
+- the cumulative civilizational record.
 
-π = prosperity( canopy expansion, substrate fertility,
-                illumination, energy sufficiency )
-```
+**Active possession** — the civilization *can currently use, reproduce, maintain, access, or interpret* something. May change, migrate, decay locally, transform, fall dormant, become obsolete, lose participation, be abandoned, fail, be replaced, disappear from active use, or revive later:
 
-`growth` is zero below the flourishing threshold and rises monotonically (with saturation) above it. Population changes through ecological prosperity and through nothing else. The count is a **monotone ratchet**: it never decreases — not during decay, not in hibernation, not for any input. The visible quieting of a dormant city is carried entirely by the activity expression `A_P` (Section 2), which dims with illumination while the count holds; citizens go indoors, they do not go away.
+- ecological active structure and habitat form;
+- active cultural practice and institutional participation;
+- active technological practice, infrastructure vitality, and reproducibility;
+- illumination, circulation, and activity expression.
 
-### Forbidden Mechanics
+The two are decoupled, and the decoupling is the mechanism that lets Noctis have history without punishment. A civilization may **remember** a technology it can no longer **reproduce**; an archive may preserve a ritual no living citizen practices; a habitat may have existed and later transformed; an institution may be remembered after its collapse. In every case the legacy is intact and the active state has moved on.
 
-The following do not exist in this model and may never be added to it:
+**Non-punishment does not require the world to be frozen.** Absence freezes and later revives; internal causality (supersession, transmission failure, ecological change the user's own learning drove) may transform active possession while the user is present. What no cause may ever do is subtract a legacy value (Law 5), and what user absence in particular may never do is drive any active loss as a penalty (Law 6).
 
-- Population micromanagement of any kind: no assignment, no jobs board, no per-citizen commands.
-- Housing limits, caps that demand construction, or crowding pressure.
-- Starvation, hunger states, or any consumption-failure mechanic.
-- Death simulation: no citizen is ever removed, and none is ever shown dying from user absence.
-
-### Why A Passive Civilization Requires Different Population Logic
-
-Strategy games treat population as a consumable input: units to feed, house, employ, and lose. That logic exists to create resource tension the player must manage — and management is precisely what Noctis refuses to ask of its user (`GAME_DESIGN.md` Section 1: the user is weather, not architect). In a passive civilization, population has the opposite job: it is an *output* — the most emotionally legible display of accumulated flourishing. It must therefore be safe (no tension), monotone (growth is never clawed back, because the learning that earned it already happened and cannot un-happen), and productive of nothing (Section 11 forbids the edge from population to any resource, so more citizens can never become a farm, a quota, or a reason to grind). The citizens are the consequence of the user's mind, never a demand on it.
+Population count is a special case reconciled with Tier 5: **user absence never reduces population** (`ARCHITECTURE.md` Section 5 — "population counts never drop" in the hibernation guarantee). Whether population changes through a natural life cycle during active evaluation — birth, aging, succession, death — is deferred entirely to `CITIZEN_SYSTEM.md` (Section 19). Tier 6 mandates neither immortality nor a death model; it requires only that any demographic dynamics be narrative or biological in origin and never a consequence of user neglect, and that recorded history outlive any citizen.
 
 ---
 
-## SECTION 9 — TECHNOLOGY EVOLUTION SYSTEM
+## SECTION 11 — DETERMINISM AND SEEDED VARIATION
+
+The earlier draft forbade all randomness. That is stronger than the world needs and stronger than it can bear: a living civilization requires variation in *which* qualified citizen notices an opportunity, *which* institution investigates first, when an experiment resolves, how a prototype differs, in what order a technique is adopted, how faithfully knowledge transmits, and which small biography a citizen lives. This revision keeps reproducibility absolute while permitting variation — through determinism, not chance.
+
+### The Rule
+
+**Variation is permitted; nondeterminism is not.** All variation is *seeded*: a pure, deterministic function of stable inputs already in the committed record — the civilization seed, the committed state, the acting citizen or institution's identity, location, the historical sequence, and domain-specific context. The same complete history produces the same result, on every machine, forever. This satisfies `ARCHITECTURE.md`'s engine-purity and determinism laws (no clock, no hardware RNG), because seeded variation *is* "a deterministic function of existing state" — the carve-out the state machine already grants (Section 1).
+
+### Constraints On Variation
+
+- Variation selects **only among causally qualified candidates**; it never manufactures a candidate that prerequisites do not already support.
+- Variation never substitutes for prerequisites. If nothing qualifies, nothing is selected — there is no lucky bypass.
+- Variation may change **which** qualified outcome, actor, timing, or ordering is realized; it may never change a simulation *fact* that the state determines.
+- No arbitrary civilization-wide change may issue from variation; seeds act locally, on the entity and context they belong to.
+- Every varied outcome is **explainable**: because it is a function of committed inputs, its cause can always be reconstructed, and the result is committed into state or history so that all later evaluation remains deterministic.
+
+**Recorded bounded stochasticity** — drawing from entropy and committing the result — is available only if a future `ARCHITECTURE.md` amendment ever admits a seed source into the engine boundary; until then, seeded deterministic variation is the sole permitted mechanism, and it is sufficient. Major outcomes remain causally grounded, reproducible, prerequisite-gated, and debuggable.
+
+---
+
+## SECTION 12 — TRANSITION AND EVENT SEMANTICS
+
+An observation in Noctis is a *noticing*: the simulation observing that something meaningful changed between two committed states, and saying so. Observations carry no payload of points, bonuses, or prizes — every durable consequence they describe already lives in the committed snapshot. The earlier draft treated the four canonical flags as the *only* transitions the simulation could ever represent; this revision distinguishes four layers so that domains can express change without event spam and without new engine flags.
+
+### The Four Foundational World Events
+
+These remain the closed set of engine **event flags** published over IPC, fixed by `ARCHITECTURE.md` Section 6 and emitted in canonical row order by the deterministic generator `evaluate(I or none, S_before, S_after) -> ordered flags`:
+
+- **`THE_PHEROMONE_PLUME`** — consistency reaches the canonical three-day trigger; the moth season activates and a global acceleration applies to pending transformations.
+- **`BAROMETRIC_SHOCK_WAVE`** — atmospheric stability crosses below its shock threshold under a difficulty signal; the world enters its protective fortification posture. No loss.
+- **`ABYSSAL_DOUSE`** — an observed active-to-hibernating transition; safe dormancy, a fixed point of further decay.
+- **`BENTHIC_BLOOM`** — research readiness crosses an emergence threshold under a completion/breakthrough input; reserves surge and become permanent readiness; an era boundary may be crossed in the same evaluation.
+
+These are rare, high-level, canonically named moments. Tier 6 adds **no** new engine event flags, and no domain may.
+
+### Domain Transitions
+
+Domains routinely need to express finer changes — prototype completion, first successful reproduction, infrastructure breakdown, technological loss, rediscovery, local adoption threshold, standardization, decommissioning, cultural revival, ecological succession, citizen succession, institutional formation. These are **domain transitions**, and they are represented *without* new engine flags, by the model that best fits `ARCHITECTURE.md`:
+
+- **Committed before/after comparison.** A domain transition is a deterministic threshold crossing already implied by the committed state; it is detected by comparing `S_before` and `S_after`, exactly as `ECOLOGY_SYSTEM.md` Section 10 detects its internal ecological transitions. Because every durable consequence already lives in the snapshot, the renderer and Memory can observe the transition from committed state without a signal of its own.
+- **History entries.** Where a transition is durable, the owning domain records it into Memory state (Section 21), which travels in the snapshot.
+
+A **generalized typed transition-record channel** — transitions carried as first-class typed records alongside the four flags — is a possible future enhancement to the `ARCHITECTURE.md` Section 6 outbound contract; it is *deferred* to a Tier 5 decision and must not be assumed by any Tier 7 domain until adopted there.
+
+### Discipline
+
+A domain transition must never: act as a reward; mint resources; modify committed state after it has been observed; automatically become a user-facing popup; or bypass its owning domain. Presentation notifications are optional, owned by UI/rendering, and derived from committed state — never generated by the engine (Section 23). The event and transition contract must never become notification spam (`GAME_DESIGN.md` Section 11, Principle 4).
+
+---
+
+## SECTION 13 — CROSS-DOMAIN DEPENDENCY RULES
+
+Within a single evaluation, influence flows through the lifecycle of Section 6 without cycles. The dependency graph across families is acyclic **per evaluation**; legitimate feedback is realized **across** evaluations.
+
+- **No same-step circular dependency.** A domain proposal reads only prior committed values of other families; it never reads another domain's same-step result. Feedback (fertility multiplying growth, culture conditioning adoption, infrastructure efficiency routing nutrients, maintenance returning efficiency to metabolism) is read from `S(t)` and applied as a constant while computing `S(t+1)`.
+- **Stable resolution order.** When proposals interact or compete for the same family, they resolve in a fixed, documented order, so the result is deterministic.
+- **Explicit ownership of every mutation.** Each committed change is attributed to exactly one owning domain (Section 14). No domain silently writes another's family.
+
+Forbidden edges, stated explicitly:
+
+- **No family may mint primary learning-derived input.** Citizens, institutions, buildings, and infrastructure may transform and apply, never manufacture the user's learning, `K_total`, or metabolic energy (Sections 8–9; Law 7). This is the corrected form of the old "population produces nothing" — narrowed from "produces nothing" to "produces no *primary external input*."
+- **Buildings cannot passively generate primary value.** Structures are expressions and instruments of state; the rejected passive-currency economy of the archived pre-canon design may not leak back in (`ARCHITECTURE.md`, Final Guardrails). Infrastructure may *return efficiency* to metabolism across time steps — never energy from nothing.
+- **Rendering cannot affect simulation.** No presentation state ever enters `F` (Section 1).
+- **Observations cannot modify state.** Flags and transitions are outputs of comparison, never inputs to the next transition.
+- **Time cannot enter except as `Δt`.**
+
+---
+
+## SECTION 14 — DOMAIN OWNERSHIP
+
+Every state mutation has exactly one owning domain. No domain may silently seize another's state. Tier 6 owns the shared platform; each Tier 7 domain owns its own mechanics.
+
+**Simulation Systems (this document) owns:** the shared state-transition principles; update and evaluation semantics; the time-handling contracts and composability; the determinism and seeded-variation rules; rendering separation; persistence and non-punishment guarantees; the broad conservation-by-domain and causality rules; transition-record semantics and the four-flag world-event contract; the domain evaluation and resolution order; the shared validation laws; and the rules that forbid same-step circular dependency.
+
+**Citizen owns:** individual agency; citizen life cycles (birth, aging, succession, death, migration, replacement, if defined); skills; biographies; relationships; personal decisions; professions at the citizen level; personal participation; personal knowledge and experience.
+
+**Ecology owns:** organisms; habitats; ecological networks; biological succession; environmental consequences; species behavior; local ecological transformation.
+
+**Technology owns:** technological possibility; experiments; prototypes; reproduction and reproducibility; technical capability; infrastructure dependencies; standards; maintenance; adoption compatibility; and technical loss and rediscovery.
+
+**Culture owns:** values; practices; traditions; legitimacy; prestige; trust; symbols; identities; interpretation; and cultural diffusion and tension.
+
+**Economy owns:** production; allocation; exchange; scarcity; ownership; distribution; labor and material-economic constraints; and pricing *if any exists* (Section 20).
+
+**Memory owns:** historical records; remembered events; distortion; forgetting; archives; monuments; public historical narratives; and the persistence of recorded history.
+
+**Learning Integration owns:** the interpretation of raw study activity; subject classification; retention and mastery signals; interdisciplinary connection; telemetry boundaries; and the delivery of the interpreted learning signals this document consumes.
+
+**Era Progression owns:** the final era-transition conditions; broad civilizational transition; era gating; and era-level continuity.
+
+**Presentation owns:** visuals; animation; sound; UI; user-facing notices; visual emphasis; and camera behavior. It reads committed state and transitions; it writes nothing to the simulation.
+
+---
+
+## SECTION 15 — ERA PROGRESSION CONTRACT
+
+Era progression is a **broad civilizational transition**, not a technology score crossing a line. The earlier draft made era advancement a function chiefly of research maturity; this revision separates the two.
 
 ### The Five Canonical Eras
 
-The era state machine has exactly five states, in fixed order, mapped one-to-one onto the production eras of `GAME_DESIGN.md` Section 7 and, through them, onto the canonical movements of the tri-document canon:
+The era designation is one of five, in fixed order, mapped onto the production eras of `GAME_DESIGN.md` Section 7 and the canonical movements of Tiers 1–3:
 
 | Canonical designation | Production era (Tier 4) | Canonical movement (Tiers 1–3) |
 |---|---|---|
@@ -567,222 +491,215 @@ The era state machine has exactly five states, in fixed order, mapped one-to-one
 | `OPTOGENETIC_CIRCUIT` | Era IV — The Optogenetic Circuit Matrix | Bio-Circuitry and Alchemical Network Era |
 | `COSMIC_STELLAR` | Era V — The Cosmic Stellar Chasm | Terminal extension of Bio-Circuitry |
 
-### How Technology Emerges
+The five designations, their fixed order, and their monotone advance (eras never regress) are canon (`ARCHITECTURE.md` Section 5; `GAME_DESIGN.md` Section 7).
 
-There are **no unlock menus, no upgrade trees, no costs**. Technology is not purchased; it *precipitates* from accumulated knowledge the way crystal precipitates from saturated brine. The era designation advances when era maturity crosses the next boundary:
+### The Transition Protocol
+
+Tier 6 defines the *protocol*; `ERA_PROGRESSION.md` binds the *conditions*.
 
 ```
-M = maturity( K_total, R, cultural breadth, consistency history, m )
-
-era advances when  M ≥ Θ_era(next era)          eras never regress
+era advances when  readiness( contributions ) ≥ Θ_era(next)      eras never regress
 ```
 
-Maturity is a weighted, monotone combination of learning maturity in the canon's full sense — breadth, consistency, depth, difficulty, and reflection all contribute (`VISION.md`, The Meaning Of Eras) — with research maturity `R` (Section 6) as the load-bearing term: blooms are the discrete steps by which a civilization becomes ready. Weights and thresholds bind at Tier 7. Era transitions are structural state changes evaluated like any other transition; their staging as gradual overnight metamorphosis is a rendering concern.
+**No single hidden score defines an era.** The readiness that carries a civilization across an era boundary is a combination of contributions from multiple domains — learning maturity in the canon's full sense (breadth, consistency, depth, difficulty, reflection — `VISION.md`, The Meaning Of Eras), technological capability (Technology), cultural development (Culture), ecological succession (Ecology), population and institutional maturity (Citizen), and historical accumulation (Memory). Research readiness `R` is one contributor, load-bearing but not sole. The weights, the threshold `Θ_era`, and the final formula bind in `ERA_PROGRESSION.md`. Tier 6 requires only that the readiness be monotone, that no single domain silently define the era, and that the transition be a committed state change evaluated like any other (its staging as gradual overnight metamorphosis is a rendering concern).
 
-### What Changes At Each Era
+### Capability Envelopes, Not Guaranteed Packages
 
-For each era, the simulation binds four abstract capabilities; every visual and narrative consequence downstream of them belongs to Tiers 2, 4, and 8.
+Each era defines a **capability envelope** — what becomes *possible* — not a package of technologies automatically installed civilization-wide. The per-era descriptions of `GAME_DESIGN.md` Section 7 and `NOCTIS_ECOLOGICAL_ENGINE.md` section 3 are reclassified accordingly:
 
-**`SPORE_HEARTH`**
-- *Information storage:* tactile knot-cord records — memory as knots tied by hand.
-- *Communication:* near-range photophore semaphores and touch; echolocation survey pings captured on tympanic resonators.
-- *Infrastructure:* communal cold spore-hearths, root-paths, wild bioluminescent cultivation.
-- *Civilization expression:* a fragile communal clearing of glow in vast dark; survival close to the light it keeps.
+- **Canon (identity + envelope):** the era's thematic relationship to knowledge, its permanent-night constraints, the heatless law, and the outer bound of what the era makes possible (e.g. `PHONONIC_SUBTERRANEAN` supports massive cold mechanical work and long-range vibration communication; `COSMIC_STELLAR` supports instantaneous lattice-paired memory and starlight calibration).
+- **Representative examples / art direction:** the *specific* information-storage medium, communication method, and infrastructure named for each era. These illustrate the envelope; they are not guaranteed universal possessions.
+- **Domain-owned, path-dependent:** which technologies a given civilization actually develops within the envelope, and which a given settlement locally adopts, are Technology decisions (Section 16), shaped by ecology, materials, culture, and history. Different settlements may possess different technologies within the same era. Era advancement must not instantly install one universal technological package across the whole civilization.
 
-**`CRYSTAL_INSCRIPTION`**
-- *Information storage:* raised fiber scrolls and crystal memory lattices; the first true archive.
-- *Communication:* routed light — aqueduct signals and refracted guide-beams carrying meaning between districts.
-- *Infrastructure:* luciferin-synthesizing glass plumbing, fiber-optic crystal light-pipes, resonant crystal batteries.
-- *Civilization expression:* coordination — light shared across distance and time; a village becoming a polity.
-
-**`PHONONIC_SUBTERRANEAN`**
-- *Information storage:* resonant sound-vaults holding records as standing acoustic patterns and engraved vibration grooves.
-- *Communication:* phononic telegraphy — data as low-frequency vibration through the bedrock itself; industrialized shutter-semaphore towers.
-- *Infrastructure:* cold hydrostatic pressure works, fluidic logic computation, electroformed mineral refinement — massive mechanical power without a single flame.
-- *Civilization expression:* patient industrial strength; the dark itself made to do work.
-
-**`OPTOGENETIC_CIRCUIT`**
-- *Information storage:* living mycelial boards — records grown into computing tissue.
-- *Communication:* frequency-coded light pulses across biomorphic glass fiber; streets that carry information.
-- *Infrastructure:* neural-mycelial computer arrays, optogenetic processing vaults, light-routing towers; the city as one connected organism.
-- *Civilization expression:* cerebral serenity — a civilization whose thinking is visible as weather.
-
-**`COSMIC_STELLAR`**
-- *Information storage:* quantum-entangled lattice pairs holding identical memory across any distance — knowledge as one simultaneous whole.
-- *Communication:* instantaneous lattice-state sharing; aurora projection as civic language.
-- *Infrastructure:* rift observatories, suspended instrument plates (all anchored — nothing floats free), starlight collectors.
-- *Civilization expression:* transcendence turned toward the remaining unknown; the first question, grown up.
-
-### The Stellar Guard
-
-A hard physical law rides with the final era: **starlight is a catalyst and calibration medium, never a substitute energy source.** The collectors of `COSMIC_STELLAR` amplify and refine metabolic loops that only the user's harvested bio-light can drive. If study stops, the collectors dim into ceremonial stillness and the decay model of Section 4 proceeds exactly as in the first era. Under no configuration, in any era, does the civilization become energetically independent of the user's mind. The world at its most transcendent runs on the same rare cognitive weather it ran on around the first hearth.
+The **Stellar Guard** rides with the final era and is hard law: starlight is a catalyst and calibration medium, never a substitute energy source. No era achieves energy independence from the user's mind; if study stops, `COSMIC_STELLAR` dims into ceremonial stillness and the decay model of Section 5 proceeds exactly as in the first era.
 
 ---
 
-## SECTION 10 — EVENT GENERATION MODEL
+## SECTION 16 — TECHNOLOGY CONTRACT
 
-### Events Are Observations, Not Rewards
+Tier 6 makes it *safe* to author `TECHNOLOGY_SYSTEM.md`; it does not author it. The earlier draft reduced technology to "knowledge + research maturity + cultural breadth + consistency → maturity → threshold → invention or era advancement." That is withdrawn. Technology is a lifecycle, not a meter.
 
-An event in Noctis is a *noticing*: the simulation observing that something meaningful changed between two states, and saying so once. Events carry no payload of points, bonuses, or prizes — every durable consequence they describe already lives in the state snapshot. They exist so the rendering layer knows that a moment worth witnessing has occurred.
+Technology must be free to define distinct stages, at least: conceptual possibility; problem or opportunity recognition; prerequisite availability; investigation; experimentation; failure or partial success; prototype creation; reproducibility; production feasibility; maintenance feasibility; adoption; diffusion; normalization; adaptation; obsolescence; loss; and rediscovery. Research readiness `R` may remain an abstract civilization-level readiness signal and an input to the lifecycle; it may **not** replace the lifecycle, and **era advancement must not equal invention** (Section 15).
 
-The generator is the deterministic function fixed by `ARCHITECTURE.md` Section 6:
+Shared constraints Tier 6 binds on any technology mechanic (the capability-distinction laws):
 
-```
-evaluate( I or none, S_before, S_after ) -> ordered event flags
-```
+- No invention without causal prerequisites (Law 1).
+- Knowledge is not identical to capability (Law 9): understanding a principle is distinct from being able to engineer, produce, maintain, or reproduce it.
+- Prototypes are not identical to scalable technologies.
+- Invention does not imply adoption; adoption does not imply universal access.
+- Infrastructure requires maintenance; maintenance-sensitive systems may degrade or fall dormant by domain rule — never by user absence as punishment.
+- Technologies may be lost (active possession), while their record persists (legacy) and may later be rediscovered (Section 10).
+- Technology cannot bypass ecological or material constraints (Ecology and Economy own those resolutions), and it emits consequences as typed pressure signals, never as direct writes into other families.
 
-It reads nothing but the two snapshots and the input; it is evaluated after every mutation; flags are emitted in the canonical table row order below, are transient, and are never persisted. All four canonical events are **transition observations** — each fires exactly when its condition crosses, which is what makes them deterministic and unrepeatable-by-accident.
-
-### THE_PHEROMONE_PLUME
-
-- **Trigger:** the consistency condition activates — the consecutive-day count reaches `K_PLUME` (canonically three consecutive daily sessions), observed as the spore-moth season switching from inactive to active between the snapshots.
-- **Meaning:** rhythm has become season. The user's discipline is now a visible weather system.
-- **State impact:** the moth network activates; the global acceleration multiplier applies to all pending transformations for as long as the consistency condition holds; circulation rises.
-- **Visual layer handoff:** the flag plus the active moth-season state; the silver drift, migration lines, and their choreography are rendering interpretations guided by Tiers 2–3.
-
-### BAROMETRIC_SHOCK_WAVE
-
-- **Trigger:** atmospheric stability crosses below the shock threshold `θ_shock`, driven by a high difficulty/failure signal in the session input.
-- **Meaning:** the civilization has felt the pressure of the user's hardest work — and answers it with protection, not grief.
-- **State impact:** the fortification posture engages: reserve drawdown pauses, endurance memory accrues, stability then relaxes deterministically toward calm across subsequent evaluations. No stock, structure, or memory is lost; a hard week leaves the world *stronger-founded*.
-- **Visual layer handoff:** the flag plus the depressed-stability state; quivering channels and protective crimson dimming are the rendering layer's translation.
-
-### ABYSSAL_DOUSE
-
-- **Trigger:** an observed active-to-hibernating transition between the two snapshots — a crossing only the decay evaluation can produce (never a session, never rendering).
-- **Meaning:** the ecology has chosen conservation; the world is sleeping sensibly, not dying of neglect.
-- **State impact:** the hibernation invariants of Section 4 hold: illumination exactly zero, circulation still, activity at its dormant floor, population and all legacy fully preserved, the state a fixed point of further decay.
-- **Visual layer handoff:** the flag plus the hibernating status; settled clear aqueduct fluid and stilled canopies are presentation. UI language around this state must remain welcoming (`ART_DIRECTION.md`, Hibernation).
-
-### BENTHIC_BLOOM
-
-- **Trigger:** research maturity crosses an emergence threshold — driven by a completion/breakthrough input or by accumulated pressure reaching readiness.
-- **Meaning:** understanding has become invention: a genuine milestone in the user's real learning, honored as structure.
-- **State impact:** nutrient reserves are consumed in the surge toward the civic core; research maturity permanently increments; era maturity may cross an era boundary in the same evaluation (in which case the era transition is part of this mutation's after-state).
-- **Visual layer handoff:** the flag plus the incremented maturity and any era change; the rising neon-teal wave is the rendering layer's celebration, kept quiet by Tier 2 law.
-
-### The Handoff Law
-
-**Simulation produces signals. Rendering decides appearance.** The generator's output is a list of canonical flag designators and nothing more — no colors, no animations, no durations, no copy. Every visual manifestation in the canon's event table (`NOCTIS_ECOLOGICAL_ENGINE.md` section 7) is a *rendering obligation triggered by* these signals, never a property of them.
+`TECHNOLOGY_SYSTEM.md` owns the per-era capability envelopes' realization, the infrastructure-efficiency curves, the invention lifecycle, and adoption/diffusion/loss/rediscovery mechanics, under these constraints.
 
 ---
 
-## SECTION 11 — SYSTEM DEPENDENCY TOPOLOGY
+## SECTION 17 — CULTURE CONTRACT
 
-### The Canonical Flow
+Culture is not one monotone resource stock. The earlier draft defined it as a permanently increasing quantity produced directly by study subjects and used to lower technology thresholds; that is withdrawn as premature. Tier 6 acknowledges that the civilization carries social and cultural state and defines only how such state *enters shared transitions*; `CULTURE_SYSTEM.md` owns its internal mechanics.
 
-Within a single evaluation, influence flows strictly downward through six strata:
+Cultural state is a family of domain-owned signals — such as practices, values, legitimacy, prestige, trust, institutions, traditions, taboos, identities, transmission fidelity, local variation, resistance, openness, preservation strength, reinterpretation, and cultural tension. These signals may **strengthen, weaken, transform, fragment, hybridize, disappear, revive, or change meaning**; culture is not assumed monotone. What is preserved regardless of how active cultural forms change is the **recorded cultural history** (legacy, Section 10): the civilization always remembers a tradition it once held, even after it stops practicing it.
 
-```
-Learning Input            (focus blocks; elapsed time)
-      |
-      v
-Metabolic Conversion      (pathway synthesis, saturation, banking)
-      |
-      v
-Resource State            (knowledge, reservoirs, culture, innovation, energy)
-      |
-      v
-Ecological State          (networks, fauna, illumination, circulation)
-      |
-      v
-Civilization State        (population, era, expression, memory)
-      |
-      v
-Event Signals             (transient flags; terminal output)
-```
-
-### No Circular Dependencies
-
-The graph above is acyclic and its direction is law. Within one evaluation, no stratum ever reads a value computed below it. Where the model contains legitimate feedback — culture lowering innovation thresholds, lattice mass damping decay, fertility multiplying growth — the downstream value is read **from the previous state** `S(t)` and applied as a constant during the computation of `S(t+1)`. Feedback across time steps is lawful recurrence; feedback within a step would be circular definition, and is forbidden. This single rule keeps every evaluation a finite, ordered, deterministic pass.
-
-Forbidden edges, stated explicitly:
-
-- **Population cannot create knowledge** — or nutrients, or culture, or any resource. Citizens are consequence, never source; otherwise the civilization would become a self-feeding engine that no longer needs the user's mind, falsifying the entire premise.
-- **Buildings cannot create resources.** Structures are expressions of ecological and civilization state. Passive generation by owned objects is the rejected economy of the archived pre-canon design and may not leak back in (`ARCHITECTURE.md`, Final Architectural Guardrails).
-- **Visuals cannot affect simulation.** No rendering state, camera state, window state, or user gaze ever enters `F`. The world grows identically whether watched or not — which is precisely why watching it feels honest.
-- **Events cannot modify state.** Flags are outputs of the comparison between snapshots, never inputs to the next transition. Anything durable an event describes already happened inside the state.
-- **Time cannot enter except as `Δt`.** No stratum may consult a clock (Section 3).
-
-### Why Topology Is A Physics Law
-
-The dependency direction is not an engineering preference; it is the mathematical form of the module's meaning. Learning is the only source (`VISION.md`: light as metabolism), so the graph must have exactly one root. The civilization is a reflection, so nothing downstream may push back upstream within an evaluation. The night runs on the user's mind — and the topology is where that sentence becomes checkable.
+A derived aggregate summary (for example a single "cultural breadth" reading) may exist **only** if `CULTURE_SYSTEM.md` explicitly defines and retains it as a derived projection; no domain may depend on such a scalar as though it were primitive, and none may treat any subject as a direct producer of a fixed "culture amount." Other domains consume culture as an abstract reception context (legitimacy, compatibility, resistance, preservation), not as a number to accumulate.
 
 ---
 
-## SECTION 12 — MATHEMATICAL INTEGRITY LAWS
+## SECTION 18 — ECOLOGY CONTRACT
 
-These laws bind every current system and every future extension. A proposed mechanic that violates any one of them is invalid regardless of its other merits, and must be redesigned from the constraint upward.
+Ecology is a fully authored Tier 7 peer (`ECOLOGY_SYSTEM.md`) and is not modified by this task. Tier 6 provides it a stable contract: ecology consumes the nutrient tendencies of Section 7, grows its own family under conservation (Section 9, transformation ≤ 1, recycling < 1), obeys the legacy/active distinction (Section 10), and emits ecological facts to Memory and reception context to Citizen, Culture, and Technology across committed evaluations (Section 13).
 
-### Law 1 — Determinism
-
-`F(S, I, Δt)` is a pure function. Same input, same output, always — states, flags, and their order. No randomness, no clocks, no hidden iteration counts, no environmental reads. Corollary (composability): evaluating elapsed time over `Δt` equals evaluating it over any partition of `Δt`; lazy checkpoints are therefore exact, not approximate.
-
-### Law 2 — Conservation
-
-No impossible resource creation. Every stock increase traces to exactly one of: metabolized learning input, transformation of another stock (at efficiency ≤ 1), or recycling of system byproducts (at efficiency < 1). Every stock decrease traces to transformation, consumption by a named system, lawful decay, or explicit dissipation. The metabolic ledger of Section 6 balances at every evaluation. Population is exempt as a non-conserved *indicator* — but it is bounded by the prosperity function and produces nothing, so the exemption can never mint value.
-
-### Law 3 — Separation
-
-The simulation cannot know presentation. No state variable encodes appearance; no transition reads rendering; no event carries visual instruction. The same blindness extends to platform: no clock reads, no persistence knowledge, no channel names (`ARCHITECTURE.md` Sections 1–2). The model must remain evaluable, in principle, by hand on paper.
-
-### Law 4 — Persistence
-
-User achievements survive absence — all of them, always. Accumulated knowledge, culture, innovation maturity, era designation, network mass, population count, and every Memory State entry are invariant under `D` for every `Δt`. Decay's entire domain is the renewable environmental layer: illumination, circulation, reservoirs, activity expression. What learning built, absence cannot touch.
-
-### Law 5 — Non-Punishment
-
-Dormancy preserves progress. Formally: for every state `S` and every `Δt`, the legacy projection of `D(S, Δt)` equals the legacy projection of `S`; hibernation is a fixed point of `D`; and no input `I` exists whose processing reduces any legacy variable. There is no mechanism anywhere in the model by which the user can *lose* for having lived their life. Absence dims; it never subtracts.
-
-### Corollary Laws
-
-- **Monotone Legacy:** `K_total`, culture, research maturity, era, network masses, population count, and memory entries are non-decreasing over the lifetime of a civilization.
-- **Boundedness:** illumination, circulation, stability, and activity live in `[0, 1]`; all quantities are finite; the validation invariants of Section 1 hold on every produced state.
-- **Dormancy Fixed Point:** `D(S_hibernating, Δt) = S_hibernating`.
-- **Saturation:** metabolic uptake per evaluation saturates; sustained genuine study strictly dominates burst grinding without any burst ever being punished.
-- **Honesty (Trustworthy Mystery):** the same class of behavior always produces the same class of consequence; any pattern a patient observer infers from the world must be true (`GAME_DESIGN.md` Section 8). The model may keep secrets; it may never tell lies.
+Because `ECOLOGY_SYSTEM.md` was written against the earlier Tier 6 draft, several of its clauses inherit assumptions this revision has changed. Those clauses are catalogued for a later surgical compatibility pass in Section 28; Tier 6 does not weaken itself into vagueness to accommodate them, and it does not edit Ecology here. The contract is explicit so that the audit can be surgical.
 
 ---
 
-## SECTION 13 — FUTURE EXPANSION BOUNDARIES
+## SECTION 19 — CITIZEN CONTRACT
 
-### The Physics / Domain Boundary
+Citizen is a fully authored Tier 7 peer (`CITIZEN_SYSTEM.md`) and is not modified by this task. Tier 6 provides it a stable contract and, in the corrections of Sections 8 and 10, the latitude it previously lacked:
 
-**SIMULATION_SYSTEMS.md defines the physics.** State categories, transition structure, functional forms, ordering laws, invariants, event conditions, and topology — the laws every subsystem lives under.
+- Citizens are genuine actors within the agency boundary of Section 8.
+- Citizen life-cycle dynamics — birth, aging, retirement, succession, death, migration, replacement, apprenticeship, inheritance, institutional turnover — are **owned by `CITIZEN_SYSTEM.md`**, not by Tier 6. Tier 6 neither mandates immortality nor prescribes death.
+- The only Tier 6 demographic law is non-punishment: **user absence never reduces population** and never causes starvation, punitive death, or demographic collapse (`ARCHITECTURE.md` Section 5; Laws 5–6). Any death a domain defines must be narrative or biological in origin, and recorded history always outlives the citizen (Section 21).
 
-**The Tier 7 domain blueprints define the specialized domains.** Each binds the concrete formulas, coefficient values, category tables, and threshold constants for its territory — every bound value carrying a canon citation, under the calibration constraints stated here (`ARCHITECTURE.md`, authority chain):
+`CITIZEN_SYSTEM.md` currently encodes citizen immortality and a strictly monotone population, inherited from the earlier Tier 6 draft. That is now *permitted but not required*; whether Citizen adopts a life cycle under the new latitude is its own decision, catalogued for compatibility review in Section 28.
 
-- **`CITIZEN_SYSTEM.md`** — citizen activity loops, semaphore dialect drift mechanics, lore-capture state hooks; everything that makes `A_P` legible as lives being lived.
-- **`ECOLOGY_SYSTEM.md`** — network growth coefficients, fauna cycle rates, recycling efficiencies, vault-depth threshold tables, survey frontier mechanics.
-- **`CULTURE_SYSTEM.md`** — dialect complexity measures, ritual formation, district behavioral modifier tables, cultural breadth metrics.
-- **`TECHNOLOGY_SYSTEM.md`** — era maturity weights and thresholds `Θ_era`, bloom emergence thresholds, infrastructure efficiency curves per era.
-- **`MEMORY_SYSTEM.md`** — vault entry generation, monument grant conditions, milestone taxonomy, the permanence guarantees in practice.
+---
 
-Domain blueprints may specialize the physics; they may never contradict it. A Tier 7 equation that breaks a Section 12 law is invalid at birth. The Tier 8 production pipeline documents (visual and asset authoring) sit below all of this and must not define simulation rules of any kind.
+## SECTION 20 — ECONOMY CONTRACT
 
-### Deliberately Unbound At This Tier
+Economy is a reserved domain (`ECONOMY_SYSTEM.md`, placeholder) and is not authored here. Tier 6 defines only its boundary and a strong canon caution.
 
-For clarity of the contract, this document intentionally does **not** bind: any numeric coefficient or threshold value beyond the three canonical anchors (three-day plume, five-day douse horizon, ten-minute reawakening); the subject-category-to-pathway weight table; the exact state field identifiers; the internal decomposition of the engine; and any presentation behavior whatsoever. Those bindings belong to Tier 7 and the implementation phases, under these laws.
+Economy owns production, allocation, exchange, scarcity, ownership, distribution, and labor/material constraints. **Canon caution:** Noctis has no coin, no market the user shops in, and no user-facing spending; resources are metabolic states, not currencies (`GAME_DESIGN.md` Section 6), and the terms coin, gold, xp, and score are forbidden tokens (`ARCHITECTURE.md` Trope Guard; `DOCUMENT_ARCHITECTURE.md` terminology lock). Any economic mechanic must therefore express allocation, scarcity, and production as *civilizational conditions and pressures*, never as a price the user pays or a currency they accumulate. What technology and ecology emit toward Economy are production-capability and demand-pressure signals; what Economy resolves is distribution and sufficiency, under conservation (Section 9) and non-management (Law 10).
+
+---
+
+## SECTION 21 — MEMORY CONTRACT
+
+Memory is a reserved domain (`MEMORY_SYSTEM.md`, placeholder) and is not authored here. Tier 6 binds the permanence physics; Memory owns the model.
+
+Memory holds the legacy family (Section 10): historical records, remembered events, monuments, public narratives, and — as Memory defines them — distortion, forgetting, access, and interpretation. The distinction Tier 6 requires is between **historical record** (that something existed or happened, once validly recorded — permanent) and **active capability** (that the civilization can currently use it — subject to loss and revival). Memory may preserve a technique no one reproduces, a ritual no one practices, or an institution that has collapsed; it may let recorded meaning expand through interpretation without minting physical stock (Section 9). What Memory records, absence never erases and no later transition deletes (`GAME_DESIGN.md` Section 9, Rules of Memory; Laws 4–5). Memory decides how records persist, distort, or fade *as records*; it never resurrects an active capability by fiat — revival is a domain event that reads Memory as a precondition.
+
+---
+
+## SECTION 22 — LEARNING INTEGRATION CONTRACT
+
+Learning Integration is a reserved domain (`LEARNING_INTEGRATION.md`, placeholder) and is not authored here. It owns the interpretation of raw study activity, subject classification, retention and mastery signals, interdisciplinary connection, telemetry boundaries, and the delivery of the interpreted learning signals this document consumes (Section 3).
+
+The boundary is firm in both directions. Tier 6 (and every domain below it) receives **already-interpreted** signals — the interpreted learning profile — never raw telemetry, never a subject taxonomy to switch on. Learning Integration receives, from the world, nothing it can spend: **learning is the source of possibility, not a currency** (`VISION.md`, Light Economy; `GAME_DESIGN.md` Section 11, Principle 2). No mechanic converts study minutes into a spendable stock, and no domain infers a fixed outcome from a single subject (Section 7).
+
+---
+
+## SECTION 23 — PRESENTATION HANDOFF
+
+**Simulation produces committed state and transition records. Rendering decides appearance.** The engine emits values, never visuals: no colors, no animations, no durations, no copy, no notifications. Every visual manifestation in the canon event table, every era metamorphosis staging, every ambient motion during quiet minutes, and every user-facing notice is a *presentation obligation* interpreted from committed state and the four flags and domain transitions — never a property of them (`ARCHITECTURE.md` Section 6; `ART_DIRECTION.md`). Presentation is strictly downstream (Section 13); it reads everything and writes nothing back into `F`.
+
+---
+
+## SECTION 24 — INTEGRITY LAWS
+
+These laws bind every current system and every future extension. A proposed mechanic that violates any one is invalid regardless of its other merits, and must be redesigned from the constraint upward.
+
+**Law 1 — Causal Integrity.** Every major outcome has sufficient causes and prerequisites. Nothing significant happens without a traceable reason in committed state and input.
+
+**Law 2 — Reproducible Evaluation.** Given the same committed state, interpreted input, elapsed-time context, and stable simulation seed/history, the engine produces the same result — state, transitions, and order. Corollary (composability): evaluating elapsed time over `Δt` equals evaluating it over any partition of `Δt`.
+
+**Law 3 — Domain Ownership.** Every state mutation has exactly one owning domain; no domain silently writes another's family.
+
+**Law 4 — Presentation Separation.** Rendering cannot alter simulation truth; no presentation state enters `F`; no observation carries visual instruction.
+
+**Law 5 — Legacy Protection.** Normal user absence cannot erase earned learning achievements or civilization history. The legacy projection of `D(S, Δt)` equals the legacy projection of `S`, for every `Δt`.
+
+**Law 6 — Non-Coercion.** The simulation cannot punish the user for ordinary breaks: no starvation, no punitive death, no demographic collapse, no accumulating debt, no coercive countdown, no imposed return task list, caused by absence.
+
+**Law 7 — No Infinite Generation.** No passive loop may create unlimited primary learning-derived energy, knowledge, or material value from nothing. Every primary stock traces to real user learning; internal transformation and recombination never mint primary value.
+
+**Law 8 — Living Change.** Preserving legacy does not require freezing active ecology, culture, technology, institutions, or citizens. Active possession may change, decay, transform, fall dormant, be lost, and revive, while legacy endures.
+
+**Law 9 — Capability Distinction.** Knowledge, possession, reproduction, maintenance, access, and use are separate states. A civilization may hold any subset of them for a given capability.
+
+**Law 10 — No Micromanagement Dependency.** No core progression may require the user to manage the civilization instead of studying. The best way to advance the world is always to live a genuine learning life (`GAME_DESIGN.md` Section 11, Principle 2).
+
+**Law 11 — Explainable Variation.** Variation occurs only among causally qualified candidates and is always seeded/reproducible or committed into history; it never substitutes for a prerequisite and never varies a fact the state determines (Section 11).
+
+**Law 12 — Deferred Specialization.** Tier 6 defines shared physics; Tier 7 owns domain-specific mechanics. A Tier 6 rule that pre-authors a Tier 7 domain is a defect, corrected here rather than propagated.
+
+---
+
+## SECTION 25 — DORMANCY AND NON-PUNISHMENT
+
+Dormancy is a welcoming state, not a failure. When the world is dormant: active illumination quiets, ambient civic expression reduces, optional processes pause, continuity is preserved, and return is gentle. Each Tier 7 domain defines what dormancy means for *its* active state; Tier 6 fixes only the hard rules, which no domain may weaken:
+
+- No user achievement is ever deleted.
+- No catastrophic collapse is caused solely by absence.
+- No starvation occurs because the user did not study.
+- No coercive countdown exists, and no accumulated penalty debt grows.
+- No return task list is imposed on the user.
+
+The three canonical numeric anchors — the three-consecutive-day consistency trigger, the five-day absence horizon, and the ten-minute reawakening session — are fixed by `NOCTIS_ECOLOGICAL_ENGINE.md` section 7 (Tier 3) and are therefore preserved as law, not as calibration. Every other day-scale or rate value referenced by dormancy is a calibration question bound at Tier 7 under the constraint that these three anchors are honored.
+
+---
+
+## SECTION 26 — FAILURE CONDITIONS
+
+A transition, proposal, or state is invalid — and must be rejected and reshaped from the constraint up — if it: reads a clock, hardware randomness, or any presentation state inside the engine; produces a same-step circular dependency; mints primary learning-derived value from within the world (Law 7); reduces any legacy value, or reduces population through absence (Laws 5–6); leaves a non-finite, negative-stock, out-of-band-illumination, or non-canonical-era state (Section 1); writes a family it does not own (Law 3); introduces a new engine event flag beyond the canonical four (Section 12); requires user micromanagement (Law 10); or introduces a forbidden Trope-Guard token (`ARCHITECTURE.md` — thermal, heat, fire, flame, combust, smoke, steam, forge, daylight, sun, coin, gold, xp, score, build, construct, zone). Invalid states throw `AbyssalConstraintError` synchronously (`ARCHITECTURE.md`, Final Guardrails).
+
+---
+
+## SECTION 27 — EXTENSION PROTOCOL
+
+Any future simulation concept enters by this protocol: pass the tiered validation of `DOCUMENT_ARCHITECTURE.md` (Tier 1 → 2 → 3), then the experience tests of `GAME_DESIGN.md`, then the structural laws of `ARCHITECTURE.md`, then the physics of this document (Sections 1–26). A concept that satisfies the canon but violates a law here is rejected and reshaped, never merged with adjustments. A concept that belongs to a domain is specified in that domain's Tier 7 blueprint under the contract this document gives it — never pre-authored here. Numeric values bind at Tier 7 with canon citations; they are never fabricated at Tier 6 beyond the three canonical anchors.
+
+---
+
+## SECTION 28 — KNOWN DOWNSTREAM AUDIT REQUIREMENTS
+
+This revision changed shared laws that the already-written Tier 7 siblings were authored against. Those documents are **not** modified by this task; the clauses that inherit the superseded assumptions are catalogued here so a later surgical compatibility pass can be precise. Until that pass, the siblings remain valid where stricter than Tier 6 (a Tier 7 domain may always be more restrictive than the platform permits).
+
+**`ECOLOGY_SYSTEM.md` — clauses to audit against the revised Tier 6:**
+
+- reliance on the old "population produces nothing" wording (now narrowed to "no primary external input"; ecology may treat citizens as actors within Section 8);
+- fully monotone ecological network masses (`X_myc`, `X_cry` "never shrink") — audit against the legacy/active-possession distinction (Section 10): the *record* is permanent, but active habitat form may transform;
+- fixed cultural consequences produced directly by ecology — audit against the Culture contract (Section 17): ecology emits reception context, not a fixed culture amount;
+- vault breaches that automatically yield blueprint schemas — audit against the capability distinction (Law 9): a recovered record is legacy, not automatic active capability;
+- rigid subject-to-ecology phrasing — confirm it reads as symbolic tendency, not unlock equation (Section 7);
+- the closed four-event framing — confirm ecology's internal transitions are expressed as committed-state domain transitions (Section 12), which they already are;
+- any implication that all local ecological change is irreversible — audit against Law 8 (living change).
+
+**`CITIZEN_SYSTEM.md` — clauses to audit:**
+
+- citizen immortality and strictly monotone population as *physics law* — now permitted-but-not-required; audit whether Citizen wishes to adopt a life cycle under the new latitude (Section 19), keeping absence-driven reduction forbidden;
+- "roles produce nothing / citizens are consequence, never source" — reconcile with the agency boundary (Section 8): the correct statement is "roles mint no primary value," not "citizens take no action";
+- "individuality is rendered, not stored" — confirm this remains compatible with citizen agency (an acting citizen may need committed identity for seeded variation, Section 11);
+- skill transmission, teaching, maintenance, and succession — confirm Citizen can now express these as genuine actions.
+
+`GAME_DESIGN.md` (Tier 4) is **not** in scope and was not found to contain a concrete contradiction requiring change; its per-era descriptions are reclassified in place by Section 15 as envelope-plus-representative-examples rather than rewritten.
 
 ---
 
 ## FINAL QUALITY TEST
 
-- [x] **Does this describe a simulation engine, not a game?** Yes — a state machine, transition laws, and integrity constraints; no objectives, no win states, no loops of challenge and reward.
-- [x] **Are all rules deterministic?** Yes — one pure transition function; randomness, clocks, and hidden timers are prohibited by Law 1 and Section 1.
-- [x] **Is there zero micromanagement?** Yes — no placement, allocation, assignment, or spending exists anywhere in the model; the user's only input is real study.
-- [x] **Is absence non-punitive?** Yes — cushion, then bounded exponential decay of renewables only, then a fixed-point hibernation that preserves population, eras, achievements, and history (Law 5).
-- [x] **Does every system connect to learning?** Yes — the topology has a single root; every stock, network, era, and event traces back to metabolized study input.
-- [x] **Does it obey abyssal biology?** Yes — the nutrient triad, cold-light illumination bounded in the heatless waveband, anchored networks, and the fauna loops all derive from Tier 3.
-- [x] **Does it avoid normal city-builder mechanics?** Yes — no construction queues, zoning, budgets, housing, starvation, or unit management; structures are grown expressions, and buildings cannot create resources.
-- [x] **Does it avoid implementation details?** Yes — no code, classes, filenames, field identifiers, or UI; mathematics is symbolic with values reserved for Tier 7.
-- [x] **Does it respect ARCHITECTURE.md boundaries?** Yes — time-blind engine, lazy checkpoint evaluation, cushion-before-decay ordering, dormancy fixed point, the before/after event contract in canonical row order, and immutability are all restated here as physics.
-- [x] **Could engineers implement the engine from this document?** Yes — with the Tier 7 blueprints supplying bound constants, every transition, invariant, and signal defined here is directly implementable and testable.
+- [x] **Does Tier 6 still protect Noctis from becoming a conventional strategy game?** Yes — no objectives, no win/fail states, no micromanagement (Law 10); the user's only input is real study.
+- [x] **Is learning still the foundational external input?** Yes — the single source; Laws 7 and the agency boundary forbid the world minting primary value.
+- [x] **Can citizens now act meaningfully without becoming resource generators?** Yes — Section 8 narrows conservation to "no primary external input" while permitting transformation, invention, maintenance, and transmission.
+- [x] **Can Citizen define life cycles without contradicting Tier 6?** Yes — deferred to `CITIZEN_SYSTEM.md`; only absence-driven loss is forbidden.
+- [x] **Can Technology define invention, failure, adoption, maintenance, loss, and rediscovery?** Yes — Section 16; research readiness is one input, not the lifecycle.
+- [x] **Can Culture define changing, contested practice rather than one monotone stock?** Yes — Section 17.
+- [x] **Can Ecology change locally without deleting legacy?** Yes — Section 10; legacy preserved, active possession free to transform.
+- [x] **Can Memory distinguish record from active capability?** Yes — Sections 10 and 21.
+- [x] **Can Era Progression transition without being reduced to one Technology score?** Yes — Section 15; multi-domain readiness, `ERA_PROGRESSION.md` owns the formula.
+- [x] **Can Learning Integration define nuanced interpretation?** Yes — Sections 3 and 22; Tier 6 fixes only the signal shape.
+- [x] **Is variation causal, bounded, explainable, and reproducible?** Yes — Section 11, seeded deterministic variation.
+- [x] **Is rendering completely downstream, absence non-punitive, achievements preserved?** Yes — Sections 5, 10, 23; Laws 4–6.
+- [x] **Is the world allowed to remain alive and historically dynamic?** Yes — Law 8.
+- [x] **Are domain boundaries explicit and cross-references verified?** Yes — Section 14; citations checked against the repository.
+- [x] **Are the four world events preserved without blocking domain transitions?** Yes — Section 12.
+- [x] **Does the document avoid pre-authoring Tier 7?** Yes — Law 12; each domain gets a contract, not a design.
+- [x] **Is the result stable enough to guide Technology authorship?** Yes — Section 16 gives Technology a complete, contradiction-free contract.
 
 ---
 
 ## Closing Validation Statement
 
-Every future simulation concept for the Noctis Civilization Module must pass, in order: the Tier 1 test of `VISION.md`, the Tier 2 test of `ART_DIRECTION.md`, the Tier 3 test of `NOCTIS_ECOLOGICAL_ENGINE.md`, the experience tests of `GAME_DESIGN.md`, the structural laws of `ARCHITECTURE.md`, and the physics of this document — determinism, conservation, separation, persistence, and non-punishment. Anything that fails is not adjusted at the edges; it is rejected and redesigned from the constraint up.
+Every future simulation concept for the Noctis Civilization Module must pass, in order: the Tier 1 test of `VISION.md`, the Tier 2 test of `ART_DIRECTION.md`, the Tier 3 test of `NOCTIS_ECOLOGICAL_ENGINE.md`, the experience tests of `GAME_DESIGN.md`, the structural laws of `ARCHITECTURE.md`, and the physics of this document — causal integrity, reproducible evaluation, domain ownership, presentation separation, legacy protection, non-coercion, no infinite generation, living change, capability distinction, no micromanagement, explainable variation, and deferred specialization. Anything that fails is not adjusted at the edges; it is rejected and redesigned from the constraint up.
 
-The world is a function. Learning is its only source. Absence is a fixed point. Legacy is monotone. The night runs on the user's mind — and these are the laws that keep it honest.
+The world is a function. Learning is its only source. Citizens are actors, not currency. Absence is a fixed point. Legacy is monotone; life is not. Every domain owns its own truth — and the night runs on the user's mind, which is the one law all the others exist to keep honest.

@@ -6,6 +6,16 @@ import DictionaryPopup from '../components/DictionaryPopup';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
 import Icon from '../components/Icons';
 import {
+  AppChrome,
+  Button,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarSpacer,
+  useAeroMaterials,
+  type MenuBarMenu,
+} from '../components/ui';
+import {
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
   immersionStatsId,
@@ -62,6 +72,7 @@ function ensureProtocol(raw: string): string {
 
 export default function ImmersionView() {
   const { t } = useT();
+  const aero = useAeroMaterials();
   const MODE_LABELS: Record<ImmersionMode, string> = {
     live: t('immersion.mode.live'),
     reader: t('immersion.mode.reader'),
@@ -515,10 +526,261 @@ export default function ImmersionView() {
       offs.forEach((off) => off());
       window.removeEventListener('keydown', onKey);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyMode, cycleMode, currentUrl, mode]);
 
   const showRail = railOpen && showChrome;
+  const immersionMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'focus-url', label: 'Open location', onSelect: () => { urlBarRef.current?.focus(); urlBarRef.current?.select(); } },
+        { id: 'save-site', label: 'Save site', disabled: !currentUrl, onSelect: () => void saveCurrentSite() },
+        { id: 'export-library', label: 'Export reader page', disabled: !currentUrl, onSelect: () => void exportToLibrary() },
+        { id: 'capture-video', label: 'Capture video', disabled: captureBusy || !currentUrl, onSelect: () => void captureVideo() },
+        { id: 'sep-file', separator: true, label: '' },
+        { id: 'open-external', label: 'Open in system browser', disabled: !currentUrl, onSelect: openExternal },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        { id: 'mode-live', label: `${mode === 'live' ? '[x] ' : ''}Live`, onSelect: () => applyMode('live') },
+        { id: 'mode-reader', label: `${mode === 'reader' ? '[x] ' : ''}Live Reader`, onSelect: () => applyMode('reader') },
+        { id: 'mode-focus', label: `${mode === 'focus' ? '[x] ' : ''}Focus`, onSelect: () => applyMode('focus') },
+        { id: 'sep-view', separator: true, label: '' },
+        { id: 'reload', label: 'Reload', disabled: !currentUrl, onSelect: reload },
+        { id: 'toggle-sites', label: showRail ? 'Hide Sites rail' : 'Show Sites rail', onSelect: () => setRailOpen((v) => !v) },
+      ],
+    },
+    {
+      id: 'sites',
+      label: 'Sites',
+      items: [
+        ...IMMERSION_STARTERS.map((starter) => ({
+          id: starter.url,
+          label: starter.label,
+          onSelect: () => {
+            setMode('reader');
+            navigate(starter.url, { mode: 'reader' });
+          },
+        })),
+        { id: 'sep-sites', separator: true, label: '' },
+        { id: 'refresh-sites', label: 'Refresh saved sites', onSelect: () => void refreshSites() },
+      ],
+    },
+  ];
+  const immersionStatus = (
+    <>
+      <StatusBarField>{MODE_LABELS[mode]}</StatusBarField>
+      <StatusBarField>{loading ? 'Loading' : currentUrl ? title : 'Ready'}</StatusBarField>
+      {error && <StatusBarField>Reader issue</StatusBarField>}
+      <StatusBarSpacer />
+      <StatusBarField>{sites.length} sites</StatusBarField>
+      {currentUrl && <StatusBarField live>{currentUrl}</StatusBarField>}
+    </>
+  );
+
+  if (aero && showChrome) {
+    return (
+      <AppChrome menus={immersionMenus} status={immersionStatus} className="aero-immersion-chrome">
+        <div className={`aero-immersion aero-immersion-mode-${mode}`}>
+          <Toolbar className="aero-immersion-toolbar">
+            <Button size="sm" className="aero-immersion-icon-btn" title="Back" onClick={goBack} disabled={histIdx <= 0}>
+              <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />
+            </Button>
+            <Button
+              size="sm"
+              className="aero-immersion-icon-btn"
+              title="Forward"
+              onClick={goForward}
+              disabled={histIdx < 0 || histIdx >= history.length - 1}
+            >
+              <Icon name="chevron" size={14} />
+            </Button>
+            <Button size="sm" className="aero-immersion-icon-btn" title="Reload" onClick={reload}>
+              <Icon name="refresh" size={14} />
+            </Button>
+            <form
+              className="aero-immersion-url-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                navigate(urlInput);
+              }}
+            >
+              <Icon name="globe" size={15} />
+              <input
+                ref={urlBarRef}
+                className="aero-immersion-url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="Enter URL or search..."
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </form>
+            <div className="aero-immersion-mode-seg" role="group" aria-label="View mode">
+              {IMMERSION_MODE_CYCLE.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`aero-immersion-mode-btn ${mode === m ? 'active' : ''}`}
+                  onClick={() => applyMode(m)}
+                >
+                  {MODE_LABELS[m]}
+                </button>
+              ))}
+            </div>
+            <ToolbarSpacer />
+            <Button size="sm" className="aero-immersion-icon-btn" title="Save site" onClick={() => void saveCurrentSite()}>
+              <Icon name="bookmark" size={14} />
+            </Button>
+            <Button size="sm" className="aero-immersion-icon-btn" title="Export to Library" onClick={() => void exportToLibrary()}>
+              <Icon name="download" size={14} />
+            </Button>
+            <Button
+              size="sm"
+              className="aero-immersion-icon-btn"
+              title="Capture video to Media"
+              disabled={captureBusy}
+              onClick={() => void captureVideo()}
+            >
+              <Icon name="video" size={14} />
+            </Button>
+            <Button size="sm" className="aero-immersion-icon-btn" title="Open in system browser" onClick={openExternal}>
+              <Icon name="external" size={14} />
+            </Button>
+            <Button
+              size="sm"
+              className={`aero-immersion-icon-btn ${showRail ? 'active' : ''}`}
+              title={showRail ? 'Hide library' : 'Show library'}
+              onClick={() => setRailOpen((v) => !v)}
+            >
+              <Icon name="folder" size={14} />
+            </Button>
+          </Toolbar>
+
+          <div className={`aero-immersion-main${showRail ? '' : ' no-rail'}`}>
+            <section className={`aero-immersion-stage${splitView ? ' split' : ''}`}>
+              <div className="aero-immersion-stage-head">
+                <div>
+                  <span className="aero-immersion-kicker">{MODE_LABELS[mode]}</span>
+                  <strong>{currentUrl ? title : 'New immersion page'}</strong>
+                </div>
+                {currentUrl && <span className="aero-immersion-host">{new URL(currentUrl).host}</span>}
+              </div>
+
+              <div className="aero-immersion-surface">
+                {loading && <div className="aero-immersion-banner">Loading...</div>}
+                {error && <div className="aero-immersion-banner error">{error}</div>}
+                {status && (
+                  <button type="button" className="aero-immersion-banner status" onClick={() => setStatus(null)}>
+                    {status}
+                  </button>
+                )}
+
+                {!currentUrl && !loading && (
+                  <div className="aero-immersion-empty">
+                    <Icon name="globe" size={36} />
+                    <p>Open a page to begin immersion reading.</p>
+                    <div className="aero-immersion-starters">
+                      {IMMERSION_STARTERS.map((s) => (
+                        <Button
+                          key={s.url}
+                          size="sm"
+                          onClick={() => {
+                            setMode('reader');
+                            navigate(s.url, { mode: 'reader' });
+                          }}
+                        >
+                          {s.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {showWebview &&
+                  createWebview(currentUrl, (el) => {
+                    webviewRef.current = el;
+                  })}
+
+                {showReader && readerHtmlProp && (
+                  <div
+                    ref={readerRef}
+                    className={`immersion-reader aero-immersion-reader wk-on${splitView ? ' immersion-split-reader' : ''}`}
+                    onPointerDown={onReaderPointerDown}
+                    onMouseUp={onReaderMouseUp}
+                    dangerouslySetInnerHTML={readerHtmlProp}
+                  />
+                )}
+              </div>
+            </section>
+
+            {showRail && (
+              <aside className="aero-immersion-rail">
+                <div className="aero-immersion-rail-head">
+                  <span>Sites</span>
+                  <Button size="sm" className="aero-immersion-icon-btn" title="Refresh sites" onClick={() => void refreshSites()}>
+                    <Icon name="refresh" size={13} />
+                  </Button>
+                </div>
+                {sites.length === 0 && (
+                  <p className="aero-immersion-rail-empty">Saved sites appear here. Bookmark any page.</p>
+                )}
+                <ul className="aero-immersion-site-list">
+                  {sites.map((s) => (
+                    <li key={s.id}>
+                      <button type="button" className="aero-immersion-site" onClick={() => navigate(s.url)} title={s.url}>
+                        <span className="aero-immersion-site-title">
+                          {s.favorite ? 'Pinned - ' : ''}
+                          {s.title}
+                        </span>
+                        <span className="aero-immersion-site-meta">
+                          {s.lang !== 'auto' ? s.lang.toUpperCase() + ' - ' : ''}
+                          {s.visitCount} visits
+                          {s.streakDays > 0 ? ` - ${s.streakDays}d` : ''}
+                        </span>
+                        {s.completionPct > 0 && (
+                          <span className="aero-immersion-site-bar">
+                            <span style={{ width: `${s.completionPct}%` }} />
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="aero-immersion-site-remove"
+                        title="Remove"
+                        onClick={() => void window.api.immersionRemoveSite(s.id)}
+                      >
+                        <Icon name="close" size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </aside>
+            )}
+          </div>
+
+          <style>{WK_HIGHLIGHT_CSS}</style>
+
+          {popup?.kind === 'dict' && (
+            <DictionaryPopup
+              query={popup.query}
+              x={popup.x}
+              y={popup.y}
+              context={popup.context}
+              onClose={() => setPopup(null)}
+            />
+          )}
+          {popup?.kind === 'translate' && (
+            <SentenceTranslatePopup text={popup.query} onClose={() => setPopup(null)} />
+          )}
+        </div>
+      </AppChrome>
+    );
+  }
 
   return (
     <div className={`immersion-root immersion-mode-${mode}`} data-mode={mode}>
@@ -668,7 +930,7 @@ export default function ImmersionView() {
                     title={s.url}
                   >
                     <span className="immersion-site-title">
-                      {s.favorite ? '★ ' : ''}
+                      {s.favorite && <Icon name="star" size={11} className="immersion-site-fav" fill />}
                       {s.title}
                     </span>
                     <span className="immersion-site-meta muted">

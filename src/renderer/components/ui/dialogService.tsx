@@ -1,0 +1,225 @@
+/**
+ * dialogService — promise-based replacement for native confirm(). Phase 4 · M2.
+ * -----------------------------------------------------------------------------
+ * `confirmDialog(opts)` renders an accessible ui/Dialog (focus trap, Escape,
+ * labelled) into its own detached React root on document.body and resolves
+ * true/false. Self-mounting means no <DialogHost> needs wiring into App.tsx —
+ * it works identically in the desktop shell, pop-outs, reader takeover, focus
+ * and mini shells.
+ *
+ * Conventions (APPLICATION_CHROME_AND_DIALOGS.md): Escape/backdrop = cancel,
+ * Enter = default action, the default button is pre-focused — Cancel when the
+ * action is destructive (`danger`), Confirm otherwise.
+ */
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Dialog } from './Dialog';
+import { Button } from './Button';
+
+export interface ConfirmOptions {
+  message: ReactNode;
+  title?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  /** Destructive action: red confirm button, Cancel gets initial focus. */
+  danger?: boolean;
+}
+
+function ConfirmDialog({ opts, onDone }: { opts: ConfirmOptions; onDone: (ok: boolean) => void }) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  // Runs after Dialog's own panel-focus effect (child effects fire first), so
+  // the default button wins.
+  useEffect(() => {
+    (opts.danger ? cancelRef : confirmRef).current?.focus();
+  }, [opts.danger]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      e.stopPropagation();
+      onDone(true);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onDone]);
+
+  return (
+    <Dialog
+      open
+      onClose={() => onDone(false)}
+      title={opts.title ?? 'Confirm'}
+      footer={
+        <>
+          <Button ref={cancelRef} onClick={() => onDone(false)}>
+            {opts.cancelLabel ?? 'Cancel'}
+          </Button>
+          <Button ref={confirmRef} variant={opts.danger ? 'danger' : 'primary'} onClick={() => onDone(true)}>
+            {opts.confirmLabel ?? 'OK'}
+          </Button>
+        </>
+      }
+    >
+      <div style={{ whiteSpace: 'pre-line' }}>{opts.message}</div>
+    </Dialog>
+  );
+}
+
+function AlertDialog({ opts, onDone }: { opts: AlertOptions; onDone: () => void }) {
+  const okRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    okRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      e.stopPropagation();
+      onDone();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onDone]);
+  return (
+    <Dialog
+      open
+      onClose={onDone}
+      title={opts.title ?? 'Notice'}
+      footer={
+        <Button ref={okRef} variant="primary" onClick={onDone}>
+          {opts.okLabel ?? 'OK'}
+        </Button>
+      }
+    >
+      <div style={{ whiteSpace: 'pre-line' }}>{opts.message}</div>
+    </Dialog>
+  );
+}
+
+export interface AlertOptions {
+  message: ReactNode;
+  title?: string;
+  okLabel?: string;
+}
+
+export interface PromptOptions {
+  message: ReactNode;
+  title?: string;
+  defaultValue?: string;
+  placeholder?: string;
+  okLabel?: string;
+  cancelLabel?: string;
+}
+
+function PromptDialog({ opts, onDone }: { opts: PromptOptions; onDone: (value: string | null) => void }) {
+  const [value, setValue] = useState(opts.defaultValue ?? '');
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+  const submit = (): void => onDone(value);
+  return (
+    <Dialog
+      open
+      onClose={() => onDone(null)}
+      title={opts.title ?? 'Enter a value'}
+      footer={
+        <>
+          <Button onClick={() => onDone(null)}>{opts.cancelLabel ?? 'Cancel'}</Button>
+          <Button variant="primary" onClick={submit}>
+            {opts.okLabel ?? 'OK'}
+          </Button>
+        </>
+      }
+    >
+      {opts.message != null && <div style={{ marginBottom: 8, whiteSpace: 'pre-line' }}>{opts.message}</div>}
+      <input
+        ref={inputRef}
+        className="ui-input"
+        value={value}
+        placeholder={opts.placeholder}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            submit();
+          }
+        }}
+      />
+    </Dialog>
+  );
+}
+
+/** Ask the user to confirm an action. Drop-in for `if (confirm(...))`. */
+export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
+  return new Promise((resolve) => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    // Semantic sound event (Phase 4 · M4) — routed by shellSounds → soundEngine.
+    window.dispatchEvent(new CustomEvent('shell:dialogOpen'));
+    const root = createRoot(host);
+    let settled = false;
+    const done = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      window.dispatchEvent(new CustomEvent('shell:dialogResolve', { detail: { ok } }));
+      resolve(ok);
+      // Unmount outside the event/render cycle that triggered us.
+      window.setTimeout(() => {
+        root.unmount();
+        host.remove();
+      }, 0);
+    };
+    root.render(<ConfirmDialog opts={opts} onDone={done} />);
+  });
+}
+
+/** Show an informational message. Drop-in for `alert(...)`. */
+export function alertDialog(opts: AlertOptions): Promise<void> {
+  return new Promise((resolve) => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    // Semantic sound event (Phase 4 · M4) — routed by shellSounds → soundEngine.
+    window.dispatchEvent(new CustomEvent('shell:dialogOpen'));
+    const root = createRoot(host);
+    let settled = false;
+    const done = (): void => {
+      if (settled) return;
+      settled = true;
+      window.dispatchEvent(new CustomEvent('shell:dialogResolve', { detail: { ok: true } }));
+      resolve();
+      window.setTimeout(() => {
+        root.unmount();
+        host.remove();
+      }, 0);
+    };
+    root.render(<AlertDialog opts={opts} onDone={done} />);
+  });
+}
+
+/** Ask the user for a line of text. Drop-in for `prompt(...)` (null = cancel). */
+export function promptDialog(opts: PromptOptions): Promise<string | null> {
+  return new Promise((resolve) => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    // Semantic sound event (Phase 4 · M4) — routed by shellSounds → soundEngine.
+    window.dispatchEvent(new CustomEvent('shell:dialogOpen'));
+    const root = createRoot(host);
+    let settled = false;
+    const done = (value: string | null): void => {
+      if (settled) return;
+      settled = true;
+      window.dispatchEvent(new CustomEvent('shell:dialogResolve', { detail: { ok: value !== null } }));
+      resolve(value);
+      window.setTimeout(() => {
+        root.unmount();
+        host.remove();
+      }, 0);
+    };
+    root.render(<PromptDialog opts={opts} onDone={done} />);
+  });
+}

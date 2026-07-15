@@ -104,13 +104,19 @@ export function invalidateAnkiCaches(profileId?: ProfileId): void {
 
 // ----- EnsureDeck ------------------------------------------------------------------
 
+/** Create a deck if missing. Lazy — runs on first mine only. */
+export async function ensureDeckName(deck: string): Promise<void> {
+  const name = deck.trim();
+  if (!name) return;
+  if (verifiedDecks.has(name)) return;
+  const decks = (await invoke('deckNames', undefined)) ?? [];
+  if (decks.indexOf(name) === -1) await invoke('createDeck', { deck: name });
+  verifiedDecks.add(name);
+}
+
 /** Create the profile's bound deck if missing. Lazy — runs on first mine only. */
 export async function ensureDeck(profile: StudyProfile): Promise<void> {
-  const deck = profile.anki.deckName;
-  if (verifiedDecks.has(deck)) return;
-  const decks = (await invoke('deckNames', undefined)) ?? [];
-  if (decks.indexOf(deck) === -1) await invoke('createDeck', { deck });
-  verifiedDecks.add(deck);
+  await ensureDeckName(profile.anki.deckName);
 }
 
 // ----- EnsureModel -----------------------------------------------------------------

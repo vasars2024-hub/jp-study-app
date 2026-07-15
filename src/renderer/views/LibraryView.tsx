@@ -1,4 +1,15 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from 'react';
+import {
+  confirmDialog,
+  AppChrome,
+  Button,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarSpacer,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from '../components/ui';
 import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
@@ -13,6 +24,7 @@ interface Props {
 type FolderFilter = 'all' | 'unfiled' | string;
 
 export default function LibraryView({ onOpen }: Props) {
+  const aero = useAeroMaterials();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [active, setActive] = useState<FolderFilter>('all');
@@ -38,6 +50,7 @@ export default function LibraryView({ onOpen }: Props) {
   const [wikiCat, setWikiCat] = useState(0);
   const [wikiBusy, setWikiBusy] = useState(false);
   const [wikiErr, setWikiErr] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     // Scan the watch folder for anything new, then load.
@@ -92,11 +105,22 @@ export default function LibraryView({ onOpen }: Props) {
     }
   }
 
+  async function removeItem(id: string) {
+    const ok = await confirmDialog({
+      title: 'Remove from library',
+      message: 'Remove this item from your library? The imported copy will be deleted.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (ok) {
+      setItems(await window.api.removeItem(id));
+      setSelectedId((current) => (current === id ? null : current));
+    }
+  }
+
   async function remove(e: MouseEvent, id: string) {
     e.stopPropagation();
-    if (confirm('Remove this item from your library? The imported copy will be deleted.')) {
-      setItems(await window.api.removeItem(id));
-    }
+    await removeItem(id);
   }
 
   // ----- folders -----
@@ -252,9 +276,13 @@ export default function LibraryView({ onOpen }: Props) {
   }
 
   async function deleteFolder(name: string) {
-    if (!confirm(`Delete the folder “${name}”? The books inside stay in your library (unfiled).`)) {
-      return;
-    }
+    const ok = await confirmDialog({
+      title: 'Delete folder',
+      message: `Delete the folder “${name}”? The books inside stay in your library (unfiled).`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const res = await window.api.setLibraryFolders(folders.filter((f) => f !== name));
     setFolders(res.folders);
     setItems(res.items);
@@ -282,14 +310,77 @@ export default function LibraryView({ onOpen }: Props) {
     if (active === 'unfiled') return items.filter((it) => !it.folder || !folders.includes(it.folder));
     return items.filter((it) => it.folder === active);
   }, [items, active, folders]);
+  const selectedItem = visible.find((it) => it.id === selectedId) ?? visible[0] ?? null;
+  const activeLabel = active === 'all' ? 'All items' : active === 'unfiled' ? 'Unfiled' : String(active);
+
+  // Digital Library chrome — Aero only (AppChrome pass-through in default theme).
+  // File menu drives the existing import handlers; status bar shows the shelf.
+  const libMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'import-files', label: 'Import file(s)…', disabled: busy, onSelect: importFiles },
+        { id: 'import-folder', label: 'Import image folder…', disabled: busy, onSelect: importFolder },
+        { separator: true, label: '' },
+        { id: 'import-web', label: 'Import from web…', disabled: busy, onSelect: () => setImportOpen(true) },
+        { id: 'import-wiki', label: 'Random Wikipedia…', disabled: busy, onSelect: () => setWikiOpen(true) },
+      ],
+    },
+    {
+      id: 'library',
+      label: 'Library',
+      items: [
+        { id: 'sync', label: 'Sync now', disabled: busy, onSelect: syncNow },
+        {
+          id: 'watch-folder',
+          label: watchFolder ? 'Change auto-import folder…' : 'Set auto-import folder…',
+          disabled: busy,
+          onSelect: chooseWatchFolder,
+        },
+        { id: 'stop-watch', label: 'Stop auto-import', disabled: busy || !watchFolder, onSelect: stopWatching },
+        { separator: true, label: '' },
+        { id: 'new-folder', label: 'New folder', onSelect: () => setCreating(true) },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        { id: 'view-all', label: `All items (${items.length})`, disabled: active === 'all', onSelect: () => setActive('all') },
+        {
+          id: 'view-unfiled',
+          label: `Unfiled (${counts.unfiled})`,
+          disabled: active === 'unfiled' || counts.unfiled === 0,
+          onSelect: () => setActive('unfiled'),
+        },
+        ...folders.map((f) => ({
+          id: `view-folder-${f}`,
+          label: `${f} (${counts.byFolder.get(f) ?? 0})`,
+          disabled: active === f,
+          onSelect: () => setActive(f),
+        })),
+      ],
+    },
+  ];
+  const libStatus = (
+    <>
+      <StatusBarField>{items.length} items</StatusBarField>
+      <StatusBarField>{activeLabel}</StatusBarField>
+      <StatusBarSpacer />
+      {visible.length !== items.length && <StatusBarField>{visible.length} shown</StatusBarField>}
+      {watchFolder && <StatusBarField title={watchFolder}>Auto-import on</StatusBarField>}
+    </>
+  );
 
   return (
-    <div className="library" onClick={() => setFileMenu(null)}>
+    <AppChrome menus={libMenus} status={libStatus} className="aero-library-chrome">
+    <div className={`library${aero ? ' aero-library' : ''}`} onClick={() => setFileMenu(null)}>
       <header className="view-head">
         <p className="muted">Your books and manga. Import files to start reading.</p>
         <div className="actions">
           <button className="btn primary" disabled={busy} onClick={importFiles}>
-            ＋ Import file(s)
+            + Import file(s)
           </button>
           <button className="btn" disabled={busy} onClick={importFolder}>
             <Icon name="folder" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
@@ -401,6 +492,207 @@ export default function LibraryView({ onOpen }: Props) {
         </>
       )}
 
+      {aero ? (
+        <div className="aero-library-workbench">
+          <aside className="aero-library-tree" aria-label="Library folders">
+            <div className="aero-library-pane-title">Shelves</div>
+            <button
+              type="button"
+              className={`aero-library-tree-row ${active === 'all' ? 'active' : ''} ${dropHover === '__all__' ? 'dragover' : ''}`}
+              onClick={() => setActive('all')}
+              {...chipDropProps(null, false)}
+            >
+              <Icon name="library" size={15} />
+              <span>All items</span>
+              <strong>{items.length}</strong>
+            </button>
+            {folders.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`aero-library-tree-row ${active === f ? 'active' : ''} ${dropHover === f ? 'dragover' : ''}`}
+                onClick={() => setActive(f)}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('app/lib-folder', f);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                {...chipDropProps(f, true)}
+              >
+                <Icon name="folder" size={15} />
+                <span>{f}</span>
+                <strong>{counts.byFolder.get(f) ?? 0}</strong>
+              </button>
+            ))}
+            {counts.unfiled > 0 && (
+              <button
+                type="button"
+                className={`aero-library-tree-row ${active === 'unfiled' ? 'active' : ''}`}
+                onClick={() => setActive('unfiled')}
+                {...chipDropProps(null, false)}
+              >
+                <Icon name="folder" size={15} />
+                <span>Unfiled</span>
+                <strong>{counts.unfiled}</strong>
+              </button>
+            )}
+            <div className="aero-library-tree-create">
+              {creating ? (
+                <>
+                  <input
+                    autoFocus
+                    className="lib-folder-input"
+                    type="text"
+                    value={newName}
+                    placeholder="Folder name"
+                    onChange={(e) => {
+                      setNewName(e.target.value);
+                      setFolderErr('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void createFolder();
+                      if (e.key === 'Escape') {
+                        setCreating(false);
+                        setNewName('');
+                        setFolderErr('');
+                      }
+                    }}
+                  />
+                  <Button size="sm" onClick={() => void createFolder()}>
+                    OK
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" leftIcon={<Icon name="plus" size={13} />} onClick={() => setCreating(true)}>
+                  New folder
+                </Button>
+              )}
+              {folderErr && <span className="lib-folder-err">{folderErr}</span>}
+            </div>
+            <div className="aero-library-watch">
+              <div className="aero-library-pane-title">Auto-import</div>
+              <p title={watchFolder ?? undefined}>{watchFolder ? watchFolder : 'No watch folder selected'}</p>
+              <div className="aero-library-watch-actions">
+                <Button size="sm" disabled={busy} leftIcon={<Icon name="refresh" size={13} />} onClick={syncNow}>
+                  Sync
+                </Button>
+                <Button size="sm" disabled={busy} onClick={chooseWatchFolder}>
+                  {watchFolder ? 'Change' : 'Set'}
+                </Button>
+              </div>
+            </div>
+          </aside>
+
+          <main className="aero-library-main">
+            <Toolbar className="aero-library-toolbar" aria-label="Library commands">
+              <Button size="sm" disabled={busy} leftIcon={<Icon name="plus" size={14} />} onClick={importFiles}>
+                Import
+              </Button>
+              <Button size="sm" disabled={busy} leftIcon={<Icon name="folder" size={14} />} onClick={importFolder}>
+                Folder
+              </Button>
+              <Button size="sm" disabled={busy} leftIcon={<Icon name="globe" size={14} />} onClick={() => setImportOpen(true)}>
+                Web
+              </Button>
+              <ToolbarSpacer />
+              <span className="aero-library-filter-label">{activeLabel}</span>
+            </Toolbar>
+            {busy && <div className="banner">Importing… this can take a moment for large manga.</div>}
+            {items.length === 0 ? (
+              <div className="aero-library-empty">
+                <Icon name="library" size={38} />
+                <h2>Your library is empty</h2>
+                <p className="muted">Import an EPUB, PDF, CBZ/ZIP, or image folder.</p>
+                <Button variant="primary" onClick={importFiles}>
+                  Import your first file
+                </Button>
+              </div>
+            ) : visible.length === 0 ? (
+              <div className="aero-library-empty">
+                <Icon name="folder" size={38} />
+                <h2>This folder is empty</h2>
+                <p className="muted">Drop books onto the shelf or switch back to All items.</p>
+              </div>
+            ) : (
+              <div className="aero-library-table" role="table" aria-label="Library items">
+                <div className="aero-library-row aero-library-row-head" role="row">
+                  <span>Title</span>
+                  <span>Type</span>
+                  <span>Progress</span>
+                  <span>Folder</span>
+                </div>
+                {visible.map((it) => {
+                  const pct = Math.round((it.progress?.percent ?? 0) * 100);
+                  const selected = selectedItem?.id === it.id;
+                  return (
+                    <button
+                      key={it.id}
+                      type="button"
+                      className={`aero-library-row ${selected ? 'active' : ''}`}
+                      onClick={() => setSelectedId(it.id)}
+                      onDoubleClick={() => onOpen(it)}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('app/lib-item', it.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                    >
+                      <span className="aero-library-title-cell">
+                        <span className="aero-library-thumb" style={coverStyle(it)} />
+                        <span title={it.title}>{it.title}</span>
+                      </span>
+                      <span>{libraryKindLabel(it)}</span>
+                      <span>{pct > 0 ? `${pct}%` : 'Not started'}</span>
+                      <span>{it.folder && folders.includes(it.folder) ? it.folder : 'Unfiled'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </main>
+
+          <aside className="aero-library-inspector" aria-label="Selected item">
+            <div className="aero-library-pane-title">Details</div>
+            {selectedItem ? (
+              <>
+                <div className="aero-library-preview" style={coverStyle(selectedItem)}>
+                  {!selectedItem.coverPath && <span>{selectedItem.title}</span>}
+                </div>
+                <h3 title={selectedItem.title}>{selectedItem.title}</h3>
+                <dl className="aero-library-meta">
+                  <div>
+                    <dt>Type</dt>
+                    <dd>{libraryKindLabel(selectedItem)}</dd>
+                  </div>
+                  <div>
+                    <dt>Progress</dt>
+                    <dd>{Math.round((selectedItem.progress?.percent ?? 0) * 100)}%</dd>
+                  </div>
+                  <div>
+                    <dt>Folder</dt>
+                    <dd>{selectedItem.folder && folders.includes(selectedItem.folder) ? selectedItem.folder : 'Unfiled'}</dd>
+                  </div>
+                  <div>
+                    <dt>Added</dt>
+                    <dd>{new Date(selectedItem.createdAt).toLocaleDateString()}</dd>
+                  </div>
+                </dl>
+                <div className="aero-library-inspector-actions">
+                  <Button variant="primary" leftIcon={<Icon name="novels" size={14} />} onClick={() => onOpen(selectedItem)}>
+                    Open
+                  </Button>
+                  <Button leftIcon={<Icon name="close" size={14} />} onClick={() => void removeItem(selectedItem.id)}>
+                    Remove
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p className="muted">Select an item to see details.</p>
+            )}
+          </aside>
+        </div>
+      ) : (
+        <>
       <div className="watch-bar">
         <span className="watch-icon">
           <Icon name="refresh" size={14} />
@@ -507,7 +799,7 @@ export default function LibraryView({ onOpen }: Props) {
           </span>
         ) : (
           <button className="lib-folder-chip lib-folder-new" onClick={() => setCreating(true)}>
-            ＋ New folder
+            + New folder
           </button>
         )}
         {folderErr && <span className="lib-folder-err">{folderErr}</span>}
@@ -625,8 +917,16 @@ export default function LibraryView({ onOpen }: Props) {
           })}
         </div>
       )}
+        </>
+      )}
     </div>
+    </AppChrome>
   );
+}
+
+function libraryKindLabel(it: LibraryItem): string {
+  if (it.kind === 'manga') return `${it.pageCount ?? 0} pages`;
+  return it.epubFile?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
 }
 
 function coverStyle(it: LibraryItem): CSSProperties {

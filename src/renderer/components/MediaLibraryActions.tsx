@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { confirmDialog } from './ui';
 import type { MediaItem } from '../../shared/types';
 import { clearArtCache } from '../albumArt';
 import { clearAllLiked } from '../likedSongs';
@@ -56,13 +57,14 @@ export default function MediaLibraryActions({ onItemsChange, onCleared, classNam
   }, [onItemsChange, resetPlayback]);
 
   const clearAll = useCallback(async () => {
-    if (
-      !confirm(
+    const ok = await confirmDialog({
+      title: 'Clear media library',
+      message:
         'Clear the entire media library?\n\nThis removes all saved videos and songs from the app, cached YouTube downloads, converted copies, and lyrics/likes. Your original files on disk are not deleted.',
-      )
-    ) {
-      return;
-    }
+      confirmLabel: 'Clear',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setStatus('Clearing…');
     setStatusError(false);

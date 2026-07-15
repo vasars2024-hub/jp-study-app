@@ -1,4 +1,5 @@
 import SettingsCard from '../SettingsCard';
+import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { THEMES } from '../../../theme';
 import {
@@ -13,11 +14,48 @@ import {
 import { clearCustomCss, saveCustomCss } from '../../../customCss';
 import { setUiLang, useT } from '../../../i18n';
 import { LANG_LABELS, LANG_TAGS, UI_LANGS } from '../../../../shared/i18n/core';
+import { loadAppBorderSettings, saveAppBorderSettings, onAppBorderSettingsChanged, type AppBorderStyle } from '../../../appBorderSettings';
+import { loadPillarboxSettings, savePillarboxSettings, onPillarboxSettingsChanged, type PillarboxStyle } from '../../../pillarboxSettings';
+import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
+import { useEffect, useState } from 'react';
 
 export default function AppearancePage() {
   const s = useSettings();
   const { look, patchLook, theme, chooseTheme, seg, userCss, setUserCss, cssMsg, setCssMsg, focusSettingId } = s;
   const { t, lang } = useT();
+
+  const [borderSettings, setBorderSettings] = useState(() => loadAppBorderSettings());
+  const [pillarboxSettings, setPillarboxSettings] = useState(() => loadPillarboxSettings());
+
+  useEffect(() => {
+    const unsub = onAppBorderSettingsChanged(setBorderSettings);
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = onPillarboxSettingsChanged(setPillarboxSettings);
+    return unsub;
+  }, []);
+
+  const borderStyleOptions: { id: AppBorderStyle; label: string }[] = [
+    { id: 'aero-glass', label: 'Aero Glass' },
+    { id: 'blurred-wall', label: 'Blurred Wallpaper' },
+    { id: 'solid-accent', label: 'Solid Accent' },
+    { id: 'retro-xp', label: 'Retro XP' },
+    { id: 'minimal', label: 'Minimal' },
+    { id: 'glass-dark', label: 'Glass Dark' },
+  ];
+
+  const pillarboxStyleOptions: { id: PillarboxStyle; label: string }[] = [
+    { id: 'default-gradient', label: 'Default Gradient' },
+    { id: 'blurred-wallpaper', label: 'Blurred Wallpaper' },
+    { id: 'solid-color', label: 'Solid Color' },
+    { id: 'dark-mode', label: 'Dark Mode' },
+  ];
+
+  const [isAeroDiscovered, setIsAeroDiscovered] = useState(hasDiscoveredAero);
+
+  useEffect(() => onAeroDiscoveryChanged(setIsAeroDiscovered), []);
 
   return (
     <>
@@ -185,6 +223,114 @@ export default function AppearancePage() {
         </div>
       </SettingsCard>
 
+      {isAeroDiscovered && (
+      <SettingsCard
+        id="app-border"
+        title="App borders"
+        description="Window frame style (Secret OS / Aero theme only)."
+        highlight={focusSettingId === 'app-border'}
+      >
+        <div className="os-viz-row">
+          <span className="os-viz-label muted">Style</span>
+          {borderStyleOptions.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={seg(borderSettings.style === opt.id)}
+              onClick={() => {
+                const updated = saveAppBorderSettings({ ...borderSettings, style: opt.id });
+                setBorderSettings(updated);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {borderSettings.style === 'blurred-wall' && (
+          <div className="os-viz-row" style={{ marginTop: 10 }}>
+            <span className="os-viz-label muted">Blur</span>
+            <input
+              type="range"
+              min={0}
+              max={40}
+              value={borderSettings.blurAmount}
+              onChange={(e) => {
+                const updated = saveAppBorderSettings({ ...borderSettings, blurAmount: Number(e.target.value) });
+                setBorderSettings(updated);
+              }}
+              style={{ flex: 1 }}
+            />
+            <span className="muted">{borderSettings.blurAmount}px</span>
+          </div>
+        )}
+        <div className="os-viz-row" style={{ marginTop: 10 }}>
+          <span className="os-viz-label muted">Border width</span>
+          <input
+            type="range"
+            min={1}
+            max={4}
+            step={1}
+            value={borderSettings.borderWidth}
+            onChange={(e) => {
+              const updated = saveAppBorderSettings({ ...borderSettings, borderWidth: Number(e.target.value) });
+              setBorderSettings(updated);
+            }}
+            style={{ flex: 1 }}
+          />
+          <span className="muted">{borderSettings.borderWidth}px</span>
+        </div>
+      </SettingsCard>
+      )}
+
+      {isAeroDiscovered && (
+      <SettingsCard
+        id="pillarbox"
+        title="Pillarbox style"
+        description="Outer border background (Secret OS / Aero theme only)."
+        highlight={focusSettingId === 'pillarbox'}
+      >
+        <div className="os-viz-row">
+          <span className="os-viz-label muted">Style</span>
+          {pillarboxStyleOptions.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={seg(pillarboxSettings.style === opt.id)}
+              onClick={() => {
+                const updated = savePillarboxSettings({ ...pillarboxSettings, style: opt.id });
+                setPillarboxSettings(updated);
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {pillarboxSettings.style === 'solid-color' && (
+          <div className="os-viz-row" style={{ marginTop: 10 }}>
+            <span className="os-viz-label muted">Color</span>
+            <input
+              type="color"
+              value={pillarboxSettings.solidColor}
+              onChange={(e) => {
+                const updated = savePillarboxSettings({ ...pillarboxSettings, solidColor: e.target.value });
+                setPillarboxSettings(updated);
+              }}
+              style={{ width: 48, height: 32, padding: 0, border: '1px solid var(--border)', borderRadius: 4 }}
+            />
+            <input
+              type="text"
+              value={pillarboxSettings.solidColor}
+              onChange={(e) => {
+                const updated = savePillarboxSettings({ ...pillarboxSettings, solidColor: e.target.value });
+                setPillarboxSettings(updated);
+              }}
+              style={{ width: 100, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 4, background: 'var(--panel)', color: 'var(--text)' }}
+            />
+          </div>
+        )}
+      </SettingsCard>
+      )}
+
       <SettingsCard
         id="custom-css"
         title="Custom CSS"
@@ -227,8 +373,14 @@ export default function AppearancePage() {
               <button
                 type="button"
                 className="btn small"
-                onClick={() => {
-                  if (!confirm('Reset theme-related look settings and clear custom CSS?')) return;
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: 'Reset look',
+                    message: 'Reset theme-related look settings and clear custom CSS?',
+                    confirmLabel: 'Reset',
+                    danger: true,
+                  });
+                  if (!ok) return;
                   resetLook();
                   setUserCss('');
                   setCssMsg('Look reset.');

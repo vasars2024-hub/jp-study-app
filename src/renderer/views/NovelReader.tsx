@@ -13,6 +13,13 @@ import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
 import {
+  AppChrome,
+  StatusBarField,
+  StatusBarSpacer,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from '../components/ui';
+import {
   buildNovelCss,
   clampFontSize,
   loadSettings,
@@ -28,13 +35,19 @@ import { loadPdf } from '../pdfLoader';
 import { getTokenizer, tokenizerReady } from '../tokenizer';
 import { highlightEl, recolorEl, resetHighlightRoot } from '../wordHighlight';
 import { onKnowledgeChanged } from '../knownWords';
-import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
+import {
+  lookupWordFromMouseUp,
+  isLookupClick,
+  noteLookupPointerDown,
+  selectSentenceAtPoint,
+} from '../wordLookup';
 import {
   ANNO_COLORS,
   addAnnotation,
   applyAnnotationsToRoot,
   flushAnnotationsMirror,
   loadAnnotations,
+  removeAnnotation,
   type AnnoColor,
   type Annotation,
 } from '../annotations';
@@ -44,6 +57,13 @@ import { recordReaderCopy } from '../clipboardHistory';
 import ReaderCollectionPanel, {
   type CollectionAddPayload,
 } from '../components/ReaderCollectionPanel';
+import {
+  articleBodyHtml,
+  fetchReadableArticle,
+  isJaWikiArticleUrl,
+  resolveWikiUrl,
+  type WikiNavEntry,
+} from '../wikiArticle';
 
 interface Props {
   item: LibraryItem;
@@ -82,6 +102,7 @@ function parseLoc(loc: string | undefined): { part: number; frac: number } | nul
  * DOM stays small enough that huge books never freeze.
  */
 export default function NovelReader({ item, onClose }: Props) {
+  const aero = useAeroMaterials();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -112,9 +133,34 @@ export default function NovelReader({ item, onClose }: Props) {
   annotationsRef.current = annotations;
   const [pendingAdd, setPendingAdd] = useState<CollectionAddPayload | null>(null);
 
+  // In-app web/wiki article opened from EPUB hyperlinks (keeps the book underneath).
+  const [linkView, setLinkView] = useState<{
+    url: string;
+    title: string;
+    bodyHtml: string;
+  } | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [canLinkBack, setCanLinkBack] = useState(false);
+  const linkHistoryRef = useRef<WikiNavEntry[]>([]);
+  const linkBusyRef = useRef(false);
+  const linkViewRef = useRef(linkView);
+  linkViewRef.current = linkView;
+  const canLinkBackRef = useRef(false);
+  canLinkBackRef.current = canLinkBack;
+  const bookTitleRef = useRef(item.title);
+  bookTitleRef.current = title;
+  /** Stable ref so keyboard handlers can call leaveLinkView before its declaration. */
+  const leaveLinkViewRef = useRef<() => void>(() => {});
+
   // Reload from storage when switching books; flush durable mirror on exit.
   useEffect(() => {
     setAnnotations(loadAnnotations(item.id));
+    // Clear any in-app web navigation from a previous book.
+    linkHistoryRef.current = [];
+    setLinkView(null);
+    setCanLinkBack(false);
+    setLinkBusy(false);
+    linkBusyRef.current = false;
     return () => {
       const list = annotationsRef.current;
       if (list.length) {
@@ -141,6 +187,8 @@ export default function NovelReader({ item, onClose }: Props) {
   // ----- refs mirrored for stable handlers -----
   const layoutRef = useRef({ axis, rtl, paged, vertical });
   layoutRef.current = { axis, rtl, paged, vertical };
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const loadedRef = useRef(loaded);
   loadedRef.current = loaded;
   const partRef = useRef(part);
@@ -965,8 +1013,24 @@ export default function NovelReader({ item, onClose }: Props) {
     ];
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (popupRef.current) setPopup(null);
-        else onClose();
+        if (popupRef.current) {
+          setPopup(null);
+          return;
+        }
+        if (linkViewRef.current || canLinkBackRef.current) {
+          e.preventDefault();
+          leaveLinkViewRef.current();
+          return;
+        }
+        onClose();
+        return;
+      }
+      if (
+        (linkViewRef.current || canLinkBackRef.current) &&
+        (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowLeft'))
+      ) {
+        e.preventDefault();
+        leaveLinkViewRef.current();
         return;
       }
       // Layout-aware horizontal arrows (not in the global defaults as L/R).
@@ -1029,6 +1093,8 @@ export default function NovelReader({ item, onClose }: Props) {
   }, [item.id]);
 
   const popupOpenOnDownRef = useRef(false);
+  /** Skip dictionary lookup on the next mouseup (sentence-select chord just ran). */
+  const skipLookupRef = useRef(false);
   /** Last pointer over the reader (for H when no selection / click target). */
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   /**
@@ -1063,7 +1129,12 @@ export default function NovelReader({ item, onClose }: Props) {
         pre.setEnd(range.startContainer, range.startOffset);
         const start = pre.toString().length;
         const raw = range.toString();
-        const end = start + raw.length;
+        const blockLen = (block.textContent ?? '').length;
+        // A selection that runs past this block's own text (e.g. a long
+        // sentence spanning two windowed .novel-part chunks) would otherwise
+        // compute an out-of-range end and silently fail to render — clamp to
+        // what this block actually contains.
+        const end = Math.min(start + raw.length, blockLen);
         if (end <= start) return null;
         const text = (raw.trim() || raw).slice(0, 200);
         return { text, start, end, block };
@@ -1192,6 +1263,12 @@ export default function NovelReader({ item, onClose }: Props) {
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
+      // Sentence-select keybind (e.g. Alt+MouseLeft) already selected text —
+      // do not open dictionary on the same click.
+      if (skipLookupRef.current) {
+        skipLookupRef.current = false;
+        return;
+      }
       const dismissOnly = popupOpenOnDownRef.current && isLookupClick(e);
       const hit = lookupWordFromMouseUp(e);
       if (hit) {
@@ -1217,6 +1294,175 @@ export default function NovelReader({ item, onClose }: Props) {
     },
     [captureLookupAnnoTarget, resolveWordAtPoint, rememberAnnoTarget],
   );
+
+  /** Exit all in-app link history and show the EPUB again. */
+  const exitLinkViewToBook = useCallback(() => {
+    linkHistoryRef.current = [];
+    setCanLinkBack(false);
+    setLinkView(null);
+    setTitle(item.title);
+    setLinkBusy(false);
+    linkBusyRef.current = false;
+  }, [item.title]);
+
+  /** One step back in link history, or return to the book. */
+  const leaveLinkView = useCallback(() => {
+    const prev = linkHistoryRef.current.pop();
+    setCanLinkBack(linkHistoryRef.current.length > 0);
+    if (!prev || prev.url === 'book://current' || !prev.bodyHtml) {
+      exitLinkViewToBook();
+      return;
+    }
+    setLinkView({ url: prev.url, title: prev.title, bodyHtml: prev.bodyHtml });
+    setTitle(prev.title);
+  }, [exitLinkViewToBook]);
+  leaveLinkViewRef.current = leaveLinkView;
+
+  const [linkStatus, setLinkStatus] = useState('');
+
+  /**
+   * When hyperlinks are enabled: Wikipedia → import as EPUB into the library
+   * (and open in-app for reading). Other https → system browser.
+   */
+  const importWikiAsEpub = useCallback(
+    async (url: string) => {
+      if (linkBusyRef.current) return;
+      linkBusyRef.current = true;
+      setLinkBusy(true);
+      setLinkStatus('Importing page as EPUB…');
+      setPopup(null);
+      try {
+        const art = await fetchReadableArticle(url);
+        const bodyHtml = articleBodyHtml(art.title, art.html, art.meta);
+        const next = await window.api.importGenerated({
+          title: art.title,
+          html: bodyHtml,
+          source: art.url,
+        });
+        // Open in-app for immediate reading (book stays under history).
+        const cur = linkViewRef.current;
+        if (cur) {
+          linkHistoryRef.current.push({
+            url: cur.url,
+            title: cur.title,
+            bodyHtml: cur.bodyHtml,
+          });
+        } else {
+          linkHistoryRef.current.push({
+            url: 'book://current',
+            title: item.title,
+            bodyHtml: '',
+          });
+        }
+        setCanLinkBack(true);
+        setLinkView({ url: art.url, title: art.title, bodyHtml });
+        setTitle(art.title);
+        const saved = next.find((i) => i.sourcePath === art.url) ?? next[0];
+        setLinkStatus(saved ? `Saved to library: ${art.title}` : `Saved: ${art.title}`);
+        window.setTimeout(() => setLinkStatus(''), 4000);
+      } catch (err) {
+        console.error(err);
+        setLinkStatus(err instanceof Error ? err.message : 'Import failed');
+        void window.api.openExternal(url);
+        window.setTimeout(() => setLinkStatus(''), 5000);
+      } finally {
+        linkBusyRef.current = false;
+        setLinkBusy(false);
+      }
+    },
+    [item.title],
+  );
+
+  /** Intercept hyperlinks in EPUB / article HTML so the app window never leaves. */
+  const onContentClick = useCallback(
+    (e: React.MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!a) return;
+      const href = a.getAttribute('href');
+      if (!href) return;
+
+      // In-page anchors always work (navigation within the current document).
+      if (href.startsWith('#')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = decodeURIComponent(href.slice(1));
+        if (!id) return;
+        const scope = (e.currentTarget as HTMLElement) ?? contentRef.current;
+        const target =
+          scope?.querySelector?.(`[id="${CSS.escape(id)}"]`) ?? document.getElementById(id);
+        target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Master switch — when off, external / wiki links do nothing.
+      if (!settingsRef.current.hyperlinksEnabled) {
+        setLinkStatus('Hyperlinks disabled (enable in reader Aa settings)');
+        window.setTimeout(() => setLinkStatus(''), 2500);
+        return;
+      }
+
+      let resolved = href;
+      try {
+        resolved = resolveWikiUrl(href, a.href || a.baseURI || undefined);
+      } catch {
+        resolved = href;
+      }
+
+      if (/^https?:\/\//i.test(resolved)) {
+        if (isJaWikiArticleUrl(resolved) || /wikipedia\.org/i.test(resolved)) {
+          void importWikiAsEpub(resolved);
+        } else {
+          void window.api.openExternal(resolved);
+        }
+        return;
+      }
+
+      // Relative internal fragment (path#id)
+      const hash = href.includes('#') ? href.slice(href.indexOf('#') + 1) : '';
+      if (hash) {
+        const scope = (e.currentTarget as HTMLElement) ?? contentRef.current;
+        const el = scope?.querySelector?.(`[id="${CSS.escape(hash)}"]`);
+        if (el) {
+          el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }
+      }
+    },
+    [importWikiAsEpub],
+  );
+
+  /**
+   * Select full sentence at a click (or last pointer). Bound via
+   * reader.selectSentence — default Alt+MouseLeft so it never fights dict click.
+   */
+  const selectSentenceAtClick = useCallback((e?: Event) => {
+    const root = contentRef.current;
+    if (!root) return false;
+    let x = lastPointerRef.current?.x;
+    let y = lastPointerRef.current?.y;
+    if (e && 'clientX' in e) {
+      const me = e as MouseEvent;
+      x = me.clientX;
+      y = me.clientY;
+      lastPointerRef.current = { x: me.clientX, y: me.clientY };
+    }
+    if (x == null || y == null) return false;
+    // Only act when the click is inside the reader content.
+    const el = document.elementFromPoint(x, y);
+    if (!el || !root.contains(el)) return false;
+    const text = selectSentenceAtPoint(x, y);
+    if (!text) return false;
+    skipLookupRef.current = true;
+    // Clear any stale lookup highlight so selection is the only emphasis.
+    try {
+      root.querySelectorAll('.lookup-active').forEach((n) => n.classList.remove('lookup-active'));
+    } catch {
+      /* ignore */
+    }
+    return true;
+  }, []);
 
   /** Current selection or popup query → local collection (never Anki). */
   const addSelectionToCollection = useCallback(
@@ -1410,6 +1656,19 @@ export default function NovelReader({ item, onClose }: Props) {
     // Keep last target in sync so repeated H is stable
     rememberAnnoTarget(target);
 
+    // Toggle: pressing H again over an already-highlighted spot removes it,
+    // instead of silently no-op'ing (the old dedup in addAnnotation) or
+    // stacking a duplicate highlight underneath.
+    const overlapping = annotations.filter(
+      (a) => a.part === pi && a.startOffset < target!.end && a.endOffset > target!.start,
+    );
+    if (overlapping.length) {
+      let list = annotations;
+      for (const a of overlapping) list = removeAnnotation(item.id, a.id);
+      setAnnotations(list);
+      return;
+    }
+
     setAnnotations(
       addAnnotation(item.id, {
         part: pi,
@@ -1422,6 +1681,7 @@ export default function NovelReader({ item, onClose }: Props) {
   }, [
     item.id,
     annoColor,
+    annotations,
     paged,
     annoBlockOf,
     offsetsFromRange,
@@ -1541,6 +1801,10 @@ export default function NovelReader({ item, onClose }: Props) {
       registerCommandHandler('reader.highlightWord', () => highlightSelectionAsAnno()),
       registerCommandHandler('reader.highlightSentence', () => annotateSentenceAroundSelection()),
       registerCommandHandler('reader.saveToCollection', () => addSelectionToCollection('selection')),
+      registerCommandHandler('reader.selectSentence', (e) => {
+        // Return false so other chords can run if we missed the reader text.
+        return selectSentenceAtClick(e);
+      }),
       registerCommandHandler('reader.dictLookup', () => openPopupFromSelection('dict')),
       registerCommandHandler('reader.translateSel', () => openPopupFromSelection('translate')),
       registerCommandHandler('reader.fontUp', () => bumpFont(10)),
@@ -1556,6 +1820,7 @@ export default function NovelReader({ item, onClose }: Props) {
     highlightSelectionAsAnno,
     annotateSentenceAroundSelection,
     addSelectionToCollection,
+    selectSentenceAtClick,
     openPopupFromSelection,
     bumpFont,
     readerMetaNow,
@@ -1678,22 +1943,139 @@ export default function NovelReader({ item, onClose }: Props) {
     }
   }
 
+  const readerMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'library', label: 'Return to library', icon: <Icon name="library" size={14} />, onSelect: onClose },
+        {
+          id: 'book',
+          label: 'Back to book',
+          icon: <Icon name="novels" size={14} />,
+          disabled: !linkView,
+          onSelect: exitLinkViewToBook,
+        },
+      ],
+    },
+    {
+      id: 'navigate',
+      label: 'Navigate',
+      items: [
+        {
+          id: 'previous',
+          label: 'Previous',
+          icon: <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />,
+          disabled: !!linkView || !loaded,
+          onSelect: () => flip(-1),
+        },
+        {
+          id: 'next',
+          label: 'Next',
+          icon: <Icon name="chevron" size={14} />,
+          disabled: !!linkView || !loaded,
+          onSelect: () => flip(1),
+        },
+        {
+          id: 'back-link',
+          label: 'Back through article history',
+          disabled: !linkView && !canLinkBack,
+          onSelect: leaveLinkView,
+        },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        {
+          id: 'settings',
+          label: settingsOpen ? 'Hide reading settings' : 'Reading settings',
+          icon: <Icon name="settings" size={14} />,
+          onSelect: () => setSettingsOpen((o) => !o),
+        },
+        {
+          id: 'bookmarks',
+          label: bookmarksOpen ? 'Hide bookmarks' : 'Bookmarks',
+          icon: <Icon name="bookmark" size={14} />,
+          onSelect: () => setBookmarksOpen((o) => !o),
+        },
+        {
+          id: 'collection',
+          label: collectionOpen ? 'Hide collection' : 'Flashcard collection',
+          icon: <Icon name="flashcards" size={14} />,
+          onSelect: () => setCollectionOpen((o) => !o),
+        },
+      ],
+    },
+    {
+      id: 'study',
+      label: 'Study',
+      items: [
+        {
+          id: 'bookmark-current',
+          label: 'Bookmark current position',
+          icon: <Icon name="bookmark" size={14} />,
+          disabled: !loaded || !!linkView,
+          onSelect: addCurrent,
+        },
+        {
+          id: 'collect-selection',
+          label: 'Collect selection',
+          icon: <Icon name="flashcards" size={14} />,
+          onSelect: () => addSelectionToCollection('selection'),
+        },
+      ],
+    },
+  ];
+  const readerStatus = (
+    <>
+      <StatusBarField>{linkView ? 'Article view' : loaded ? 'Book view' : 'Loading'}</StatusBarField>
+      <StatusBarField>{vertical ? 'Vertical' : 'Horizontal'}</StatusBarField>
+      <StatusBarField>{paged ? 'Pages' : 'Scroll'}</StatusBarField>
+      <StatusBarSpacer />
+      {paged && pageCount > 1 && <StatusBarField>{page + 1}/{pageCount}</StatusBarField>}
+      <StatusBarField>{Math.round((seek ?? progress) * 100)}%</StatusBarField>
+    </>
+  );
+
   return (
-    <div className="reader">
+    <AppChrome menus={readerMenus} status={readerStatus} className="aero-reader-chrome">
+    <div className={`reader${aero ? ' aero-reader' : ''}`}>
       <style>{injectedCss}</style>
       <div className="reader-bar">
-        <button className="btn" onClick={onClose}>
+        <button className="btn" onClick={onClose} title="Return to library">
           <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
           Library
         </button>
+        {(linkView || canLinkBack) && (
+          <button
+            type="button"
+            className="btn"
+            title="Back to previous page or book (Alt+← / Backspace / Esc)"
+            onClick={leaveLinkView}
+          >
+            <Icon name="chevron" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+            Back
+          </button>
+        )}
+        {linkView && (
+          <button type="button" className="btn" title="Close article and return to the book" onClick={exitLinkViewToBook}>
+            Book
+          </button>
+        )}
         <div className="reader-title">{title}</div>
         <div className="reader-controls">
+          {!linkView && (
+            <>
           <button className="btn" onClick={() => flip(-1)}>
             ‹ Prev
           </button>
           <button className="btn" onClick={() => flip(1)}>
             Next ›
           </button>
+            </>
+          )}
           <div className="settings-anchor">
             <button
               className={`btn ${bookmarksOpen ? 'active' : ''}`}
@@ -1781,50 +2163,93 @@ export default function NovelReader({ item, onClose }: Props) {
       </div>
 
       <div className="reader-stage" style={{ background: theme.bg }}>
-        {loading && (
+        {loading && !linkView && (
           <div className="reader-msg">
             {pdfProgress != null
               ? `Reading PDF… ${Math.round(pdfProgress * 100)}%`
               : 'Opening book…'}
           </div>
         )}
-        {error && <div className="reader-msg error">{error}</div>}
-        <div
-          ref={scrollerRef}
-          className="novel-scroller"
-          style={scrollerStyle}
-          onMouseDown={(e) => {
-            popupOpenOnDownRef.current = !!popupRef.current;
-            noteLookupPointerDown(e);
-            lastPointerRef.current = { x: e.clientX, y: e.clientY };
-          }}
-          onMouseMove={(e) => {
-            lastPointerRef.current = { x: e.clientX, y: e.clientY };
-          }}
-          onMouseUp={onMouseUp}
-        >
-          {paged ? (
+        {error && !linkView && <div className="reader-msg error">{error}</div>}
+        {linkBusy && <div className="reader-msg">Importing article…</div>}
+        {linkStatus && !linkBusy && (
+          <div className="reader-link-status" role="status">
+            {linkStatus}
+          </div>
+        )}
+
+        {linkView ? (
+          <div
+            className="novel-scroller novel-link-view"
+            onClick={onContentClick}
+            onMouseDown={(e) => {
+              popupOpenOnDownRef.current = !!popupRef.current;
+              noteLookupPointerDown(e);
+              lastPointerRef.current = { x: e.clientX, y: e.clientY };
+            }}
+            onMouseUp={onMouseUp}
+          >
             <div
-              key={`p${part}`}
-              ref={contentRef}
-              className={`novel-content ${wkClass}`}
+              className={`novel-content novel-link-article ${wkClass}`}
               style={contentStyle}
               lang="ja"
-              dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
+              dangerouslySetInnerHTML={{ __html: linkView.bodyHtml }}
             />
-          ) : (
-            <div key="scrollwin" ref={contentRef} className={`novel-content ${wkClass}`} style={contentStyle} lang="ja">
-              {winParts.map((i) => (
-                <div
-                  key={i}
-                  className="novel-part"
-                  data-pi={i}
-                  dangerouslySetInnerHTML={chapterHtml[i] ?? EMPTY_HTML}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div
+            ref={scrollerRef}
+            className="novel-scroller"
+            style={scrollerStyle}
+            onClick={onContentClick}
+            onMouseDown={(e) => {
+              popupOpenOnDownRef.current = !!popupRef.current;
+              noteLookupPointerDown(e);
+              lastPointerRef.current = { x: e.clientX, y: e.clientY };
+            }}
+            onMouseMove={(e) => {
+              lastPointerRef.current = { x: e.clientX, y: e.clientY };
+            }}
+            onMouseUp={onMouseUp}
+          >
+            {paged ? (
+              <div
+                key={`p${part}`}
+                ref={contentRef}
+                className={`novel-content ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                style={contentStyle}
+                lang="ja"
+                dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
+              />
+            ) : (
+              <div
+                key="scrollwin"
+                ref={contentRef}
+                className={`novel-content ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                style={contentStyle}
+                lang="ja"
+              >
+                {winParts.map((i) => (
+                  <div
+                    key={i}
+                    className="novel-part"
+                    data-pi={i}
+                    dangerouslySetInnerHTML={chapterHtml[i] ?? EMPTY_HTML}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <ReaderCollectionPanel
+          bookId={item.id}
+          bookTitle={item.title}
+          open={collectionOpen}
+          onClose={() => setCollectionOpen(false)}
+          pendingAdd={pendingAdd}
+          onPendingConsumed={() => setPendingAdd(null)}
+        />
       </div>
 
       <div className="reader-footer">
@@ -1874,15 +2299,6 @@ export default function NovelReader({ item, onClose }: Props) {
         <span className="reader-pct muted">{Math.round((seek ?? progress) * 100)}%</span>
       </div>
 
-      <ReaderCollectionPanel
-        bookId={item.id}
-        bookTitle={title}
-        open={collectionOpen}
-        onClose={() => setCollectionOpen(false)}
-        pendingAdd={pendingAdd}
-        onPendingConsumed={() => setPendingAdd(null)}
-      />
-
       {popup &&
         (popup.kind === 'translate' ? (
           <SentenceTranslatePopup text={popup.query} onClose={() => setPopup(null)} />
@@ -1896,5 +2312,6 @@ export default function NovelReader({ item, onClose }: Props) {
           />
         ))}
     </div>
+    </AppChrome>
   );
 }

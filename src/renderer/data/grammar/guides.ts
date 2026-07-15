@@ -8,7 +8,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'hack-kanji-radicals',
     category: 'Hacks',
-    icon: '🧩',
+    icon: 'parts',
     title: 'The kanji shortcut: learn parts, not strokes',
     summary: 'Stop memorizing kanji as random strokes. Break them into reusable building blocks.',
     level: 'All levels',
@@ -32,8 +32,8 @@ export const GUIDES: Guide[] = [
           'Readings come later and more easily, because many components also hint at the on-yomi (sound). For example, 青 (sei) shows up in 晴 (sei, clear weather), 清 (sei, clean), 請 (sei, request).',
         ],
         examples: [
-          { jp: '訁＋舌 → 話', reading: 'はなす', en: '"words" + "tongue" = to talk / story' },
-          { jp: '氵＋每 → 海', reading: 'うみ', en: '"water" + a phonetic = sea' },
+          { jp: '訁 + 舌 → 話', reading: 'はなす', en: '"words" + "tongue" = to talk / story' },
+          { jp: '氵 + 每 → 海', reading: 'うみ', en: '"water" + a phonetic = sea' },
         ],
       },
     ],
@@ -41,7 +41,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'hack-wa-vs-ga',
     category: 'Hacks',
-    icon: '🎯',
+    icon: 'topic',
     title: 'は vs が, finally explained',
     summary: 'The single most asked question in Japanese — with a rule you can actually use.',
     level: 'N5–N4',
@@ -74,7 +74,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'hack-counters',
     category: 'Hacks',
-    icon: '🔢',
+    icon: 'counts',
     title: 'Counting survival kit',
     summary: 'You can\'t just say "two" in Japanese — you need the right counter. Here\'s the minimum set.',
     level: 'N5',
@@ -104,7 +104,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'hack-politeness-levels',
     category: 'Hacks',
-    icon: '🎚️',
+    icon: 'register',
     title: 'Politeness levels decoded',
     summary: 'Plain, polite, and keigo — when to use each so you never sound rude or stiff.',
     level: 'N5–N3',
@@ -133,7 +133,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'hack-onomatopoeia',
     category: 'Hacks',
-    icon: '✨',
+    icon: 'sound',
     title: 'Onomatopoeia (オノマトペ) crash course',
     summary: 'ドキドキ, ぺこぺこ, きらきら — the sound words that make Japanese come alive.',
     level: 'N4–N2',
@@ -161,7 +161,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'hack-study-method',
     category: 'Hacks',
-    icon: '🚀',
+    icon: 'loop',
     title: 'The 80/20 study loop (and how this app fits)',
     summary: 'The fastest known path: comprehensible input + spaced repetition + immersion.',
     level: 'All levels',
@@ -192,7 +192,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'read-first-manga',
     category: 'Reading',
-    icon: '📖',
+    icon: 'manga',
     title: 'How to read your first manga',
     summary: 'Manga is the friendliest native material — here\'s how to start without drowning.',
     level: 'N5–N4',
@@ -221,7 +221,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'read-first-novel',
     category: 'Reading',
-    icon: '📕',
+    icon: 'prose',
     title: 'Tackling your first novel',
     summary: 'The jump from manga to prose is real — here\'s how to make it survivable.',
     level: 'N3–N2',
@@ -249,7 +249,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'read-news',
     category: 'Reading',
-    icon: '📰',
+    icon: 'news',
     title: 'Reading the news without a dictionary meltdown',
     summary: 'A ladder from NHK Easy News up to the real thing.',
     level: 'N3–N1',
@@ -278,7 +278,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'write-stroke-order',
     category: 'Writing',
-    icon: '🖌️',
+    icon: 'strokes',
     title: 'Stroke order & handwriting that looks right',
     summary: 'A handful of rules generate correct stroke order for almost any character.',
     level: 'N5–N4',
@@ -308,7 +308,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'write-ime',
     category: 'Writing',
-    icon: '⌨️',
+    icon: 'ime',
     title: 'Typing Japanese like a native',
     summary: 'Set up the IME and learn the keystrokes that make input fast.',
     level: 'All levels',
@@ -337,7 +337,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'write-style',
     category: 'Writing',
-    icon: '✍️',
+    icon: 'style',
     title: 'Casual vs formal written style',
     summary: 'です・ます, だ, and である — pick the right register for essays, emails, and chats.',
     level: 'N3–N1',
@@ -367,7 +367,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'speak-pitch-accent',
     category: 'Speaking',
-    icon: '🎵',
+    icon: 'pitch',
     title: 'Pitch accent demystified',
     summary: 'Japanese isn\'t toneless — pitch distinguishes words and makes you sound native.',
     level: 'N4–N1',
@@ -398,7 +398,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'speak-tricky-sounds',
     category: 'Speaking',
-    icon: '👄',
+    icon: 'sounds',
     title: 'Sounds that trip learners up',
     summary: 'Long vowels, the small っ, and the ら-row — fix these and your accent jumps.',
     level: 'N5–N3',
@@ -428,7 +428,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'lit-reading-ladder',
     category: 'Literature',
-    icon: '🪜',
+    icon: 'ladder',
     title: 'A reading ladder to the classics',
     summary: 'A staged path from graded readers all the way to Sōseki and Murakami.',
     level: 'N4–N1',
@@ -454,7 +454,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'lit-bungo',
     category: 'Literature',
-    icon: '📜',
+    icon: 'classic',
     title: 'Classical Japanese (古文) in a nutshell',
     summary: 'What changes when you open the Tale of Genji or a haiku from 1680.',
     level: 'N1+',
@@ -482,7 +482,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'lit-haiku',
     category: 'Literature',
-    icon: '🍃',
+    icon: 'haiku',
     title: 'Haiku & the poetry of the seasons',
     summary: 'The 5-7-5 form, the season word, and the art of the unsaid.',
     level: 'All levels',
@@ -511,7 +511,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'culture-keigo',
     category: 'Culture',
-    icon: '🙇',
+    icon: 'keigo',
     title: 'Keigo at work: phrases that make you sound fluent',
     summary: 'Memorize these set expressions and survive any shop, office, or formal call.',
     level: 'N3–N1',
@@ -543,7 +543,7 @@ export const GUIDES: Guide[] = [
   {
     id: 'culture-you',
     category: 'Culture',
-    icon: '🫵',
+    icon: 'pronouns',
     title: 'The "you" trap: stop saying あなた',
     summary: 'Pronouns are social minefields. Here\'s what natives actually do.',
     level: 'N5–N3',

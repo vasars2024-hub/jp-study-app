@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { defFor, type CompanionInstance } from './companionCatalog';
 import { resolvePrimaryRoutineId } from './buddyRoutines';
+import ShimejiSprite from './ShimejiSprite';
 
 interface HostState {
   companions: CompanionInstance[];
@@ -28,6 +29,11 @@ interface DisplayInfo {
 }
 
 const SIZE = 52;
+const SHIMEJI_SIZE = 96;
+
+function companionSize(c: Pick<CompanionInstance, 'typeId'>): number {
+  return c.typeId === 'miko-shimeji' ? SHIMEJI_SIZE : SIZE;
+}
 
 function hashId(id: string): number {
   let h = 2166136261;
@@ -153,6 +159,7 @@ export default function CompanionHostView() {
       {visible.map((c) => {
         const def = defFor(c.typeId);
         const pos = mapToHost(c, deskW, deskH, vp, displays);
+        const size = companionSize(c);
         return (
           <div
             key={c.id}
@@ -160,8 +167,8 @@ export default function CompanionHostView() {
             style={{
               left: pos.left,
               top: pos.top,
-              width: SIZE,
-              height: SIZE,
+              width: size,
+              height: size,
               transform: `scaleX(${c.facing})`,
               ['--c-body' as string]: def.color,
               ['--c-accent' as string]: def.accent,
@@ -179,11 +186,15 @@ export default function CompanionHostView() {
               setMenuId((id) => (id === c.id ? null : c.id));
             }}
           >
-            <div className="os-companion-body">
-              <span className="os-companion-eye" />
-              <span className="os-companion-eye" />
-              <span className={`os-companion-mouth mood-${c.mood}`} />
-            </div>
+            {def.sprite === 'miko-shimeji' ? (
+              <ShimejiSprite motion={c.motion} mood={c.mood} />
+            ) : (
+              <div className="os-companion-body">
+                <span className="os-companion-eye" />
+                <span className="os-companion-eye" />
+                <span className={`os-companion-mouth mood-${c.mood}`} />
+              </div>
+            )}
             {c.mood === 'celebrate' && <span className="os-companion-spark" />}
             {menuId === c.id && (
               <div

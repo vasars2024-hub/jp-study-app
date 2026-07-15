@@ -16,6 +16,16 @@ const TASKBAR = 48;
 function zoomFactor(): number {
   return getZoomFactor();
 }
+
+function desktopPointerScale(desk: HTMLElement | null): number {
+  if (!desk) return zoomFactor();
+  const rect = desk.getBoundingClientRect();
+  const sx = rect.width / Math.max(1, desk.clientWidth);
+  const sy = rect.height / Math.max(1, desk.clientHeight);
+  const scale = Math.max(sx, sy);
+  return Number.isFinite(scale) && scale > 0.05 ? scale : zoomFactor();
+}
+
 const snap = (n: number): number => Math.round(n / GRID) * GRID;
 
 export interface WidgetFrameProps {
@@ -68,9 +78,9 @@ export default function WidgetFrame({
     const el = frameRef.current;
     if (!el) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    const z = zoomFactor();
-    const sx = e.clientX, sy = e.clientY, ox = widget.x, oy = widget.y;
     const desk = deskRef.current;
+    const z = desktopPointerScale(desk);
+    const sx = e.clientX, sy = e.clientY, ox = widget.x, oy = widget.y;
     const dw = desk?.clientWidth ?? 1200;
     const dh = (desk?.clientHeight ?? 720) - TASKBAR;
     let curX = ox, curY = oy;
@@ -108,7 +118,7 @@ export default function WidgetFrame({
     if (!el) return;
     const handle = e.currentTarget as HTMLElement;
     handle.setPointerCapture(e.pointerId);
-    const z = zoomFactor();
+    const z = desktopPointerScale(deskRef.current);
     const sx = e.clientX, sy = e.clientY, ow = widget.w, oh = widget.h;
     let curW = ow, curH = oh;
     let raf: number | null = null;

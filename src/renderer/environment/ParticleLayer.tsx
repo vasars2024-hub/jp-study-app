@@ -26,6 +26,7 @@ import {
   perfSampleFrame,
   perfSetParticleCount,
 } from '../perf/perfHub';
+import { particlesForWall } from './frameworkBridge';
 
 const FIXED_DT = 1 / 60;
 const MAX_STEPS = 2;
@@ -51,10 +52,20 @@ function isNightish(tags: string[]): boolean {
 
 function resolvePresets(env: EnvironmentSettings): ParticlePresetId[] {
   if (env.matchParticleSuggestions) {
+    // Prefer explicit wallpaper-framework metadata for the active wall
+    // (Phase 3 · M1), else fall back to the tag heuristic.
+    if (env.rotationEnabled) {
+      const fw = particlesForWall(resolveWall(env)?.item.ref);
+      if (fw.length) return fw;
+    }
     return suggestPresetsFromTags(activeTags(env));
   }
   const list = env.particlePresets ?? [];
   return list.length ? list : ['fireflies'];
+}
+
+function secretLifecycleSuspended(): boolean {
+  return document.documentElement.classList.contains('secret-lifecycle-suspended');
 }
 
 export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
@@ -79,7 +90,7 @@ export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
     let raf = 0;
     let last = performance.now();
     let acc = 0;
-    let running = true;
+    let running = !document.hidden && !secretLifecycleSuspended();
     let cfgCache: ParticleSimConfig | null = null;
     let cfgAt = 0;
     let skipDraw = 0;
@@ -131,7 +142,7 @@ export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
       }
       const e = envRef.current;
       const tags = activeTags(e);
-      const reduceMotion = document.documentElement.classList.contains('reduce-motion');
+      const reduceMotion = document.documentElement.classList.contains('reduce-motion') || secretLifecycleSuspended();
       const presets = resolvePresets(e);
       const budget = perfGetBudget();
       const base = tierMaxParticles(e.performanceTier, e.particleDensity);
@@ -153,9 +164,17 @@ export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
     };
 
     const onVis = () => {
-      if (document.hidden) {
+      const shouldRun = !document.hidden && !secretLifecycleSuspended();
+      if (!shouldRun) {
         running = false;
         cancelAnimationFrame(raf);
+        particles.length = 0;
+        perfSetParticleCount(0);
+        try {
+          g.clearRect(0, 0, size.w, size.h);
+        } catch {
+          /* ignore */
+        }
       } else if (!running) {
         running = true;
         last = performance.now();
@@ -164,6 +183,7 @@ export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
       }
     };
     document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('secret:lifecycle', onVis);
 
     const frame = (now: number) => {
       if (!running) return;
@@ -229,6 +249,7 @@ export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('secret:lifecycle', onVis);
       particles.length = 0;
       perfSetParticleCount(0);
       snow = createSnowAccumulation(1, 1);

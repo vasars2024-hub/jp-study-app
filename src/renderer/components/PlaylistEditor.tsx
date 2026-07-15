@@ -2,6 +2,7 @@
  * Full wallpaper playlist + rotation rules editor for Settings → Living atmosphere.
  */
 import { useMemo, useState } from 'react';
+import { alertDialog, confirmDialog, promptDialog } from './ui';
 import {
   buildDefaultDayCyclePlaylist,
   buildDefaultRules,
@@ -23,8 +24,23 @@ const CAL_CATS: { id: CalendarCategory; label: string }[] = [
   { id: 'personal', label: 'Personal' },
 ];
 
-function uid(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+function isDirectMediaRef(ref: string): boolean {
+  return /^(app:|data:|blob:|file:|https?:|\/)/i.test(ref);
+}
+
+function itemSwatchStyle(it: WallpaperItem): { background?: string; backgroundImage?: string; backgroundSize?: string; backgroundPosition?: string } {
+  if (it.kind === 'preset') {
+    return { background: WALL_PRESETS.find((p) => p.id === it.ref)?.css ?? '#222' };
+  }
+  if (it.kind === 'image' && it.ref && isDirectMediaRef(it.ref)) {
+    return {
+      background: '#2a2830',
+      backgroundImage: `url("${it.ref}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    };
+  }
+  return { background: '#2a2830' };
 }
 
 function itemLabel(it: WallpaperItem): string {
@@ -124,8 +140,12 @@ export default function PlaylistEditor({
     }
   };
 
-  const createPlaylist = () => {
-    const name = window.prompt('New playlist name:', 'My playlist');
+  const createPlaylist = async () => {
+    const name = await promptDialog({
+      title: 'New playlist',
+      message: 'New playlist name:',
+      defaultValue: 'My playlist',
+    });
     if (!name?.trim()) return;
     const pl: WallpaperPlaylist = {
       id: uid('pl'),
@@ -137,12 +157,21 @@ export default function PlaylistEditor({
     onChange({ playlists: [...playlists, pl], activePlaylistId: pl.id });
   };
 
-  const deletePlaylist = () => {
+  const deletePlaylist = async () => {
     if (active.id === DAY_CYCLE_PLAYLIST_ID) {
-      window.alert('The default Day cycle playlist cannot be deleted. Reset it instead.');
+      await alertDialog({
+        title: 'Cannot delete',
+        message: 'The default Day cycle playlist cannot be deleted. Reset it instead.',
+      });
       return;
     }
-    if (!window.confirm(`Delete playlist “${active.name}”?`)) return;
+    const ok = await confirmDialog({
+      title: 'Delete playlist',
+      message: `Delete playlist “${active.name}”?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const next = playlists.filter((p) => p.id !== active.id);
     onChange({
       playlists: next.length ? next : [buildDefaultDayCyclePlaylist()],
@@ -150,8 +179,14 @@ export default function PlaylistEditor({
     });
   };
 
-  const resetDayCycle = () => {
-    if (!window.confirm('Reset Day cycle playlist and default time rules?')) return;
+  const resetDayCycle = async () => {
+    const ok = await confirmDialog({
+      title: 'Reset Day cycle',
+      message: 'Reset Day cycle playlist and default time rules?',
+      confirmLabel: 'Reset',
+      danger: true,
+    });
+    if (!ok) return;
     const def = buildDefaultDayCyclePlaylist();
     const others = playlists.filter((p) => p.id !== DAY_CYCLE_PLAYLIST_ID);
     onChange({
@@ -314,11 +349,7 @@ export default function PlaylistEditor({
           <li key={it.id} className="pl-item">
             <div
               className="pl-swatch"
-              style={
-                it.kind === 'preset'
-                  ? { background: WALL_PRESETS.find((p) => p.id === it.ref)?.css ?? '#222' }
-                  : { background: '#2a2830' }
-              }
+              style={itemSwatchStyle(it)}
               title={it.kind}
             />
             <div className="pl-item-meta">

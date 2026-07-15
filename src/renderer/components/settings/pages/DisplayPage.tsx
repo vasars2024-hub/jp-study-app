@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
+import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { ZOOM_DEFAULT, ZOOM_MAX, ZOOM_MIN } from '../../../appZoom';
 import {
@@ -51,7 +52,7 @@ export default function DisplayPage() {
             onChange={(e) => setZoomValue(Number(e.target.value))}
           />
           <button type="button" className="btn small" onClick={() => bumpZoomBy(0.1)} disabled={zoom >= ZOOM_MAX}>
-            ＋
+            +
           </button>
           <span className="muted os-zoom-val">{Math.round(zoom * 100)}%</span>
         </div>
@@ -360,8 +361,14 @@ export default function DisplayPage() {
         <button
           type="button"
           className="btn"
-          onClick={() => {
-            if (window.confirm('Reset all display settings to defaults?')) {
+          onClick={async () => {
+            const ok = await confirmDialog({
+              title: 'Reset display settings',
+              message: 'Reset all display settings to defaults?',
+              confirmLabel: 'Reset',
+              danger: true,
+            });
+            if (ok) {
               setD(resetDisplayPrefs());
               setZoomValue(ZOOM_DEFAULT);
             }

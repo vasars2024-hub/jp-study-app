@@ -22,7 +22,7 @@ export interface ResourceCategory {
 export const RESOURCES: ResourceCategory[] = [
   {
     id: 'dictionaries',
-    icon: '📖',
+    icon: 'book',
     title: 'Dictionaries & lookup',
     blurb: 'Look up words, kanji, and example sentences.',
     items: [
@@ -72,7 +72,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'kanji-srs',
-    icon: '🈯',
+    icon: 'kanji',
     title: 'Kanji & vocab (SRS)',
     blurb: 'Spaced-repetition systems to make words stick.',
     items: [
@@ -115,7 +115,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'grammar',
-    icon: '✏️',
+    icon: 'grammar',
     title: 'Grammar references',
     blurb: 'Deeper explanations when a point won’t click.',
     items: [
@@ -165,7 +165,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'reading',
-    icon: '📚',
+    icon: 'reading',
     title: 'Reading practice',
     blurb: 'Graded readers and native text to level up.',
     items: [
@@ -208,7 +208,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'listening',
-    icon: '🎧',
+    icon: 'audio',
     title: 'Listening & video',
     blurb: 'Train your ear with comprehensible input.',
     items: [
@@ -251,7 +251,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'tools',
-    icon: '🛠️',
+    icon: 'tools',
     title: 'Immersion tools',
     blurb: 'Turn anything you watch or read into study material.',
     items: [
@@ -294,7 +294,7 @@ export const RESOURCES: ResourceCategory[] = [
   },
   {
     id: 'community',
-    icon: '🗣️',
+    icon: 'speaking',
     title: 'Practice & community',
     blurb: 'Real people to talk to and learn alongside.',
     items: [

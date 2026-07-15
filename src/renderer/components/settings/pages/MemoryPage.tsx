@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icons';
 import SettingsCard from '../SettingsCard';
+import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import {
   clearSettingsDomain,
@@ -173,7 +174,13 @@ export default function MemoryPage() {
     const msg =
       d.clearConfirm ??
       `Clear “${d.label}”? This only removes that settings domain.`;
-    if (!window.confirm(msg)) return;
+    const ok = await confirmDialog({
+      title: 'Clear settings domain',
+      message: msg,
+      confirmLabel: 'Clear',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setStatus('');
     try {
@@ -188,13 +195,14 @@ export default function MemoryPage() {
   }
 
   async function handleFactoryReset(): Promise<void> {
-    if (
-      !window.confirm(
+    const ok = await confirmDialog({
+      title: 'Factory reset',
+      message:
         'Factory reset: deletes local settings, decks, drafts, caches, and resets mining config, then restarts. Export a backup first. Continue?',
-      )
-    ) {
-      return;
-    }
+      confirmLabel: 'Factory reset',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await window.api.miningSetConfig(DEFAULT_TRADITIONAL_MINING_CONFIG).catch(() => undefined);

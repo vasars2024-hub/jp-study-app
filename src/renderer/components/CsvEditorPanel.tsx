@@ -46,6 +46,7 @@ import {
   type DeckColumnMapping,
   type DeckFieldKey,
 } from '../../shared/deckImport';
+import { promptDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from './ui';
 import { importDeckFromEntries } from '../flashcardDeck';
 import { getActiveProfile } from '../profileState';
 import { parseCsvTextAsync } from '../csvParseAsync';
@@ -467,27 +468,27 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     });
   }
 
-  function handleSplitColumn(): void {
+  async function handleSplitColumn(): Promise<void> {
     const col = selectedCols.size === 1 ? [...selectedCols][0] : null;
     if (col === null || col === undefined) {
       setStatus('Select exactly one column to split.');
       return;
     }
-    const delim = window.prompt('Split delimiter (e.g. : or ;)', ':');
+    const delim = await promptDialog({ title: 'Split column', message: 'Split delimiter (e.g. : or ;)', defaultValue: ':' });
     if (delim === null) return;
     updateTable(splitColumn(table, col, delim));
     setMapping((m) => remapMappingOnSplit(m, col));
   }
 
-  function handleMergeColumns(): void {
+  async function handleMergeColumns(): Promise<void> {
     if (selectedCols.size < 2) {
       setStatus('Select two or more columns to merge.');
       return;
     }
-    const sep = window.prompt('Merge separator', ' ');
+    const sep = await promptDialog({ title: 'Merge columns', message: 'Merge separator', defaultValue: ' ' });
     if (sep === null) return;
     const cols = [...selectedCols].sort((a, b) => a - b);
-    const header = window.prompt('Merged column header (optional)') ?? undefined;
+    const header = (await promptDialog({ title: 'Merge columns', message: 'Merged column header (optional)' })) ?? undefined;
     const next = mergeColumns(table, cols, sep, header);
     updateTable(next);
     setMapping((prev) => refreshMapping(next.headers, prev));
@@ -501,15 +502,16 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     updateTable(next, `Removed ${before - next.rows.length} duplicate row(s).`);
   }
 
-  function handleTagColumn(): void {
-    const header = window.prompt('Tag column header', 'Tag') ?? 'Tag';
-    const value = window.prompt('Tag value for all rows', 'Vocabulary Set 1') ?? '';
+  async function handleTagColumn(): Promise<void> {
+    const header = (await promptDialog({ title: 'Tag column', message: 'Tag column header', defaultValue: 'Tag' })) ?? 'Tag';
+    const value =
+      (await promptDialog({ title: 'Tag column', message: 'Tag value for all rows', defaultValue: 'Vocabulary Set 1' })) ?? '';
     updateTable(addTagColumn(table, header, value));
     setMapping((prev) => refreshMapping(table.headers, prev));
   }
 
-  function handleAutoNumber(): void {
-    const header = window.prompt('ID column header', 'ID') ?? 'ID';
+  async function handleAutoNumber(): Promise<void> {
+    const header = (await promptDialog({ title: 'Auto-number', message: 'ID column header', defaultValue: 'ID' })) ?? 'ID';
     updateTable(addAutoNumberColumn(table, header));
     setMapping((m) => remapMappingOnInsert(m, 0));
   }
@@ -537,7 +539,61 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     if (colIndex !== null) toggleColSelection(colIndex, e.ctrlKey || e.metaKey);
   }
 
+  // Native menu bar + status bar (Future Spreadsheet). AppChrome renders them
+  // only under Aero; pass-through in the default theme. Items drive existing
+  // handlers only — no ribbon, no behavior forked by theme.
+  const csvMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'open', label: 'Open file…', onSelect: () => fileRef.current?.click() },
+        { id: 'download', label: table.delimiter === '\t' ? 'Download TSV' : 'Download CSV', disabled: saving, onSelect: () => void downloadCsv() },
+        { separator: true, label: '' },
+        { id: 'import', label: 'Import to flashcards', onSelect: manualImport },
+      ],
+    },
+    {
+      id: 'edit',
+      label: 'Edit',
+      items: [
+        { id: 'undo', label: 'Undo', disabled: !canUndo(history), onSelect: () => setHistory((h) => undoHistory(h) ?? h) },
+        { id: 'redo', label: 'Redo', disabled: !canRedo(history), onSelect: () => setHistory((h) => redoHistory(h) ?? h) },
+        { separator: true, label: '' },
+        { id: 'find', label: 'Find and replace…', onSelect: () => setShowFindReplace(true) },
+      ],
+    },
+    {
+      id: 'data',
+      label: 'Data',
+      items: [
+        { id: 'split', label: 'Split column…', disabled: selectedCols.size !== 1, onSelect: () => void handleSplitColumn() },
+        { id: 'merge', label: 'Merge columns…', disabled: selectedCols.size < 2, onSelect: () => void handleMergeColumns() },
+        { id: 'dedup', label: 'Remove duplicate rows', onSelect: handleDeduplicate },
+        { separator: true, label: '' },
+        { id: 'tag', label: 'Add tag column…', onSelect: () => void handleTagColumn() },
+        { id: 'autonum', label: 'Add auto-number column…', onSelect: () => void handleAutoNumber() },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [{ id: 'preview', label: showPreview ? 'Hide card preview' : 'Show card preview', onSelect: () => setShowPreview((v) => !v) }],
+    },
+  ];
+
+  const csvStatus = (
+    <>
+      <StatusBarField>{table.rows.length} rows</StatusBarField>
+      <StatusBarField>{table.headers.length} cols</StatusBarField>
+      {selectedCols.size > 0 && <StatusBarField>{selectedCols.size} selected</StatusBarField>}
+      <StatusBarSpacer />
+      {dirty && <StatusBarField live>Unsaved changes</StatusBarField>}
+    </>
+  );
+
   return (
+    <AppChrome menus={csvMenus} status={csvStatus} className="aero-csv-chrome">
     <section className="anki-card csv-editor">
       <p className="muted csv-editor-lead">
         Spreadsheet editor for CSV / TSV decks. Paste or open a file, edit with power tools, then import to flashcards.
@@ -913,5 +969,6 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
         </div>
       )}
     </section>
+    </AppChrome>
   );
 }

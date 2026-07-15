@@ -6,9 +6,13 @@ import { useT } from '../../i18n';
 export default function SettingsNav({
   page,
   onNavigate,
+  advancedMode,
+  onToggleAdvanced,
 }: {
   page: SettingsPageId;
   onNavigate: (id: SettingsPageId) => void;
+  advancedMode: boolean;
+  onToggleAdvanced: () => void;
 }) {
   const { t } = useT();
   const home = SETTINGS_NAV.find((p) => p.id === 'home')!;
@@ -27,7 +31,10 @@ export default function SettingsNav({
       </button>
 
       {groups.map((group) => {
-        const pages = SETTINGS_NAV.filter((p) => p.group === group);
+        const pages = SETTINGS_NAV.filter(
+          (p) => p.group === group && (advancedMode || !p.advanced),
+        );
+        if (!pages.length) return null;
         const groupLabel = t(groupLabelKey(group));
         return (
           <div key={group} className="os-set-nav-group">
@@ -46,6 +53,7 @@ export default function SettingsNav({
                   >
                     <Icon name={p.icon} size={16} />
                     <span>{t(p.labelKey)}</span>
+                    {p.advanced && <span className="os-set-adv-dot" title="Advanced" />}
                   </button>
                 </li>
               ))}
@@ -53,6 +61,30 @@ export default function SettingsNav({
           </div>
         );
       })}
+
+      <div className="os-set-nav-footer">
+        <button
+          type="button"
+          className={`os-set-advanced-btn${advancedMode ? ' on' : ''}`}
+          onClick={onToggleAdvanced}
+          aria-pressed={advancedMode}
+          title={
+            advancedMode
+              ? 'Advanced mode on — showing extra settings'
+              : 'Advanced mode off — extra settings hidden (still active in background)'
+          }
+        >
+          <span className="os-set-advanced-glyph" aria-hidden>
+            <Icon name="wrench" size={15} />
+          </span>
+          <span className="os-set-advanced-label">
+            {advancedMode ? 'Advanced' : 'Advanced'}
+          </span>
+        </button>
+        <p className="os-set-advanced-hint muted">
+          {advancedMode ? 'Extra pages unlocked' : 'Tap to unlock expert options'}
+        </p>
+      </div>
     </nav>
   );
 }

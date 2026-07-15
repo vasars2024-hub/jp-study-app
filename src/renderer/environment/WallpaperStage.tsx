@@ -7,6 +7,7 @@ import { loadEnvironment, onEnvironmentChanged } from './environmentStore';
 import { resolveWall, wallItemKey } from './schedules';
 import type { EnvironmentSettings, ResolvedWall, WallpaperItem } from './types';
 import { getWallPreset } from './wallCatalog';
+import { syncPillarboxWallImage } from '../pillarboxSettings';
 
 interface LayerStyle {
   key: string;
@@ -38,8 +39,8 @@ function itemToLayer(item: WallpaperItem, reason: string): LayerStyle {
 
 async function hydrateMedia(layer: LayerStyle, item: WallpaperItem): Promise<LayerStyle> {
   if (item.kind === 'image' && item.ref) {
-    // data:/blob: URLs are already displayable; file paths go through mediaFileUrl.
-    if (/^(data:|blob:|file:|https?:)/i.test(item.ref)) {
+    // Bundled/data/blob/file/http URLs are already displayable; disk paths go through mediaFileUrl.
+    if (/^(app:|data:|blob:|file:|https?:|\/)/i.test(item.ref)) {
       return { ...layer, imageUrl: item.ref };
     }
     try {
@@ -50,7 +51,7 @@ async function hydrateMedia(layer: LayerStyle, item: WallpaperItem): Promise<Lay
     }
   }
   if (item.kind === 'video' && item.ref) {
-    if (/^(data:|blob:|file:|https?:)/i.test(item.ref)) {
+    if (/^(app:|data:|blob:|file:|https?:)/i.test(item.ref)) {
       return { ...layer, videoUrl: item.ref };
     }
     try {
@@ -187,6 +188,16 @@ export default function WallpaperStage({
     if (!env.enabled || !env.rotationEnabled) return;
     tickRef.current();
   }, [env]);
+
+  useEffect(() => {
+    if (!env.enabled || !env.rotationEnabled) {
+      syncPillarboxWallImage(null);
+      return;
+    }
+    const slot = front >= 0 ? front : visibleFrontRef.current;
+    const layer = layers[slot];
+    syncPillarboxWallImage(layer?.imageUrl ?? null);
+  }, [env.enabled, env.rotationEnabled, front, layers]);
 
   if (!env.enabled || !env.rotationEnabled) return null;
 

@@ -158,6 +158,7 @@ declare global {
       ankiLinkState(): Promise<AnkiLinkStatus>;
       onAnkiLinkChanged(cb: (s: AnkiLinkStatus) => void): () => void;
       ankiMineNote(req: MineNoteRequest): Promise<MineNoteResult>;
+      ankiDeleteNotes(noteIds: number[]): Promise<{ ok: boolean; error?: string }>;
       ankiEnsureModel(id?: ProfileId): Promise<EnsureModelResult>;
       ankiModelFields(modelName: string): Promise<{ ok: boolean; fields: string[]; error?: string }>;
       ankiGetIntervals(opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot>;
@@ -182,6 +183,16 @@ declare global {
       popoutListOpen(): Promise<string[]>;
       onPopoutChanged(cb: (sections: string[]) => void): () => void;
       popoutControl(action: 'minimize' | 'maximize' | 'close'): Promise<void>;
+      miniOpen(size?: { width?: number; height?: number }): Promise<{ ok: boolean }>;
+      miniClose(): Promise<{ ok: boolean }>;
+      miniSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
+      miniIsOpen(): Promise<boolean>;
+      miniFocusMain(): Promise<void>;
+      lockscreenOpen(size?: { width?: number; height?: number }): Promise<{ ok: boolean }>;
+      lockscreenUnlock(): Promise<{ ok: boolean }>;
+      lockscreenSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
+      lockscreenIsOpen(): Promise<boolean>;
+      onLockscreenUnlocked(cb: () => void): () => void;
       companionHostSetEnabled(enabled: boolean, span?: 'primary' | 'all'): Promise<{ ok: boolean }>;
       companionHostSetSpan(span: 'primary' | 'all'): Promise<{ ok: boolean }>;
       companionHostIsOpen(): Promise<boolean>;

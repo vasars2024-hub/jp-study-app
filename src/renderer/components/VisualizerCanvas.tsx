@@ -204,6 +204,107 @@ export default function VisualizerCanvas({ settings, className, idleBaseline }: 
       g.globalAlpha = 1;
     };
 
+    // Windows XP Classic visualizer - green bars with reflection
+    const drawXPClassic = (w: number, h: number, c: Palette) => {
+      const bins = usableBins();
+      const bars = Math.max(16, Math.min(64, Math.floor(w / 12)));
+      const barWidth = w / bars - 2;
+      const maxBarHeight = h * 0.7;
+      
+      for (let i = 0; i < bars; i++) {
+        const [binStart, binEnd] = barBinRange(i, bars, bins);
+        const v = Math.min(1, peakInRange(binStart, binEnd, bins) * sens) * fade;
+        const barHeight = Math.max(4, v * maxBarHeight);
+        const x = i * (w / bars) + 1;
+        const y = h - barHeight;
+        
+        // XP-style green gradient bars
+        const grad = g.createLinearGradient(x, y, x, h);
+        grad.addColorStop(0, '#00ff00');
+        grad.addColorStop(0.3, '#00cc00');
+        grad.addColorStop(0.7, '#009900');
+        grad.addColorStop(1, '#006600');
+        
+        g.fillStyle = grad;
+        g.globalAlpha = 0.8 + v * 0.2;
+        g.fillRect(x, y, barWidth, barHeight);
+        
+        // Reflection effect (faded mirror below)
+        if (barHeight > 10) {
+          const reflectGrad = g.createLinearGradient(x, h, x, h + barHeight * 0.4);
+          reflectGrad.addColorStop(0, 'rgba(0, 255, 0, 0.3)');
+          reflectGrad.addColorStop(1, 'rgba(0, 255, 0, 0)');
+          g.fillStyle = reflectGrad;
+          g.fillRect(x, h, barWidth, barHeight * 0.4);
+        }
+      }
+      g.globalAlpha = 1;
+    };
+
+    // Windows Vista Aero visualizer - glass bars with glow
+    const drawVistaAero = (w: number, h: number, c: Palette) => {
+      const bins = usableBins();
+      const bars = Math.max(16, Math.min(48, Math.floor(w / 14)));
+      const barWidth = w / bars - 4;
+      const maxBarHeight = h * 0.65;
+      
+      for (let i = 0; i < bars; i++) {
+        const [binStart, binEnd] = barBinRange(i, bars, bins);
+        const v = Math.min(1, peakInRange(binStart, binEnd, bins) * sens) * fade;
+        const barHeight = Math.max(6, v * maxBarHeight);
+        const x = i * (w / bars) + 2;
+        const y = h - barHeight;
+        
+        // Vista-style glass bars with gradient
+        const grad = g.createLinearGradient(x, y, x, h);
+        grad.addColorStop(0, c.primary);
+        grad.addColorStop(0.5, c.secondary);
+        grad.addColorStop(1, colorMix(c.secondary, '#000000', 0.3));
+        
+        // Glow effect
+        g.shadowColor = c.primary;
+        g.shadowBlur = 8 * v;
+        g.fillStyle = grad;
+        g.globalAlpha = 0.7 + v * 0.3;
+        
+        // Rounded top corners for glass effect
+        g.beginPath();
+        g.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
+        g.fill();
+        
+        // Glass highlight at top
+        g.shadowBlur = 0;
+        const highlightGrad = g.createLinearGradient(x, y, x, y + barHeight * 0.3);
+        highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+        highlightGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        g.fillStyle = highlightGrad;
+        g.beginPath();
+        g.roundRect(x, y, barWidth, barHeight * 0.3, [4, 4, 0, 0]);
+        g.fill();
+      }
+      g.globalAlpha = 1;
+      g.shadowBlur = 0;
+    };
+
+    // Helper for color mixing
+    const colorMix = (color1: string, color2: string, ratio: number): string => {
+      // Simple hex color mixing
+      const hex = (c: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(c);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : { r: 0, g: 0, b: 0 };
+      };
+      const c1 = hex(color1);
+      const c2 = hex(color2);
+      const r = Math.round(c1.r + (c2.r - c1.r) * ratio);
+      const g = Math.round(c1.g + (c2.g - c1.g) * ratio);
+      const b = Math.round(c1.b + (c2.b - c1.b) * ratio);
+      return `rgb(${r}, ${g}, ${b})`;
+    };
+
     const avgLevel = (): number => {
       const bins = usableBins();
       let sum = 0;
@@ -271,6 +372,8 @@ export default function VisualizerCanvas({ settings, className, idleBaseline }: 
         const c = colors();
         if (settings.style === 'spectrum') drawSpectrum(w, h, c);
         else if (settings.style === 'wave') drawWave(w, h, c);
+        else if (settings.style === 'xp-classic') drawXPClassic(w, h, c);
+        else if (settings.style === 'vista-aero') drawVistaAero(w, h, c);
         else drawParticles(w, h, c);
         raf = requestAnimationFrame(frame);
       } else {

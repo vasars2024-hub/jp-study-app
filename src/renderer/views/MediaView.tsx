@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
 import MediaLibraryActions from '../components/MediaLibraryActions';
+import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import VirtualGrid from '../components/VirtualGrid';
 import { translate } from '../translator';
 import type { MediaItem, MediaOpen } from '../../shared/types';
@@ -388,7 +389,73 @@ export default function MediaView() {
     setWatchFolder(null);
   }, []);
 
+  const mediaMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'open', label: 'Open media file…', icon: <Icon name="folder" size={14} />, onSelect: openFile },
+        {
+          id: 'watch-folder',
+          label: watchFolder ? 'Change watch folder…' : 'Set watch folder…',
+          icon: <Icon name="folder" size={14} />,
+          onSelect: chooseWatchFolder,
+        },
+        { id: 'clear-watch', label: 'Stop watching folder', disabled: !watchFolder, onSelect: clearWatch },
+      ],
+    },
+    {
+      id: 'subtitles',
+      label: 'Subtitles',
+      items: [
+        { id: 'load-subs', label: 'Load subtitles…', disabled: !src, icon: <Icon name="caption" size={14} />, onSelect: openSubs },
+        {
+          id: 'generate-subs',
+          label: 'Generate subtitles',
+          disabled: !src || generating,
+          icon: <Icon name="sparkle" size={14} />,
+          onSelect: () => src && runGeneration(src),
+        },
+        { separator: true, label: '' },
+        { id: 'prev-line', label: 'Previous line', disabled: cues.length === 0, onSelect: () => jumpLine(-1) },
+        { id: 'next-line', label: 'Next line', disabled: cues.length === 0, onSelect: () => jumpLine(1) },
+        { id: 'replay-line', label: 'Replay line', disabled: !active, onSelect: replayLine },
+      ],
+    },
+    {
+      id: 'library',
+      label: 'Library',
+      items: [
+        {
+          id: 'clear-player',
+          label: 'Clear player',
+          disabled: !current && !src,
+          onSelect: () => {
+            setSrc(null);
+            setCurrent(null);
+          },
+        },
+        {
+          id: 'open-mal',
+          label: 'Search current title on MAL',
+          disabled: !current,
+          onSelect: () => current && window.api.openExternal(malUrl(current.title)),
+        },
+      ],
+    },
+  ];
+  const mediaStatus = (
+    <>
+      <StatusBarField>{items.length} media items</StatusBarField>
+      <StatusBarField>{current ? current.title : 'No media loaded'}</StatusBarField>
+      <StatusBarSpacer />
+      {cues.length > 0 && <StatusBarField>{cues.length} subtitle lines</StatusBarField>}
+      {watchFolder && <StatusBarField title={watchFolder}>Watch folder on</StatusBarField>}
+    </>
+  );
+
   return (
+    <AppChrome menus={mediaMenus} status={mediaStatus} className="aero-media-chrome">
     <div className="media-view">
       <div className="view-head">
         <p className="muted">{t('media.intro')}</p>
@@ -755,5 +822,6 @@ export default function MediaView() {
         />
       )}
     </div>
+    </AppChrome>
   );
 }

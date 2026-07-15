@@ -901,22 +901,54 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       )}
 
       {anki?.connected && entries.length > 0 && (
-        <div className="dict-anki-cfg">
+        <div className={`dict-anki-cfg ${variant === 'popup' ? 'compact' : ''}`}>
+          <Icon name="anki" size={12} className="dict-anki-icon" />
           <span className="dict-mine-target">
-            Mining into <b>{active.label}</b>
-            <span className="muted">
-              {' '}
-              · {active.anki.deckName} / {active.anki.modelName}
-            </span>
+            <b>{active.label}</b>
+            {variant !== 'popup' && (
+              <span className="muted">
+                {' '}
+                · {active.anki.deckName} / {active.anki.modelName}
+              </span>
+            )}
           </span>
-          {selectedEx.size > 0 ? (
-            <span className="dict-ex-selected muted">
-              {selectedEx.size} selected (manual) — all will be mined
-            </span>
-          ) : (
-            <span className="dict-ex-selected muted">
-              Auto examples: up to {counts.ja} ja / {counts.en} en / {counts.ru} ru / {counts.zh} zh
-            </span>
+          {variant !== 'popup' &&
+            (selectedEx.size > 0 ? (
+              <span className="dict-ex-selected muted">
+                {selectedEx.size} selected (manual) — all will be mined
+              </span>
+            ) : (
+              <span className="dict-ex-selected muted">
+                Auto examples: up to {counts.ja} ja / {counts.en} en / {counts.ru} ru / {counts.zh} zh
+              </span>
+            ))}
+          {variant === 'popup' && (
+            <div className="dict-anki-tip">
+              <div className="dict-anki-tip-row">
+                <span className="muted">Language</span>
+                <b>{lang.toUpperCase()}</b>
+              </div>
+              <div className="dict-anki-tip-row">
+                <span className="muted">Profile</span>
+                <b>{active.label}</b>
+              </div>
+              <div className="dict-anki-tip-row">
+                <span className="muted">Deck</span>
+                <b>{active.anki.deckName}</b>
+              </div>
+              <div className="dict-anki-tip-row">
+                <span className="muted">Note type</span>
+                <b>{active.anki.modelName}</b>
+              </div>
+              <div className="dict-anki-tip-row">
+                <span className="muted">Examples</span>
+                <b>
+                  {selectedEx.size > 0
+                    ? `${selectedEx.size} selected (manual)`
+                    : `up to ${counts.ja} ja / ${counts.en} en / ${counts.ru} ru / ${counts.zh} zh`}
+                </b>
+              </div>
+            </div>
           )}
         </div>
       )}

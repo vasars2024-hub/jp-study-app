@@ -53,7 +53,8 @@ type BoolKey =
   | 'prettyWrap'
   | 'prioritizeStyles'
   | 'hideFurigana'
-  | 'wordHighlight';
+  | 'wordHighlight'
+  | 'hyperlinksEnabled';
 const TOGGLES: { key: BoolKey; label: string }[] = [
   { key: 'justify', label: 'Justify text' },
   { key: 'kerning', label: 'Font kerning' },
@@ -62,6 +63,10 @@ const TOGGLES: { key: BoolKey; label: string }[] = [
   { key: 'prioritizeStyles', label: 'Prioritize my styles' },
   { key: 'hideFurigana', label: 'Hide furigana' },
   { key: 'wordHighlight', label: 'Vocabulary colors (New / Learning / Known)' },
+  {
+    key: 'hyperlinksEnabled',
+    label: 'Hyperlinks (Wikipedia → import as EPUB)',
+  },
 ];
 
 function Stepper(props: {
@@ -81,7 +86,7 @@ function Stepper(props: {
         </button>
         <span className="sp-value">{props.value}</span>
         <button className="btn small" disabled={props.incDisabled} onClick={props.onInc}>
-          ＋
+          +
         </button>
       </div>
     </div>

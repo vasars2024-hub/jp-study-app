@@ -33,6 +33,17 @@ import { groupLabelKey, pageMeta } from './settingsRegistry';
 import { useT } from '../../i18n';
 import { pushRecentPage } from './settingsRecent';
 import type { SettingsController, SettingsPageId, SettingsWallProps } from './types';
+import Icon from '../Icons';
+import {
+  AppChrome,
+  Button,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarSpacer,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from '../ui';
 import AppearancePage from './pages/AppearancePage';
 import WallpaperPage from './pages/WallpaperPage';
 import AtmospherePage from './pages/AtmospherePage';
@@ -46,6 +57,20 @@ import StoragePage from './pages/StoragePage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
 import MemoryPage from './pages/MemoryPage';
+import MiniModePage from './pages/MiniModePage';
+import LockscreenPage from './pages/LockscreenPage';
+import {
+  loadMiniMode,
+  onMiniModeChanged,
+  saveMiniMode,
+  type MiniModeSettings,
+} from '../../miniMode';
+import {
+  applySettingsAdvancedClass,
+  loadSettingsAdvanced,
+  onSettingsAdvancedChanged,
+  setSettingsAdvanced,
+} from '../../settingsAdvanced';
 
 const MOTION_KEY = 'jp-os-reduce-motion';
 
@@ -55,6 +80,7 @@ function applyMotion(reduce: boolean): void {
 
 export default function SettingsApp(props: SettingsWallProps) {
   const { t } = useT();
+  const aero = useAeroMaterials();
   const [page, setPage] = useState<SettingsPageId>('home');
   const [focusSettingId, setFocusSettingId] = useState<string | null>(null);
   const [look, setLook] = useState<OsPersonalization>(loadPersonalization);
@@ -69,6 +95,8 @@ export default function SettingsApp(props: SettingsWallProps) {
   const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
   const [whisperDevice, setWhisperDeviceState] = useState<WhisperDevice>(loadWhisperDevice);
   const [lyricsSettings, setLyricsSettings] = useState(loadLyricsSettings);
+  const [mini, setMini] = useState<MiniModeSettings>(() => loadMiniMode());
+  const [advancedMode, setAdvancedModeState] = useState(() => loadSettingsAdvanced());
   const searchRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -79,12 +107,17 @@ export default function SettingsApp(props: SettingsWallProps) {
     contentRef.current?.scrollTo({ top: 0 });
   }, []);
 
+  useEffect(() => {
+    applySettingsAdvancedClass();
+  }, []);
   useEffect(() => onZoomChanged(setZoomState), []);
   useEffect(() => onLyricsSettingsChanged(setLyricsSettings), []);
   useEffect(() => onPersonalizationChanged(setLook), []);
   useEffect(() => onDesktopPrefsChanged(setDeskPrefs), []);
   useEffect(() => onEnvironmentChanged(setEnv), []);
   useEffect(() => onCustomCssChanged(setUserCss), []);
+  useEffect(() => onMiniModeChanged(setMini), []);
+  useEffect(() => onSettingsAdvancedChanged(setAdvancedModeState), []);
 
   useEffect(() => {
     return registerCommandHandler('settings.focusSearch', () => {
@@ -162,6 +195,10 @@ export default function SettingsApp(props: SettingsWallProps) {
       setUserCss,
       cssMsg,
       setCssMsg,
+      mini,
+      patchMini: (p) => setMini(saveMiniMode(p)),
+      advancedMode,
+      setAdvancedMode: (on: boolean) => setAdvancedModeState(setSettingsAdvanced(on)),
       seg: (active: boolean) => `btn small ${active ? 'primary' : ''}`,
     }),
     [
@@ -181,61 +218,234 @@ export default function SettingsApp(props: SettingsWallProps) {
       lyricsSettings,
       userCss,
       cssMsg,
+      mini,
+      advancedMode,
     ],
   );
 
   const meta = pageMeta(page);
   const reduceMotion = typeof document !== 'undefined' && document.documentElement.classList.contains('reduce-motion');
+  const pageLabel = meta?.label ?? 'Control Center';
+  const pageGroup = meta?.group ?? 'Settings';
+  const toggleAdvanced = () => setAdvancedModeState(setSettingsAdvanced(!advancedMode));
+  const focusSearch = () => {
+    searchRef.current?.focus();
+    searchRef.current?.select();
+  };
+  const settingsMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        {
+          id: 'home',
+          label: 'Control Center Home',
+          icon: <Icon name="settings" size={14} />,
+          disabled: page === 'home',
+          onSelect: () => navigate('home'),
+        },
+        {
+          id: 'find-setting',
+          label: 'Find a setting',
+          icon: <Icon name="search" size={14} />,
+          onSelect: focusSearch,
+        },
+        { id: 'file-sep-1', separator: true, label: '' },
+        {
+          id: 'display',
+          label: 'Open Display',
+          icon: <Icon name="monitor" size={14} />,
+          disabled: page === 'display',
+          onSelect: () => navigate('display'),
+        },
+        {
+          id: 'lockscreen',
+          label: 'Open Lockscreen',
+          icon: <Icon name="lock" size={14} />,
+          disabled: page === 'lockscreen',
+          onSelect: () => navigate('lockscreen'),
+        },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        {
+          id: 'standard',
+          label: advancedMode ? 'Hide advanced pages' : 'Show advanced pages',
+          icon: <Icon name="wrench" size={14} />,
+          onSelect: toggleAdvanced,
+        },
+        {
+          id: 'desktop-layout',
+          label: 'Desktop layout',
+          icon: <Icon name="app" size={14} />,
+          disabled: page === 'desktop-layout',
+          onSelect: () => navigate('desktop-layout'),
+        },
+        {
+          id: 'shortcuts',
+          label: 'Keyboard shortcuts',
+          icon: <Icon name="keyboard" size={14} />,
+          disabled: page === 'shortcuts',
+          onSelect: () => navigate('shortcuts'),
+        },
+      ],
+    },
+    {
+      id: 'page',
+      label: 'Page',
+      items: [
+        {
+          id: 'appearance',
+          label: 'Appearance',
+          icon: <Icon name="brush" size={14} />,
+          disabled: page === 'appearance',
+          onSelect: () => navigate('appearance'),
+        },
+        {
+          id: 'reading',
+          label: 'Reading',
+          icon: <Icon name="novels" size={14} />,
+          disabled: page === 'reading',
+          onSelect: () => navigate('reading'),
+        },
+        {
+          id: 'transcription',
+          label: 'Transcription',
+          icon: <Icon name="caption" size={14} />,
+          disabled: page === 'transcription',
+          onSelect: () => navigate('transcription'),
+        },
+        {
+          id: 'memory',
+          label: 'Memory and storage',
+          icon: <Icon name="folder" size={14} />,
+          disabled: page === 'memory',
+          onSelect: () => navigate('memory'),
+        },
+      ],
+    },
+  ];
+  const settingsStatus = (
+    <>
+      <StatusBarField>{pageLabel}</StatusBarField>
+      <StatusBarField>{pageGroup}</StatusBarField>
+      <StatusBarSpacer />
+      <StatusBarField>{advancedMode ? 'Advanced pages visible' : 'Standard pages'}</StatusBarField>
+      <StatusBarField title={`Theme: ${theme}`}>{theme}</StatusBarField>
+      <StatusBarField>{Math.round(zoom * 100)}%</StatusBarField>
+    </>
+  );
+
+  // If user turns Advanced off while on an advanced-only page, bounce home.
+  useEffect(() => {
+    if (!advancedMode && meta?.advanced && page !== 'home') {
+      navigate('home');
+    }
+  }, [advancedMode, meta?.advanced, page, navigate]);
 
   return (
     <SettingsProvider value={ctrl}>
-      <div className="os-settings os-settings-v2">
-        <div className="os-set-top">
-          <SettingsSearch ref={searchRef} onNavigate={navigate} />
-        </div>
-        <div className="os-set-body">
-          <SettingsNav page={page} onNavigate={(id) => navigate(id)} />
-          <div
-            ref={contentRef}
-            className={`os-set-pane-v2${reduceMotion ? '' : ' os-set-pane-anim'}`}
-            key={page}
-            role="main"
-            aria-label={meta ? t(meta.labelKey) : t('settings.appTitle')}
-          >
-            {page !== 'home' && meta && (
-              <header className="os-set-page-head">
-                <p className="os-set-breadcrumb muted">
-                  {meta.group ? (
-                    <>
-                      <span>{t(groupLabelKey(meta.group))}</span>
-                      <span className="os-set-breadcrumb-sep" aria-hidden>
-                        /
-                      </span>
-                    </>
-                  ) : null}
-                  <span>{t(meta.labelKey)}</span>
-                </p>
-                <h2 className="os-set-page-title">{t(meta.labelKey)}</h2>
-                {meta.descKey && <p className="os-set-page-intro muted">{t(meta.descKey)}</p>}
-              </header>
+      <AppChrome menus={settingsMenus} status={settingsStatus} className="aero-settings-chrome">
+        <div className={`os-settings os-settings-v2${advancedMode ? ' is-advanced' : ''}${aero ? ' aero-settings' : ''}`}>
+          <div className="os-set-top">
+            <SettingsSearch ref={searchRef} onNavigate={navigate} />
+            {aero && (
+              <Toolbar className="aero-settings-commandbar" aria-label="Settings commands">
+                <Button
+                  size="sm"
+                  disabled={page === 'home'}
+                  leftIcon={<Icon name="settings" size={14} />}
+                  onClick={() => navigate('home')}
+                >
+                  Home
+                </Button>
+                <Button size="sm" leftIcon={<Icon name="search" size={14} />} onClick={focusSearch}>
+                  Find
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={page === 'display'}
+                  leftIcon={<Icon name="monitor" size={14} />}
+                  onClick={() => navigate('display')}
+                >
+                  Display
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={page === 'lockscreen'}
+                  leftIcon={<Icon name="lock" size={14} />}
+                  onClick={() => navigate('lockscreen')}
+                >
+                  Lock
+                </Button>
+                <ToolbarSpacer />
+                <Button
+                  size="sm"
+                  variant={advancedMode ? 'primary' : 'default'}
+                  leftIcon={<Icon name="wrench" size={14} />}
+                  onClick={toggleAdvanced}
+                  aria-pressed={advancedMode}
+                >
+                  Advanced
+                </Button>
+              </Toolbar>
             )}
-            {page === 'home' && <SettingsHome />}
-            {page === 'appearance' && <AppearancePage />}
-            {page === 'wallpaper' && <WallpaperPage />}
-            {page === 'atmosphere' && <AtmospherePage />}
-            {page === 'companions' && <CompanionsPage />}
-            {page === 'desktop-layout' && <DesktopLayoutPage />}
-            {page === 'shortcuts' && <ShortcutsPage />}
-            {page === 'study' && <StudyPage />}
-            {page === 'reading' && <ReadingPage />}
-            {page === 'transcription' && <TranscriptionPage />}
-            {page === 'visualizer' && <VisualizerPage />}
-            {page === 'display' && <DisplayPage />}
-            {page === 'storage' && <StoragePage />}
-            {page === 'memory' && <MemoryPage />}
+          </div>
+          <div className="os-set-body">
+            <SettingsNav
+              page={page}
+              onNavigate={(id) => navigate(id)}
+              advancedMode={advancedMode}
+              onToggleAdvanced={toggleAdvanced}
+            />
+            <div
+              ref={contentRef}
+              className={`os-set-pane-v2${reduceMotion ? '' : ' os-set-pane-anim'}`}
+              key={page}
+              role="main"
+              aria-label={meta ? t(meta.labelKey) : t('settings.appTitle')}
+            >
+              {page !== 'home' && meta && (
+                <header className="os-set-page-head">
+                  <p className="os-set-breadcrumb muted">
+                    {meta.group ? (
+                      <>
+                        <span>{t(groupLabelKey(meta.group))}</span>
+                        <span className="os-set-breadcrumb-sep" aria-hidden>
+                          /
+                        </span>
+                      </>
+                    ) : null}
+                    <span>{t(meta.labelKey)}</span>
+                    {meta.advanced && <span className="os-set-adv-badge">Advanced</span>}
+                  </p>
+                  <h2 className="os-set-page-title">{t(meta.labelKey)}</h2>
+                  {meta.descKey && <p className="os-set-page-intro muted">{t(meta.descKey)}</p>}
+                </header>
+              )}
+              {page === 'home' && <SettingsHome />}
+              {page === 'appearance' && <AppearancePage />}
+              {page === 'wallpaper' && <WallpaperPage />}
+              {page === 'atmosphere' && <AtmospherePage />}
+              {page === 'companions' && <CompanionsPage />}
+              {page === 'desktop-layout' && <DesktopLayoutPage />}
+              {page === 'shortcuts' && <ShortcutsPage />}
+              {page === 'mini' && <MiniModePage />}
+              {page === 'lockscreen' && <LockscreenPage />}
+              {page === 'study' && <StudyPage />}
+              {page === 'reading' && <ReadingPage />}
+              {page === 'transcription' && <TranscriptionPage />}
+              {page === 'visualizer' && <VisualizerPage />}
+              {page === 'display' && <DisplayPage />}
+              {page === 'storage' && <StoragePage />}
+              {page === 'memory' && <MemoryPage />}
+            </div>
           </div>
         </div>
-      </div>
+      </AppChrome>
     </SettingsProvider>
   );
 }

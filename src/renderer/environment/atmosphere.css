@@ -1,0 +1,31 @@
+/* =============================================================================
+   Atmosphere polish (Phase 3 · M5/M6)
+   -----------------------------------------------------------------------------
+   Self-contained: no edits to the tested lighting/particle code and no changes
+   to styles.css. Additive rules only.
+   ============================================================================= */
+
+/* M5 — ease the day-cycle lighting opacity so time-of-day phase changes settle
+   softly instead of snapping (opacity is animatable; the gradient still swaps,
+   but the fade hides the seam). */
+.os-day-lighting {
+  transition: opacity 1.6s ease;
+}
+
+/* M6 — subtle depth: a soft top light-bloom + an edge vignette over the living
+   stack, giving the desktop a sense of place. Aero secret-mode ONLY, so the
+   default living desktop is unchanged. pointer-events:none; never distracting. */
+:root[data-materials='aero'] .os-env-stack::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(80% 50% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 55%),
+    radial-gradient(130% 100% at 50% 35%, transparent 55%, rgba(0, 0, 0, 0.18) 100%);
+}
+
+/* Battery Saver — drop the extra atmospheric layer. */
+:root[data-perf='battery'] .os-env-stack::after {
+  display: none;
+}

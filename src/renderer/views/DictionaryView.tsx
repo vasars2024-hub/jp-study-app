@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import DictionaryResults, { type DictLang } from '../components/DictionaryResults';
+import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 
 export const DICT_LANG_KEY = 'jp-study-dict-lang';
 
@@ -22,7 +23,28 @@ export default function DictionaryView() {
 
   const isZh = lang === 'zh';
 
+  // View menu (language) + source status — Aero only (AppChrome pass-through in
+  // the default theme). Drives the existing pickLang handler.
+  const dictMenus: MenuBarMenu[] = [
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        { id: 'ja', label: '日本語 (Japanese)', onSelect: () => pickLang('ja') },
+        { id: 'zh', label: '中文 (Chinese)', onSelect: () => pickLang('zh') },
+      ],
+    },
+  ];
+  const dictStatus = (
+    <>
+      <StatusBarField>{isZh ? 'Chinese' : 'Japanese'}</StatusBarField>
+      <StatusBarSpacer />
+      <StatusBarField>{isZh ? 'CC-CEDICT' : 'JMdict / Jisho'}</StatusBarField>
+    </>
+  );
+
   return (
+    <AppChrome menus={dictMenus} status={dictStatus} className="aero-dict-chrome">
     <div className="dict-view">
       <div className="view-head">
         <p className="muted">
@@ -70,5 +92,6 @@ export default function DictionaryView() {
         <DictionaryResults query={query} variant="page" lang={lang} />
       )}
     </div>
+    </AppChrome>
   );
 }

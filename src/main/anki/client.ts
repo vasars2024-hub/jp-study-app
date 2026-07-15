@@ -47,6 +47,7 @@ export interface AnkiActionMap {
   createModel: { params: CreateModelParams; result: unknown };
   addNote: { params: { note: AnkiNoteInput }; result: number };
   canAddNotes: { params: { notes: AnkiNoteInput[] }; result: boolean[] };
+  deleteNotes: { params: { notes: number[] }; result: null };
   storeMediaFile: { params: { filename: string; data: string }; result: string };
   findNotes: { params: { query: string }; result: number[] };
   notesInfo: { params: { notes: number[] }; result: AnkiNoteInfo[] };
@@ -71,6 +72,7 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   createModel: MUTATE_TIMEOUT_MS,
   addNote: MUTATE_TIMEOUT_MS,
   canAddNotes: MUTATE_TIMEOUT_MS,
+  deleteNotes: MUTATE_TIMEOUT_MS,
   storeMediaFile: MUTATE_TIMEOUT_MS,
   findNotes: BULK_TIMEOUT_MS,
   notesInfo: BULK_TIMEOUT_MS,

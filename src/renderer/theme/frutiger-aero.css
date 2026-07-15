@@ -1,0 +1,92 @@
+/* =============================================================================
+   Frutiger Aero — the secret theme (Phase 1 · M3)
+   -----------------------------------------------------------------------------
+   A LIGHT, glass-and-sky palette mapped onto the app's semantic tokens. A theme
+   is the one place literal color values belong; component/material code stays
+   token-driven. Registered HIDDEN (theme/frutiger-aero.ts) and reachable only
+   via the secret activator — never listed in the theme picker. materialSet
+   'aero' stamps data-materials="aero" so the material utilities brighten.
+
+   Imported after styles.css; `:root[data-theme='frutiger-aero']` outranks the
+   base `:root`, so these overrides win.
+   ============================================================================= */
+
+:root[data-theme='frutiger-aero'] {
+  color-scheme: light;
+
+  /* ---- Surfaces — bright sky & glass white ---- */
+  --bg: #9ed8f2;
+  --panel: #f7fbf7;
+  --panel-2: #e7f0ed;
+  --sidebar: #d2e5ed;
+  --chrome: #e4edf1;
+  --chrome-elevated: #fffdf6;
+
+  /* ---- Ink — deep ocean ---- */
+  --text: #123143;
+  --muted: #526f7a;
+  --border: #90afba;
+  --grid-line: rgba(18, 49, 67, 0.14);
+
+  /* ---- Accents — sky/aqua primary + warm-sunlight secondary ----
+     (Study OS uses red for --accent/--red; Aero swaps to sky blue, with warm
+     orange kept on --red so danger/caution controls still read as warm.) */
+  --accent: #d7245f;
+  --accent-2: #00a8c8;
+  --red: #c21f45;
+  --red-deep: #861a33;
+  --aero-aqua: #00b8d0;
+  --aero-green: #35a86b;
+  --aero-amber: #f4b04c;
+
+  /* ---- Controls — frosted white ---- */
+  --control-bg: rgba(255, 255, 255, 0.84);
+  --control-border: rgba(18, 49, 67, 0.28);
+
+  /* ---- Soft, blue-tinted shadows ---- */
+  --shadow-color-weak: rgba(17, 50, 65, 0.14);
+  --shadow-color: rgba(17, 50, 65, 0.24);
+  --shadow-color-strong: rgba(10, 29, 39, 0.42);
+  --shadow-card: 0 3px 14px rgba(17, 50, 65, 0.22);
+
+  /* ---- Pillarbox (outer border) styles ---- */
+  --pillarbox-bg: linear-gradient(135deg, #9ed8f2 0%, #b8e4f8 50%, #d4f0fc 100%);
+  --pillarbox-solid: #1a1a2e;
+  --shadow-toolbar: 0 1px 6px rgba(17, 50, 65, 0.18);
+
+  /* ---- Bright Aero glass (overrides the dark base glass tokens) ---- */
+  --aero-work-surface: #f9fbf4;
+  --aero-work-surface-alt: #eef5f0;
+  --aero-nav-surface: #d8e9ef;
+  --aero-chrome-glass: rgba(229, 242, 247, 0.72);
+  --aero-chrome-glass-strong: rgba(238, 248, 251, 0.88);
+  --aero-chrome-glass-inactive: rgba(218, 229, 234, 0.58);
+  --aero-frame-active: rgba(0, 168, 200, 0.52);
+  --aero-frame-inactive: rgba(95, 116, 126, 0.28);
+  /* Vista Luna aqua selection — not the Study OS red accent. */
+  --aero-selection-fill: rgba(139, 218, 244, 0.52);
+  --aero-selection-fill-strong: rgba(87, 179, 220, 0.62);
+  --aero-sunken: rgba(255, 255, 255, 0.72);
+
+  --sheen: rgba(255, 255, 255, 0.82);
+  --sheen-strong: rgba(255, 255, 255, 1);
+  --glass-tint: rgba(226, 241, 247, 0.56);
+  --glass-tint-strong: rgba(238, 248, 251, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.78);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+  --glass-blur: 22px;
+
+  /* ---- Silver chrome / plastic faces for .mat-chrome / .mat-plastic ---- */
+  --mat-metal-top: #ffffff;
+  --mat-metal-mid: #e7eef2;
+  --mat-metal-bot: #b9ccd6;
+  --mat-plastic-face: #f7fbf7;
+  --mat-plastic-top: #ffffff;
+
+  /* ---- Scrollbars follow the sky accent ---- */
+  --scrollbar-thumb: color-mix(in srgb, var(--accent) 50%, #ffffff);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 75%, #ffffff);
+
+  /* ---- Friendly, slightly heavier display face ---- */
+  --font-display: 'Segoe UI Semibold', 'Segoe UI', var(--font-body);
+}

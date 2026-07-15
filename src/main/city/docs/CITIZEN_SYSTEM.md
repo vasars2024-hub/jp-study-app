@@ -48,7 +48,7 @@ The Noctae are not NPC workers, not controllable units, not a population statist
 
 ### Notation
 
-`P` is population count, a non-negative integer and a monotone ratchet. `A_P ∈ [0, 1]` is population activity, the renewable expression level of the citizenry. `π` is the ecological prosperity signal that drives growth (`SIMULATION_SYSTEMS.md` Section 8). Throughout, an *individual citizen* is not a stored record but a deterministic expression rendered from aggregate state; Section 3 makes this precise.
+`P` is population count, a non-negative integer that grows through prosperity and is never reduced by user absence (its life cycle, if any, is Citizen-owned — Section 4). `A_P ∈ [0, 1]` is population activity, the renewable expression level of the citizenry. `π` is the ecological prosperity signal that drives growth (`SIMULATION_SYSTEMS.md` Sections 2 and 19). Throughout, an *individual citizen* is not a stored record but a deterministic expression rendered from aggregate state; Section 3 makes this precise.
 
 ---
 
@@ -113,13 +113,15 @@ This is the load-bearing architectural fidelity point of the citizen layer. The 
 
 Two consequences bind every future refinement. First, the citizen state model adds *vocabulary* over canonical population variables; it never introduces hidden per-citizen simulation variables that would balloon the state or demand ticking. Second, the individuality the user sees and loves is real and honest — it is a faithful function of true civilization state — but it lives at the point of expression, seeded deterministically, and is snapshotted into permanence only when the user captures it as lore (Section 10).
 
+Rendered-not-stored does not mean inert. Within the agency boundary of `SIMULATION_SYSTEMS.md` Section 8 the Noctae genuinely *act* — they observe, maintain, teach, invent, preserve, and lose knowledge — and where an action carries durable consequence, the acting citizen's identity is committed so that its seeded-deterministic variation stays reproducible (`SIMULATION_SYSTEMS.md` Section 11: variation among causally qualified candidates, never uncontrolled randomness). What is never stored is a ticking per-citizen loop; what is real is the action and its recorded result. Citizens are actors, not decorative density.
+
 ---
 
 ## SECTION 4 — EMERGENT CITIZENSHIP
 
 ### Citizens Emerge; They Are Never Placed
 
-There is no citizen spawning control, no housing system, no recruitment, and no birth management anywhere in Noctis. Citizens appear as a deterministic consequence of ecological prosperity and nothing else. Following `SIMULATION_SYSTEMS.md` Section 8 and `ECOLOGY_SYSTEM.md` Section 13, population grows from the ecological prosperity signal `π`:
+There is no citizen spawning control, no housing system, no recruitment, and no birth management anywhere in Noctis. Citizens appear as a deterministic consequence of ecological prosperity and nothing else. Following `SIMULATION_SYSTEMS.md` Sections 2 and 19 and `ECOLOGY_SYSTEM.md` Section 13, population grows from the ecological prosperity signal `π`:
 
 ```
 P(t+1) = P(t) + growth( π )          growth >= 0, always
@@ -130,11 +132,11 @@ P(t+1) = P(t) + growth( π )          growth >= 0, always
 
 Growth is zero below the flourishing threshold and rises, with saturation, above it. As accumulated knowledge deepens, the ecology matures (the succession stages of `ECOLOGY_SYSTEM.md` Section 5) and the eras turn (`SIMULATION_SYSTEMS.md` Section 9); with that maturity the citizenry gains new biological complexity, forms social structures, and expresses more specialized symbolic roles (Section 6). Knowledge does not recruit citizens — it creates the conditions in which more life becomes possible, and life follows.
 
-### The Monotone Ratchet
+### Population And Absence
 
-Population count is a monotone ratchet: **it never decreases** — not during offline decay, not in hibernation, not for any input (`SIMULATION_SYSTEMS.md` Sections 2 and 8). What dims during quiet periods is the *activity* expression `A_P`, never the count. The citizens of a dormant city are indoors tending memory, not gone; the visible sparseness of a sleeping civilization is `A_P` at its floor while `P` holds exactly (Section 8).
+Under the model this document currently defines, population count only grows: it is not reduced by offline decay, by hibernation, or by any input (`SIMULATION_SYSTEMS.md` Sections 5 and 10). What dims during quiet periods is the *activity* expression `A_P`, never the count. The citizens of a dormant city are indoors tending memory, not gone; the visible sparseness of a sleeping civilization is `A_P` at its floor while `P` holds exactly (Section 8).
 
-The following do not exist in this model and may never be added: population micromanagement of any kind; assignment, jobs boards, or per-citizen commands; housing limits, caps that demand growth, or crowding pressure; starvation, hunger, or any consumption-failure state; and death simulation. No citizen is ever removed, and none is ever shown dying from the user's absence — ever (`GAME_DESIGN.md` Section 6). The learning that earned a citizen already happened and cannot un-happen; the ratchet is the mathematical form of that truth.
+One guarantee is permanent canon and never negotiable: **user absence never reduces population, and no citizen is ever shown dying from the user's absence — ever** (`GAME_DESIGN.md` Section 6; `SIMULATION_SYSTEMS.md` Section 10, Laws 5–6). The learning that earned a citizen already happened and cannot un-happen. What Tier 6 no longer fixes as physics is citizen *immortality itself*: the revised `SIMULATION_SYSTEMS.md` (Sections 10 and 19) neither mandates immortality nor prescribes a death model, and defers every life-cycle rule — birth, aging, retirement, succession, death, migration, replacement — to this document. This document does not define such a life cycle here, and does not invent one; it records only that the question is Citizen-owned, that any future life cycle must be biological or narrative in origin and never a consequence of user neglect, and that recorded history always outlives the citizen (`MEMORY_SYSTEM.md`). Forbidden in every model, present or future: population micromanagement of any kind; assignment, jobs boards, or per-citizen commands; housing limits, caps that demand growth, or crowding pressure; and starvation, hunger, or any consumption-failure state.
 
 ---
 
@@ -158,20 +160,20 @@ From this, **semaphore dialects drift**: the flash-grammar of a district complex
 
 ### Functions, Not Professions
 
-Noctis has no professions. There are no workers, farmers, miners, or soldiers, because there is no labor economy for them to belong to. Instead, citizens express **ecological and cultural functions** — symbolic roles that make a facet of civilization state legible as an individuated life. Representative roles:
+Noctis has no *user-managed* professions and no labor economy the user operates: there are no workers, farmers, miners, or soldiers to assign, staff, or optimize. Instead, citizens express **ecological and cultural functions** — symbolic roles that make a facet of civilization state legible as an individuated life. (Where a future `ECONOMY_SYSTEM.md` models production, labor, or allocation as civilizational *conditions*, it reads citizen participation, institutions, and vocational functions as input and owns their allocation; the user still operates none of it, and roles remain character — `SIMULATION_SYSTEMS.md` Section 20.) Representative roles:
 
 - **Archive Keepers** — citizens whose behavior expresses the mycelial memory layer: they tend the vaults and the knotted records, and their presence thickens where language study has rooted the archive (`ECOLOGY_SYSTEM.md` Section 7).
 - **Resonance Interpreters** — citizens who express the crystal-resonance state of their district, reading the coupled lattices and flashing in the sharp geometric rhythms that mathematics grows (`ECOLOGY_SYSTEM.md` Section 8).
 - **Migration Observers** — citizens who witness and mark the spore-moth seasons; their role activates while the moth network is active (Section 8, The Pheromone Plume).
 - **Memory Custodians** — citizens who carry generational inheritance, the diegetic bearers of what the civilization has preserved (Section 10).
 
-### Roles Produce Nothing
+### Roles Mint No Primary Value
 
-This is the discipline that keeps roles honest. A role is **character, not employment**. It produces no resource, carries no output, has no efficiency, and is never assigned — by the user or by the citizen. `SIMULATION_SYSTEMS.md` Section 11 forbids any edge from population to a resource ("Citizens are consequence, never source"), and Section 8 forbids assignment and per-citizen command. A Resonance Interpreter does not *operate* the crystal network; the citizen's behavior *reflects* it. Roles emerge deterministically from the ecological and era context a citizen expresses, and their sole function is legibility: they let the user read the state of their civilization in the lives of the people who embody it. Any future role that generates value, demands staffing, or invites optimization is invalid at birth (Section 12, Rule 3).
+This is the discipline that keeps roles honest. A role is **character, not employment**. It is never assigned by the user, never staffed, never optimized, and it mints no *primary* value — no learning-derived input, accumulated knowledge, or metabolic energy from nothing (`SIMULATION_SYSTEMS.md` Sections 8 and 13, the narrowed conservation boundary — the corrected form of the old "citizens are consequence, never source"). What a role *may* do is exactly what living citizens do: tend the vaults, read the resonance, teach an apprentice, keep a technique alive. Agency is not production — the behavior transforms and applies capabilities that learning, ecology, and prior history already support, and it is legible rather than profitable. A Resonance Interpreter does not *operate* the crystal network as a resource engine; the citizen's behavior *reflects and tends* it. Roles emerge deterministically from the ecological and era context a citizen expresses, and their sole function is legibility: they let the user read the state of their civilization in the lives of the people who embody it. Any future role that mints primary value, demands staffing, or invites optimization is invalid at birth (Section 12, Rule 3).
 
 ### Role Expansion
 
-New roles enter Noctis the way new fauna enter the ecology (`ECOLOGY_SYSTEM.md` Section 9): by function, not by roster. A proposed role must name the ecological or cultural facet it makes legible, the civilization state it expresses, and the Noctae organs through which it expresses that state — and it must produce nothing, demand nothing, and be assignable by no one. There is no numeric pressure to multiply roles; a few resonant, legible functions outweigh a directory of titles. Roles are also era-inflected: the same underlying function wears different behavior as technology turns — the knot-keeper of `SPORE_HEARTH` and the sound-vault tender of `PHONONIC_SUBTERRANEAN` are both Archive Keepers, expressing the memory layer in the idiom their era allows (era detail bound in `TECHNOLOGY_SYSTEM.md`). A role that reads as a job description rather than a way of seeing the civilization is rejected at Section 12, Rule 3.
+New roles enter Noctis the way new fauna enter the ecology (`ECOLOGY_SYSTEM.md` Section 9): by function, not by roster. A proposed role must name the ecological or cultural facet it makes legible, the civilization state it expresses, and the Noctae organs through which it expresses that state — and it must mint no primary value, demand no staffing, and be assignable by no one. There is no numeric pressure to multiply roles; a few resonant, legible functions outweigh a directory of titles. Roles are also era-inflected: the same underlying function wears different behavior as technology turns — the knot-keeper of `SPORE_HEARTH` and the sound-vault tender of `PHONONIC_SUBTERRANEAN` are both Archive Keepers, expressing the memory layer in the idiom their era allows (era detail bound in `TECHNOLOGY_SYSTEM.md`). A role that reads as a job description rather than a way of seeing the civilization is rejected at Section 12, Rule 3.
 
 ---
 
@@ -189,7 +191,7 @@ Human learning reaches citizens only through the ecological layer — never dire
 
 **Consistency** creates **participation rhythm**: the moth seasons bring the citizenry out; a world studied daily is a world whose people are visibly present, its Migration Observers active and its plazas full.
 
-Every one of these is a cross-time-step consequence of metabolized study, read from the previous state and expressed in the next. Citizens never feed a value back upstream within an evaluation (`SIMULATION_SYSTEMS.md` Section 11).
+Every one of these is a cross-time-step consequence of metabolized study, read from the previous state and expressed in the next. Citizens never feed a *primary* value back upstream within an evaluation (`SIMULATION_SYSTEMS.md` Section 13). And because knowledge, practice, maintenance, reproduction, and possession are distinct states (`SIMULATION_SYSTEMS.md` Section 10, Law 9), a citizen may understand a technique without currently practicing it, keep one alive by maintenance long after the understanding that first grew it has thinned, or let a technique lapse from active practice while its record endures — invention, reproduction, and technical loss being Technology's mechanics (`TECHNOLOGY_SYSTEM.md`), for which the citizen layer supplies the actors who carry them.
 
 ---
 
@@ -258,7 +260,7 @@ Any future citizen feature must pass every rule below, *after* clearing the tier
 
 Every future citizen concept for the Noctis Civilization Module must pass, in order: the Tier 1 test of `VISION.md`, the Tier 2 test of `ART_DIRECTION.md`, the Tier 3 test of `NOCTIS_ECOLOGICAL_ENGINE.md`, the experience tests of `GAME_DESIGN.md`, the structural laws of `ARCHITECTURE.md`, the physics of `SIMULATION_SYSTEMS.md`, the ecological laws of `ECOLOGY_SYSTEM.md`, and the citizen laws of this document. Anything that fails is rejected and redesigned from the constraint up.
 
-The population is a ratchet, never a resource. The roles are character, never labor. The memory is inheritance, never a database. And the citizens themselves are the clearest proof the module offers that learning becomes life.
+Population grows through prosperity and is never a resource, and absence never reduces it. The roles are character, never user-managed labor. The memory is inheritance, never a database. And the citizens themselves are the clearest proof the module offers that learning becomes life.
 
 Noctae are not characters the user commands.
 

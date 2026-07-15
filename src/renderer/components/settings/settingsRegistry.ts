@@ -30,6 +30,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'flame',
     group: 'Personalization',
     descKey: 'settings.nav.atmosphere.desc',
+    advanced: true,
   },
   {
     id: 'companions',
@@ -37,6 +38,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'heart',
     group: 'Personalization',
     descKey: 'settings.nav.companions.desc',
+    advanced: true,
   },
   {
     id: 'desktop-layout',
@@ -51,6 +53,20 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'command',
     group: 'Desktop',
     descKey: 'settings.nav.shortcuts.desc',
+  },
+  {
+    id: 'mini',
+    labelKey: 'Mini View',
+    icon: 'widgets',
+    group: 'Desktop',
+    descKey: 'Reduced launcher with pop-out apps',
+  },
+  {
+    id: 'lockscreen',
+    labelKey: 'Lockscreen',
+    icon: 'lock',
+    group: 'Desktop',
+    descKey: 'PIN gate on app launch',
   },
   {
     id: 'study',
@@ -72,6 +88,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'caption',
     group: 'Study',
     descKey: 'settings.nav.transcription.desc',
+    advanced: true,
   },
   {
     id: 'visualizer',
@@ -79,6 +96,7 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'monitor',
     group: 'Media',
     descKey: 'settings.nav.visualizer.desc',
+    advanced: true,
   },
   {
     id: 'display',
@@ -178,6 +196,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     keywords: ['css', 'custom css', 'advanced', 'sandbox', 'style'],
     pageId: 'appearance',
     group: 'Personalization',
+    advanced: true,
   },
 
   // Wallpaper
@@ -341,6 +360,32 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.shortcuts.desc',
     keywords: ['shortcut', 'keybind', 'hotkey', 'keyboard', 'mouse', 'ctrl', 'binding'],
     pageId: 'shortcuts',
+    group: 'Desktop',
+  },
+
+  // Lockscreen
+  {
+    id: 'lockscreen-enable',
+    title: 'Lockscreen',
+    description: 'Require a passcode when Study OS launches',
+    keywords: ['lock', 'lockscreen', 'pin', 'passcode', 'password', 'security', 'login'],
+    pageId: 'lockscreen',
+    group: 'Desktop',
+  },
+  {
+    id: 'lockscreen-pin',
+    title: 'Lockscreen passcode',
+    description: 'Set or change the 4-digit PIN',
+    keywords: ['pin', 'passcode', 'password', '4 digit', 'lock'],
+    pageId: 'lockscreen',
+    group: 'Desktop',
+  },
+  {
+    id: 'lockscreen-tint',
+    title: 'Lockscreen look',
+    description: 'Tint behind the PIN panel',
+    keywords: ['lockscreen', 'tint', 'look', 'theme'],
+    pageId: 'lockscreen',
     group: 'Desktop',
   },
 
@@ -599,17 +644,20 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
 ];
 
-/**
- * `t` is required so a query matches the *displayed* (translated) title as
- * well as the always-English `keywords` — a JA/ZH/RU user can search in their
- * UI language, and everyone can still search by the English feature name.
- */
-export function searchSettings(query: string, t: (key: string) => string): SettingsRegistryEntry[] {
+export function searchSettings(
+  query: string,
+  t: (key: string) => string,
+  opts?: { advanced?: boolean },
+): SettingsRegistryEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
+  const advanced = opts?.advanced ?? false;
   const words = q.split(/\s+/).filter(Boolean);
   const scored: { e: SettingsRegistryEntry; score: number; title: string }[] = [];
   for (const e of SETTINGS_REGISTRY) {
+    if (e.advanced && !advanced) continue;
+    const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
+    if (page?.advanced && !advanced) continue;
     const title = t(e.titleKey);
     const desc = e.descKey ? t(e.descKey) : '';
     const hay = [title, desc, e.group, e.pageId, ...e.keywords].join(' ').toLowerCase();

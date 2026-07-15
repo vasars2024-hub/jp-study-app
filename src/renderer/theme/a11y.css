@@ -1,0 +1,101 @@
+/* =============================================================================
+   Frutiger Aero Platform — Accessibility foundation (Phase 1 · M8)
+   -----------------------------------------------------------------------------
+   Global a11y that every component inherits. Imported late so it can reinforce.
+   Complements the reduced-motion handling already in motion.css and the
+   focus-ring tokens in tokens.css.
+   ============================================================================= */
+
+/* ---------- Screen-reader-only utility ----------------------------------- */
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+.sr-only-focusable:focus,
+.sr-only-focusable:focus-visible {
+  position: static !important;
+  width: auto; height: auto;
+  margin: 0; overflow: visible; clip: auto; white-space: normal;
+}
+
+/* ---------- Global focus-visible fallback -------------------------------
+   Guarantees keyboard users always see a focus ring, even on elements that
+   don't style focus themselves. Component rings (.ui-*:focus-visible) have
+   higher specificity and override this. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* ---------- Reduced motion (OS setting) ---------------------------------
+   Honour the OS preference app-wide, not just for .anim-* utilities. Durations
+   collapse to ~0 so transition/animation end events still fire (logic that
+   waits on them keeps working) but nothing visibly moves. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* In-app reduce-motion toggle (html.reduce-motion) — global, mirrors the OS
+   behaviour above so the setting actually stops all motion. */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* ---------- Large-text support ------------------------------------------
+   A future settings toggle sets data-text-size on <html>; the rem-based type
+   scale (typography.css) then grows uniformly. Complements the appZoom system
+   (which scales the whole UI); this scales text only. */
+html[data-text-size='large'] { font-size: 112.5%; }
+html[data-text-size='xlarge'] { font-size: 125%; }
+
+/* ---------- High-contrast theme formalisation ---------------------------
+   The high-contrast theme must not rely on translucency/blur (they wreck
+   contrast). Force opaque surfaces, strong borders, and a text-colour focus
+   ring wherever glass/materials are used. */
+:root[data-theme='high-contrast'] {
+  --glass-tint: var(--panel);
+  --glass-tint-strong: var(--panel);
+  --glass-border: var(--text);
+  --glass-highlight: transparent;
+  --focus-ring-color: var(--text);
+  --focus-ring-width: 3px;
+  --control-border: var(--text);
+}
+:root[data-theme='high-contrast'] .mat-glass,
+:root[data-theme='high-contrast'] .mat-frosted,
+:root[data-theme='high-contrast'] .mat-dialog,
+:root[data-theme='high-contrast'] .ui-glass-card,
+:root[data-theme='high-contrast'] .ui-window,
+:root[data-theme='high-contrast'] .ui-dialog,
+:root[data-theme='high-contrast'] .ui-menu,
+:root[data-theme='high-contrast'] .ui-toast,
+:root[data-theme='high-contrast'] .ui-tooltip,
+:root[data-theme='high-contrast'] .ui-overlay,
+:root[data-theme='high-contrast'] .os-flyout {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--panel) !important;
+  border-color: var(--text) !important;
+}
+
+/* ---------- OS "increased contrast" hint --------------------------------- */
+@media (prefers-contrast: more) {
+  :root {
+    --border: var(--text);
+    --focus-ring-width: 3px;
+  }
+}

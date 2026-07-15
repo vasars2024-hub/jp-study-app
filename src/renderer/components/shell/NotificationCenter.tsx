@@ -1,131 +1,104 @@
-import { useEffect, useRef, useState } from 'react';
+/**
+ * Notification Center (Phase 2 · M6) — a bottom-right glass flyout listing the
+ * persistent notification history (notificationStore). Toggled by the taskbar
+ * bell via the `shell:toggleNotifications` event. Escape / backdrop closes;
+ * opening marks all read.
+ */
+import { useEffect, useReducer, useRef, useState } from 'react';
+import { Notification, Toggle } from '../ui';
 import {
+  clearAll,
   dismiss,
   getNotifications,
+  isDnd,
   markAllRead,
-  markRead,
   onNotificationsChanged,
   setDnd,
-  isDnd,
   type NotificationKind,
-  type ShellNotification,
 } from '../../notificationStore';
-import { NOTIFICATION_TOGGLE_EVENT } from './NotificationBell';
 import { useT } from '../../i18n';
 
-function kindClass(kind: NotificationKind): string {
-  if (kind === 'error') return 'os-notif-item--error';
-  if (kind === 'warning') return 'os-notif-item--warning';
-  if (kind === 'success') return 'os-notif-item--success';
-  if (kind === 'info') return 'os-notif-item--info';
-  return '';
+const TOGGLE_EVENT = 'shell:toggleNotifications';
+
+function uiKind(k: NotificationKind): 'default' | 'success' | 'warning' | 'error' {
+  return k === 'info' ? 'default' : k;
 }
 
-function formatWhen(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-function NotificationRow({ item, onOpen }: { item: ShellNotification; onOpen: () => void }) {
-  const { t } = useT();
-  const open = async () => {
-    markRead(item.id);
-    if (item.actionUrl) {
-      await window.api.openExternal(item.actionUrl);
-    }
-    onOpen();
-  };
-
-  return (
-    <div className={`os-notif-item ${kindClass(item.kind)} ${item.read ? 'read' : ''}`}>
-      <button type="button" className="os-notif-item-main" onClick={() => void open()}>
-        <strong>{item.title}</strong>
-        <span>{item.message}</span>
-        <time>{formatWhen(item.createdAt)}</time>
-      </button>
-      <button type="button" className="os-notif-dismiss" title={t('notifications.dismiss')} onClick={() => dismiss(item.id)}>
-        ×
-      </button>
-    </div>
-  );
+function timeAgo(ts: number): string {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
 export default function NotificationCenter() {
   const { t } = useT();
   const [open, setOpen] = useState(false);
-  const [dnd, setDndState] = useState(isDnd);
-  const [, force] = useState(0);
+  const [, force] = useReducer((n: number) => n + 1, 0);
   const panelRef = useRef<HTMLElement>(null);
 
-  useEffect(() => onNotificationsChanged(() => force((n) => n + 1)), []);
+  useEffect(() => onNotificationsChanged(force), []);
 
   useEffect(() => {
-    const toggle = () => setOpen((v) => !v);
-    window.addEventListener(NOTIFICATION_TOGGLE_EVENT, toggle);
-    return () => window.removeEventListener(NOTIFICATION_TOGGLE_EVENT, toggle);
+    const toggle = () => setOpen((o) => !o);
+    window.addEventListener(TOGGLE_EVENT, toggle);
+    return () => window.removeEventListener(TOGGLE_EVENT, toggle);
   }, []);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    const onClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('mousedown', onClick);
+    markAllRead();
     panelRef.current?.focus();
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('mousedown', onClick);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+      }
     };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [open]);
 
   if (!open) return null;
-
   const items = getNotifications();
 
   return (
-    <div className="os-notif-backdrop">
-      <aside
-        ref={panelRef}
-        tabIndex={-1}
-        className="os-notif-panel anim-slide-up"
-        role="dialog"
-        aria-label={t('notifications.title')}
-      >
-        <header className="os-notif-header">
-          <span>{t('notifications.title')}</span>
-          <div className="os-notif-header-actions">
-            <label className="os-notif-dnd">
-              <input
-                type="checkbox"
-                checked={dnd}
-                onChange={(e) => {
-                  setDnd(e.target.checked);
-                  setDndState(e.target.checked);
-                }}
-              />
-              <span>{t('notifications.quiet')}</span>
-            </label>
-            {items.length > 0 ? (
-              <button type="button" className="os-notif-link" onClick={() => markAllRead()}>
-                {t('notifications.markAllRead')}
-              </button>
-            ) : null}
-          </div>
+    <>
+      <div className="os-panel-backdrop" onMouseDown={() => setOpen(false)} />
+      <aside ref={panelRef} tabIndex={-1} className="os-flyout os-flyout--notifications anim-slide-up" role="dialog" aria-label={t('notifications.title')}>
+        <header className="os-flyout-head">
+          <span className="os-flyout-title">{t('notifications.title')}</span>
+          <span className="os-flyout-spacer" />
+          <Toggle
+            checked={isDnd()}
+            onChange={(e) => setDnd(e.currentTarget.checked)}
+            label={t('notifications.quiet')}
+          />
+          <button
+            type="button"
+            className="ui-btn ui-btn--sm ui-btn--ghost ui-focusable"
+            onClick={clearAll}
+            disabled={items.length === 0}
+          >
+            Clear all
+          </button>
         </header>
-        <div className="os-notif-list">
+        <div className="os-flyout-body">
           {items.length === 0 ? (
-            <p className="os-notif-empty">{t('notifications.empty')}</p>
+            <div className="os-notif-empty type-body">{t('notifications.empty')}</div>
           ) : (
             items.map((n) => (
-              <NotificationRow key={n.id} item={n} onOpen={() => setOpen(false)} />
+              <Notification key={n.id} title={n.title} kind={uiKind(n.kind)} onClose={() => dismiss(n.id)}>
+                {n.message}
+                <div className="os-notif-time type-status">{timeAgo(n.ts)}</div>
+              </Notification>
             ))
           )}
         </div>
       </aside>
-    </div>
+    </>
   );
 }

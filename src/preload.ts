@@ -231,6 +231,8 @@ const api = {
   },
   ankiMineNote: (req: MineNoteRequest): Promise<MineNoteResult> =>
     ipcRenderer.invoke('anki:mineNote', req),
+  ankiDeleteNotes: (noteIds: number[]): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('anki:deleteNotes', noteIds),
   ankiEnsureModel: (id?: ProfileId): Promise<EnsureModelResult> =>
     ipcRenderer.invoke('anki:ensureModel', id),
   /** Ordered field names of a note type (for the field-mapping editor). */
@@ -284,6 +286,28 @@ const api = {
   /** Control the calling pop-out window (its custom min/max/close buttons). */
   popoutControl: (action: 'minimize' | 'maximize' | 'close'): Promise<void> =>
     ipcRenderer.invoke('popout:control', action),
+
+  /** Floating Mini Widget Mode — borderless transparent always-on-top craft window. */
+  miniOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('mini:open', size),
+  miniClose: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('mini:close'),
+  miniSetSize: (size: { width: number; height: number }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('mini:setSize', size),
+  miniIsOpen: (): Promise<boolean> => ipcRenderer.invoke('mini:isOpen'),
+  miniFocusMain: (): Promise<void> => ipcRenderer.invoke('mini:focusMain'),
+
+  /** Floating lock widget — frameless, transparent, no OS shadow. */
+  lockscreenOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('lockscreen:open', size),
+  lockscreenUnlock: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('lockscreen:unlock'),
+  lockscreenSetSize: (size: { width: number; height: number }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('lockscreen:setSize', size),
+  lockscreenIsOpen: (): Promise<boolean> => ipcRenderer.invoke('lockscreen:isOpen'),
+  onLockscreenUnlocked: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('lockscreen:unlocked', handler);
+    return () => ipcRenderer.removeListener('lockscreen:unlocked', handler);
+  },
 
   // L4 — transparent OS companion host over the real desktop
   companionHostSetEnabled: (

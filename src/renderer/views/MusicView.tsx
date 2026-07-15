@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
 import MediaLibraryActions from '../components/MediaLibraryActions';
+import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu, useAeroMaterials } from '../components/ui';
 import VirtualList from '../components/VirtualList';
 import type { MediaItem } from '../../shared/types';
 import { guessSongMeta, type SongMeta } from '../lyrics';
@@ -55,6 +56,7 @@ function fmt(sec: number): string {
 
 export default function MusicView() {
   const { t } = useT();
+  const aero = useAeroMaterials();
   const activeLineRef = useRef<HTMLDivElement>(null);
   /** Suppress auto-scroll for a moment after the user scrolls the lyrics. */
   const userScrollUntil = useRef(0);
@@ -299,8 +301,65 @@ export default function MusicView() {
       ? t('music.empty.noLiked')
       : t('music.empty.noAudio');
 
+  const musicMenus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        {
+          id: 'open-media',
+          label: 'Open Media library',
+          onSelect: () => window.dispatchEvent(new CustomEvent('os:open', { detail: 'player' })),
+        },
+        { id: 'open-widget', label: 'Open mini-player widget', onSelect: openWidget },
+      ],
+    },
+    {
+      id: 'playback',
+      label: 'Playback',
+      items: [
+        { id: 'play-pause', label: ps.playing ? 'Pause' : 'Play', disabled: !ps.current, onSelect: player.toggle },
+        { id: 'previous', label: 'Previous song', disabled: !ps.current, onSelect: player.prev },
+        { id: 'next', label: 'Next song', disabled: !ps.current, onSelect: player.next },
+        { separator: true, label: '' },
+        { id: 'shuffle', label: ps.shuffle ? 'Shuffle: On' : 'Shuffle: Off', onSelect: player.toggleShuffle },
+        { id: 'repeat', label: `Repeat: ${ps.repeat}`, onSelect: player.cycleRepeat },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        ...(['recent', 'title', 'artist', 'folder'] as SortBy[]).map((id) => ({
+          id: `sort-${id}`,
+          label: `Sort by ${id[0].toUpperCase()}${id.slice(1)}`,
+          disabled: sortBy === id,
+          onSelect: () => setSortBy(id),
+        })),
+        { separator: true, label: '' },
+        {
+          id: 'liked-only',
+          label: likedOnly ? 'Show all songs' : 'Show liked songs only',
+          onSelect: () => setLikedOnly((v) => !v),
+        },
+      ],
+    },
+  ];
+
+  const musicStatus = (
+    <>
+      <StatusBarField>{baseSongs.length} songs</StatusBarField>
+      <StatusBarField>{rows.length} rows</StatusBarField>
+      {likedOnly && <StatusBarField>Liked only</StatusBarField>}
+      <StatusBarSpacer />
+      <StatusBarField>{ps.current && currentMeta ? currentMeta.title : 'No song selected'}</StatusBarField>
+      {lyrics.kind === 'synced' && <StatusBarField>{lyrics.cues.length} cues</StatusBarField>}
+    </>
+  );
+
   return (
-    <div className="music-view">
+    <AppChrome menus={musicMenus} status={musicStatus} className="aero-music-chrome">
+    <div className={`music-view${aero ? ' aero-music' : ''}`}>
       <aside className="music-songlist">
         <header className="music-list-head">
           <Icon name="music" size={20} />
@@ -527,5 +586,6 @@ export default function MusicView() {
         />
       )}
     </div>
+    </AppChrome>
   );
 }

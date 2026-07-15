@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { confirmDialog } from '../components/ui';
 import { PROFILE_GROUPS, type ProfileId } from '../../shared/profiles';
 import { KNOWN_LANGS } from '../../shared/langs';
 import type { YomitanDictInfo } from '../../shared/types';
@@ -122,7 +123,13 @@ export function ProfileSettingsSection() {
     const question = isSeed
       ? `Reset "${active.label}" to its default configuration?`
       : `Delete the profile "${active.label}"? This can't be undone.`;
-    if (!window.confirm(question)) return;
+    const ok = await confirmDialog({
+      title: isSeed ? 'Reset profile' : 'Delete profile',
+      message: question,
+      confirmLabel: isSeed ? 'Reset' : 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     setMsg(null);
     const res = await deleteProfile(activeId);
@@ -301,7 +308,13 @@ export function DictionarySettingsSection() {
   }
 
   async function onRemove(id: string, title: string) {
-    if (!window.confirm(`Remove “${title}” from offline dictionaries?`)) return;
+    const ok = await confirmDialog({
+      title: 'Remove dictionary',
+      message: `Remove “${title}” from offline dictionaries?`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     setRemoving(id);
     setMsg(null);
     const res = await window.api.dictRemoveYomitan(id);
@@ -576,7 +589,7 @@ export default function SettingsView() {
               disabled={atMax}
               aria-label="Increase app zoom"
             >
-              ＋
+              +
             </button>
             <button
               className="btn small"

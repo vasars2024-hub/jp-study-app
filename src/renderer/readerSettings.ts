@@ -45,6 +45,13 @@ export interface ReaderSettings {
 
   /** Tint words by how well you know them (LingQ-style; Japanese text). */
   wordHighlight: boolean;
+
+  /**
+   * When true, hyperlinks in EPUB text are active. Wikipedia links import as a
+   * new library EPUB; other https links open externally. When false, link
+   * clicks are ignored (safe for dense wiki dumps).
+   */
+  hyperlinksEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
@@ -64,6 +71,7 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   flow: 'paginated',
   writingMode: 'auto',
   wordHighlight: true,
+  hyperlinksEnabled: true,
 };
 
 export const FONT_MIN = 70;

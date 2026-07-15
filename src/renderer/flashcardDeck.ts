@@ -17,6 +17,12 @@ export interface DeckFlashcard {
   /** Persisted study state — marked via review "Got it". */
   known?: boolean;
   addedAt: number;
+  /** Anki export status for reader collection. */
+  ankiExported?: boolean;
+  ankiExportedAt?: number;
+  ankiNoteId?: number;
+  ankiExportError?: string;
+  ankiDeck?: string;
 }
 
 export type DeckFolderFilter = 'all' | 'unfiled' | string;
@@ -119,7 +125,22 @@ export function removeDeckCard(id: string): DeckFlashcard[] {
 /** Patch a card's editable fields in place (word/reading/meaning/sentence…). */
 export function updateDeckCard(
   id: string,
-  patch: Partial<Pick<DeckFlashcard, 'word' | 'reading' | 'meaning' | 'sentence' | 'front' | 'back'>>,
+  patch: Partial<
+    Pick<
+      DeckFlashcard,
+      | 'word'
+      | 'reading'
+      | 'meaning'
+      | 'sentence'
+      | 'front'
+      | 'back'
+      | 'ankiExported'
+      | 'ankiExportedAt'
+      | 'ankiNoteId'
+      | 'ankiExportError'
+      | 'ankiDeck'
+    >
+  >,
 ): DeckFlashcard[] {
   const store = readStore();
   store.cards = store.cards.map((c) => (c.id === id ? { ...c, ...patch } : c));

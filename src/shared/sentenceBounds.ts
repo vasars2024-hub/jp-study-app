@@ -2,16 +2,13 @@
 // highlight / collection and unit-tested without a browser.
 
 const ENDERS = new Set(['。', '．', '！', '？', '!', '?', '…', '‥']);
-const TRAIL_CLOSE = new Set(['」', '』', '）', ')', '」', '"', "'", '”', '’']);
-const OPEN_QUOTES: Record<string, string> = {
-  '「': '」',
-  '『': '』',
-  '（': '）',
-  '(': ')',
-  '“': '”',
-  '"': '"',
-  "'": "'",
-};
+const TRAIL_CLOSE = new Set(['」', '』', '）', ')', '"', "'", '”', '’']);
+const OPEN_QUOTES = new Set(['「', '『', '（', '(', '“', '"', "'"]);
+
+/** True for any punctuation that should trigger sentence-select instead of word lookup on click. */
+export function isSentencePunct(ch: string): boolean {
+  return ENDERS.has(ch) || TRAIL_CLOSE.has(ch) || OPEN_QUOTES.has(ch) || ch === '、' || ch === ',' || ch === '，';
+}
 
 export interface SentenceBounds {
   start: number;
@@ -20,64 +17,45 @@ export interface SentenceBounds {
 
 /**
  * Find the sentence containing `offset` in `text`.
- * - Enders: 。．！？!?… plus optional trailing closers 」』）"'
- * - Does not treat enders inside nested 「」『』（） pairs as sentence breaks
- *   when a matching open is on the stack (best-effort for nested quotes).
+ *
+ * A sentence ends at an ender (。．！？!?…) or a closing bracket/quote
+ * (」』）)"'”’ — Japanese dialogue routinely omits the ender before a closing
+ * quote (「元気ですか」 not 「元気ですか。」), so closers are boundaries in
+ * their own right, not just trailing decoration on an ender. This
+ * deliberately does NOT special-case quote nesting: a 「...」 block containing
+ * several sentences (the normal case for dialogue) breaks sentence-by-
+ * sentence like any other text, rather than being treated as one giant
+ * unbreakable span.
  */
 export function detectSentenceBounds(text: string, offset: number): SentenceBounds {
   if (!text) return { start: 0, end: 0 };
   const n = text.length;
-  let o = Math.max(0, Math.min(offset, n));
+  const o = Math.max(0, Math.min(offset, n));
+  const isBoundary = (ch: string) => ENDERS.has(ch) || TRAIL_CLOSE.has(ch);
 
-  // Start: walk back to previous ender (outside open quotes) or start.
+  // Start: walk back to the previous boundary char, or start of text.
   let start = 0;
-  {
-    const stack: string[] = [];
-    for (let i = 0; i < o; i++) {
-      const ch = text[i];
-      const closer = OPEN_QUOTES[ch];
-      if (closer) {
-        stack.push(closer);
-        continue;
-      }
-      if (stack.length && ch === stack[stack.length - 1]) {
-        stack.pop();
-        continue;
-      }
-      if (stack.length === 0 && ENDERS.has(ch)) {
-        // Include trailing closers with previous sentence; next char is start.
-        let j = i + 1;
-        while (j < n && (TRAIL_CLOSE.has(text[j]) || text[j] === ' ' || text[j] === '\n')) j++;
-        start = j;
-      }
+  for (let i = 0; i < o; i++) {
+    if (isBoundary(text[i])) {
+      let j = i + 1;
+      while (j < n && (TRAIL_CLOSE.has(text[j]) || text[j] === ' ' || text[j] === '\n')) j++;
+      start = j;
     }
   }
 
-  // End: walk forward to ender (+ trailing closers) or end of text.
+  // End: walk forward to the next boundary char (absorbing further trailing
+  // closers), a newline, or end of text.
   let end = n;
-  {
-    const stack: string[] = [];
-    for (let i = start; i < n; i++) {
-      const ch = text[i];
-      const closer = OPEN_QUOTES[ch];
-      if (closer) {
-        stack.push(closer);
-        continue;
-      }
-      if (stack.length && ch === stack[stack.length - 1]) {
-        stack.pop();
-        continue;
-      }
-      if (stack.length === 0 && ENDERS.has(ch)) {
-        end = i + 1;
-        while (end < n && TRAIL_CLOSE.has(text[end])) end++;
-        break;
-      }
-      // Soft break on newline when not inside quotes and we already have content.
-      if (stack.length === 0 && ch === '\n' && i > start) {
-        end = i;
-        break;
-      }
+  for (let i = start; i < n; i++) {
+    const ch = text[i];
+    if (isBoundary(ch)) {
+      end = i + 1;
+      while (end < n && TRAIL_CLOSE.has(text[end])) end++;
+      break;
+    }
+    if (ch === '\n' && i > start) {
+      end = i;
+      break;
     }
   }
 

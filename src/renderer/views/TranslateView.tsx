@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '../components/Icons';
+import {
+  AppChrome,
+  StatusBarField,
+  StatusBarSpacer,
+  Toolbar,
+  ToolbarSpacer,
+  type MenuBarMenu,
+  useAeroMaterials,
+} from '../components/ui';
 import { translateTo, onModelProgress, type TransLang } from '../translator';
 
 type State = 'idle' | 'loading' | 'translating' | 'done' | 'error';
@@ -26,6 +35,7 @@ const PLACEHOLDERS: Record<TransLang, string> = {
 };
 
 export default function TranslateView() {
+  const aero = useAeroMaterials();
   const [source, setSource] = useState<TransLang>(() => {
     const saved = localStorage.getItem(SOURCE_KEY) as TransLang | null;
     return saved ?? ((localStorage.getItem(LANG_KEY) as TransLang) || 'ja');
@@ -100,6 +110,99 @@ export default function TranslateView() {
   }, [input, source, target]);
 
   const busy = state === 'loading' || state === 'translating';
+
+  const menus: MenuBarMenu[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'clear', label: 'Clear text', disabled: !input && !output, onSelect: () => { setInput(''); setOutput(''); setError(''); setMsg(''); setState('idle'); } },
+      ],
+    },
+    {
+      id: 'tools',
+      label: 'Tools',
+      items: [
+        { id: 'swap', label: 'Swap languages', onSelect: swap },
+        { id: 'translate', label: 'Translate', disabled: busy || !input.trim(), onSelect: () => void run() },
+      ],
+    },
+  ];
+
+  if (aero) {
+    return (
+      <AppChrome
+        menus={menus}
+        status={
+          <>
+            <StatusBarField>{LANG_LABELS[source]} to {LANG_LABELS[target]}</StatusBarField>
+            <StatusBarField>{input.length} source chars</StatusBarField>
+            <StatusBarSpacer />
+            <StatusBarField live>{busy ? msg || 'Working' : state === 'done' ? 'Complete' : state === 'error' ? 'Error' : 'Ready'}</StatusBarField>
+          </>
+        }
+        className="aero-translate-chrome"
+      >
+        <div className="aero-translate">
+          <Toolbar className="aero-translate-toolbar" aria-label="Translation commands">
+            <label>
+              From
+              <select value={source} onChange={(e) => pickSource(e.target.value as TransLang)}>
+                {LANG_ORDER.filter((l) => l !== target).map((l) => (
+                  <option key={l} value={l}>{LANG_LABELS[l]}</option>
+                ))}
+              </select>
+            </label>
+            <button className="aero-translate-swap" onClick={swap} aria-label="Swap languages" title="Swap languages">
+              <Icon name="globe" size={13} />
+            </button>
+            <label>
+              To
+              <select value={target} onChange={(e) => pickTarget(e.target.value as TransLang)}>
+                {LANG_ORDER.filter((l) => l !== source).map((l) => (
+                  <option key={l} value={l}>{LANG_LABELS[l]}</option>
+                ))}
+              </select>
+            </label>
+            <ToolbarSpacer />
+            <button className="aero-translate-run" onClick={() => void run()} disabled={busy || !input.trim()}>
+              {busy ? 'Working...' : 'Translate'}
+            </button>
+          </Toolbar>
+
+          <div className="aero-translate-workbench">
+            <section className="aero-translate-pane">
+              <header>{LANG_LABELS[source]} source</header>
+              <textarea
+                className="aero-translate-textarea"
+                lang={source}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
+                }}
+                placeholder={PLACEHOLDERS[source]}
+              />
+            </section>
+
+            <section className="aero-translate-pane">
+              <header>{LANG_LABELS[target]} output</header>
+              <div className="aero-translate-output" lang={target}>
+                {output || <span className="muted">Translation appears here.</span>}
+              </div>
+            </section>
+          </div>
+
+          {(busy || error) && (
+            <div className="aero-translate-status">
+              {busy && <><span className="media-gen-dot" /><span>{msg}</span></>}
+              {error && <span className="aero-translate-error">{error}</span>}
+            </div>
+          )}
+        </div>
+      </AppChrome>
+    );
+  }
 
   return (
     <div className="tr-view">

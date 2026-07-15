@@ -88,12 +88,18 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
 
   const companionTypes = Array.isArray(partial.companionTypes)
     ? (partial.companionTypes.filter((t) =>
-        t === 'study-buddy' || t === 'critter' || t === 'timekeeper' || t === 'noctis',
+        t === 'study-buddy' || t === 'critter' || t === 'timekeeper' || t === 'noctis' || t === 'miko-shimeji',
       ) as EnvironmentSettings['companionTypes'])
     : DEFAULT_ENVIRONMENT.companionTypes;
 
   const companions = Array.isArray(partial.companions) ? partial.companions : DEFAULT_ENVIRONMENT.companions;
   const buddyRoutines = mergeBuddyRoutines(partial.buddyRoutines);
+
+  const WEATHER_MODES = ['off', 'auto', 'clear', 'rain', 'snow', 'fog', 'clouds'];
+  const weatherMode =
+    partial.weather && WEATHER_MODES.includes(partial.weather.mode)
+      ? partial.weather.mode
+      : DEFAULT_ENVIRONMENT.weather.mode;
 
   return {
     ...DEFAULT_ENVIRONMENT,
@@ -135,6 +141,24 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
         : DEFAULT_ENVIRONMENT.lightingIntensity,
     ),
     achievementCelebrations: partial.achievementCelebrations !== false,
+    weather: {
+      mode: weatherMode,
+      intensity: clamp01(
+        typeof partial.weather?.intensity === 'number'
+          ? partial.weather.intensity
+          : DEFAULT_ENVIRONMENT.weather.intensity,
+      ),
+    },
+    ambientAudio: {
+      enabled: partial.ambientAudio?.enabled === true,
+      volume: clamp01(
+        typeof partial.ambientAudio?.volume === 'number'
+          ? partial.ambientAudio.volume
+          : DEFAULT_ENVIRONMENT.ambientAudio.volume,
+      ),
+    },
+    environmentPresetId:
+      typeof partial.environmentPresetId === 'string' ? partial.environmentPresetId : undefined,
   };
 }
 

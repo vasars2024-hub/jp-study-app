@@ -4,6 +4,7 @@ import { getRecentQueries, pushRecentQuery } from './settingsRecent';
 import type { SettingsPageId, SettingsRegistryEntry } from './types';
 import Icon from '../Icons';
 import { useT } from '../../i18n';
+import { loadSettingsAdvanced } from '../../settingsAdvanced';
 
 const SettingsSearch = forwardRef<
   HTMLInputElement,
@@ -12,14 +13,19 @@ const SettingsSearch = forwardRef<
   }
 >(function SettingsSearch({ onNavigate }, ref) {
   const { t, lang } = useT();
+  // Prefer live advanced flag from document class (set by SettingsApp / boot).
+  const advancedMode =
+    typeof document !== 'undefined' && document.documentElement.classList.contains('settings-advanced')
+      ? true
+      : loadSettingsAdvanced();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();
-  // `lang`, not `t`, is the real dependency — see the note on useT() in
-  // renderer/i18n.ts: t's identity is stable, so depending on it here would
-  // let stale (previous-language) results linger after a language switch.
-  const results = useMemo(() => searchSettings(query, t), [query, lang]);
+  const results = useMemo(
+    () => searchSettings(query, t, { advanced: advancedMode }),
+    [query, lang, advancedMode, t],
+  );
   const recent = useMemo(() => (query.trim() ? [] : getRecentQueries()), [query, open]);
 
   useEffect(() => {

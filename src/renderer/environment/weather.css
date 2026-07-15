@@ -1,0 +1,63 @@
+/* =============================================================================
+   Weather overlays (Phase 3 · M3)
+   -----------------------------------------------------------------------------
+   Lightweight, atmospheric-only weather fields over the living desktop. Pure CSS
+   (no canvas), pointer-events none, opacity scaled by --weather-intensity.
+   Precipitation (rain/snow particles) is drawn by the particle engine — these
+   add the fog / cloud / overcast / haze wash + the drift motion.
+   ============================================================================= */
+
+.os-weather {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--weather-intensity, 0.5);
+  will-change: transform, background-position;
+}
+
+/* Fog — soft drifting grey-white haze */
+.os-weather-fog {
+  background:
+    radial-gradient(120% 80% at 50% 120%, rgba(220, 228, 236, 0.55), transparent 60%),
+    linear-gradient(0deg, rgba(210, 220, 230, 0.35), rgba(210, 220, 230, 0.05));
+  animation: os-weather-drift 40s ease-in-out infinite alternate;
+}
+
+/* Clouds — slow soft grey gradients drifting sideways */
+.os-weather-clouds {
+  background:
+    radial-gradient(60% 40% at 20% 25%, rgba(235, 240, 245, 0.45), transparent 70%),
+    radial-gradient(50% 34% at 75% 18%, rgba(225, 232, 240, 0.38), transparent 70%);
+  background-size: 200% 100%, 200% 100%;
+  animation: os-weather-slide 90s linear infinite;
+}
+
+/* Rain — cool overcast wash + faint diagonal streaks */
+.os-weather-rain {
+  background:
+    linear-gradient(0deg, rgba(40, 60, 80, 0.2), rgba(60, 80, 100, 0.06)),
+    repeating-linear-gradient(78deg, rgba(180, 200, 220, 0.1) 0 1px, transparent 1px 7px);
+  background-size: auto, 100% 200%;
+  animation: os-weather-rainfall 0.9s linear infinite;
+}
+
+/* Snow — soft brightening haze */
+.os-weather-snow {
+  background: radial-gradient(120% 90% at 50% -10%, rgba(255, 255, 255, 0.35), transparent 65%);
+}
+
+@keyframes os-weather-drift {
+  from { transform: translateX(-2%); }
+  to { transform: translateX(2%); }
+}
+@keyframes os-weather-slide {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 200% 0, -200% 0; }
+}
+@keyframes os-weather-rainfall {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 0, 0 200%; }
+}
+
+/* Reduced motion — freeze drift (also collapsed globally by a11y.css). */
+.os-weather-still { animation: none !important; }

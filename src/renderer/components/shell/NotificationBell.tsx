@@ -1,34 +1,34 @@
-import { useEffect, useState } from 'react';
-import Icon from '../Icons';
+/**
+ * NotificationBell (Phase 2 · M3) — the taskbar tray bell. Self-manages its
+ * unread badge from the notification store and toggles the Notification Center
+ * via `shell:toggleNotifications`. Dropped into the shell's `.os-tray`.
+ */
+import { useEffect, useReducer } from 'react';
 import { isDnd, onNotificationsChanged, unreadCount } from '../../notificationStore';
 import { useT } from '../../i18n';
 
-const TOGGLE_EVENT = 'shell:toggleNotifications';
-
 export default function NotificationBell() {
   const { t } = useT();
-  const [, tick] = useState(0);
-  const unread = unreadCount();
-  const dnd = isDnd();
+  const [, force] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => onNotificationsChanged(force), []);
 
-  useEffect(() => onNotificationsChanged(() => tick((n) => n + 1)), []);
+  const count = unreadCount();
+  const dnd = isDnd();
+  const showBadge = count > 0 && !dnd;
 
   return (
     <button
       type="button"
-      className="os-tray-btn"
+      className="os-tray-btn os-tray-btn-bell"
       title={dnd ? t('notifications.title.dnd') : t('notifications.title')}
-      aria-label={t('notifications.title')}
-      onClick={() => window.dispatchEvent(new CustomEvent(TOGGLE_EVENT))}
+      aria-label={showBadge ? `${t('notifications.title')}, ${count}` : t('notifications.title')}
+      onClick={() => window.dispatchEvent(new CustomEvent('shell:toggleNotifications'))}
     >
-      <Icon name="bell" size={18} />
-      {unread > 0 && !dnd ? (
-        <span className="os-tray-badge" aria-hidden="true">
-          {unread > 9 ? '9+' : unread}
-        </span>
-      ) : null}
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+      </svg>
+      {showBadge && <span className="os-tray-badge">{count > 99 ? '99+' : count}</span>}
     </button>
   );
 }
-
-export { TOGGLE_EVENT as NOTIFICATION_TOGGLE_EVENT };

@@ -51,6 +51,23 @@ export type ParticlePresetId =
   | 'stars'
   | 'magic';
 
+// ---- Weather (Phase 3 · M3) ----
+export type WeatherKind = 'clear' | 'rain' | 'snow' | 'fog' | 'clouds';
+/** off = none; auto = derive from the active wallpaper; else a fixed kind. */
+export type WeatherMode = 'off' | 'auto' | WeatherKind;
+export interface WeatherSettings {
+  mode: WeatherMode;
+  /** 0–1 strength of the atmospheric overlay. */
+  intensity: number;
+}
+
+// ---- Ambient audio (Phase 3 · M4) ----
+export interface AmbientAudioSettings {
+  enabled: boolean;
+  /** 0–1 ambient soundscape volume. */
+  volume: number;
+}
+
 export interface EnvironmentSettings {
   /** Master switch for the living desktop layer. Default false. */
   enabled: boolean;
@@ -72,7 +89,7 @@ export interface EnvironmentSettings {
   /** Experimental: companions on the real Windows desktop (not implemented in L0). */
   companionsOnOsDesktop: boolean;
   /** Which companion types are active. */
-  companionTypes: Array<'study-buddy' | 'critter' | 'timekeeper' | 'noctis'>;
+  companionTypes: Array<'study-buddy' | 'critter' | 'timekeeper' | 'noctis' | 'miko-shimeji'>;
   companionReactivity: 'quiet' | 'normal' | 'playful';
   companionCelebrate: boolean;
   companionPauseWhenStudying: boolean;
@@ -97,6 +114,16 @@ export interface EnvironmentSettings {
   lightingIntensity: number;
   /** Emit companion celebrations for streaks / daily volume. */
   achievementCelebrations: boolean;
+
+  // ---- Weather (Phase 3 · M3) ----
+  weather: WeatherSettings;
+
+  // ---- Ambient audio (Phase 3 · M4) ----
+  ambientAudio: AmbientAudioSettings;
+
+  // ---- Environment presets (Phase 3 · M2) ----
+  /** Active cohesive preset id, if one was applied. */
+  environmentPresetId?: string;
 }
 
 export const DAY_CYCLE_PLAYLIST_ID = 'day-cycle';
@@ -160,6 +187,8 @@ export const DEFAULT_ENVIRONMENT: EnvironmentSettings = {
   dayCycleLighting: false,
   lightingIntensity: 0.45,
   achievementCelebrations: true,
+  weather: { mode: 'off', intensity: 0.5 },
+  ambientAudio: { enabled: false, volume: 0.5 },
 };
 
 /** Resolved surface the stage paints. */

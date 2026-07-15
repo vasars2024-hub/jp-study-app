@@ -1,0 +1,175 @@
+/* =============================================================================
+   Frutiger Aero Platform — Material Library (Phase 1 · M3)
+   -----------------------------------------------------------------------------
+   Token-driven surface utilities that make the OS feel physical. Every value
+   comes from a design token (M1) or a semantic theme var, so the SAME class
+   renders as a subtle dark surface on the Study OS base and as luminous glass
+   under the Frutiger Aero theme (which brightens the glass/sheen tokens and
+   sets data-materials="aero").
+
+   Imported AFTER styles.css. These are additive utility classes — no existing
+   selector is touched.
+   ============================================================================= */
+
+:root {
+  /* Material face anchors — derived from base tokens so they adapt to any
+     theme; the Frutiger Aero theme overrides these to bright silver/glass. */
+  --mat-metal-top: color-mix(in srgb, var(--panel-2) 74%, var(--sheen) 10%);
+  --mat-metal-mid: var(--panel-2);
+  --mat-metal-bot: color-mix(in srgb, var(--panel-2) 80%, var(--sidebar));
+  --mat-plastic-face: var(--panel);
+  --mat-plastic-top: color-mix(in srgb, var(--panel) 82%, var(--sheen) 14%);
+}
+
+/* ---------- Glass ---------------------------------------------------------- */
+.mat-glass {
+  background: var(--glass-tint);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-3), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+}
+
+.mat-frosted {
+  background: var(--glass-tint-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-2), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--blur-md)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(1.1);
+}
+
+/* ---------- Gloss (classic Aero glossy top-sheen) ------------------------- */
+.mat-gloss {
+  background:
+    linear-gradient(
+      to bottom,
+      var(--sheen) 0%,
+      color-mix(in srgb, var(--sheen) 24%, transparent) 46%,
+      transparent 50%
+    ),
+    var(--glass-tint-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-2), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ---------- Chrome (metallic silver) ------------------------------------- */
+.mat-chrome {
+  background: linear-gradient(
+    to bottom,
+    var(--mat-metal-top),
+    var(--mat-metal-mid) 50%,
+    var(--mat-metal-bot)
+  );
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-1), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ---------- Plastic (soft matte) ----------------------------------------- */
+.mat-plastic {
+  background: linear-gradient(to bottom, var(--mat-plastic-top), var(--mat-plastic-face));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ---------- Solid panel (opaque; safe over wallpaper) -------------------- */
+.mat-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-2);
+}
+
+/* ---------- Dialog (deep glass) ------------------------------------------ */
+.mat-dialog {
+  background: var(--glass-tint-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--elevation-4), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--blur-xl)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(1.2);
+}
+
+/* ---------- Overlay / scrim ---------------------------------------------- */
+.mat-overlay {
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
+}
+
+/* ---------- Aero enhancement --------------------------------------------
+   When the Aero theme is active, push saturation/brightness a touch further
+   so glass reads as bright and alive. */
+:root[data-materials='aero'] .mat-glass,
+:root[data-materials='aero'] .mat-dialog,
+:root[data-materials='aero'] .mat-frosted {
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4) brightness(1.03);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4) brightness(1.03);
+}
+
+/* ---------- Interaction-state utilities ---------------------------------
+   Lightweight, material-agnostic helpers. Primitives (M5) implement richer
+   per-component states; these are for quick composition. */
+.is-hover { filter: brightness(1.06); }
+.is-pressed { filter: brightness(0.94); transform: translateY(0.5px); }
+.is-selected { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: calc(-1 * var(--focus-ring-width)); }
+.is-disabled { opacity: var(--alpha-disabled); pointer-events: none; cursor: default; }
+
+/* =============================================================================
+   Secret Frutiger Aero activator (platform chrome, all themes)
+   -----------------------------------------------------------------------------
+   A near-invisible corner "button" — the hidden discovery from the vision. It
+   reveals a faint glint on hover; double-click toggles the Aero theme. (Typing
+   "aero" anywhere outside a text field also toggles it — see SecretAeroTrigger.)
+   ============================================================================= */
+.aero-secret-trigger {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+  opacity: 0;
+  z-index: var(--z-max);
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+.aero-secret-trigger:hover {
+  opacity: 1;
+  background: radial-gradient(
+    circle at bottom right,
+    color-mix(in srgb, var(--sheen) 75%, transparent),
+    transparent 72%
+  );
+}
+
+.aero-secret-flash {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: var(--z-toast);
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  background: var(--glass-tint-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--elevation-3), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
+  animation: aero-flash-in var(--dur-normal) var(--ease-glass);
+}
+@keyframes aero-flash-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}

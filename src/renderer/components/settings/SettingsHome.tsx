@@ -14,6 +14,7 @@ const QUICK: {
 }[] = [
   { page: 'wallpaper', labelKey: 'settings.home.quick.wallpaper', icon: 'image' },
   { page: 'shortcuts', labelKey: 'settings.home.quick.shortcuts', icon: 'command' },
+  { page: 'lockscreen', labelKey: 'Lockscreen & PIN', icon: 'lock', settingId: 'lockscreen-enable' },
   { page: 'appearance', labelKey: 'settings.home.quick.theme', icon: 'sparkle', settingId: 'theme' },
   { page: 'companions', labelKey: 'settings.home.quick.companions', icon: 'heart' },
   {
