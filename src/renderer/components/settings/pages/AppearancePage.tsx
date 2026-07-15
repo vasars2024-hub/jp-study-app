@@ -11,13 +11,37 @@ import {
   type ShadowStrengthId,
 } from '../../../osPersonalization';
 import { clearCustomCss, saveCustomCss } from '../../../customCss';
+import { setUiLang, useT } from '../../../i18n';
+import { LANG_LABELS, LANG_TAGS, UI_LANGS } from '../../../../shared/i18n/core';
 
 export default function AppearancePage() {
   const s = useSettings();
   const { look, patchLook, theme, chooseTheme, seg, userCss, setUserCss, cssMsg, setCssMsg, focusSettingId } = s;
+  const { t, lang } = useT();
 
   return (
     <>
+      <SettingsCard
+        id="ui-language"
+        title={t('settings.language.title')}
+        description={t('settings.language.desc')}
+        highlight={focusSettingId === 'ui-language'}
+      >
+        <div className="sp-seg" role="group" aria-label={t('settings.language.title')}>
+          {UI_LANGS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              lang={LANG_TAGS[id]}
+              className={`sp-seg-btn ${lang === id ? 'active' : ''}`}
+              onClick={() => setUiLang(id)}
+            >
+              {LANG_LABELS[id]}
+            </button>
+          ))}
+        </div>
+      </SettingsCard>
+
       <SettingsCard
         id="theme"
         title="Theme"

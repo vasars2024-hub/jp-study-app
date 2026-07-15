@@ -18,6 +18,8 @@ import type {
   MineNoteRequest,
   MineNoteResult,
 } from '../shared/anki';
+import type { ApkgImportResult } from '../shared/apkgParse';
+import type { AssetError, AssetSpec, AssetStatus } from '../shared/assetRegistry';
 import type {
   AiEngineConfig,
   AiDeckGenerationRequest,
@@ -51,6 +53,9 @@ import type {
   ImmersionSitesStore,
   ImmersionVisitInput,
 } from '../shared/immersion';
+import type { AppReleaseInfo } from '../shared/release';
+import type { InterpretedLearningInput } from '../main/city/engine/types';
+import type { CityStateMessage } from '../main/city/ipc/channels';
 
 // Describes the `window.api` bridge exposed by the preload script.
 declare global {
@@ -156,6 +161,7 @@ declare global {
       ankiEnsureModel(id?: ProfileId): Promise<EnsureModelResult>;
       ankiModelFields(modelName: string): Promise<{ ok: boolean; fields: string[]; error?: string }>;
       ankiGetIntervals(opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot>;
+      importApkg(filePath?: string): Promise<ApkgImportResult>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;
       desktopCommitLayout(
@@ -206,6 +212,8 @@ declare global {
       onPlayerSync(cb: (snap: import('../shared/playerSync').PlayerSnapshot) => void): () => void;
       onPlayerCommand(cb: (cmd: import('../shared/playerSync').PlayerCommand) => void): () => void;
       openExternal(url: string): Promise<boolean>;
+      appVersion(): Promise<string>;
+      checkAppRelease(): Promise<AppReleaseInfo | null>;
       translateRun(req: {
         id: number;
         text: string;
@@ -358,6 +366,25 @@ declare global {
         onBattery?: boolean | null;
       }>;
       clipboardReadText(): Promise<string>;
+
+      // Downloadable models & dictionaries (Phase 6)
+      assetsList(): Promise<{ assets: AssetSpec[]; statuses: AssetStatus[] }>;
+      assetsStart(id: string): Promise<{ ok: boolean; error?: AssetError }>;
+      assetsPause(id: string): Promise<void>;
+      assetsCancel(id: string): Promise<void>;
+      assetsRemove(id: string): Promise<{ ok: boolean; error?: AssetError }>;
+      assetsIsInstalled(id: string): Promise<boolean>;
+      assetsPath(id: string): Promise<string | null>;
+      assetsFreeSpace(): Promise<number>;
+      assetsRoot(): Promise<string>;
+      onAssetStatus(cb: (status: AssetStatus) => void): () => void;
+      onAssetUnload(cb: (id: string) => void): () => void;
+      setUiLang(lang: string): void;
+
+      // Noctis Civilization Module (read-only mirror, refreshed by push).
+      cityGetState(): Promise<CityStateMessage>;
+      cityRecordSession(input: InterpretedLearningInput): Promise<CityStateMessage>;
+      onCityChanged(cb: (message: CityStateMessage) => void): () => void;
     };
   }
 }

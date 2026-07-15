@@ -23,17 +23,9 @@ import {
   type ClipboardEntryType,
 } from '../clipboardHistory';
 import { registerCommandHandler } from '../keyboardShortcuts';
+import { useT } from '../i18n';
 
 type FilterKey = 'all' | 'word' | 'sentence' | 'dictionary' | 'reader' | 'manual';
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'word', label: 'Words' },
-  { key: 'sentence', label: 'Sentences' },
-  { key: 'dictionary', label: 'Dictionary' },
-  { key: 'reader', label: 'Reader' },
-  { key: 'manual', label: 'Manual Copy' },
-];
 
 function matchesFilter(e: ClipboardEntry, f: FilterKey): boolean {
   if (f === 'all') return true;
@@ -58,6 +50,7 @@ function EntryCard({
   onToggleSelect: () => void;
   onChanged: () => void;
 }) {
+  const { t } = useT();
   const [expanded, setExpanded] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
   const isLong = entry.text.length > COLLAPSE_LEN;
@@ -74,11 +67,11 @@ function EntryCard({
           className="cbh-check"
           checked={selected}
           onChange={onToggleSelect}
-          aria-label="Select entry"
+          aria-label={t('clipboard.selectEntry')}
         />
         <span className="cbh-badge">{CLIPBOARD_TYPE_LABELS[entry.type]}</span>
         {entry.pinned && (
-          <span className="cbh-badge pin" title="Pinned">
+          <span className="cbh-badge pin" title={t('clipboard.pinned')}>
             <Icon name="pin" size={11} />
           </span>
         )}
@@ -97,73 +90,73 @@ function EntryCard({
 
       {isLong && !entry.dictMeta && (
         <button type="button" className="cbh-expand" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? 'Show less' : 'Show more'}
+          {expanded ? t('clipboard.showLess') : t('clipboard.showMore')}
         </button>
       )}
 
       {entry.readerMeta && (entry.readerMeta.book || entry.readerMeta.chapter || entry.readerMeta.position) && (
         <div className="cbh-meta-wrap">
           <button type="button" className="cbh-expand" onClick={() => setMetaOpen((v) => !v)}>
-            {metaOpen ? 'Hide details' : 'Reader details'}
+            {metaOpen ? t('clipboard.hideDetails') : t('clipboard.readerDetails')}
           </button>
           {metaOpen && (
             <div className="cbh-meta">
-              {entry.readerMeta.book && <div><span className="muted">Book:</span> {entry.readerMeta.book}</div>}
-              {entry.readerMeta.chapter && <div><span className="muted">Chapter:</span> {entry.readerMeta.chapter}</div>}
-              {entry.readerMeta.position && <div><span className="muted">Position:</span> {entry.readerMeta.position}</div>}
-              {entry.readerMeta.language && <div><span className="muted">Language:</span> {entry.readerMeta.language}</div>}
+              {entry.readerMeta.book && <div><span className="muted">{t('clipboard.book')}</span> {entry.readerMeta.book}</div>}
+              {entry.readerMeta.chapter && <div><span className="muted">{t('clipboard.chapter')}</span> {entry.readerMeta.chapter}</div>}
+              {entry.readerMeta.position && <div><span className="muted">{t('clipboard.position')}</span> {entry.readerMeta.position}</div>}
+              {entry.readerMeta.language && <div><span className="muted">{t('clipboard.language')}</span> {entry.readerMeta.language}</div>}
             </div>
           )}
         </div>
       )}
 
       <div className="cbh-actions">
-        <button type="button" className="cbh-btn" title="Copy again" onClick={copyAgain}>
-          <Icon name="download" size={13} /> Copy
+        <button type="button" className="cbh-btn" title={t('clipboard.copyAgain')} onClick={copyAgain}>
+          <Icon name="download" size={13} /> {t('clipboard.copy')}
         </button>
-        <button type="button" className="cbh-btn" title="Copy as plain text" onClick={copyPlain}>
-          <Icon name="edit" size={13} /> Plain
+        <button type="button" className="cbh-btn" title={t('clipboard.copyPlainTitle')} onClick={copyPlain}>
+          <Icon name="edit" size={13} /> {t('clipboard.plain')}
         </button>
         <button
           type="button"
           className={`cbh-btn ${entry.pinned ? 'on' : ''}`}
-          title={entry.pinned ? 'Unpin' : 'Pin'}
+          title={entry.pinned ? t('clipboard.unpin') : t('clipboard.pin')}
           onClick={() => {
             togglePin(entry.id);
             onChanged();
           }}
         >
-          <Icon name="pin" size={13} /> {entry.pinned ? 'Pinned' : 'Pin'}
+          <Icon name="pin" size={13} /> {entry.pinned ? t('clipboard.pinned') : t('clipboard.pin')}
         </button>
         <button
           type="button"
           className={`cbh-btn ${entry.favorite ? 'on' : ''}`}
-          title={entry.favorite ? 'Remove favorite' : 'Favorite'}
+          title={entry.favorite ? t('clipboard.removeFavorite') : t('clipboard.favorite')}
           onClick={() => {
             toggleFavorite(entry.id);
             onChanged();
           }}
         >
-          <Icon name="star" size={13} fill={entry.favorite} /> Fav
+          <Icon name="star" size={13} fill={entry.favorite} /> {t('clipboard.fav')}
         </button>
         <button
           type="button"
           className="cbh-btn"
-          title="Send to Flashcard Collection"
+          title={t('clipboard.sendToFlashcardCollection')}
           onClick={() => sendEntriesToFlashcards([entry])}
         >
-          <Icon name="flashcards" size={13} /> Flashcard
+          <Icon name="flashcards" size={13} /> {t('clipboard.flashcard')}
         </button>
         <button
           type="button"
           className="cbh-btn danger"
-          title="Delete"
+          title={t('clipboard.delete')}
           onClick={() => {
             deleteEntry(entry.id);
             onChanged();
           }}
         >
-          <Icon name="close" size={13} /> Delete
+          <Icon name="close" size={13} /> {t('clipboard.delete')}
         </button>
       </div>
     </li>
@@ -171,6 +164,7 @@ function EntryCard({
 }
 
 export default function ClipboardHistoryPanel() {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -178,6 +172,15 @@ export default function ClipboardHistoryPanel() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettingsState] = useState(loadClipboardSettings);
+
+  const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: t('clipboard.filter.all') },
+    { key: 'word', label: t('clipboard.filter.words') },
+    { key: 'sentence', label: t('clipboard.filter.sentences') },
+    { key: 'dictionary', label: t('clipboard.filter.dictionary') },
+    { key: 'reader', label: t('clipboard.filter.reader') },
+    { key: 'manual', label: t('clipboard.filter.manual') },
+  ];
 
   // Start monitoring once, globally — gated internally by settings.monitoringEnabled.
   useEffect(() => startClipboardMonitor(), []);
@@ -238,21 +241,21 @@ export default function ClipboardHistoryPanel() {
   return (
     <>
       <div className="cbh-backdrop" onMouseDown={() => setOpen(false)} />
-      <div className="cbh-panel" role="dialog" aria-label="Clipboard history">
+      <div className="cbh-panel" role="dialog" aria-label={t('clipboard.dialogLabel')}>
         <div className="cbh-head">
           <Icon name="clipboard" size={16} />
           <input
             autoFocus
             className="cbh-search"
-            placeholder="Search clipboard history…"
+            placeholder={t('clipboard.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
           />
-          <button type="button" className="cbh-icon-btn" title="Settings" onClick={() => setSettingsOpen((v) => !v)}>
+          <button type="button" className="cbh-icon-btn" title={t('clipboard.settings')} onClick={() => setSettingsOpen((v) => !v)}>
             <Icon name="settings" size={15} />
           </button>
-          <button type="button" className="cbh-icon-btn" title="Close" onClick={() => setOpen(false)}>
+          <button type="button" className="cbh-icon-btn" title={t('common.close')} onClick={() => setOpen(false)}>
             <Icon name="close" size={15} />
           </button>
         </div>
@@ -260,7 +263,7 @@ export default function ClipboardHistoryPanel() {
         {settingsOpen && (
           <div className="cbh-settings">
             <label className="cbh-setting-row">
-              <span>Max history size</span>
+              <span>{t('clipboard.maxHistorySize')}</span>
               <input
                 type="number"
                 min={10}
@@ -275,7 +278,7 @@ export default function ClipboardHistoryPanel() {
                 checked={settings.dedupeConsecutive}
                 onChange={(e) => setSettingsState(saveClipboardSettings({ dedupeConsecutive: e.target.checked }))}
               />
-              <span>Remove consecutive duplicates automatically</span>
+              <span>{t('clipboard.dedupeConsecutive')}</span>
             </label>
             <label className="cbh-setting-row">
               <input
@@ -283,7 +286,7 @@ export default function ClipboardHistoryPanel() {
                 checked={settings.clearOnExit}
                 onChange={(e) => setSettingsState(saveClipboardSettings({ clearOnExit: e.target.checked }))}
               />
-              <span>Clear unpinned history when the app exits</span>
+              <span>{t('clipboard.clearOnExit')}</span>
             </label>
             <label className="cbh-setting-row">
               <input
@@ -291,7 +294,7 @@ export default function ClipboardHistoryPanel() {
                 checked={settings.monitoringEnabled}
                 onChange={(e) => setSettingsState(saveClipboardSettings({ monitoringEnabled: e.target.checked }))}
               />
-              <span>Enable clipboard monitoring (record system copies)</span>
+              <span>{t('clipboard.enableMonitoring')}</span>
             </label>
           </div>
         )}
@@ -313,22 +316,22 @@ export default function ClipboardHistoryPanel() {
           <div className="cbh-bulkbar">
             <label className="cbh-selall">
               <input type="checkbox" checked={selected.size > 0 && selected.size === filtered.length} onChange={toggleSelectAll} />
-              <span>{selected.size > 0 ? `${selected.size} selected` : 'Select all'}</span>
+              <span>{selected.size > 0 ? t('clipboard.selectedCount', { count: selected.size }) : t('clipboard.selectAll')}</span>
             </label>
             {selected.size > 0 && (
               <div className="cbh-bulk-actions">
-                <button type="button" className="cbh-btn" onClick={bulkCopy}>Copy</button>
-                <button type="button" className="cbh-btn" onClick={bulkFlashcards}>Send to Flashcards</button>
-                <button type="button" className="cbh-btn danger" onClick={bulkDelete}>Delete</button>
+                <button type="button" className="cbh-btn" onClick={bulkCopy}>{t('clipboard.copy')}</button>
+                <button type="button" className="cbh-btn" onClick={bulkFlashcards}>{t('clipboard.sendToFlashcards')}</button>
+                <button type="button" className="cbh-btn danger" onClick={bulkDelete}>{t('clipboard.delete')}</button>
               </div>
             )}
             <button
               type="button"
               className="cbh-btn cbh-clear-unpinned"
-              title="Clear Unpinned Entries"
+              title={t('clipboard.clearUnpinnedTitle')}
               onClick={() => clearUnpinned()}
             >
-              Clear unpinned
+              {t('clipboard.clearUnpinned')}
             </button>
           </div>
         )}
@@ -336,7 +339,7 @@ export default function ClipboardHistoryPanel() {
         <ul className="cbh-list">
           {filtered.length === 0 && (
             <li className="cbh-empty muted">
-              {entries.length === 0 ? 'Nothing copied yet. Copy some text to get started.' : 'No entries match this search/filter.'}
+              {entries.length === 0 ? t('clipboard.emptyNothing') : t('clipboard.emptyNoMatch')}
             </li>
           )}
           {filtered.map((e) => (

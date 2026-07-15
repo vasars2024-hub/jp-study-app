@@ -7,8 +7,10 @@ import {
   type ParticlePresetId,
   type PerformanceTier,
 } from '../../../environment';
+import { useT } from '../../../i18n';
 
 export default function AtmospherePage() {
+  const { t } = useT();
   const s = useSettings();
   const { env, patchEnv, seg, focusSettingId } = s;
   const resolved = env.enabled && env.rotationEnabled ? resolveWall(env) : null;
@@ -17,8 +19,8 @@ export default function AtmospherePage() {
     <>
       <SettingsCard
         id="living-layer"
-        title="Living desktop layer"
-        description="Optional atmosphere stack: rotation, particles, lighting, and companions. Off by default."
+        title={t('settings.atmosphere.livingLayer.title')}
+        description={t('settings.atmosphere.livingLayer.desc')}
         highlight={focusSettingId === 'living-layer'}
         trailing={
           <label className="os-toggle os-toggle-compact">
@@ -26,19 +28,19 @@ export default function AtmospherePage() {
               type="checkbox"
               checked={env.enabled}
               onChange={(e) => patchEnv({ enabled: e.target.checked })}
-              aria-label="Enable living desktop layer"
+              aria-label={t('settings.atmosphere.enableLivingLayer')}
             />
-            <span>{env.enabled ? 'On' : 'Off'}</span>
+            <span>{env.enabled ? t('common.on') : t('common.off')}</span>
           </label>
         }
       >
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Performance</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.performance')}</span>
           {([
-            ['off', 'Off'],
-            ['low', 'Low'],
-            ['medium', 'Medium'],
-            ['high', 'High'],
+            ['off', t('common.off')],
+            ['low', t('settings.atmosphere.perf.low')],
+            ['medium', t('settings.atmosphere.perf.medium')],
+            ['high', t('settings.atmosphere.perf.high')],
           ] as [PerformanceTier, string][]).map(([id, label]) => (
             <button
               key={id}
@@ -55,8 +57,8 @@ export default function AtmospherePage() {
 
       <SettingsCard
         id="rotation"
-        title="Wallpaper rotation"
-        description="Drive the background from playlists, time of day, and calendar rules."
+        title={t('settings.atmosphere.rotation.title')}
+        description={t('settings.atmosphere.rotation.desc')}
         highlight={focusSettingId === 'rotation'}
         trailing={
           <label className="os-toggle os-toggle-compact">
@@ -65,15 +67,15 @@ export default function AtmospherePage() {
               checked={env.rotationEnabled}
               disabled={!env.enabled}
               onChange={(e) => patchEnv({ rotationEnabled: e.target.checked })}
-              aria-label="Enable wallpaper rotation"
+              aria-label={t('settings.atmosphere.enableRotation')}
             />
-            <span>{env.rotationEnabled ? 'On' : 'Off'}</span>
+            <span>{env.rotationEnabled ? t('common.on') : t('common.off')}</span>
           </label>
         }
       >
         {resolved && (
           <p className="muted os-set-hint">
-            Now: <strong>{resolved.item.label ?? resolved.item.ref}</strong>
+            {t('settings.atmosphere.now')} <strong>{resolved.item.label ?? resolved.item.ref}</strong>
             {' — '}
             {resolved.reason}
           </p>
@@ -85,15 +87,15 @@ export default function AtmospherePage() {
             disabled={!env.enabled || !env.rotationEnabled}
             onChange={(e) => patchEnv({ calendarWallsEnabled: e.target.checked })}
           />
-          <span>Calendar walls (exam / study days override time-of-day)</span>
+          <span>{t('settings.atmosphere.calendarWalls')}</span>
         </label>
         <PlaylistEditor env={env} disabled={!env.enabled || !env.rotationEnabled} onChange={patchEnv} />
       </SettingsCard>
 
       <SettingsCard
         id="lighting"
-        title="Day-cycle lighting"
-        description="Soft ambient wash that follows the time of day."
+        title={t('settings.atmosphere.lighting.title')}
+        description={t('settings.atmosphere.lighting.desc')}
         highlight={focusSettingId === 'lighting'}
         trailing={
           <label className="os-toggle os-toggle-compact">
@@ -102,14 +104,14 @@ export default function AtmospherePage() {
               checked={env.dayCycleLighting}
               disabled={!env.enabled}
               onChange={(e) => patchEnv({ dayCycleLighting: e.target.checked })}
-              aria-label="Enable day-cycle lighting"
+              aria-label={t('settings.atmosphere.enableLighting')}
             />
-            <span>{env.dayCycleLighting ? 'On' : 'Off'}</span>
+            <span>{env.dayCycleLighting ? t('common.on') : t('common.off')}</span>
           </label>
         }
       >
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Intensity</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.intensity')}</span>
           <input
             type="range"
             min={0}
@@ -125,8 +127,8 @@ export default function AtmospherePage() {
 
       <SettingsCard
         id="particles"
-        title="Particles"
-        description="Fireflies, snow, rain, and more. Density is count; intensity is glow; size is radius."
+        title={t('settings.atmosphere.particles.title')}
+        description={t('settings.atmosphere.particles.desc')}
         highlight={
           focusSettingId === 'particles' ||
           focusSettingId === 'particle-size' ||
@@ -139,9 +141,9 @@ export default function AtmospherePage() {
               checked={env.particlesEnabled}
               disabled={!env.enabled}
               onChange={(e) => patchEnv({ particlesEnabled: e.target.checked })}
-              aria-label="Enable particles"
+              aria-label={t('settings.atmosphere.enableParticles')}
             />
-            <span>{env.particlesEnabled ? 'On' : 'Off'}</span>
+            <span>{env.particlesEnabled ? t('common.on') : t('common.off')}</span>
           </label>
         }
       >
@@ -152,10 +154,10 @@ export default function AtmospherePage() {
             disabled={!env.enabled || !env.particlesEnabled}
             onChange={(e) => patchEnv({ matchParticleSuggestions: e.target.checked })}
           />
-          <span>Match wallpaper / time of day</span>
+          <span>{t('settings.atmosphere.matchWallpaper')}</span>
         </label>
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
-          <span className="os-viz-label muted">Presets</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.presets')}</span>
           {PARTICLE_PRESETS.map((p) => {
             const on = env.particlePresets.includes(p.id);
             return (
@@ -178,7 +180,7 @@ export default function AtmospherePage() {
           })}
         </div>
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Density</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.density')}</span>
           <input
             type="range"
             min={0}
@@ -191,7 +193,7 @@ export default function AtmospherePage() {
           <span className="muted">{Math.round(env.particleDensity * 100)}%</span>
         </div>
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Intensity</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.intensity')}</span>
           <input
             type="range"
             min={0}
@@ -204,7 +206,7 @@ export default function AtmospherePage() {
           <span className="muted">{Math.round((env.particleIntensity ?? 0.8) * 100)}%</span>
         </div>
         <div className="os-viz-row" data-setting-id="particle-size">
-          <span className="os-viz-label muted">Size</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.size')}</span>
           <input
             type="range"
             min={0}
@@ -223,14 +225,14 @@ export default function AtmospherePage() {
             disabled={!env.enabled || !env.particlesEnabled}
             onChange={(e) => patchEnv({ snowAccumulation: e.target.checked })}
           />
-          <span>Snow accumulation (piles on the desk edge)</span>
+          <span>{t('settings.atmosphere.snowAccumulation')}</span>
         </label>
       </SettingsCard>
 
       <SettingsCard
         id="achievements"
-        title="Achievements"
-        description="Celebrate streaks and daily reading milestones with companions."
+        title={t('settings.atmosphere.achievements.title')}
+        description={t('settings.atmosphere.achievements.desc')}
         highlight={focusSettingId === 'achievements'}
       >
         <label className="os-toggle">
@@ -240,12 +242,9 @@ export default function AtmospherePage() {
             disabled={!env.enabled}
             onChange={(e) => patchEnv({ achievementCelebrations: e.target.checked })}
           />
-          <span>Celebrate streaks and daily reading milestones</span>
+          <span>{t('settings.atmosphere.celebrateStreaks')}</span>
         </label>
-        <p className="muted os-set-hint">
-          Noctis city simulation is not driven from the desktop layer yet — only soft pulses for the
-          emissary companion.
-        </p>
+        <p className="muted os-set-hint">{t('settings.atmosphere.noctisNote')}</p>
       </SettingsCard>
     </>
   );

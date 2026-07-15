@@ -29,7 +29,8 @@ import { SettingsProvider } from './SettingsContext';
 import SettingsNav from './SettingsNav';
 import SettingsSearch from './SettingsSearch';
 import SettingsHome from './SettingsHome';
-import { pageMeta } from './settingsRegistry';
+import { groupLabelKey, pageMeta } from './settingsRegistry';
+import { useT } from '../../i18n';
 import { pushRecentPage } from './settingsRecent';
 import type { SettingsController, SettingsPageId, SettingsWallProps } from './types';
 import AppearancePage from './pages/AppearancePage';
@@ -41,6 +42,7 @@ import ShortcutsPage from './pages/ShortcutsPage';
 import StudyPage from './pages/StudyPage';
 import ReadingPage from './pages/ReadingPage';
 import TranscriptionPage from './pages/TranscriptionPage';
+import StoragePage from './pages/StoragePage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
 import MemoryPage from './pages/MemoryPage';
@@ -52,6 +54,7 @@ function applyMotion(reduce: boolean): void {
 }
 
 export default function SettingsApp(props: SettingsWallProps) {
+  const { t } = useT();
   const [page, setPage] = useState<SettingsPageId>('home');
   const [focusSettingId, setFocusSettingId] = useState<string | null>(null);
   const [look, setLook] = useState<OsPersonalization>(loadPersonalization);
@@ -197,23 +200,23 @@ export default function SettingsApp(props: SettingsWallProps) {
             className={`os-set-pane-v2${reduceMotion ? '' : ' os-set-pane-anim'}`}
             key={page}
             role="main"
-            aria-label={meta?.label ?? 'Settings'}
+            aria-label={meta ? t(meta.labelKey) : t('settings.appTitle')}
           >
             {page !== 'home' && meta && (
               <header className="os-set-page-head">
                 <p className="os-set-breadcrumb muted">
                   {meta.group ? (
                     <>
-                      <span>{meta.group}</span>
+                      <span>{t(groupLabelKey(meta.group))}</span>
                       <span className="os-set-breadcrumb-sep" aria-hidden>
                         /
                       </span>
                     </>
                   ) : null}
-                  <span>{meta.label}</span>
+                  <span>{t(meta.labelKey)}</span>
                 </p>
-                <h2 className="os-set-page-title">{meta.label}</h2>
-                {meta.description && <p className="os-set-page-intro muted">{meta.description}</p>}
+                <h2 className="os-set-page-title">{t(meta.labelKey)}</h2>
+                {meta.descKey && <p className="os-set-page-intro muted">{t(meta.descKey)}</p>}
               </header>
             )}
             {page === 'home' && <SettingsHome />}
@@ -228,6 +231,7 @@ export default function SettingsApp(props: SettingsWallProps) {
             {page === 'transcription' && <TranscriptionPage />}
             {page === 'visualizer' && <VisualizerPage />}
             {page === 'display' && <DisplayPage />}
+            {page === 'storage' && <StoragePage />}
             {page === 'memory' && <MemoryPage />}
           </div>
         </div>

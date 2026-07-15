@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { ProfileSettingsSection, DictionarySettingsSection } from '../../../views/SettingsView';
+import { LevelSettingsSection } from '../../LevelMeter';
 import { useSettings } from '../SettingsContext';
 import { loadFocusMode, onFocusModeChanged, setFocusMode } from '../../../focusMode';
 
@@ -33,6 +34,14 @@ export default function StudyPage() {
           Shortcut: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>. Exit anytime with the same shortcut or Exit focus.
           Living desktop settings are kept and restore when you leave focus mode.
         </p>
+      </SettingsCard>
+      <SettingsCard
+        id="level"
+        title="Level"
+        description="Fill each JLPT/HSK slot by pasting a deck's words or uploading its Anki .apkg. Your level is computed from how many of those words you already know."
+        highlight={focusSettingId === 'level'}
+      >
+        <LevelSettingsSection />
       </SettingsCard>
       <SettingsCard
         id="profile"

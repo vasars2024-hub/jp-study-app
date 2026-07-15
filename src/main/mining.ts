@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import AdmZip from 'adm-zip';
+import { mt } from './i18n';
 import type {
   AiApiKeysSet,
   AiEngineConfig,
@@ -1710,9 +1711,9 @@ async function importFrequencyDictionary(filePath?: string): Promise<{ ok: boole
   let target = filePath;
   if (!target) {
     const picked = await dialog.showOpenDialog({
-      title: 'Import frequency dictionary',
+      title: mt('dialog.importFrequencyDict.title'),
       properties: ['openFile'],
-      filters: [{ name: 'JSON', extensions: ['json'] }],
+      filters: [{ name: mt('dialog.filter.json'), extensions: ['json'] }],
     });
     if (picked.canceled || !picked.filePaths[0]) return { ok: false, error: 'cancelled' };
     target = picked.filePaths[0];
@@ -1770,9 +1771,15 @@ async function saveTextFileWithName(
   ext: string,
 ): Promise<{ ok: boolean; path?: string; error?: string }> {
   const label =
-    ext === 'csv' ? 'CSV' : ext === 'json' ? 'JSON' : ext === 'txt' ? 'Text' : 'File';
+    ext === 'csv'
+      ? mt('dialog.format.csv')
+      : ext === 'json'
+        ? mt('dialog.filter.json')
+        : ext === 'txt'
+          ? mt('dialog.format.text')
+          : mt('dialog.format.file');
   const picked = await dialog.showSaveDialog({
-    title: `Save ${label} deck`,
+    title: mt('dialog.saveDeck.title', { label }),
     defaultPath: defaultName,
     filters: [{ name: label, extensions: [ext] }],
   });

@@ -23,6 +23,7 @@ import {
   type RecurrenceFreq,
   type ReminderOffset,
 } from '../calendar';
+import { useT } from '../i18n';
 
 type ViewMode = 'month' | 'week' | 'day' | 'agenda';
 
@@ -62,6 +63,7 @@ function EventModal({
   initial: Partial<typeof EMPTY_FORM> & { date?: string };
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
   const isEditing = !!form.id;
 
@@ -97,42 +99,47 @@ function EventModal({
     <div className="cal-modal-backdrop" onMouseDown={onClose}>
       <div className="cal-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="cal-modal-head">
-          <h3>{isEditing ? 'Edit event' : 'New event'}</h3>
-          <button type="button" className="cbh-icon-btn" onClick={onClose} aria-label="Close">
+          <h3>{isEditing ? t('calendar.modal.editEvent') : t('calendar.newEvent')}</h3>
+          <button type="button" className="cbh-icon-btn" onClick={onClose} aria-label={t('common.close')}>
             <Icon name="close" size={15} />
           </button>
         </div>
 
         <div className="cal-form">
           <label className="cal-field">
-            <span>Title</span>
-            <input value={form.title} autoFocus onChange={(e) => set('title', e.target.value)} placeholder="Event title" />
+            <span>{t('calendar.modal.title')}</span>
+            <input
+              value={form.title}
+              autoFocus
+              onChange={(e) => set('title', e.target.value)}
+              placeholder={t('calendar.modal.titlePlaceholder')}
+            />
           </label>
 
           <label className="cal-field">
-            <span>Description</span>
+            <span>{t('calendar.modal.description')}</span>
             <textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={2} />
           </label>
 
           <div className="cal-field-row">
             <label className="cal-field">
-              <span>Date</span>
+              <span>{t('calendar.modal.date')}</span>
               <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
             </label>
             <label className="cal-field cal-check">
               <input type="checkbox" checked={form.allDay} onChange={(e) => set('allDay', e.target.checked)} />
-              <span>All day</span>
+              <span>{t('calendar.allDay')}</span>
             </label>
           </div>
 
           {!form.allDay && (
             <div className="cal-field-row">
               <label className="cal-field">
-                <span>Start time</span>
+                <span>{t('calendar.modal.startTime')}</span>
                 <input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
               </label>
               <label className="cal-field">
-                <span>End time</span>
+                <span>{t('calendar.modal.endTime')}</span>
                 <input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
               </label>
             </div>
@@ -140,7 +147,7 @@ function EventModal({
 
           <div className="cal-field-row">
             <label className="cal-field">
-              <span>Category</span>
+              <span>{t('calendar.modal.category')}</span>
               <select
                 value={form.category}
                 onChange={(e) => {
@@ -155,13 +162,13 @@ function EventModal({
               </select>
             </label>
             <label className="cal-field">
-              <span>Color</span>
+              <span>{t('calendar.modal.color')}</span>
               <input type="color" value={form.color} onChange={(e) => set('color', e.target.value)} />
             </label>
           </div>
 
           <label className="cal-field">
-            <span>Reminder</span>
+            <span>{t('calendar.modal.reminder')}</span>
             <select value={form.reminder} onChange={(e) => set('reminder', e.target.value as ReminderOffset)}>
               {(Object.keys(REMINDER_LABELS) as ReminderOffset[]).map((r) => (
                 <option key={r} value={r}>{REMINDER_LABELS[r]}</option>
@@ -171,18 +178,18 @@ function EventModal({
 
           <div className="cal-field-row">
             <label className="cal-field">
-              <span>Repeat</span>
+              <span>{t('calendar.modal.repeat')}</span>
               <select value={form.recurrence} onChange={(e) => set('recurrence', e.target.value as RecurrenceFreq)}>
-                <option value="none">Does not repeat</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="custom">Custom interval (days)</option>
+                <option value="none">{t('calendar.modal.repeat.none')}</option>
+                <option value="daily">{t('calendar.modal.repeat.daily')}</option>
+                <option value="weekly">{t('calendar.modal.repeat.weekly')}</option>
+                <option value="monthly">{t('calendar.modal.repeat.monthly')}</option>
+                <option value="custom">{t('calendar.modal.repeat.custom')}</option>
               </select>
             </label>
             {form.recurrence === 'custom' && (
               <label className="cal-field">
-                <span>Every N days</span>
+                <span>{t('calendar.modal.everyNDays')}</span>
                 <input
                   type="number"
                   min={1}
@@ -196,7 +203,7 @@ function EventModal({
 
           {form.recurrence !== 'none' && (
             <label className="cal-field">
-              <span>Repeat until (optional)</span>
+              <span>{t('calendar.modal.repeatUntil')}</span>
               <input type="date" value={form.recurrenceEndDate} onChange={(e) => set('recurrenceEndDate', e.target.value)} />
             </label>
           )}
@@ -204,12 +211,12 @@ function EventModal({
 
         <div className="cal-modal-actions">
           {isEditing && (
-            <button type="button" className="cbh-btn danger" onClick={remove}>Delete</button>
+            <button type="button" className="cbh-btn danger" onClick={remove}>{t('calendar.modal.delete')}</button>
           )}
           <div className="cal-modal-spacer" />
-          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
           <button type="button" className="btn primary" onClick={save} disabled={!form.title.trim()}>
-            {isEditing ? 'Save' : 'Create'}
+            {isEditing ? t('common.save') : t('calendar.modal.create')}
           </button>
         </div>
       </div>
@@ -227,6 +234,7 @@ function EventChip({ ev, onClick }: { ev: EventOccurrence; onClick: () => void }
 }
 
 export default function CalendarView() {
+  const { t, lang } = useT();
   const [events, setEvents] = useState<CalendarEvent[]>(() => loadEvents());
   useEffect(() => onCalendarChanged(() => setEvents(loadEvents())), []);
 
@@ -303,8 +311,10 @@ export default function CalendarView() {
       return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
     if (mode === 'day') return cursor.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    return 'Agenda';
-  }, [mode, cursor]);
+    return t('calendar.mode.agenda');
+    // `t` is intentionally left out of the deps: its identity is stable, `lang`
+    // is what actually needs to trigger a redo.
+  }, [mode, cursor, lang]);
 
   const openNew = (date: string) => setModal({ ...EMPTY_FORM, date });
   const openEdit = (ev: EventOccurrence) =>
@@ -324,15 +334,22 @@ export default function CalendarView() {
       recurrenceEndDate: ev.recurrenceEndDate ?? '',
     });
 
+  const modeLabels: Record<ViewMode, string> = {
+    month: t('calendar.mode.month'),
+    week: t('calendar.mode.week'),
+    day: t('calendar.mode.day'),
+    agenda: t('calendar.mode.agenda'),
+  };
+
   return (
     <div className="calendar-view">
       <div className="view-head">
         <div>
-          <h1>Calendar</h1>
-          <p className="muted">Study sessions, exams, assignments, and reminders in one place.</p>
+          <h1>{t('calendar.title')}</h1>
+          <p className="muted">{t('calendar.intro')}</p>
         </div>
         <button type="button" className="btn primary" onClick={() => openNew(toKey(cursor))}>
-          <Icon name="plus" size={14} /> New event
+          <Icon name="plus" size={14} /> {t('calendar.newEvent')}
         </button>
       </div>
 
@@ -340,15 +357,15 @@ export default function CalendarView() {
         <div className="cal-modes">
           {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
             <button key={m} type="button" className={`cal-mode-btn ${mode === m ? 'active' : ''}`} onClick={() => setMode(m)}>
-              {m[0].toUpperCase() + m.slice(1)}
+              {modeLabels[m]}
             </button>
           ))}
         </div>
         {mode !== 'agenda' && (
           <div className="cal-nav">
-            <button type="button" className="wgt-btn-icon" onClick={() => shift(-1)} title="Previous">‹</button>
-            <button type="button" className="btn small" onClick={goToday}>Today</button>
-            <button type="button" className="wgt-btn-icon" onClick={() => shift(1)} title="Next">›</button>
+            <button type="button" className="wgt-btn-icon" onClick={() => shift(-1)} title={t('calendar.prev')}>‹</button>
+            <button type="button" className="btn small" onClick={goToday}>{t('calendar.today')}</button>
+            <button type="button" className="wgt-btn-icon" onClick={() => shift(1)} title={t('calendar.next')}>›</button>
             <span className="cal-header-label">{headerLabel}</span>
             <input
               type="date"
@@ -358,7 +375,7 @@ export default function CalendarView() {
                 setJumpVal(e.target.value);
                 jump(e.target.value);
               }}
-              title="Jump to date"
+              title={t('calendar.jumpToDate')}
             />
           </div>
         )}
@@ -385,7 +402,11 @@ export default function CalendarView() {
                   {dayEvents.slice(0, 3).map((ev) => (
                     <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
                   ))}
-                  {dayEvents.length > 3 && <div className="cal-more muted">+{dayEvents.length - 3} more</div>}
+                  {dayEvents.length > 3 && (
+                    <div className="cal-more muted">
+                      {t('calendar.moreCount', { count: dayEvents.length - 3 })}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -410,7 +431,7 @@ export default function CalendarView() {
                   {dayEvents.map((ev) => (
                     <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
                   ))}
-                  <button type="button" className="cal-add-inline muted" onClick={() => openNew(key)}>+ Add</button>
+                  <button type="button" className="cal-add-inline muted" onClick={() => openNew(key)}>{t('calendar.addInline')}</button>
                 </div>
               </div>
             );
@@ -421,24 +442,24 @@ export default function CalendarView() {
       {mode === 'day' && (
         <div className="cal-day-list">
           {(occsByDay.get(toKey(cursor)) ?? []).length === 0 && (
-            <p className="muted">No events on this day.</p>
+            <p className="muted">{t('calendar.noEventsToday')}</p>
           )}
           {(occsByDay.get(toKey(cursor)) ?? []).map((ev) => (
             <button type="button" key={`${ev.id}-${ev.occurrenceDate}`} className="cal-day-row" style={{ borderLeftColor: ev.color }} onClick={() => openEdit(ev)}>
-              <span className="cal-day-time">{ev.allDay ? 'All day' : `${ev.startTime ?? ''}${ev.endTime ? `–${ev.endTime}` : ''}`}</span>
+              <span className="cal-day-time">{ev.allDay ? t('calendar.allDay') : `${ev.startTime ?? ''}${ev.endTime ? `–${ev.endTime}` : ''}`}</span>
               <span className="cal-day-title">{ev.title}</span>
               <span className="cal-badge" style={{ background: ev.color }}>{CATEGORY_LABELS[ev.category]}</span>
             </button>
           ))}
-          <button type="button" className="btn small" onClick={() => openNew(toKey(cursor))}>+ Add event</button>
+          <button type="button" className="btn small" onClick={() => openNew(toKey(cursor))}>{t('calendar.addEvent')}</button>
         </div>
       )}
 
       {mode === 'agenda' && (
         <div className="cal-agenda">
           <section>
-            <h3>Today</h3>
-            {agendaToday.length === 0 ? <p className="muted">Nothing today.</p> : (
+            <h3>{t('calendar.today')}</h3>
+            {agendaToday.length === 0 ? <p className="muted">{t('calendar.agenda.nothingToday')}</p> : (
               <ul className="cal-agenda-list">
                 {agendaToday.map((ev) => (
                   <li key={`${ev.id}-${ev.occurrenceDate}`}>
@@ -449,8 +470,8 @@ export default function CalendarView() {
             )}
           </section>
           <section>
-            <h3>Upcoming</h3>
-            {agendaUpcoming.length === 0 ? <p className="muted">Nothing on the horizon.</p> : (
+            <h3>{t('calendar.agenda.upcoming')}</h3>
+            {agendaUpcoming.length === 0 ? <p className="muted">{t('calendar.agenda.nothingUpcoming')}</p> : (
               <ul className="cal-agenda-list">
                 {agendaUpcoming.map((ev) => (
                   <li key={`${ev.id}-${ev.occurrenceDate}`}>
@@ -462,8 +483,8 @@ export default function CalendarView() {
             )}
           </section>
           <section>
-            <h3>Overdue reminders</h3>
-            {agendaOverdue.length === 0 ? <p className="muted">None.</p> : (
+            <h3>{t('calendar.agenda.overdueReminders')}</h3>
+            {agendaOverdue.length === 0 ? <p className="muted">{t('calendar.agenda.none')}</p> : (
               <ul className="cal-agenda-list">
                 {agendaOverdue.map((ev) => (
                   <li key={`${ev.id}-${ev.occurrenceDate}`}>

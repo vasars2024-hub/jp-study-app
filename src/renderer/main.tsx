@@ -6,13 +6,17 @@ import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
 import { bootOsLook } from './components/DesktopSettings';
 import { bootDisplayPrefs } from './displayPrefs';
 import { bootTheme } from './theme';
+import { applyLangAttribute } from './i18n';
 import { bootEnvironment } from './environment';
 import { bootCustomCss } from './customCss';
 import { runStorageMigrations } from './storage/migrationRunner';
 import { initProfileState } from './profileState';
 import { initDesktopState } from './desktopState';
+import { initCityState } from './cityState';
+import { startCitySession } from './citySession';
 import { installKeyboardShortcuts } from './keyboardShortcuts';
 import { clearOnExitIfConfigured } from './clipboardHistory';
+import { startReleaseCheck } from './releaseCheck';
 import './styles.css';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
@@ -28,6 +32,9 @@ const isCompanionHost =
 applyZoom(loadZoom());
 installZoomResizeHook();
 bootTheme();
+// Sets <html lang> from the saved UI language before first paint — CJK glyph
+// shapes depend on it, so doing it later would flash the wrong forms.
+applyLangAttribute();
 bootOsLook();
 bootDisplayPrefs();
 
@@ -48,6 +55,9 @@ if (!isCompanionHost) {
   });
   initProfileState().catch((err) => console.error('[profileState] init failed:', err));
   initDesktopState().catch((err) => console.error('[desktopState] init failed:', err));
+  initCityState()
+    .then(() => startCitySession())
+    .catch((err) => console.error('[cityState] init failed:', err));
 
   // Dev-only: prove the Japanese tokenizer actually builds in the renderer (its
   // result is mirrored to the terminal via the main-process console forwarder).
@@ -74,6 +84,7 @@ if (!isCompanionHost) {
     .catch((e) => console.error('[tokenizer] preload failed:', e?.message ?? e));
 
   installKeyboardShortcuts();
+  startReleaseCheck();
 }
 
 const container = document.getElementById('root');

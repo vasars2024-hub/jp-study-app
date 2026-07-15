@@ -7,6 +7,7 @@ import {
   rowsToDeckEntries,
 } from '../../shared/deckImport';
 import { importDeckFromEntries } from '../flashcardDeck';
+import { getActiveProfile } from '../profileState';
 
 type Props = {
   onImported?: () => void;
@@ -81,6 +82,7 @@ export default function DeckImportPanel({ onImported }: Props) {
         placeholder="Paste vocabulary list, CSV, or TSV here…"
         rows={5}
         spellCheck={false}
+        lang={getActiveProfile().targetLang}
         onPaste={(e) => {
           const text = e.clipboardData.getData('text/plain');
           if (!text.trim()) return;

@@ -47,6 +47,7 @@ import {
   type DeckFieldKey,
 } from '../../shared/deckImport';
 import { importDeckFromEntries } from '../flashcardDeck';
+import { getActiveProfile } from '../profileState';
 import { parseCsvTextAsync } from '../csvParseAsync';
 import { clampToViewport, toLayoutPoint } from '../zoomCoords';
 import Icon from './Icons';
@@ -638,6 +639,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
           placeholder="Paste CSV / TSV here and click Load"
           rows={2}
           spellCheck={false}
+          lang={getActiveProfile().targetLang}
         />
         <button type="button" className="btn" onClick={handlePasteArea}>
           Load paste

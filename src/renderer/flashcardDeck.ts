@@ -27,6 +27,7 @@ interface FlashcardDeckStore {
 }
 
 import { IDB_KEYS, mirrorToIdb } from './storage/storage';
+import { emitCompanionEvent } from './environment/companionEvents';
 
 const KEY = 'jp-flashcard-deck';
 const EVENT = 'flashcard-deck-changed';
@@ -139,6 +140,9 @@ export function setDeckCardKnown(id: string, known: boolean): DeckFlashcard[] {
   const store = readStore();
   store.cards = store.cards.map((c) => (c.id === id ? { ...c, known: known || undefined } : c));
   writeStore(store);
+  // A real review action ("Got it"), distinct from folder/import edits — the
+  // one flashcard-deck event the city bridge's telemetry collector counts.
+  emitCompanionEvent('flashcard');
   return store.cards;
 }
 

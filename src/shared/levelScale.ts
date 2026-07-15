@@ -1,0 +1,153 @@
+// The user's language level as a single 1..7 scale, shared by main and
+// renderer (no Electron / DOM imports allowed here — this is the pure math the
+// LevelService and its tests both consume).
+//
+// Scale (Plan 0.5, "Road to v1.01"):
+//   JP: 1 Beginner (pre-N5), 2 N5, 3 N4, 4 N3, 5 N2, 6 N1, 7 Advanced (post-N1).
+//   ZH: 1 HSK1 … 6 HSK6, 7 Advanced.
+// A level "counts as reached" when coverage of its list ≥ threshold (default
+// 0.8). Level 7 is inferred from an advanced custom list and/or the total
+// known-word count, since there is no single canonical post-N1 / post-HSK6 list.
+
+export type StudyLang = 'ja' | 'zh';
+export type LevelTier = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/** Stable identifier for one upload/paste slot on the Level page. */
+export type LevelSlotId =
+  | 'jlpt-n5'
+  | 'jlpt-n4'
+  | 'jlpt-n3'
+  | 'jlpt-n2'
+  | 'jlpt-n1'
+  | 'hsk-1'
+  | 'hsk-2'
+  | 'hsk-3'
+  | 'hsk-4'
+  | 'hsk-5'
+  | 'hsk-6';
+
+export interface LevelSlot {
+  id: LevelSlotId;
+  /** The tier this slot proves when its coverage crosses the threshold. */
+  tier: LevelTier;
+  /** Short badge label, e.g. "N5" or "HSK 3". */
+  short: string;
+  /** Full label for prose, e.g. "JLPT N5". */
+  label: string;
+}
+
+export interface TierInfo {
+  tier: LevelTier;
+  /** One-word name of the tier, e.g. "Beginner", "N5", "Advanced". */
+  name: string;
+}
+
+/** Default coverage of a list required to call its level "reached". */
+export const DEFAULT_LEVEL_THRESHOLD = 0.8;
+
+/**
+ * Known-word count that, combined with the top list being cleared, lifts a user
+ * to tier 7 (Advanced) when no dedicated advanced list is provided. Post-N1 /
+ * post-HSK6 active vocabulary is conventionally ~8–10k words.
+ */
+export const ADVANCED_KNOWN_WORDS = 8000;
+
+export const JA_SLOTS: readonly LevelSlot[] = [
+  { id: 'jlpt-n5', tier: 2, short: 'N5', label: 'JLPT N5' },
+  { id: 'jlpt-n4', tier: 3, short: 'N4', label: 'JLPT N4' },
+  { id: 'jlpt-n3', tier: 4, short: 'N3', label: 'JLPT N3' },
+  { id: 'jlpt-n2', tier: 5, short: 'N2', label: 'JLPT N2' },
+  { id: 'jlpt-n1', tier: 6, short: 'N1', label: 'JLPT N1' },
+];
+
+export const ZH_SLOTS: readonly LevelSlot[] = [
+  { id: 'hsk-1', tier: 1, short: 'HSK 1', label: 'HSK 1' },
+  { id: 'hsk-2', tier: 2, short: 'HSK 2', label: 'HSK 2' },
+  { id: 'hsk-3', tier: 3, short: 'HSK 3', label: 'HSK 3' },
+  { id: 'hsk-4', tier: 4, short: 'HSK 4', label: 'HSK 4' },
+  { id: 'hsk-5', tier: 5, short: 'HSK 5', label: 'HSK 5' },
+  { id: 'hsk-6', tier: 6, short: 'HSK 6', label: 'HSK 6' },
+];
+
+export const JA_TIERS: readonly TierInfo[] = [
+  { tier: 1, name: 'Beginner' },
+  { tier: 2, name: 'N5' },
+  { tier: 3, name: 'N4' },
+  { tier: 4, name: 'N3' },
+  { tier: 5, name: 'N2' },
+  { tier: 6, name: 'N1' },
+  { tier: 7, name: 'Advanced' },
+];
+
+export const ZH_TIERS: readonly TierInfo[] = [
+  { tier: 1, name: 'HSK 1' },
+  { tier: 2, name: 'HSK 2' },
+  { tier: 3, name: 'HSK 3' },
+  { tier: 4, name: 'HSK 4' },
+  { tier: 5, name: 'HSK 5' },
+  { tier: 6, name: 'HSK 6' },
+  { tier: 7, name: 'Advanced' },
+];
+
+export function slotsForLang(lang: StudyLang): readonly LevelSlot[] {
+  return lang === 'zh' ? ZH_SLOTS : JA_SLOTS;
+}
+
+export function tiersForLang(lang: StudyLang): readonly TierInfo[] {
+  return lang === 'zh' ? ZH_TIERS : JA_TIERS;
+}
+
+export function tierName(lang: StudyLang, tier: LevelTier): string {
+  return tiersForLang(lang).find((t) => t.tier === tier)?.name ?? String(tier);
+}
+
+export interface DeriveLevelInput {
+  /** Coverage 0..1 for each slot that has a list; missing = no list. */
+  coverageBySlot: Partial<Record<LevelSlotId, number>>;
+  /** Coverage 0..1 of a user-provided "advanced" custom list, if any. */
+  advancedCoverage?: number;
+  /** Total known/familiar words for this language (for the tier-7 inference). */
+  totalKnown?: number;
+  /** Reached threshold, 0..1. Defaults to DEFAULT_LEVEL_THRESHOLD. */
+  threshold?: number;
+}
+
+export interface DerivedLevel {
+  level: LevelTier;
+  /** Slots whose coverage met the threshold, in ascending tier order. */
+  reached: LevelSlotId[];
+  /** Whether the tier-7 (Advanced) condition was satisfied. */
+  advanced: boolean;
+}
+
+/**
+ * Derive the user's overall level from per-slot coverage. The level is the
+ * highest tier whose slot cleared the threshold (slots need not be contiguous —
+ * clearing N1 alone is enough to read as N1). Tier 7 requires the top slot to
+ * be cleared AND either an advanced list cleared or the known-word count over
+ * ADVANCED_KNOWN_WORDS.
+ */
+export function deriveUserLevel(lang: StudyLang, input: DeriveLevelInput): DerivedLevel {
+  const threshold = input.threshold ?? DEFAULT_LEVEL_THRESHOLD;
+  const slots = slotsForLang(lang);
+  const reached: LevelSlotId[] = [];
+  let level: LevelTier = 1;
+
+  for (const slot of slots) {
+    const cov = input.coverageBySlot[slot.id];
+    if (cov != null && cov >= threshold) {
+      reached.push(slot.id);
+      if (slot.tier > level) level = slot.tier;
+    }
+  }
+
+  const topSlot = slots[slots.length - 1];
+  const topCleared = reached.includes(topSlot.id);
+  const advanced =
+    topCleared &&
+    ((input.advancedCoverage != null && input.advancedCoverage >= threshold) ||
+      (input.totalKnown ?? 0) >= ADVANCED_KNOWN_WORDS);
+  if (advanced) level = 7;
+
+  return { level, reached, advanced };
+}

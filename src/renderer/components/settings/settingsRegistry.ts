@@ -1,154 +1,180 @@
 import type { SettingsNavPage, SettingsPageId, SettingsRegistryEntry } from './types';
+import { en } from '../../../shared/i18n/catalogs';
+
+// Labels and descriptions here are i18n catalog keys (see shared/i18n/catalogs.ts,
+// 'settings.nav.*'), not display text — every consumer must resolve them with
+// t() at render time. `en` is imported only to seed search keywords below,
+// since the search index still matches on English feature names regardless of
+// the active UI language (see the SETTINGS_REGISTRY comment).
 
 /** Sidebar pages in display order, grouped for the rail. */
 export const SETTINGS_NAV: SettingsNavPage[] = [
-  { id: 'home', label: 'Home', icon: 'settings', group: '', description: 'Quick actions and status' },
+  { id: 'home', labelKey: 'settings.nav.home', icon: 'settings', group: '', descKey: 'settings.nav.home.desc' },
   {
     id: 'appearance',
-    label: 'Appearance',
+    labelKey: 'settings.nav.appearance',
     icon: 'sparkle',
     group: 'Personalization',
-    description: 'Themes, colors, fonts',
+    descKey: 'settings.nav.appearance.desc',
   },
   {
     id: 'wallpaper',
-    label: 'Wallpaper',
+    labelKey: 'settings.nav.wallpaper',
     icon: 'image',
     group: 'Personalization',
-    description: 'Desktop background',
+    descKey: 'settings.nav.wallpaper.desc',
   },
   {
     id: 'atmosphere',
-    label: 'Atmosphere',
+    labelKey: 'settings.nav.atmosphere',
     icon: 'flame',
     group: 'Personalization',
-    description: 'Living layer, particles, lighting',
+    descKey: 'settings.nav.atmosphere.desc',
   },
   {
     id: 'companions',
-    label: 'Companions',
+    labelKey: 'settings.nav.companions',
     icon: 'heart',
     group: 'Personalization',
-    description: 'Desktop pets',
+    descKey: 'settings.nav.companions.desc',
   },
   {
     id: 'desktop-layout',
-    label: 'Desktop layout',
+    labelKey: 'settings.nav.desktopLayout',
     icon: 'app',
     group: 'Desktop',
-    description: 'Icons, taskbar, session',
+    descKey: 'settings.nav.desktopLayout.desc',
   },
   {
     id: 'shortcuts',
-    label: 'Shortcuts',
+    labelKey: 'settings.nav.shortcuts',
     icon: 'command',
     group: 'Desktop',
-    description: 'Keyboard and mouse bindings',
+    descKey: 'settings.nav.shortcuts.desc',
   },
   {
     id: 'study',
-    label: 'Profile & dictionary',
+    labelKey: 'settings.nav.study',
     icon: 'dictionary',
     group: 'Study',
-    description: 'Profiles and dictionaries',
+    descKey: 'settings.nav.study.desc',
   },
   {
     id: 'reading',
-    label: 'Reading',
+    labelKey: 'settings.nav.reading',
     icon: 'novels',
     group: 'Study',
-    description: 'Reader typography',
+    descKey: 'settings.nav.reading.desc',
   },
   {
     id: 'transcription',
-    label: 'Transcription',
+    labelKey: 'settings.nav.transcription',
     icon: 'caption',
     group: 'Study',
-    description: 'Whisper device',
+    descKey: 'settings.nav.transcription.desc',
   },
   {
     id: 'visualizer',
-    label: 'Visualizer',
+    labelKey: 'settings.nav.visualizer',
     icon: 'monitor',
     group: 'Media',
-    description: 'Music visuals and lyrics',
+    descKey: 'settings.nav.visualizer.desc',
   },
   {
     id: 'display',
-    label: 'Display',
+    labelKey: 'settings.nav.display',
     icon: 'eye',
     group: 'System',
-    description: 'Zoom and motion',
+    descKey: 'settings.nav.display.desc',
+  },
+  {
+    id: 'storage',
+    labelKey: 'settings.nav.storage',
+    icon: 'download',
+    group: 'System',
+    descKey: 'settings.nav.storage.desc',
   },
   {
     id: 'memory',
-    label: 'Memory & storage',
+    labelKey: 'settings.nav.memory',
     icon: 'folder',
     group: 'System',
-    description: 'Usage, inventory, backups, and clear tools',
+    descKey: 'settings.nav.memory.desc',
   },
 ];
 
+/**
+ * Suggestion chips shown when the search box is empty. Reuses each entry's own
+ * `titleKey` — clicking a chip sets the query to that translated text, which
+ * `searchSettings` then matches against the very same translated title.
+ */
 export const SETTINGS_SEARCH_SUGGESTIONS = [
-  'wallpaper',
-  'theme',
-  'shortcuts',
-  'particles',
-  'companions',
-  'zoom',
-  'dictionary',
-  'custom css',
+  'search.wallpaper',
+  'search.theme',
+  'search.shortcuts',
+  'search.particles',
+  'search.companions',
+  'search.zoom',
+  'search.dictionary',
+  'search.customCss',
 ];
 
 /** Searchable index — maps queries to pages and cards. */
 export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
-  // Pages
-  ...SETTINGS_NAV.filter((p) => p.id !== 'home').map((p) => ({
-    id: `page-${p.id}`,
-    title: p.label,
-    description: p.description ?? '',
-    keywords: [p.label, p.group, p.description ?? '', p.id].filter(Boolean),
-    pageId: p.id,
-    group: p.group || 'Settings',
-  })),
+  // Pages — reuse SETTINGS_NAV's own keys directly, so a page's search entry
+  // and its nav-rail label can never drift apart. Keywords are still seeded
+  // from the `en` catalog (literal text), since search keywords stay English
+  // regardless of UI language — see the SettingsRegistryEntry comment.
+  ...SETTINGS_NAV.filter((p) => p.id !== 'home').map((p) => {
+    const label = en[p.labelKey] as string;
+    const desc = (p.descKey ? (en[p.descKey] as string) : '') ?? '';
+    return {
+      id: `page-${p.id}`,
+      titleKey: p.labelKey,
+      descKey: p.descKey,
+      keywords: [label, p.group, desc, p.id].filter(Boolean),
+      pageId: p.id,
+      group: p.group || 'Settings',
+    };
+  }),
 
   // Appearance
   {
     id: 'theme',
-    title: 'Theme',
-    description: 'Light, dark, and classic color themes',
+    titleKey: 'search.theme',
+    descKey: 'search.theme.desc',
     keywords: ['theme', 'dark', 'light', 'appearance', 'color scheme'],
     pageId: 'appearance',
     group: 'Personalization',
   },
   {
     id: 'accent',
-    title: 'Accent colour',
-    description: 'Accent color presets and custom accent',
+    titleKey: 'search.accent',
+    descKey: 'search.accent.desc',
     keywords: ['accent', 'color', 'colour', 'red', 'personalization'],
     pageId: 'appearance',
     group: 'Personalization',
   },
   {
     id: 'typography',
-    title: 'Typography & density',
-    description: 'Font family, density, and corner radius',
+    titleKey: 'search.typography',
+    descKey: 'search.typography.desc',
     keywords: ['font', 'density', 'corners', 'typography', 'spacing'],
     pageId: 'appearance',
     group: 'Personalization',
   },
   {
     id: 'materials',
-    title: 'Shape & materials',
-    description: 'Chrome material and window shadows',
+    titleKey: 'search.materials',
+    descKey: 'search.materials.desc',
     keywords: ['chrome', 'frosted', 'shadow', 'materials', 'glass'],
     pageId: 'appearance',
     group: 'Personalization',
   },
   {
     id: 'custom-css',
-    title: 'Custom CSS',
-    description: 'User CSS sandbox and reset look',
+    titleKey: 'search.customCss',
+    descKey: 'search.customCss.desc',
     keywords: ['css', 'custom css', 'advanced', 'sandbox', 'style'],
     pageId: 'appearance',
     group: 'Personalization',
@@ -157,8 +183,8 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // Wallpaper
   {
     id: 'wallpaper',
-    title: 'Wallpaper',
-    description: 'Preset, image, video, or folder slideshow',
+    titleKey: 'search.wallpaper',
+    descKey: 'search.wallpaper.desc',
     keywords: [
       'wallpaper',
       'background',
@@ -175,8 +201,8 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
   {
     id: 'wallpaper-dim',
-    title: 'Wallpaper dim',
-    description: 'Dim the desktop background',
+    titleKey: 'search.wallpaperDim',
+    descKey: 'search.wallpaperDim.desc',
     keywords: ['dim', 'brightness', 'wallpaper'],
     pageId: 'wallpaper',
     group: 'Personalization',
@@ -185,56 +211,56 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // Atmosphere
   {
     id: 'living-layer',
-    title: 'Living desktop layer',
-    description: 'Master switch for environment effects',
+    titleKey: 'search.livingLayer',
+    descKey: 'search.livingLayer.desc',
     keywords: ['living', 'atmosphere', 'environment', 'layer'],
     pageId: 'atmosphere',
     group: 'Personalization',
   },
   {
     id: 'rotation',
-    title: 'Wallpaper rotation',
-    description: 'Playlist and time-of-day wall rotation',
+    titleKey: 'search.rotation',
+    descKey: 'search.rotation.desc',
     keywords: ['rotation', 'playlist', 'schedule', 'day cycle', 'calendar walls'],
     pageId: 'atmosphere',
     group: 'Personalization',
   },
   {
     id: 'particles',
-    title: 'Particles',
-    description: 'Fireflies, snow, rain, density, intensity, and size',
+    titleKey: 'search.particles',
+    descKey: 'search.particles.desc',
     keywords: ['particles', 'fireflies', 'snow', 'rain', 'dust', 'intensity', 'density', 'size'],
     pageId: 'atmosphere',
     group: 'Personalization',
   },
   {
     id: 'particle-size',
-    title: 'Particle size',
-    description: 'Radius of flakes, motes, and glows',
+    titleKey: 'search.particleSize',
+    descKey: 'search.particleSize.desc',
     keywords: ['particle size', 'size', 'radius', 'flake size', 'scale'],
     pageId: 'atmosphere',
     group: 'Personalization',
   },
   {
     id: 'snow-accumulation',
-    title: 'Snow accumulation',
-    description: 'Snow piles on the desk edge',
+    titleKey: 'search.snowAccumulation',
+    descKey: 'search.snowAccumulation.desc',
     keywords: ['snow', 'accumulation', 'piles', 'winter'],
     pageId: 'atmosphere',
     group: 'Personalization',
   },
   {
     id: 'lighting',
-    title: 'Day-cycle lighting',
-    description: 'Ambient light wash from dawn to night',
+    titleKey: 'search.lighting',
+    descKey: 'search.lighting.desc',
     keywords: ['lighting', 'ambient', 'dawn', 'night', 'wash'],
     pageId: 'atmosphere',
     group: 'Personalization',
   },
   {
     id: 'achievements',
-    title: 'Achievements',
-    description: 'Celebrate streaks and reading milestones',
+    titleKey: 'search.achievements',
+    descKey: 'search.achievements.desc',
     keywords: ['achievements', 'streak', 'celebration', 'milestone'],
     pageId: 'atmosphere',
     group: 'Personalization',
@@ -243,16 +269,16 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // Companions
   {
     id: 'companions',
-    title: 'Companions',
-    description: 'Desktop pets that react to study',
+    titleKey: 'search.companions',
+    descKey: 'search.companions.desc',
     keywords: ['companions', 'pets', 'critter', 'noctis', 'buddy'],
     pageId: 'companions',
     group: 'Personalization',
   },
   {
     id: 'buddy-programmer',
-    title: 'Buddy programmer',
-    description: 'Programmable click routines and command chains for companions',
+    titleKey: 'search.buddyProgrammer',
+    descKey: 'search.buddyProgrammer.desc',
     keywords: [
       'buddy',
       'routine',
@@ -267,8 +293,8 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
   {
     id: 'os-pets',
-    title: 'Windows desktop pets',
-    description: 'Show companions on the real Windows desktop',
+    titleKey: 'search.osPets',
+    descKey: 'search.osPets.desc',
     keywords: ['os desktop', 'overlay', 'host', 'multi-monitor', 'monitors'],
     pageId: 'companions',
     group: 'Personalization',
@@ -277,32 +303,32 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // Desktop layout
   {
     id: 'icons',
-    title: 'Icons',
-    description: 'Icon size, labels, snap grid, lock',
+    titleKey: 'search.icons',
+    descKey: 'search.icons.desc',
     keywords: ['icons', 'snap', 'grid', 'label', 'desktop'],
     pageId: 'desktop-layout',
     group: 'Desktop',
   },
   {
     id: 'taskbar',
-    title: 'Taskbar',
-    description: 'Taskbar size and clock format',
+    titleKey: 'search.taskbar',
+    descKey: 'search.taskbar.desc',
     keywords: ['taskbar', 'clock', '24h', 'time'],
     pageId: 'desktop-layout',
     group: 'Desktop',
   },
   {
     id: 'start-menu',
-    title: 'Start menu',
-    description: 'Start menu columns',
+    titleKey: 'search.startMenu',
+    descKey: 'search.startMenu.desc',
     keywords: ['start', 'menu', 'columns'],
     pageId: 'desktop-layout',
     group: 'Desktop',
   },
   {
     id: 'session',
-    title: 'Session restore',
-    description: 'Restore open windows on launch',
+    titleKey: 'search.session',
+    descKey: 'search.session.desc',
     keywords: ['session', 'restore', 'windows', 'launch'],
     pageId: 'desktop-layout',
     group: 'Desktop',
@@ -311,8 +337,8 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // Shortcuts
   {
     id: 'shortcuts',
-    title: 'Keyboard shortcuts',
-    description: 'Rebind keys, mouse buttons, and profiles',
+    titleKey: 'search.shortcuts',
+    descKey: 'search.shortcuts.desc',
     keywords: ['shortcut', 'keybind', 'hotkey', 'keyboard', 'mouse', 'ctrl', 'binding'],
     pageId: 'shortcuts',
     group: 'Desktop',
@@ -321,32 +347,32 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // Study
   {
     id: 'profile',
-    title: 'Study profile',
-    description: 'Active profile and profile management',
+    titleKey: 'search.profile',
+    descKey: 'search.profile.desc',
     keywords: ['profile', 'study', 'jlpt'],
     pageId: 'study',
     group: 'Study',
   },
   {
     id: 'dictionary',
-    title: 'Dictionary',
-    description: 'Yomitan packs and dictionary settings',
+    titleKey: 'search.dictionary',
+    descKey: 'search.dictionary.desc',
     keywords: ['dictionary', 'yomitan', 'lookup'],
     pageId: 'study',
     group: 'Study',
   },
   {
     id: 'reading',
-    title: 'Reading settings',
-    description: 'Reader typography and layout',
+    titleKey: 'search.reading',
+    descKey: 'search.reading.desc',
     keywords: ['reading', 'font size', 'epub', 'novel', 'typography'],
     pageId: 'reading',
     group: 'Study',
   },
   {
     id: 'whisper',
-    title: 'Transcription device',
-    description: 'GPU or CPU for Whisper subtitles',
+    titleKey: 'search.whisper',
+    descKey: 'search.whisper.desc',
     keywords: ['whisper', 'transcription', 'gpu', 'cpu', 'subtitles'],
     pageId: 'transcription',
     group: 'Study',
@@ -355,16 +381,16 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // Media
   {
     id: 'visualizer',
-    title: 'Music visualizer',
-    description: 'Spectrum, waveform, and colors',
+    titleKey: 'search.visualizer',
+    descKey: 'search.visualizer.desc',
     keywords: ['visualizer', 'spectrum', 'music', 'fft'],
     pageId: 'visualizer',
     group: 'Media',
   },
   {
     id: 'lyrics',
-    title: 'Lyrics lookup',
-    description: 'Use album names in lyrics search',
+    titleKey: 'search.lyrics',
+    descKey: 'search.lyrics.desc',
     keywords: ['lyrics', 'album', 'search'],
     pageId: 'visualizer',
     group: 'Media',
@@ -373,112 +399,137 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // System
   {
     id: 'zoom',
-    title: 'App zoom',
-    description: 'Scale the entire interface',
+    titleKey: 'search.zoom',
+    descKey: 'search.zoom.desc',
     keywords: ['zoom', 'scale', 'size', 'accessibility', 'display'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'base-font',
-    title: 'Base text size',
-    description: 'Root font size and bold UI text',
+    titleKey: 'search.baseFont',
+    descKey: 'search.baseFont.desc',
     keywords: ['font', 'text size', 'bold', 'display', 'typography'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'contrast',
-    title: 'Contrast & spacing',
-    description: 'UI contrast and letter spacing',
+    titleKey: 'search.contrast',
+    descKey: 'search.contrast.desc',
     keywords: ['contrast', 'letter spacing', 'underline', 'accessibility'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'night-light',
-    title: 'Night light',
-    description: 'Warm screen filter for evening use',
+    titleKey: 'search.nightLight',
+    descKey: 'search.nightLight.desc',
     keywords: ['night', 'warm', 'blue light', 'evening', 'display'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'brightness-sat',
-    title: 'Brightness & saturation',
-    description: 'Screen brightness and color intensity',
+    titleKey: 'search.brightnessSat',
+    descKey: 'search.brightnessSat.desc',
     keywords: ['brightness', 'saturation', 'color', 'display'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'color-filter',
-    title: 'Color filter',
-    description: 'Warm, cool, grayscale, high contrast filters',
+    titleKey: 'search.colorFilter',
+    descKey: 'search.colorFilter.desc',
     keywords: ['grayscale', 'filter', 'color blind', 'accessibility'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'transparency',
-    title: 'Transparency effects',
-    description: 'Frosted glass and backdrop blur',
+    titleKey: 'search.transparency',
+    descKey: 'search.transparency.desc',
     keywords: ['transparency', 'blur', 'frosted', 'acrylic', 'performance'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'focus-ring',
-    title: 'Focus indicator',
-    description: 'Keyboard focus outline strength',
+    titleKey: 'search.focusRing',
+    descKey: 'search.focusRing.desc',
     keywords: ['focus', 'keyboard', 'outline', 'accessibility'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'scrollbars',
-    title: 'Scrollbars',
-    description: 'Auto-hide, always, or hidden scrollbars',
+    titleKey: 'search.scrollbars',
+    descKey: 'search.scrollbars.desc',
     keywords: ['scrollbar', 'scroll', 'smooth'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'pointer',
-    title: 'Pointer & targets',
-    description: 'Larger click targets',
+    titleKey: 'search.pointer',
+    descKey: 'search.pointer.desc',
     keywords: ['pointer', 'cursor', 'touch', 'targets'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'animation-level',
-    title: 'Motion',
-    description: 'Animation level and flash reduction',
+    titleKey: 'search.animationLevel',
+    descKey: 'search.animationLevel.desc',
     keywords: ['motion', 'animation', 'reduce', 'flashes', 'accessibility'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'reduce-motion',
-    title: 'Reduce motion',
-    description: 'Pause animated wallpaper and effects',
+    titleKey: 'search.reduceMotion',
+    descKey: 'search.reduceMotion.desc',
     keywords: ['motion', 'animation', 'reduce', 'accessibility'],
     pageId: 'display',
     group: 'System',
   },
   {
     id: 'focus-mode',
-    title: 'Focus mode',
-    description: 'Library, reader, dictionary, Anki, mini music — no desktop',
+    titleKey: 'search.focusMode',
+    descKey: 'search.focusMode.desc',
     keywords: ['focus', 'reader', 'distraction', 'study', 'minimal', 'epub'],
     pageId: 'study',
     group: 'Study',
   },
   {
+    id: 'storage-models',
+    titleKey: 'search.storageModels',
+    descKey: 'search.storageModels.desc',
+    keywords: [
+      'download',
+      'model',
+      'models',
+      'whisper',
+      'ocr',
+      'manga ocr',
+      'tesseract',
+      'dictionary',
+      'jmdict',
+      'cedict',
+      'pitch accent',
+      'tatoeba',
+      'install',
+      'remove',
+      'storage',
+      'disk space',
+    ],
+    pageId: 'storage',
+    group: 'System',
+  },
+  {
     id: 'memory',
-    title: 'Memory & storage',
-    description: 'RAM, settings inventory, export all configs',
+    titleKey: 'search.memory',
+    descKey: 'search.memory.desc',
     keywords: [
       'memory',
       'storage',
@@ -500,71 +551,79 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
   {
     id: 'system-memory',
-    title: 'System memory',
-    description: 'Live RAM and CPU load on this PC',
+    titleKey: 'search.systemMemory',
+    descKey: 'search.systemMemory.desc',
     keywords: ['ram', 'memory', 'cpu', 'uptime', 'system'],
     pageId: 'memory',
     group: 'System',
   },
   {
     id: 'storage-usage',
-    title: 'App storage',
-    description: 'How much browser storage this app uses',
+    titleKey: 'search.storageUsage',
+    descKey: 'search.storageUsage.desc',
     keywords: ['usage', 'quota', 'disk', 'space', 'used', 'app storage'],
     pageId: 'memory',
     group: 'System',
   },
   {
     id: 'storage-inventory',
-    title: 'Data inventory',
-    description: 'List of decks, drafts, caches, and settings sizes',
+    titleKey: 'search.storageInventory',
+    descKey: 'search.storageInventory.desc',
     keywords: ['inventory', 'list', 'size', 'indexeddb', 'localstorage'],
     pageId: 'memory',
     group: 'System',
   },
   {
     id: 'backup',
-    title: 'Backup & restore',
-    description: 'Export or import a full JSON backup',
+    titleKey: 'search.backup',
+    descKey: 'search.backup.desc',
     keywords: ['backup', 'export', 'import', 'restore', 'json'],
     pageId: 'memory',
     group: 'System',
   },
   {
     id: 'clear-data',
-    title: 'Clear data',
-    description: 'Delete decks, CSV draft, clipboard, lyrics, or calendar',
+    titleKey: 'search.clearData',
+    descKey: 'search.clearData.desc',
     keywords: ['clear', 'delete', 'decks', 'csv', 'clipboard', 'lyrics', 'calendar', 'cache'],
     pageId: 'memory',
     group: 'System',
   },
   {
     id: 'factory-reset',
-    title: 'Factory reset',
-    description: 'Wipe all local data and restart',
+    titleKey: 'search.factoryReset',
+    descKey: 'search.factoryReset.desc',
     keywords: ['factory', 'reset', 'wipe', 'erase', 'fresh'],
     pageId: 'memory',
     group: 'System',
   },
 ];
 
-export function searchSettings(query: string): SettingsRegistryEntry[] {
+/**
+ * `t` is required so a query matches the *displayed* (translated) title as
+ * well as the always-English `keywords` — a JA/ZH/RU user can search in their
+ * UI language, and everyone can still search by the English feature name.
+ */
+export function searchSettings(query: string, t: (key: string) => string): SettingsRegistryEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const words = q.split(/\s+/).filter(Boolean);
-  const scored: { e: SettingsRegistryEntry; score: number }[] = [];
+  const scored: { e: SettingsRegistryEntry; score: number; title: string }[] = [];
   for (const e of SETTINGS_REGISTRY) {
-    const hay = [e.title, e.description, e.group, e.pageId, ...e.keywords].join(' ').toLowerCase();
+    const title = t(e.titleKey);
+    const desc = e.descKey ? t(e.descKey) : '';
+    const hay = [title, desc, e.group, e.pageId, ...e.keywords].join(' ').toLowerCase();
+    const titleLower = title.toLowerCase();
     let score = 0;
-    if (e.title.toLowerCase().includes(q)) score += 40;
+    if (titleLower.includes(q)) score += 40;
     if (hay.includes(q)) score += 20;
     for (const w of words) {
-      if (e.title.toLowerCase().includes(w)) score += 12;
+      if (titleLower.includes(w)) score += 12;
       else if (hay.includes(w)) score += 6;
     }
-    if (score > 0) scored.push({ e, score });
+    if (score > 0) scored.push({ e, score, title });
   }
-  scored.sort((a, b) => b.score - a.score || a.e.title.localeCompare(b.e.title));
+  scored.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title));
   // Dedupe by id
   const seen = new Set<string>();
   const out: SettingsRegistryEntry[] = [];
@@ -588,4 +647,17 @@ export function groupOrder(): string[] {
     if (!order.includes(p.group)) order.push(p.group);
   }
   return order;
+}
+
+/** Stable English group id (e.g. 'Personalization') → its i18n catalog key. */
+const GROUP_LABEL_KEY: Record<string, string> = {
+  Personalization: 'settings.group.personalization',
+  Desktop: 'settings.group.desktop',
+  Study: 'settings.group.study',
+  Media: 'settings.group.media',
+  System: 'settings.group.system',
+};
+
+export function groupLabelKey(group: string): string {
+  return GROUP_LABEL_KEY[group] ?? group;
 }

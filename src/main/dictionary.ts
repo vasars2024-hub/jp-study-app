@@ -1,6 +1,7 @@
 import { ipcMain, app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { mt } from './i18n';
 import type {
   DictEntry,
   DictResult,
@@ -364,8 +365,8 @@ export function registerDictionaryIpc(): void {
     let linksPath = payload?.linksPath;
     if (!sentencesPath) {
       const picked = await dialog.showOpenDialog({
-        title: 'Import Tatoeba Japanese sentences CSV',
-        filters: [{ name: 'CSV / TSV', extensions: ['csv', 'tsv', 'txt'] }],
+        title: mt('dialog.importTatoebaCsv.title'),
+        filters: [{ name: mt('dialog.filter.csvTsv'), extensions: ['csv', 'tsv', 'txt'] }],
         properties: ['openFile'],
       });
       if (picked.canceled || !picked.filePaths[0]) return { ok: false, added: 0, error: 'cancelled' };

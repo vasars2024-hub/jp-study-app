@@ -17,21 +17,7 @@ import {
   type BuddyStep,
 } from '../../../environment/buddyRoutines';
 import { COMMAND_CATALOG, SHORTCUT_OPEN_APPS } from '../../../keyboardShortcuts';
-
-const STEP_TYPES: { id: BuddyStep['type']; label: string }[] = [
-  { id: 'openApp', label: 'Open app' },
-  { id: 'runCommand', label: 'Run command' },
-  { id: 'toggleEnv', label: 'Toggle atmosphere' },
-  { id: 'setMood', label: 'Set mood / status' },
-  { id: 'wait', label: 'Wait' },
-  { id: 'notify', label: 'Notify' },
-  { id: 'music', label: 'Music control' },
-  { id: 'clipboard', label: 'Open clipboard' },
-  { id: 'palette', label: 'Command palette' },
-  { id: 'speak', label: 'Speak (TTS)' },
-  { id: 'dispatch', label: 'Dispatch event' },
-  { id: 'routine', label: 'Run another routine' },
-];
+import { useT } from '../../../i18n';
 
 function blankStep(type: BuddyStep['type']): BuddyStep {
   switch (type) {
@@ -63,12 +49,28 @@ function blankStep(type: BuddyStep['type']): BuddyStep {
 }
 
 export default function CompanionsPage() {
+  const { t } = useT();
   const { env, patchEnv, deskPrefs, patchDesk, seg, focusSettingId } = useSettings();
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
   const [editId, setEditId] = useState<string>(routines[0]?.id ?? '');
   const [testMsg, setTestMsg] = useState('');
   const selectedType = COMPANION_DEFS.find((d) => d.id === 'study-buddy')?.id ?? 'study-buddy';
   const [assignType, setAssignType] = useState<CompanionTypeId>(selectedType);
+
+  const STEP_TYPES: { id: BuddyStep['type']; label: string }[] = [
+    { id: 'openApp', label: t('settings.companions.step.openApp') },
+    { id: 'runCommand', label: t('settings.companions.step.runCommand') },
+    { id: 'toggleEnv', label: t('settings.companions.step.toggleEnv') },
+    { id: 'setMood', label: t('settings.companions.step.setMood') },
+    { id: 'wait', label: t('settings.companions.step.wait') },
+    { id: 'notify', label: t('settings.companions.step.notify') },
+    { id: 'music', label: t('settings.companions.step.music') },
+    { id: 'clipboard', label: t('settings.companions.step.clipboard') },
+    { id: 'palette', label: t('settings.companions.step.palette') },
+    { id: 'speak', label: t('settings.companions.step.speak') },
+    { id: 'dispatch', label: t('settings.companions.step.dispatch') },
+    { id: 'routine', label: t('settings.companions.step.routine') },
+  ];
 
   const editing = useMemo(
     () => routines.find((r) => r.id === editId) ?? routines[0] ?? null,
@@ -114,9 +116,9 @@ export default function CompanionsPage() {
     const j = idx + dir;
     if (j < 0 || j >= editing.steps.length) return;
     const steps = [...editing.steps];
-    const t = steps[idx];
+    const tmp = steps[idx];
     steps[idx] = steps[j];
-    steps[j] = t;
+    steps[j] = tmp;
     updateRoutine(editing.id, { steps });
   };
 
@@ -135,7 +137,7 @@ export default function CompanionsPage() {
 
   const deleteRoutine = () => {
     if (!editing || editing.builtin) return;
-    if (!window.confirm(`Delete routine “${editing.name}”?`)) return;
+    if (!window.confirm(t('settings.companions.deleteRoutineConfirm', { name: editing.name }))) return;
     const next = routines.filter((r) => r.id !== editing.id);
     setRoutines(next);
     setEditId(next[0]?.id ?? '');
@@ -158,13 +160,13 @@ export default function CompanionsPage() {
 
   const testRun = async () => {
     if (!editing) return;
-    setTestMsg('Running…');
+    setTestMsg(t('settings.companions.testRunning'));
     const res = await runBuddyRoutine(editing.id, {
       companionId: sample.id,
       typeId: assignType,
       patchCompanion: () => undefined,
     });
-    setTestMsg(res.ok ? 'OK — routine finished.' : res.error ?? 'Failed.');
+    setTestMsg(res.ok ? t('settings.companions.testOk') : res.error ?? t('settings.companions.testFailed'));
   };
 
   const typeRoutines = routines.filter(
@@ -175,8 +177,8 @@ export default function CompanionsPage() {
     <>
       <SettingsCard
         id="companions"
-        title="Companions"
-        description="Desktop buddies. Enable the living layer first (Atmosphere). Click a buddy to run its primary routine; right-click for the menu."
+        title={t('settings.companions.title')}
+        description={t('settings.companions.desc')}
         highlight={focusSettingId === 'companions'}
         trailing={
           <label className="os-toggle os-toggle-compact">
@@ -185,14 +187,14 @@ export default function CompanionsPage() {
               checked={env.companionsEnabled}
               disabled={!env.enabled}
               onChange={(e) => patchEnv({ companionsEnabled: e.target.checked })}
-              aria-label="Show in-app companions"
+              aria-label={t('settings.companions.showInApp')}
             />
-            <span>{env.companionsEnabled ? 'On' : 'Off'}</span>
+            <span>{env.companionsEnabled ? t('common.on') : t('common.off')}</span>
           </label>
         }
       >
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
-          <span className="os-viz-label muted">Who</span>
+          <span className="os-viz-label muted">{t('settings.companions.who')}</span>
           {COMPANION_DEFS.map((d) => {
             const on = env.companionTypes.includes(d.id);
             return (
@@ -218,11 +220,11 @@ export default function CompanionsPage() {
           })}
         </div>
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Reactivity</span>
+          <span className="os-viz-label muted">{t('settings.companions.reactivity')}</span>
           {([
-            ['quiet', 'Quiet'],
-            ['normal', 'Normal'],
-            ['playful', 'Playful'],
+            ['quiet', t('settings.companions.reactivity.quiet')],
+            ['normal', t('settings.companions.reactivity.normal')],
+            ['playful', t('settings.companions.reactivity.playful')],
           ] as [CompanionReactivity, string][]).map(([id, label]) => (
             <button
               key={id}
@@ -242,7 +244,7 @@ export default function CompanionsPage() {
             disabled={!env.enabled || !env.companionsEnabled}
             onChange={(e) => patchEnv({ companionCelebrate: e.target.checked })}
           />
-          <span>Celebrate study / card progress</span>
+          <span>{t('settings.companions.celebrateProgress')}</span>
         </label>
         <label className="os-toggle">
           <input
@@ -251,19 +253,19 @@ export default function CompanionsPage() {
             disabled={!env.enabled || !env.companionsEnabled}
             onChange={(e) => patchEnv({ companionPauseWhenStudying: e.target.checked })}
           />
-          <span>Calmer movement while focused</span>
+          <span>{t('settings.companions.calmerMovement')}</span>
         </label>
       </SettingsCard>
 
       <SettingsCard
         id="buddy-programmer"
-        title="Buddy programmer"
-        description="Build command chains. Left-click runs primary; double-click runs secondary; menu lists more."
+        title={t('settings.companions.buddyProgrammer.title')}
+        description={t('settings.companions.buddyProgrammer.desc')}
         highlight={focusSettingId === 'buddy-programmer'}
       >
         <div className="buddy-prog-toolbar">
           <label className="pl-field">
-            <span className="muted">Buddy type</span>
+            <span className="muted">{t('settings.companions.buddyType')}</span>
             <select
               className="set-select"
               value={assignType}
@@ -277,7 +279,7 @@ export default function CompanionsPage() {
             </select>
           </label>
           <label className="pl-field">
-            <span className="muted">Primary (click)</span>
+            <span className="muted">{t('settings.companions.primaryClick')}</span>
             <select
               className="set-select"
               value={resolvePrimaryRoutineId(sample)}
@@ -291,7 +293,7 @@ export default function CompanionsPage() {
             </select>
           </label>
           <label className="pl-field">
-            <span className="muted">Secondary (double-click)</span>
+            <span className="muted">{t('settings.companions.secondaryDoubleClick')}</span>
             <select
               className="set-select"
               value={resolveSecondaryRoutineId(sample)}
@@ -308,7 +310,7 @@ export default function CompanionsPage() {
 
         <div className="buddy-prog-toolbar">
           <label className="pl-field grow">
-            <span className="muted">Edit routine</span>
+            <span className="muted">{t('settings.companions.editRoutine')}</span>
             <select
               className="set-select"
               value={editing?.id ?? ''}
@@ -317,32 +319,32 @@ export default function CompanionsPage() {
               {routines.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
-                  {r.builtin ? ' (built-in)' : ''}
+                  {r.builtin ? t('settings.companions.builtinSuffix') : ''}
                   {r.forType && r.forType !== '*' ? ` · ${r.forType}` : ''}
                 </option>
               ))}
             </select>
           </label>
           <button type="button" className="btn small" onClick={createRoutine}>
-            New routine
+            {t('settings.companions.newRoutine')}
           </button>
           <button type="button" className="btn small" onClick={() => void testRun()} disabled={!editing}>
-            Test run
+            {t('settings.companions.testRun')}
           </button>
           <button
             type="button"
             className="btn small"
             onClick={() => {
-              if (!window.confirm('Reset all built-in routines to defaults? Custom routines are kept.'))
+              if (!window.confirm(t('settings.companions.resetBuiltinsConfirm')))
                 return;
               setRoutines(resetBuiltinRoutines(routines));
             }}
           >
-            Reset built-ins
+            {t('settings.companions.resetBuiltins')}
           </button>
           {editing && !editing.builtin && (
             <button type="button" className="btn small" onClick={deleteRoutine}>
-              Delete
+              {t('settings.companions.delete')}
             </button>
           )}
         </div>
@@ -352,7 +354,7 @@ export default function CompanionsPage() {
           <div className="buddy-prog-editor">
             <div className="buddy-prog-toolbar">
               <label className="pl-field grow">
-                <span className="muted">Name</span>
+                <span className="muted">{t('settings.companions.name')}</span>
                 <input
                   value={editing.name}
                   disabled={editing.builtin}
@@ -360,7 +362,7 @@ export default function CompanionsPage() {
                 />
               </label>
               <label className="pl-field">
-                <span className="muted">For type</span>
+                <span className="muted">{t('settings.companions.forType')}</span>
                 <select
                   className="set-select"
                   value={editing.forType ?? '*'}
@@ -371,7 +373,7 @@ export default function CompanionsPage() {
                     })
                   }
                 >
-                  <option value="*">Any</option>
+                  <option value="*">{t('settings.companions.any')}</option>
                   {COMPANION_DEFS.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.label}
@@ -381,7 +383,7 @@ export default function CompanionsPage() {
               </label>
             </div>
 
-            <p className="muted os-set-hint">Steps run top to bottom. Built-ins are read-only (duplicate via New).</p>
+            <p className="muted os-set-hint">{t('settings.companions.stepsHint')}</p>
             <ul className="buddy-step-list">
               {editing.steps.map((step, idx) => (
                 <li key={idx} className="buddy-step-row">
@@ -390,13 +392,13 @@ export default function CompanionsPage() {
                     disabled={editing.builtin}
                     value={step.type}
                     onChange={(e) => {
-                      const t = e.target.value as BuddyStep['type'];
-                      updateStep(idx, blankStep(t));
+                      const nt = e.target.value as BuddyStep['type'];
+                      updateStep(idx, blankStep(nt));
                     }}
                   >
-                    {STEP_TYPES.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
+                    {STEP_TYPES.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.label}
                       </option>
                     ))}
                   </select>
@@ -409,13 +411,13 @@ export default function CompanionsPage() {
                   {!editing.builtin && (
                     <div className="buddy-step-actions">
                       <button type="button" className="btn small" onClick={() => moveStep(idx, -1)}>
-                        Up
+                        {t('settings.companions.up')}
                       </button>
                       <button type="button" className="btn small" onClick={() => moveStep(idx, 1)}>
-                        Down
+                        {t('settings.companions.down')}
                       </button>
                       <button type="button" className="btn small" onClick={() => removeStep(idx)}>
-                        Remove
+                        {t('common.remove')}
                       </button>
                     </div>
                   )}
@@ -424,7 +426,7 @@ export default function CompanionsPage() {
             </ul>
             {!editing.builtin && (
               <button type="button" className="btn small" onClick={addStep}>
-                Add step
+                {t('settings.companions.addStep')}
               </button>
             )}
             {editing.builtin && (
@@ -436,7 +438,7 @@ export default function CompanionsPage() {
                   const fork: BuddyRoutine = {
                     ...editing,
                     id,
-                    name: `${editing.name} (copy)`,
+                    name: `${editing.name}${t('settings.companions.copySuffix')}`,
                     builtin: false,
                     steps: editing.steps.map((s) => sanitizeStep(s)!).filter(Boolean),
                   };
@@ -444,7 +446,7 @@ export default function CompanionsPage() {
                   setEditId(id);
                 }}
               >
-                Duplicate as editable
+                {t('settings.companions.duplicateEditable')}
               </button>
             )}
           </div>
@@ -453,8 +455,8 @@ export default function CompanionsPage() {
 
       <SettingsCard
         id="os-pets"
-        title="Windows desktop pets"
-        description="Transparent always-on-top overlay. Click a pet to focus Study OS and run its primary routine."
+        title={t('settings.companions.osPets.title')}
+        description={t('settings.companions.osPets.desc')}
         highlight={focusSettingId === 'os-pets'}
       >
         <label className="os-toggle">
@@ -464,17 +466,17 @@ export default function CompanionsPage() {
             disabled={!env.enabled || !env.companionsEnabled}
             onChange={(e) => patchEnv({ companionsOnOsDesktop: e.target.checked })}
           />
-          <span>Show on Windows desktop</span>
+          <span>{t('settings.companions.showOnDesktop')}</span>
         </label>
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Monitors</span>
+          <span className="os-viz-label muted">{t('settings.companions.monitors')}</span>
           <button
             type="button"
             className={seg(deskPrefs.companionHostDisplays !== 'all')}
             disabled={!env.enabled || !env.companionsEnabled || !env.companionsOnOsDesktop}
             onClick={() => patchDesk({ companionHostDisplays: 'primary' })}
           >
-            Primary
+            {t('settings.companions.primary')}
           </button>
           <button
             type="button"
@@ -482,7 +484,7 @@ export default function CompanionsPage() {
             disabled={!env.enabled || !env.companionsEnabled || !env.companionsOnOsDesktop}
             onClick={() => patchDesk({ companionHostDisplays: 'all' })}
           >
-            All displays
+            {t('settings.companions.allDisplays')}
           </button>
         </div>
       </SettingsCard>
@@ -501,6 +503,7 @@ function StepFields({
   routines: BuddyRoutine[];
   onChange: (s: BuddyStep) => void;
 }) {
+  const { t } = useT();
   switch (step.type) {
     case 'openApp':
       return (
@@ -547,11 +550,11 @@ function StepFields({
               })
             }
           >
-            <option value="particles">Particles</option>
-            <option value="companions">Companions</option>
-            <option value="lighting">Lighting</option>
-            <option value="living">Living layer</option>
-            <option value="rotation">Wallpaper rotation</option>
+            <option value="particles">{t('settings.companions.toggleKey.particles')}</option>
+            <option value="companions">{t('settings.companions.toggleKey.companions')}</option>
+            <option value="lighting">{t('settings.companions.toggleKey.lighting')}</option>
+            <option value="living">{t('settings.companions.toggleKey.living')}</option>
+            <option value="rotation">{t('settings.companions.toggleKey.rotation')}</option>
           </select>
           <select
             className="set-select"
@@ -565,9 +568,9 @@ function StepFields({
               })
             }
           >
-            <option value="toggle">Toggle</option>
-            <option value="on">On</option>
-            <option value="off">Off</option>
+            <option value="toggle">{t('settings.companions.toggleValue.toggle')}</option>
+            <option value="on">{t('common.on')}</option>
+            <option value="off">{t('common.off')}</option>
           </select>
         </>
       );
@@ -586,16 +589,16 @@ function StepFields({
               })
             }
           >
-            <option value="calm">Calm</option>
-            <option value="happy">Happy</option>
-            <option value="sleepy">Sleepy</option>
-            <option value="curious">Curious</option>
-            <option value="celebrate">Celebrate</option>
+            <option value="calm">{t('settings.companions.mood.calm')}</option>
+            <option value="happy">{t('settings.companions.mood.happy')}</option>
+            <option value="sleepy">{t('settings.companions.mood.sleepy')}</option>
+            <option value="curious">{t('settings.companions.mood.curious')}</option>
+            <option value="celebrate">{t('settings.companions.mood.celebrate')}</option>
           </select>
           <input
             disabled={disabled}
             value={step.status ?? ''}
-            placeholder="Status text"
+            placeholder={t('settings.companions.statusPlaceholder')}
             onChange={(e) => onChange({ type: 'setMood', mood: step.mood, status: e.target.value })}
           />
         </>
@@ -617,13 +620,13 @@ function StepFields({
           <input
             disabled={disabled}
             value={step.title}
-            placeholder="Title"
+            placeholder={t('settings.companions.titlePlaceholder')}
             onChange={(e) => onChange({ type: 'notify', title: e.target.value, body: step.body })}
           />
           <input
             disabled={disabled}
             value={step.body ?? ''}
-            placeholder="Body"
+            placeholder={t('settings.companions.bodyPlaceholder')}
             onChange={(e) => onChange({ type: 'notify', title: step.title, body: e.target.value })}
           />
         </>
@@ -641,9 +644,9 @@ function StepFields({
             })
           }
         >
-          <option value="playPause">Play / pause</option>
-          <option value="next">Next</option>
-          <option value="prev">Previous</option>
+          <option value="playPause">{t('settings.companions.music.playPause')}</option>
+          <option value="next">{t('settings.companions.music.next')}</option>
+          <option value="prev">{t('settings.companions.music.previous')}</option>
         </select>
       );
     case 'speak':
@@ -660,13 +663,13 @@ function StepFields({
           <input
             disabled={disabled}
             value={step.event}
-            placeholder="event name"
+            placeholder={t('settings.companions.eventNamePlaceholder')}
             onChange={(e) => onChange({ type: 'dispatch', event: e.target.value, detail: step.detail })}
           />
           <input
             disabled={disabled}
             value={step.detail ?? ''}
-            placeholder="detail"
+            placeholder={t('settings.companions.detailPlaceholder')}
             onChange={(e) => onChange({ type: 'dispatch', event: step.event, detail: e.target.value })}
           />
         </>
@@ -681,8 +684,8 @@ function StepFields({
             onChange({ type: 'palette', mode: e.target.value === 'search' ? 'search' : 'commands' })
           }
         >
-          <option value="commands">Commands</option>
-          <option value="search">Search</option>
+          <option value="commands">{t('settings.companions.palette.commands')}</option>
+          <option value="search">{t('settings.companions.palette.search')}</option>
         </select>
       );
     case 'routine':
@@ -701,7 +704,7 @@ function StepFields({
         </select>
       );
     case 'clipboard':
-      return <span className="muted">Opens clipboard history</span>;
+      return <span className="muted">{t('settings.companions.opensClipboard')}</span>;
     default:
       return null;
   }

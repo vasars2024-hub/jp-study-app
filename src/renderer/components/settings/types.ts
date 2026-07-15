@@ -30,20 +30,30 @@ export type SettingsPageId =
   | 'transcription'
   | 'visualizer'
   | 'display'
+  | 'storage'
   | 'memory';
 
 export interface SettingsNavPage {
   id: SettingsPageId;
-  label: string;
+  /** i18n catalog key — resolve with t() at render time, never read directly. */
+  labelKey: string;
   icon: IconName;
   group: string;
-  description?: string;
+  /** i18n catalog key — resolve with t() at render time, never read directly. */
+  descKey?: string;
 }
 
 export interface SettingsRegistryEntry {
   id: string;
-  title: string;
-  description: string;
+  /** i18n catalog key — resolve with t() at render time, never read directly. */
+  titleKey: string;
+  /** i18n catalog key — resolve with t() at render time, never read directly. */
+  descKey?: string;
+  /**
+   * Search terms, deliberately kept as literal English rather than catalog
+   * keys — search matches translated title/description text plus these, so a
+   * JA/ZH/RU user can still find a setting by typing its English feature name.
+   */
   keywords: string[];
   pageId: SettingsPageId;
   group: string;

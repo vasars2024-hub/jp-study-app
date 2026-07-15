@@ -27,6 +27,7 @@ import EpubCardLayoutEditor from './EpubCardLayoutEditor';
 import EpubFilterPipelinePanel from './EpubFilterPipelinePanel';
 import EpubTestCard from './EpubTestCard';
 import FieldHint from './FieldHint';
+import { getActiveProfile } from '../profileState';
 import Icon from './Icons';
 import MiningProgressPanel from './MiningProgressPanel';
 import { addDeckCards } from '../flashcardDeck';
@@ -1134,6 +1135,7 @@ export default function EpubMiningPanel({ onDeckSaved }: Props) {
               }
               rows={3}
               placeholder="One expression per line — merged with built-in junk when enabled"
+              lang={getActiveProfile().targetLang}
             />
           </label>
           <div className="mining-freq-list">

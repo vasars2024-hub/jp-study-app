@@ -19,6 +19,7 @@ import type {
   MineNoteRequest,
   MineNoteResult,
 } from './shared/anki';
+import type { ApkgImportResult } from './shared/apkgParse';
 import type {
   AiEngineConfig,
   AiDeckGenerationRequest,
@@ -52,6 +53,10 @@ import type {
   ImmersionVisitInput,
   ImmersionDayMetrics,
 } from './shared/immersion';
+import type { AppReleaseInfo } from './shared/release';
+import type { AssetError, AssetSpec, AssetStatus } from './shared/assetRegistry';
+import type { InterpretedLearningInput } from './main/city/engine/types';
+import type { CityStateMessage } from './main/city/ipc/channels';
 
 // The single, safe bridge between the sandboxed renderer (React UI) and the
 // Electron main process. The UI can only call exactly these functions.
@@ -167,6 +172,9 @@ const api = {
     ipcRenderer.invoke('examples:importOffline', payload),
   dictImportYomitan: (filePath?: string): Promise<{ ok: boolean; error?: string; info?: YomitanDictInfo }> =>
     ipcRenderer.invoke('dict:importYomitan', filePath),
+  /** Parse an Anki .apkg and return its (raw, pre-lemmatization) expressions. */
+  importApkg: (filePath?: string): Promise<ApkgImportResult> =>
+    ipcRenderer.invoke('apkg:import', filePath),
   dictListYomitan: (): Promise<YomitanDictInfo[]> => ipcRenderer.invoke('dict:listYomitan'),
   dictRemoveYomitan: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:removeYomitan', id),
@@ -347,6 +355,8 @@ const api = {
 
   /** Open an http/https link in the system browser. */
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),
+  appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
+  checkAppRelease: (): Promise<AppReleaseInfo | null> => ipcRenderer.invoke('release:check'),
 
   // Offline translation (Qwen3 in main process)
   translateRun: (req: {
@@ -596,6 +606,54 @@ const api = {
     onBattery?: boolean | null;
   }> => ipcRenderer.invoke('system:getMetrics'),
   clipboardReadText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
+
+  // Downloadable models & dictionaries (Phase 6). Nothing heavy ships in the
+  // installer; every consumer checks assetsIsInstalled() before using an asset.
+  assetsList: (): Promise<{ assets: AssetSpec[]; statuses: AssetStatus[] }> =>
+    ipcRenderer.invoke('assets:list'),
+  assetsStart: (id: string): Promise<{ ok: boolean; error?: AssetError }> =>
+    ipcRenderer.invoke('assets:start', id),
+  assetsPause: (id: string): Promise<void> => ipcRenderer.invoke('assets:pause', id),
+  assetsCancel: (id: string): Promise<void> => ipcRenderer.invoke('assets:cancel', id),
+  assetsRemove: (id: string): Promise<{ ok: boolean; error?: AssetError }> =>
+    ipcRenderer.invoke('assets:remove', id),
+  assetsIsInstalled: (id: string): Promise<boolean> => ipcRenderer.invoke('assets:isInstalled', id),
+  assetsPath: (id: string): Promise<string | null> => ipcRenderer.invoke('assets:path', id),
+  assetsFreeSpace: (): Promise<number> => ipcRenderer.invoke('assets:freeSpace'),
+  assetsRoot: (): Promise<string> => ipcRenderer.invoke('assets:root'),
+  onAssetStatus: (cb: (status: AssetStatus) => void): (() => void) => {
+    const handler = (_e: unknown, status: AssetStatus): void => cb(status);
+    ipcRenderer.on('assets:status', handler);
+    return () => ipcRenderer.removeListener('assets:status', handler);
+  },
+  /** Fired before an asset is deleted so a consumer can drop its handle to the file. */
+  onAssetUnload: (cb: (id: string) => void): (() => void) => {
+    const handler = (_e: unknown, id: string): void => cb(id);
+    ipcRenderer.on('assets:unload', handler);
+    return () => ipcRenderer.removeListener('assets:unload', handler);
+  },
+
+  // Tells the main process which UI language is active, so native dialog
+  // titles/filters (file pickers) aren't stuck in English. See main/i18n.ts.
+  // Fire-and-forget: main's handler is a `handle()`, so this must be an
+  // `invoke()` call to actually reach it — a plain `send()` would silently
+  // go nowhere.
+  setUiLang: (lang: string): void => {
+    void ipcRenderer.invoke('i18n:setLang', lang);
+  },
+
+  // Noctis Civilization Module (src/main/city). The renderer holds a
+  // read-only mirror of committed civilization state, refreshed by push.
+  // recordSession carries the already-interpreted learning input (no raw
+  // telemetry, title, or word crosses — LEARNING_INTEGRATION.md Section 9).
+  cityGetState: (): Promise<CityStateMessage> => ipcRenderer.invoke('city:getState'),
+  cityRecordSession: (input: InterpretedLearningInput): Promise<CityStateMessage> =>
+    ipcRenderer.invoke('city:recordSession', input),
+  onCityChanged: (cb: (message: CityStateMessage) => void): (() => void) => {
+    const handler = (_e: unknown, message: CityStateMessage): void => cb(message);
+    ipcRenderer.on('city:changed', handler);
+    return () => ipcRenderer.removeListener('city:changed', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

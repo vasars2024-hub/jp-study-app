@@ -3,6 +3,7 @@ import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
 import { fetchReadableArticle, articleBodyHtml } from '../wikiArticle';
+import { getActiveProfile } from '../profileState';
 
 interface Props {
   onOpen: (item: LibraryItem) => void;
@@ -386,6 +387,7 @@ export default function LibraryView({ onOpen }: Props) {
               placeholder="Paste Japanese or Chinese text here… (Ctrl+V)"
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
+              lang={getActiveProfile().targetLang}
             />
             <div className="lib-import-actions">
               <button className="btn" onClick={() => setImportOpen(false)}>

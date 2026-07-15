@@ -37,6 +37,8 @@ import {
 } from '../desktopPrefs';
 import { EnvironmentStack, WALL_PRESETS, loadEnvironment, saveEnvironment } from '../environment';
 import BuddyToast from '../environment/BuddyToast';
+import NotificationBell from './shell/NotificationBell';
+import NotificationCenter from './shell/NotificationCenter';
 import { startCompanionOsBridge, stopCompanionOsBridge } from '../environment/companionOsBridge';
 import { startAchievementWatcher } from '../environment/achievements';
 import { startNoctisLightBridge } from '../environment/noctisLightBridge';
@@ -49,6 +51,7 @@ import {
   removeUserWallpaper,
   type UserWallpaper,
 } from '../wallpaperLibrary';
+import { useT } from '../i18n';
 
 type WinSection =
   | 'library' | 'novels' | 'dictionary' | 'grammar' | 'translate'
@@ -81,22 +84,24 @@ interface NoteData {
   color: string;
 }
 
-const APPS: { id: WinSection; label: string; glyph: IconName }[] = [
-  { id: 'player', label: 'Media', glyph: 'player' },
-  { id: 'music', label: 'Music', glyph: 'music' },
-  { id: 'dictionary', label: 'Dictionary', glyph: 'dictionary' },
-  { id: 'immersion', label: 'Immersion', glyph: 'globe' },
-  { id: 'library', label: 'Library', glyph: 'library' },
-  { id: 'novels', label: 'Novels', glyph: 'novels' },
-  { id: 'translate', label: 'Translate', glyph: 'translate' },
-  { id: 'grammar', label: 'Grammar', glyph: 'grammar' },
-  { id: 'anki', label: 'Anki', glyph: 'anki' },
-  { id: 'flashcards', label: 'Flashcards', glyph: 'flashcards' },
-  { id: 'stats', label: 'Statistics', glyph: 'stats' },
-  { id: 'calendar', label: 'Calendar', glyph: 'calendar' },
-  { id: 'resources', label: 'Resources', glyph: 'resources' },
-  { id: 'settings', label: 'Settings', glyph: 'settings' },
-  { id: 'city', label: 'Noctis', glyph: 'city' },
+// Reuses CommandPalette's palette.section.* keys — same 15 app names, so one
+// translation serves both surfaces rather than drifting into two catalogs.
+const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
+  { id: 'player', labelKey: 'palette.section.player', glyph: 'player' },
+  { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
+  { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
+  { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
+  { id: 'library', labelKey: 'palette.section.library', glyph: 'library' },
+  { id: 'novels', labelKey: 'palette.section.novels', glyph: 'novels' },
+  { id: 'translate', labelKey: 'palette.section.translate', glyph: 'translate' },
+  { id: 'grammar', labelKey: 'palette.section.grammar', glyph: 'grammar' },
+  { id: 'anki', labelKey: 'palette.section.anki', glyph: 'anki' },
+  { id: 'flashcards', labelKey: 'palette.section.flashcards', glyph: 'flashcards' },
+  { id: 'stats', labelKey: 'palette.section.stats', glyph: 'stats' },
+  { id: 'calendar', labelKey: 'palette.section.calendar', glyph: 'calendar' },
+  { id: 'resources', labelKey: 'palette.section.resources', glyph: 'resources' },
+  { id: 'settings', labelKey: 'palette.section.settings', glyph: 'settings' },
+  { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
 ];
 
 const WALLPAPERS = WALL_PRESETS;
@@ -113,7 +118,7 @@ const WIN_SNAP = 26;
 /** HTML5 DnD payload for pinning a Start-menu app onto the desktop. */
 const START_APP_DND = 'text/x-study-os-app';
 
-type AppMeta = { id: WinSection; label: string; glyph: IconName };
+type AppMeta = { id: WinSection; labelKey: string; glyph: IconName };
 
 function zoomFactor(): number {
   return getZoomFactor();
@@ -180,14 +185,14 @@ function parseStartAppDrag(dt: DataTransfer | null | undefined): AppMeta | null 
     const parsed = JSON.parse(raw) as Partial<AppMeta>;
     if (typeof parsed.id !== 'string') return null;
     const catalog = APPS.find((a) => a.id === parsed.id);
-    return catalog ? { id: catalog.id, label: catalog.label, glyph: catalog.glyph } : null;
+    return catalog ? { id: catalog.id, labelKey: catalog.labelKey, glyph: catalog.glyph } : null;
   } catch {
     const catalog = APPS.find((a) => a.id === raw);
-    return catalog ? { id: catalog.id, label: catalog.label, glyph: catalog.glyph } : null;
+    return catalog ? { id: catalog.id, labelKey: catalog.labelKey, glyph: catalog.glyph } : null;
   }
 }
 
-function appListForDesktop(desktopIndex: DesktopIndex): { id: WinSection; label: string; glyph: IconName }[] {
+function appListForDesktop(desktopIndex: DesktopIndex): { id: WinSection; labelKey: string; glyph: IconName }[] {
   if (desktopIndex === 1) return [];
   return APPS;
 }
@@ -377,6 +382,10 @@ function layoutSignature(layout: DesktopLayout): string {
 }
 
 export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: LibraryItem) => void }) {
+  // No useMemo/useCallback here caches a translated string, so `t` alone is
+  // enough — every call site below reads it fresh at render time, unlike the
+  // CommandPalette/SettingsSearch memos that needed `lang` as an explicit dep.
+  const { t } = useT();
   const deskRef = useRef<HTMLDivElement>(null);
   const hydrating = useRef(true);
   const winsRef = useRef<Win[]>([]);
@@ -1038,7 +1047,10 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           id: `app-${app.id}`,
           kind: 'app',
           section: app.id,
-          name: app.label,
+          // Baked in at pin time, like naming a shortcut on a real desktop — a
+          // later UI-language switch does not retranslate an icon someone has
+          // already placed, only the live Start menu list does.
+          name: t(app.labelKey),
           glyph: app.glyph,
           x: pos.x,
           y: pos.y,
@@ -1057,7 +1069,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   };
 
   const beginStartAppDrag = (app: AppMeta, e: RDragEvent) => {
-    const payload = JSON.stringify({ id: app.id, label: app.label, glyph: app.glyph });
+    const payload = JSON.stringify({ id: app.id, labelKey: app.labelKey, glyph: app.glyph });
     e.dataTransfer.setData(START_APP_DND, payload);
     e.dataTransfer.setData('text/plain', payload);
     e.dataTransfer.effectAllowed = 'copyMove';
@@ -1240,6 +1252,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
 
       <EnvironmentStack onRotationActive={(active) => setWallFromEnv(active)} />
       <BuddyToast />
+      <NotificationCenter />
 
       {viz.enabled && (viz.mode === 'wallpaper' || viz.mode === 'both') && musicPlaying && (
         <VisualizerCanvas className="os-wall-visualizer" settings={viz} />
@@ -1271,7 +1284,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           <span className="os-desk-icon-label">{ic.name}</span>
           <button
             className="os-desk-icon-x"
-            title="Remove from desktop"
+            title={t('desktop.removeFromDesktop')}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -1305,7 +1318,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
             <textarea
               className="desk-note-text"
               style={{ background: notes[w.id]?.color ?? NOTE_COLORS[0] }}
-              placeholder="Write a note… (closing deletes it)"
+              placeholder={t('desktop.notePlaceholder')}
               value={notes[w.id]?.text ?? ''}
               onChange={(e) => setNotes((n) => ({ ...n, [w.id]: { color: NOTE_COLORS[0], ...n[w.id], text: e.target.value } }))}
             />
@@ -1388,9 +1401,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           >
             <div className="os-start-title">Study OS</div>
             <div className="os-start-hint">
-              {startAppDragging
-                ? 'Drop on the desktop to place the app'
-                : 'Drag apps onto the desktop · click to open · pin to add'}
+              {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
             </div>
             <div className="os-start-grid">
               {desktopApps.map((a) => {
@@ -1404,7 +1415,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                       type="button"
                       className="os-start-app"
                       draggable
-                      title={pinned ? 'Drag to move on desktop · click to open' : 'Drag to desktop · click to open'}
+                      title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
                       onDragStart={(e) => beginStartAppDrag(a, e)}
                       onDragEnd={endStartAppDrag}
                       onClick={() => open(a.id)}
@@ -1412,12 +1423,12 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                       <span className="os-start-app-ic">
                         <Icon name={a.glyph} size={24} />
                       </span>
-                      {a.label}
+                      {t(a.labelKey)}
                     </button>
                     <button
                       type="button"
                       className={`os-start-tile-pin${pinned ? ' on' : ''}`}
-                      title={pinned ? 'Remove from desktop' : 'Add to desktop'}
+                      title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
                       draggable={false}
                       onClick={() => togglePinApp(a)}
                     >
@@ -1460,28 +1471,28 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       <div className="os-taskbar">
         <button
           className={`os-start-btn ${startOpen ? 'active' : ''}`}
-          title="Start"
+          title={t('desktop.start')}
           onClick={() => setStartOpen((o) => !o)}
         >
           <Icon name="logo" size={22} />
-          <span>Start</span>
+          <span>{t('desktop.start')}</span>
         </button>
         <div className="os-desktop-switches">
           <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} onClick={() => void switchDesktop(0)}>
-            Desktop 1
+            {t('desktop.desktopN', { n: 1 })}
           </button>
           <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} onClick={() => void switchDesktop(1)}>
-            Desktop 2
+            {t('desktop.desktopN', { n: 2 })}
           </button>
         </div>
         <div className="os-task-wins">
           {wins.map((w) => {
             const app = APPS.find((a) => a.id === w.section);
             const label =
-              w.section === 'note' ? 'Note'
-                : w.section === 'visualizer' ? 'Visualizer'
+              w.section === 'note' ? t('desktop.noteLabel')
+                : w.section === 'visualizer' ? t('settings.nav.visualizer')
                   : w.section === 'musicwidget' ? ''
-                    : app?.label ?? w.section;
+                    : app ? t(app.labelKey) : w.section;
             const glyph: IconName =
               w.section === 'note' ? 'note'
                 : w.section === 'visualizer' || w.section === 'musicwidget' ? 'music'
@@ -1500,17 +1511,18 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           })}
         </div>
         <div className="os-tray">
-          <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title="Widgets" onClick={() => setGalleryOpen((o) => !o)}>
+          <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title={t('desktop.widgets')} onClick={() => setGalleryOpen((o) => !o)}>
             <Icon name="app" size={18} />
           </button>
+          <NotificationBell />
           <button
             className="os-tray-btn"
-            title="Clipboard history (Ctrl+Shift+V)"
+            title={t('desktop.clipboardHistory')}
             onClick={() => window.dispatchEvent(new CustomEvent('clipboard:open'))}
           >
             <Icon name="clipboard" size={18} />
           </button>
-          <button className="os-tray-btn" title="Settings" onClick={() => open('settings')}>
+          <button className="os-tray-btn" title={t('palette.section.settings')} onClick={() => open('settings')}>
             <Icon name="settings" size={18} />
           </button>
           <TaskbarClock
@@ -1578,6 +1590,7 @@ const FloatingWindow = memo(function FloatingWindow({
   onPatch: (p: Partial<Win>) => void;
   children: ReactNode;
 }) {
+  const { t } = useT();
   const app = APPS.find((a) => a.id === win.section);
   const isNote = win.section === 'note';
   const isVisualizer = win.section === 'visualizer';
@@ -1586,7 +1599,13 @@ const FloatingWindow = memo(function FloatingWindow({
   // Real apps (incl. Noctis, music widget) can detach into their own OS window;
   // desktop-only trinkets (notes, the viz widget) cannot.
   const canPopOut = !isNote && !isVisualizer;
-  const title = isNote ? 'Sticky note' : isVisualizer || isMusicWidget || isNoctis ? '' : app?.label ?? win.section;
+  const title = isNote
+    ? t('desktop.stickyNote')
+    : isVisualizer || isMusicWidget || isNoctis
+      ? ''
+      : app
+        ? t(app.labelKey)
+        : win.section;
   const glyph: IconName = isNote ? 'note' : isVisualizer || isMusicWidget ? 'music' : app?.glyph ?? 'app';
 
   // The window element, so a drag/resize can move it directly (no per-frame
@@ -1724,16 +1743,16 @@ const FloatingWindow = memo(function FloatingWindow({
           </span>
           <span className="fwin-btns">
             {canPopOut && (
-              <button className="fwin-b" title="Pop out into its own window" onClick={onPopOut}>
+              <button className="fwin-b" title={t('desktop.popOut')} onClick={onPopOut}>
                 ⧉
               </button>
             )}
             {!isNote && (
               <>
-                <button className="fwin-b" title="Minimize" onClick={onMinimize}>
+                <button className="fwin-b" title={t('desktop.minimize')} onClick={onMinimize}>
                   ─
                 </button>
-                <button className="fwin-b" title="Maximize" onClick={onMaximize}>
+                <button className="fwin-b" title={t('desktop.maximize')} onClick={onMaximize}>
                   ▢
                 </button>
               </>
@@ -1741,7 +1760,7 @@ const FloatingWindow = memo(function FloatingWindow({
             <button
               className="fwin-b fwin-close"
               style={isNote ? { color: '#3a3320' } : undefined}
-              title={isNote ? 'Delete note' : 'Close'}
+              title={isNote ? t('desktop.deleteNote') : t('common.close')}
               onClick={onClose}
             >
               ×
@@ -1754,17 +1773,17 @@ const FloatingWindow = memo(function FloatingWindow({
           <div className="fwin-drag-strip" onPointerDown={dragStart} onDoubleClick={() => onMaximize()} aria-hidden />
           <div className="fwin-frameless-controls">
             {canPopOut && (
-              <button className="fwin-b" title="Pop out into its own window" onClick={onPopOut}>
+              <button className="fwin-b" title={t('desktop.popOut')} onClick={onPopOut}>
                 ⧉
               </button>
             )}
-            <button className="fwin-b" title="Minimize" onClick={onMinimize}>
+            <button className="fwin-b" title={t('desktop.minimize')} onClick={onMinimize}>
               ─
             </button>
-            <button className="fwin-b" title="Maximize" onClick={onMaximize}>
+            <button className="fwin-b" title={t('desktop.maximize')} onClick={onMaximize}>
               ▢
             </button>
-            <button className="fwin-b fwin-close" title="Close" onClick={onClose}>
+            <button className="fwin-b fwin-close" title={t('common.close')} onClick={onClose}>
               ×
             </button>
           </div>
@@ -1779,7 +1798,7 @@ const FloatingWindow = memo(function FloatingWindow({
         <>
           <div className="fwin-edge-r" onPointerDown={resizeStart('right')} />
           <div className="fwin-edge-b" onPointerDown={resizeStart('bottom')} />
-          <div className="fwin-resize" title="Resize" onPointerDown={resizeStart('corner')} />
+          <div className="fwin-resize" title={t('desktop.resize')} onPointerDown={resizeStart('corner')} />
         </>
       )}
     </section>

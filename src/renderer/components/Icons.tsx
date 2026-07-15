@@ -58,6 +58,7 @@ export type IconName =
   | 'keyboard'
   | 'calendar'
   | 'clipboard'
+  | 'bell'
   | 'pin'
   | 'plus'
   | 'city'
@@ -128,6 +129,7 @@ const P: Record<IconName, string> = {
   keyboard: 'M3 7h18v10H3z M6 10h1 M9.5 10h1 M13 10h1 M16.5 10h1 M7 14h10',
   calendar: 'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z M4 10h16 M8 2v4 M16 2v4 M8 14h2 M8 17h2 M14 14h2 M14 17h2',
   clipboard: 'M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z M6 5h12v16H6z M9 10h6 M9 13h6 M9 16h4',
+  bell: 'M12 3a5 5 0 0 1 5 5v3l1 2H6l1-2V8a5 5 0 0 1 5-5z M10 19a2 2 0 0 0 4 0',
   pin: 'M12 2v6 M8 8h8l1 4H7z M12 12v10 M9 12h6',
   plus: 'M12 5v14 M5 12h14',
 };

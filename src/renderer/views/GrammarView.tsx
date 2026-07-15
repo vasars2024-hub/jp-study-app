@@ -10,6 +10,7 @@ import {
   type GuideCategory,
 } from '../data/grammar';
 import type { ExampleSentence } from '../../shared/types';
+import { useT } from '../i18n';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 
@@ -43,25 +44,24 @@ function matchesGuide(g: Guide, q: string): boolean {
 
 export default function GrammarView() {
   const [mode, setMode] = useState<Mode>('grammar');
+  const { t } = useT();
 
   return (
     <div className="gram-view">
       <div className="view-head">
-        <p className="muted">
-          Every JLPT grammar point from N5 to N1, plus hand-written hacks and tutorials.
-        </p>
+        <p className="muted">{t('grammar.intro')}</p>
         <div className="gram-mode-toggle">
           <button
             className={`gram-mode-btn ${mode === 'grammar' ? 'active' : ''}`}
             onClick={() => setMode('grammar')}
           >
-            Grammar points
+            {t('grammar.mode.points')}
           </button>
           <button
             className={`gram-mode-btn ${mode === 'guides' ? 'active' : ''}`}
             onClick={() => setMode('guides')}
           >
-            Guides &amp; hacks
+            {t('grammar.mode.guides')}
           </button>
         </div>
       </div>
@@ -77,6 +77,7 @@ function GrammarBrowser() {
   const [filter, setFilter] = useState<LevelFilter>('All');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { t } = useT();
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -106,18 +107,16 @@ function GrammarBrowser() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search grammar or meaning…"
+          placeholder={t('grammar.search.placeholder')}
           lang="ja"
         />
       </div>
 
-      <div className="gram-count muted">
-        {list.length} point{list.length === 1 ? '' : 's'}
-      </div>
+      <div className="gram-count muted">{t('grammar.count', { count: list.length })}</div>
 
       <div className="gram-body">
         <div className="gram-list">
-          {list.length === 0 && <div className="gram-empty muted">No grammar points found.</div>}
+          {list.length === 0 && <div className="gram-empty muted">{t('grammar.empty')}</div>}
           {list.map((g) => (
             <button
               key={g.id}
@@ -139,7 +138,7 @@ function GrammarBrowser() {
           {selected ? (
             <GrammarDetail key={selected.id} point={selected} />
           ) : (
-            <div className="gram-detail-empty muted">Select a grammar point to see details.</div>
+            <div className="gram-detail-empty muted">{t('grammar.selectPrompt')}</div>
           )}
         </div>
       </div>
@@ -151,6 +150,7 @@ function GrammarDetail({ point }: { point: GrammarPoint }) {
   const [exState, setExState] = useState<ExState>('idle');
   const [examples, setExamples] = useState<ExampleSentence[]>([]);
   const [exError, setExError] = useState('');
+  const { t } = useT();
 
   async function loadExamples() {
     setExState('loading');
@@ -174,19 +174,19 @@ function GrammarDetail({ point }: { point: GrammarPoint }) {
       <p className="gram-gloss">{point.meaning}</p>
 
       <div className="gram-block">
-        <h3>Structure</h3>
+        <h3>{t('grammar.structure')}</h3>
         <p className="gram-structure" lang="ja">
           {point.structure}
         </p>
       </div>
 
       <div className="gram-block">
-        <h3>How to use it</h3>
+        <h3>{t('grammar.howToUse')}</h3>
         <p>{point.explanation}</p>
       </div>
 
       <div className="gram-block">
-        <h3>Examples</h3>
+        <h3>{t('grammar.examples')}</h3>
         <ul className="gram-examples">
           {point.examples.map((ex, i) => (
             <li key={i}>
@@ -205,14 +205,16 @@ function GrammarDetail({ point }: { point: GrammarPoint }) {
 
         {exState === 'idle' && (
           <button className="gram-more-btn" onClick={loadExamples}>
-            ＋ More examples from Tatoeba
+            {t('grammar.moreExamples')}
           </button>
         )}
-        {exState === 'loading' && <p className="gram-more-status muted">Searching Tatoeba…</p>}
+        {exState === 'loading' && (
+          <p className="gram-more-status muted">{t('grammar.searchingTatoeba')}</p>
+        )}
         {exState === 'error' && <p className="gram-more-status muted">{exError}</p>}
         {exState === 'done' && examples.length === 0 && (
           <p className="gram-more-status muted">
-            No extra sentences found for “{exampleQuery(point)}”.
+            {t('grammar.noExtraExamples', { query: exampleQuery(point) })}
           </p>
         )}
         {exState === 'done' && examples.length > 0 && (
@@ -238,6 +240,7 @@ function GuidesBrowser() {
   const [cat, setCat] = useState<CatFilter>('All');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { t } = useT();
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -267,17 +270,15 @@ function GuidesBrowser() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search guides…"
+          placeholder={t('grammar.guideSearch.placeholder')}
         />
       </div>
 
-      <div className="gram-count muted">
-        {list.length} guide{list.length === 1 ? '' : 's'}
-      </div>
+      <div className="gram-count muted">{t('grammar.guideCount', { count: list.length })}</div>
 
       <div className="gram-body">
         <div className="gram-list guide-list">
-          {list.length === 0 && <div className="gram-empty muted">No guides found.</div>}
+          {list.length === 0 && <div className="gram-empty muted">{t('grammar.guidesEmpty')}</div>}
           {list.map((g) => (
             <button
               key={g.id}
@@ -299,7 +300,7 @@ function GuidesBrowser() {
           {selected ? (
             <GuideArticle guide={selected} />
           ) : (
-            <div className="gram-detail-empty muted">Select a guide to start reading.</div>
+            <div className="gram-detail-empty muted">{t('grammar.selectGuidePrompt')}</div>
           )}
         </div>
       </div>

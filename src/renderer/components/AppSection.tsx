@@ -19,6 +19,49 @@ import ResourcesView from '../views/ResourcesView';
 import ImmersionView from '../views/ImmersionView';
 import CalendarView from '../views/CalendarView';
 import Icon from './Icons';
+import { getCityState, onCityChanged } from '../cityState';
+import type { CityStateMessage } from '../../main/city/ipc/channels';
+
+// Diagnostic view of the live civilization mirror until rendering/ and ui/
+// (ARCHITECTURE.md Section 1) land. Its own component so its hooks stay off
+// AppSection's call order when `section` switches to something else.
+function CityPanel() {
+  const [message, setMessage] = useState<CityStateMessage | null>(getCityState());
+
+  useEffect(() => onCityChanged(setMessage), []);
+
+  const state = message?.state;
+  return (
+    <div className="coming-soon">
+      <div className="cs-emoji">
+        <Icon name="stats" size={40} />
+      </div>
+      <h1>Noctis</h1>
+      <p className="muted">
+        Civilization module — implementation lives in <code>src/main/city</code>.
+      </p>
+      <div className="cs-card">
+        <div className="cs-tag">Scaffolding phase</div>
+        {state ? (
+          <ul>
+            <li>Status: {state.status}</li>
+            <li>Era: {state.era.designation}</li>
+            <li>Population: {state.citizens.population}</li>
+          </ul>
+        ) : (
+          <ul>
+            <li>Waiting for the civilization mirror to load…</li>
+          </ul>
+        )}
+        <ul>
+          <li>Read the canon docs in src/main/city/docs/</li>
+          <li>Build rendering and ui under src/main/city/</li>
+          <li>Observational 2D civilization — not a grid builder or CP economy</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 // The section → view mapping. Shared by the in-desktop FloatingWindow
 // (DesktopShell) and the pop-out window (App) so an app renders identically
@@ -33,25 +76,7 @@ export default function AppSection({
 }) {
   switch (section) {
     case 'city':
-      return (
-        <div className="coming-soon">
-          <div className="cs-emoji">
-            <Icon name="stats" size={40} />
-          </div>
-          <h1>Noctis</h1>
-          <p className="muted">
-            Civilization module — implementation lives in <code>src/main/city</code>.
-          </p>
-          <div className="cs-card">
-            <div className="cs-tag">Scaffolding phase</div>
-            <ul>
-              <li>Read the canon docs in src/main/city/docs/</li>
-              <li>Build service, engine, ipc, rendering, and ui under src/main/city/</li>
-              <li>Observational 2D civilization — not a grid builder or CP economy</li>
-            </ul>
-          </div>
-        </div>
-      );
+      return <CityPanel />;
     case 'library':
       return <LibraryView onOpen={onOpenBook} />;
     case 'novels':

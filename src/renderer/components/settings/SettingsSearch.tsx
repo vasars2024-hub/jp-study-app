@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
-import { SETTINGS_SEARCH_SUGGESTIONS, searchSettings } from './settingsRegistry';
+import { groupLabelKey, SETTINGS_SEARCH_SUGGESTIONS, searchSettings } from './settingsRegistry';
 import { getRecentQueries, pushRecentQuery } from './settingsRecent';
 import type { SettingsPageId, SettingsRegistryEntry } from './types';
 import Icon from '../Icons';
+import { useT } from '../../i18n';
 
 const SettingsSearch = forwardRef<
   HTMLInputElement,
@@ -10,11 +11,15 @@ const SettingsSearch = forwardRef<
     onNavigate: (page: SettingsPageId, settingId?: string) => void;
   }
 >(function SettingsSearch({ onNavigate }, ref) {
+  const { t, lang } = useT();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();
-  const results = useMemo(() => searchSettings(query), [query]);
+  // `lang`, not `t`, is the real dependency — see the note on useT() in
+  // renderer/i18n.ts: t's identity is stable, so depending on it here would
+  // let stale (previous-language) results linger after a language switch.
+  const results = useMemo(() => searchSettings(query, t), [query, lang]);
   const recent = useMemo(() => (query.trim() ? [] : getRecentQueries()), [query, open]);
 
   useEffect(() => {
@@ -22,7 +27,7 @@ const SettingsSearch = forwardRef<
   }, [query]);
 
   const pick = (e: SettingsRegistryEntry) => {
-    pushRecentQuery(query.trim() || e.title);
+    pushRecentQuery(query.trim() || t(e.titleKey));
     onNavigate(e.pageId, e.id.startsWith('page-') ? undefined : e.id);
     setQuery('');
     setOpen(false);
@@ -56,9 +61,9 @@ const SettingsSearch = forwardRef<
         ref={ref}
         className="os-set-search-input"
         type="search"
-        placeholder="Search settings"
+        placeholder={t('settings.search.placeholder')}
         value={query}
-        aria-label="Search settings"
+        aria-label={t('settings.search.placeholder')}
         aria-controls={listId}
         aria-expanded={open && (results.length > 0 || recent.length > 0 || !query.trim())}
         aria-autocomplete="list"
@@ -88,20 +93,20 @@ const SettingsSearch = forwardRef<
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => pick(r)}
                 >
-                  <span className="os-set-search-item-title">{r.title}</span>
+                  <span className="os-set-search-item-title">{t(r.titleKey)}</span>
                   <span className="os-set-search-item-path muted">
-                    {r.group} · {r.description || r.pageId}
+                    {t(groupLabelKey(r.group))} · {(r.descKey && t(r.descKey)) || r.pageId}
                   </span>
                 </button>
               ))
             ) : (
-              <p className="os-set-search-empty muted">No matching settings</p>
+              <p className="os-set-search-empty muted">{t('settings.search.noMatches')}</p>
             )
           ) : (
             <>
               {recent.length > 0 && (
                 <div className="os-set-search-section">
-                  <div className="os-set-search-section-label muted">Recent searches</div>
+                  <div className="os-set-search-section-label muted">{t('settings.search.recent')}</div>
                   {recent.map((q) => (
                     <button
                       key={q}
@@ -119,19 +124,19 @@ const SettingsSearch = forwardRef<
                 </div>
               )}
               <div className="os-set-search-section">
-                <div className="os-set-search-section-label muted">Suggestions</div>
-                {SETTINGS_SEARCH_SUGGESTIONS.map((q) => (
+                <div className="os-set-search-section-label muted">{t('settings.search.suggestions')}</div>
+                {SETTINGS_SEARCH_SUGGESTIONS.map((key) => (
                   <button
-                    key={q}
+                    key={key}
                     type="button"
                     className="os-set-search-item"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
-                      setQuery(q);
+                      setQuery(t(key));
                       setOpen(true);
                     }}
                   >
-                    {q}
+                    {t(key)}
                   </button>
                 ))}
               </div>

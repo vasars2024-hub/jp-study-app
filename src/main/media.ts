@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import type { MediaItem, MediaOpen, SubtitlePick } from '../shared/types';
+import { mt } from './i18n';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -410,11 +411,11 @@ export function registerMediaIpc(): void {
 
   ipcMain.handle('media:pick', async (): Promise<MediaOpen | null> => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Open a video or audio file',
+      title: mt('dialog.openVideoAudio.title'),
       properties: ['openFile'],
       filters: [
-        { name: 'Video & audio', extensions: [...MEDIA_EXT].map((e) => e.slice(1)) },
-        { name: 'All files', extensions: ['*'] },
+        { name: mt('dialog.filter.videoAudio'), extensions: [...MEDIA_EXT].map((e) => e.slice(1)) },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
       ],
     });
     if (res.canceled || !res.filePaths[0]) return null;
@@ -442,9 +443,9 @@ export function registerMediaIpc(): void {
       label: string;
     } | null> => {
       const res = await dialog.showOpenDialog(focusedWindow()!, {
-        title: 'Choose a video for the animated wallpaper',
+        title: mt('dialog.chooseWallpaperVideo.title'),
         properties: ['openFile'],
-        filters: [{ name: 'Video', extensions: [...VIDEO_EXT].map((e) => e.slice(1)) }],
+        filters: [{ name: mt('dialog.filter.video'), extensions: [...VIDEO_EXT].map((e) => e.slice(1)) }],
       });
       const p = res.filePaths[0];
       if (res.canceled || !p) return null;
@@ -605,11 +606,11 @@ export function registerMediaIpc(): void {
 
   ipcMain.handle('media:pickSubtitle', async (): Promise<SubtitlePick | null> => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Open a subtitle file',
+      title: mt('dialog.openSubtitle.title'),
       properties: ['openFile'],
       filters: [
-        { name: 'Subtitles', extensions: SUBTITLE_EXT },
-        { name: 'All files', extensions: ['*'] },
+        { name: mt('dialog.filter.subtitles'), extensions: SUBTITLE_EXT },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
       ],
     });
     if (res.canceled || !res.filePaths[0]) return null;
@@ -624,7 +625,7 @@ export function registerMediaIpc(): void {
   ipcMain.handle('media:getWatchFolder', () => readDb().watchFolder ?? null);
   ipcMain.handle('media:setWatchFolder', async () => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Choose a folder to auto-add videos from',
+      title: mt('dialog.autoAddVideosFolder.title'),
       properties: ['openDirectory'],
     });
     if (res.canceled || !res.filePaths[0]) return { folder: readDb().watchFolder ?? null, items: readDb().items };

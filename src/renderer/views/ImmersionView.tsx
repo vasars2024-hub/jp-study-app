@@ -30,6 +30,7 @@ import { recordReading } from '../stats';
 import { getTokenizer, tokenizerReady } from '../tokenizer';
 import { onKnowledgeChanged } from '../knownWords';
 import { registerCommandHandler } from '../keyboardShortcuts';
+import { useT } from '../i18n';
 
 type PopupState =
   | { kind: 'dict'; query: string; x: number; y: number; context?: string }
@@ -37,12 +38,6 @@ type PopupState =
   | null;
 
 const STATS_FLUSH_MS = 5000;
-
-const MODE_LABELS: Record<ImmersionMode, string> = {
-  live: 'Live',
-  reader: 'Live·Reader',
-  focus: 'Focus',
-};
 
 /** Electron <webview> is not in React's DOM typings; create via createElement. */
 function createWebview(src: string, setRef: (el: HTMLElement | null) => void) {
@@ -66,6 +61,12 @@ function ensureProtocol(raw: string): string {
 }
 
 export default function ImmersionView() {
+  const { t } = useT();
+  const MODE_LABELS: Record<ImmersionMode, string> = {
+    live: t('immersion.mode.live'),
+    reader: t('immersion.mode.reader'),
+    focus: t('immersion.mode.focus'),
+  };
   const [urlInput, setUrlInput] = useState('');
   const [currentUrl, setCurrentUrl] = useState('');
   const [title, setTitle] = useState('Immersion');
@@ -220,12 +221,10 @@ export default function ImmersionView() {
         }
       }
       if (!art || bestLen < 40) {
-        throw new Error('Reader extraction failed. Wait for the page to finish loading, then try again.');
+        throw new Error(t('immersion.readerExtractionFailed'));
       }
       if (nhk && !nhkArticleLooksHydrated(art.html.replace(/<[^>]+>/g, ' '))) {
-        throw new Error(
-          'NHK article is still loading in the browser panel. Wait a few seconds for the full text, then reload Reader.',
-        );
+        throw new Error(t('immersion.nhkStillLoading'));
       }
       const body = articleBodyHtml(art.title, art.html, art.meta);
       setReaderHtml(body);
@@ -237,14 +236,12 @@ export default function ImmersionView() {
       setLoading(false);
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : 'Reader extraction failed. Switch to Live mode to browse this page.',
+        e instanceof Error ? e.message : t('immersion.readerExtractionFailedSwitchLive'),
       );
       setReaderHtml('');
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const navigate = useCallback(
     (raw: string, opts?: { pushHistory?: boolean; mode?: ImmersionMode }) => {
@@ -354,7 +351,7 @@ export default function ImmersionView() {
     };
     const onFail = () => {
       setLoading(false);
-      setError('Page failed to load. Try Reader Mode for text articles.');
+      setError(t('immersion.pageLoadFailed'));
     };
     const onTitle = (e: Event) => {
       const t = (e as { title?: string }).title;
@@ -418,7 +415,7 @@ export default function ImmersionView() {
       title: activeTitle.current,
       favorite: true,
     });
-    setStatus(res.ok ? 'Saved to Sites Library' : res.error ?? 'Save failed');
+    setStatus(res.ok ? t('immersion.saved') : res.error ?? t('immersion.saveFailed'));
   };
 
   const exportToLibrary = async () => {
@@ -434,9 +431,9 @@ export default function ImmersionView() {
           source: art.url,
         });
         void window.api.immersionBumpMetrics({ pagesExported: 1 });
-        setStatus('Exported to Library');
+        setStatus(t('immersion.exported'));
       } catch (e) {
-        setStatus(e instanceof Error ? e.message : 'Export failed');
+        setStatus(e instanceof Error ? e.message : t('immersion.exportFailed'));
       } finally {
         setLoading(false);
       }
@@ -450,29 +447,29 @@ export default function ImmersionView() {
         source: currentUrl,
       });
       void window.api.immersionBumpMetrics({ pagesExported: 1 });
-      setStatus('Exported to Library');
+      setStatus(t('immersion.exported'));
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Export failed');
+      setStatus(e instanceof Error ? e.message : t('immersion.exportFailed'));
     }
   };
 
   const captureVideo = async () => {
     if (!currentUrl || !isRemoteMediaUrl(currentUrl)) {
-      setStatus('Video capture needs a video page URL (requires yt-dlp on PATH).');
+      setStatus(t('immersion.videoCaptureNeedsUrl'));
       return;
     }
     setCaptureBusy(true);
-    setStatus('Capturing video…');
+    setStatus(t('immersion.capturing'));
     try {
       const res = await window.api.downloadYouTube(currentUrl, false);
       if ('error' in res && res.error) {
         setStatus(res.error);
       } else {
         void window.api.immersionBumpMetrics({ videosCaptured: 1 });
-        setStatus('Saved to Media library');
+        setStatus(t('immersion.savedToMedia'));
       }
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Capture failed');
+      setStatus(e instanceof Error ? e.message : t('immersion.captureFailed'));
     } finally {
       setCaptureBusy(false);
     }
@@ -527,19 +524,19 @@ export default function ImmersionView() {
     <div className={`immersion-root immersion-mode-${mode}`} data-mode={mode}>
       {showChrome && (
         <div className="immersion-toolbar">
-          <button type="button" className="btn small icon-btn" title="Back" onClick={goBack} disabled={histIdx <= 0}>
+          <button type="button" className="btn small icon-btn" title={t('immersion.back')} onClick={goBack} disabled={histIdx <= 0}>
             <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />
           </button>
           <button
             type="button"
             className="btn small icon-btn"
-            title="Forward"
+            title={t('immersion.forward')}
             onClick={goForward}
             disabled={histIdx < 0 || histIdx >= history.length - 1}
           >
             <Icon name="chevron" size={14} />
           </button>
-          <button type="button" className="btn small icon-btn" title="Reload" onClick={reload}>
+          <button type="button" className="btn small icon-btn" title={t('immersion.reload')} onClick={reload}>
             <Icon name="refresh" size={14} />
           </button>
           <form
@@ -554,46 +551,46 @@ export default function ImmersionView() {
               className="immersion-url"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="Enter URL or search…"
+              placeholder={t('immersion.urlPlaceholder')}
               spellCheck={false}
               autoComplete="off"
             />
           </form>
-          <div className="immersion-mode-seg" role="group" aria-label="View mode">
+          <div className="immersion-mode-seg" role="group" aria-label={t('immersion.viewMode.ariaLabel')}>
             {IMMERSION_MODE_CYCLE.map((m) => (
               <button
                 key={m}
                 type="button"
                 className={`immersion-mode-btn immersion-mode-btn-${m}${mode === m ? ' active' : ''}`}
-                title={`${MODE_LABELS[m]}${m === 'focus' ? ' (F6)' : ''}${m === 'live' ? ' — browse' : m === 'reader' ? ' — read + highlight' : ' — distraction-free'}`}
+                title={`${MODE_LABELS[m]}${m === 'focus' ? t('immersion.mode.titleSuffix.focus') : ''}${t(`immersion.mode.titleDesc.${m}`)}`}
                 onClick={() => applyMode(m)}
               >
                 {MODE_LABELS[m]}
               </button>
             ))}
           </div>
-          <button type="button" className="btn small icon-btn" title="Save site (Ctrl+D)" onClick={() => void saveCurrentSite()}>
+          <button type="button" className="btn small icon-btn" title={t('immersion.saveSite')} onClick={() => void saveCurrentSite()}>
             <Icon name="bookmark" size={14} />
           </button>
-          <button type="button" className="btn small icon-btn" title="Export to Library" onClick={() => void exportToLibrary()}>
+          <button type="button" className="btn small icon-btn" title={t('immersion.exportToLibrary')} onClick={() => void exportToLibrary()}>
             <Icon name="download" size={14} />
           </button>
           <button
             type="button"
             className="btn small icon-btn"
-            title="Capture video to Media"
+            title={t('immersion.captureVideo')}
             disabled={captureBusy}
             onClick={() => void captureVideo()}
           >
             <Icon name="video" size={14} />
           </button>
-          <button type="button" className="btn small icon-btn" title="Open in system browser" onClick={openExternal}>
+          <button type="button" className="btn small icon-btn" title={t('immersion.openInSystemBrowser')} onClick={openExternal}>
             <Icon name="external" size={14} />
           </button>
           <button
             type="button"
             className="btn small icon-btn"
-            title={showRail ? 'Hide library' : 'Show library'}
+            title={showRail ? t('immersion.hideLibrary') : t('immersion.showLibrary')}
             onClick={() => setRailOpen((v) => !v)}
           >
             <Icon name="folder" size={14} />
@@ -603,13 +600,13 @@ export default function ImmersionView() {
 
       {mode === 'focus' && (
         <button type="button" className="immersion-focus-exit btn small" onClick={() => applyMode('reader')}>
-          Exit focus
+          {t('immersion.exitFocus')}
         </button>
       )}
 
       <div className="immersion-body">
         <div className={`immersion-stage${splitView ? ' immersion-split' : ''}`}>
-          {loading && <div className="immersion-banner">Loading…</div>}
+          {loading && <div className="immersion-banner">{t('immersion.loading')}</div>}
           {error && <div className="immersion-banner error">{error}</div>}
           {status && (
             <div className="immersion-banner status" onClick={() => setStatus(null)}>
@@ -619,7 +616,7 @@ export default function ImmersionView() {
 
           {!currentUrl && !loading && (
             <div className="immersion-empty">
-              <p className="muted">Open a page to begin immersion reading.</p>
+              <p className="muted">{t('immersion.openPageToBegin')}</p>
               <div className="immersion-starters">
                 {IMMERSION_STARTERS.map((s) => (
                   <button
@@ -635,9 +632,7 @@ export default function ImmersionView() {
                   </button>
                 ))}
               </div>
-              <p className="muted immersion-hint">
-                Search opens Live · F8 cycles modes · F6 Focus · Ctrl+L URL bar
-              </p>
+              <p className="muted immersion-hint">{t('immersion.hint')}</p>
             </div>
           )}
 
@@ -659,9 +654,9 @@ export default function ImmersionView() {
 
         {showRail && (
           <aside className="immersion-rail">
-            <div className="immersion-rail-head">Sites</div>
+            <div className="immersion-rail-head">{t('immersion.sites')}</div>
             {sites.length === 0 && (
-              <p className="muted immersion-rail-empty">Saved sites appear here. Bookmark any page.</p>
+              <p className="muted immersion-rail-empty">{t('immersion.rail.empty')}</p>
             )}
             <ul className="immersion-site-list">
               {sites.map((s) => (
@@ -678,8 +673,8 @@ export default function ImmersionView() {
                     </span>
                     <span className="immersion-site-meta muted">
                       {s.lang !== 'auto' ? s.lang.toUpperCase() + ' · ' : ''}
-                      {s.visitCount} visits
-                      {s.streakDays > 0 ? ` · ${s.streakDays}d` : ''}
+                      {t('immersion.visitsCount', { count: s.visitCount })}
+                      {s.streakDays > 0 ? ` · ${t('immersion.streakDays', { days: s.streakDays })}` : ''}
                     </span>
                     {s.completionPct > 0 && (
                       <span className="immersion-site-bar">
@@ -690,7 +685,7 @@ export default function ImmersionView() {
                   <button
                     type="button"
                     className="immersion-site-remove"
-                    title="Remove"
+                    title={t('immersion.remove')}
                     onClick={() => void window.api.immersionRemoveSite(s.id)}
                   >
                     <Icon name="close" size={12} />

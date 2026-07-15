@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import Icon from '../components/Icons';
+import { useT } from '../i18n';
 import {
   NOVELS,
   NOVEL_TYPES,
@@ -62,6 +63,7 @@ const DIFFICULTY_CLASS: Record<Difficulty, string> = {
 };
 
 export default function NovelsView() {
+  const { t } = useT();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<TypeFilter>('All');
   const [diff, setDiff] = useState<DiffFilter>('All');
@@ -114,17 +116,14 @@ export default function NovelsView() {
   return (
     <div className="nov-view">
       <div className="view-head">
-        <p className="muted">
-          A browsable catalogue for immersion reading — filter by type, genre and difficulty.
-          Public-domain classics link to the free full text on Aozora Bunko.
-        </p>
+        <p className="muted">{t('novels.intro')}</p>
         <div className="nov-refs">
           <button className="btn small" onClick={() => openLink('https://learnnatively.com/languages/japanese/')}>
-            Difficulty grades · Natively
+            {t('novels.ref.natively')}
             <Icon name="external" size={11} style={{ marginLeft: 4, verticalAlign: '-1px' }} />
           </button>
           <button className="btn small" onClick={() => openLink('https://jpdb.io/prebuilt_decks?lang=japanese')}>
-            Study decks · jpdb
+            {t('novels.ref.jpdb')}
             <Icon name="external" size={11} style={{ marginLeft: 4, verticalAlign: '-1px' }} />
           </button>
         </div>
@@ -136,15 +135,15 @@ export default function NovelsView() {
             className={`gram-level-btn ${type === 'All' ? 'active' : ''}`}
             onClick={() => setType('All')}
           >
-            All types
+            {t('novels.filter.allTypes')}
           </button>
-          {NOVEL_TYPES.map((t) => (
+          {NOVEL_TYPES.map((nt) => (
             <button
-              key={t}
-              className={`gram-level-btn ${type === t ? 'active' : ''}`}
-              onClick={() => setType(t)}
+              key={nt}
+              className={`gram-level-btn ${type === nt ? 'active' : ''}`}
+              onClick={() => setType(nt)}
             >
-              {t}
+              {nt}
             </button>
           ))}
           <span className="nov-chip-sep" />
@@ -152,7 +151,7 @@ export default function NovelsView() {
             className={`gram-level-btn ${diff === 'All' ? 'active' : ''}`}
             onClick={() => setDiff('All')}
           >
-            Any level
+            {t('novels.filter.anyLevel')}
           </button>
           {DIFFICULTY_ORDER.map((d) => (
             <button
@@ -167,10 +166,11 @@ export default function NovelsView() {
           <button
             className={`gram-level-btn nov-plan-chip ${planOnly ? 'active' : ''}`}
             onClick={() => setPlanOnly((v) => !v)}
-            title="Show only the books on your plan-to-read list"
+            title={t('novels.planChip.title')}
           >
             <Icon name="library" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-            Plan to read{planned.size > 0 ? ` (${planned.size})` : ''}
+            {t('novels.planChip.label')}
+            {planned.size > 0 ? ` (${planned.size})` : ''}
           </button>
         </div>
 
@@ -180,13 +180,13 @@ export default function NovelsView() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search title, author, or theme…"
+            placeholder={t('novels.search.placeholder')}
             lang="ja"
           />
           <label className="nov-select">
-            Genre
+            {t('novels.genre.label')}
             <select value={genre} onChange={(e) => setGenre(e.target.value as GenreFilter)}>
-              <option value="All">All</option>
+              <option value="All">{t('novels.genre.all')}</option>
               {GENRES.map((g) => (
                 <option key={g} value={g}>
                   {g}
@@ -195,23 +195,21 @@ export default function NovelsView() {
             </select>
           </label>
           <label className="nov-select">
-            Sort
+            {t('novels.sort.label')}
             <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-              <option value="difficulty">Easiest first</option>
-              <option value="title">Title (あ→ん)</option>
-              <option value="year">Year</option>
-              <option value="author">Author</option>
+              <option value="difficulty">{t('novels.sort.easiest')}</option>
+              <option value="title">{t('novels.sort.titleOrder')}</option>
+              <option value="year">{t('novels.sort.year')}</option>
+              <option value="author">{t('novels.sort.author')}</option>
             </select>
           </label>
         </div>
       </div>
 
-      <div className="gram-count muted">
-        {list.length} title{list.length === 1 ? '' : 's'}
-      </div>
+      <div className="gram-count muted">{t('novels.count', { count: list.length })}</div>
 
       {list.length === 0 ? (
-        <div className="res-empty muted">No titles match those filters.</div>
+        <div className="res-empty muted">{t('novels.noMatches')}</div>
       ) : (
         <div className="nov-grid">
           {list.map((nv) => (
@@ -220,10 +218,10 @@ export default function NovelsView() {
                 <span className="nov-cover-title" lang="ja">
                   {nv.titleJp}
                 </span>
-                {nv.freeOnAozora && <span className="nov-free-tag">FREE</span>}
+                {nv.freeOnAozora && <span className="nov-free-tag">{t('novels.freeTag')}</span>}
                 <span
                   className={`nov-plan-star ${planned.has(nv.id) ? 'active' : ''}`}
-                  title={planned.has(nv.id) ? 'Remove from plan-to-read' : 'Add to plan-to-read'}
+                  title={planned.has(nv.id) ? t('novels.plan.remove') : t('novels.plan.add')}
                   onClick={(e) => {
                     e.stopPropagation();
                     togglePlanned(nv.id);
@@ -273,10 +271,11 @@ function NovelDetail({
   onTogglePlanned: () => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   return (
     <div className="nov-modal-backdrop" onClick={onClose}>
       <div className="nov-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="nov-modal-x" onClick={onClose} aria-label="Close">
+        <button className="nov-modal-x" onClick={onClose} aria-label={t('common.close')}>
           ×
         </button>
         <div className="nov-modal-head" style={coverStyle(novel.id)}>
@@ -295,19 +294,19 @@ function NovelDetail({
 
           <div className="nov-meta">
             <span>
-              <b>Author</b> {novel.author}
+              <b>{t('novels.meta.author')}</b> {novel.author}
               {novel.authorEn ? ` · ${novel.authorEn}` : ''}
             </span>
             <span>
-              <b>Type</b> {novel.type}
+              <b>{t('novels.meta.type')}</b> {novel.type}
             </span>
             {novel.year && (
               <span>
-                <b>Year</b> {novel.year}
+                <b>{t('novels.meta.year')}</b> {novel.year}
               </span>
             )}
             <span>
-              <b>Difficulty</b>{' '}
+              <b>{t('novels.meta.difficulty')}</b>{' '}
               <span className={`nov-diff ${DIFFICULTY_CLASS[novel.difficulty]}`}>
                 {novel.difficulty}
               </span>
@@ -331,7 +330,7 @@ function NovelDetail({
               onClick={onTogglePlanned}
             >
               <Icon name="star" size={13} fill={planned} style={{ marginRight: 5, verticalAlign: '-2px' }} />
-              {planned ? 'On your list — remove' : 'Add to plan-to-read'}
+              {planned ? t('novels.onListRemove') : t('novels.plan.add')}
             </button>
             {novel.links.map((l) => (
               <button
@@ -348,7 +347,7 @@ function NovelDetail({
           {novel.freeOnAozora && (
             <p className="nov-free-note muted">
               <Icon name="check" size={12} style={{ marginRight: 4, verticalAlign: '-1px' }} />
-              Public domain — the complete original text is free to read on Aozora Bunko.
+              {t('novels.freeNote')}
             </p>
           )}
         </div>

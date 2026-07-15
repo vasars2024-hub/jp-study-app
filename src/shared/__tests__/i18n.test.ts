@@ -1,0 +1,136 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CATALOGS, en } from '../i18n/catalogs';
+import {
+  LANG_TAGS,
+  UI_LANGS,
+  isUiLang,
+  resetMissingWarnings,
+  translate,
+  type UiLang,
+} from '../i18n/core';
+
+const t = (key: string, lang: UiLang, vars?: Record<string, string | number>, onMissing?: (k: string, l: UiLang) => void) =>
+  translate(key, vars, { lang, catalog: CATALOGS[lang], fallback: en, onMissing });
+
+beforeEach(() => {
+  resetMissingWarnings();
+});
+
+describe('translate', () => {
+  it('resolves a key in each language', () => {
+    expect(t('common.download', 'en')).toBe('Download');
+    expect(t('common.download', 'ja')).toBe('ダウンロード');
+    expect(t('common.download', 'zh')).toBe('下载');
+    expect(t('common.download', 'ru')).toBe('Скачать');
+  });
+
+  it('interpolates variables', () => {
+    expect(t('storage.installedSize', 'en', { size: '2.1 GB' })).toBe('2.1 GB installed');
+    expect(t('storage.removed', 'ru', { name: 'Whisper Base' })).toContain('Whisper Base');
+  });
+
+  it('leaves an unknown placeholder alone rather than printing undefined', () => {
+    expect(t('storage.installedSize', 'en', {})).toBe('{size} installed');
+  });
+
+  it('localises numbers with the active locale', () => {
+    // ru groups thousands with a space, en with a comma.
+    expect(t('storage.modelCount', 'en', { count: 1234 })).toBe('1,234 models installed');
+    expect(t('storage.modelCount', 'ru', { count: 1234 })).toMatch(/1\s234/);
+  });
+});
+
+describe('fallback', () => {
+  it('falls back to English for a key the language is missing', () => {
+    // 'common.save' exists everywhere, so use a key only English has.
+    const partial = { lang: 'ru' as UiLang, catalog: {}, fallback: en };
+    expect(translate('common.download', undefined, partial)).toBe('Download');
+  });
+
+  it('warns once per missing key, not once per render', () => {
+    const onMissing = vi.fn();
+    const opts = { lang: 'ru' as UiLang, catalog: {}, fallback: en, onMissing };
+    translate('common.download', undefined, opts);
+    translate('common.download', undefined, opts);
+    translate('common.download', undefined, opts);
+    expect(onMissing).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the key itself when English is missing it too, so the bug is findable', () => {
+    expect(translate('nope.not.a.key', undefined, { lang: 'en', catalog: {}, fallback: {} })).toBe(
+      'nope.not.a.key',
+    );
+  });
+});
+
+describe('plurals', () => {
+  it('handles English one/other', () => {
+    expect(t('storage.modelCount', 'en', { count: 1 })).toBe('1 model installed');
+    expect(t('storage.modelCount', 'en', { count: 2 })).toBe('2 models installed');
+    expect(t('storage.modelCount', 'en', { count: 0 })).toBe('0 models installed');
+  });
+
+  it('handles the Russian 1 / 2-4 / 5+ forms', () => {
+    // The whole reason plural categories exist rather than a bare count check:
+    // Russian needs three forms, and 21 behaves like 1 while 11 does not.
+    expect(t('storage.modelCount', 'ru', { count: 1 })).toBe('Установлена 1 модель');
+    expect(t('storage.modelCount', 'ru', { count: 3 })).toBe('Установлено 3 модели');
+    expect(t('storage.modelCount', 'ru', { count: 7 })).toBe('Установлено 7 моделей');
+    expect(t('storage.modelCount', 'ru', { count: 11 })).toBe('Установлено 11 моделей');
+    expect(t('storage.modelCount', 'ru', { count: 21 })).toBe('Установлена 21 модель');
+  });
+
+  it('uses the single form for languages without plural inflection', () => {
+    expect(t('storage.modelCount', 'ja', { count: 1 })).toBe('1 個のモデルをインストール済み');
+    expect(t('storage.modelCount', 'ja', { count: 5 })).toBe('5 個のモデルをインストール済み');
+    expect(t('storage.modelCount', 'zh', { count: 5 })).toBe('已安装 5 个模型');
+  });
+});
+
+describe('catalog hygiene', () => {
+  it('gives every language a tag Intl accepts', () => {
+    for (const lang of UI_LANGS) {
+      expect(() => new Intl.PluralRules(LANG_TAGS[lang])).not.toThrow();
+    }
+  });
+
+  it('never leaves a translated catalog with keys English does not have', () => {
+    // A stray key in ja/zh/ru is dead weight — usually a typo of a real key,
+    // which would silently fall back to English forever.
+    for (const lang of UI_LANGS) {
+      for (const key of Object.keys(CATALOGS[lang])) {
+        expect(en[key], `${lang} has orphan key ${key}`).toBeDefined();
+      }
+    }
+  });
+
+  it('keeps Russian plural entries complete', () => {
+    for (const [key, entry] of Object.entries(CATALOGS.ru)) {
+      if (typeof entry === 'object') {
+        expect(entry.one, `${key} missing 'one'`).toBeDefined();
+        expect(entry.few, `${key} missing 'few'`).toBeDefined();
+        expect(entry.many, `${key} missing 'many'`).toBeDefined();
+      }
+    }
+  });
+
+  it('validates language ids', () => {
+    expect(isUiLang('ru')).toBe(true);
+    expect(isUiLang('de')).toBe(false);
+    expect(isUiLang(null)).toBe(false);
+  });
+
+  it('gives every English key a translation in ja/zh/ru', () => {
+    // The reverse of the orphan-key check above: a key present in en but
+    // missing from another catalog silently falls back to English at runtime
+    // (by design), so nothing *breaks* — but a hand-authored batch of keys is
+    // exactly how one gets dropped from one language without anyone noticing.
+    // This turns that into a loud, immediate test failure instead.
+    const enKeys = Object.keys(en);
+    for (const lang of UI_LANGS) {
+      if (lang === 'en') continue;
+      const missing = enKeys.filter((k) => CATALOGS[lang][k] === undefined);
+      expect(missing, `${lang} is missing translations for: ${missing.join(', ')}`).toEqual([]);
+    }
+  });
+});

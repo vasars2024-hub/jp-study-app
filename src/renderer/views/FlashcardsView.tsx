@@ -28,6 +28,7 @@ import {
 import { deckCardsToCsv } from '../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../savedWords';
 import { registerCommandHandler } from '../keyboardShortcuts';
+import { useT } from '../i18n';
 
 type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 type OverviewTab = 'dictionary' | 'epub';
@@ -51,6 +52,7 @@ function shuffle<T>(arr: T[]): T[] {
 type EpubMiningUi = 'simple' | 'advanced';
 
 export default function FlashcardsView() {
+  const { t } = useT();
   const [saved, setSaved] = useState<SavedWord[]>(() => loadSaved());
   const [deck, setDeck] = useState<DeckFlashcard[]>(() => loadDeck());
   const [folders, setFolders] = useState<string[]>(() => loadDeckFolders());
@@ -286,7 +288,7 @@ export default function FlashcardsView() {
       return;
     }
     if (name.toLowerCase() === 'all' || name.toLowerCase() === 'unfiled') {
-      setFolderErr('That name is reserved.');
+      setFolderErr(t('flash.reservedName'));
       return;
     }
     if (folders.includes(name)) {
@@ -361,7 +363,7 @@ export default function FlashcardsView() {
   }
 
   function removeBookDeck(bookId: string, bookTitle: string): void {
-    if (!window.confirm(`Delete all ${bookTitle} cards from flashcards? This cannot be undone.`)) return;
+    if (!window.confirm(t('flash.deleteConfirm', { title: bookTitle }))) return;
     setDeck(removeBookGroup(bookId, bookTitle));
     setBookFolderMenu(null);
   }
@@ -438,16 +440,14 @@ export default function FlashcardsView() {
             <div className="flash-done-emoji">
               <Icon name="confetti" size={44} />
             </div>
-            <h2>Session complete</h2>
-            <p className="muted">
-              You reviewed {total} {total === 1 ? 'card' : 'cards'}.
-            </p>
+            <h2>{t('flash.sessionComplete')}</h2>
+            <p className="muted">{t('flash.reviewedCount', { count: total })}</p>
             <div className="flash-done-actions">
               <button className="btn primary" onClick={restartReview}>
-                Review again
+                {t('flash.reviewAgain')}
               </button>
               <button className="btn" onClick={endReview}>
-                Done
+                {t('flash.done')}
               </button>
             </div>
           </div>
@@ -466,7 +466,7 @@ export default function FlashcardsView() {
           <div className="flash-review-top">
             <button className="btn small" onClick={endReview}>
               <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
-              Exit
+              {t('flash.exit')}
             </button>
             {reviewTitle && <span className="flash-review-source muted">{reviewTitle}</span>}
             <div className="flash-progress">
@@ -482,22 +482,22 @@ export default function FlashcardsView() {
               className="btn small flash-review-shuffle"
               onClick={shuffleReview}
               disabled={sessionCards.length < 2}
-              title="Shuffle unknown cards"
+              title={t('flash.shuffleTitle')}
             >
               <Icon name="shuffle" size={14} />
-              Shuffle
+              {t('flash.shuffle')}
             </button>
           </div>
 
           <p className="flash-review-explored">
-            Flashcards explored: {exploredIds.size} / {sessionCards.length}
+            {t('flash.exploredCount', { explored: exploredIds.size, total: sessionCards.length })}
           </p>
 
           <div className="flash-review-nav" ref={stripRef}>
             {unknownReviewCards.length > 0 && (
               <div className="flash-review-group flash-review-group-unknown">
                 <span className="flash-review-group-label">
-                  Don&apos;t know ({unknownReviewCards.length})
+                  {t('flash.dontKnowGroup', { count: unknownReviewCards.length })}
                 </span>
                 <div className="flash-strip flash-review-strip" role="list">
                   {unknownReviewCards.map((card) => reviewStripCard(card, false))}
@@ -506,7 +506,9 @@ export default function FlashcardsView() {
             )}
             {knownReviewCards.length > 0 && (
               <div className="flash-review-group flash-review-group-known">
-                <span className="flash-review-group-label">Know ({knownReviewCards.length})</span>
+                <span className="flash-review-group-label">
+                  {t('flash.knowGroup', { count: knownReviewCards.length })}
+                </span>
                 <div className="flash-strip flash-review-strip" role="list">
                   {knownReviewCards.map((card) => reviewStripCard(card, true))}
                 </div>
@@ -514,7 +516,7 @@ export default function FlashcardsView() {
             )}
             {sessionCards.length > 1 && (
               <label className="flash-review-slider">
-                <span className="muted">Slide to card</span>
+                <span className="muted">{t('flash.slideToCard')}</span>
                 <input
                   type="range"
                   min={0}
@@ -540,26 +542,26 @@ export default function FlashcardsView() {
                   {current.reading}
                 </span>
               )}
-              <span className="flash-meaning">{current.meaning || 'No meaning saved.'}</span>
+              <span className="flash-meaning">{current.meaning || t('flash.noMeaningSaved')}</span>
             </div>
           ) : (
-            <span className="flash-tap-hint">Tap or press Space to reveal</span>
+            <span className="flash-tap-hint">{t('flash.tapToReveal')}</span>
           )}
         </div>
 
         {flipped ? (
           <div className="flash-actions">
             <button className="btn flash-again" onClick={again}>
-              Don&apos;t know
+              {t('flash.dontKnow')}
             </button>
             <button className="btn primary flash-got" onClick={gotIt}>
-              Know
+              {t('flash.know')}
             </button>
           </div>
         ) : (
           <div className="flash-actions">
             <button className="btn primary" onClick={flip}>
-              Show answer
+              {t('flash.showAnswer')}
             </button>
           </div>
         )}
@@ -572,13 +574,13 @@ export default function FlashcardsView() {
     return (
       <div className="flash-view flash-view-mining">
         <div className="view-head">
-          <p className="muted">Mine vocabulary from a library EPUB into flashcards.</p>
+          <p className="muted">{t('flash.mining.intro')}</p>
           <div className="actions">
             <button className="btn" onClick={() => setMode('overview')}>
-              Back to decks
+              {t('flash.backToDecks')}
             </button>
             <button className="btn" onClick={() => setMode('ai-studio')}>
-              AI card studio
+              {t('flash.aiCardStudio')}
             </button>
           </div>
         </div>
@@ -589,21 +591,19 @@ export default function FlashcardsView() {
             className={`flash-tab${epubMiningUi === 'simple' ? ' active' : ''}`}
             onClick={() => setEpubMiningUi('simple')}
           >
-            Simple
+            {t('flash.tab.simple')}
           </button>
           <button
             type="button"
             className={`flash-tab${epubMiningUi === 'advanced' ? ' active' : ''}`}
             onClick={() => setEpubMiningUi('advanced')}
           >
-            Advanced
+            {t('flash.tab.advanced')}
           </button>
         </div>
 
         <p className="epub-mining-mode-lead muted">
-          {epubMiningUi === 'simple'
-            ? 'English meaning + Japanese sentence & definition — two frequency filters only.'
-            : 'Full control: all languages, export formats, translation engines.'}
+          {epubMiningUi === 'simple' ? t('flash.mining.simpleLead') : t('flash.mining.advancedLead')}
         </p>
 
         {epubMiningUi === 'simple' ? (
@@ -619,13 +619,13 @@ export default function FlashcardsView() {
     return (
       <div className="flash-view flash-view-mining">
         <div className="view-head">
-          <p className="muted">Paste CSV/TSV, edit in a spreadsheet grid, or import TXT lists — auto-syncs to flashcards.</p>
+          <p className="muted">{t('flash.csv.intro')}</p>
           <div className="actions">
             <button className="btn" onClick={() => setMode('overview')}>
-              Back to decks
+              {t('flash.backToDecks')}
             </button>
             <button className="btn" onClick={() => openEpubMining('advanced')}>
-              EPUB mining
+              {t('flash.epubMining')}
             </button>
           </div>
         </div>
@@ -638,13 +638,13 @@ export default function FlashcardsView() {
     return (
       <div className="flash-view flash-view-mining">
         <div className="view-head">
-          <p className="muted">Configure preset and field mapping above, then generate cards from saved dictionary words.</p>
+          <p className="muted">{t('flash.aiStudio.intro')}</p>
           <div className="actions">
             <button className="btn" onClick={() => setMode('overview')}>
-              Back to decks
+              {t('flash.backToDecks')}
             </button>
             <button className="btn" onClick={() => openEpubMining('advanced')}>
-              EPUB mining
+              {t('flash.epubMining')}
             </button>
           </div>
         </div>
@@ -656,22 +656,22 @@ export default function FlashcardsView() {
   return (
     <div className="flash-view flash-view-decks">
       <div className="view-head">
-        <p className="muted">Dictionary saves, EPUB deck strip, and folder explorer.</p>
+        <p className="muted">{t('flash.overview.intro')}</p>
         <div className="actions">
           <button className="btn primary" onClick={() => openEpubMining('simple')}>
-            Simple EPUB mining
+            {t('flash.simpleEpubMining')}
           </button>
           <button className="btn" onClick={() => openEpubMining('advanced')}>
-            Advanced EPUB
+            {t('flash.advancedEpub')}
           </button>
           <button className="btn" onClick={() => setMode('csv-tool')}>
-            CSV tool
+            {t('flash.csvTool')}
           </button>
           <button className="btn" onClick={() => setMode('ai-studio')}>
-            AI card studio
+            {t('flash.aiCardStudio')}
           </button>
           <button className="btn primary" onClick={startReview} disabled={saved.length === 0}>
-            {saved.length ? `Review dictionary (${saved.length})` : 'Review dictionary'}
+            {saved.length ? t('flash.reviewDictionaryCount', { count: saved.length }) : t('flash.reviewDictionary')}
           </button>
         </div>
       </div>
@@ -682,14 +682,14 @@ export default function FlashcardsView() {
           className={`flash-tab ${overviewTab === 'epub' ? 'active' : ''}`}
           onClick={() => setOverviewTab('epub')}
         >
-          EPUB decks ({epubCards.length})
+          {t('flash.tab.epubDecks', { count: epubCards.length })}
         </button>
         <button
           type="button"
           className={`flash-tab ${overviewTab === 'dictionary' ? 'active' : ''}`}
           onClick={() => setOverviewTab('dictionary')}
         >
-          Dictionary ({saved.length})
+          {t('flash.tab.dictionary', { count: saved.length })}
         </button>
       </div>
 
@@ -699,27 +699,25 @@ export default function FlashcardsView() {
         <>
           <section className="anki-card epub-mine-promo">
             <div className="flash-strip-head">
-              <h2 className="flash-section-title">Mine from EPUB</h2>
-              <span className="muted">Lean 3-step flow — English + Japanese only</span>
+              <h2 className="flash-section-title">{t('flash.mineFromEpub')}</h2>
+              <span className="muted">{t('flash.mineFromEpub.hint')}</span>
             </div>
-            <p className="epub-mine-promo-text">
-              Pick a book, filter by frequency in the book or in the dictionary, then save cards to flashcards.
-            </p>
+            <p className="epub-mine-promo-text">{t('flash.mineFromEpub.text')}</p>
             <button type="button" className="btn primary epub-mine-promo-btn" onClick={() => openEpubMining('simple')}>
-              Open Simple EPUB mining
+              {t('flash.openSimpleMining')}
             </button>
           </section>
 
           <section className="anki-card flash-review-setup">
             <div className="flash-strip-head">
-              <h2 className="flash-section-title">Study session</h2>
-              <span className="muted">Pick an EPUB source, then start reviewing</span>
+              <h2 className="flash-section-title">{t('flash.studySession')}</h2>
+              <span className="muted">{t('flash.studySession.hint')}</span>
             </div>
             <div className="flash-review-setup-grid">
               <label>
-                EPUB source
+                {t('flash.epubSource')}
                 <select value={reviewBookKey} onChange={(e) => setReviewBookKey(e.target.value)}>
-                  <option value="all">All in current folder ({filteredDeck.length})</option>
+                  <option value="all">{t('flash.allInFolder', { count: filteredDeck.length })}</option>
                   {epubReviewBooks.map((group) => {
                     const key = `${group.bookId}::${group.bookTitle}`;
                     const inFolder = filterDeckByBook(filteredDeck, key).length;
@@ -737,7 +735,7 @@ export default function FlashcardsView() {
                   checked={reviewUnknownOnly}
                   onChange={(e) => setReviewUnknownOnly(e.target.checked)}
                 />
-                Unknown cards only
+                {t('flash.unknownOnly')}
               </label>
               <button
                 type="button"
@@ -746,21 +744,19 @@ export default function FlashcardsView() {
                 onClick={startEpubReview}
               >
                 {epubReviewCandidates.length
-                  ? `Start review (${epubReviewCandidates.length})`
-                  : 'Start review'}
+                  ? t('flash.startReviewCount', { count: epubReviewCandidates.length })
+                  : t('flash.startReview')}
               </button>
             </div>
           </section>
 
           <section className="flash-strip-section anki-card">
             <div className="flash-strip-head">
-              <h2 className="flash-section-title">Recent EPUB cards</h2>
-              <span className="muted">Left to right — newest first</span>
+              <h2 className="flash-section-title">{t('flash.recentCards')}</h2>
+              <span className="muted">{t('flash.recentCards.hint')}</span>
             </div>
             {recentStrip.length === 0 ? (
-              <p className="muted flash-strip-empty">
-                Mine cards in EPUB mining to fill this strip.
-              </p>
+              <p className="muted flash-strip-empty">{t('flash.recentCards.empty')}</p>
             ) : (
               <div className="flash-strip" role="list">
                 {recentStrip.map((card) => (
@@ -783,8 +779,8 @@ export default function FlashcardsView() {
 
           <section className="flash-explorer anki-card">
             <div className="flash-explorer-head">
-              <h2 className="flash-section-title">Deck explorer</h2>
-              <span className="muted">Folders and EPUB source groups</span>
+              <h2 className="flash-section-title">{t('flash.deckExplorer')}</h2>
+              <span className="muted">{t('flash.deckExplorer.hint')}</span>
             </div>
 
             <div className="lib-folders flash-folders">
@@ -793,7 +789,7 @@ export default function FlashcardsView() {
                 className={`lib-folder-chip ${folderFilter === 'all' ? 'active' : ''}`}
                 onClick={() => setFolderFilter('all')}
               >
-                All
+                {t('flash.all')}
                 <span className="lib-chip-count">{epubCards.length}</span>
               </button>
               <button
@@ -807,7 +803,7 @@ export default function FlashcardsView() {
                 onDrop={(e) => onFolderDrop(e, null)}
                 className={`lib-folder-chip ${folderFilter === 'unfiled' ? 'active' : ''} ${dropHover === 'unfiled' ? 'dragover' : ''}`}
               >
-                Unfiled
+                {t('flash.unfiled')}
                 <span className="lib-chip-count">{epubCards.filter((c) => !c.folder).length}</span>
               </button>
               {folders.map((folder) => (
@@ -838,7 +834,7 @@ export default function FlashcardsView() {
                     className="lib-chip-del"
                     role="button"
                     tabIndex={0}
-                    title="Delete folder"
+                    title={t('flash.deleteFolder')}
                     onClick={(e) => {
                       e.stopPropagation();
                       removeFolder(folder);
@@ -868,23 +864,23 @@ export default function FlashcardsView() {
                         setFolderErr('');
                       }
                     }}
-                    placeholder="Folder name"
+                    placeholder={t('flash.folderNamePlaceholder')}
                     autoFocus
                   />
                   <button type="button" className="btn small" onClick={createFolder}>
-                    Add
+                    {t('flash.add')}
                   </button>
                 </span>
               ) : (
                 <button type="button" className="lib-folder-chip lib-folder-new" onClick={() => setCreatingFolder(true)}>
-                  + New folder
+                  {t('flash.newFolder')}
                 </button>
               )}
             </div>
             {folderErr && <div className="lib-folder-err">{folderErr}</div>}
 
             {filteredDeck.length === 0 ? (
-              <p className="muted">No cards in this view. Mine from an EPUB or switch folder filters.</p>
+              <p className="muted">{t('flash.noCardsInView')}</p>
             ) : (
               <div className="flash-groups">
                 {bookGroups.map((group) => {
@@ -925,9 +921,9 @@ export default function FlashcardsView() {
                           >
                             {group.bookTitle}
                           </span>
-                          <span className="muted flash-group-count">{group.cards.length} cards</span>
+                          <span className="muted flash-group-count">{t('flash.cardsCount', { count: group.cards.length })}</span>
                           <span className="muted flash-group-known">
-                            {group.cards.filter((c) => c.known).length} known
+                            {t('flash.knownCount', { count: group.cards.filter((c) => c.known).length })}
                           </span>
                         </div>
                         <div className="flash-group-head-actions">
@@ -936,19 +932,19 @@ export default function FlashcardsView() {
                             className="btn small"
                             onClick={() => setDeckMenuGroup(group)}
                           >
-                            Options
+                            {t('flash.options')}
                           </button>
                           <button
                             type="button"
                             className="btn small flash-group-delete"
                             onClick={() => removeBookDeck(group.bookId, group.bookTitle)}
                           >
-                            Delete deck
+                            {t('flash.deleteDeck')}
                           </button>
                           {bookFolderMenu === groupKey && (
                             <div className="flash-file-menu flash-book-folder-menu">
                               <button type="button" onClick={() => moveBookToFolder(group.bookId, group.bookTitle, null)}>
-                                Unfiled
+                                {t('flash.unfiled')}
                               </button>
                               {folders.map((folder) => (
                                 <button
@@ -991,12 +987,12 @@ export default function FlashcardsView() {
                                   className="btn small"
                                   onClick={() => setFileMenu(fileMenu === card.id ? null : card.id)}
                                 >
-                                  File
+                                  {t('flash.file')}
                                 </button>
                                 {fileMenu === card.id && (
                                   <div className="flash-file-menu">
                                     <button type="button" onClick={() => { setDeck(setDeckCardFolder(card.id, null)); setFileMenu(null); }}>
-                                      Unfiled
+                                      {t('flash.unfiled')}
                                     </button>
                                     {folders.map((folder) => (
                                       <button
@@ -1014,7 +1010,7 @@ export default function FlashcardsView() {
                                 )}
                                 <button
                                   className="flash-row-x"
-                                  title="Remove"
+                                  title={t('common.remove')}
                                   onClick={() => setDeck(removeDeckCard(card.id))}
                                 >
                                   ×
@@ -1036,10 +1032,8 @@ export default function FlashcardsView() {
           <div className="flash-empty-emoji">
             <Icon name="flashcards" size={40} />
           </div>
-          <h2>No saved words yet</h2>
-          <p className="muted">
-            Open the Dictionary (or highlight a word while reading) and tap the star icon on a result to save it here.
-          </p>
+          <h2>{t('flash.noSavedWords')}</h2>
+          <p className="muted">{t('flash.noSavedWords.hint')}</p>
         </div>
       ) : (
         <div className="flash-list">
@@ -1056,7 +1050,7 @@ export default function FlashcardsView() {
                 )}
                 <span className="flash-row-meaning">{w.meaning}</span>
               </div>
-              <button className="flash-row-x" title="Remove" onClick={() => removeSaved(w.word)}>
+              <button className="flash-row-x" title={t('common.remove')} onClick={() => removeSaved(w.word)}>
                 ×
               </button>
             </div>

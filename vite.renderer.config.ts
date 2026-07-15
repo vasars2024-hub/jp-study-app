@@ -45,4 +45,9 @@ export default defineConfig({
   },
   // Some browser libraries (e.g. epub.js dependencies) expect a `global`.
   define: { global: 'globalThis' },
+  // ~1 GB models/dicts live in public/ and ship via packager extraResource (see
+  // forge.config.ts). Skipping copyPublicDir keeps the Vite renderer build fast.
+  build: {
+    copyPublicDir: false,
+  },
 });

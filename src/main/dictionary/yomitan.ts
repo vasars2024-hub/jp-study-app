@@ -8,6 +8,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
 import type { DictEntry, DictResult, DictSense, YomitanDictInfo } from '../../shared/types';
+import { mt } from '../i18n';
 
 interface StoredGlossaryEntry {
   word: string;
@@ -840,9 +841,9 @@ export async function importYomitanZip(filePath?: string): Promise<{
   let zipPath = filePath;
   if (!zipPath) {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Import a Yomitan dictionary (.zip)',
+      title: mt('dialog.importYomitanDict.title'),
       properties: ['openFile'],
-      filters: [{ name: 'Yomitan dictionary', extensions: ['zip'] }],
+      filters: [{ name: mt('dialog.filter.yomitanDict'), extensions: ['zip'] }],
     });
     if (res.canceled || !res.filePaths[0]) return { ok: false, error: 'cancelled' };
     zipPath = res.filePaths[0];

@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 import AdmZip from 'adm-zip';
 import type { LibraryItem, Progress } from '../shared/types';
 import { extractReadableFromUrl } from './readabilityExtract';
+import { mt } from './i18n';
 
 /** Token → absolute path for localfile:// wallpaper/image streaming. */
 const localFileTokens = new Map<string, string>();
@@ -433,12 +434,12 @@ export function registerLibraryIpc(): void {
 
   ipcMain.handle('library:importFiles', async () => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Import books or manga',
+      title: mt('dialog.importBooks.title'),
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Books & Manga', extensions: ['epub', 'pdf', 'cbz', 'zip'] },
-        { name: 'Books', extensions: ['epub', 'pdf'] },
-        { name: 'Manga archive', extensions: ['cbz', 'zip'] },
+        { name: mt('dialog.filter.booksManga'), extensions: ['epub', 'pdf', 'cbz', 'zip'] },
+        { name: mt('dialog.filter.books'), extensions: ['epub', 'pdf'] },
+        { name: mt('dialog.filter.mangaArchive'), extensions: ['cbz', 'zip'] },
       ],
     });
     if (res.canceled) return readDb();
@@ -460,7 +461,7 @@ export function registerLibraryIpc(): void {
 
   ipcMain.handle('library:importFolder', async () => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Import a folder of images as manga',
+      title: mt('dialog.importMangaFolder.title'),
       properties: ['openDirectory'],
     });
     if (res.canceled || res.filePaths.length === 0) return readDb();
@@ -580,9 +581,9 @@ export function registerLibraryIpc(): void {
       label: string;
     } | null> => {
       const res = await dialog.showOpenDialog(focusedWindow()!, {
-        title: 'Choose a wallpaper image',
+        title: mt('dialog.chooseWallpaperImage.title'),
         properties: ['openFile'],
-        filters: [{ name: 'Images', extensions: WALL_EXT.map((e) => e.slice(1)) }],
+        filters: [{ name: mt('dialog.filter.images'), extensions: WALL_EXT.map((e) => e.slice(1)) }],
       });
       const src = res.filePaths[0];
       if (res.canceled || !src) return null;
@@ -629,9 +630,9 @@ export function registerLibraryIpc(): void {
   /** Pick an image for environment playlists without overwriting the shell wallpaper file. */
   ipcMain.handle('desktop:pickEnvImage', async (): Promise<string | null> => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Add image to wallpaper playlist',
+      title: mt('dialog.addWallpaperPlaylistImage.title'),
       properties: ['openFile'],
-      filters: [{ name: 'Images', extensions: WALL_EXT.map((e) => e.slice(1)) }],
+      filters: [{ name: mt('dialog.filter.images'), extensions: WALL_EXT.map((e) => e.slice(1)) }],
     });
     const src = res.filePaths[0];
     if (res.canceled || !src) return null;
@@ -663,7 +664,7 @@ export function registerLibraryIpc(): void {
     'desktop:pickWallpaperFolder',
     async (): Promise<{ folder: string; images: string[] } | null> => {
       const res = await dialog.showOpenDialog(focusedWindow()!, {
-        title: 'Choose a folder of wallpaper images',
+        title: mt('dialog.chooseWallpaperFolder.title'),
         properties: ['openDirectory'],
       });
       const folder = res.filePaths[0];
@@ -698,11 +699,11 @@ export function registerLibraryIpc(): void {
   // Pick any program/file and return what the desktop needs for its icon.
   ipcMain.handle('desktop:pickShortcut', async () => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Choose a program or file to add to the desktop',
+      title: mt('dialog.chooseDesktopProgram.title'),
       properties: ['openFile'],
       filters: [
-        { name: 'Programs & shortcuts', extensions: ['exe', 'lnk', 'bat', 'cmd'] },
-        { name: 'All files', extensions: ['*'] },
+        { name: mt('dialog.filter.programsShortcuts'), extensions: ['exe', 'lnk', 'bat', 'cmd'] },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
       ],
     });
     const target = res.filePaths[0];
@@ -910,7 +911,7 @@ export function registerLibraryIpc(): void {
 
   ipcMain.handle('config:setWatchFolder', async () => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
-      title: 'Choose a folder to auto-import books & manga from',
+      title: mt('dialog.autoImportBooksFolder.title'),
       properties: ['openDirectory'],
     });
     if (res.canceled || !res.filePaths[0]) {

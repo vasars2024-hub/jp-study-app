@@ -19,6 +19,7 @@ import {
   type MusicRow,
 } from '../musicLibrary';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
+import { useT } from '../i18n';
 
 // The Music app: songs from the media library on the left (as a search box +
 // virtualized, collapsible folder tree so a library of thousands of tracks
@@ -53,6 +54,7 @@ function fmt(sec: number): string {
 }
 
 export default function MusicView() {
+  const { t } = useT();
   const activeLineRef = useRef<HTMLDivElement>(null);
   /** Suppress auto-scroll for a moment after the user scrolls the lyrics. */
   const userScrollUntil = useRef(0);
@@ -268,7 +270,7 @@ export default function MusicView() {
               }}
             />
             <Icon name="folder" size={13} style={{ flexShrink: 0 }} />
-            <span className="music-row-folder-name">{row.name || 'Untitled folder'}</span>
+            <span className="music-row-folder-name">{row.name || t('music.folder.untitled')}</span>
             <span className="muted music-row-folder-count">{row.count}</span>
           </button>
         );
@@ -292,31 +294,27 @@ export default function MusicView() {
   );
 
   const emptyMessage = searchActive
-    ? `No songs match "${debouncedQuery}".`
+    ? t('music.empty.noMatch', { query: debouncedQuery })
     : likedOnly
-      ? 'No liked songs yet — like one with the heart icon.'
-      : 'No audio in your media library yet. Add songs (mp3, flac…) in the Media app or its watch folder — they’ll show up here.';
+      ? t('music.empty.noLiked')
+      : t('music.empty.noAudio');
 
   return (
     <div className="music-view">
       <aside className="music-songlist">
         <header className="music-list-head">
           <Icon name="music" size={20} />
-          <h2>Songs</h2>
+          <h2>{t('music.songs')}</h2>
           <button
             className={`music-liked-chip ${likedOnly ? 'on' : ''}`}
-            title="Show only liked songs"
+            title={t('music.likedOnly.title')}
             onClick={() => setLikedOnly((v) => !v)}
           >
             <Icon name="heart" size={13} fill={likedOnly} />
           </button>
           <button
             className={`music-liked-chip ${useAlbumInSearch ? 'on' : ''}`}
-            title={
-              useAlbumInSearch
-                ? 'Lyrics search uses album / folder names — click to disable'
-                : 'Lyrics search uses file names only — click to include album / folders'
-            }
+            title={useAlbumInSearch ? t('music.albumSearch.on') : t('music.albumSearch.off')}
             onClick={() => setUseAlbumInSearch(toggleUseAlbumInSearch().useAlbumInSearch)}
           >
             <Icon name="folder" size={13} />
@@ -325,12 +323,12 @@ export default function MusicView() {
             className="music-sort"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortBy)}
-            title="Sort songs"
+            title={t('music.sortSelect.title')}
           >
-            <option value="recent">Recent</option>
-            <option value="title">Title</option>
-            <option value="artist">Artist</option>
-            <option value="folder">Folder</option>
+            <option value="recent">{t('music.sort.recent')}</option>
+            <option value="title">{t('music.sort.byTitle')}</option>
+            <option value="artist">{t('music.sort.byArtist')}</option>
+            <option value="folder">{t('music.sort.byFolder')}</option>
           </select>
           <MediaLibraryActions onItemsChange={setItems} className="music-lib-actions" />
         </header>
@@ -341,11 +339,11 @@ export default function MusicView() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search songs…"
-            aria-label="Search songs"
+            placeholder={t('music.search.placeholder')}
+            aria-label={t('music.search.ariaLabel')}
           />
           {query && (
-            <button className="music-search-clear" onClick={() => setQuery('')} title="Clear search">
+            <button className="music-search-clear" onClick={() => setQuery('')} title={t('music.search.clear')}>
               ×
             </button>
           )}
@@ -366,7 +364,7 @@ export default function MusicView() {
           <input
             type="text"
             className="music-yt-input"
-            placeholder="Video or audio link → download…"
+            placeholder={t('music.yt.placeholder')}
             value={ytUrl}
             onChange={(e) => setYtUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void downloadYt()}
@@ -374,7 +372,7 @@ export default function MusicView() {
           />
           <button className="btn small" disabled={!!yt || !ytUrl.trim()} onClick={() => void downloadYt()}>
             <Icon name="download" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-            {yt ? `${yt.stage} ${Math.round(yt.percent)}%` : 'Get audio'}
+            {yt ? `${yt.stage} ${Math.round(yt.percent)}%` : t('music.yt.getAudio')}
           </button>
           {ytError && <div className="lib-import-err music-yt-err">{ytError}</div>}
         </div>
@@ -391,26 +389,32 @@ export default function MusicView() {
             noteLookupPointerDown(e);
           }}
           onMouseUp={lookupAt}
-          title="Click or highlight a word to look it up"
+          title={t('music.lyricsClickHint')}
         >
           {!ps.current && (
             <div className="music-hint muted">
               <Icon name="music" size={44} />
-              <p>Pick a song — lyrics are found automatically and sing along, karaoke style.</p>
+              <p>{t('music.hint.pickSong')}</p>
             </div>
           )}
-          {ps.current && lyrics.kind === 'loading' && <p className="muted music-hint">歌詞を探しています…</p>}
+          {ps.current && lyrics.kind === 'loading' && (
+            <p className="muted music-hint">{t('music.lyricsLoading')}</p>
+          )}
           {ps.current && lyrics.kind === 'missing' && (
             <div className="music-hint muted">
-              <p>No lyrics found for this song{lyrics.error ? ` (${lyrics.error})` : ''}.</p>
+              <p>
+                {lyrics.error
+                  ? t('music.noLyricsWithError', { error: lyrics.error })
+                  : t('music.noLyrics')}
+              </p>
               <div className="music-hint-btns">
                 <button className="btn small" onClick={liveLyrics.reload}>
                   <Icon name="refresh" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                  Search again
+                  {t('music.searchAgain')}
                 </button>
                 <button className="btn small" onClick={() => void pickLrcFile()}>
                   <Icon name="note" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                  Load .lrc file…
+                  {t('music.loadLrcFile')}
                 </button>
               </div>
             </div>
@@ -422,14 +426,14 @@ export default function MusicView() {
                 ref={i === activeIndex ? activeLineRef : undefined}
                 className={`music-line ${i === activeIndex ? 'active' : ''} ${i < activeIndex ? 'past' : ''}`}
                 onDoubleClick={() => player.seek(c.start)}
-                title="Double-click to jump here"
+                title={t('music.doubleClickJump')}
               >
                 {c.text}
               </div>
             ))}
           {lyrics.kind === 'plain' && (
             <>
-              <p className="muted music-plain-note">Lyrics aren't time-synced — showing them as text.</p>
+              <p className="muted music-plain-note">{t('music.notSynced')}</p>
               {lyrics.lines.map((l, i) => (
                 <div key={i} className="music-line plain">
                   {l}
@@ -443,32 +447,32 @@ export default function MusicView() {
           <button
             className={`btn small ${ps.shuffle ? 'primary' : ''}`}
             onClick={player.toggleShuffle}
-            title="Shuffle"
+            title={t('music.controls.shuffle')}
           >
             <Icon name="shuffle" size={15} />
           </button>
-          <button className="btn small" onClick={player.prev} disabled={!ps.current} title="Previous song">
+          <button className="btn small" onClick={player.prev} disabled={!ps.current} title={t('music.controls.previous')}>
             <Icon name="skip-back" size={15} />
           </button>
           <button className="btn primary music-play" onClick={player.toggle} disabled={!ps.current}>
             <Icon name={ps.playing ? 'pause' : 'player'} size={16} />
           </button>
-          <button className="btn small" onClick={player.next} disabled={!ps.current} title="Next song">
+          <button className="btn small" onClick={player.next} disabled={!ps.current} title={t('music.controls.next')}>
             <Icon name="skip-forward" size={15} />
           </button>
           <button
             className={`btn small music-repeat-btn ${ps.repeat !== 'off' ? 'primary' : ''}`}
             onClick={player.cycleRepeat}
-            title={`Repeat: ${ps.repeat}`}
+            title={t('music.controls.repeatTitle', { mode: t(`music.repeat.${ps.repeat}`) })}
           >
             <Icon name="repeat" size={15} />
             {ps.repeat === 'one' && <span className="music-repeat-one">1</span>}
           </button>
           <button
             className="btn small"
-            onClick={() => ps.current && (toggleLiked(ps.current.id), setLikedTick((t) => t + 1))}
+            onClick={() => ps.current && (toggleLiked(ps.current.id), setLikedTick((tick) => tick + 1))}
             disabled={!ps.current}
-            title="Add to Liked"
+            title={t('music.controls.addToLiked')}
           >
             <Icon name="heart" size={15} fill={!!ps.current && isLiked(ps.current.id)} />
           </button>
@@ -493,9 +497,9 @@ export default function MusicView() {
             step={0.05}
             value={ps.volume}
             onChange={(e) => player.setVolume(Number(e.target.value))}
-            title="Volume"
+            title={t('music.controls.volume')}
           />
-          <button className="btn small" onClick={openWidget} title="Open the mini-player widget">
+          <button className="btn small" onClick={openWidget} title={t('music.controls.openWidget')}>
             <Icon name="window" size={15} />
           </button>
         </div>

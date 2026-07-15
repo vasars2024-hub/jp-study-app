@@ -16,6 +16,7 @@ import FieldMappingEditor from '../components/FieldMappingEditor';
 import NoteCssEditor from '../components/NoteCssEditor';
 import { getActiveProfile, onProfileChanged, updateProfile } from '../profileState';
 import { ProfileSettingsSection } from './SettingsView';
+import { useT } from '../i18n';
 
 type Msg = { kind: 'ok' | 'err'; text: string };
 
@@ -25,6 +26,7 @@ function withCurrent(list: string[], current: string): string[] {
 }
 
 export default function AnkiView() {
+  const { t } = useT();
   const [status, setStatus] = useState<AnkiStatus | null>(null);
   const [link, setLink] = useState<AnkiLinkStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,7 +132,7 @@ export default function AnkiView() {
         setFields([...specFields]);
       } else {
         setFields([]);
-        setFieldsErr(r.error ?? 'Could not read this note type’s fields.');
+        setFieldsErr(r.error ?? t('anki.msg.fieldsReadFailed'));
       }
     });
     return () => {
@@ -147,10 +149,10 @@ export default function AnkiView() {
     setMapMsg(null);
     const res = await window.api.ankiEnsureModel(active.id);
     if (res.ok) {
-      setMapMsg({ kind: 'ok', text: `Note type "${model}" is ready in Anki.` });
+      setMapMsg({ kind: 'ok', text: t('anki.msg.noteTypeReady', { model: model ?? '' }) });
       if (active.anki.noteFields?.length) setFields([...active.anki.noteFields]);
     } else {
-      setMapMsg({ kind: 'err', text: res.error ?? 'Could not create the note type.' });
+      setMapMsg({ kind: 'err', text: res.error ?? t('anki.msg.noteTypeCreateFailed') });
     }
   }
 
@@ -170,16 +172,16 @@ export default function AnkiView() {
     });
     setAdding(false);
     if (res.ok) {
-      setAddMsg({ kind: 'ok', text: 'Card added to Anki.' });
+      setAddMsg({ kind: 'ok', text: t('anki.msg.cardAdded') });
       setTerm('');
       setReading('');
       setMeaning('');
       setSentence('');
       setTranslation('');
     } else if (res.error === 'duplicate') {
-      setAddMsg({ kind: 'err', text: 'That card already exists in Anki.' });
+      setAddMsg({ kind: 'err', text: t('anki.msg.duplicate') });
     } else {
-      setAddMsg({ kind: 'err', text: res.error ?? 'Could not add the card.' });
+      setAddMsg({ kind: 'err', text: res.error ?? t('anki.msg.addFailed') });
     }
   }
 
@@ -214,21 +216,21 @@ export default function AnkiView() {
       <ProfileSettingsSection />
 
       <div className="view-head">
-        <p className="muted">Create cards in your real Anki collection via AnkiConnect.</p>
+        <p className="muted">{t('anki.intro')}</p>
         <div className="actions">
           <button className="btn" onClick={check} disabled={loading}>
-            {loading ? 'Checking…' : 'Recheck'}
+            {loading ? t('anki.checking') : t('anki.recheck')}
           </button>
         </div>
       </div>
 
-      {loading && <div className="banner">Checking your Anki connection…</div>}
+      {loading && <div className="banner">{t('anki.checkingConnection')}</div>}
 
       {!loading && status && !status.connected && (
         <div className="anki-card">
           <div className={`status-banner ${waitingCollection ? 'warn' : 'bad'}`}>
             <span className={`status-dot ${waitingCollection ? 'warn' : 'bad'}`} />
-            {waitingCollection ? 'Waiting for Anki collection…' : 'Not connected to Anki.'}
+            {waitingCollection ? t('anki.waitingCollection') : t('anki.notConnected')}
           </div>
           <AnkiSetup status={status} onRetry={check} waitingCollection={waitingCollection} />
         </div>
@@ -239,19 +241,19 @@ export default function AnkiView() {
           <div className="anki-workspace-main">
             <div className="status-banner ok">
               <span className="status-dot ok" />
-              Connected — {status.decks.length} decks, {status.models.length} note types.
+              {t('anki.connected', { decks: status.decks.length, models: status.models.length })}
             </div>
 
             <div className="anki-card">
-              <h2>Deck &amp; note type</h2>
+              <h2>{t('anki.deckNoteType.title')}</h2>
               <p className="muted anki-sub">
-                Bound to <b>{active.label}</b>
-                {active.description ? ` — ${active.description}` : ''}. Switch profiles above to
-                change deck, mapping, and card layout together.
+                {t('anki.boundTo')} <b>{active.label}</b>
+                {active.description ? ` — ${active.description}` : ''}
+                {t('anki.deckNoteType.subTail')}
               </p>
               <div className="anki-selects">
                 <label>
-                  Deck
+                  {t('anki.deck.label')}
                   <select value={deck} onChange={(e) => changeDeck(e.target.value)}>
                     {withCurrent(status.decks, deck).map((d) => (
                       <option key={d} value={d}>
@@ -261,17 +263,17 @@ export default function AnkiView() {
                   </select>
                 </label>
                 <div className="anki-note-type-readonly">
-                  <span className="anki-note-type-label">Note type</span>
+                  <span className="anki-note-type-label">{t('anki.noteType.label')}</span>
                   <code className="anki-note-type-name">{model || '—'}</code>
                   <button className="btn small" type="button" onClick={() => void ensureNoteType()}>
-                    Create in Anki
+                    {t('anki.noteType.create')}
                   </button>
                 </div>
               </div>
 
               {active.requiredDictionaries && active.requiredDictionaries.length > 0 && (
                 <details className="profile-dicts-details">
-                  <summary>Recommended dictionaries &amp; data</summary>
+                  <summary>{t('anki.recommendedDicts')}</summary>
                   <ul className="profile-dicts-list">
                     {active.requiredDictionaries.map((d) => (
                       <li key={d}>{d}</li>
@@ -282,16 +284,16 @@ export default function AnkiView() {
             </div>
 
             <div className="anki-card">
-              <h2>Field mapping</h2>
+              <h2>{t('anki.fieldMapping.title')}</h2>
               <p className="muted anki-sub">
-                Control what goes into each field of <b>{model || '—'}</b>. The preview panel on the
-                right updates as you edit.
+                {t('anki.fieldMapping.subPrefix')} <b>{model || '—'}</b>
+                {t('anki.fieldMapping.subSuffix')}
               </p>
 
-              {fieldsLoading && <div className="muted anki-sub">Reading this note type’s fields…</div>}
+              {fieldsLoading && <div className="muted anki-sub">{t('anki.readingFields')}</div>}
               {fieldsErr && <div className="form-msg err">{fieldsErr}</div>}
               {!fieldsLoading && !fieldsErr && fields.length === 0 && (
-                <div className="muted anki-sub">This note type has no fields.</div>
+                <div className="muted anki-sub">{t('anki.noFields')}</div>
               )}
               {fields.length > 0 && (
                 <FieldMappingEditor
@@ -315,14 +317,14 @@ export default function AnkiView() {
             </div>
 
             <div className="anki-card anki-card-flush">
-              <CollapsibleSection title="Add a card by hand" summary="Manual test without mining">
+              <CollapsibleSection
+                title={t('anki.manualCard.title')}
+                summary={t('anki.manualCard.summary')}
+              >
                 <form className="anki-manual-form" onSubmit={addCard}>
-                <p className="muted collapse-lead">
-                  Fill variables — they flow into your mapped fields. Useful for testing a profile
-                  before mining from the dictionary.
-                </p>
+                <p className="muted collapse-lead">{t('anki.manualCard.lead')}</p>
                 <div className="field-row">
-                  <label>Expression (word) *</label>
+                  <label>{t('anki.field.expression')}</label>
                   <input
                     value={term}
                     onChange={(e) => setTerm(e.target.value)}
@@ -332,7 +334,7 @@ export default function AnkiView() {
                 </div>
                 <div className="anki-selects">
                   <label>
-                    Reading
+                    {t('anki.field.reading')}
                     <input
                       value={reading}
                       onChange={(e) => setReading(e.target.value)}
@@ -341,7 +343,7 @@ export default function AnkiView() {
                     />
                   </label>
                   <label>
-                    Translation
+                    {t('anki.field.translation')}
                     <input
                       value={translation}
                       onChange={(e) => setTranslation(e.target.value)}
@@ -350,7 +352,7 @@ export default function AnkiView() {
                   </label>
                 </div>
                 <div className="field-row">
-                  <label>Meaning</label>
+                  <label>{t('anki.field.meaning')}</label>
                   <textarea
                     value={meaning}
                     onChange={(e) => setMeaning(e.target.value)}
@@ -358,7 +360,7 @@ export default function AnkiView() {
                   />
                 </div>
                 <div className="field-row">
-                  <label>Sentence</label>
+                  <label>{t('anki.field.sentence')}</label>
                   <textarea
                     value={sentence}
                     onChange={(e) => setSentence(e.target.value)}
@@ -373,7 +375,10 @@ export default function AnkiView() {
                     checked={attachImage}
                     onChange={(e) => setAttachImage(e.target.checked)}
                   />
-                  <span>Attach clipboard image (fills <code>{'{image}'}</code>)</span>
+                  <span>
+                    {t('anki.attachImagePrefix')} <code>{'{image}'}</code>
+                    {t('anki.attachImageSuffix')}
+                  </span>
                 </label>
 
                 <label className="anki-check">
@@ -382,18 +387,23 @@ export default function AnkiView() {
                     checked={fetchAudio}
                     onChange={(e) => setFetchAudio(e.target.checked)}
                   />
-                  <span>Fetch native audio (fills <code>{'{audio}'}</code>)</span>
+                  <span>
+                    {t('anki.fetchAudioPrefix')} <code>{'{audio}'}</code>
+                    {t('anki.fetchAudioSuffix')}
+                  </span>
                 </label>
 
                 {usingTemplates && preview.length > 0 && (
                   <div className="fm-preview">
-                    <div className="fm-preview-title muted">This card will send:</div>
+                    <div className="fm-preview-title muted">{t('anki.preview.willSend')}</div>
                     {preview.map((p) => (
                       <div className="fm-preview-row" key={p.field}>
                         <span className="fm-field-name">{p.field}</span>
                         <span
                           className="fm-preview-val"
-                          dangerouslySetInnerHTML={{ __html: p.value || '<i>(empty)</i>' }}
+                          dangerouslySetInnerHTML={{
+                            __html: p.value || `<i>${t('anki.preview.empty')}</i>`,
+                          }}
                         />
                       </div>
                     ))}
@@ -401,12 +411,12 @@ export default function AnkiView() {
                 )}
 
                 <button className="btn primary" type="submit" disabled={adding || !term.trim()}>
-                  {adding ? 'Adding…' : 'Add to Anki'}
+                  {adding ? t('anki.adding') : t('anki.addToAnki')}
                 </button>
                 {addMsg && <div className={`form-msg ${addMsg.kind}`}>{addMsg.text}</div>}
                 <p className="muted anki-sub">
-                  Goes into <b>{deck || '—'}</b> as <b>{model || '—'}</b>, tagged{' '}
-                  <code>jp-study-app</code>.
+                  {t('anki.goesIntoPrefix')} <b>{deck || '—'}</b> {t('anki.goesIntoAs')}{' '}
+                  <b>{model || '—'}</b>, {t('anki.goesIntoTagged')} <code>jp-study-app</code>.
                 </p>
                 </form>
               </CollapsibleSection>

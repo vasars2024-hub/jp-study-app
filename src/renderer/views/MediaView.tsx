@@ -17,6 +17,7 @@ import {
   searchMediaByFileName,
 } from '../mediaLibrary';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
+import { useT } from '../i18n';
 
 const CARD_MIN_WIDTH = 230;
 const CARD_GAP = 12;
@@ -41,6 +42,7 @@ function malUrl(title: string): string {
 }
 
 export default function MediaView() {
+  const { t } = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const resumeRef = useRef(0);
@@ -178,7 +180,7 @@ export default function MediaView() {
       setSubOffset(0);
       setGenProgress(0);
       setGenState('extracting');
-      setGenMsg('Extracting audio with ffmpeg…');
+      setGenMsg(t('media.gen.extractingAudio'));
       let audio: Float32Array;
       try {
         const buf = await window.api.extractAudio(targetUrl);
@@ -186,11 +188,11 @@ export default function MediaView() {
         if (audio.length === 0) throw new Error('no audio track found');
       } catch (e) {
         setGenState('error');
-        setGenError(`Could not extract audio: ${msg(e)}`);
+        setGenError(t('media.gen.extractAudioFailed', { detail: msg(e) }));
         return;
       }
       setGenState('loading');
-      setGenMsg('Loading the Whisper model (first run downloads it, then it’s cached)…');
+      setGenMsg(t('media.gen.loadingModel'));
 
       const worker = new Worker(new URL('../whisperWorker.ts', import.meta.url), { type: 'module' });
       workerRef.current = worker;
@@ -198,10 +200,14 @@ export default function MediaView() {
         const m = ev.data;
         if (m.type === 'progress' && m.status === 'progress' && typeof m.progress === 'number') {
           const f = typeof m.file === 'string' ? m.file.split('/').pop() : 'model';
-          setGenMsg(`Downloading model: ${f} — ${Math.round(m.progress)}%`);
+          setGenMsg(t('media.gen.downloadingModel', { file: f, percent: Math.round(m.progress) }));
         } else if (m.type === 'status' && m.status === 'transcribing') {
           setGenState('transcribing');
-          setGenMsg(`Transcribing on ${m.device === 'webgpu' ? 'the GPU' : 'the CPU'}…`);
+          setGenMsg(
+            t('media.gen.transcribingOn', {
+              device: m.device === 'webgpu' ? t('media.device.gpu') : t('media.device.cpu'),
+            }),
+          );
         } else if (m.type === 'partial') {
           setCues((prev) => [...prev, ...(m.cues as Cue[])]);
           setGenProgress(m.progress ?? 0);
@@ -209,27 +215,27 @@ export default function MediaView() {
           setGenState('done');
           setGenMsg('');
           setGenProgress(1);
-          setSubName('Whisper (generated)');
+          setSubName(t('media.subName.whisperGenerated'));
           setCues((prev) => {
-            setSubStatus(`Generated ${prev.length} subtitle lines.`);
+            setSubStatus(t('media.subStatus.generated', { count: prev.length }));
             return prev;
           });
           worker.terminate();
           workerRef.current = null;
         } else if (m.type === 'error') {
           setGenState('error');
-          setGenError(`Subtitle generation failed: ${m.message}`);
+          setGenError(t('media.gen.subtitleFailed', { detail: m.message }));
           worker.terminate();
           workerRef.current = null;
         }
       };
       worker.onerror = (err) => {
         setGenState('error');
-        setGenError(`Could not start the transcriber: ${err.message}`);
+        setGenError(t('media.gen.transcriberStartFailed', { detail: err.message }));
       };
       worker.postMessage({ audio, model, prefer, lang: subLang }, [audio.buffer]);
     },
-    [model, prefer, subLang],
+    [model, prefer, subLang, t],
   );
 
   const openFile = useCallback(async () => {
@@ -294,10 +300,10 @@ export default function MediaView() {
     setSubOffset(0);
     setSubStatus(
       parsed.length
-        ? `Loaded ${parsed.length} subtitle lines.`
-        : `No lines found in “${r.name}”. Is it a .srt / .vtt / .ass file?`,
+        ? t('media.subStatus.loaded', { count: parsed.length })
+        : t('media.subStatus.noLines', { name: r.name }),
     );
-  }, []);
+  }, [t]);
 
   const convertAndPlay = useCallback(async () => {
     if (!src) return;
@@ -306,12 +312,12 @@ export default function MediaView() {
     try {
       const r = await window.api.convertMedia(src);
       if (r) setSrc(r.url);
-      else setError('Conversion failed.');
+      else setError(t('media.conversionFailedGeneric'));
     } catch (e) {
-      setError(`Conversion failed: ${msg(e)}`);
+      setError(t('media.conversionFailed', { detail: msg(e) }));
     }
     setConverting(false);
-  }, [src]);
+  }, [src, t]);
 
   // Sync the on-screen subtitle to playback (reads refs so it never re-subscribes
   // mid-transcription as cues stream in).
@@ -355,10 +361,10 @@ export default function MediaView() {
       const lang = (localStorage.getItem('jp-study-dict-lang') as 'ja' | 'zh') || 'ja';
       setLineTrans(await translate(active.text, lang));
     } catch {
-      setLineTrans('(offline translator unavailable)');
+      setLineTrans(t('media.offlineTranslatorUnavailable'));
     }
     setLineBusy(false);
-  }, [active]);
+  }, [active, t]);
 
   const lookupAt = useCallback((e: React.MouseEvent) => {
     const dismissOnly = popupOpenOnDownRef.current && isLookupClick(e);
@@ -385,49 +391,46 @@ export default function MediaView() {
   return (
     <div className="media-view">
       <div className="view-head">
-        <p className="muted">
-          Watch with Japanese subtitles — load them, generate them with Whisper, or download a video
-          from any supported site (YouTube, Vimeo, and more). Click any word to look it up and add it to Anki.
-        </p>
+        <p className="muted">{t('media.intro')}</p>
       </div>
 
       <div className="media-toolbar">
         <button className="btn primary" onClick={openFile}>
           <Icon name="folder" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-          Open file
+          {t('media.openFile')}
         </button>
         <button className="btn" onClick={openSubs} disabled={!src}>
           <Icon name="caption" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-          {subName && genState !== 'done' ? `Subs: ${subName}` : 'Load subtitles'}
+          {subName && genState !== 'done' ? t('media.subs.loaded', { name: subName }) : t('media.subs.load')}
         </button>
         <button className="btn" onClick={() => src && runGeneration(src)} disabled={!src || generating}>
           <Icon name="sparkle" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-          Generate subtitles
+          {t('media.generateSubs')}
         </button>
-        <div className="sp-seg media-modelseg" role="group" aria-label="Whisper model">
+        <div className="sp-seg media-modelseg" role="group" aria-label={t('media.model.ariaLabel')}>
           <button
             className={`sp-seg-btn ${model === 'Xenova/whisper-base' ? 'active' : ''}`}
             onClick={() => setModel('Xenova/whisper-base')}
-            title="Faster, lower accuracy"
+            title={t('media.model.fast.title')}
           >
-            Fast
+            {t('media.model.fast')}
           </button>
           <button
             className={`sp-seg-btn ${model === 'Xenova/whisper-small' ? 'active' : ''}`}
             onClick={() => setModel('Xenova/whisper-small')}
-            title="Slower, more accurate Japanese"
+            title={t('media.model.accurate.title')}
           >
-            Accurate
+            {t('media.model.accurate')}
           </button>
         </div>
-        <div className="sp-seg media-modelseg" role="group" aria-label="Subtitle language">
+        <div className="sp-seg media-modelseg" role="group" aria-label={t('media.lang.ariaLabel')}>
           <button
             className={`sp-seg-btn ${subLang === 'ja' ? 'active' : ''}`}
             onClick={() => {
               setSubLang('ja');
               localStorage.setItem('jp-study-whisper-lang', 'ja');
             }}
-            title="Transcribe speech as Japanese"
+            title={t('media.lang.ja.title')}
             lang="ja"
           >
             日本語
@@ -438,7 +441,7 @@ export default function MediaView() {
               setSubLang('zh');
               localStorage.setItem('jp-study-whisper-lang', 'zh');
             }}
-            title="Transcribe speech as Chinese"
+            title={t('media.lang.zh.title')}
             lang="zh"
           >
             中文
@@ -452,13 +455,13 @@ export default function MediaView() {
                 {watchFolder.split(/[\\/]/).pop()}
               </span>
               <button className="btn small" onClick={clearWatch}>
-                Stop
+                {t('media.watch.stop')}
               </button>
             </>
           ) : (
             <button className="btn small" onClick={chooseWatchFolder}>
               <Icon name="eye" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-              Auto-add folder…
+              {t('media.watch.autoAdd')}
             </button>
           )}
         </div>
@@ -471,16 +474,16 @@ export default function MediaView() {
           value={ytUrl}
           onChange={(e) => setYtUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && downloadYouTube()}
-          placeholder="Paste a video link to download + auto-transcribe…"
+          placeholder={t('media.yt.placeholder')}
           disabled={!!yt}
         />
         <button className="btn" onClick={downloadYouTube} disabled={!ytUrl.trim() || !!yt}>
           <Icon name="download" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-          Download & transcribe
+          {t('media.yt.downloadTranscribe')}
         </button>
         {yt && (
           <span className="muted media-yt-prog">
-            {yt.stage === 'merging' ? 'Merging…' : `Downloading ${Math.round(yt.percent)}%`}
+            {yt.stage === 'merging' ? t('media.yt.merging') : t('media.yt.downloading', { percent: Math.round(yt.percent) })}
           </span>
         )}
       </div>
@@ -518,11 +521,7 @@ export default function MediaView() {
               }
             }}
             onPause={saveProgress}
-            onError={() =>
-              setError(
-                'This file can’t play directly (often MKV/AVI). Convert it to MP4 below — subtitle generation still works on the original.',
-              )
-            }
+            onError={() => setError(t('media.playError'))}
           />
 
           {error && (
@@ -530,11 +529,11 @@ export default function MediaView() {
               <span>{error}</span>
               <button className="btn small" onClick={convertAndPlay} disabled={converting}>
                 {converting ? (
-                  'Converting…'
+                  t('media.converting')
                 ) : (
                   <>
                     <Icon name="video" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                    Convert to MP4
+                    {t('media.convertToMp4')}
                   </>
                 )}
               </button>
@@ -546,25 +545,25 @@ export default function MediaView() {
               <div className="media-subctrls">
                 <button className="btn small" onClick={() => jumpLine(-1)}>
                   <Icon name="skip-back" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                  Prev
+                  {t('media.subctrl.prev')}
                 </button>
                 <button className="btn small" onClick={replayLine} disabled={!active}>
                   <Icon name="refresh" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                  Replay
+                  {t('media.subctrl.replay')}
                 </button>
                 <button className="btn small" onClick={() => jumpLine(1)}>
-                  Next
+                  {t('media.subctrl.next')}
                   <Icon name="skip-forward" size={13} style={{ marginLeft: 4, verticalAlign: '-2px' }} />
                 </button>
                 <div className="media-sync">
-                  <button className="btn small" onClick={() => nudge(-0.5)} title="Subtitles earlier">
+                  <button className="btn small" onClick={() => nudge(-0.5)} title={t('media.sync.earlier')}>
                     −0.5s
                   </button>
-                  <span className="media-sync-val" title="Subtitle timing offset">
+                  <span className="media-sync-val" title={t('media.sync.offsetTitle')}>
                     {subOffset > 0 ? '+' : ''}
                     {subOffset.toFixed(1)}s
                   </span>
-                  <button className="btn small" onClick={() => nudge(0.5)} title="Subtitles later">
+                  <button className="btn small" onClick={() => nudge(0.5)} title={t('media.sync.later')}>
                     +0.5s
                   </button>
                 </div>
@@ -574,13 +573,13 @@ export default function MediaView() {
                   ) : (
                     <>
                       <Icon name="globe" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                      Translate
+                      {t('media.translate')}
                     </>
                   )}
                 </button>
                 {current && (
                   <button className="btn small" onClick={() => window.api.openExternal(malUrl(current.title))}>
-                    MyAnimeList
+                    {t('media.mal')}
                     <Icon name="external" size={12} style={{ marginLeft: 4, verticalAlign: '-2px' }} />
                   </button>
                 )}
@@ -589,7 +588,7 @@ export default function MediaView() {
             <div
               className="media-subtitle"
               lang="ja"
-              title="Click or highlight a word to look it up"
+              title={t('media.clickToLookup')}
               onMouseDown={(e) => {
                 popupOpenOnDownRef.current = !!popupRef.current;
                 noteLookupPointerDown(e);
@@ -600,9 +599,7 @@ export default function MediaView() {
             </div>
             {lineTrans && <div className="media-subtrans">{lineTrans}</div>}
             {cues.length === 0 && (
-              <p className="media-subhint muted">
-                No subtitles yet. Load a file or generate them with Whisper, then click any word.
-              </p>
+              <p className="media-subhint muted">{t('media.noSubsHint')}</p>
             )}
           </div>
         </div>
@@ -611,7 +608,7 @@ export default function MediaView() {
       {/* ---- media library ---- */}
       <div className="media-lib-head">
         <h2>
-          Your media{' '}
+          {t('media.yourMedia')}{' '}
           {items.length > 0 && (
             <span className="muted">
               ({searchActive || selectedFolder ? `${displayedItems.length} / ${items.length}` : items.length})
@@ -626,10 +623,9 @@ export default function MediaView() {
           <div className="media-empty-emoji">
             <Icon name="video" size={44} />
           </div>
-          <p>Open a file or paste a YouTube link — it’s saved here automatically.</p>
+          <p>{t('media.emptyHint')}</p>
           <p className="muted media-empty-note">
-            Set an <b>Auto-add folder</b> to pull in a whole folder. Generate Japanese subtitles with
-            Whisper, click words to mine them, and jump to each title’s MyAnimeList page.
+            {t('media.emptyNotePrefix')} <b>{t('media.watch.autoAddLabel')}</b> {t('media.emptyNoteSuffix')}
           </p>
         </div>
       ) : (
@@ -640,11 +636,11 @@ export default function MediaView() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by file name…"
-              aria-label="Search media by file name"
+              placeholder={t('media.search.placeholder')}
+              aria-label={t('media.search.ariaLabel')}
             />
             {query && (
-              <button className="media-search-clear" onClick={() => setQuery('')} title="Clear search">
+              <button className="media-search-clear" onClick={() => setQuery('')} title={t('media.search.clear')}>
                 ×
               </button>
             )}
@@ -652,14 +648,14 @@ export default function MediaView() {
 
           <div className={`media-lib-body ${hasFolders ? 'has-folders' : ''}`}>
             {hasFolders && !searchActive && (
-              <nav className="media-lib-folders" aria-label="Media folders">
+              <nav className="media-lib-folders" aria-label={t('media.folders.ariaLabel')}>
                 <button
                   type="button"
                   className={`media-folder-row media-folder-all ${selectedFolder === null ? 'active' : ''}`}
                   onClick={() => setSelectedFolder(null)}
                 >
                   <Icon name="video" size={13} style={{ flexShrink: 0 }} />
-                  <span className="media-folder-name">All media</span>
+                  <span className="media-folder-name">{t('media.folders.all')}</span>
                   <span className="muted media-folder-count">{items.length}</span>
                 </button>
                 {folderRows.map((row) => (
@@ -672,7 +668,7 @@ export default function MediaView() {
                       type="button"
                       className="media-folder-chevron"
                       onClick={(e) => toggleFolder(row.key, e)}
-                      aria-label={row.collapsed ? 'Expand folder' : 'Collapse folder'}
+                      aria-label={row.collapsed ? t('media.folder.expand') : t('media.folder.collapse')}
                     >
                       <Icon
                         name="chevron"
@@ -702,8 +698,8 @@ export default function MediaView() {
               <div className="media-empty media-empty-filtered">
                 <p className="muted">
                   {searchActive
-                    ? `No files match “${debouncedQuery}”.`
-                    : 'No media in this folder.'}
+                    ? t('media.noMatch', { query: debouncedQuery })
+                    : t('media.noFilesInFolder')}
                 </p>
               </div>
             ) : (
@@ -733,10 +729,10 @@ export default function MediaView() {
                             window.api.openExternal(malUrl(it.title));
                           }}
                         >
-                          MAL
+                          {t('media.malShort')}
                           <Icon name="external" size={11} style={{ marginLeft: 3, verticalAlign: '-2px' }} />
                         </button>
-                        <button className="media-card-del" onClick={(e) => removeItem(it.id, e)} title="Remove">
+                        <button className="media-card-del" onClick={(e) => removeItem(it.id, e)} title={t('media.remove')}>
                           <Icon name="close" size={12} />
                         </button>
                       </div>

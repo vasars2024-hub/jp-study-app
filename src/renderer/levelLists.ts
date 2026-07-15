@@ -7,6 +7,7 @@
 // which is exactly what the Anki sync maintains. Persisted to localStorage.
 
 import { getLevel } from './knownWords';
+import type { LevelSlotId } from '../shared/levelScale';
 import { tokenizeSync, tokenizerReady } from './tokenizer';
 
 export type LevelKind = 'jlpt' | 'hsk' | 'custom';
@@ -15,6 +16,11 @@ export interface LevelList {
   id: string;
   label: string;
   kind: LevelKind;
+  /**
+   * Which fixed Level-page slot this list fills (e.g. 'jlpt-n5'). Absent for
+   * free-form custom lists. At most one list per slot.
+   */
+  slot?: LevelSlotId;
   /** Raw expressions as pasted (trimmed + de-duplicated). */
   words: string[];
 }
@@ -92,6 +98,40 @@ export function removeLevelList(id: string): LevelList[] {
   const updated = loadLevelLists().filter((l) => l.id !== id);
   persist(updated);
   return updated;
+}
+
+/**
+ * Create or replace the single list bound to a fixed slot (JLPT/HSK), storing a
+ * pre-built, already-lemmatized+deduplicated word array (from an .apkg import or
+ * a paste). Any existing list for the same slot is replaced.
+ */
+export function upsertSlotList(
+  slot: LevelSlotId,
+  label: string,
+  kind: LevelKind,
+  words: string[],
+): LevelList[] {
+  const seen = new Set<string>();
+  const cleaned = words.map((w) => w.trim()).filter((w) => w && !seen.has(w) && seen.add(w));
+  const existing = loadLevelLists();
+  const prev = existing.find((l) => l.slot === slot);
+  const next: LevelList = {
+    id: prev?.id ?? `ll-${slot}`,
+    label: label.trim() || slot,
+    kind,
+    slot,
+    words: cleaned,
+  };
+  const updated = prev
+    ? existing.map((l) => (l.slot === slot ? next : l))
+    : [...existing, next];
+  persist(updated);
+  return updated;
+}
+
+/** The list bound to a slot, if any. */
+export function getSlotList(slot: LevelSlotId): LevelList | undefined {
+  return loadLevelLists().find((l) => l.slot === slot);
 }
 
 export function updateLevelListWords(id: string, rawWords: string): LevelList[] {

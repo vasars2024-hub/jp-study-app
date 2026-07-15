@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import Icon from '../components/Icons';
 import { RESOURCES, type Resource, type ResourceCategory } from '../data/resources';
+import { useT } from '../i18n';
 
 type Filter = 'All' | string;
 
@@ -22,6 +23,7 @@ function matchesResource(r: Resource, q: string): boolean {
 }
 
 export default function ResourcesView() {
+  const { t } = useT();
   const [filter, setFilter] = useState<Filter>('All');
   const [query, setQuery] = useState('');
 
@@ -41,9 +43,7 @@ export default function ResourcesView() {
   return (
     <div className="res-view">
       <div className="view-head">
-        <p className="muted">
-          A hand-picked directory of the best places to study Japanese. Links open in your browser.
-        </p>
+        <p className="muted">{t('resources.intro')}</p>
       </div>
 
       <div className="res-controls">
@@ -52,7 +52,7 @@ export default function ResourcesView() {
             className={`gram-level-btn ${filter === 'All' ? 'active' : ''}`}
             onClick={() => setFilter('All')}
           >
-            All
+            {t('resources.filter.all')}
           </button>
           {RESOURCES.map((cat) => (
             <button
@@ -70,16 +70,14 @@ export default function ResourcesView() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search resources…"
+          placeholder={t('resources.search.placeholder')}
         />
       </div>
 
-      <div className="gram-count muted">
-        {total} resource{total === 1 ? '' : 's'}
-      </div>
+      <div className="gram-count muted">{t('resources.count', { count: total })}</div>
 
       {groups.length === 0 ? (
-        <div className="res-empty muted">No resources match your search.</div>
+        <div className="res-empty muted">{t('resources.noMatches')}</div>
       ) : (
         groups.map((cat) => (
           <section className="res-group" key={cat.id}>
