@@ -5995,6 +5995,182 @@ mark.lookup-mark,
   font-size: 12px;
 }
 
+/* ---- Grammar Explorer (one component, skinned by class) ------------------ */
+
+.gram-x {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+.gram-x-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gram-x-controls .gram-search {
+  flex: 1;
+  min-width: 160px;
+}
+.gram-x-count {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+}
+.gram-x-selcount {
+  font-weight: 600;
+}
+.gram-x-hidden {
+  margin-left: 6px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.gram-x-body {
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+.gram-x-filters {
+  width: 260px;
+  flex: 0 0 auto;
+  overflow: auto;
+}
+.gram-x-list {
+  width: 320px;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.gram-x-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.gram-x-detail-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.gram-x-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 7px;
+}
+.gram-x-row.focused {
+  background: color-mix(in srgb, var(--accent-2) 16%, transparent);
+}
+.gram-x-row.selected {
+  outline: 1px solid var(--accent-2);
+}
+.gram-x-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+.gram-x-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gram-x-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.gram-x-flag {
+  font-size: 11px;
+  color: var(--accent);
+}
+.gram-x-meaning {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.gram-x-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gram-x-preset-name {
+  min-width: 140px;
+}
+.gram-x-status {
+  font-size: 12px;
+}
+.gram-x-drawer {
+  width: 240px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  min-height: 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-2) 7%, transparent);
+}
+.gram-x-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+}
+.gram-x-drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.gram-x-drawer-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+  min-height: 0;
+  font-size: 12px;
+}
+.gram-x-drawer-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+/* Selected but filtered out of the list behind the drawer. */
+.gram-x-drawer-list li.hidden-by-filter {
+  opacity: 0.65;
+}
+.gram-x-drawer-level,
+.gram-x-drawer-flag {
+  font-size: 10px;
+  color: var(--muted);
+}
+.gram-x-drawer-remove {
+  margin-left: auto;
+  padding: 0 4px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.gram-x-drawer-remove:hover {
+  color: var(--text);
+}
+
 /* ---- Grammar review queue ------------------------------------------------ */
 
 .gram-cur {

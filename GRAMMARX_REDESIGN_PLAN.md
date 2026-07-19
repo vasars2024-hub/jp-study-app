@@ -1,7 +1,15 @@
 # GrammarX Redesign Plan
 
-Living document. Phase 1 and Phase 1.5 are both implemented. Phase 2 (Grammar
-Explorer redesign) is next and is specified, not built.
+Living document. Phases 1, 1.5 and 2 are implemented. Phase 3 (learner state)
+is next and is specified, not built.
+
+**Nothing in Phases 1.5 or 2 has been driven live.** The browser harness §7
+refers to cannot render this app: the renderer boots by awaiting `window.api`
+from the Electron preload bridge, so under plain Vite React mounts and `#root`
+stays empty *with no console error*. Treat that silence as absence of evidence,
+not evidence of absence — the review queue, the unified Explorer and the
+selection drawer are verified by tests and build only, and want an `npm start`
+pass before anyone trusts the screens.
 
 A recurring lesson, now bitten three times: **numbers in this document are only
 as good as the query behind them.** §2.2 counted a populated non-answer as an
@@ -539,11 +547,59 @@ and dedupe strategy. Import must land as a reproducible adapter retaining
 
 ### Phase 2 — Grammar Explorer redesign
 
-- [ ] Collapse the Aero and classic explorers into one themed component
-- [ ] Selection drawer, stable across filter changes, with hidden-selection count
-- [ ] Bulk actions with disabled-reason tooltips
-- [ ] Saved filter presets
-- [ ] Virtualized results in both skins
+- [x] Collapse the Aero and classic explorers into one themed component —
+      **done, and it was hiding a bigger problem than duplication.**
+
+      The two explorers had drifted: `AeroGrammarExplorer` had favourites, a
+      study queue and back/forward history that `GrammarBrowser` simply did not,
+      so which features you got depended on your theme. But the real defect was
+      that **neither used the Phase 1 filter layer.** Both read raw `GRAMMAR`,
+      so both listed all 2,227 rows — including the 334 duplicates
+      `dedupeGrammarByTitle` exists to collapse — and neither could filter by
+      category, register, verified tags or study-readiness. The entire Phase 1
+      investment was reachable only from Practice. Browsing, the thing people
+      actually do, was the one screen missing it.
+
+      `components/grammar/GrammarExplorer.tsx` replaces both. It holds only
+      selection and navigation state and defers every "which records match"
+      question to `filterGrammarPoints` — the same predicate behind the counts
+      and the practice list. Skins differ by CSS class, never by behaviour.
+      Explorer filters persist under their own key (`EXPLORER_FILTERS_KEY`)
+      rather than sharing Practice's, so narrowing a browse does not silently
+      reach into the next study session.
+
+      Removed 741 lines of now-dead code (the Aero explorer and its five
+      sub-components, plus `GrammarBrowser`); `GrammarView.tsx` went 1,148 →
+      ~400 lines. The theme early-return that made Practice unreachable in Aero
+      is gone with them, so the mode switch is now the only thing deciding what
+      renders. The status bar was also reading raw `GRAMMAR.length`, which would
+      have claimed 2,227 next to a list of 1,893 — now deduped.
+
+      **Caveat:** guides lose their Aero-specific presentation, since
+      `AeroGuideList`/`AeroGuideDetail` went with the explorer and `GuidesBrowser`
+      now serves both skins. Re-skinning that is CSS work, not a component fork.
+- [x] Virtualized results in both skins — came free with unification: the list
+      is a single `VirtualList`, so there is no longer a skin that renders all
+      1,893 rows eagerly.
+- [x] Selection drawer, stable across filter changes, with hidden-selection
+      count — selection survives filtering, the header reports how many selected
+      records are currently out of view, and the drawer lists the full selection
+      with the filtered-out rows dimmed and flagged. Hiding a record never
+      silently drops it from a pending bulk action.
+- [x] Bulk actions with disabled-reason tooltips — favourite / queue / add to
+      flashcards. The reasons are specific rather than generic: a deck card
+      built from a record with no example sentence is an empty card, so the
+      action is blocked only when *every* selected record lacks examples
+      ("None of the 12 selected points have an example sentence, so the cards
+      would be empty"), and when only some do it runs and reports how many it
+      skipped instead of quietly producing junk.
+- [x] Saved filter presets — `grammarPresets.ts`, named snapshots of
+      `PracticeFilters`, saving twice under one name overwrites rather than
+      accumulating. Presets are **deep**-copied in both directions: a shallow
+      spread left them sharing `levels`/`categories` arrays with live state, and
+      `parsePresets` merging over `DEFAULT_PRACTICE_FILTERS` left them sharing
+      the module-level default arrays — shared state one in-place edit from
+      corruption. Caught by its own test; 9 tests pin it.
 
 ### Phase 3 — learner state
 

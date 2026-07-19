@@ -107,13 +107,24 @@ function coerce(parsed: Partial<PracticeFilters>): PracticeFilters {
   };
 }
 
-export function loadPracticeFilters(): PracticeFilters {
+/**
+ * The Explorer keeps its own saved filters.
+ *
+ * Sharing one key with Practice sounds tidier but means narrowing a browse to
+ * "N2 conditionals" silently reaches into the next study session. They are
+ * different tasks, so they get different state.
+ */
+export const EXPLORER_FILTERS_KEY = 'jp-grammarx-explorer-filters-v1';
+
+export function loadPracticeFilters(key: string = PRACTICE_FILTERS_KEY): PracticeFilters {
   try {
-    const raw = localStorage.getItem(PRACTICE_FILTERS_KEY);
+    const raw = localStorage.getItem(key);
     if (raw) return coerce(JSON.parse(raw) as Partial<PracticeFilters>);
   } catch {
     /* fall through to the legacy read */
   }
+  // Only the Practice key has a v1 predecessor to migrate from.
+  if (key !== PRACTICE_FILTERS_KEY) return { ...DEFAULT_PRACTICE_FILTERS };
   try {
     const legacyRaw = localStorage.getItem(LEGACY_PRACTICE_FILTERS_KEY);
     if (legacyRaw) {
@@ -127,9 +138,12 @@ export function loadPracticeFilters(): PracticeFilters {
   return { ...DEFAULT_PRACTICE_FILTERS };
 }
 
-export function savePracticeFilters(filters: PracticeFilters): void {
+export function savePracticeFilters(
+  filters: PracticeFilters,
+  key: string = PRACTICE_FILTERS_KEY,
+): void {
   try {
-    localStorage.setItem(PRACTICE_FILTERS_KEY, JSON.stringify(filters));
+    localStorage.setItem(key, JSON.stringify(filters));
   } catch {
     /* ignore */
   }
