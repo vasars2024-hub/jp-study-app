@@ -39,6 +39,12 @@ export const IDB_KEYS = {
   bookmarks: 'reading-bookmarks',
   /** Map of grammar point id → human review verdict on its imported examples. */
   grammarCuration: 'grammar-curation',
+  /** Versioned envelope of grammar point id → per-point familiarity level. */
+  grammarFamiliarity: 'grammar-familiarity',
+  /** Last-used practice session shape (count, direction, types, ratio). */
+  grammarSessionOptions: 'grammar-session-options',
+  /** Versioned envelope of completed practice sessions, newest first. */
+  grammarSessionHistory: 'grammar-session-history',
 } as const;
 
 /** localStorage keys that hold the matching hot-path caches. */

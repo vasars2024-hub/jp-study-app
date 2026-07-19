@@ -1,76 +1,208 @@
-import { useMemo, useState } from 'react';
+/**
+ * Practice session UI.
+ *
+ * Replaces a modal that asked one question ("how many cards?"), dealt a
+ * self-graded flip card for each, and discarded every result on close.
+ *
+ * Two of the four question types are auto-graded (the multiple-choice ones) and
+ * two are self-graded (flip, and cloze). Cloze is deliberately self-graded
+ * rather than typed: requiring Japanese text entry would make the card a test
+ * of the user's IME, and generating plausible wrong cores to choose from would
+ * mean the same runtime pattern-matching that `clozeFor` refuses to do.
+ *
+ * Familiarity is persisted **per answer**, not at the end. Discarding a
+ * half-finished session's results was the original defect, and closing the
+ * modal early is the most likely way to hit it.
+ */
+
+import { useCallback, useMemo, useState } from 'react';
 import type { NormalizedGrammarPoint } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import {
+  applyGrade,
+  loadFamiliarity,
+  saveFamiliarity,
+  type AnswerGrade,
+  type FamiliarityState,
+} from '../../grammarFamiliarity';
+import {
+  buildSession,
+  loadSessionOptions,
+  saveSessionOptions,
+  snapshotSessionOptions,
+  MASTERED_MODES,
+  QUESTION_TYPES,
+  SESSION_DIRECTIONS,
+  type MasteredMode,
+  type QuestionType,
+  type SessionDirection,
+  type SessionOptions,
+  type SessionPlan,
+  type SessionQuestion,
+} from '../../grammarSession';
+import {
+  appendSession,
+  historyStats,
+  loadSessionHistory,
+  saveSessionHistory,
+  type SessionRecord,
+} from '../../grammarSessionHistory';
 
 type Phase = 'setup' | 'play' | 'done';
-type Grade = 'again' | 'hard' | 'good';
 
-function shuffle<T>(arr: T[]): T[] {
-  const out = [...arr];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
+/** Shown left-to-right, hardest first, so the safe default is not the nearest. */
+const GRADES: Array<{ grade: AnswerGrade; key: string }> = [
+  { grade: 'hard', key: 'grammar.test.hard' },
+  { grade: 'okay', key: 'grammar.test.okay' },
+  { grade: 'good', key: 'grammar.test.good' },
+];
+
+const DIRECTION_KEY: Record<SessionDirection, string> = {
+  recognition: 'grammar.test.directionRecognition',
+  production: 'grammar.test.directionProduction',
+  mixed: 'grammar.test.directionMixed',
+};
+
+const TYPE_KEY: Record<QuestionType, string> = {
+  flip: 'grammar.test.typeFlip',
+  'meaning-choice': 'grammar.test.typeMeaningChoice',
+  'pattern-choice': 'grammar.test.typePatternChoice',
+  cloze: 'grammar.test.typeCloze',
+};
+
+const MASTERED_KEY: Record<MasteredMode, string> = {
+  exclude: 'grammar.test.masteredExclude',
+  include: 'grammar.test.masteredInclude',
+  only: 'grammar.test.masteredOnly',
+};
 
 export default function GrammarTestModal({
   pool,
-  initialFilters,
   onClose,
 }: {
   pool: NormalizedGrammarPoint[];
+  /**
+   * Accepted for the caller's convenience but no longer read. The setup screen
+   * used to append the raw study-language code to its hint ("· ja"), which put
+   * an untranslated identifier in front of the user; the pool is already
+   * filtered by the time it arrives here.
+   */
   initialFilters: PracticeFilters;
   onClose: () => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [phase, setPhase] = useState<Phase>('setup');
-  const [count, setCount] = useState(10);
-  const [custom, setCustom] = useState('10');
-  const [deck, setDeck] = useState<NormalizedGrammarPoint[]>([]);
+  const [options, setOptions] = useState<SessionOptions>(() => loadSessionOptions());
+  const [custom, setCustom] = useState(() => String(loadSessionOptions().count));
+  const [plan, setPlan] = useState<SessionPlan | null>(null);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
   const [missed, setMissed] = useState<NormalizedGrammarPoint[]>([]);
-  const [goodCount, setGoodCount] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [familiarity, setFamiliarity] = useState<FamiliarityState>(() => loadFamiliarity());
+  const [history, setHistory] = useState(() => loadSessionHistory());
 
   const maxAvailable = pool.length;
-  const card = deck[index] ?? null;
+  const question: SessionQuestion | null = plan?.questions[index] ?? null;
+  const stats = useMemo(() => historyStats(history), [history]);
 
-  const summary = useMemo(() => {
-    const total = deck.length;
-    return { total, good: goodCount, missed: missed.length };
-  }, [deck.length, goodCount, missed.length]);
+  const patch = useCallback((next: Partial<SessionOptions>) => {
+    setOptions((prev) => {
+      const merged = snapshotSessionOptions({ ...prev, ...next });
+      saveSessionOptions(merged);
+      return merged;
+    });
+  }, []);
 
-  function start(n: number) {
-    const size = Math.max(1, Math.min(n, maxAvailable || 1));
-    const picked = shuffle(pool).slice(0, Math.min(size, pool.length));
-    if (!picked.length) return;
-    setDeck(picked);
+  const toggleType = useCallback(
+    (type: QuestionType) => {
+      setOptions((prev) => {
+        const has = prev.types.includes(type);
+        const types = has ? prev.types.filter((x) => x !== type) : [...prev.types, type];
+        // Never let the last type be switched off — an empty list can only
+        // build an empty session, which reads as the screen being broken.
+        const merged = snapshotSessionOptions({ ...prev, types: types.length ? types : prev.types });
+        saveSessionOptions(merged);
+        return merged;
+      });
+    },
+    [],
+  );
+
+  const start = useCallback(() => {
+    const built = buildSession(pool, familiarity, options);
+    setPlan(built);
     setIndex(0);
     setRevealed(false);
+    setPicked(null);
     setMissed([]);
-    setGoodCount(0);
-    setPhase('play');
-  }
+    setCorrectCount(0);
+    setPhase(built.questions.length ? 'play' : 'setup');
+    if (!built.questions.length) setPlan(built);
+  }, [pool, familiarity, options]);
 
-  function grade(g: Grade) {
-    if (!card) return;
-    if (g === 'again' || g === 'hard') {
-      setMissed((prev) => (prev.some((p) => p.id === card.id) ? prev : [...prev, card]));
-    } else {
-      setGoodCount((c) => c + 1);
-    }
-    if (index + 1 >= deck.length) {
+  const finish = useCallback(
+    (correct: number, missedPoints: NormalizedGrammarPoint[], delivered: number) => {
+      const record: SessionRecord = {
+        at: Date.now(),
+        requested: plan?.requested ?? 0,
+        delivered,
+        correct,
+        direction: options.direction,
+        types: [...options.types],
+        mastered: options.mastered,
+        missed: missedPoints.map((p) => p.id),
+      };
+      const next = appendSession(history, record);
+      setHistory(next);
+      saveSessionHistory(next);
       setPhase('done');
-      return;
-    }
-    setIndex((i) => i + 1);
-    setRevealed(false);
-  }
+    },
+    [history, options.direction, options.mastered, options.types, plan?.requested],
+  );
 
-  function addMissedToDeck() {
+  const answer = useCallback(
+    (grade: AnswerGrade) => {
+      if (!question || !plan) return;
+      const point = pool.find((p) => p.id === question.id) ?? null;
+      const wasCorrect = grade !== 'hard';
+
+      // Persist immediately: a session abandoned halfway must still count.
+      const nextFamiliarity = applyGrade(familiarity, question.id, grade);
+      setFamiliarity(nextFamiliarity);
+      saveFamiliarity(nextFamiliarity);
+
+      const nextCorrect = correctCount + (wasCorrect ? 1 : 0);
+      const nextMissed =
+        !wasCorrect && point && !missed.some((p) => p.id === point.id)
+          ? [...missed, point]
+          : missed;
+      setCorrectCount(nextCorrect);
+      setMissed(nextMissed);
+
+      if (index + 1 >= plan.questions.length) {
+        finish(nextCorrect, nextMissed, plan.questions.length);
+        return;
+      }
+      setIndex((i) => i + 1);
+      setRevealed(false);
+      setPicked(null);
+    },
+    [question, plan, pool, familiarity, correctCount, missed, index, finish],
+  );
+
+  const choose = useCallback(
+    (choice: string) => {
+      if (picked !== null) return;
+      setPicked(choice);
+    },
+    [picked],
+  );
+
+  function addMissedToDeck(): void {
     if (!missed.length) return;
     createDeckFolder('Grammar');
     addDeckCards(
@@ -87,8 +219,19 @@ export default function GrammarTestModal({
     );
   }
 
+  const typeLabels = useMemo(
+    () => QUESTION_TYPES.map((type) => ({ type, label: t(TYPE_KEY[type]) })),
+    // `lang`, never `t` — t's identity is stable, so depending on it goes stale.
+    [lang], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   return (
-    <div className="gx-test-overlay" role="dialog" aria-modal="true" aria-label={t('grammar.test.title')}>
+    <div
+      className="gx-test-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('grammar.test.title')}
+    >
       <div className="gx-test-modal">
         <header className="gx-test-head">
           <h2>{t('grammar.test.title')}</h2>
@@ -99,10 +242,7 @@ export default function GrammarTestModal({
 
         {phase === 'setup' && (
           <div className="gx-test-setup">
-            <p className="muted">
-              {t('grammar.test.setupHint', { count: maxAvailable })}
-              {initialFilters.lang !== 'all' ? ` · ${initialFilters.lang}` : ''}
-            </p>
+            <p className="muted">{t('grammar.test.setupHint', { count: maxAvailable })}</p>
             {!maxAvailable ? (
               <p className="muted">{t('grammar.test.noPool')}</p>
             ) : (
@@ -112,10 +252,10 @@ export default function GrammarTestModal({
                     <button
                       key={n}
                       type="button"
-                      className={`btn ${count === n ? 'primary' : ''}`}
+                      className={`btn ${options.count === n ? 'primary' : ''}`}
                       disabled={n > maxAvailable}
                       onClick={() => {
-                        setCount(n);
+                        patch({ count: n });
                         setCustom(String(n));
                       }}
                     >
@@ -132,17 +272,72 @@ export default function GrammarTestModal({
                       onChange={(e) => {
                         setCustom(e.target.value);
                         const n = Number(e.target.value);
-                        if (Number.isFinite(n) && n > 0) setCount(Math.floor(n));
+                        if (Number.isFinite(n) && n > 0) patch({ count: Math.floor(n) });
                       }}
                     />
                   </label>
                 </div>
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={!maxAvailable}
-                  onClick={() => start(count)}
-                >
+
+                <label className="gx-test-field">
+                  <span>{t('grammar.test.direction')}</span>
+                  <select
+                    value={options.direction}
+                    onChange={(e) => patch({ direction: e.target.value as SessionDirection })}
+                  >
+                    {SESSION_DIRECTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {t(DIRECTION_KEY[d])}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <fieldset className="gx-test-types">
+                  <legend>{t('grammar.test.types')}</legend>
+                  {typeLabels.map(({ type, label }) => (
+                    <label key={type} className="gx-test-type">
+                      <input
+                        type="checkbox"
+                        checked={options.types.includes(type)}
+                        onChange={() => toggleType(type)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </fieldset>
+
+                <label className="gx-test-field">
+                  <span>{t('grammar.test.mastered')}</span>
+                  <select
+                    value={options.mastered}
+                    onChange={(e) => patch({ mastered: e.target.value as MasteredMode })}
+                  >
+                    {MASTERED_MODES.map((m) => (
+                      <option key={m} value={m}>
+                        {t(MASTERED_KEY[m])}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="gx-test-field">
+                  <span>{t('grammar.test.ratio', { pct: Math.round(options.newRatio * 100) })}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={10}
+                    value={Math.round(options.newRatio * 100)}
+                    onChange={(e) => patch({ newRatio: Number(e.target.value) / 100 })}
+                  />
+                </label>
+                <p className="muted gx-test-hint">{t('grammar.test.ratioHint')}</p>
+
+                {plan && !plan.questions.length ? (
+                  <p className="gx-test-warn">{t('grammar.test.noQuestions')}</p>
+                ) : null}
+
+                <button type="button" className="btn primary" onClick={start}>
                   {t('grammar.test.start')}
                 </button>
               </>
@@ -150,24 +345,47 @@ export default function GrammarTestModal({
           </div>
         )}
 
-        {phase === 'play' && card && (
+        {phase === 'play' && question && plan && (
           <div className="gx-test-play">
             <p className="muted">
-              {t('grammar.test.progress', { current: index + 1, total: deck.length })}
+              {t('grammar.test.progress', { current: index + 1, total: plan.questions.length })}
+              {' · '}
+              {t(TYPE_KEY[question.type])}
             </p>
+
             <div className="gx-test-card">
-              <div className="gx-test-pattern">{card.title}</div>
-              <div className="gx-test-level">{card.level}</div>
-              {revealed ? (
+              {question.type === 'cloze' ? (
+                <>
+                  <div className="gx-test-cloze">{question.blanked}</div>
+                  <p className="muted">{t('grammar.test.clozePrompt')}</p>
+                </>
+              ) : (
+                <div className="gx-test-pattern">{question.prompt}</div>
+              )}
+
+              {question.choices ? (
+                <div className="gx-test-choices">
+                  {question.choices.map((choice) => {
+                    const isAnswer = choice === question.answer;
+                    const state =
+                      picked === null ? '' : isAnswer ? ' correct' : picked === choice ? ' wrong' : '';
+                    return (
+                      <button
+                        key={choice}
+                        type="button"
+                        className={`btn gx-test-choice${state}`}
+                        disabled={picked !== null}
+                        onClick={() => choose(choice)}
+                      >
+                        {choice}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : revealed ? (
                 <div className="gx-test-reveal">
-                  <p>{card.meaning}</p>
-                  {card.structure ? <p className="muted">{card.structure}</p> : null}
-                  {card.examples[0] ? (
-                    <p className="gx-test-ex">
-                      {card.examples[0].jp}
-                      {card.examples[0].en ? ` — ${card.examples[0].en}` : ''}
-                    </p>
-                  ) : null}
+                  <p>{question.answer}</p>
+                  {question.sentence ? <p className="gx-test-ex">{question.sentence}</p> : null}
                 </div>
               ) : (
                 <button type="button" className="btn" onClick={() => setRevealed(true)}>
@@ -175,31 +393,91 @@ export default function GrammarTestModal({
                 </button>
               )}
             </div>
-            {revealed && (
+
+            {question.choices && picked !== null && (
+              <div className="gx-test-feedback">
+                <p className={picked === question.answer ? 'gx-test-ok' : 'gx-test-no'}>
+                  {picked === question.answer ? t('grammar.test.correct') : t('grammar.test.wrong')}
+                </p>
+                {picked !== question.answer ? (
+                  <p className="muted">{t('grammar.test.answerWas', { answer: question.answer })}</p>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => answer(picked === question.answer ? 'good' : 'hard')}
+                >
+                  {t('grammar.test.next')}
+                </button>
+              </div>
+            )}
+
+            {!question.choices && revealed && (
               <div className="gx-test-grades">
-                <button type="button" className="btn" onClick={() => grade('again')}>
-                  {t('grammar.test.again')}
-                </button>
-                <button type="button" className="btn" onClick={() => grade('hard')}>
-                  {t('grammar.test.hard')}
-                </button>
-                <button type="button" className="btn primary" onClick={() => grade('good')}>
-                  {t('grammar.test.good')}
-                </button>
+                {GRADES.map(({ grade, key }) => (
+                  <button
+                    key={grade}
+                    type="button"
+                    className={`btn gx-grade-${grade}${grade === 'good' ? ' primary' : ''}`}
+                    onClick={() => answer(grade)}
+                  >
+                    {t(key)}
+                  </button>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {phase === 'done' && (
+        {phase === 'done' && plan && (
           <div className="gx-test-done">
             <p>
               {t('grammar.test.score', {
-                good: summary.good,
-                total: summary.total,
-                missed: summary.missed,
+                good: correctCount,
+                total: plan.questions.length,
+                missed: missed.length,
               })}
             </p>
+            {plan.delivered < plan.requested ? (
+              <p className="muted">
+                {t('grammar.test.cards', {
+                  delivered: plan.delivered,
+                  requested: plan.requested,
+                })}
+              </p>
+            ) : null}
+            {plan.unusableTypes.length ? (
+              <p className="muted">
+                {t('grammar.test.unusable', {
+                  types: plan.unusableTypes.map((x) => t(TYPE_KEY[x])).join(', '),
+                })}
+              </p>
+            ) : null}
+
+            <section className="gx-test-history">
+              <h3>{t('grammar.test.history')}</h3>
+              {!history.length ? (
+                <p className="muted">{t('grammar.test.historyEmpty')}</p>
+              ) : (
+                <>
+                  <p className="muted">
+                    {t('grammar.test.historyStats', {
+                      count: stats.sessions,
+                      pct: Math.round(stats.accuracy * 100),
+                    })}
+                  </p>
+                  <ul className="gx-test-history-list">
+                    {history.slice(0, 5).map((r) => (
+                      <li key={r.at}>
+                        {new Date(r.at).toLocaleDateString()} · {r.correct}/{r.delivered} ·{' '}
+                        {t(DIRECTION_KEY[r.direction])}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+
             <div className="gx-test-done-actions">
               <button
                 type="button"
@@ -209,7 +487,7 @@ export default function GrammarTestModal({
               >
                 {t('grammar.test.addMissed')}
               </button>
-              <button type="button" className="btn primary" onClick={() => start(count)}>
+              <button type="button" className="btn primary" onClick={start}>
                 {t('grammar.test.retry')}
               </button>
               <button type="button" className="btn ghost" onClick={onClose}>

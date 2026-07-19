@@ -1,15 +1,25 @@
 # GrammarX Redesign Plan
 
-Living document. Phases 1, 1.5 and 2 are implemented. Phase 3 (learner state)
-is next and is specified, not built.
+Living document. Phases 1, 1.5, 2 and 3 are implemented. Phase 4 (Notebook) is
+next and is specified, not built.
 
-**Nothing in Phases 1.5 or 2 has been driven live.** The browser harness §7
-refers to cannot render this app: the renderer boots by awaiting `window.api`
-from the Electron preload bridge, so under plain Vite React mounts and `#root`
-stays empty *with no console error*. Treat that silence as absence of evidence,
-not evidence of absence — the review queue, the unified Explorer and the
-selection drawer are verified by tests and build only, and want an `npm start`
-pass before anyone trusts the screens.
+**Phases 1.5 and 2 have now been driven live (2026-07-19) and the screens work.**
+The browser harness §7 refers to still cannot render this app — the renderer
+boots by awaiting `window.api` from the Electron preload bridge, so under plain
+Vite React mounts and `#root` stays empty *with no console error*. That silence
+remains absence of evidence, not evidence of absence. **Use `npm start`
+(electron-forge) plus computer-use instead**; the dev app runs as `electron.exe`
+out of `node_modules/electron/dist`, which is the name computer-use must be
+granted (the packaged "Nihongo Study" grant does not cover it).
+
+Verified live: Explorer renders 1,893 deduped points with working detail pane
+and Tatoeba examples; filters show live per-category counts, the HSK10 footnote
+and the verified-tags default; selection survives filtering and reports
+`3 selected (3 hidden by filters)` with the drawer flagging each hidden row;
+category counts recompute against active filters (Time & sequence 168 → 39
+under N1); the Review queue renders four queues with `0 of 1,893 entries
+verified by a human`; presets save, reset and reload correctly. See §7.1 for
+the defects this pass did find.
 
 A recurring lesson, now bitten three times: **numbers in this document are only
 as good as the query behind them.** §2.2 counted a populated non-answer as an
@@ -601,16 +611,71 @@ and dedupe strategy. Import must land as a reproducible adapter retaining
       the module-level default arrays — shared state one in-place edit from
       corruption. Caught by its own test; 9 tests pin it.
 
-### Phase 3 — learner state
+### Phase 3 — learner state ✅ done
 
-There is currently **no** grammar familiarity, mastery, or session history
-anywhere. `GrammarTestModal` has exactly one question type (a self-graded flip
-card) and discards results on close.
+- [x] **Per-point familiarity store with migration** — `grammarFamiliarity.ts`.
+      Reuses the vocabulary scale rather than inventing a second one:
+      `GX_LEVELS` is asserted equal to `knownWords.ts`'s `WK_LEVELS` by test, so
+      the two cannot drift, and `GX_KNOWN_THRESHOLD` matches the
+      Familiar-or-better rule `levelService` already sums. Mirrors two further
+      patterns from `knownWords`: the `m?: 1` manual flag (a session result
+      records statistics but never moves a hand-set band, exactly as
+      `bulkSetFromAnki` skips manual words) and sparse storage (clearing to New
+      deletes the entry).
 
-- [ ] Per-point familiarity store with migration
-- [ ] Session builder (count, direction, question types, mastered handling, ratio)
-- [ ] Real exercise types; results feed familiarity
-- [ ] Session history
+      **The existing study queue is deliberately NOT migrated into levels.**
+      `jp-grammarx-explorer-study-v1` and the favourites list were the obvious
+      seed, and using them would have been wrong: queueing records an intention
+      to study, favouriting records interest, and neither is evidence of
+      knowledge. Promoting either into `Learning` would manufacture a
+      familiarity the user never asserted, indistinguishable afterwards from one
+      they earned — §1.1 repeating itself. What the store *is* built for is
+      being migrated: a versioned envelope from day one, with `parseFamiliarity`
+      mapping an unversioned bare map forward rather than discarding it.
+- [x] **Session builder** — `grammarSession.ts`. Count, direction, question
+      types, mastered handling and new/review ratio.
+
+      `count` and `newRatio` are targets, not promises, and the plan reports
+      what it actually delivered (`delivered`, `ratioDelivered`,
+      `unusableTypes`) rather than silently returning 7 cards for a request of
+      20. A question is never dealt that the record cannot support, following
+      the Phase 2 bulk-action rule about empty cards.
+
+      `MASTERED_LEVEL` (Known, 3) is deliberately **not** `GX_KNOWN_THRESHOLD`
+      (Familiar, 2). They answer different questions — coverage versus "further
+      drilling has little value" — and a test pins them apart.
+- [x] **Real exercise types; results feed familiarity** — flip, meaning-choice,
+      pattern-choice and cloze, wired into a rewritten `GrammarTestModal`.
+      Grading is three-way (**Hard / Okay / Good** → −1 / 0 / +1 band); `okay`
+      counts as recalled for accuracy but holds position, because collapsing it
+      into either neighbour lies about progress. Choice questions auto-grade
+      onto the outer two. Familiarity is persisted **per answer**, so a session
+      abandoned halfway still counts — discarding it was the original defect.
+
+      **Cloze matching is under-inclusive on purpose.** `clozeCore` requires a
+      literal core of `MIN_CLOZE_CORE` (4) characters or a kanji, and a verbatim
+      occurrence in the example — the same rule the Tatoeba importer applied.
+      Measured reach: **745 of the 1,113 records that have examples (66.9%)**,
+      682 ja and 63 zh. This refuses common patterns — ながら is three kana and
+      gets no cloze card. Note this threshold is independent of the importer's
+      `MIN_KANA_LITERAL`; changing one does not change the other.
+- [x] **Session history** — `grammarSessionHistory.ts`. Bounded, newest-first,
+      versioned envelope with the same forward-migrating parser. Records what
+      happened in a session, deliberately **not** a schedule: no due dates,
+      intervals or ease. Scheduling is Anki's job and this app already exports
+      there; a third opinion about what is due would compete with both.
+
+**Verified live on 2026-07-20**, not by tests alone. A complete five-card
+session was driven end to end in `npm start`: setup screen, grading, the done
+screen reading `Score: 4/5 good · 1 missed` and `1 session · 80% correct`, and
+all three stores confirmed written to the Electron LevelDB on disk —
+familiarity (`{"l":1,"seen":1,"correct":1,...}` per point), session options,
+and the history record. 809 tests / 85 files, i18n clean at 3,640 keys,
+`vite build` clean.
+
+**Not built: familiarity is stored but invisible.** No band badge on Explorer
+rows, no sort or filter by New/Learning/Familiar/Known. The data is correct and
+persisted; nothing surfaces it yet.
 
 ### Phase 4 — Notebook
 
@@ -667,6 +732,30 @@ runtime is unaffected — but no type-safety claim should be made about this wor
 
 Consistent with this repo's history: passing tests proved the engine's logic,
 never that the screen was usable.
+
+### 7.1 Defects found in the 2026-07-19 live pass
+
+The Phase 1.5 / Phase 2 screens all render and behave as specified. Four
+presentation-level defects survived the test suite, none of them blocking:
+
+1. **The Review queue's "No category" chip reads 0 while 852 records genuinely
+   have no category.** Not a broken count — `issueFor` in `grammarCuration.ts`
+   is a first-match-wins chain (`reviewed` → `imported-unreviewed` →
+   `no-examples` → `no-category`), so a record only reaches the last branch if
+   it has examples, is not Tatoeba-imported, *and* lacks categories. The Mazii
+   pattern index is absorbed by the earlier branches. One record to one queue is
+   the right routing; the defect is that the chip reads as a census and is
+   actually a residual. Either relabel it or show `0 of 852`. **This is the same
+   failure mode as §1.4 and §2.2 in presentational form** — a number whose
+   meaning is set by the query behind it.
+2. **Filter sidebar layout collisions**, in both the Explorer and Practice
+   skins: the `Search` label overlaps its input (placeholder clipped mid-word),
+   and category group counts collide with their labels and overflow the panel
+   (`Time & sequence168`, `Condition & hypothesis203`).
+3. **A raw study-language code leaks into UI copy** — the Grammar Test count
+   dialog reads "…how many cards to practice. · ja".
+4. **The saved-filter dropdown resets its label** to "Saved filters…" after
+   loading a preset instead of showing the active preset's name.
 
 ---
 
