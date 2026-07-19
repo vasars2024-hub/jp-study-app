@@ -3,6 +3,7 @@ import type { GrammarPoint } from './types';
 export const N2: GrammarPoint[] = [
   {
     id: 'n2-ni-chigai-nai',
+    categories: ['judgment.certainty'],
     level: 'N2',
     title: '〜に違いない',
     meaning: 'must be ~ / no doubt that ~',
@@ -15,6 +16,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-wake-dewa-nai',
+    categories: ['emphasis.negation', 'judgment.evaluation'],
     level: 'N2',
     title: '〜わけではない',
     meaning: "it doesn't mean that ~ / not necessarily ~",
@@ -26,6 +28,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-zaru-o-enai',
+    categories: ['obligation.necessity'],
     level: 'N2',
     title: '〜ざるを得ない',
     meaning: 'have no choice but to ~',
@@ -37,6 +40,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-dokoro-ka',
+    categories: ['contrast.opposition', 'emphasis.emphasize'],
     level: 'N2',
     title: '〜どころか',
     meaning: 'far from ~ / let alone ~',
@@ -48,6 +52,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-motozuite',
+    categories: ['method.means', 'evidence.source'],
     level: 'N2',
     title: '〜に基づいて',
     meaning: 'based on ~',
@@ -59,6 +64,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-nimo-kakawarazu',
+    categories: ['contrast.concession'],
     level: 'N2',
     title: '〜にもかかわらず',
     meaning: 'despite ~ / in spite of ~',
@@ -70,6 +76,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-tsutsu-aru',
+    categories: ['state.ongoing', 'state.change'],
     level: 'N2',
     title: '〜つつある',
     meaning: 'be in the process of ~ing',
@@ -81,6 +88,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-tsutsu',
+    categories: ['time.simultaneous', 'contrast.concession'],
     level: 'N2',
     title: '〜つつ / 〜つつも',
     meaning: 'while ~ / even though ~',
@@ -93,6 +101,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ippou-de',
+    categories: ['contrast.opposition'],
     level: 'N2',
     title: '〜一方で',
     meaning: 'on the other hand / while ~',
@@ -104,6 +113,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-hanmen',
+    categories: ['contrast.opposition'],
     level: 'N2',
     title: '〜反面',
     meaning: 'on the other hand / while also ~',
@@ -115,6 +125,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-kanshite',
+    categories: ['method.perspective'],
     level: 'N2',
     title: '〜に関して',
     meaning: 'regarding ~ / concerning ~',
@@ -126,6 +137,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-o-tsujite',
+    categories: ['method.means', 'time.duration'],
     level: 'N2',
     title: '〜を通じて / 〜を通して',
     meaning: 'through ~ / throughout ~',
@@ -137,6 +149,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-o-hajime',
+    categories: ['examples.instance', 'examples.listing'],
     level: 'N2',
     title: '〜をはじめ',
     meaning: 'starting with ~ / ~ and others',
@@ -148,6 +161,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-o-megutte',
+    categories: ['method.perspective'],
     level: 'N2',
     title: '〜をめぐって',
     meaning: 'concerning ~ / surrounding ~ (a dispute)',
@@ -159,6 +173,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-oujite',
+    categories: ['method.means', 'comparison.proportion'],
     level: 'N2',
     title: '〜に応じて',
     meaning: 'in accordance with ~ / depending on ~',
@@ -170,6 +185,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-tomonatte',
+    categories: ['comparison.proportion', 'time.simultaneous'],
     level: 'N2',
     title: '〜に伴って',
     meaning: 'along with ~ / as ~ (changes)',
@@ -181,6 +197,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-shitagatte',
+    categories: ['comparison.proportion', 'method.means'],
     level: 'N2',
     title: '〜にしたがって',
     meaning: 'as ~ / in accordance with ~',
@@ -192,6 +209,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-tsurete',
+    categories: ['comparison.proportion', 'state.change'],
     level: 'N2',
     title: '〜につれて',
     meaning: 'as ~ changes, ~ also changes',
@@ -203,6 +221,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-amari',
+    categories: ['cause.reason', 'degree.extreme'],
     level: 'N2',
     title: '〜あまり',
     meaning: 'so much ~ that / out of excessive ~',
@@ -214,6 +233,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ageku',
+    categories: ['time.sequence', 'cause.result'],
     level: 'N2',
     title: '〜あげく',
     meaning: 'after ~ (in the end, often bad)',
@@ -225,6 +245,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-sue-ni',
+    categories: ['time.sequence', 'cause.result'],
     level: 'N2',
     title: '〜末に',
     meaning: 'after ~ (much effort), finally ~',
@@ -236,6 +257,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ijou-wa',
+    categories: ['cause.grounds', 'cause.premise'],
     level: 'N2',
     title: '〜以上は',
     meaning: 'now that ~ / since ~',
@@ -247,6 +269,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-kagiri',
+    categories: ['condition.requirement', 'degree.limit'],
     level: 'N2',
     title: '〜限り',
     meaning: 'as long as / as far as ~',
@@ -259,6 +282,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-uru-enai',
+    categories: ['possibility.ability'],
     level: 'N2',
     title: '〜得る / 〜得ない',
     meaning: 'can possibly ~ / cannot possibly ~',
@@ -270,6 +294,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-kaneru',
+    categories: ['possibility.ability', 'judgment.conjecture'],
     level: 'N2',
     title: '〜かねる / 〜かねない',
     meaning: 'unable to ~ (かねる) / might (badly) ~ (かねない)',
@@ -283,6 +308,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-mono-da',
+    categories: ['time.repetition', 'request.advice', 'judgment.evaluation'],
     level: 'N2',
     title: '〜ものだ',
     meaning: 'used to ~ / should ~ / it\'s natural that ~',
@@ -296,6 +322,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-mono-no',
+    categories: ['contrast.concession'],
     level: 'N2',
     title: '〜ものの',
     meaning: 'although ~ / even though ~',
@@ -307,6 +334,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-koto-da',
+    categories: ['request.advice'],
     level: 'N2',
     title: '〜ことだ',
     meaning: 'should ~ / the best thing is to ~',
@@ -318,6 +346,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-koto-ka',
+    categories: ['emotion.exclamation', 'emphasis.emphasize'],
     level: 'N2',
     title: '〜ことか',
     meaning: 'how ~! (exclamation)',
@@ -329,6 +358,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-koto-naku',
+    categories: ['emphasis.negation', 'method.means'],
     level: 'N2',
     title: '〜ことなく',
     meaning: 'without ~ing',
@@ -340,6 +370,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-nai-koto-ni-wa',
+    categories: ['condition.requirement'],
     level: 'N2',
     title: '〜ないことには',
     meaning: 'unless ~ / without ~ first',
@@ -351,6 +382,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-towa-kagiranai',
+    categories: ['judgment.evaluation', 'emphasis.negation'],
     level: 'N2',
     title: '〜とは限らない',
     meaning: 'not necessarily ~',
@@ -362,6 +394,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-wake-ni-wa-ikanai',
+    categories: ['obligation.necessity', 'possibility.ability'],
     level: 'N2',
     title: '〜わけにはいかない',
     meaning: "can't afford to ~ / can't just ~",
@@ -374,6 +407,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-yori-hoka-nai',
+    categories: ['obligation.necessity'],
     level: 'N2',
     title: '〜ほか（は）ない / 〜よりほかない',
     meaning: 'have no choice but to ~',
@@ -385,6 +419,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-beki',
+    categories: ['obligation.rules', 'request.advice'],
     level: 'N2',
     title: '〜べきだ',
     meaning: 'should ~ / ought to ~',
@@ -397,6 +432,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-mai',
+    categories: ['volition.will', 'judgment.conjecture', 'emphasis.negation'],
     level: 'N2',
     title: '〜まい',
     meaning: 'will not ~ / probably not ~',
@@ -409,6 +445,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-dake-atte',
+    categories: ['cause.grounds', 'judgment.evaluation'],
     level: 'N2',
     title: '〜だけあって',
     meaning: 'as expected of ~ / fitting for ~',
@@ -421,6 +458,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-dake-ni',
+    categories: ['cause.grounds', 'emphasis.emphasize'],
     level: 'N2',
     title: '〜だけに',
     meaning: 'precisely because ~ (all the more)',
@@ -432,6 +470,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-kuse-ni',
+    categories: ['contrast.concession', 'emotion.feeling'],
     level: 'N2',
     title: '〜くせに',
     meaning: 'even though ~ (with reproach)',
@@ -443,6 +482,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-furi-o-suru',
+    categories: ['comparison.similarity', 'state.description'],
     level: 'N2',
     title: '〜ふりをする',
     meaning: 'pretend to ~',
@@ -454,6 +494,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-totan',
+    categories: ['time.immediate'],
     level: 'N2',
     title: '〜たとたん（に）',
     meaning: 'the moment ~ / just as ~',
@@ -465,6 +506,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ka-to-omou-to',
+    categories: ['time.immediate', 'contrast.unexpected'],
     level: 'N2',
     title: '〜かと思うと / 〜かと思ったら',
     meaning: 'just when ~ / no sooner than ~',
@@ -476,6 +518,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ka-nai-ka-no-uchi-ni',
+    categories: ['time.immediate'],
     level: 'N2',
     title: '〜か〜ないかのうちに',
     meaning: 'almost as soon as ~',
@@ -487,6 +530,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-sai-ni',
+    categories: ['time.point'],
     level: 'N2',
     title: '〜際に',
     meaning: 'on the occasion of ~ / when ~',
@@ -498,6 +542,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-oite',
+    categories: ['space.location', 'time.point'],
     level: 'N2',
     title: '〜において',
     meaning: 'in / at / on ~ (formal)',
@@ -509,6 +554,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-ni-kakete-wa',
+    categories: ['method.perspective', 'comparison.compare'],
     level: 'N2',
     title: '〜にかけては',
     meaning: 'when it comes to ~ (no one beats)',
@@ -520,6 +566,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-kkonai',
+    categories: ['judgment.certainty', 'emphasis.negation'],
     level: 'N2',
     title: '〜っこない',
     meaning: 'there\'s no way ~ (casual)',
@@ -531,6 +578,7 @@ export const N2: GrammarPoint[] = [
   },
   {
     id: 'n2-yara-yara',
+    categories: ['examples.listing'],
     level: 'N2',
     title: '〜やら〜やら',
     meaning: 'what with ~ and ~ (and so on)',

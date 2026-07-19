@@ -1,0 +1,107 @@
+import { describe, expect, it } from 'vitest';
+import {
+  GRAMMAR,
+  GRAMMAR_COUNTS,
+  HSK_COUNTS,
+  frameworkForLevel,
+  isUnofficialLevel,
+} from '../data/grammar';
+import { N1_MAZII } from '../data/grammar/n1-mazii';
+import { N2_MAZII } from '../data/grammar/n2-mazii';
+import { N3_MAZII } from '../data/grammar/n3-mazii';
+import { N4_MAZII } from '../data/grammar/n4-mazii';
+
+const JLPT = ['N5', 'N4', 'N3', 'N2', 'N1'];
+const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7', 'HSK8', 'HSK9', 'HSK10'];
+
+describe('GrammarX corpus', () => {
+  it('includes Mazii N1–N4 and HSK bands', () => {
+    expect(N1_MAZII.length).toBeGreaterThan(200);
+    expect(N2_MAZII.length).toBeGreaterThan(300);
+    expect(N3_MAZII.length).toBeGreaterThan(100);
+    expect(N4_MAZII.length).toBeGreaterThan(50);
+    expect(GRAMMAR.length).toBeGreaterThan(1000);
+    expect(GRAMMAR_COUNTS.N1).toBeGreaterThan(200);
+    expect(GRAMMAR_COUNTS.N2).toBeGreaterThan(300);
+    expect(GRAMMAR_COUNTS.N3).toBeGreaterThan(100);
+    expect(GRAMMAR_COUNTS.N4).toBeGreaterThan(50);
+    expect(HSK_COUNTS.HSK1).toBeGreaterThan(5);
+    expect(HSK_COUNTS.HSK10).toBeGreaterThan(3);
+  });
+
+  it('assigns every point a study language', () => {
+    expect(GRAMMAR.every((p) => p.lang === 'ja' || p.lang === 'zh')).toBe(true);
+  });
+
+  /*
+   * The previous version of this file asserted `functions.length > 0`, which the
+   * regex tagger satisfied by emitting `['other']` for 44% of the corpus. It
+   * was green for the entire period the filters were unusable. Assert things
+   * that can actually fail instead.
+   */
+  it('never labels a Japanese point with an HSK level, or a Chinese one with JLPT', () => {
+    const mismatched = GRAMMAR.filter(
+      (p) =>
+        (p.lang === 'ja' && HSK.includes(p.level)) || (p.lang === 'zh' && JLPT.includes(p.level)),
+    );
+    expect(mismatched.map((p) => `${p.id}:${p.level}`)).toEqual([]);
+  });
+
+  it('gives every point a known level', () => {
+    const unknown = GRAMMAR.filter((p) => !JLPT.includes(p.level) && !HSK.includes(p.level));
+    expect(unknown.map((p) => p.id)).toEqual([]);
+  });
+
+  it('records provenance on every point', () => {
+    const missing = GRAMMAR.filter((p) => !p.provenance?.tagSource || !p.provenance?.verification);
+    expect(missing.map((p) => p.id)).toEqual([]);
+  });
+
+  it('marks records with no examples as missing content rather than complete', () => {
+    const lying = GRAMMAR.filter(
+      (p) => (!p.examples || p.examples.length === 0) && p.provenance.verification !== 'missing',
+    );
+    expect(lying.map((p) => p.id)).toEqual([]);
+  });
+
+  it('never reports a heuristic tag as authored', () => {
+    // Every Mazii record arrived pre-tagged by the same inference, so none of
+    // them may claim authored provenance no matter what the source file says.
+    const overclaiming = GRAMMAR.filter(
+      (p) => p.provenance.source?.startsWith('mazii-') && p.provenance.tagSource === 'authored',
+    );
+    expect(overclaiming.map((p) => p.id)).toEqual([]);
+  });
+
+  it('resolves no category from the "other" fallback', () => {
+    const laundered = GRAMMAR.filter(
+      (p) => p.functions.length === 1 && p.functions[0] === 'other' && p.categories.length > 0,
+    );
+    expect(laundered.map((p) => p.id)).toEqual([]);
+  });
+
+  describe('level frameworks', () => {
+    it('flags HSK10 as a GrammarX invention, not an official band', () => {
+      expect(isUnofficialLevel('HSK10')).toBe(true);
+      expect(frameworkForLevel('HSK10')).toBe('grammarx');
+    });
+
+    it('attributes official bands to their real framework', () => {
+      expect(frameworkForLevel('HSK1')).toBe('hsk3.0');
+      expect(frameworkForLevel('HSK9')).toBe('hsk3.0');
+      expect(frameworkForLevel('N5')).toBe('jlpt');
+      expect(isUnofficialLevel('HSK9')).toBe(false);
+    });
+  });
+
+  it('derives counts from the corpus rather than hard-coding them', () => {
+    for (const level of JLPT) {
+      const actual = GRAMMAR.filter((p) => p.level === level).length;
+      expect(GRAMMAR_COUNTS[level as keyof typeof GRAMMAR_COUNTS]).toBe(actual);
+    }
+    for (const level of HSK) {
+      const actual = GRAMMAR.filter((p) => p.level === level).length;
+      expect(HSK_COUNTS[level as keyof typeof HSK_COUNTS]).toBe(actual);
+    }
+  });
+});

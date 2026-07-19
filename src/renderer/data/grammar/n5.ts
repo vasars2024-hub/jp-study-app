@@ -3,6 +3,7 @@ import type { GrammarPoint } from './types';
 export const N5: GrammarPoint[] = [
   {
     id: 'n5-desu',
+    categories: ['explanation.definition', 'discourse.topic'],
     level: 'N5',
     title: '〜は〜です',
     meaning: 'A is B (copula / "to be")',
@@ -16,6 +17,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-dewa-arimasen',
+    categories: ['explanation.definition', 'emphasis.negation'],
     level: 'N5',
     title: '〜ではありません',
     meaning: 'is not ~ (negative copula)',
@@ -29,6 +31,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-deshita',
+    categories: ['explanation.definition', 'time.point'],
     level: 'N5',
     title: '〜でした',
     meaning: 'was ~ (past copula)',
@@ -42,6 +45,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-wa-topic',
+    categories: ['discourse.topic'],
     level: 'N5',
     title: '〜は (topic particle)',
     meaning: 'as for ~ (marks the topic)',
@@ -55,6 +59,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ga-subject',
+    categories: ['discourse.topic'],
     level: 'N5',
     title: '〜が (subject particle)',
     meaning: 'marks the subject / new information',
@@ -68,6 +73,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-o-object',
+    categories: ['voice.form'],
     level: 'N5',
     title: '〜を (object particle)',
     meaning: 'marks the direct object',
@@ -81,6 +87,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ni-time',
+    categories: ['time.point', 'space.direction', 'space.location'],
     level: 'N5',
     title: '〜に (time / destination)',
     meaning: 'at (time), to (destination), in/on (location of existence)',
@@ -94,6 +101,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-de-place',
+    categories: ['space.location', 'method.means'],
     level: 'N5',
     title: '〜で (place of action / means)',
     meaning: 'at/in (action place); by/with (means)',
@@ -107,6 +115,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-e-direction',
+    categories: ['space.direction'],
     level: 'N5',
     title: '〜へ (direction)',
     meaning: 'toward ~ (direction of movement)',
@@ -120,6 +129,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-to-and',
+    categories: ['examples.listing', 'space.relation'],
     level: 'N5',
     title: '〜と (and / with)',
     meaning: 'and (full list); together with',
@@ -133,6 +143,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ya',
+    categories: ['examples.listing', 'examples.instance'],
     level: 'N5',
     title: '〜や〜（など）',
     meaning: 'things like A and B (partial list)',
@@ -145,6 +156,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-no-possessive',
+    categories: ['space.relation'],
     level: 'N5',
     title: '〜の (possessive / modifier)',
     meaning: "'s / of (links two nouns)",
@@ -158,6 +170,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mo',
+    categories: ['emphasis.emphasize', 'examples.listing'],
     level: 'N5',
     title: '〜も (also / too)',
     meaning: 'also, too; (with negative) not ~ either',
@@ -171,6 +184,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-kara-made',
+    categories: ['space.range', 'time.duration'],
     level: 'N5',
     title: '〜から〜まで',
     meaning: 'from ~ to ~ (time / place)',
@@ -184,6 +198,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ka-question',
+    categories: ['request.ask'],
     level: 'N5',
     title: '〜か (question marker)',
     meaning: 'turns a sentence into a question',
@@ -197,6 +212,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ne-yo',
+    categories: ['emphasis.emphasize'],
     level: 'N5',
     title: '〜ね / 〜よ',
     meaning: 'right? (ね); you know / I tell you (よ)',
@@ -210,6 +226,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-masu',
+    categories: ['register.honorific', 'voice.form'],
     level: 'N5',
     title: '〜ます / 〜ません',
     meaning: 'polite verb (do / do not)',
@@ -223,6 +240,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mashita',
+    categories: ['time.point', 'voice.form'],
     level: 'N5',
     title: '〜ました / 〜ませんでした',
     meaning: 'polite past (did / did not)',
@@ -235,6 +253,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-arimasu-imasu',
+    categories: ['state.description', 'space.location'],
     level: 'N5',
     title: 'あります / います',
     meaning: 'there is / exists',
@@ -248,6 +267,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-i-adjective',
+    categories: ['state.description', 'voice.form'],
     level: 'N5',
     title: 'い-adjectives',
     meaning: 'describing words ending in い',
@@ -261,6 +281,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-na-adjective',
+    categories: ['state.description', 'voice.form'],
     level: 'N5',
     title: 'な-adjectives',
     meaning: 'adjectival nouns (use な before nouns)',
@@ -274,6 +295,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-adverbial',
+    categories: ['voice.form', 'state.description'],
     level: 'N5',
     title: 'Adjective → adverb (〜く / 〜に)',
     meaning: 'makes an adjective modify a verb',
@@ -287,6 +309,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-suki',
+    categories: ['emotion.feeling', 'judgment.evaluation'],
     level: 'N5',
     title: '〜が好き / 上手 / 下手',
     meaning: 'like / good at / bad at',
@@ -300,6 +323,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-hoshii',
+    categories: ['volition.desire'],
     level: 'N5',
     title: '〜がほしい',
     meaning: 'want (a thing)',
@@ -312,6 +336,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-tai',
+    categories: ['volition.desire'],
     level: 'N5',
     title: '〜たい',
     meaning: 'want to do ~',
@@ -325,6 +350,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mashou',
+    categories: ['request.invite', 'volition.will'],
     level: 'N5',
     title: '〜ましょう / 〜ましょうか',
     meaning: "let's ~ / shall I/we ~?",
@@ -338,6 +364,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-masenka',
+    categories: ['request.invite'],
     level: 'N5',
     title: '〜ませんか',
     meaning: "won't you ~? (invitation)",
@@ -350,6 +377,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-form',
+    categories: ['time.sequence', 'discourse.connection', 'voice.form'],
     level: 'N5',
     title: 'て-form (connecting)',
     meaning: 'and (links verbs/clauses in sequence)',
@@ -362,6 +390,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-kudasai',
+    categories: ['request.ask'],
     level: 'N5',
     title: '〜てください',
     meaning: 'please do ~',
@@ -374,6 +403,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-naide-kudasai',
+    categories: ['request.ask', 'emphasis.negation'],
     level: 'N5',
     title: '〜ないでください',
     meaning: "please don't do ~",
@@ -385,6 +415,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-iru',
+    categories: ['state.ongoing', 'state.description'],
     level: 'N5',
     title: '〜ている',
     meaning: 'is doing / is in a state',
@@ -398,6 +429,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-temo-ii',
+    categories: ['possibility.permission'],
     level: 'N5',
     title: '〜てもいいです',
     meaning: "may ~ / it's OK to ~",
@@ -409,6 +441,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-tewa-ikemasen',
+    categories: ['obligation.prohibition'],
     level: 'N5',
     title: '〜てはいけません',
     meaning: 'must not ~ (prohibition)',
@@ -421,6 +454,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-kara',
+    categories: ['time.sequence'],
     level: 'N5',
     title: '〜てから',
     meaning: 'after doing ~',
@@ -433,6 +467,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mae-ni',
+    categories: ['time.sequence'],
     level: 'N5',
     title: '〜前に',
     meaning: 'before ~',
@@ -446,6 +481,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ato-de',
+    categories: ['time.sequence'],
     level: 'N5',
     title: '〜あとで',
     meaning: 'after ~',
@@ -458,6 +494,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-nagara',
+    categories: ['time.simultaneous'],
     level: 'N5',
     title: '〜ながら',
     meaning: 'while doing ~ (two actions at once)',
@@ -470,6 +507,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-tari-tari',
+    categories: ['examples.listing', 'examples.instance'],
     level: 'N5',
     title: '〜たり〜たりする',
     meaning: 'do things like A and B (examples)',
@@ -482,6 +520,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-naru',
+    categories: ['state.change'],
     level: 'N5',
     title: '〜くなる / 〜になる',
     meaning: 'become ~',
@@ -494,6 +533,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mada-mou',
+    categories: ['time.point', 'state.ongoing'],
     level: 'N5',
     title: 'まだ / もう',
     meaning: 'still / not yet (まだ); already (もう)',
@@ -507,6 +547,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-deshou',
+    categories: ['judgment.conjecture'],
     level: 'N5',
     title: '〜でしょう',
     meaning: 'probably ~ / right?',
@@ -519,6 +560,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-kara-because',
+    categories: ['cause.reason'],
     level: 'N5',
     title: '〜から (because)',
     meaning: 'because ~ / so ~',
@@ -531,6 +573,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ga-but',
+    categories: ['contrast.opposition'],
     level: 'N5',
     title: '〜が / 〜けど (but)',
     meaning: 'but / however',
@@ -543,6 +586,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-toki',
+    categories: ['time.point'],
     level: 'N5',
     title: '〜とき',
     meaning: 'when ~ / at the time of ~',
@@ -556,6 +600,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-hou-ga',
+    categories: ['comparison.compare'],
     level: 'N5',
     title: '〜より〜のほうが',
     meaning: 'A is more ~ than B',
@@ -568,6 +613,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ichiban',
+    categories: ['comparison.compare', 'degree.extreme'],
     level: 'N5',
     title: '〜で一番',
     meaning: 'the most ~ (superlative)',
@@ -580,6 +626,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-counter',
+    categories: ['quantity.amount'],
     level: 'N5',
     title: 'Counters (〜つ・〜人・〜枚…)',
     meaning: 'counting with the right counter word',
@@ -593,6 +640,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-n-desu',
+    categories: ['explanation.explain'],
     level: 'N5',
     title: '〜んです / のです',
     meaning: 'explanatory ~ (gives a reason/context)',
@@ -606,6 +654,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-question-words',
+    categories: ['request.ask'],
     level: 'N5',
     title: 'Question words (なに・だれ・どこ…)',
     meaning: 'what, who, where, when, why, how',
@@ -619,6 +668,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-koso-ado',
+    categories: ['space.relation', 'space.location'],
     level: 'N5',
     title: 'これ・それ・あれ / この・その・あの',
     meaning: 'this / that / that over there',

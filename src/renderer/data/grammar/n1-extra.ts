@@ -5,6 +5,7 @@ import type { GrammarPoint } from './types';
 export const N1_EXTRA: GrammarPoint[] = [
   {
     id: 'n1x-tomiete',
+    categories: ['judgment.conjecture', 'evidence.source'],
     level: 'N1',
     title: '〜とみえて / 〜とみえる',
     meaning: 'it seems that ~ (judging from evidence)',
@@ -17,6 +18,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toareba',
+    categories: ['condition.general'],
     level: 'N1',
     title: '〜とあれば',
     meaning: 'if it is the case that ~ (then naturally)',
@@ -29,6 +31,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-katagata',
+    categories: ['purpose.goal', 'time.simultaneous'],
     level: 'N1',
     title: '〜かたがた',
     meaning: 'while ~ / for the purpose of ~ as well',
@@ -41,6 +44,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tomonaku',
+    categories: ['state.description', 'emphasis.negation'],
     level: 'N1',
     title: '〜ともなく / 〜ともなしに',
     meaning: 'without consciously ~ / absentmindedly ~',
@@ -53,6 +57,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-gurumi',
+    categories: ['quantity.amount', 'space.range'],
     level: 'N1',
     title: '〜ぐるみ',
     meaning: 'together with ~ / the whole ~',
@@ -65,6 +70,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nami',
+    categories: ['comparison.compare', 'comparison.similarity'],
     level: 'N1',
     title: '〜並み',
     meaning: 'on par with ~ / the same level as ~',
@@ -77,6 +83,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tokitara',
+    categories: ['discourse.topic', 'emotion.feeling'],
     level: 'N1',
     title: '〜ときたら',
     meaning: 'when it comes to ~ (often complaining)',
@@ -89,6 +96,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-kotonashini',
+    categories: ['emphasis.negation', 'method.means'],
     level: 'N1',
     title: '〜ことなしに',
     meaning: 'without doing ~',
@@ -101,6 +109,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-houdai',
+    categories: ['degree.extent', 'state.description'],
     level: 'N1',
     title: '〜放題',
     meaning: 'freely ~ / all-you-can ~ / left unchecked',
@@ -113,6 +122,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-madademonai',
+    categories: ['obligation.necessity', 'emphasis.negation'],
     level: 'N1',
     title: '〜までもない / 〜までもなく',
     meaning: "there's no need to ~",
@@ -125,6 +135,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nitaru',
+    categories: ['judgment.evaluation'],
     level: 'N1',
     title: '〜に足る / 〜に足りない',
     meaning: 'worth ~ing / not worth ~ing',
@@ -137,6 +148,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-meku',
+    categories: ['state.change', 'comparison.similarity'],
     level: 'N1',
     title: '〜めく',
     meaning: 'to show signs of ~ / to become ~-like',
@@ -149,6 +161,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tatokorode',
+    categories: ['contrast.concession', 'condition.hypothetical'],
     level: 'N1',
     title: '〜たところで',
     meaning: 'even if ~, it’s useless',
@@ -161,6 +174,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-buru',
+    categories: ['comparison.similarity', 'state.description'],
     level: 'N1',
     title: '〜ぶる',
     meaning: 'to put on airs / to act like ~',
@@ -173,6 +187,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-wokagirini',
+    categories: ['time.point', 'degree.limit'],
     level: 'N1',
     title: '〜を限りに',
     meaning: 'with ~ as the limit / from ~ on (ending)',
@@ -185,6 +200,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-atteno',
+    categories: ['cause.reason', 'condition.requirement'],
     level: 'N1',
     title: '〜あっての',
     meaning: 'which exists only thanks to ~',
@@ -197,6 +213,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tekaratoiumono',
+    categories: ['time.duration', 'state.change'],
     level: 'N1',
     title: '〜てからというもの',
     meaning: 'ever since ~ (a marked change followed)',
@@ -209,6 +226,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nagarani',
+    categories: ['state.description', 'time.simultaneous'],
     level: 'N1',
     title: '〜ながらに（して）',
     meaning: 'while remaining ~ / without changing ~',
@@ -221,6 +239,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-narini',
+    categories: ['method.means', 'degree.extent'],
     level: 'N1',
     title: '〜なりに / 〜なりの',
     meaning: 'in one’s own way (suited to ~)',
@@ -233,6 +252,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-wokawakirini',
+    categories: ['time.point', 'examples.instance'],
     level: 'N1',
     title: '〜を皮切りに（して）',
     meaning: 'starting with ~ (and spreading)',
@@ -245,6 +265,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-ikanniyorazu',
+    categories: ['contrast.concession', 'condition.general'],
     level: 'N1',
     title: '〜いかんによらず / 〜いかんを問わず',
     meaning: 'regardless of ~ / no matter what ~',
@@ -257,6 +278,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nikakawaru',
+    categories: ['cause.result', 'state.description'],
     level: 'N1',
     title: '〜にかかわる',
     meaning: 'to affect ~ / to be a matter of ~',
@@ -269,6 +291,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-naidewasumanai',
+    categories: ['obligation.necessity'],
     level: 'N1',
     title: '〜ないではすまない / 〜ずにはすまない',
     meaning: "can't get away without ~ing",
@@ -281,6 +304,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-naidewaokanai',
+    categories: ['judgment.certainty', 'cause.result'],
     level: 'N1',
     title: '〜ないではおかない / 〜ずにはおかない',
     meaning: 'will surely ~ / cannot help but cause ~',
@@ -293,6 +317,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-woyoginakusareru',
+    categories: ['obligation.necessity', 'voice.passive'],
     level: 'N1',
     title: '〜を余儀なくされる',
     meaning: 'to be forced (unavoidably) to ~',
@@ -305,6 +330,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-niataisuru',
+    categories: ['judgment.evaluation'],
     level: 'N1',
     title: '〜に値する / 〜に値しない',
     meaning: 'to be worthy of ~ / to deserve ~',
@@ -317,6 +343,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-gasaigo',
+    categories: ['condition.general', 'cause.result'],
     level: 'N1',
     title: '〜が最後 / 〜たら最後',
     meaning: 'once ~ happens, (an inevitable bad result)',
@@ -329,6 +356,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tarasoremadeda',
+    categories: ['condition.hypothetical', 'cause.result'],
     level: 'N1',
     title: '〜たらそれまでだ',
     meaning: 'if ~ then that’s the end of it',
@@ -341,6 +369,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-wonukinishite',
+    categories: ['contrast.exception', 'emphasis.negation'],
     level: 'N1',
     title: '〜を抜きにして（は）',
     meaning: 'leaving ~ aside / without ~',
@@ -353,6 +382,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-karaaru',
+    categories: ['quantity.amount', 'emphasis.emphasize'],
     level: 'N1',
     title: '〜からある / 〜からする / 〜からの',
     meaning: 'as much as ~ (emphasizing a large amount)',
@@ -365,6 +395,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nishite',
+    categories: ['time.point', 'emphasis.emphasize'],
     level: 'N1',
     title: '〜にして',
     meaning: 'at ~ (a notable point) / only at ~',
@@ -377,6 +408,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toiutokoroda',
+    categories: ['degree.approximation', 'degree.limit'],
     level: 'N1',
     title: '〜というところだ / 〜といったところだ',
     meaning: 'at most ~ / about ~',
@@ -389,6 +421,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toittaranai',
+    categories: ['degree.extreme', 'emotion.exclamation'],
     level: 'N1',
     title: '〜といったらない / 〜といったらありはしない',
     meaning: 'indescribably ~ / extremely ~',
@@ -401,6 +434,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-noitari',
+    categories: ['degree.extreme', 'emotion.feeling'],
     level: 'N1',
     title: '〜の至り',
     meaning: 'the height of ~ / utterly ~',
@@ -413,6 +447,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-kotokonouenai',
+    categories: ['degree.extreme'],
     level: 'N1',
     title: '〜ことこの上ない',
     meaning: 'could not be more ~ / extremely ~',
@@ -425,6 +460,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toshitatokorode',
+    categories: ['contrast.concession', 'method.perspective'],
     level: 'N1',
     title: '〜としたところで / 〜にしたところで',
     meaning: 'even if ~ / even from the standpoint of ~',

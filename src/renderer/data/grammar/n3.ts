@@ -3,6 +3,7 @@ import type { GrammarPoint } from './types';
 export const N3: GrammarPoint[] = [
   {
     id: 'n3-tokoro',
+    categories: ['time.point', 'time.immediate', 'state.ongoing'],
     level: 'N3',
     title: '〜ところだ',
     meaning: 'about to / in the middle of / just did',
@@ -16,6 +17,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-bakari',
+    categories: ['time.immediate', 'degree.limit'],
     level: 'N3',
     title: '〜たばかり / 〜ばかり',
     meaning: 'just did ~ / nothing but ~',
@@ -29,6 +31,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-you-to-suru',
+    categories: ['state.effort', 'time.immediate'],
     level: 'N3',
     title: '〜ようとする',
     meaning: 'try to ~ / be about to ~',
@@ -41,6 +44,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ba-hodo',
+    categories: ['comparison.proportion', 'condition.general'],
     level: 'N3',
     title: '〜ば〜ほど',
     meaning: 'the more ~, the more ~',
@@ -53,6 +57,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-mama',
+    categories: ['state.description', 'state.ongoing'],
     level: 'N3',
     title: '〜まま',
     meaning: 'as is / leaving ~ unchanged',
@@ -66,6 +71,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-uchi-ni',
+    categories: ['time.duration', 'time.simultaneous'],
     level: 'N3',
     title: '〜うちに',
     meaning: 'while ~ / before ~ changes',
@@ -79,6 +85,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-aida-ni',
+    categories: ['time.duration', 'time.simultaneous'],
     level: 'N3',
     title: '〜間に',
     meaning: 'during / while ~ (something happens)',
@@ -91,6 +98,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tabi-ni',
+    categories: ['time.repetition', 'quantity.frequency'],
     level: 'N3',
     title: '〜たびに',
     meaning: 'every time ~ / whenever ~',
@@ -102,6 +110,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-sae-ba',
+    categories: ['condition.requirement', 'degree.minimal'],
     level: 'N3',
     title: '〜さえ〜ば',
     meaning: 'if only ~ / as long as ~',
@@ -114,6 +123,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-about-ni-tsuite',
+    categories: ['method.perspective'],
     level: 'N3',
     title: '〜について',
     meaning: 'about ~ / concerning ~',
@@ -125,6 +135,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ni-taishite',
+    categories: ['space.direction', 'contrast.opposition'],
     level: 'N3',
     title: '〜に対して',
     meaning: 'toward / against / in contrast to ~',
@@ -137,6 +148,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ni-yotte',
+    categories: ['method.means', 'cause.reason', 'voice.passive'],
     level: 'N3',
     title: '〜によって',
     meaning: 'by / due to / depending on ~',
@@ -149,6 +161,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ni-totte',
+    categories: ['method.perspective'],
     level: 'N3',
     title: '〜にとって',
     meaning: 'for / to (someone)',
@@ -161,6 +174,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-toshite',
+    categories: ['method.perspective'],
     level: 'N3',
     title: '〜として',
     meaning: 'as ~ / in the role of ~',
@@ -172,6 +186,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-okage-sei',
+    categories: ['cause.reason', 'cause.result'],
     level: 'N3',
     title: '〜おかげで / 〜せいで',
     meaning: 'thanks to ~ / because of ~ (blame)',
@@ -185,6 +200,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tame-ni',
+    categories: ['purpose.goal', 'cause.reason'],
     level: 'N3',
     title: '〜ために',
     meaning: 'in order to ~ / for the sake of ~',
@@ -197,6 +213,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-temo',
+    categories: ['contrast.concession', 'condition.general'],
     level: 'N3',
     title: '疑問詞 + 〜ても',
     meaning: 'no matter what/who/how ~',
@@ -209,6 +226,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-wake-da',
+    categories: ['explanation.conclusion', 'explanation.explain'],
     level: 'N3',
     title: '〜わけだ',
     meaning: 'no wonder ~ / that means ~',
@@ -221,6 +239,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-wake-ga-nai',
+    categories: ['judgment.certainty', 'emphasis.negation'],
     level: 'N3',
     title: '〜わけがない',
     meaning: 'there\'s no way that ~',
@@ -233,6 +252,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-to-iu-koto-da',
+    categories: ['evidence.hearsay', 'explanation.conclusion'],
     level: 'N3',
     title: '〜ということだ',
     meaning: 'I hear that ~ / it means that ~',
@@ -245,6 +265,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-bakari-de-naku',
+    categories: ['examples.listing', 'emphasis.emphasize'],
     level: 'N3',
     title: '〜ばかりでなく / 〜だけでなく',
     meaning: 'not only ~ but also ~',
@@ -256,6 +277,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-baai',
+    categories: ['condition.general'],
     level: 'N3',
     title: '〜場合は',
     meaning: 'in the case of ~ / if ~',
@@ -267,6 +289,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-saichu-ni',
+    categories: ['time.duration', 'state.ongoing'],
     level: 'N3',
     title: '〜最中に',
     meaning: 'right in the middle of ~',
@@ -279,6 +302,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-toori-ni',
+    categories: ['comparison.similarity', 'method.means'],
     level: 'N3',
     title: '〜とおりに',
     meaning: 'just as ~ / in the way that ~',
@@ -290,6 +314,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-marude-you',
+    categories: ['comparison.similarity'],
     level: 'N3',
     title: 'まるで〜ようだ',
     meaning: 'just like ~ / as if ~',
@@ -301,6 +326,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-koto-wa-nai',
+    categories: ['obligation.necessity', 'emphasis.negation'],
     level: 'N3',
     title: '〜ことはない',
     meaning: "there's no need to ~",
@@ -312,6 +338,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-zu-ni',
+    categories: ['method.means', 'emphasis.negation'],
     level: 'N3',
     title: '〜ずに / 〜ないで',
     meaning: 'without doing ~',
@@ -324,6 +351,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-dasu',
+    categories: ['state.change', 'time.immediate'],
     level: 'N3',
     title: '〜出す',
     meaning: 'suddenly start to ~',
@@ -335,6 +363,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-hajimeru',
+    categories: ['time.point', 'state.change'],
     level: 'N3',
     title: '〜始める / 〜終わる',
     meaning: 'begin to ~ / finish ~ing',
@@ -348,6 +377,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tsuzukeru',
+    categories: ['time.duration', 'state.ongoing'],
     level: 'N3',
     title: '〜続ける',
     meaning: 'keep on ~ing',
@@ -359,6 +389,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-kiru',
+    categories: ['time.completion', 'degree.extent'],
     level: 'N3',
     title: '〜きる / 〜きれない',
     meaning: 'do completely / can\'t do completely',
@@ -372,6 +403,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-gachi',
+    categories: ['quantity.frequency', 'judgment.evaluation'],
     level: 'N3',
     title: '〜がち',
     meaning: 'tend to ~ / prone to ~ (often negative)',
@@ -383,6 +415,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-gimi',
+    categories: ['degree.minimal', 'state.description'],
     level: 'N3',
     title: '〜気味',
     meaning: 'a touch of ~ / slightly ~',
@@ -394,6 +427,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ppoi',
+    categories: ['comparison.similarity', 'state.description'],
     level: 'N3',
     title: '〜っぽい',
     meaning: '-ish / looks/acts like ~',
@@ -406,6 +440,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-muke-muki',
+    categories: ['purpose.goal', 'method.perspective'],
     level: 'N3',
     title: '〜向け / 〜向き',
     meaning: 'aimed at ~ / suitable for ~',
@@ -418,6 +453,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ue-de',
+    categories: ['time.sequence', 'method.means'],
     level: 'N3',
     title: '〜上で',
     meaning: 'upon / after ~ / in the process of ~',
@@ -430,6 +466,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ippou-da',
+    categories: ['state.change', 'degree.extent'],
     level: 'N3',
     title: '〜一方だ',
     meaning: 'keep ~ing more and more (one-way trend)',
@@ -441,6 +478,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-kawari-ni',
+    categories: ['contrast.exception', 'method.means'],
     level: 'N3',
     title: '〜代わりに',
     meaning: 'instead of ~ / in exchange for ~',
@@ -452,6 +490,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tsuide-ni',
+    categories: ['time.simultaneous', 'method.means'],
     level: 'N3',
     title: '〜ついでに',
     meaning: 'while you\'re at it / on the occasion of ~',
@@ -463,6 +502,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-to-tomo-ni',
+    categories: ['time.simultaneous', 'comparison.proportion'],
     level: 'N3',
     title: '〜とともに',
     meaning: 'along with ~ / as ~ (changes)',
@@ -474,6 +514,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-shidai',
+    categories: ['time.immediate'],
     level: 'N3',
     title: '〜次第',
     meaning: 'as soon as ~',
@@ -486,6 +527,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ba-yokatta',
+    categories: ['emotion.regret', 'condition.counterfactual'],
     level: 'N3',
     title: '〜ばよかった',
     meaning: 'should have ~ / I wish I had ~',
@@ -497,6 +539,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-hodo',
+    categories: ['degree.extent'],
     level: 'N3',
     title: '〜ほど',
     meaning: 'to the extent of ~ / so ~ that',
@@ -509,6 +552,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-kurai',
+    categories: ['degree.approximation', 'degree.extent'],
     level: 'N3',
     title: '〜くらい / 〜ぐらい',
     meaning: 'about ~ / to the degree of ~',
@@ -521,6 +565,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-mitai-ni',
+    categories: ['comparison.similarity'],
     level: 'N3',
     title: '〜みたいに / 〜みたいな',
     meaning: 'like ~ / similar to ~',
@@ -532,6 +577,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-koso',
+    categories: ['emphasis.emphasize'],
     level: 'N3',
     title: '〜こそ',
     meaning: 'precisely ~ / it is exactly ~',
@@ -543,6 +589,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-you-ga-nai',
+    categories: ['possibility.ability', 'emphasis.negation'],
     level: 'N3',
     title: '〜ようがない',
     meaning: 'there is no way to ~',
@@ -554,6 +601,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-temo-kamawanai',
+    categories: ['possibility.permission', 'contrast.concession'],
     level: 'N3',
     title: '〜てもかまわない',
     meaning: "it's fine even if ~ / I don't mind if ~",

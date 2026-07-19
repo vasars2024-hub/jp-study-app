@@ -5,6 +5,7 @@ import type { GrammarPoint } from './types';
 export const N2_EXTRA: GrammarPoint[] = [
   {
     id: 'n2x-karatoitte',
+    categories: ['cause.reason', 'emphasis.negation'],
     level: 'N2',
     title: '〜からといって',
     meaning: "just because ~ (doesn't mean)",
@@ -17,6 +18,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-toiumonoda',
+    categories: ['explanation.definition', 'judgment.evaluation'],
     level: 'N2',
     title: '〜というものだ',
     meaning: 'that is exactly ~ / that is what you call ~',
@@ -29,6 +31,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-toiumonodewanai',
+    categories: ['emphasis.negation', 'judgment.evaluation'],
     level: 'N2',
     title: '〜というものではない / 〜というものでもない',
     meaning: "it doesn't necessarily mean ~",
@@ -41,6 +44,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nisuginai',
+    categories: ['degree.minimal', 'degree.limit'],
     level: 'N2',
     title: '〜にすぎない / 〜に過ぎない',
     meaning: 'merely ~ / nothing more than ~',
@@ -53,6 +57,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nihokanaranai',
+    categories: ['emphasis.emphasize', 'explanation.definition'],
     level: 'N2',
     title: '〜にほかならない',
     meaning: 'is nothing but ~ / is precisely ~',
@@ -65,6 +70,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nishiro-nishiro',
+    categories: ['examples.alternative', 'contrast.concession'],
     level: 'N2',
     title: '〜にしろ〜にしろ / 〜にせよ〜にせよ',
     meaning: 'whether ~ or ~',
@@ -77,6 +83,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nishiro',
+    categories: ['contrast.concession'],
     level: 'N2',
     title: '〜にしろ / 〜にせよ / 〜にしても',
     meaning: 'even if ~ / granting that ~',
@@ -89,6 +96,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-tehajimete',
+    categories: ['time.sequence', 'condition.requirement'],
     level: 'N2',
     title: '〜てはじめて',
     meaning: 'not until ~ / only after ~',
@@ -101,6 +109,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-wo-toshite',
+    categories: ['method.perspective', 'explanation.definition'],
     level: 'N2',
     title: '〜を〜として / 〜とする',
     meaning: 'regard ~ as ~ / take ~ as ~',
@@ -113,6 +122,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nisaishite',
+    categories: ['time.point'],
     level: 'N2',
     title: '〜に際して',
     meaning: 'on the occasion of ~ / when ~',
@@ -125,6 +135,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-niatatte',
+    categories: ['time.point'],
     level: 'N2',
     title: '〜に当たって',
     meaning: 'at the time of ~ / on (undertaking) ~',
@@ -137,6 +148,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nisakidatte',
+    categories: ['time.sequence'],
     level: 'N2',
     title: '〜に先立って',
     meaning: 'prior to ~ / in advance of ~',
@@ -149,6 +161,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-wokikkakeni',
+    categories: ['cause.reason', 'time.point'],
     level: 'N2',
     title: '〜をきっかけに（して）',
     meaning: 'with ~ as a trigger / prompted by ~',
@@ -161,6 +174,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-wokeikini',
+    categories: ['cause.reason', 'time.point'],
     level: 'N2',
     title: '〜を契機に（して）',
     meaning: 'taking ~ as a turning point',
@@ -173,6 +187,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-teirai',
+    categories: ['time.duration'],
     level: 'N2',
     title: '〜て以来',
     meaning: 'ever since ~',
@@ -185,6 +200,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-karatoiumono',
+    categories: ['time.duration', 'state.change'],
     level: 'N2',
     title: '〜からというもの',
     meaning: 'ever since ~ (a lasting change followed)',
@@ -197,6 +213,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-mokamawazu',
+    categories: ['emphasis.negation', 'contrast.concession'],
     level: 'N2',
     title: '〜も構わず',
     meaning: 'without caring about ~',
@@ -209,6 +226,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-naraizashirazu',
+    categories: ['contrast.opposition', 'condition.hypothetical'],
     level: 'N2',
     title: '〜ならいざしらず / 〜はいざしらず',
     meaning: "if it were ~ that'd be one thing, but ~",
@@ -221,6 +239,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-osoregaaru',
+    categories: ['judgment.conjecture', 'emotion.feeling'],
     level: 'N2',
     title: '〜おそれがある',
     meaning: 'there is a risk / fear that ~',
@@ -233,6 +252,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nikimatteiru',
+    categories: ['judgment.certainty'],
     level: 'N2',
     title: '〜に決まっている',
     meaning: 'surely ~ / bound to be ~',
@@ -245,6 +265,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-monoka',
+    categories: ['emphasis.negation', 'emotion.exclamation'],
     level: 'N2',
     title: '〜ものか / 〜もんか',
     meaning: 'absolutely not ~ / as if I would ~',
@@ -257,6 +278,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-teshouganai',
+    categories: ['emotion.feeling', 'degree.extreme'],
     level: 'N2',
     title: '〜てしょうがない / 〜てしかたがない',
     meaning: "can't help ~ / unbearably ~",
@@ -269,6 +291,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-tetamaranai',
+    categories: ['emotion.feeling', 'degree.extreme'],
     level: 'N2',
     title: '〜てたまらない',
     meaning: 'unbearably ~ / dying to ~',
@@ -281,6 +304,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-tenaranai',
+    categories: ['emotion.feeling', 'degree.extreme'],
     level: 'N2',
     title: '〜てならない',
     meaning: "can't help feeling ~",
@@ -293,6 +317,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-naidewairarenai',
+    categories: ['emotion.feeling', 'obligation.necessity'],
     level: 'N2',
     title: '〜ないではいられない',
     meaning: "can't help but ~",
@@ -305,6 +330,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-gatai',
+    categories: ['judgment.evaluation', 'possibility.ability'],
     level: 'N2',
     title: '〜がたい',
     meaning: 'hard to ~ / difficult to ~',
@@ -317,6 +343,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-dokorodewanai',
+    categories: ['contrast.opposition', 'emphasis.negation'],
     level: 'N2',
     title: '〜どころではない',
     meaning: 'not the situation for ~ / far from ~',
@@ -329,6 +356,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-warini',
+    categories: ['contrast.unexpected', 'comparison.compare'],
     level: 'N2',
     title: '〜わりに（は）',
     meaning: 'considering ~ / for ~',
@@ -341,6 +369,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nishitewa',
+    categories: ['contrast.unexpected', 'comparison.compare'],
     level: 'N2',
     title: '〜にしては',
     meaning: "for ~ / considering it's ~",
@@ -353,6 +382,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-dakenokotowaaru',
+    categories: ['cause.grounds', 'judgment.evaluation'],
     level: 'N2',
     title: '〜だけのことはある',
     meaning: 'no wonder ~ / worthy of ~',
@@ -365,6 +395,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nominarazu',
+    categories: ['examples.listing', 'emphasis.emphasize'],
     level: 'N2',
     title: '〜のみならず',
     meaning: 'not only ~ but also ~',
@@ -377,6 +408,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-bakarika',
+    categories: ['examples.listing', 'emphasis.emphasize'],
     level: 'N2',
     title: '〜ばかりか',
     meaning: 'not only ~ but even ~',
@@ -389,6 +421,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-hamotoyori',
+    categories: ['examples.listing', 'emphasis.emphasize'],
     level: 'N2',
     title: '〜はもとより',
     meaning: 'not to mention ~ / let alone ~',
@@ -401,6 +434,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-bakarini',
+    categories: ['cause.reason', 'cause.result'],
     level: 'N2',
     title: '〜ばかりに',
     meaning: 'simply because ~ (unfortunate result)',
@@ -413,6 +447,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-karaniwa',
+    categories: ['cause.grounds', 'cause.premise'],
     level: 'N2',
     title: '〜からには',
     meaning: 'now that ~ / since ~ (so naturally)',
@@ -425,6 +460,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-wotowazu',
+    categories: ['contrast.concession', 'condition.general'],
     level: 'N2',
     title: '〜を問わず',
     meaning: 'regardless of ~ / irrespective of ~',
@@ -437,6 +473,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nikakawarazu',
+    categories: ['contrast.concession', 'condition.general'],
     level: 'N2',
     title: '〜にかかわらず',
     meaning: 'regardless of ~ / whether or not ~',
@@ -449,6 +486,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nomotode',
+    categories: ['condition.general', 'method.means'],
     level: 'N2',
     title: '〜のもとで / 〜のもとに',
     meaning: 'under (the guidance / conditions of) ~',
@@ -461,6 +499,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nisotte',
+    categories: ['method.means', 'space.direction'],
     level: 'N2',
     title: '〜に沿って',
     meaning: 'along ~ / in accordance with ~',
@@ -473,6 +512,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nihanshite',
+    categories: ['contrast.opposition'],
     level: 'N2',
     title: '〜に反して',
     meaning: 'contrary to ~ / against ~',
@@ -485,6 +525,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-tsuke-tsuke',
+    categories: ['time.repetition', 'examples.alternative'],
     level: 'N2',
     title: '〜につけ（〜につけ）',
     meaning: 'every time ~ / whether ~ or ~',
@@ -497,6 +538,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-mo-ba-mo',
+    categories: ['examples.listing', 'emphasis.emphasize'],
     level: 'N2',
     title: '〜も〜ば〜も',
     meaning: 'both ~ and ~ / not only ~ but also ~',
@@ -509,6 +551,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-kkiri',
+    categories: ['degree.limit', 'time.point'],
     level: 'N2',
     title: '〜きり / 〜っきり',
     meaning: 'only ~ / and that was the last ~',
@@ -521,6 +564,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-ge',
+    categories: ['judgment.conjecture', 'evidence.source'],
     level: 'N2',
     title: '〜げ',
     meaning: 'seeming ~ / looking ~',
@@ -533,6 +577,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-sae',
+    categories: ['emphasis.emphasize'],
     level: 'N2',
     title: '〜さえ',
     meaning: 'even ~',
@@ -545,6 +590,7 @@ export const N2_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n2x-nuku',
+    categories: ['time.completion', 'degree.extent'],
     level: 'N2',
     title: '〜抜く',
     meaning: 'do ~ thoroughly to the very end',

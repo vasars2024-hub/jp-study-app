@@ -1,0 +1,968 @@
+{
+  "generatedAt": "2026-07-19T10:20:21.055Z",
+  "totals": {
+    "all": 2227,
+    "ja": 2145,
+    "zh": 82,
+    "uniqueIds": 2227
+  },
+  "levels": {
+    "N5": 50,
+    "N4": 480,
+    "N3": 675,
+    "N2": 531,
+    "N1": 409,
+    "HSK1": 12,
+    "HSK2": 10,
+    "HSK3": 10,
+    "HSK4": 8,
+    "HSK5": 8,
+    "HSK6": 8,
+    "HSK7": 6,
+    "HSK8": 6,
+    "HSK9": 6,
+    "HSK10": 8
+  },
+  "levelsByLang": {
+    "ja": {
+      "N5": 50,
+      "N4": 480,
+      "N3": 675,
+      "N2": 531,
+      "N1": 409
+    },
+    "zh": {
+      "HSK1": 12,
+      "HSK2": 10,
+      "HSK3": 10,
+      "HSK4": 8,
+      "HSK5": 8,
+      "HSK6": 8,
+      "HSK7": 6,
+      "HSK8": 6,
+      "HSK9": 6,
+      "HSK10": 8
+    }
+  },
+  "completeness": {
+    "meaning": {
+      "missing": 0,
+      "pct": 0
+    },
+    "structure": {
+      "missing": 0,
+      "pct": 0
+    },
+    "explanation": {
+      "missing": 0,
+      "pct": 0
+    },
+    "examples": {
+      "missing": 1820,
+      "pct": 81.7
+    },
+    "exampleTranslation": {
+      "missing": 0,
+      "pct": 0
+    },
+    "exampleReading": {
+      "missing": 0,
+      "pct": 0
+    },
+    "source": {
+      "missing": 2227,
+      "pct": 100
+    }
+  },
+  "taxonomy": {
+    "declaredIds": 185,
+    "usedIds": 89,
+    "unusedIds": 96,
+    "unusedIdList": [
+      "described",
+      "rate-parallel",
+      "exclamatory",
+      "percentage-parallel",
+      "feel",
+      "at-the-same-time",
+      "process",
+      "status-action",
+      "denote-by-example",
+      "time-situation",
+      "direction",
+      "location-method-cause",
+      "time-direction",
+      "point-of-departure-receipt",
+      "level",
+      "wish",
+      "invite-advise",
+      "obligatory",
+      "judge",
+      "intent",
+      "benefit",
+      "conjugated-from",
+      "orders",
+      "emphasize-on-level",
+      "purpose-nouns",
+      "relationships-in-time",
+      "planning-rules",
+      "purpose-target",
+      "achievement",
+      "comes-next",
+      "condition-requirement",
+      "case",
+      "represented-by-example",
+      "limit-extreme",
+      "reaching",
+      "taste-point-of-view",
+      "remind",
+      "standard",
+      "time-space",
+      "short-time",
+      "results-state",
+      "as",
+      "suggest",
+      "emphasize-the-negative",
+      "aspiration",
+      "refuse",
+      "levels-are-few",
+      "adjective",
+      "listed",
+      "how-to-say-the-first",
+      "origin-and-end-point",
+      "relationships-follow",
+      "determination-decisive",
+      "extreme-example",
+      "queue-listing",
+      "state-contrast",
+      "speak",
+      "repeat-habits",
+      "order",
+      "request-permission",
+      "relationships-behind",
+      "communication-skillful",
+      "starting-point",
+      "vague",
+      "transfer-the-story",
+      "request-suggestion",
+      "of-course",
+      "innocent",
+      "cause-time-relationship",
+      "method",
+      "much-less-volume",
+      "value",
+      "related-respectively",
+      "forced",
+      "unexpected",
+      "condition-general",
+      "willpower-intention",
+      "description-explanation",
+      "invite-to-invite",
+      "negative-in-the-past",
+      "space-relations",
+      "as-expected",
+      "give",
+      "premise",
+      "affection",
+      "expected",
+      "attach",
+      "order-definition",
+      "through",
+      "halfway",
+      "blame",
+      "contemptuous",
+      "ratio",
+      "shortly-before",
+      "conditions-contrary-to-reality",
+      "amount-roughly"
+    ],
+    "unknownIdList": [],
+    "otherOnly": 987,
+    "noFunctions": 0,
+    "distribution": {
+      "other": 987,
+      "condition": 247,
+      "negative": 237,
+      "limit": 134,
+      "cause-reason": 124,
+      "concessions": 102,
+      "necessary-obligation": 95,
+      "time-sequence": 86,
+      "ability": 79,
+      "speculation": 53,
+      "compare": 51,
+      "definition": 44,
+      "simultaneous": 42,
+      "result": 33,
+      "request": 28,
+      "desire": 27,
+      "purpose-goal": 25,
+      "emphasize": 22,
+      "action-effort": 19,
+      "surprise": 17,
+      "finish": 16,
+      "reverent-humble": 15,
+      "heard": 15,
+      "ban": 14,
+      "experience": 13,
+      "for-example": 12,
+      "plan": 11,
+      "invite-suggest": 9,
+      "decision": 8,
+      "evaluate": 8,
+      "add": 6,
+      "passive": 5,
+      "describe": 5,
+      "allow": 5,
+      "contrast": 5,
+      "frequency": 4,
+      "amount": 4,
+      "confirm": 3,
+      "asked": 3,
+      "similarity-degree": 3,
+      "advice": 3,
+      "continuity": 3,
+      "explain": 3,
+      "extremes": 3,
+      "completed": 2,
+      "action-status": 2,
+      "situation": 2,
+      "past-state": 2,
+      "grounds": 2,
+      "condition-contrary": 2,
+      "unexpected-outcome": 2,
+      "status": 1,
+      "change-the-way": 1,
+      "place": 1,
+      "characteristics": 1,
+      "modify": 1,
+      "range": 1,
+      "companion": 1,
+      "future-time": 1,
+      "act": 1,
+      "time": 1,
+      "condition-assumption": 1,
+      "proportional": 1,
+      "trend": 1,
+      "condition-sufficient": 1,
+      "exception": 1,
+      "period": 1,
+      "information-resource": 1,
+      "compare-contrast": 1,
+      "invariant": 1,
+      "emphasize-negative": 1,
+      "means-methods": 1,
+      "story-topic": 1,
+      "perspective-way": 1,
+      "criticize": 1,
+      "regret": 1,
+      "determination-decision": 1,
+      "similarities": 1,
+      "much-less-on-level": 1,
+      "arguments-affirmative": 1,
+      "immediately-after": 1,
+      "approve-agree": 1,
+      "corrections": 1,
+      "deductive": 1,
+      "conclude": 1,
+      "warning": 1,
+      "assumptions": 1,
+      "selective": 1,
+      "highest-level": 1
+    }
+  },
+  "register": {
+    "all": {
+      "neutral": 2184,
+      "casual": 10,
+      "business": 17,
+      "literary": 16
+    },
+    "byLang": {
+      "ja": {
+        "neutral": 2135,
+        "casual": 3,
+        "business": 6,
+        "literary": 1
+      },
+      "zh": {
+        "neutral": 49,
+        "casual": 7,
+        "business": 11,
+        "literary": 15
+      }
+    }
+  },
+  "tagProvenance": {
+    "functions": 0,
+    "register": 0,
+    "both": 0
+  },
+  "duplicates": {
+    "duplicateIdCount": 0,
+    "duplicateIdList": [],
+    "nearDuplicateGroups": 220,
+    "nearDuplicateSample": [
+      {
+        "key": "ja|からまで",
+        "count": 2,
+        "ids": [
+          "n5-kara-made",
+          "n4m-g-370071"
+        ],
+        "levels": [
+          "N5",
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|ている",
+        "count": 3,
+        "ids": [
+          "n5-te-iru",
+          "n4m-g-92cf53",
+          "n4m-g-68eabb"
+        ],
+        "levels": [
+          "N5",
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|前に",
+        "count": 2,
+        "ids": [
+          "n5-mae-ni",
+          "n4m-g-b64ec5"
+        ],
+        "levels": [
+          "N5",
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|あとで",
+        "count": 2,
+        "ids": [
+          "n5-ato-de",
+          "n4m-g-341743"
+        ],
+        "levels": [
+          "N5",
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|ながら",
+        "count": 2,
+        "ids": [
+          "n5-nagara",
+          "n4m-g-2ec369"
+        ],
+        "levels": [
+          "N5",
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|でしょう",
+        "count": 2,
+        "ids": [
+          "n5-deshou",
+          "n4m-g-b9b1d4"
+        ],
+        "levels": [
+          "N5",
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|なければならない",
+        "count": 2,
+        "ids": [
+          "n4-nakereba-naranai",
+          "n4m-g-e8906e"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|なくてもいい",
+        "count": 2,
+        "ids": [
+          "n4-nakutemo-ii",
+          "n4m-g-cf4ee1"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|ほうがいい",
+        "count": 2,
+        "ids": [
+          "n4-ta-hou-ga-ii",
+          "n4m-g-83aa14"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|つもりだ",
+        "count": 3,
+        "ids": [
+          "n4-tsumori",
+          "n4m-g-e5e54c",
+          "n3m-g-e5e54c"
+        ],
+        "levels": [
+          "N4",
+          "N3"
+        ]
+      },
+      {
+        "key": "ja|予定だ",
+        "count": 2,
+        "ids": [
+          "n4-yotei",
+          "n4m-g-a16f6c"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|たことがある",
+        "count": 2,
+        "ids": [
+          "n4-ta-koto-ga-aru",
+          "n4m-g-f083a4"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|なら",
+        "count": 3,
+        "ids": [
+          "n4-nara",
+          "n4m-g-11f721",
+          "n3m-g-11f721"
+        ],
+        "levels": [
+          "N4",
+          "N3"
+        ]
+      },
+      {
+        "key": "ja|ので",
+        "count": 2,
+        "ids": [
+          "n4-node",
+          "n4m-g-d3020d"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|のに",
+        "count": 4,
+        "ids": [
+          "n4-noni",
+          "n4m-g-ac789a",
+          "n4m-g-f6dffd",
+          "n4m-g-a00391"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|し",
+        "count": 2,
+        "ids": [
+          "n4-shi",
+          "n3m-g-98eb0a"
+        ],
+        "levels": [
+          "N4",
+          "N3"
+        ]
+      },
+      {
+        "key": "ja|らしい",
+        "count": 3,
+        "ids": [
+          "n4-rashii",
+          "n4m-g-d27005",
+          "n3m-g-d27005"
+        ],
+        "levels": [
+          "N4",
+          "N3"
+        ]
+      },
+      {
+        "key": "ja|かもしれない",
+        "count": 3,
+        "ids": [
+          "n4-kamoshirenai",
+          "n4m-g-8fd871",
+          "n4m-g-64604f"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|はずだ",
+        "count": 3,
+        "ids": [
+          "n4-hazu",
+          "n4m-g-4eb1b3",
+          "n3m-g-4eb1b3"
+        ],
+        "levels": [
+          "N4",
+          "N3"
+        ]
+      },
+      {
+        "key": "ja|てある",
+        "count": 2,
+        "ids": [
+          "n4-te-aru",
+          "n4m-g-532a11"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|ておく",
+        "count": 2,
+        "ids": [
+          "n4-te-oku",
+          "n4m-g-a37ae3"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|てしまう",
+        "count": 2,
+        "ids": [
+          "n4-te-shimau",
+          "n4m-g-14edef"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|てみる",
+        "count": 2,
+        "ids": [
+          "n4-te-miru",
+          "n4m-g-5f256e"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|なさい",
+        "count": 2,
+        "ids": [
+          "n4-nasai",
+          "n4m-g-8b58fd"
+        ],
+        "levels": [
+          "N4"
+        ]
+      },
+      {
+        "key": "ja|ようにする",
+        "count": 2,
+        "ids": [
+          "n4-you-ni-suru",
+          "n4m-g-c6b2bd"
+        ],
+        "levels": [
+          "N4"
+        ]
+      }
+    ],
+    "conflictingLevelGroups": 98,
+    "conflictingLevelSample": [
+      {
+        "title": "〜から〜まで",
+        "lang": "ja",
+        "levels": [
+          "N5",
+          "N4"
+        ],
+        "ids": [
+          "n5-kara-made",
+          "n4m-g-370071"
+        ]
+      },
+      {
+        "title": "〜ている",
+        "lang": "ja",
+        "levels": [
+          "N5",
+          "N4"
+        ],
+        "ids": [
+          "n5-te-iru",
+          "n4m-g-92cf53",
+          "n4m-g-68eabb"
+        ]
+      },
+      {
+        "title": "〜前に",
+        "lang": "ja",
+        "levels": [
+          "N5",
+          "N4"
+        ],
+        "ids": [
+          "n5-mae-ni",
+          "n4m-g-b64ec5"
+        ]
+      },
+      {
+        "title": "〜あとで",
+        "lang": "ja",
+        "levels": [
+          "N5",
+          "N4"
+        ],
+        "ids": [
+          "n5-ato-de",
+          "n4m-g-341743"
+        ]
+      },
+      {
+        "title": "〜ながら",
+        "lang": "ja",
+        "levels": [
+          "N5",
+          "N4"
+        ],
+        "ids": [
+          "n5-nagara",
+          "n4m-g-2ec369"
+        ]
+      },
+      {
+        "title": "〜でしょう",
+        "lang": "ja",
+        "levels": [
+          "N5",
+          "N4"
+        ],
+        "ids": [
+          "n5-deshou",
+          "n4m-g-b9b1d4"
+        ]
+      },
+      {
+        "title": "〜つもりだ",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-tsumori",
+          "n4m-g-e5e54c",
+          "n3m-g-e5e54c"
+        ]
+      },
+      {
+        "title": "〜なら",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-nara",
+          "n4m-g-11f721",
+          "n3m-g-11f721"
+        ]
+      },
+      {
+        "title": "〜し",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-shi",
+          "n3m-g-98eb0a"
+        ]
+      },
+      {
+        "title": "〜らしい",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-rashii",
+          "n4m-g-d27005",
+          "n3m-g-d27005"
+        ]
+      },
+      {
+        "title": "〜はずだ",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-hazu",
+          "n4m-g-4eb1b3",
+          "n3m-g-4eb1b3"
+        ]
+      },
+      {
+        "title": "〜ようになる",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-you-ni-naru",
+          "n4m-g-6cbc0c",
+          "n3m-g-6cbc0c"
+        ]
+      },
+      {
+        "title": "〜ことになる",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-koto-ni-naru",
+          "n4m-g-431e94",
+          "n3m-g-431e94"
+        ]
+      },
+      {
+        "title": "〜という",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4-to-iu",
+          "n3m-g-12772f"
+        ]
+      },
+      {
+        "title": "でも",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N2"
+        ],
+        "ids": [
+          "n4m-g-142e26",
+          "n2m-g-142e26"
+        ]
+      },
+      {
+        "title": "... のだ",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-4c6375",
+          "n3m-g-4c6375"
+        ]
+      },
+      {
+        "title": "ても",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-a93e17",
+          "n4m-g-4eb310",
+          "n3m-g-a93e17"
+        ]
+      },
+      {
+        "title": "と",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-a5401f",
+          "n3m-g-a5401f"
+        ]
+      },
+      {
+        "title": "だから…のだ",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N2"
+        ],
+        "ids": [
+          "n4m-g-c54654",
+          "n2m-g-c54654"
+        ]
+      },
+      {
+        "title": "てもかまわない",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-468c6e",
+          "n3-temo-kamawanai"
+        ]
+      },
+      {
+        "title": "... ば ...",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-5aac91",
+          "n4m-g-4e4cfe",
+          "n4m-g-f725e7",
+          "n4m-g-b7d64f",
+          "n3m-g-4e4cfe"
+        ]
+      },
+      {
+        "title": "... の",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-3e1e9e",
+          "n4m-g-359ebe",
+          "n4m-g-b4dfbc",
+          "n3m-g-359ebe"
+        ]
+      },
+      {
+        "title": "まで",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3",
+          "N2"
+        ],
+        "ids": [
+          "n4m-g-ff113c",
+          "n3m-g-ff113c",
+          "n2m-g-ff113c"
+        ]
+      },
+      {
+        "title": "ようだ",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-3f87a2",
+          "n3m-g-3f87a2"
+        ]
+      },
+      {
+        "title": "ようとする",
+        "lang": "ja",
+        "levels": [
+          "N4",
+          "N3"
+        ],
+        "ids": [
+          "n4m-g-b31c87",
+          "n3-you-to-suru",
+          "n3m-g-b31c87"
+        ]
+      }
+    ]
+  },
+  "coherence": {
+    "langLevelMismatch": 0,
+    "langLevelMismatchSample": []
+  },
+  "sparseLevels": [
+    {
+      "level": "HSK1",
+      "count": 12
+    },
+    {
+      "level": "HSK2",
+      "count": 10
+    },
+    {
+      "level": "HSK3",
+      "count": 10
+    },
+    {
+      "level": "HSK4",
+      "count": 8
+    },
+    {
+      "level": "HSK5",
+      "count": 8
+    },
+    {
+      "level": "HSK6",
+      "count": 8
+    },
+    {
+      "level": "HSK7",
+      "count": 6
+    },
+    {
+      "level": "HSK8",
+      "count": 6
+    },
+    {
+      "level": "HSK9",
+      "count": 6
+    },
+    {
+      "level": "HSK10",
+      "count": 8
+    }
+  ],
+  "emptyLevels": []
+}

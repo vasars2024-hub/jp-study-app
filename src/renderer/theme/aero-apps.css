@@ -80,6 +80,146 @@
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shadow-color) 35%, transparent);
 }
 
+.aero-settings-terminal {
+  --aero-special-accent: var(--accent);
+  --aero-special-panel: color-mix(in srgb, var(--panel) 86%, transparent);
+  --aero-special-panel-2: color-mix(in srgb, var(--panel-2) 88%, transparent);
+  --aero-special-border: color-mix(in srgb, var(--accent) 32%, var(--border));
+  --aero-special-text: var(--text);
+  --aero-special-muted: var(--muted);
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--aero-special-border);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--text) 8%, transparent), transparent),
+    var(--aero-special-panel);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 14%, transparent), 0 12px 28px color-mix(in srgb, var(--shadow-color, #000) 14%, transparent);
+  font-family: 'Tahoma', 'Segoe UI', sans-serif;
+}
+
+:root[data-materials='aero'] .aero-settings-terminal {
+  --aero-special-accent: #3194cd;
+  --aero-special-panel: rgba(198, 226, 246, 0.68);
+  --aero-special-panel-2: #06131f;
+  --aero-special-border: rgba(86, 139, 188, 0.34);
+  --aero-special-text: #17324a;
+  --aero-special-muted: #4f6b80;
+}
+
+.aero-settings-terminal-screen {
+  min-height: 86px;
+  max-height: 128px;
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--aero-special-accent) 36%, var(--border));
+  background: color-mix(in srgb, var(--panel) 76%, #06131f);
+  color: var(--text);
+  font-family: 'Lucida Console', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.aero-settings-terminal-command,
+.aero-settings-terminal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.aero-settings-terminal-command span {
+  color: var(--aero-special-text);
+  font-weight: 700;
+}
+
+.aero-settings-terminal-command input {
+  flex: 1;
+  min-width: 160px;
+  border: 1px solid color-mix(in srgb, var(--aero-special-accent) 46%, var(--border));
+  border-radius: 3px;
+  background: var(--control-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.aero-settings-terminal-command button,
+.aero-settings-terminal-actions button {
+  border: 1px solid color-mix(in srgb, var(--aero-special-accent) 50%, var(--border));
+  border-radius: 4px;
+  color: var(--aero-special-text);
+  background: color-mix(in srgb, var(--aero-special-panel-2) 72%, var(--panel));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent);
+  font: inherit;
+  font-size: 11px;
+}
+
+.aero-feature-grid {
+  --aero-special-accent: var(--accent);
+  --aero-special-panel: color-mix(in srgb, var(--panel) 86%, transparent);
+  --aero-special-panel-2: color-mix(in srgb, var(--panel-2) 88%, transparent);
+  --aero-special-border: color-mix(in srgb, var(--accent) 32%, var(--border));
+  --aero-special-text: var(--text);
+  --aero-special-muted: var(--muted);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+:root[data-materials='aero'] .aero-feature-grid {
+  --aero-special-accent: #3194cd;
+  --aero-special-panel: rgba(198, 226, 246, 0.68);
+  --aero-special-panel-2: #06131f;
+  --aero-special-border: rgba(86, 139, 188, 0.34);
+  --aero-special-text: #17324a;
+  --aero-special-muted: #4f6b80;
+}
+
+.aero-feature-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: start;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--aero-special-accent) 26%, var(--border));
+  border-radius: 6px;
+  background: var(--aero-special-panel);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.aero-feature-toggle.is-active {
+  border-color: color-mix(in srgb, var(--aero-special-accent) 56%, var(--border));
+  background: color-mix(in srgb, var(--aero-special-accent) 14%, var(--aero-special-panel));
+}
+
+.aero-feature-toggle input {
+  margin-top: 2px;
+}
+
+.aero-feature-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.aero-feature-toggle strong {
+  color: var(--aero-special-text);
+  font-size: 12px;
+}
+
+.aero-feature-toggle small {
+  color: var(--aero-special-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.aero-feature-toggle code {
+  color: var(--aero-special-accent);
+  font-size: 10px;
+}
+
 /* ---------- Toolbar: compact command surface with restrained gloss --------- */
 :root[data-materials='aero'] .ui-toolbar {
   min-height: var(--app-toolbar-h);
@@ -2943,6 +3083,7 @@
 }
 
 :root[data-materials='aero'] .aero-library-preview {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 2 / 3;
@@ -3159,7 +3300,7 @@
 }
 
 :root[data-materials='aero'] .aero-stat-command.danger {
-  color: color-mix(in srgb, var(--accent) 78%, #8a2d3d);
+  color: color-mix(in srgb, var(--red) 78%, var(--red-deep));
 }
 
 :root[data-materials='aero'] .aero-resource-search,
@@ -3499,6 +3640,29 @@
 
 :root[data-materials='aero'] .aero-stats-knowledge .wk-head {
   margin-bottom: 6px;
+}
+
+:root[data-materials='aero'] .aero-stats-knowledge .stats-level-estimate {
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--panel) 72%, #ffffff);
+}
+
+:root[data-materials='aero'] .aero-stats-knowledge .stats-level-badge {
+  min-width: 3.6rem;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 18px;
+}
+
+:root[data-materials='aero'] .aero-stats-knowledge .stats-level-title {
+  font-size: var(--font-size-xs);
+}
+
+:root[data-materials='aero'] .aero-stats-knowledge .stats-level-hint {
+  font-size: 11px;
 }
 
 :root[data-materials='aero'] .aero-stats-knowledge .stats-cards {
@@ -4324,7 +4488,7 @@
 }
 
 :root[data-materials='aero'] .deck-action-item.danger {
-  color: color-mix(in srgb, var(--accent) 86%, #5a1823);
+  color: color-mix(in srgb, var(--red) 86%, var(--red-deep));
 }
 
 :root[data-materials='aero'] .deck-action-sub {
@@ -4768,6 +4932,14 @@
   font-size: var(--font-size-sm);
 }
 
+/* Licence credit for imported example sentences — present but unobtrusive. */
+:root[data-materials='aero'] .aero-gram-attribution {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  opacity: 0.75;
+}
+
 /* =============================================================================
    Vista Explorer application pass
    ----------------------------------------------------------------------------- */
@@ -4783,7 +4955,7 @@
 }
 
 :root[data-materials='aero'] .ui-app-chrome {
-  color: #15354a;
+  color: #17425f;
   background:
     linear-gradient(180deg, rgba(44, 145, 231, 0.56) 0, rgba(69, 169, 241, 0.36) 54px, rgba(255, 255, 255, 0.96) 112px),
     var(--vista-app-pane);
@@ -5001,7 +5173,7 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,0.92), rgba(238, 248, 253, 0.92)),
     #ffffff;
-  color: #15354a;
+  color: #17425f;
   box-shadow: inset 0 1px 2px rgba(38, 101, 150, 0.2);
 }
 
@@ -5080,8 +5252,9 @@
 }
 
 :root[data-materials='aero'] .aero-settings .os-set-nav-v2 {
-  width: auto;
-  min-width: 0;
+  width: 200px;
+  min-width: 200px;
+  padding: 6px 5px;
   max-height: 100%;
   overflow-y: auto;
 }
@@ -5091,7 +5264,7 @@
   max-height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-bottom: 34px;
+  padding: 10px 11px 34px 4px;
   overscroll-behavior: contain;
   pointer-events: auto;
   position: relative;
@@ -5100,6 +5273,18 @@
 
 :root[data-materials='aero'] .aero-settings .os-set-card {
   overflow: visible;
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-card-head {
+  padding: 8px 10px;
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-card-body {
+  padding: 9px 10px 10px;
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-card-advanced {
+  padding: 8px 10px 10px;
 }
 
 :root[data-materials='aero'] .aero-settings .os-set-card-body,
@@ -5115,6 +5300,47 @@
   pointer-events: auto;
 }
 
+:root[data-materials='aero'] .aero-settings .os-set-home {
+  gap: 11px;
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-home-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 70%, #ffffff);
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-status-chip {
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(226,238,242,0.5));
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-quick-grid {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px;
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-quick-card {
+  min-height: 36px;
+  gap: 8px;
+  padding: 7px 9px;
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-recent-list {
+  padding: 6px;
+}
+
+:root[data-materials='aero'] .aero-settings .os-set-recent-item {
+  min-height: 28px;
+  padding: 5px 8px;
+}
+
 /* Reader lookup and settings popovers: Vista glass utility panels. */
 :root[data-materials='aero'] .dict-popup,
 :root[data-materials='aero'] .tr-popup {
@@ -5127,7 +5353,7 @@
   box-shadow:
     0 18px 38px rgba(0, 32, 86, 0.42),
     inset 0 1px 0 rgba(255,255,255,0.92);
-  color: #12364d;
+  color: #17425f;
   font: 12px Tahoma, "MS Sans Serif", sans-serif;
   scrollbar-color: #ff7fa5 #f4fbff;
   backdrop-filter: blur(7px) saturate(1.18);
@@ -5273,7 +5499,7 @@
 :root[data-materials='aero'] .dict-popup .dict-pitch-pattern,
 :root[data-materials='aero'] .dict-popup .dict-glossary-html,
 :root[data-materials='aero'] .dict-popup .dict-senses {
-  color: #12364d;
+  color: #17425f;
 }
 
 :root[data-materials='aero'] .dict-popup .dict-add {
@@ -5301,7 +5527,7 @@
   border: 1px solid #7aa5c6;
   border-radius: 3px;
   background: #ffffff;
-  color: #12364d;
+  color: #17425f;
   box-shadow: 0 10px 24px rgba(0, 32, 86, 0.28);
 }
 
@@ -5330,7 +5556,7 @@
   box-shadow:
     0 16px 36px rgba(0, 32, 86, 0.38),
     inset 0 1px 0 rgba(255,255,255,0.92);
-  color: #12364d;
+  color: #17425f;
   font-family: Tahoma, "MS Sans Serif", sans-serif;
 }
 
@@ -5376,7 +5602,7 @@
   border: 1px solid #7aa5c6;
   border-radius: 2px;
   background: #ffffff;
-  color: #12364d;
+  color: #17425f;
 }
 
 :root[data-materials='aero'] .settings-panel.reader-settings .sp-seg-btn,
@@ -5396,7 +5622,7 @@
 :root[data-materials='aero'] .aero-anki-chrome .anki-view {
   gap: 8px;
   padding: 14px 18px 10px;
-  color: #15364c;
+  color: #17425f;
   font: 12px Tahoma, "MS Sans Serif", sans-serif;
 }
 
@@ -5463,7 +5689,7 @@
 :root[data-materials='aero'] .aero-anki-chrome .fm-field-name,
 :root[data-materials='aero'] .aero-anki-chrome .anki-note-type-label,
 :root[data-materials='aero'] .aero-anki-chrome .card-preview-face-label {
-  color: #15364c;
+  color: #17425f;
   font: 700 11px Tahoma, "MS Sans Serif", sans-serif;
 }
 
@@ -5564,7 +5790,7 @@
   background:
     linear-gradient(180deg, #ffffff, #f6fdff),
     #ffffff;
-  color: #15364c;
+  color: #17425f;
   font: 12px Tahoma, "MS Sans Serif", sans-serif;
   box-shadow: inset 1px 1px 2px rgba(45, 98, 137, 0.2);
 }
@@ -5692,7 +5918,7 @@
   padding: 0 0 7px;
   border-bottom: 1px solid #9bc8dd;
   background: transparent;
-  color: #15364c;
+  color: #17425f;
   box-shadow: none;
 }
 

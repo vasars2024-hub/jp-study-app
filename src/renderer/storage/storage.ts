@@ -37,6 +37,8 @@ export const IDB_KEYS = {
   annotations: 'reading-annotations',
   /** Map of bookId → bookmarks. */
   bookmarks: 'reading-bookmarks',
+  /** Map of grammar point id → human review verdict on its imported examples. */
+  grammarCuration: 'grammar-curation',
 } as const;
 
 /** localStorage keys that hold the matching hot-path caches. */
@@ -55,11 +57,36 @@ export const UI_STATE_KEYS = [
   'jp-app-zoom',
 ] as const;
 
-/** Fire-and-forget mirror of a heavy value into IndexedDB. */
+const pendingMirrors = new Map<string, unknown>();
+let mirrorTimer: number | null = null;
+
+function scheduleIdle(fn: () => void): void {
+  const idle = window.requestIdleCallback as
+    | ((cb: IdleRequestCallback, opts?: IdleRequestOptions) => number)
+    | undefined;
+  if (idle) {
+    idle(fn, { timeout: 2500 });
+    return;
+  }
+  window.setTimeout(fn, 250);
+}
+
+function flushMirrors(): void {
+  mirrorTimer = null;
+  const batch = Array.from(pendingMirrors.entries());
+  pendingMirrors.clear();
+  for (const [key, value] of batch) {
+    void kvSet(key, value).catch((err) => {
+      console.error(`[storage] IndexedDB mirror failed for ${key}:`, err);
+    });
+  }
+}
+
+/** Fire-and-forget mirror of a heavy value into IndexedDB, off the click path. */
 export function mirrorToIdb(key: string, value: unknown): void {
-  void kvSet(key, value).catch((err) => {
-    console.error(`[storage] IndexedDB mirror failed for ${key}:`, err);
-  });
+  pendingMirrors.set(key, value);
+  if (mirrorTimer != null) return;
+  mirrorTimer = window.setTimeout(() => scheduleIdle(flushMirrors), 120);
 }
 
 export interface StoredItemInfo {

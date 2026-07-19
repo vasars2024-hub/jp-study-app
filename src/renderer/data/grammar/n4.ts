@@ -3,6 +3,7 @@ import type { GrammarPoint } from './types';
 export const N4: GrammarPoint[] = [
   {
     id: 'n4-nakereba-naranai',
+    categories: ['obligation.necessity'],
     level: 'N4',
     title: '〜なければならない',
     meaning: 'must do ~ / have to do ~',
@@ -16,6 +17,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-nakutemo-ii',
+    categories: ['obligation.necessity', 'possibility.permission'],
     level: 'N4',
     title: '〜なくてもいい',
     meaning: "don't have to ~",
@@ -27,6 +29,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ta-hou-ga-ii',
+    categories: ['request.advice'],
     level: 'N4',
     title: '〜ほうがいい',
     meaning: "had better ~ / it's better to ~",
@@ -40,6 +43,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-tsumori',
+    categories: ['purpose.intention', 'volition.will'],
     level: 'N4',
     title: '〜つもりだ',
     meaning: 'intend to ~ / plan to ~',
@@ -52,6 +56,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-yotei',
+    categories: ['purpose.plan'],
     level: 'N4',
     title: '〜予定だ',
     meaning: 'be scheduled to ~ / plan to ~',
@@ -64,6 +69,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-potential',
+    categories: ['possibility.ability', 'voice.form'],
     level: 'N4',
     title: 'Potential form (〜られる / 〜える)',
     meaning: 'can do ~ / be able to ~',
@@ -77,6 +83,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-koto-ga-dekiru',
+    categories: ['possibility.ability'],
     level: 'N4',
     title: '〜ことができる',
     meaning: 'be able to ~ / can ~',
@@ -89,6 +96,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ta-koto-ga-aru',
+    categories: ['time.experience'],
     level: 'N4',
     title: '〜たことがある',
     meaning: 'have done ~ before (experience)',
@@ -102,6 +110,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-volitional',
+    categories: ['volition.will', 'request.invite'],
     level: 'N4',
     title: 'Volitional 〜よう / 〜おう',
     meaning: "let's ~ (casual) / I'll ~",
@@ -114,6 +123,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-to-omou',
+    categories: ['purpose.intention', 'volition.will'],
     level: 'N4',
     title: '〜ようと思う',
     meaning: 'I think I will ~ / I intend to ~',
@@ -126,6 +136,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-tara',
+    categories: ['condition.general', 'time.sequence'],
     level: 'N4',
     title: '〜たら (conditional)',
     meaning: 'if / when ~',
@@ -139,6 +150,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ba',
+    categories: ['condition.hypothetical', 'condition.general'],
     level: 'N4',
     title: '〜ば (conditional)',
     meaning: 'if ~ (general / hypothetical)',
@@ -152,6 +164,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-to-conditional',
+    categories: ['condition.general', 'cause.result'],
     level: 'N4',
     title: '〜と (natural consequence)',
     meaning: 'whenever / if ~ then (always)',
@@ -165,6 +178,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-nara',
+    categories: ['condition.general', 'discourse.topic'],
     level: 'N4',
     title: '〜なら',
     meaning: 'if it is the case that ~ / speaking of ~',
@@ -177,6 +191,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-temo',
+    categories: ['contrast.concession', 'condition.general'],
     level: 'N4',
     title: '〜ても / 〜でも',
     meaning: 'even if ~ / even though ~',
@@ -190,6 +205,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-node',
+    categories: ['cause.reason'],
     level: 'N4',
     title: '〜ので',
     meaning: 'because ~ (softer, objective)',
@@ -202,6 +218,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-noni',
+    categories: ['contrast.concession', 'contrast.unexpected'],
     level: 'N4',
     title: '〜のに',
     meaning: 'even though ~ / despite ~',
@@ -214,6 +231,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-shi',
+    categories: ['examples.listing', 'cause.reason'],
     level: 'N4',
     title: '〜し',
     meaning: 'and (listing reasons); what\'s more',
@@ -226,6 +244,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-sou-appearance',
+    categories: ['judgment.conjecture', 'evidence.source'],
     level: 'N4',
     title: '〜そうだ (looks like)',
     meaning: 'looks ~ / seems ~ (from appearance)',
@@ -239,6 +258,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-sou-hearsay',
+    categories: ['evidence.hearsay'],
     level: 'N4',
     title: '〜そうだ (hearsay)',
     meaning: 'I heard that ~ / they say ~',
@@ -251,6 +271,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-da',
+    categories: ['judgment.conjecture', 'comparison.similarity'],
     level: 'N4',
     title: '〜ようだ / 〜みたいだ',
     meaning: 'it seems / it looks like ~',
@@ -264,6 +285,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-rashii',
+    categories: ['evidence.hearsay', 'judgment.conjecture'],
     level: 'N4',
     title: '〜らしい',
     meaning: 'apparently ~ / typical of ~',
@@ -277,6 +299,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-kamoshirenai',
+    categories: ['judgment.conjecture'],
     level: 'N4',
     title: '〜かもしれない',
     meaning: 'might ~ / maybe ~',
@@ -289,6 +312,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-hazu',
+    categories: ['judgment.certainty'],
     level: 'N4',
     title: '〜はずだ',
     meaning: 'should be ~ / is expected to ~',
@@ -301,6 +325,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-jita-pairs',
+    categories: ['voice.form'],
     level: 'N4',
     title: 'Transitive / intransitive pairs',
     meaning: 'verbs that do vs. verbs that happen',
@@ -314,6 +339,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-aru',
+    categories: ['state.result', 'voice.passive'],
     level: 'N4',
     title: '〜てある',
     meaning: 'has been done (and the state remains)',
@@ -326,6 +352,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-oku',
+    categories: ['time.sequence', 'purpose.plan'],
     level: 'N4',
     title: '〜ておく',
     meaning: 'do ~ in advance / leave ~ as is',
@@ -338,6 +365,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-shimau',
+    categories: ['time.completion', 'emotion.regret'],
     level: 'N4',
     title: '〜てしまう',
     meaning: 'completely do ~ / do ~ (regret)',
@@ -351,6 +379,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-miru',
+    categories: ['state.effort'],
     level: 'N4',
     title: '〜てみる',
     meaning: 'try doing ~ (and see)',
@@ -362,6 +391,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-iku-kuru',
+    categories: ['state.change', 'time.duration'],
     level: 'N4',
     title: '〜ていく / 〜てくる',
     meaning: 'go on doing / come to / start to ~',
@@ -375,6 +405,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ageru-kureru-morau',
+    categories: ['voice.benefactive'],
     level: 'N4',
     title: 'あげる / くれる / もらう',
     meaning: 'give (out) / give (to me) / receive',
@@ -388,6 +419,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-favors',
+    categories: ['voice.benefactive'],
     level: 'N4',
     title: '〜てあげる / 〜てくれる / 〜てもらう',
     meaning: 'do a favor / have something done for you',
@@ -401,6 +433,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-passive',
+    categories: ['voice.passive'],
     level: 'N4',
     title: 'Passive 〜られる',
     meaning: 'be done to / suffer ~ (受身)',
@@ -413,6 +446,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-causative',
+    categories: ['voice.form'],
     level: 'N4',
     title: 'Causative 〜させる',
     meaning: 'make / let someone do ~ (使役)',
@@ -425,6 +459,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-nasai',
+    categories: ['volition.command'],
     level: 'N4',
     title: '〜なさい',
     meaning: 'do ~ (gentle command)',
@@ -437,6 +472,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-ni',
+    categories: ['purpose.goal'],
     level: 'N4',
     title: '〜ように (so that)',
     meaning: 'so that ~ / in order to ~',
@@ -449,6 +485,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-ni-suru',
+    categories: ['state.effort', 'purpose.intention'],
     level: 'N4',
     title: '〜ようにする',
     meaning: 'try to ~ / make an effort to ~',
@@ -461,6 +498,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-ni-naru',
+    categories: ['state.change'],
     level: 'N4',
     title: '〜ようになる',
     meaning: 'come to ~ / reach the point where ~',
@@ -473,6 +511,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-koto-ni-suru',
+    categories: ['purpose.decision'],
     level: 'N4',
     title: '〜ことにする',
     meaning: 'decide to ~',
@@ -485,6 +524,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-koto-ni-naru',
+    categories: ['purpose.decision', 'state.result'],
     level: 'N4',
     title: '〜ことになる',
     meaning: 'it has been decided that ~',
@@ -497,6 +537,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-tagaru',
+    categories: ['volition.desire', 'evidence.source'],
     level: 'N4',
     title: '〜たがる',
     meaning: 'someone (else) shows they want to ~',
@@ -509,6 +550,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-yasui-nikui',
+    categories: ['judgment.evaluation', 'degree.extent'],
     level: 'N4',
     title: '〜やすい / 〜にくい',
     meaning: 'easy to ~ / hard to ~',
@@ -521,6 +563,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-sugiru',
+    categories: ['degree.extreme'],
     level: 'N4',
     title: '〜すぎる',
     meaning: 'too much / excessively ~',
@@ -533,6 +576,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-kata',
+    categories: ['method.means'],
     level: 'N4',
     title: '〜方 (かた)',
     meaning: 'way of doing / how to ~',
@@ -544,6 +588,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-imperative',
+    categories: ['volition.command', 'obligation.prohibition'],
     level: 'N4',
     title: 'Imperative & prohibition (〜ろ / 〜な)',
     meaning: 'do it! / don\'t do it!',
@@ -557,6 +602,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-o-ni-naru',
+    categories: ['register.honorific'],
     level: 'N4',
     title: 'Honorific お〜になる / Humble お〜する',
     meaning: 'respectful vs. humble polite verbs',
@@ -570,6 +616,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-to-omou',
+    categories: ['judgment.conjecture'],
     level: 'N4',
     title: '〜と思う',
     meaning: 'I think that ~',
@@ -582,6 +629,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-to-iu',
+    categories: ['explanation.definition', 'method.communication'],
     level: 'N4',
     title: '〜という',
     meaning: 'called ~ / that says ~',

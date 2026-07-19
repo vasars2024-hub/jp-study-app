@@ -1,9 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   GRAMMAR,
   LEVELS,
   GUIDES,
   GUIDE_CATEGORIES,
+  type GrammarFunctionId,
+  type GrammarLevel,
   type GrammarPoint,
   type JlptLevel,
   type Guide,
@@ -24,6 +26,9 @@ import {
   type MenuBarMenu,
 } from '../components/ui';
 import Icon from '../components/Icons';
+import GrammarPracticePanel from '../components/grammar/GrammarPracticePanel';
+import GrammarCurationPanel from '../components/grammar/GrammarCurationPanel';
+import type { PracticeFilters } from '../data/grammar/practiceFilters';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
 
@@ -40,10 +45,34 @@ function exampleQuery(point: GrammarPoint): string {
   return longest;
 }
 
-type Mode = 'grammar' | 'guides';
+type Mode = 'grammar' | 'practice' | 'guides' | 'review';
 type LevelFilter = 'All' | JlptLevel;
 type CatFilter = 'All' | GuideCategory;
 type GrammarScope = LevelFilter | 'Favorites' | 'Study Queue' | 'Recent';
+
+type Translate = ReturnType<typeof useT>['t'];
+
+const GUIDE_CAT_KEYS: Record<GuideCategory, string> = {
+  Hacks: 'grammar.aero.cat.hacks',
+  Reading: 'grammar.aero.cat.reading',
+  Writing: 'grammar.aero.cat.writing',
+  Literature: 'grammar.aero.cat.literature',
+  Speaking: 'grammar.aero.cat.speaking',
+  Culture: 'grammar.aero.cat.culture',
+};
+
+function guideCategoryFilterLabel(cat: CatFilter, t: Translate): string {
+  if (cat === 'All') return t('grammar.filter.all');
+  return t(GUIDE_CAT_KEYS[cat]);
+}
+
+function grammarScopeLabel(scope: GrammarScope, t: Translate): string {
+  if (scope === 'All') return t('grammar.aero.scope.all');
+  if (scope === 'Favorites') return t('grammar.aero.scope.favorites');
+  if (scope === 'Study Queue') return t('grammar.aero.scope.studyQueue');
+  if (scope === 'Recent') return t('grammar.aero.scope.recent');
+  return scope;
+}
 
 function matchesPoint(g: GrammarPoint, q: string): boolean {
   const hay = `${g.title} ${g.meaning} ${g.structure} ${g.explanation}`.toLowerCase();
@@ -56,14 +85,64 @@ function matchesGuide(g: Guide, q: string): boolean {
   return hay.includes(q);
 }
 
+function parsePracticeDeepLink(detail: unknown): Partial<PracticeFilters> | undefined {
+  if (!detail || typeof detail !== 'object') return undefined;
+  const d = detail as Record<string, unknown>;
+  const out: Partial<PracticeFilters> = {};
+  if (d.lang === 'ja' || d.lang === 'zh' || d.lang === 'all') out.lang = d.lang;
+  if (typeof d.level === 'string') out.levels = [d.level as GrammarLevel];
+  if (Array.isArray(d.levels)) out.levels = d.levels as GrammarLevel[];
+  if (typeof d.functions === 'string') out.functions = [d.functions as GrammarFunctionId];
+  if (Array.isArray(d.functions)) out.functions = d.functions as GrammarFunctionId[];
+  return out;
+}
+
 export default function GrammarView() {
   const aero = useAeroMaterials();
   const [mode, setMode] = useState<Mode>('grammar');
+  const [practiceSeed, setPracticeSeed] = useState<Partial<PracticeFilters> | undefined>();
   const { t } = useT();
 
-  if (aero) return <AeroGrammarExplorer />;
+  useEffect(() => {
+    const onPractice = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail;
+      setPracticeSeed(parsePracticeDeepLink(detail));
+      setMode('practice');
+    };
+    window.addEventListener('grammar:open-practice', onPractice);
+    return () => window.removeEventListener('grammar:open-practice', onPractice);
+  }, []);
+
+  /*
+   * The Aero explorer has no practice mode, so returning it unconditionally
+   * made Practice and Test unreachable in that theme — including the
+   * `grammar:open-practice` deep link above, which set the mode on a component
+   * that then never rendered, so the extension's "practise this" action
+   * silently did nothing. Let practice win over the theme branch until the two
+   * explorers are unified.
+   */
+  if (aero && mode !== 'practice') return <AeroGrammarExplorer />;
+
+  const modeLabel =
+    mode === 'grammar'
+      ? t('grammar.mode.points')
+      : mode === 'practice'
+        ? t('grammar.mode.practice')
+        : mode === 'review'
+          ? t('grammar.mode.review')
+          : t('grammar.mode.guides');
+
+  const classicStatus = (
+    <>
+      <StatusBarField>SYN / PARSE UNIT READY</StatusBarField>
+      <StatusBarField>{modeLabel}</StatusBarField>
+      <StatusBarSpacer />
+      <StatusBarField>{t('grammar.count', { count: GRAMMAR.length })}</StatusBarField>
+    </>
+  );
 
   return (
+    <AppChrome status={classicStatus} className="gram-chrome">
     <div className="gram-view">
       <div className="view-head">
         <p className="muted">{t('grammar.intro')}</p>
@@ -75,22 +154,44 @@ export default function GrammarView() {
             {t('grammar.mode.points')}
           </button>
           <button
+            className={`gram-mode-btn ${mode === 'practice' ? 'active' : ''}`}
+            onClick={() => setMode('practice')}
+          >
+            {t('grammar.mode.practice')}
+          </button>
+          <button
             className={`gram-mode-btn ${mode === 'guides' ? 'active' : ''}`}
             onClick={() => setMode('guides')}
           >
             {t('grammar.mode.guides')}
           </button>
+          <button
+            className={`gram-mode-btn ${mode === 'review' ? 'active' : ''}`}
+            onClick={() => setMode('review')}
+          >
+            {t('grammar.mode.review')}
+          </button>
         </div>
       </div>
 
-      {mode === 'grammar' ? <GrammarBrowser /> : <GuidesBrowser />}
+      {mode === 'grammar' ? (
+        <GrammarBrowser />
+      ) : mode === 'practice' ? (
+        <GrammarPracticePanel initialFilters={practiceSeed} />
+      ) : mode === 'review' ? (
+        <GrammarCurationPanel />
+      ) : (
+        <GuidesBrowser />
+      )}
     </div>
+    </AppChrome>
   );
 }
 
 /* -------------------------- Aero Grammar Explorer -------------------------- */
 
 function AeroGrammarExplorer() {
+  const { t, lang } = useT();
   const [mode, setMode] = useState<Mode>('grammar');
   const [scope, setScope] = useState<GrammarScope>('All');
   const [cat, setCat] = useState<CatFilter>('All');
@@ -190,111 +291,188 @@ function AeroGrammarExplorer() {
     await navigator.clipboard?.writeText(text);
   }
 
-  const menus: MenuBarMenu[] = [
-    {
-      id: 'file',
-      label: 'File',
-      items: [
-        { id: 'copy-ref', label: 'Copy selected reference', disabled: !selectedPoint, onSelect: () => void copySelectedReference() },
-        { id: 'sep-file', separator: true, label: '' },
-        { id: 'focus-search', label: 'Find grammar...', onSelect: () => searchRef.current?.focus() },
-      ],
-    },
-    {
-      id: 'edit',
-      label: 'Edit',
-      items: [
-        { id: 'clear-search', label: 'Clear search', disabled: !query, onSelect: () => setQuery('') },
-        { id: 'copy-structure', label: 'Copy structure', disabled: !selectedPoint, onSelect: () => void navigator.clipboard?.writeText(selectedPoint?.structure ?? '') },
-      ],
-    },
-    {
-      id: 'view',
-      label: 'View',
-      items: [
-        { id: 'grammar', label: 'Grammar points', onSelect: () => setMode('grammar') },
-        { id: 'guides', label: 'Guides and hacks', onSelect: () => setMode('guides') },
-        { id: 'sep-view', separator: true, label: '' },
-        { id: 'all', label: 'All grammar', onSelect: () => setGrammarScope('All') },
-        ...LEVELS.map((lv) => ({ id: `level-${lv}`, label: lv, onSelect: () => setGrammarScope(lv) })),
-      ],
-    },
-    {
-      id: 'grammar',
-      label: 'Grammar',
-      items: [
-        {
-          id: 'favorite',
-          label: favoriteIds.has(selectedPoint?.id ?? '') ? 'Remove favorite' : 'Add favorite',
-          disabled: !selectedPoint,
-          onSelect: toggleFavorite,
-        },
-        {
-          id: 'study',
-          label: studyIds.has(selectedPoint?.id ?? '') ? 'Remove from study queue' : 'Add to study queue',
-          disabled: !selectedPoint,
-          onSelect: toggleStudy,
-        },
-        { id: 'sep-grammar', separator: true, label: '' },
-        { id: 'show-favorites', label: `Favorites (${favoriteIds.size})`, onSelect: () => setGrammarScope('Favorites') },
-        { id: 'show-study', label: `Study queue (${studyIds.size})`, onSelect: () => setGrammarScope('Study Queue') },
-      ],
-    },
-    {
-      id: 'help',
-      label: 'Help',
-      items: [
-        { id: 'open-guides', label: 'Open learning guides', onSelect: () => setMode('guides') },
-        { id: 'recent', label: 'Recently viewed grammar', disabled: recentIds.length === 0, onSelect: () => setGrammarScope('Recent') },
-      ],
-    },
-  ];
+  const isFavorite = favoriteIds.has(selectedPoint?.id ?? '');
+  const isQueued = studyIds.has(selectedPoint?.id ?? '');
+
+  const menus: MenuBarMenu[] = useMemo(
+    () => [
+      {
+        id: 'file',
+        label: t('grammar.aero.menu.file'),
+        items: [
+          {
+            id: 'copy-ref',
+            label: t('grammar.aero.menu.copyRef'),
+            disabled: !selectedPoint,
+            onSelect: () => void copySelectedReference(),
+          },
+          { id: 'sep-file', separator: true, label: '' },
+          {
+            id: 'focus-search',
+            label: t('grammar.aero.menu.findGrammar'),
+            onSelect: () => searchRef.current?.focus(),
+          },
+        ],
+      },
+      {
+        id: 'edit',
+        label: t('grammar.aero.menu.edit'),
+        items: [
+          {
+            id: 'clear-search',
+            label: t('grammar.aero.menu.clearSearch'),
+            disabled: !query,
+            onSelect: () => setQuery(''),
+          },
+          {
+            id: 'copy-structure',
+            label: t('grammar.aero.menu.copyStructure'),
+            disabled: !selectedPoint,
+            onSelect: () => void navigator.clipboard?.writeText(selectedPoint?.structure ?? ''),
+          },
+        ],
+      },
+      {
+        id: 'view',
+        label: t('grammar.aero.menu.view'),
+        items: [
+          { id: 'grammar', label: t('grammar.mode.points'), onSelect: () => setMode('grammar') },
+          { id: 'guides', label: t('grammar.mode.guides'), onSelect: () => setMode('guides') },
+          { id: 'sep-view', separator: true, label: '' },
+          { id: 'all', label: t('grammar.aero.menu.allGrammar'), onSelect: () => setGrammarScope('All') },
+          ...LEVELS.map((lv) => ({ id: `level-${lv}`, label: lv, onSelect: () => setGrammarScope(lv) })),
+        ],
+      },
+      {
+        id: 'grammar',
+        label: t('grammar.aero.menu.grammar'),
+        items: [
+          {
+            id: 'favorite',
+            label: isFavorite ? t('grammar.aero.favorite.remove') : t('grammar.aero.favorite.add'),
+            disabled: !selectedPoint,
+            onSelect: toggleFavorite,
+          },
+          {
+            id: 'study',
+            label: isQueued ? t('grammar.aero.study.remove') : t('grammar.aero.study.add'),
+            disabled: !selectedPoint,
+            onSelect: toggleStudy,
+          },
+          { id: 'sep-grammar', separator: true, label: '' },
+          {
+            id: 'show-favorites',
+            label: t('grammar.aero.menu.favoritesCount', { count: favoriteIds.size }),
+            onSelect: () => setGrammarScope('Favorites'),
+          },
+          {
+            id: 'show-study',
+            label: t('grammar.aero.menu.studyCount', { count: studyIds.size }),
+            onSelect: () => setGrammarScope('Study Queue'),
+          },
+        ],
+      },
+      {
+        id: 'help',
+        label: t('grammar.aero.menu.help'),
+        items: [
+          { id: 'open-guides', label: t('grammar.aero.menu.openGuides'), onSelect: () => setMode('guides') },
+          {
+            id: 'recent',
+            label: t('grammar.aero.menu.recent'),
+            disabled: recentIds.length === 0,
+            onSelect: () => setGrammarScope('Recent'),
+          },
+        ],
+      },
+    ],
+    [
+      favoriteIds.size,
+      isFavorite,
+      isQueued,
+      lang,
+      query,
+      recentIds.length,
+      selectedPoint,
+      studyIds.size,
+    ],
+  );
+
+  const scopeStatusLabel = grammarScopeLabel(scope, t);
+  const catStatusLabel = cat === 'All' ? t('grammar.aero.scope.allGuides') : t(GUIDE_CAT_KEYS[cat]);
 
   const status = (
     <>
-      <StatusBarField>{mode === 'grammar' ? `${pointList.length} grammar points` : `${guideList.length} guides`}</StatusBarField>
-      <StatusBarField>{mode === 'grammar' ? `Scope: ${scope}` : `Category: ${cat}`}</StatusBarField>
+      <StatusBarField>
+        {mode === 'grammar'
+          ? t('grammar.count', { count: pointList.length })
+          : t('grammar.guideCount', { count: guideList.length })}
+      </StatusBarField>
+      <StatusBarField>
+        {mode === 'grammar'
+          ? t('grammar.aero.status.scope', { scope: scopeStatusLabel })
+          : t('grammar.aero.status.category', { category: catStatusLabel })}
+      </StatusBarField>
       {selectedPoint && mode === 'grammar' && <StatusBarField>{selectedPoint.title}</StatusBarField>}
       {selectedGuide && mode === 'guides' && <StatusBarField>{selectedGuide.title}</StatusBarField>}
       <StatusBarSpacer />
-      <StatusBarField>{favoriteIds.size} favorites</StatusBarField>
-      <StatusBarField live>{studyIds.size} queued</StatusBarField>
+      <StatusBarField>{t('grammar.aero.status.favorites', { count: favoriteIds.size })}</StatusBarField>
+      <StatusBarField live>{t('grammar.aero.status.queued', { count: studyIds.size })}</StatusBarField>
     </>
   );
 
   return (
     <AppChrome menus={menus} status={status} className="aero-gram-chrome">
       <div className="aero-gram">
-        <Toolbar className="aero-gram-toolbar" aria-label="Grammar Explorer commands">
-          <IconButton label="Back" size="sm" disabled={historyIndex <= 0} onClick={() => goHistory(-1)}>
+        <Toolbar className="aero-gram-toolbar" aria-label={t('grammar.aero.toolbar.aria')}>
+          <IconButton label={t('grammar.aero.back')} size="sm" disabled={historyIndex <= 0} onClick={() => goHistory(-1)}>
             <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />
           </IconButton>
-          <IconButton label="Forward" size="sm" disabled={historyIndex >= history.length - 1} onClick={() => goHistory(1)}>
+          <IconButton
+            label={t('grammar.aero.forward')}
+            size="sm"
+            disabled={historyIndex >= history.length - 1}
+            onClick={() => goHistory(1)}
+          >
             <Icon name="chevron" size={14} />
           </IconButton>
           <ToolbarSeparator />
           <Button size="sm" variant={mode === 'grammar' ? 'primary' : 'default'} onClick={() => setMode('grammar')}>
-            Grammar
+            {t('grammar.aero.toolbar.grammar')}
           </Button>
           <Button size="sm" variant={mode === 'guides' ? 'primary' : 'default'} onClick={() => setMode('guides')}>
-            Guides
+            {t('grammar.aero.toolbar.guides')}
           </Button>
           <ToolbarSeparator />
           {mode === 'grammar' ? (
-            <select className="aero-gram-select" value={scope} onChange={(e) => setGrammarScope(e.target.value as GrammarScope)} aria-label="Grammar scope">
-              <option value="All">All Grammar</option>
+            <select
+              className="aero-gram-select"
+              value={scope}
+              onChange={(e) => setGrammarScope(e.target.value as GrammarScope)}
+              aria-label={t('grammar.aero.scope.aria')}
+            >
+              <option value="All">{t('grammar.aero.scope.all')}</option>
               {LEVELS.map((lv) => (
-                <option key={lv} value={lv}>{lv}</option>
+                <option key={lv} value={lv}>
+                  {lv}
+                </option>
               ))}
-              <option value="Favorites">Favorites</option>
-              <option value="Study Queue">Study Queue</option>
-              <option value="Recent">Recently Viewed</option>
+              <option value="Favorites">{t('grammar.aero.scope.favorites')}</option>
+              <option value="Study Queue">{t('grammar.aero.scope.studyQueue')}</option>
+              <option value="Recent">{t('grammar.aero.scope.recent')}</option>
             </select>
           ) : (
-            <select className="aero-gram-select" value={cat} onChange={(e) => setGuideScope(e.target.value as CatFilter)} aria-label="Guide category">
-              <option value="All">All Guides</option>
+            <select
+              className="aero-gram-select"
+              value={cat}
+              onChange={(e) => setGuideScope(e.target.value as CatFilter)}
+              aria-label={t('grammar.aero.cat.aria')}
+            >
+              <option value="All">{t('grammar.aero.scope.allGuides')}</option>
               {GUIDE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                  {t(GUIDE_CAT_KEYS[c])}
+                </option>
               ))}
             </select>
           )}
@@ -305,15 +483,27 @@ function AeroGrammarExplorer() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={mode === 'grammar' ? 'Search grammar, meaning, structure...' : 'Search guides...'}
+              placeholder={
+                mode === 'grammar' ? t('grammar.aero.search.placeholder') : t('grammar.guideSearch.placeholder')
+              }
               lang={mode === 'grammar' ? 'ja' : undefined}
             />
           </div>
           <ToolbarSeparator />
-          <IconButton label={favoriteIds.has(selectedPoint?.id ?? '') ? 'Remove favorite' : 'Add favorite'} size="sm" disabled={!selectedPoint || mode !== 'grammar'} onClick={toggleFavorite}>
-            <Icon name="star" size={15} fill={favoriteIds.has(selectedPoint?.id ?? '')} />
+          <IconButton
+            label={isFavorite ? t('grammar.aero.favorite.remove') : t('grammar.aero.favorite.add')}
+            size="sm"
+            disabled={!selectedPoint || mode !== 'grammar'}
+            onClick={toggleFavorite}
+          >
+            <Icon name="star" size={15} fill={isFavorite} />
           </IconButton>
-          <IconButton label={studyIds.has(selectedPoint?.id ?? '') ? 'Remove from study queue' : 'Add to study queue'} size="sm" disabled={!selectedPoint || mode !== 'grammar'} onClick={toggleStudy}>
+          <IconButton
+            label={isQueued ? t('grammar.aero.study.remove') : t('grammar.aero.study.add')}
+            size="sm"
+            disabled={!selectedPoint || mode !== 'grammar'}
+            onClick={toggleStudy}
+          >
             <Icon name="check" size={15} />
           </IconButton>
         </Toolbar>
@@ -352,12 +542,12 @@ function AeroGrammarExplorer() {
                   onStudy={toggleStudy}
                 />
               ) : (
-                <div className="aero-gram-empty">No grammar points match this view.</div>
+                <div className="aero-gram-empty">{t('grammar.aero.empty.pointsMatch')}</div>
               )
             ) : selectedGuide ? (
               <AeroGuideDetail guide={selectedGuide} />
             ) : (
-              <div className="aero-gram-empty">No guides match this view.</div>
+              <div className="aero-gram-empty">{t('grammar.aero.empty.guidesMatch')}</div>
             )}
           </SplitPane>
         </SplitPane>
@@ -385,22 +575,35 @@ function AeroGrammarNav({
   onGrammarScope: (scope: GrammarScope) => void;
   onGuideScope: (cat: CatFilter) => void;
 }) {
-  const grammarItems: { id: GrammarScope; label: string; count: number }[] = [
-    { id: 'All', label: 'All Grammar', count: GRAMMAR.length },
-    ...LEVELS.map((lv) => ({ id: lv, label: lv, count: GRAMMAR.filter((g) => g.level === lv).length })),
-    { id: 'Favorites', label: 'Favorites', count: favoriteCount },
-    { id: 'Study Queue', label: 'Study Queue', count: studyCount },
-    { id: 'Recent', label: 'Recently Viewed', count: recentCount },
-  ];
-  const guideItems: { id: CatFilter; label: string; count: number }[] = [
-    { id: 'All', label: 'All Guides', count: GUIDES.length },
-    ...GUIDE_CATEGORIES.map((c) => ({ id: c, label: c, count: GUIDES.filter((g) => g.category === c).length })),
-  ];
+  const { t, lang } = useT();
+
+  const grammarItems = useMemo(
+    () => [
+      { id: 'All' as const, label: t('grammar.aero.scope.all'), count: GRAMMAR.length },
+      ...LEVELS.map((lv) => ({ id: lv, label: lv, count: GRAMMAR.filter((g) => g.level === lv).length })),
+      { id: 'Favorites' as const, label: t('grammar.aero.scope.favorites'), count: favoriteCount },
+      { id: 'Study Queue' as const, label: t('grammar.aero.scope.studyQueue'), count: studyCount },
+      { id: 'Recent' as const, label: t('grammar.aero.scope.recent'), count: recentCount },
+    ],
+    [favoriteCount, lang, recentCount, studyCount],
+  );
+
+  const guideItems = useMemo(
+    () => [
+      { id: 'All' as const, label: t('grammar.aero.scope.allGuides'), count: GUIDES.length },
+      ...GUIDE_CATEGORIES.map((c) => ({
+        id: c,
+        label: t(GUIDE_CAT_KEYS[c]),
+        count: GUIDES.filter((g) => g.category === c).length,
+      })),
+    ],
+    [lang],
+  );
 
   return (
-    <aside className="aero-gram-nav" aria-label="Grammar Explorer navigation">
+    <aside className="aero-gram-nav" aria-label={t('grammar.aero.nav.aria')}>
       <div className="aero-gram-nav-group">
-        <div className="aero-gram-nav-title">Grammar Library</div>
+        <div className="aero-gram-nav-title">{t('grammar.aero.nav.library')}</div>
         {grammarItems.map((item) => (
           <button
             key={item.id}
@@ -408,14 +611,25 @@ function AeroGrammarNav({
             className={`aero-gram-nav-row${mode === 'grammar' && scope === item.id ? ' active' : ''}`}
             onClick={() => onGrammarScope(item.id)}
           >
-            <Icon name={item.id === 'Favorites' ? 'star' : item.id === 'Study Queue' ? 'check' : item.id === 'Recent' ? 'refresh' : 'grammar'} size={14} />
+            <Icon
+              name={
+                item.id === 'Favorites'
+                  ? 'star'
+                  : item.id === 'Study Queue'
+                    ? 'check'
+                    : item.id === 'Recent'
+                      ? 'refresh'
+                      : 'grammar'
+              }
+              size={14}
+            />
             <span>{item.label}</span>
             <span className="aero-gram-nav-count">{item.count}</span>
           </button>
         ))}
       </div>
       <div className="aero-gram-nav-group">
-        <div className="aero-gram-nav-title">Guides</div>
+        <div className="aero-gram-nav-title">{t('grammar.aero.nav.guides')}</div>
         {guideItems.map((item) => (
           <button
             key={item.id}
@@ -446,16 +660,17 @@ function AeroPointList({
   queued: Set<string>;
   onSelect: (point: GrammarPoint) => void;
 }) {
+  const { t } = useT();
   return (
-    <section className="aero-gram-list-pane" aria-label="Grammar points">
+    <section className="aero-gram-list-pane" aria-label={t('grammar.aero.list.aria.points')}>
       <div className="aero-gram-list-head">
-        <span>Pattern</span>
-        <span>Meaning</span>
-        <span>Level</span>
-        <span>State</span>
+        <span>{t('grammar.aero.list.pattern')}</span>
+        <span>{t('grammar.aero.list.meaning')}</span>
+        <span>{t('grammar.aero.list.level')}</span>
+        <span>{t('grammar.aero.list.state')}</span>
       </div>
-      <div className="aero-gram-list" role="listbox" aria-label="Grammar point list">
-        {points.length === 0 && <div className="aero-gram-empty">No grammar points found.</div>}
+      <div className="aero-gram-list" role="listbox" aria-label={t('grammar.aero.list.aria.pointList')}>
+        {points.length === 0 && <div className="aero-gram-empty">{t('grammar.empty')}</div>}
         {points.map((point) => (
           <button
             key={point.id}
@@ -480,14 +695,15 @@ function AeroPointList({
 }
 
 function AeroGuideList({ guides, selectedId, onSelect }: { guides: Guide[]; selectedId: string; onSelect: (guide: Guide) => void }) {
+  const { t } = useT();
   return (
-    <section className="aero-gram-list-pane" aria-label="Guides">
+    <section className="aero-gram-list-pane" aria-label={t('grammar.aero.list.aria.guides')}>
       <div className="aero-gram-list-head aero-gram-guide-head">
-        <span>Guide</span>
-        <span>Category</span>
+        <span>{t('grammar.aero.list.guide')}</span>
+        <span>{t('grammar.aero.list.category')}</span>
       </div>
-      <div className="aero-gram-list" role="listbox" aria-label="Guide list">
-        {guides.length === 0 && <div className="aero-gram-empty">No guides found.</div>}
+      <div className="aero-gram-list" role="listbox" aria-label={t('grammar.aero.list.aria.guideList')}>
+        {guides.length === 0 && <div className="aero-gram-empty">{t('grammar.guidesEmpty')}</div>}
         {guides.map((guide) => (
           <button
             key={guide.id}
@@ -499,7 +715,7 @@ function AeroGuideList({ guides, selectedId, onSelect }: { guides: Guide[]; sele
           >
             <span className="aero-gram-guide-title">{guide.title}</span>
             <span className="aero-gram-guide-summary">{guide.summary}</span>
-            <span className="aero-gram-guide-cat">{guide.category}</span>
+            <span className="aero-gram-guide-cat">{t(GUIDE_CAT_KEYS[guide.category])}</span>
           </button>
         ))}
       </div>
@@ -520,6 +736,7 @@ function AeroGrammarDetail({
   onFavorite: () => void;
   onStudy: () => void;
 }) {
+  const { t } = useT();
   const [exState, setExState] = useState<ExState>('idle');
   const [examples, setExamples] = useState<ExampleSentence[]>([]);
   const [exError, setExError] = useState('');
@@ -541,33 +758,43 @@ function AeroGrammarDetail({
     <article className="aero-gram-detail">
       <header className="aero-gram-detail-head">
         <div>
-          <div className="aero-gram-detail-kicker">Grammar Point</div>
+          <div className="aero-gram-detail-kicker">{t('grammar.aero.detail.kicker')}</div>
           <h2 lang="ja">{point.title}</h2>
           <p>{point.meaning}</p>
         </div>
         <span className={`aero-gram-level lv-${point.level}`}>{point.level}</span>
       </header>
       <div className="aero-gram-detail-actions">
-        <Button size="sm" variant={favorite ? 'primary' : 'default'} leftIcon={<Icon name="star" size={13} fill={favorite} />} onClick={onFavorite}>
-          {favorite ? 'Favorited' : 'Favorite'}
+        <Button
+          size="sm"
+          variant={favorite ? 'primary' : 'default'}
+          leftIcon={<Icon name="star" size={13} fill={favorite} />}
+          onClick={onFavorite}
+        >
+          {favorite ? t('grammar.aero.favorite.on') : t('grammar.aero.favorite.off')}
         </Button>
-        <Button size="sm" variant={queued ? 'primary' : 'default'} leftIcon={<Icon name="check" size={13} />} onClick={onStudy}>
-          {queued ? 'Queued' : 'Add to Study'}
+        <Button
+          size="sm"
+          variant={queued ? 'primary' : 'default'}
+          leftIcon={<Icon name="check" size={13} />}
+          onClick={onStudy}
+        >
+          {queued ? t('grammar.aero.study.queued') : t('grammar.aero.study.addShort')}
         </Button>
       </div>
       <section className="aero-gram-property">
-        <h3>Structure</h3>
+        <h3>{t('grammar.structure')}</h3>
         <div className="aero-gram-structure" lang="ja">{point.structure}</div>
       </section>
       <section className="aero-gram-property">
-        <h3>Usage Notes</h3>
+        <h3>{t('grammar.howToUse')}</h3>
         <p>{point.explanation}</p>
       </section>
       <section className="aero-gram-property">
         <div className="aero-gram-section-row">
-          <h3>Examples</h3>
+          <h3>{t('grammar.examples')}</h3>
           <Button size="sm" onClick={loadExamples} disabled={exState === 'loading'}>
-            {exState === 'loading' ? 'Searching...' : 'More Examples'}
+            {exState === 'loading' ? t('grammar.searchingTatoeba') : t('grammar.aero.moreExamples')}
           </Button>
         </div>
         <ul className="aero-gram-examples">
@@ -585,19 +812,31 @@ function AeroGrammarDetail({
             </li>
           ))}
         </ul>
+        {/*
+          CC-BY 2.0 FR obliges us to credit imported sentences. These ship
+          inside the app rather than being fetched, so the notice has to ship
+          with them; it appears only when a shown example actually came from
+          Tatoeba.
+        */}
+        {point.examples.some((ex) => ex.source === 'tatoeba') && (
+          <p className="aero-gram-attribution">{t('grammar.examples.tatoebaCredit')}</p>
+        )}
         {exState === 'error' && <p className="aero-gram-message">{exError}</p>}
-        {exState === 'done' && examples.length === 0 && <p className="aero-gram-message">No extra sentences found for "{exampleQuery(point)}".</p>}
+        {exState === 'done' && examples.length === 0 && (
+          <p className="aero-gram-message">{t('grammar.noExtraExamples', { query: exampleQuery(point) })}</p>
+        )}
       </section>
     </article>
   );
 }
 
 function AeroGuideDetail({ guide }: { guide: Guide }) {
+  const { t } = useT();
   return (
     <article className="aero-gram-detail aero-gram-guide-detail">
       <header className="aero-gram-detail-head">
         <div>
-          <div className="aero-gram-detail-kicker">{guide.category}</div>
+          <div className="aero-gram-detail-kicker">{t(GUIDE_CAT_KEYS[guide.category])}</div>
           <h2>{guide.title}</h2>
           <p>{guide.summary}</p>
         </div>
@@ -656,7 +895,7 @@ function GrammarBrowser() {
               className={`gram-level-btn ${filter === lv ? 'active' : ''}`}
               onClick={() => setFilter(lv)}
             >
-              {lv}
+              {lv === 'All' ? t('grammar.filter.all') : lv}
             </button>
           ))}
         </div>
@@ -819,7 +1058,7 @@ function GuidesBrowser() {
               className={`gram-level-btn ${cat === c ? 'active' : ''}`}
               onClick={() => setCat(c)}
             >
-              {c}
+              {guideCategoryFilterLabel(c, t)}
             </button>
           ))}
         </div>
@@ -846,7 +1085,7 @@ function GuidesBrowser() {
               <span className="guide-item-text">
                 <span className="guide-item-top">
                   <span className="guide-item-title">{g.title}</span>
-                  <span className="guide-cat-badge">{g.category}</span>
+                  <span className="guide-cat-badge">{t(GUIDE_CAT_KEYS[g.category])}</span>
                 </span>
                 <span className="guide-item-summary">{g.summary}</span>
               </span>
@@ -867,6 +1106,7 @@ function GuidesBrowser() {
 }
 
 function GuideArticle({ guide }: { guide: Guide }) {
+  const { t } = useT();
   return (
     <article className="guide-article">
       <header className="guide-article-head">
@@ -874,7 +1114,7 @@ function GuideArticle({ guide }: { guide: Guide }) {
           <h2>{guide.title}</h2>
           <p className="guide-article-summary">{guide.summary}</p>
           <div className="guide-article-meta">
-            <span className="guide-cat-badge">{guide.category}</span>
+            <span className="guide-cat-badge">{t(GUIDE_CAT_KEYS[guide.category])}</span>
             {guide.level && <span className="guide-level-tag">{guide.level}</span>}
           </div>
         </div>
