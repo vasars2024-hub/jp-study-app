@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blanc harness</title>
+    <script>
+      // Preload-bridge stub. Must be a classic script so it runs BEFORE any ES
+      // module import — several renderer modules (e.g. playerBus.ts) touch
+      // window.api at module-eval time.
+      (function () {
+        var explicit = {
+          blancSetFullScreen: function () { return Promise.resolve({ ok: true }); },
+          blancOpen: function () { return Promise.resolve({ ok: true }); },
+          blancClose: function () { return Promise.resolve({ ok: true }); },
+          syncLibrary: function () { return Promise.resolve([]); },
+          getLibraryFolders: function () { return Promise.resolve([]); },
+          getWatchFolder: function () { return Promise.resolve(null); },
+          importFiles: function () { return Promise.resolve([]); },
+          importFolder: function () { return Promise.resolve([]); },
+          setWatchFolder: function () { return Promise.resolve({ folder: null, items: [] }); },
+          setLibraryFolders: function (f) { return Promise.resolve({ folders: f, items: [] }); },
+          setItemFolder: function () { return Promise.resolve([]); },
+          ankiStatus: function () { return Promise.resolve({ connected: false, decks: [] }); },
+          ankiMineNote: function () { return Promise.resolve({ ok: false, error: 'harness' }); },
+          systemGetMetrics: function () {
+            return Promise.resolve({
+              cpuLoad: 0.23,
+              freemem: 9 * Math.pow(1024, 3),
+              totalmem: 16 * Math.pow(1024, 3),
+              platform: 'win32',
+              uptime: 54321,
+              battery: 0.8,
+              onBattery: false,
+            });
+          },
+          toolboxPickSearchFolder: function () { return Promise.resolve(null); },
+          toolboxFileSearch: function () { return Promise.resolve({ ok: true, results: [], scanned: 0, truncated: false }); },
+          launchTarget: function () { return Promise.resolve('Harness: launching files is disabled.'); },
+          launchAutomationBuilder: function () { return Promise.resolve({ ok: false, error: 'Harness: no PowerShell here.' }); },
+        };
+        window.api = new Proxy(explicit, {
+          get: function (target, prop) {
+            if (prop in target) return target[prop];
+            if (typeof prop === 'string' && prop.indexOf('on') === 0) {
+              return function () { return function () {}; };
+            }
+            return function () { return Promise.resolve(undefined); };
+          },
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/renderer/__devharness__/blancHarness.tsx"></script>
+  </body>
+</html>
