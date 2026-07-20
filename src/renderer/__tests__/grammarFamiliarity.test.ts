@@ -21,9 +21,11 @@ import {
   getFamiliarity,
   isGrammarKnown,
   isManual,
+  onFamiliarityChanged,
   parseFamiliarity,
   recordAnswer,
   setFamiliarity,
+  FAMILIARITY_LS_KEY,
   FAMILIARITY_VERSION,
   GX_KNOWN_THRESHOLD,
   GX_LEVELS,
@@ -266,5 +268,58 @@ describe('against the shipped corpus', () => {
     const before = JSON.stringify(GRAMMAR[0]);
     applyFamiliarity(GRAMMAR, setFamiliarity({}, GRAMMAR[0].id, 3));
     expect(JSON.stringify(GRAMMAR[0])).toBe(before);
+  });
+});
+
+describe('onFamiliarityChanged wiring', () => {
+  // No DOM environment (see the hoisted stub above), so exercise the wiring
+  // against a controllable fake window: subscribe registers, the reported
+  // event fires the callback, the storage filter honours the key, and
+  // unsubscribe removes both listeners.
+  type Listener = (e: unknown) => void;
+
+  function withFakeWindow(run: (fire: (type: string, e?: unknown) => void) => void): void {
+    const listeners: Record<string, Set<Listener>> = {};
+    const fake = {
+      addEventListener: (type: string, cb: Listener) => {
+        (listeners[type] ??= new Set()).add(cb);
+      },
+      removeEventListener: (type: string, cb: Listener) => {
+        listeners[type]?.delete(cb);
+      },
+      dispatchEvent: () => true,
+    };
+    const g = globalThis as unknown as { window: unknown };
+    const prev = g.window;
+    g.window = fake;
+    try {
+      run((type, e) => listeners[type]?.forEach((cb) => cb(e)));
+    } finally {
+      g.window = prev;
+    }
+  }
+
+  it('fires on the familiarity event and stops after unsubscribe', () => {
+    withFakeWindow((fire) => {
+      let hits = 0;
+      const off = onFamiliarityChanged(() => (hits += 1));
+      fire('grammar-familiarity-changed');
+      expect(hits).toBe(1);
+      off();
+      fire('grammar-familiarity-changed');
+      expect(hits).toBe(1);
+    });
+  });
+
+  it('reacts to a storage event only for its own key', () => {
+    withFakeWindow((fire) => {
+      let hits = 0;
+      const off = onFamiliarityChanged(() => (hits += 1));
+      fire('storage', { key: 'some-other-app-key' });
+      expect(hits).toBe(0);
+      fire('storage', { key: FAMILIARITY_LS_KEY });
+      expect(hits).toBe(1);
+      off();
+    });
   });
 });

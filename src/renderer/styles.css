@@ -5882,6 +5882,47 @@ mark.lookup-mark,
   background: rgba(224, 85, 106, 0.18);
   color: #f3a3b0;
 }
+/* Familiarity pill: gram-badge geometry, the wk-grade knowledge palette. Loud
+   while unlearned and quiet once Known, matching the vocabulary band control. */
+.gram-fam {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.gram-fam.fam-1 {
+  background: rgba(255, 179, 0, 0.35);
+  color: #ffce6b;
+}
+.gram-fam.fam-2 {
+  background: rgba(255, 179, 0, 0.18);
+  color: #f0c074;
+}
+.gram-fam.fam-3 {
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.gram-x-detail-band {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gram-x-band-label {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.gram-x-band.wk-grade {
+  flex: 1;
+  padding: 0;
+  border-bottom: none;
+}
+.gx-fam-chip .gx-filters-cat-count {
+  margin-left: 4px;
+}
 .gram-detail {
   flex: 1;
   min-width: 0;

@@ -32,6 +32,7 @@ export function snapshotFilters(f: PracticeFilters): PracticeFilters {
     categories: [...f.categories],
     excludeCategories: [...f.excludeCategories],
     registers: [...f.registers],
+    familiarity: [...f.familiarity],
   };
 }
 

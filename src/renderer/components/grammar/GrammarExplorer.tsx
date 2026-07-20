@@ -12,6 +12,15 @@ import {
 } from '../../data/grammar/practiceFilters';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import {
+  applyFamiliarity,
+  loadFamiliarity,
+  onFamiliarityChanged,
+  saveFamiliarity,
+  setFamiliarity,
+  type FamiliarityState,
+  type GxLevel,
+} from '../../grammarFamiliarity';
+import {
   addPreset,
   loadPresets,
   savePresets,
@@ -21,6 +30,7 @@ import {
 import { useT } from '../../i18n';
 import { Button } from '../ui';
 import VirtualList from '../VirtualList';
+import GrammarBandControl from './GrammarBandControl';
 import GrammarFilterPanel from './GrammarFilterPanel';
 
 /**
@@ -49,6 +59,7 @@ const FAVORITES_KEY = 'jp-grammarx-explorer-favorites-v1';
 const STUDY_KEY = 'jp-grammarx-explorer-study-v1';
 const MAX_HISTORY = 40;
 const ROW_HEIGHT = 58;
+const FAMILIARITY_KEYS = ['new', 'learning', 'familiar', 'known'] as const;
 
 function loadIds(key: string): Set<string> {
   try {
@@ -83,6 +94,7 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [favorites, setFavorites] = useState<Set<string>>(() => loadIds(FAVORITES_KEY));
   const [studyQueue, setStudyQueue] = useState<Set<string>>(() => loadIds(STUDY_KEY));
+  const [familiarity, setFamiliarityState] = useState<FamiliarityState>(() => loadFamiliarity());
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [showFilters, setShowFilters] = useState(false);
@@ -98,7 +110,24 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
   useEffect(() => saveIds(FAVORITES_KEY, favorites), [favorites]);
   useEffect(() => saveIds(STUDY_KEY, studyQueue), [studyQueue]);
 
-  const corpus = useMemo(() => dedupeGrammarByTitle(GRAMMAR), []);
+  // A practice session grading a card, or another window, writes familiarity;
+  // re-read so the badges and band controls here never show a stale level.
+  useEffect(() => onFamiliarityChanged(() => setFamiliarityState(loadFamiliarity())), []);
+
+  const setBand = useCallback(
+    (id: string, level: GxLevel) => {
+      setFamiliarityState((prev) => {
+        const next = setFamiliarity(prev, id, level);
+        saveFamiliarity(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Dedupe is static; decoration re-runs only when learner state changes.
+  const baseCorpus = useMemo(() => dedupeGrammarByTitle(GRAMMAR), []);
+  const corpus = useMemo(() => applyFamiliarity(baseCorpus, familiarity), [baseCorpus, familiarity]);
   const list = useMemo(() => filterGrammarPoints(corpus, filters), [corpus, filters]);
 
   const byId = useMemo(() => new Map(corpus.map((p) => [p.id, p])), [corpus]);
@@ -229,31 +258,41 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
   }, []);
 
   const renderRow = useCallback(
-    (p: NormalizedGrammarPoint) => (
-      <div
-        className={`gram-x-row ${focused?.id === p.id ? 'focused' : ''} ${
-          selected.has(p.id) ? 'selected' : ''
-        }`}
-      >
-        <input
-          type="checkbox"
-          checked={selected.has(p.id)}
-          onChange={() => toggleSelected(p.id)}
-          aria-label={t('grammar.explorer.select')}
-        />
-        <button className="gram-x-row-main" onClick={() => focus(p.id)}>
-          <span className="gram-x-row-top">
-            <span className="gram-x-title" lang="ja">
-              {p.title}
+    (p: NormalizedGrammarPoint & { familiarity?: GxLevel }) => {
+      // New (0) is the default for most of the corpus; a badge on every row
+      // would be noise, so it shows only once a point has been touched.
+      const band = p.familiarity ?? 0;
+      return (
+        <div
+          className={`gram-x-row ${focused?.id === p.id ? 'focused' : ''} ${
+            selected.has(p.id) ? 'selected' : ''
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={selected.has(p.id)}
+            onChange={() => toggleSelected(p.id)}
+            aria-label={t('grammar.explorer.select')}
+          />
+          <button className="gram-x-row-main" onClick={() => focus(p.id)}>
+            <span className="gram-x-row-top">
+              <span className="gram-x-title" lang="ja">
+                {p.title}
+              </span>
+              <span className={`gram-badge lv-${p.level}`}>{p.level}</span>
+              {band > 0 && (
+                <span className={`gram-fam fam-${band}`} title={t(`grammar.familiarity.${FAMILIARITY_KEYS[band]}`)}>
+                  {t(`grammar.familiarity.${FAMILIARITY_KEYS[band]}`).charAt(0)}
+                </span>
+              )}
+              {favorites.has(p.id) && <span className="gram-x-flag">★</span>}
+              {studyQueue.has(p.id) && <span className="gram-x-flag">＋</span>}
             </span>
-            <span className={`gram-badge lv-${p.level}`}>{p.level}</span>
-            {favorites.has(p.id) && <span className="gram-x-flag">★</span>}
-            {studyQueue.has(p.id) && <span className="gram-x-flag">＋</span>}
-          </span>
-          <span className="gram-x-meaning">{p.meaning}</span>
-        </button>
-      </div>
-    ),
+            <span className="gram-x-meaning">{p.meaning}</span>
+          </button>
+        </div>
+      );
+    },
     [favorites, focus, focused, selected, studyQueue, t, toggleSelected],
   );
 
@@ -439,6 +478,14 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
                       : 'grammar.explorer.addToQueue',
                   )}
                 </Button>
+              </div>
+              <div className="gram-x-detail-band">
+                <span className="muted gram-x-band-label">{t('grammar.familiarity.setLabel')}</span>
+                <GrammarBandControl
+                  level={familiarity[focused.id]?.l ?? 0}
+                  manual={familiarity[focused.id]?.m === 1}
+                  onSet={(level) => setBand(focused.id, level)}
+                />
               </div>
               {renderDetail(focused)}
             </>

@@ -12,11 +12,15 @@ import {
 import {
   DEFAULT_PRACTICE_FILTERS,
   categoryCounts,
+  familiarityFilterCounts,
   type PracticeFilters,
 } from '../../data/grammar/practiceFilters';
+import type { GxLevel } from '../../grammarFamiliarity';
 import { useT } from '../../i18n';
 
 const REGISTERS: GrammarRegister[] = ['neutral', 'casual', 'business', 'literary'];
+const FAMILIARITY_BANDS: GxLevel[] = [0, 1, 2, 3];
+const FAMILIARITY_KEYS = ['new', 'learning', 'familiar', 'known'] as const;
 
 /**
  * Filter sidebar for the grammar library.
@@ -56,6 +60,10 @@ export default function GrammarFilterPanel({
   /* Counts exclude the category filter itself, so a chip's number is what
    * clicking it will actually yield rather than its global total. */
   const counts = useMemo(() => categoryCounts(corpus, filters), [corpus, filters]);
+
+  /* Same "count against the other active filters" rule as the categories, so a
+   * band's number is what ticking it yields rather than its corpus-wide total. */
+  const famCounts = useMemo(() => familiarityFilterCounts(corpus, filters), [corpus, filters]);
 
   const groups = useMemo(() => {
     const langFilter = filters.lang === 'all' ? undefined : filters.lang;
@@ -110,6 +118,13 @@ export default function GrammarFilterPanel({
         key: `reg-${r}`,
         label: t(`grammar.register.${r}`),
         clear: () => patch({ registers: filters.registers.filter((x) => x !== r) }),
+      });
+    }
+    for (const b of filters.familiarity) {
+      chips.push({
+        key: `fam-${b}`,
+        label: t(`grammar.familiarity.${FAMILIARITY_KEYS[b]}`),
+        clear: () => patch({ familiarity: filters.familiarity.filter((x) => x !== b) }),
       });
     }
     if (filters.studyReadyOnly) {
@@ -235,6 +250,32 @@ export default function GrammarFilterPanel({
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className="gx-filters-field">
+        <legend>{t('grammar.familiarity.legend')}</legend>
+        <div className="gx-filters-chiprow">
+          {FAMILIARITY_BANDS.map((b) => {
+            const n = famCounts[b] || 0;
+            const checked = filters.familiarity.includes(b);
+            return (
+              <label
+                key={b}
+                className={`gx-chip gx-fam-chip gx-fam-${b}${n === 0 && !checked ? ' is-empty' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={n === 0 && !checked}
+                  onChange={() => patch({ familiarity: toggleIn(filters.familiarity, b) })}
+                />
+                {t(`grammar.familiarity.${FAMILIARITY_KEYS[b]}`)}
+                <span className="muted gx-filters-cat-count">{n}</span>
+              </label>
+            );
+          })}
+        </div>
+        <p className="muted gx-filters-hint">{t('grammar.familiarity.hint')}</p>
       </fieldset>
 
       <fieldset className="gx-filters-field">

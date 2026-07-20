@@ -4,6 +4,7 @@ import {
   categoryCounts,
   countMatching,
   dedupeGrammarByTitle,
+  familiarityFilterCounts,
   filterGrammarPoints,
   grammarTitleKey,
   hasActiveFilters,
@@ -12,6 +13,7 @@ import {
   type PracticeFilters,
 } from '../data/grammar/practiceFilters';
 import { GRAMMAR } from '../data/grammar';
+import { applyFamiliarity, setFamiliarity } from '../grammarFamiliarity';
 import type { NormalizedGrammarPoint } from '../data/grammar/normalize';
 import type { GrammarTagSource, GrammarVerification } from '../data/grammar/types';
 
@@ -574,5 +576,60 @@ describe('migrateLegacyFilters', () => {
     expect(out.levels).toEqual([]);
     expect(out.categories).toEqual([]);
     expect(out.query).toBe('');
+  });
+});
+
+describe('familiarity filter dimension', () => {
+  const raw = [
+    point({ id: 'a', title: 'あ' }),
+    point({ id: 'b', title: 'い' }),
+    point({ id: 'c', title: 'う' }),
+  ];
+  // a → Learning, b → Known, c → left New.
+  let state = setFamiliarity({}, 'a', 1);
+  state = setFamiliarity(state, 'b', 3);
+  const decorated = applyFamiliarity(raw, state);
+
+  it('keeps only the requested bands, OR within the group', () => {
+    expect(filterGrammarPoints(decorated, filters({ familiarity: [1] })).map((p) => p.id)).toEqual([
+      'a',
+    ]);
+    expect(
+      filterGrammarPoints(decorated, filters({ familiarity: [1, 3] }))
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('treats an untracked point as New (0), so [0] selects the unstudied', () => {
+    expect(filterGrammarPoints(decorated, filters({ familiarity: [0] })).map((p) => p.id)).toEqual([
+      'c',
+    ]);
+  });
+
+  it('preserves the decoration through the filter so rows can read the band', () => {
+    const kept = filterGrammarPoints(decorated, filters({ familiarity: [3] }));
+    expect(kept[0]?.familiarity).toBe(3);
+  });
+
+  it('reports the band as active and the default as inactive', () => {
+    expect(hasActiveFilters(filters({ familiarity: [2] }))).toBe(true);
+    expect(hasActiveFilters(DEFAULT_PRACTICE_FILTERS)).toBe(false);
+  });
+
+  it('counts each band against the other active filters, and agrees with the list', () => {
+    const counts = familiarityFilterCounts(decorated, filters());
+    expect(counts).toEqual({ 0: 1, 1: 1, 2: 0, 3: 1 });
+    // The list a band yields must match the number shown beside it.
+    for (const band of [0, 1, 2, 3] as const) {
+      const listed = filterGrammarPoints(decorated, filters({ familiarity: [band] })).length;
+      expect(listed).toBe(counts[band]);
+    }
+  });
+
+  it('counts respect a co-active filter, so a band promises what a click delivers', () => {
+    // Narrow to Learning-band counts computed under a level filter that excludes b/c.
+    const counts = familiarityFilterCounts(decorated, filters({ levels: ['N5'] }));
+    expect(counts[1]).toBe(1);
   });
 });

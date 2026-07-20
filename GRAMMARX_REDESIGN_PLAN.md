@@ -673,9 +673,40 @@ familiarity (`{"l":1,"seen":1,"correct":1,...}` per point), session options,
 and the history record. 809 tests / 85 files, i18n clean at 3,640 keys,
 `vite build` clean.
 
-**Not built: familiarity is stored but invisible.** No band badge on Explorer
-rows, no sort or filter by New/Learning/Familiar/Known. The data is correct and
-persisted; nothing surfaces it yet.
+**Familiarity is now surfaced (done 2026-07-20).** The Phase 3 gap — state
+stored but invisible — is closed:
+
+- **Row badge.** A compact N/L/F/K pill on each Explorer row, shown only once a
+  point leaves New (a badge on every row is noise). It reuses the vocabulary
+  `wk-grade` palette, so the two knowledge scales read as one visual language.
+- **Filter dimension.** `PracticeFilters.familiarity: GxLevel[]`, wired into the
+  shared predicate, chips and a `familiarityFilterCounts` helper that counts
+  each band against the *other* active filters — the same anti-drift recipe as
+  `categoryCounts`. Forward-compatible via `coerce`, so no key-version bump. The
+  filter and its counts appear on **both** the Explorer and Practice screens,
+  which both now decorate their corpus with `applyFamiliarity`.
+- **Manual band setter.** A reusable `GrammarBandControl` in the Explorer detail
+  pane, the same four-button picker vocabulary uses; clicking the active band
+  clears to New (sparse-delete). A hand-set band shows a "set by hand" tooltip
+  and is protected from automatic grading, exactly as `knownWords` does.
+- **Live cross-screen sync.** `grammarFamiliarity` gained `onFamiliarityChanged`
+  + an emit from `saveFamiliarity` (mirroring `knownWords.onKnowledgeChanged`),
+  so grading a card in the test modal live-updates the badges and counts behind
+  it. `filterGrammarPoints`/`sortGrammarPoints` are now generic so the
+  decoration survives to the rows.
+
+**Verified live on 2026-07-20** under `npm start`, driving the real Electron
+window (the Vite harness renders nothing for this app): set ～あとで to Familiar
+→ the row badge appeared, the detail control showed "Familiar · set by hand",
+the filter counts read New 1892 / Familiar 1, ticking Familiar narrowed the list
+to that one point, and switching to Practice showed the same counts (proving the
+decoration and the localStorage-backed persistence across a remount). Clearing
+the band removed the entry. 826 tests / 86 files (+8 new, including corpus-level
+familiarity-filter and subscription-wiring tests), i18n clean at 3,657 keys,
+`vite build` clean, changed files lint clean.
+
+**Still not built (a smaller gap): sort by familiarity.** The filter narrows by
+band, but there is no "sort by how well I know it" option in `GrammarSort`.
 
 ### Phase 4 — Notebook
 

@@ -280,6 +280,15 @@ export const GRAMMAR_TAXONOMY_EN: Catalog = {
   'grammar.practice.hiddenSelected': '{count} selected but hidden',
   'grammar.practice.exporting': 'Exporting…',
   'grammar.practice.empty.hint': 'Try removing a filter, or turn off "Verified tags only".',
+  // —— familiarity (learner state) ——
+  'grammar.familiarity.legend': 'Familiarity',
+  'grammar.familiarity.new': 'New',
+  'grammar.familiarity.learning': 'Learning',
+  'grammar.familiarity.familiar': 'Familiar',
+  'grammar.familiarity.known': 'Known',
+  'grammar.familiarity.hint': 'How well you know each point, from practice sessions or set by hand.',
+  'grammar.familiarity.setLabel': 'I know this',
+  'grammar.familiarity.manual': 'set by hand',
 };
 
 export const GRAMMAR_TAXONOMY_JA: Catalog = {
@@ -523,6 +532,15 @@ export const GRAMMAR_TAXONOMY_JA: Catalog = {
   'grammar.practice.hiddenSelected': '選択中{count}件が非表示',
   'grammar.practice.exporting': '書き出し中…',
   'grammar.practice.empty.hint': '絞り込みを減らすか、「検証済みタグのみ」をオフにしてください。',
+  // —— familiarity (learner state) ——
+  'grammar.familiarity.legend': '習熟度',
+  'grammar.familiarity.new': '未学習',
+  'grammar.familiarity.learning': '学習中',
+  'grammar.familiarity.familiar': 'なじみ',
+  'grammar.familiarity.known': '習得済み',
+  'grammar.familiarity.hint': '各項目の習熟度。練習セッションの結果、または手動で設定されます。',
+  'grammar.familiarity.setLabel': '習熟度',
+  'grammar.familiarity.manual': '手動設定',
 };
 
 export const GRAMMAR_TAXONOMY_ZH: Catalog = {
@@ -765,6 +783,15 @@ export const GRAMMAR_TAXONOMY_ZH: Catalog = {
   'grammar.practice.hiddenSelected': '已选 {count} 项被隐藏',
   'grammar.practice.exporting': '正在导出…',
   'grammar.practice.empty.hint': '试着减少筛选条件，或关闭「仅限已核验标签」。',
+  // —— familiarity (learner state) ——
+  'grammar.familiarity.legend': '熟悉度',
+  'grammar.familiarity.new': '未学',
+  'grammar.familiarity.learning': '学习中',
+  'grammar.familiarity.familiar': '熟悉',
+  'grammar.familiarity.known': '已掌握',
+  'grammar.familiarity.hint': '你对每个语法点的熟悉程度，来自练习或手动设置。',
+  'grammar.familiarity.setLabel': '熟悉度',
+  'grammar.familiarity.manual': '手动设置',
 };
 
 export const GRAMMAR_TAXONOMY_RU: Catalog = {
@@ -1008,4 +1035,13 @@ export const GRAMMAR_TAXONOMY_RU: Catalog = {
   'grammar.practice.hiddenSelected': 'Выбрано, но скрыто: {count}',
   'grammar.practice.exporting': 'Экспорт…',
   'grammar.practice.empty.hint': 'Уберите фильтр или отключите «Только проверенные теги».',
+  // —— familiarity (learner state) ——
+  'grammar.familiarity.legend': 'Знание',
+  'grammar.familiarity.new': 'Новое',
+  'grammar.familiarity.learning': 'Изучается',
+  'grammar.familiarity.familiar': 'Знакомо',
+  'grammar.familiarity.known': 'Усвоено',
+  'grammar.familiarity.hint': 'Насколько вы знаете каждый пункт — по итогам практики или вручную.',
+  'grammar.familiarity.setLabel': 'Знание',
+  'grammar.familiarity.manual': 'задано вручную',
 };

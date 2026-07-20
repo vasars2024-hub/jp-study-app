@@ -12,6 +12,7 @@
  *   - exclusions always win over inclusions
  */
 
+import type { GxLevel, WithFamiliarity } from '../../grammarFamiliarity';
 import type { GrammarFunctionId } from './functions';
 import { GRAMMAR_FUNCTION_LABELS } from './functions';
 import {
@@ -21,6 +22,15 @@ import {
 } from './normalize';
 import { resolveCategories } from './taxonomy';
 import type { GrammarLang, GrammarLevel, GrammarRegister } from './types';
+
+/**
+ * A point as the filter reads it. Familiarity is learner state applied over the
+ * corpus by `applyFamiliarity`, not a property of the data module, so it is
+ * optional here: an undecorated point reads as New (0), never as a crash. Every
+ * caller that offers the familiarity filter must feed decorated points, or the
+ * whole corpus looks New — the two Explorer/Practice screens both decorate.
+ */
+export type FilterablePoint = NormalizedGrammarPoint & Partial<WithFamiliarity>;
 
 export type GrammarSort = 'level' | 'alphabetical' | 'completeness' | 'random';
 
@@ -40,6 +50,8 @@ export interface PracticeFilters {
   /** Hide records with no examples/explanation — unusable in study or export. */
   studyReadyOnly: boolean;
   requireExamples: boolean;
+  /** Learner-state bands (New/Learning/Familiar/Known) to keep; empty = all. */
+  familiarity: GxLevel[];
   query: string;
   sort: GrammarSort;
 }
@@ -57,6 +69,7 @@ export const DEFAULT_PRACTICE_FILTERS: PracticeFilters = {
   verifiedTagsOnly: true,
   studyReadyOnly: false,
   requireExamples: false,
+  familiarity: [],
   query: '',
   sort: 'level',
 };
@@ -103,6 +116,12 @@ function coerce(parsed: Partial<PracticeFilters>): PracticeFilters {
     categories: Array.isArray(parsed.categories) ? parsed.categories : [],
     excludeCategories: Array.isArray(parsed.excludeCategories) ? parsed.excludeCategories : [],
     registers: Array.isArray(parsed.registers) ? parsed.registers : [],
+    // A v2 payload written before familiarity existed simply has no key here;
+    // the DEFAULT spread supplies [] and this guard rejects a corrupt value.
+    // No key-version bump is needed — only a changed field meaning warrants one.
+    familiarity: Array.isArray(parsed.familiarity)
+      ? (parsed.familiarity.filter((n) => n === 0 || n === 1 || n === 2 || n === 3) as GxLevel[])
+      : [],
     query: typeof parsed.query === 'string' ? parsed.query : '',
   };
 }
@@ -158,6 +177,7 @@ export function hasActiveFilters(f: PracticeFilters): boolean {
     f.registers.length > 0 ||
     f.studyReadyOnly ||
     f.requireExamples ||
+    f.familiarity.length > 0 ||
     f.query.trim().length > 0
   );
 }
@@ -178,9 +198,13 @@ function matchesQuery(point: NormalizedGrammarPoint, q: string): boolean {
   });
 }
 
-export function matchesFilters(point: NormalizedGrammarPoint, filters: PracticeFilters): boolean {
+export function matchesFilters(point: FilterablePoint, filters: PracticeFilters): boolean {
   if (filters.lang !== 'all' && point.lang !== filters.lang) return false;
   if (filters.levels.length && !filters.levels.includes(point.level)) return false;
+
+  if (filters.familiarity.length && !filters.familiarity.includes(point.familiarity ?? 0)) {
+    return false;
+  }
 
   if (filters.categories.length) {
     if (!filters.categories.some((c) => point.categories.includes(c))) return false;
@@ -251,11 +275,11 @@ function seededSort(list: NormalizedGrammarPoint[], seed: number): NormalizedGra
   });
 }
 
-export function sortGrammarPoints(
-  points: NormalizedGrammarPoint[],
+export function sortGrammarPoints<T extends NormalizedGrammarPoint>(
+  points: T[],
   sort: GrammarSort,
   seed = 1,
-): NormalizedGrammarPoint[] {
+): T[] {
   switch (sort) {
     case 'alphabetical':
       return [...points].sort((a, b) => a.title.localeCompare(b.title));
@@ -275,10 +299,16 @@ export function sortGrammarPoints(
   }
 }
 
-export function filterGrammarPoints(
-  points: readonly NormalizedGrammarPoint[],
+/**
+ * Generic over the point type so a corpus decorated by `applyFamiliarity`
+ * keeps its `familiarity` field through the filter — the Explorer rows read it
+ * to draw a band badge, and losing it here would force a second lookup that
+ * could disagree with what was filtered.
+ */
+export function filterGrammarPoints<T extends NormalizedGrammarPoint>(
+  points: readonly T[],
   filters: PracticeFilters,
-): NormalizedGrammarPoint[] {
+): T[] {
   const out = points.filter((p) => matchesFilters(p, filters));
   return sortGrammarPoints(out, filters.sort);
 }
@@ -307,6 +337,25 @@ export function categoryCounts(
   for (const p of points) {
     if (!matchesFilters(p, base)) continue;
     for (const c of p.categories) out[c] = (out[c] || 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * Per-band result counts for the familiarity filter, computed against every
+ * *other* active filter — the same recipe as `categoryCounts`, so each band's
+ * number is what ticking it will actually yield. Points must be decorated;
+ * undecorated ones all read as New.
+ */
+export function familiarityFilterCounts(
+  points: readonly FilterablePoint[],
+  filters: PracticeFilters,
+): Record<GxLevel, number> {
+  const base: PracticeFilters = { ...filters, familiarity: [] };
+  const out: Record<GxLevel, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+  for (const p of points) {
+    if (!matchesFilters(p, base)) continue;
+    out[p.familiarity ?? 0] += 1;
   }
   return out;
 }

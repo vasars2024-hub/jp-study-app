@@ -9,6 +9,12 @@ import {
   type PracticeFilters,
 } from '../../data/grammar/practiceFilters';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
+import {
+  applyFamiliarity,
+  loadFamiliarity,
+  onFamiliarityChanged,
+  type FamiliarityState,
+} from '../../grammarFamiliarity';
 import { useT } from '../../i18n';
 import VirtualList from '../VirtualList';
 import GrammarFilterPanel from './GrammarFilterPanel';
@@ -30,12 +36,20 @@ export default function GrammarPracticePanel({
   const [status, setStatus] = useState('');
   const [testOpen, setTestOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [familiarity, setFamiliarityState] = useState<FamiliarityState>(() => loadFamiliarity());
 
   useEffect(() => {
     savePracticeFilters(filters);
   }, [filters]);
 
-  const corpus = useMemo(() => dedupeGrammarByTitle(GRAMMAR), []);
+  // Finishing a test session writes familiarity; re-read so a "Learning only"
+  // filter reflects what the session just changed.
+  useEffect(() => onFamiliarityChanged(() => setFamiliarityState(loadFamiliarity())), []);
+
+  // Decorated so the shared familiarity filter and its counts are correct here
+  // too; dedupe stays static, decoration re-runs when learner state changes.
+  const baseCorpus = useMemo(() => dedupeGrammarByTitle(GRAMMAR), []);
+  const corpus = useMemo(() => applyFamiliarity(baseCorpus, familiarity), [baseCorpus, familiarity]);
   const filtered = useMemo(() => filterGrammarPoints(corpus, filters), [corpus, filters]);
 
   /*

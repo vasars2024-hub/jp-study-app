@@ -329,4 +329,40 @@ export function saveFamiliarity(state: FamiliarityState): void {
   } catch {
     /* storage full or unavailable — the in-memory state still stands */
   }
+  // Announce after persisting so a listener that re-reads sees the new value.
+  emitFamiliarityChanged();
+}
+
+// ---- change notification ---------------------------------------------------
+
+/**
+ * Familiarity is written from three places — the practice modal grading an
+ * answer, and (after this) the Explorer and Practice band setters — while any
+ * number of screens read it. Without a signal, grading a card behind an open
+ * Explorer leaves its badges stale until a remount. This mirrors
+ * `knownWords.onKnowledgeChanged` exactly: a same-window `CustomEvent` plus the
+ * cross-window `storage` event, both funnelling to one callback.
+ */
+const FAMILIARITY_EVENT = 'grammar-familiarity-changed';
+
+function emitFamiliarityChanged(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(FAMILIARITY_EVENT));
+  } catch {
+    /* no window (e.g. a non-DOM test) — nothing to notify */
+  }
+}
+
+/** Subscribe to familiarity changes, including from other windows. Returns unsubscribe. */
+export function onFamiliarityChanged(cb: () => void): () => void {
+  const handler = (): void => cb();
+  const storageHandler = (e: Event): void => {
+    if ((e as StorageEvent).key === FAMILIARITY_LS_KEY) cb();
+  };
+  window.addEventListener(FAMILIARITY_EVENT, handler);
+  window.addEventListener('storage', storageHandler);
+  return () => {
+    window.removeEventListener(FAMILIARITY_EVENT, handler);
+    window.removeEventListener('storage', storageHandler);
+  };
 }
