@@ -35,6 +35,11 @@ import { useAssets, type AssetView } from '../../assetStore';
 import { useT } from '../../i18n';
 import type { TVars } from '../../../shared/i18n/core';
 
+// This panel renders Study OS class names, whose rules live in styles.css.
+// Imported here rather than in the boot entry so the 468 KB sheet rides this
+// lazy chunk instead of Blanc's boot. See theme/studyos-compat.css.
+void import('../../theme/studyos-compat.css');
+
 export type BlancAnalyzerResult = {
   level: BookLevelEstimate | null;
   score: ComprehensibilityScore | null;

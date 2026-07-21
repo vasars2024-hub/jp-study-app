@@ -7,6 +7,38 @@
    Must import after the per-stream files so its resets win ties. */
 @import './blanc-native.css';
 
+/* Page baseline.
+   ---------------------------------------------------------------------------
+   Blanc used to inherit html/body sizing, overflow, and typography from
+   styles.css, which meant its boot had to carry all 468 KB of the Study OS
+   stylesheet to get ten lines of page setup. These are the only rules from that
+   file the Blanc *shell* actually needed — verified by removing the import and
+   diffing computed styles: `.blanc-root` and `.blanc-taskbar` came out
+   byte-identical, and only the body background/colour, the 14px base size, and
+   `overflow: hidden` were lost.
+
+   Study OS keeps its own copy in styles.css; this is deliberately a small
+   duplicate rather than a shared import, because sharing is what coupled the two
+   windows in the first place. --app-zoom is set by appZoom.ts. */
+html {
+  --app-zoom: 1;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow: hidden; /* never put page scrollbars on the window chrome */
+}
+
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--blanc-bg, #1c1c1e);
+  color: var(--blanc-text, #f5f5f7);
+  font-family: var(--blanc-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);
+  font-size: 14px;
+}
+
 .blanc-root,
 .blanc-root * {
   box-sizing: border-box;

@@ -39,6 +39,11 @@ import {
   useFlashcards,
 } from '../flashcards/FlashcardsContent';
 
+// This panel renders Study OS class names, whose rules live in styles.css.
+// Imported here rather than in the boot entry so the 468 KB sheet rides this
+// lazy chunk instead of Blanc's boot. See theme/studyos-compat.css.
+void import('../../theme/studyos-compat.css');
+
 /**
  * Pillar 0 fix for the `player` / `video` tab bail-out, which mounted
  * `MediaView` (and therefore `AppChrome`) inside `BlancViewHost`.

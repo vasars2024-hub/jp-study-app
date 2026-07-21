@@ -1,0 +1,36 @@
+/* Study OS stylesheet, for the Blanc panels that reuse Study OS class names.
+   ===========================================================================
+
+   Why this file exists
+   --------------------
+   Blanc's ported panels deliberately render Study OS markup — the novels
+   workbench is `jiten-workbench` / `jiten-row`, immersion is `immersion-root` /
+   `immersion-toolbar`, and so on. That is the Pillar 0 bargain: share the data
+   layer and the inner content component, present it in Blanc chrome. Those class
+   names need their layout rules, which live in styles.css.
+
+   Loading styles.css from `blancMain.tsx` meant Blanc's *boot* paid 468 KB of
+   source (~85% of its 420 KB boot stylesheet) so that a handful of lazy panels
+   could have their grids — including rules for `ui-app-chrome`, `media-view`,
+   and the aero packs, i.e. Study OS window furniture, in the window whose whole
+   purpose is not to be Study OS.
+
+   Importing it here instead, from the lazy panel modules, moves it into their
+   chunks. A Blanc session that never opens a ported panel never fetches it.
+
+   Why the layer
+   -------------
+   Lazy stylesheets are appended to the document when their chunk loads, i.e.
+   AFTER blanc.css. Under normal cascade rules that hands every specificity tie
+   to Study OS, which would visibly un-skin the Blanc panels — the exact
+   regression `blanc-native.css` exists to prevent, reintroduced by load order.
+
+   `layer(studyos)` fixes that by construction rather than by ordering:
+   unlayered rules always beat layered ones in the CSS cascade, so blanc.css
+   (unlayered) wins every tie no matter when this file arrives. That is strictly
+   more robust than today's import-order arrangement, which only holds while the
+   order holds.
+
+   Do not import this from `blancMain.tsx` or `BlancShell.tsx` — both are in the
+   boot path, and either would undo the split. */
+@import '../styles.css' layer(studyos);

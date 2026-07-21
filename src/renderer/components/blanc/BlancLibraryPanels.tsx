@@ -36,6 +36,11 @@ import {
   useImmersion,
 } from '../immersion/ImmersionContent';
 
+// This panel renders Study OS class names, whose rules live in styles.css.
+// Imported here rather than in the boot entry so the 468 KB sheet rides this
+// lazy chunk instead of Blanc's boot. See theme/studyos-compat.css.
+void import('../../theme/studyos-compat.css');
+
 /**
  * Pillar 2 port of `NovelsView` — Blanc previously had only `NovelReader`
  * (reading), no catalogue. Composes the shared `useNovels` state and the

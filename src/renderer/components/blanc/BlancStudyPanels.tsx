@@ -99,6 +99,11 @@ import {
   useNotebook,
 } from '../notebook/NotebookContent';
 
+// This panel renders Study OS class names, whose rules live in styles.css.
+// Imported here rather than in the boot entry so the 468 KB sheet rides this
+// lazy chunk instead of Blanc's boot. See theme/studyos-compat.css.
+void import('../../theme/studyos-compat.css');
+
 export function BlancDictionaryPanel() {
   const [lang, setLang] = useState<DictLang>(() => getStudyLang());
   const [input, setInput] = useState('');

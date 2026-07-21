@@ -33,7 +33,9 @@ import { markLockscreenUnlocked, shouldShowLockscreen } from './lockscreenSettin
 // Blanc's own tokens + the base stylesheet its panels inherit from. Study OS's
 // theme packs (aero, wired, materials, environment, city) are deliberately absent.
 import './theme/tokens.css';
-import './styles.css';
+// styles.css is NOT booted here: it is 468 KB of Study OS rules that only the
+// ported panels need, and they pull it lazily via theme/studyos-compat.css.
+// Blanc's own page baseline now lives in theme/blanc.css.
 import './components/ui/ui.css';
 import './theme/a11y.css';
 import './theme/blanc.css';
