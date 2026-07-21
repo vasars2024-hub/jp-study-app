@@ -4,10 +4,19 @@
   /* Tell Chromium the UI is dark so NATIVE widgets (select dropdown lists,
      scrollbars, checkboxes) render dark instead of stock white. */
   color-scheme: dark;
-  --bg: #0f0e13;
-  --panel: #17161d;
-  --panel-2: #211f29;
-  --sidebar: #0a0a0e;
+  /* Surface ladder (P1.2) — widened luminance gaps so windows lift off the
+     desktop and raised cards/menus separate from the window body WITHOUT a
+     border. Study-os (default, no data-theme) ONLY: every named theme, Aero
+     ([data-materials='aero']) and Wired ([data-theme='wired-archive']) define
+     their own --bg/--panel/--panel-2/--sidebar and are unaffected.
+       sidebar #0a0910  (recessed rail / wells — darkest)
+       bg      #0d0c12  (desktop backdrop)
+       panel   #1a1823  (window body / primary surface)
+       panel-2 #272433  (raised: cards, menus, popovers) */
+  --bg: #0d0c12;
+  --panel: #1a1823;
+  --panel-2: #272433;
+  --sidebar: #0a0910;
   --text: #f5f4f7;
   --muted: #9d97a6;
   --border: #2d2b37;
@@ -24,6 +33,19 @@
   --danger: #d13438;
   --danger-2: #e35b5f;
   --danger-deep: #a4262c;
+
+  /* Semantic surface ladder aliases (P1.2) — so components stop hardcoding
+     greys and reference an elevation level instead. These are var()/color-mix
+     aliases over each theme's OWN --bg/--panel/--panel-2/--sidebar/--control-bg,
+     so they resolve correctly in every theme, Aero and Wired with no per-theme
+     edits (elevation reads via luminance on dark themes, via the elevation ramp
+     on light ones). */
+  --surface-0: var(--bg);                 /* desktop / app backdrop            */
+  --surface-1: var(--panel);              /* window body / primary surface     */
+  --surface-2: var(--panel-2);            /* raised: cards, menus, popovers    */
+  --surface-3: color-mix(in srgb, var(--panel-2) 86%, #ffffff 14%); /* highest */
+  --surface-sunken: var(--sidebar);       /* recessed rail / inset wells       */
+  --surface-input: var(--control-bg);     /* form-control field background     */
 
   /* ---------- Design tokens ----------
      Single source of truth for spacing, radii, type and elevation. Component

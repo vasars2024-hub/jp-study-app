@@ -34,7 +34,8 @@ would show up.
 
 | Screen / component | Owner | Impl type | Shared primitive adopted | Temp workaround | Missing primitive/token | Remaining inconsistency | Validation status | Deferred reason | Phase | Commit |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Semantic colour split (`--status-error`→`--danger`, `--status-info`→blue, new `--danger`/`--danger-2`/`--danger-deep`/`--danger-weak`) | A | css-propagated | tokens.css/styles.css `:root` + tokens.ts mirror | none | none | Aero inherits new `--status-error` (does not override it; only `--status-info`) — verify Aero error affordances at checkpoint theme sweep; Wired likewise inherits both. Blanc insulated (overrides both). | in-progress | Aero/Wired live verify pending until theme sweep | P1 | _pending_ |
+| Semantic colour split (`--status-error`→`--danger`, `--status-info`→blue, new `--danger`/`--danger-2`/`--danger-deep`/`--danger-weak`) | A | css-propagated | tokens.css/styles.css `:root` + tokens.ts mirror | none | none | Aero inherits new `--status-error` (does not override it; only `--status-info`) — verify Aero error affordances at checkpoint theme sweep; Wired likewise inherits both. Blanc insulated (overrides both). | in-progress | Aero/Wired live verify pending until theme sweep | P1 | 9d09df0 |
+| Surface ladder widen (study-os `--bg`/`--sidebar`/`--panel`/`--panel-2`) + new `--surface-0..3`/`--surface-sunken`/`--surface-input` aliases | A | css-propagated | styles.css base `:root` | none | none | Study-os only; all 12 named themes + Aero + Wired override the four base surfaces (verified) so no leak. Aliases are var()/color-mix over per-theme tokens → adapt everywhere with no per-theme edits. Propagation confirmed live on Settings (`.fwin`=`--bg`, chip=`--panel`). | screenshotted | none | P1 | _pending_ |
 
 ## Integration requests (Account B → Account A)
 
