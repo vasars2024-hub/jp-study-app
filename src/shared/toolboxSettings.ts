@@ -48,6 +48,13 @@ export interface ToolboxSettings {
    * entirely. Empty (the default) means pure registry order.
    */
   toolOrder: ToolboxModuleId[];
+  /**
+   * Order of the launcher category sections. Same partial-preference rule as
+   * toolOrder, and same reason: a category added later must still render.
+   * Values are Blanc category ids, which this module deliberately does not
+   * enumerate — orderToolIds ignores anything unrecognised at apply time.
+   */
+  categoryOrder: string[];
   searchToolsByTitle: boolean;
   searchToolDescriptions: boolean;
   searchCommands: boolean;
@@ -108,6 +115,7 @@ export const DEFAULT_TOOLBOX_SETTINGS: ToolboxSettings = {
   hiddenTools: [],
   favoriteTools: [],
   toolOrder: [],
+  categoryOrder: [],
   searchToolsByTitle: true,
   searchToolDescriptions: true,
   searchCommands: true,
@@ -142,6 +150,7 @@ export const TOOLBOX_SETTING_DEFINITIONS: ToolboxSettingDefinition[] = [
   setting('hiddenTools', 'tool-visibility', 'module-list', 'Tools hidden from the launcher but kept searchable if enabled.', ['tools', 'hide']),
   setting('favoriteTools', 'tool-visibility', 'module-list', 'Tools pinned to the favorites strip.', ['favorites', 'pin']),
   setting('toolOrder', 'tool-visibility', 'module-list', 'User-defined order for the launcher rail; unlisted tools keep registry order.', ['order', 'reorder', 'sort', 'arrange']),
+  setting('categoryOrder', 'tool-visibility', 'module-list', 'User-defined order for launcher category sections.', ['order', 'category', 'section', 'arrange']),
   setting('searchToolsByTitle', 'search', 'boolean', 'Match tool names during Toolbox search.', ['search', 'title']),
   setting('searchToolDescriptions', 'search', 'boolean', 'Match tool descriptions during Toolbox search.', ['search', 'description']),
   setting('searchCommands', 'search', 'boolean', 'Include registered Toolbox commands in search.', ['search', 'command']),
@@ -196,6 +205,7 @@ export function sanitizeToolboxSettings(input: unknown): ToolboxSettings {
   next.hiddenTools = sanitizeModuleList(next.hiddenTools, READY_MODULE_IDS).filter((id) => id !== 'calculator');
   next.favoriteTools = sanitizeModuleList(next.favoriteTools, READY_MODULE_IDS);
   next.toolOrder = sanitizeModuleList(next.toolOrder, READY_MODULE_IDS);
+  next.categoryOrder = sanitizeStringList(next.categoryOrder);
   next.sidebarWidth = clampNumber(next.sidebarWidth, 160, 320, DEFAULT_TOOLBOX_SETTINGS.sidebarWidth);
   next.maxRecentTools = clampNumber(next.maxRecentTools, 0, 12, DEFAULT_TOOLBOX_SETTINGS.maxRecentTools);
   next.maxSearchResults = clampNumber(next.maxSearchResults, 5, 100, DEFAULT_TOOLBOX_SETTINGS.maxSearchResults);
@@ -214,6 +224,17 @@ function sanitizeModuleList(value: unknown, allowed: readonly ToolboxModuleId[])
     allowedSet.has(id as ToolboxModuleId) &&
     value.indexOf(id) === index,
   );
+}
+
+/** Deduped string list, capped. Values are validated where they are applied. */
+function sanitizeStringList(value: unknown, max = 16): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item === 'string' && item && !out.includes(item)) out.push(item);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {

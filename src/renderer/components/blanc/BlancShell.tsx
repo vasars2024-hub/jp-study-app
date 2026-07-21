@@ -1173,6 +1173,10 @@ function BlancToolsPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => vo
       });
     })();
   const visibleTools = orderedTools.slice(0, normalizedQuery ? toolboxSettings.maxSearchResults : undefined);
+  // Section order is a user preference too (Pillar 4). Same partial-order rule
+  // as tools: a category the user never moved keeps its default slot, so adding
+  // one to TOOL_CATEGORY_ORDER later does not require touching saved settings.
+  const orderedCategories = orderToolIds(TOOL_CATEGORY_ORDER, toolboxSettings.categoryOrder);
   const commandBindings = useMemo(() => {
     const map = new Map<string, string>();
     for (const row of getBindings()) map.set(row.id, row.keys);
@@ -1421,7 +1425,7 @@ function BlancToolsPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => vo
             </div>
           )}
 
-          {TOOL_CATEGORY_ORDER.map((category) => {
+          {orderedCategories.map((category) => {
             const tools = visibleTools.filter((item) => item.category === category);
             if (!tools.length) return null;
             return (
@@ -2477,6 +2481,17 @@ function BlancSettingsPanel({
     toolboxSettings.toolOrder,
   );
 
+  const moveCategory = (category: BlancToolCategory, delta: -1 | 1): void => {
+    patchToolbox({
+      categoryOrder: moveToolInOrder(
+        orderToolIds(TOOL_CATEGORY_ORDER, toolboxSettings.categoryOrder),
+        category,
+        delta,
+        toolboxSettings.categoryOrder,
+      ),
+    });
+  };
+
   const moveTool = (id: ToolboxModuleId, delta: -1 | 1): void => {
     patchToolbox({ toolOrder: moveToolInOrder(orderableTools, id, delta, toolboxSettings.toolOrder) });
   };
@@ -2851,6 +2866,44 @@ function BlancSettingsPanel({
           <span>{orderableTools.length} tools</span>
           <button type="button" disabled={!toolboxSettings.toolOrder.length} onClick={resetToolOrder}>
             Reset to default order
+          </button>
+        </div>
+
+        <p className="blanc-note">Category sections, in the order they appear:</p>
+        <ol className="blanc-order-list">
+          {orderToolIds(TOOL_CATEGORY_ORDER, toolboxSettings.categoryOrder).map((category, index, list) => (
+            <li key={category}>
+              <span className="blanc-order-index">{index + 1}</span>
+              <span className="blanc-order-label">{TOOL_CATEGORY_LABELS[category]}</span>
+              <button
+                type="button"
+                disabled={index === 0}
+                aria-label={`Move the ${TOOL_CATEGORY_LABELS[category]} section up`}
+                onClick={() => moveCategory(category, -1)}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                disabled={index === list.length - 1}
+                aria-label={`Move the ${TOOL_CATEGORY_LABELS[category]} section down`}
+                onClick={() => moveCategory(category, 1)}
+              >
+                ↓
+              </button>
+            </li>
+          ))}
+        </ol>
+        <div className="blanc-status-row">
+          <button
+            type="button"
+            disabled={!toolboxSettings.categoryOrder.length}
+            onClick={() => {
+              patchToolbox({ categoryOrder: [] });
+              setSettingsMsg('Category order reset to the default.');
+            }}
+          >
+            Reset section order
           </button>
         </div>
       </fieldset>

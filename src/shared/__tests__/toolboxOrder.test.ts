@@ -72,6 +72,39 @@ describe('moveToolInOrder', () => {
   });
 });
 
+describe('categoryOrder setting', () => {
+  it('defaults to empty, meaning the built-in section order', () => {
+    expect(DEFAULT_TOOLBOX_SETTINGS.categoryOrder).toEqual([]);
+  });
+
+  it('keeps arbitrary strings — category ids are validated where they are applied', () => {
+    // shared/ deliberately does not enumerate Blanc's category ids; orderToolIds
+    // ignores anything unrecognised, so a loose sanitizer is safe here.
+    const s = sanitizeToolboxSettings({ ...DEFAULT_TOOLBOX_SETTINGS, categoryOrder: ['language', 'quick'] });
+    expect(s.categoryOrder).toEqual(['language', 'quick']);
+  });
+
+  it('drops duplicates, empties, and non-strings', () => {
+    const s = sanitizeToolboxSettings({
+      ...DEFAULT_TOOLBOX_SETTINGS,
+      categoryOrder: ['quick', 'quick', '', 7, null, 'system'],
+    });
+    expect(s.categoryOrder).toEqual(['quick', 'system']);
+  });
+
+  it('falls back to empty for a non-array', () => {
+    const s = sanitizeToolboxSettings({ ...DEFAULT_TOOLBOX_SETTINGS, categoryOrder: 'quick' });
+    expect(s.categoryOrder).toEqual([]);
+  });
+
+  it('orders categories through the same helper as tools', () => {
+    const cats = ['quick', 'productivity', 'system', 'language'] as const;
+    expect(orderToolIds(cats, ['language'])).toEqual(['language', 'quick', 'productivity', 'system']);
+    // A category added to the constant later still renders.
+    expect(orderToolIds([...cats, 'new'] as const, ['language'])).toContain('new');
+  });
+});
+
 describe('toolOrder setting', () => {
   it('defaults to empty, meaning registry order', () => {
     expect(DEFAULT_TOOLBOX_SETTINGS.toolOrder).toEqual([]);
