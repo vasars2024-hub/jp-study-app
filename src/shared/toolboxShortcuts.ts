@@ -304,6 +304,18 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     editable: true,
   },
   {
+    id: 'toolbox.openFurigana',
+    name: 'Open Furigana Generator',
+    description: 'Open the furigana generator for annotating pasted text.',
+    category: 'Study',
+    feature: 'furigana',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
+  },
+  {
     id: 'toolbox.openCalendar',
     name: 'Open Calendar',
     description: 'Open the shared Study OS calendar.',

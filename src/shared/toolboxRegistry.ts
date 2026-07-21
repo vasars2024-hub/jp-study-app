@@ -94,7 +94,8 @@ export type ToolboxModuleId =
   | 'shadowing-player'
   | 'immersion-tracker'
   | 'context-search'
-  | 'youtube-library';
+  | 'youtube-library'
+  | 'furigana';
 
 export type ToolboxModuleCategory =
   | 'study'
@@ -550,6 +551,32 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
       notes: 'No dependency needed for capped filename search; future indexed/content search can use a mature OSS adapter.',
     },
     migrationNotes: 'Keep the search IPC generic so normal OS command palette and automation can reuse it later.',
+  },
+  {
+    id: 'furigana',
+    label: 'Furigana Generator',
+    category: 'study',
+    status: 'ready',
+    capabilities: ['japanese-analysis', 'utility', 'clipboard'],
+    permissions: ['clipboard-write'],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: false,
+    supportsGlobalShortcut: false,
+    supportsAutomation: true,
+    acceptsExternalInput: true,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation:
+      'Blanc panel over the bundled kuromoji tokenizer plus shared/furigana.ts, which aligns each token reading onto its kanji runs (食べる → 食[た]べる) instead of annotating whole words. Outputs ruby HTML, Anki bracket furigana, or kana.',
+    externalAdapter: {
+      strategy: 'built-in',
+      notes:
+        'Pure composition over the tokenizer already bundled for the readers — no new dependency and no network.',
+    },
+    migrationNotes:
+      'Study-native track item 3. Blanc-only for now: Study OS already renders furigana inline in readers and subtitles, so a second generator surface there would duplicate rather than add.',
   },
   {
     id: 'quick-notes',

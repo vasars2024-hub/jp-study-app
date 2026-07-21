@@ -1129,6 +1129,45 @@
   font-weight: 600;
 }
 
+/* Furigana generator (study-native track item 3). */
+.blanc-furigana-input,
+.blanc-furigana-output {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.7;
+}
+
+.blanc-furigana-output {
+  color: var(--blanc-muted);
+  /* The generated markup is the payload, not prose — keep it monospaced and
+     scrollable rather than reflowing long ruby tags. */
+  font-family: var(--blanc-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.blanc-furigana-preview {
+  margin: 0;
+  /* Ruby needs vertical headroom or the readings collide with the line above. */
+  line-height: 2.4;
+  font-size: 1.1em;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.blanc-furigana-preview rt {
+  /* Readings are secondary to the text they annotate, so --blanc-muted rather
+     than --blanc-accent: under the neutral macOS palette the accent (#e6e6ea)
+     is within a shade of --blanc-text (#f5f5f7), which left the ruby looking
+     like body text rather than an annotation. */
+  color: var(--blanc-muted);
+  /* 0.55em landed at ~8px on a 1.75 DPR display — legible only in theory. */
+  font-size: 0.68em;
+  /* Chromium centres ruby text but drifts on short readings over wide kanji. */
+  ruby-align: center;
+}
+
 .blanc-table-wrap {
   min-height: 0;
   overflow: auto;

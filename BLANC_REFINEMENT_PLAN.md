@@ -23,6 +23,37 @@ Created 2026-07-20. Supersedes the "Blanc Toolbox module build-out" track in `TA
   `.claude/commands/update-blanc.md`.
 - **Study-native item 1** (clipboard watch / auto-lookup) shipped as the Blanc
   `clipboard` panel.
+- **Study-native item 3 — furigana generator shipped (2026-07-21).** New pure
+  `shared/furigana.ts` (`alignFurigana` + `segmentsToRuby`/`segmentsToBrackets`/
+  `segmentsToKana`) and `components/blanc/BlancStudyNativePanels.tsx`, the new home
+  for study-native items 2–7. Registered as a real `TOOLBOX_MODULES` entry
+  (`furigana`, status `ready`, `appearsInNormalOs: false`) plus a
+  `toolbox.openFurigana` command — the registry's own gate
+  (`validateToolboxShortcutRegistry`) caught the missing command and forced it,
+  which is the gate working as designed. No `keyboardShortcuts.ts` edit was needed:
+  the generic `toolbox.open*` handler already dispatches `toolbox:open-tool` with
+  the feature id, so that frozen file stayed untouched.
+
+  The interesting part is the alignment, not the panel. Kuromoji returns a
+  whole-token katakana reading (食べる → タベル), so naive ruby writes たべる over
+  the entire word including okurigana that is already kana. `alignFurigana` splits
+  the reading against the surface's kana anchors and **refuses to guess** when
+  they do not line up — jukujikun (今日 → きょう), disagreeing readings, and
+  leftover morae all fall back to one ruby over the whole token rather than a
+  wrong per-kanji split. 20 unit tests cover both the splits and each refusal; the
+  module is pure and takes strings, so it tests without the 20 MB dictionary.
+
+  **Verified live** in `blanc-harness.html` against a dev server on this working
+  tree: zero `.ui-app-chrome`, one `.blanc-tool-detail.blanc-furigana`, tokenizer
+  reaches Ready, and 私は毎日日本語を勉強して、新しい本を読みます。 produces
+  `私[わたし] 毎日[まいにち] 日本語[にほんご] 勉強[べんきょう] 新[あたら]しい
+  本[ほん] 読[よ]みます` — note 新 and 読 correctly exclude their okurigana. All
+  three output formats verified, including the full kana rendering.
+
+  One CSS fix found only by rendering it: ruby was styled `--blanc-accent`, which
+  under the neutral macOS palette is `#e6e6ea` against `--blanc-text` `#f5f5f7` —
+  effectively invisible as an annotation. Moved to `--blanc-muted`, and bumped
+  0.55em → 0.68em after measuring ~8px on a 1.75 DPR display.
 - **Pillar 0 — `stats` tab bail-out closed (2026-07-20).** `BlancStatisticsPanel`
   is Blanc-native, composing a new `components/stats/StatsContent.tsx`
   (`useStats`, `WordKnowledge`, `StatsCards`, `StatsChart`, `StatsBooks`) that
@@ -139,7 +170,40 @@ served from `http://localhost:5173/blanc.html?blanc=1`, the dedicated entry, not
 the `index.html?blanc=1` fallback. The verification note at the end of this Status
 section is therefore closed.
 
-### Budget: gate is RED and deliberately left red
+### Budget: the 97 KB is attributed (2026-07-21) — it is CSS, not JS
+
+**Finding: Blanc's boot payload includes the entire Study OS stylesheet.**
+`blancMain.tsx:36` imports `./styles.css` (468 KB of source), and `blanc.css`
+`@import`s the per-stream files, so Rollup emits **one 420 KB boot stylesheet** —
+about 21% of Blanc's 1.95 MB boot payload. Confirmed by grepping the built entry
+CSS: it contains `ui-app-chrome`, `media-view`, and `aero` rules, which are Study
+OS chrome, in the window whose entire purpose is not to load Study OS.
+
+This is the missing half of Pillar 1. Items 1–3 split the **JS** — and that split
+is genuinely holding: `alignFurigana`, `segmentsToBrackets`, and `FuriganaSegment`
+are absent from every boot asset, with only the `lazy()` stub in the shell chunk,
+exactly as with the earlier panels. But **CSS was never split at all**, so every
+panel's styles land in boot no matter how lazily its JS loads. That is the
+mechanism behind the budget creep: 0.09 MB over during Stream A, 0.12 MB over now,
+growing once per ported surface regardless of code-splitting discipline.
+
+It is not a one-line fix. Blanc deliberately reuses Study OS classes — the ported
+panels render `jiten-workbench`, `jiten-row`, and `immersion-toolbar`, and
+`blanc-native.css` exists specifically to re-skin them. Dropping `styles.css`
+would unstyle those panels. The real fix is to move panel-specific CSS out of the
+`blanc.css` `@import` chain and into the panel modules themselves (`import
+'./blanc-library.css'` inside `BlancLibraryPanels.tsx`), so Vite attaches each
+stylesheet to its lazy chunk, and then to extract the Study OS classes Blanc
+actually reuses into a Blanc-owned file instead of importing all 468 KB.
+
+**Recommended as the next Pillar 1 item, ahead of item 4 (virtualization)** — it
+is worth more than any remaining JS work and it is the reason the gate cannot go
+green.
+
+Until then the gate stays **RED on purpose. Do not `--update` it.** The furigana
+panel added ~1 KB of CSS and zero boot JS; it is not the regression.
+
+### Original note: gate is RED and deliberately left red
 
 `blanc-budget.cjs` currently reports **over budget by 0.09 MB**
 (recorded 1,919,741 → measured 2,014,291 bytes, +96,974 over the session start).
