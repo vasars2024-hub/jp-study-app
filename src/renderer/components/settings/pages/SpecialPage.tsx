@@ -341,7 +341,7 @@ export default function SpecialPage() {
     <>
       <SettingsCard
         id="blanc-mode"
-        title="Blanc Mode"
+        title={t('special.blancMode')}
         description="Plain toolbox shell for reading, mining, media, flashcards, statistics, automation, and practical utilities."
         highlight={focusSettingId === 'blanc-mode'}
       >
@@ -359,7 +359,7 @@ export default function SpecialPage() {
                 });
             }}
           />
-          <span>Use Blanc Mode</span>
+          <span>{t('special.useBlancMode')}</span>
         </label>
         <p className="muted os-set-hint">
           This opens Blanc as a compact parallel toolbox window. Mini Mode, Focus Mode, and the main GrammarX are left alone.
@@ -409,7 +409,7 @@ export default function SpecialPage() {
           highlight={focusSettingId === 'wired-archive'}
         >
           <div className="os-viz-row">
-            <span className="os-viz-label muted">CRT intensity</span>
+            <span className="os-viz-label muted">{t('special.crtIntensity')}</span>
             {(['clean', 'standard', 'heavy'] as WiredCrtIntensity[]).map((id) => (
               <button
                 key={id}
@@ -456,7 +456,7 @@ export default function SpecialPage() {
               checked={wiredSettings.reducedStatic}
               onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ reducedStatic: e.currentTarget.checked }))}
             />
-            <span>Reduced static/noise</span>
+            <span>{t('special.reducedStatic')}</span>
           </label>
           <label className="os-toggle">
             <input
@@ -464,7 +464,7 @@ export default function SpecialPage() {
               checked={wiredSettings.ambientEnabled}
               onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ ambientEnabled: e.currentTarget.checked }))}
             />
-            <span>Terminal ambient bed</span>
+            <span>{t('special.terminalAmbient')}</span>
           </label>
           <label className="os-toggle">
             <input
@@ -472,7 +472,7 @@ export default function SpecialPage() {
               checked={wiredSettings.replayBoot}
               onChange={(e) => setWiredSettings(saveWiredArchiveSettings({ replayBoot: e.currentTarget.checked }))}
             />
-            <span>Replay boot on entry</span>
+            <span>{t('special.replayBoot')}</span>
           </label>
           <button
             type="button"
@@ -614,7 +614,7 @@ export default function SpecialPage() {
               checked={aeroSettings.overlayEnabled}
               onChange={(e) => setAeroSettings(saveAeroLegacySettings({ overlayEnabled: e.currentTarget.checked }))}
             />
-            <span>Show Aero lyric gadgets when lyrics are active</span>
+            <span>{t('special.aeroLyricGadgets')}</span>
           </label>
 
           <form
