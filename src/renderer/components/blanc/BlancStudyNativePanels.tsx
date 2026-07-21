@@ -31,6 +31,15 @@ import {
   type NumberReading,
 } from '../../../shared/japaneseNumbers';
 import { speak } from '../../tts';
+import {
+  CLASS_LABELS,
+  DRILL_WORDS,
+  FORMS,
+  checkAnswer,
+  conjugate,
+  type ConjugationForm,
+  type WordClass,
+} from '../../../shared/conjugate';
 
 type FuriganaFormat = 'ruby' | 'brackets' | 'kana';
 
@@ -308,6 +317,186 @@ export function BlancCounterPanel() {
           </p>
         </fieldset>
       )}
+    </div>
+  );
+}
+
+const ALL_CLASSES: WordClass[] = ['ichidan', 'godan', 'suru', 'kuru', 'i-adj'];
+
+interface Question {
+  dict: string;
+  reading: string;
+  meaning: string;
+  wordClass: WordClass;
+  form: ConjugationForm;
+  answer: string;
+}
+
+/** Pick a random question from the enabled classes and forms. */
+function nextQuestion(classes: Set<WordClass>, forms: Set<ConjugationForm>): Question | null {
+  const pool: Question[] = [];
+  for (const w of DRILL_WORDS) {
+    if (!classes.has(w.wordClass)) continue;
+    for (const spec of FORMS) {
+      if (!forms.has(spec.id)) continue;
+      const answer = conjugate(w.dict, w.wordClass, spec.id);
+      if (!answer) continue;
+      pool.push({ ...w, form: spec.id, answer });
+    }
+  }
+  if (!pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * Study-native item 4 — conjugation drill.
+ *
+ * Open, drill, close. Answers are checked against `shared/conjugate.ts`, which
+ * is round-trip tested against `deinflect.ts`, so a "wrong" verdict here is
+ * backed by the same engine the dictionary popup uses. Deliberately not the
+ * Game Arena: no XP, no session, no streak to protect — just the pattern.
+ */
+export function BlancConjugationPanel() {
+  const [classes, setClasses] = useState<Set<WordClass>>(new Set(ALL_CLASSES));
+  const [forms, setForms] = useState<Set<ConjugationForm>>(
+    new Set<ConjugationForm>(['polite', 'negative', 'past', 'te']),
+  );
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [answer, setAnswer] = useState('');
+  const [verdict, setVerdict] = useState<'right' | 'wrong' | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [score, setScore] = useState({ right: 0, total: 0 });
+
+  const draw = useCallback(() => {
+    setQuestion(nextQuestion(classes, forms));
+    setAnswer('');
+    setVerdict(null);
+    setRevealed(false);
+  }, [classes, forms]);
+
+  // Draw the first question, and redraw whenever the pool changes so the shown
+  // question always matches the current filters.
+  useEffect(() => {
+    draw();
+  }, [draw]);
+
+  const submit = useCallback(() => {
+    if (!question || verdict) return;
+    const ok = checkAnswer(answer, question.answer);
+    setVerdict(ok ? 'right' : 'wrong');
+    setScore((s) => ({ right: s.right + (ok ? 1 : 0), total: s.total + 1 }));
+  }, [answer, question, verdict]);
+
+  const toggle = <T,>(set: Set<T>, value: T, apply: (s: Set<T>) => void) => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    // Never let the pool go empty — the last enabled item stays on.
+    if (next.size) apply(next);
+  };
+
+  const formSpec = question && FORMS.find((f) => f.id === question.form);
+
+  return (
+    <div className="blanc-tool-detail blanc-conjugation">
+      <fieldset>
+        <legend>Drill</legend>
+        {question ? (
+          <>
+            <div className="blanc-drill-prompt">
+              <span className="blanc-drill-word" lang="ja">{question.dict}</span>
+              <span className="blanc-drill-reading" lang="ja">{question.reading}</span>
+              <span className="blanc-drill-meaning">{question.meaning}</span>
+            </div>
+            <div className="blanc-status-row">
+              <span>{CLASS_LABELS[question.wordClass]}</span>
+              <span className="blanc-drill-target">
+                → {formSpec?.label} <span lang="ja">{formSpec?.japanese}</span>
+              </span>
+            </div>
+            <div className="blanc-command-row">
+              <input
+                type="text"
+                lang="ja"
+                value={answer}
+                autoFocus
+                onChange={(e) => setAnswer(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  // One key drives the whole loop: answer, then next.
+                  if (verdict) draw();
+                  else submit();
+                }}
+                placeholder="Type the conjugated form"
+              />
+              {verdict ? (
+                <button type="button" onClick={draw}>Next</button>
+              ) : (
+                <button type="button" disabled={!answer.trim()} onClick={submit}>Check</button>
+              )}
+            </div>
+            {verdict === 'right' && <p className="blanc-drill-right">Correct</p>}
+            {verdict === 'wrong' && (
+              <p className="blanc-drill-wrong">
+                <span lang="ja">{question.answer}</span>
+              </p>
+            )}
+            {!verdict && (
+              <div className="blanc-status-row">
+                <button type="button" onClick={() => setRevealed(true)}>Show answer</button>
+                {revealed && <span className="blanc-drill-revealed" lang="ja">{question.answer}</span>}
+                <button type="button" onClick={() => speak(question.reading)}>Hear the word</button>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="blanc-note">No questions for the current filters.</p>
+        )}
+        <div className="blanc-status-row">
+          <span>
+            {score.total ? `${score.right} / ${score.total} correct` : 'No answers yet'}
+          </span>
+          {score.total > 0 && (
+            <button type="button" onClick={() => setScore({ right: 0, total: 0 })}>Reset score</button>
+          )}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Word classes</legend>
+        <div className="blanc-segmented">
+          {ALL_CLASSES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={classes.has(c) ? 'active' : ''}
+              onClick={() => toggle(classes, c, setClasses)}
+            >
+              {CLASS_LABELS[c]}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Forms</legend>
+        <div className="blanc-segmented blanc-segmented-wrap">
+          {FORMS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={forms.has(f.id) ? 'active' : ''}
+              onClick={() => toggle(forms, f.id, setForms)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <p className="blanc-note">
+          Answers are checked against the same conjugation engine the dictionary uses to look words
+          up, so the two can never disagree. い-adjectives skip the verb-only forms automatically.
+        </p>
+      </fieldset>
     </div>
   );
 }

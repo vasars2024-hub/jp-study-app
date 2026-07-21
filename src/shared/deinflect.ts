@@ -42,31 +42,35 @@ interface Rule {
 // Keyed by the dictionary (終止形) ending. A godan verb inflects by shifting that
 // final mora across the あ/い/え/お rows; past & te use 音便 (sound-change) forms.
 
-const DICT_ENDINGS = ['う', 'く', 'ぐ', 'す', 'つ', 'ぬ', 'ぶ', 'む', 'る'] as const;
-type DictEnding = (typeof DICT_ENDINGS)[number];
+// These tables are exported so `conjugate.ts` can build the *forward* direction
+// from the same data this file peels backwards. One source of truth: a fix to a
+// row or an 音便 suffix corrects deinflection and conjugation together, and the
+// round-trip test in conjugate.test.ts would catch them drifting apart.
+export const DICT_ENDINGS = ['う', 'く', 'ぐ', 'す', 'つ', 'ぬ', 'ぶ', 'む', 'る'] as const;
+export type DictEnding = (typeof DICT_ENDINGS)[number];
 
 // 未然形 (a-row): base for negative / passive / causative.
-const ROW_A: Record<DictEnding, string> = {
+export const ROW_A: Record<DictEnding, string> = {
   う: 'わ', く: 'か', ぐ: 'が', す: 'さ', つ: 'た', ぬ: 'な', ぶ: 'ば', む: 'ま', る: 'ら',
 };
 // 連用形 (i-row): base for polite ます / -tai / -sugiru.
-const ROW_I: Record<DictEnding, string> = {
+export const ROW_I: Record<DictEnding, string> = {
   う: 'い', く: 'き', ぐ: 'ぎ', す: 'し', つ: 'ち', ぬ: 'に', ぶ: 'び', む: 'み', る: 'り',
 };
 // 仮定形 / 命令形 / 可能 (e-row).
-const ROW_E: Record<DictEnding, string> = {
+export const ROW_E: Record<DictEnding, string> = {
   う: 'え', く: 'け', ぐ: 'げ', す: 'せ', つ: 'て', ぬ: 'ね', ぶ: 'べ', む: 'め', る: 'れ',
 };
 // 意向形 (o-row) — followed by う: 飲もう.
-const ROW_O: Record<DictEnding, string> = {
+export const ROW_O: Record<DictEnding, string> = {
   う: 'お', く: 'こ', ぐ: 'ご', す: 'そ', つ: 'と', ぬ: 'の', ぶ: 'ぼ', む: 'も', る: 'ろ',
 };
 // 音便 past (た/だ) suffixes.
-const PAST: Record<DictEnding, string> = {
+export const PAST: Record<DictEnding, string> = {
   う: 'った', つ: 'った', る: 'った', く: 'いた', ぐ: 'いだ', す: 'した', ぬ: 'んだ', ぶ: 'んだ', む: 'んだ',
 };
 // 音便 te-form (て/で) suffixes.
-const TE: Record<DictEnding, string> = {
+export const TE: Record<DictEnding, string> = {
   う: 'って', つ: 'って', る: 'って', く: 'いて', ぐ: 'いで', す: 'して', ぬ: 'んで', ぶ: 'んで', む: 'んで',
 };
 
@@ -132,6 +136,7 @@ add('negative', 'くない', 'い', WT.adjI, WT.adjI); // 高くない → 高�
 add('past', 'た', 'る', WT.v1, WT.v1); // 食べた → 食べる
 addGodanFull('past', PAST, WT.v5, WT.v5); // 飲んだ / 書いた / 買った …
 add('past', 'いった', 'いく', WT.v5, WT.v5); // 行った (irregular 音便) → 行く
+add('past', '行った', '行く', WT.v5, WT.v5); // …and the kanji spelling, which is the common one
 add('past', 'した', 'する', WT.vs, WT.vs); // した → する (also godan す; both returned)
 add('past', 'きた', 'くる', WT.vk, WT.vk);
 add('past', 'かった', 'い', WT.adjI, WT.adjI); // 高かった → 高い
@@ -140,6 +145,7 @@ add('past', 'かった', 'い', WT.adjI, WT.adjI); // 高かった → 高い
 add('-te', 'て', 'る', WT.v1, WT.v1);
 addGodanFull('-te', TE, WT.v5, WT.v5);
 add('-te', 'いって', 'いく', WT.v5, WT.v5); // 行って → 行く
+add('-te', '行って', '行く', WT.v5, WT.v5); // …and the kanji spelling
 add('-te', 'して', 'する', WT.vs, WT.vs);
 add('-te', 'きて', 'くる', WT.vk, WT.vk);
 add('-te', 'くて', 'い', WT.adjI, WT.adjI); // 高くて → 高い
@@ -178,6 +184,9 @@ addGodan('imperative', ROW_E, '', WT.v5, WT.v5); // 飲め → 飲む
 add('imperative', 'しろ', 'する', WT.vs, WT.vs);
 add('imperative', 'せよ', 'する', WT.vs, WT.vs);
 add('imperative', 'こい', 'くる', WT.vk, WT.vk);
+// The kanji spelling needs its own rule: 来い does not match the ichidan
+// imperative (ろ), and the kana rule above only fires on こい.
+add('imperative', '来い', '来る', WT.vk, WT.vk);
 
 // Provisional conditional (ば).
 add('conditional (–ば)', 'れば', 'る', WT.v1, WT.v1); // 食べれば → 食べる

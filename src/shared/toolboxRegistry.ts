@@ -96,7 +96,8 @@ export type ToolboxModuleId =
   | 'context-search'
   | 'youtube-library'
   | 'furigana'
-  | 'counter-reader';
+  | 'counter-reader'
+  | 'conjugation-drill';
 
 export type ToolboxModuleCategory =
   | 'study'
@@ -578,6 +579,31 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     },
     migrationNotes:
       'Study-native track item 3. Blanc-only for now: Study OS already renders furigana inline in readers and subtitles, so a second generator surface there would duplicate rather than add.',
+  },
+  {
+    id: 'conjugation-drill',
+    label: 'Conjugation Drill',
+    category: 'study',
+    status: 'ready',
+    capabilities: ['japanese-analysis', 'game'],
+    permissions: [],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: false,
+    supportsGlobalShortcut: false,
+    supportsAutomation: false,
+    acceptsExternalInput: false,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation:
+      'Blanc panel over shared/conjugate.ts, the forward direction of deinflect.ts built on the same godan tables. Answers are checked against an engine round-trip tested against deinflect, so a verdict here agrees with dictionary lookup by construction.',
+    externalAdapter: {
+      strategy: 'built-in',
+      notes: 'Pure logic, no dependency. Not the Game Arena: no XP, session, or streak — open, drill, close.',
+    },
+    migrationNotes:
+      'Study-native track item 4. Blanc-only: the Game Arena covers gamified practice in Study OS, and this is deliberately the un-gamified drill.',
   },
   {
     id: 'counter-reader',

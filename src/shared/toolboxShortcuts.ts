@@ -304,6 +304,18 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     editable: true,
   },
   {
+    id: 'toolbox.openConjugationDrill',
+    name: 'Open Conjugation Drill',
+    description: 'Open the verb and adjective conjugation drill.',
+    category: 'Study',
+    feature: 'conjugation-drill',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
+  },
+  {
     id: 'toolbox.openCounterReader',
     name: 'Open Counter Reader',
     description: 'Open the counter and number reader.',

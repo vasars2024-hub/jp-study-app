@@ -1129,6 +1129,64 @@
   font-weight: 600;
 }
 
+/* Conjugation drill (study-native track item 4). */
+.blanc-drill-prompt {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.blanc-drill-word {
+  font-size: 1.6em;
+  color: var(--blanc-text);
+}
+
+.blanc-drill-reading {
+  color: var(--blanc-muted);
+}
+
+.blanc-drill-meaning {
+  color: var(--blanc-faint);
+  font-style: italic;
+}
+
+.blanc-drill-target {
+  color: var(--blanc-text);
+}
+
+.blanc-drill-right,
+.blanc-drill-wrong {
+  margin: 6px 0 0;
+  font-weight: 600;
+}
+
+.blanc-drill-right {
+  color: var(--blanc-ok, #4caf7d);
+}
+
+/* A wrong answer shows the correct form, so it must read as information rather
+   than as a scolding — danger colour on the label only, not the whole row. */
+.blanc-drill-wrong {
+  color: var(--blanc-danger);
+}
+
+.blanc-drill-wrong::before {
+  content: 'Answer: ';
+  color: var(--blanc-muted);
+  font-weight: 400;
+}
+
+.blanc-drill-revealed {
+  color: var(--blanc-text);
+}
+
+/* The form list is long; let it wrap instead of overflowing the panel. */
+.blanc-segmented-wrap {
+  flex-wrap: wrap;
+}
+
 /* Counter reader (study-native track item 5). */
 .blanc-reading-list {
   list-style: none;
