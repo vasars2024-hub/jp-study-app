@@ -40,6 +40,19 @@ function dayQuery(offset: number): string {
 const OVERDUE_QUERY = `${NOT_SUSPENDED} prop:due<0`;
 
 /**
+ * Unseen cards. `prop:due` does not match these — a new card has no scheduled
+ * date until first studied — so without this the panel would report "10 due
+ * today" for a collection with six figures of untouched cards.
+ *
+ * Costs more than the other queries: AnkiConnect has no count-only action, so
+ * this returns every id (measured 2.2 MB / 132 ms on a 151k-card collection).
+ * Acceptable because the panel is on demand, not polled. `getDeckStats` is
+ * cheaper but its `new_count` is capped by each deck's daily limit, which is a
+ * different number and would understate the backlog.
+ */
+const NEW_QUERY = `${NOT_SUSPENDED} is:new`;
+
+/**
  * Query Anki for the coming week's due counts.
  *
  * Never throws: a transport failure becomes `{ ok: false, error }` so the panel
@@ -56,7 +69,14 @@ export async function getDueForecast(signal?: AbortSignal): Promise<DueForecast>
       const ids = (await invoke('findCards', { query: dayQuery(offset) }, { signal })) ?? [];
       days.push({ offsetDays: offset, due: ids.length });
     }
-    return { ok: true, overdue: overdueIds.length, days, generatedAt: Date.now() };
+    const newIds = (await invoke('findCards', { query: NEW_QUERY }, { signal })) ?? [];
+    return {
+      ok: true,
+      overdue: overdueIds.length,
+      days,
+      newCards: newIds.length,
+      generatedAt: Date.now(),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return emptyForecast(message || 'Anki query failed');

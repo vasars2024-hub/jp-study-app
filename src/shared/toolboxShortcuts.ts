@@ -304,6 +304,18 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     editable: true,
   },
   {
+    id: 'toolbox.openReviewForecast',
+    name: 'Open Review Forecast',
+    description: 'Open the read-only review load forecast.',
+    category: 'Study',
+    feature: 'review-forecast',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
+  },
+  {
     id: 'toolbox.openConjugationDrill',
     name: 'Open Conjugation Drill',
     description: 'Open the verb and adjective conjugation drill.',

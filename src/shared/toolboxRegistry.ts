@@ -582,6 +582,32 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
       'Study-native track item 3. Blanc-only for now: Study OS already renders furigana inline in readers and subtitles, so a second generator surface there would duplicate rather than add.',
   },
   {
+    id: 'review-forecast',
+    label: 'Review Forecast',
+    category: 'study',
+    status: 'ready',
+    capabilities: ['statistics', 'flashcards', 'anki'],
+    permissions: ['anki-connect'],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: false,
+    supportsGlobalShortcut: false,
+    supportsAutomation: false,
+    acceptsExternalInput: false,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation:
+      'Read-only Blanc panel: local deck backlog and knowledge bands from existing stores, plus a real 7-day due forecast from Anki via read-only findCards prop:due=N queries. No write path.',
+    externalAdapter: {
+      strategy: 'existing-service',
+      notes:
+        'Anki section needs AnkiConnect; degrades to an honest empty state rather than deriving due dates from interval lengths, which cannot be done.',
+    },
+    migrationNotes:
+      'Study-native track item 7. Blanc-only: Study OS Statistics covers historical counts, this is forward-looking load.',
+  },
+  {
     id: 'conjugation-drill',
     label: 'Conjugation Drill',
     category: 'study',

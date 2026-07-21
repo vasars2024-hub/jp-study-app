@@ -33,6 +33,18 @@ export interface DueForecast {
   overdue: number;
   /** Exactly FORECAST_DAYS entries, offset 0..FORECAST_DAYS-1. */
   days: ForecastDay[];
+  /**
+   * Unseen cards waiting in the collection.
+   *
+   * These are NOT part of the forecast: `prop:due` does not match new cards,
+   * because they have no scheduled date until they are first studied. But they
+   * are unambiguously study load — a collection with 151k new cards and 10
+   * reviews due today is not "a quiet week" — so the count is reported
+   * alongside rather than silently dropped.
+   *
+   * Optional so a main process without this field cannot fail the shape guard.
+   */
+  newCards?: number;
   generatedAt: number;
 }
 

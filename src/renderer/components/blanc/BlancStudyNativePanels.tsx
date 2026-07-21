@@ -622,10 +622,17 @@ export function BlancForecastPanel() {
               {summary.spikeDay !== null &&
                 ` ${dayLabel(summary.spikeDay)} is more than twice the daily average.`}
             </p>
+            {typeof forecast.newCards === 'number' && forecast.newCards > 0 && (
+              <p className="blanc-note">
+                Plus {forecast.newCards.toLocaleString()} new cards not yet started. New cards have
+                no scheduled date until you first study them, so they are not in the chart — but
+                they are still work waiting.
+              </p>
+            )}
             <p className="blanc-note">
-              Counts come from Anki&rsquo;s own scheduler, excluding suspended cards. &ldquo;Heavy&rdquo;
-              and &ldquo;steady&rdquo; are rough labels, not a recommendation — the numbers above are
-              the real answer.
+              Counts come from Anki&rsquo;s own scheduler, excluding suspended cards, and cover
+              reviews only. &ldquo;Heavy&rdquo; and &ldquo;steady&rdquo; are rough labels, not a
+              recommendation — the numbers above are the real answer.
             </p>
           </>
         )}

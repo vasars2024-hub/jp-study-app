@@ -49,6 +49,13 @@ describe('isDueForecast', () => {
     expect(isDueForecast(null)).toBe(false);
   });
 
+  it('accepts a forecast with or without newCards', () => {
+    // Optional on purpose: a main process predating the field must not blank the
+    // panel by failing the guard.
+    expect(isDueForecast({ ...forecast([1]), newCards: 151732 })).toBe(true);
+    expect(isDueForecast({ ...forecast([1]), newCards: undefined })).toBe(true);
+  });
+
   it('rejects wrong shapes', () => {
     expect(isDueForecast({})).toBe(false);
     expect(isDueForecast({ ok: true, overdue: 0 })).toBe(false);
