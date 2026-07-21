@@ -260,7 +260,43 @@ served from `http://localhost:5173/blanc.html?blanc=1`, the dedicated entry, not
 the `index.html?blanc=1` fallback. The verification note at the end of this Status
 section is therefore closed.
 
-### Pillar 1, the real headline: 55% of Blanc's boot JS is the i18n catalog
+### Pillar 1 headline — DONE 2026-07-21. Blanc boot 1.96 MB → 1.24 MB.
+
+The catalog split below is **shipped**. English is eager (default + fallback);
+ja/zh/ru are dynamic-import chunks (232/194/286 KB) a monolingual session never
+fetches. `grammarTaxonomy.ts` had to split too: with all four in one module,
+Rollup hoisted it into the entry chunk because the eager English catalog and the
+three lazy ones all imported it — confirmed by finding Japanese, Chinese and
+Russian taxonomy strings in the built boot chunk.
+
+| | before | after |
+|---|---|---|
+| Blanc boot | 1.96 MB | **1.24 MB** (−37%) |
+| Study OS boot | 4.86 MB | **4.14 MB** (−15%) |
+| Blanc vs Study OS | 60% smaller | **70% smaller** |
+
+**The budget gate is green** and `blanc-budget.json` is re-recorded at 1,299,463
+bytes. That *tightens* the gate rather than silencing it — the regression it was
+held open for is gone, so the old ceiling would no longer catch anything.
+
+Design note for anyone touching it: `translate()` is synchronous and callers
+depend on that, so catalogs resolve **before render** (`ensureCatalog` at boot,
+`catalogFor` inside `t()`), never awaited inside `t()`. `main.tsx` and
+`blancMain.tsx` gate their first render on `initI18n()`; without that a
+non-English UI paints English and flips a frame later.
+
+`src/shared/__tests__/i18nSplit.test.ts` guards it. The win is trivially undone —
+one static import of `catalogs/all` (or of a per-language catalog) from app code
+puts every language back in boot and nothing else would fail.
+
+**Remaining Pillar 1 work, now that this is done:** the 420 KB boot stylesheet
+described below is the next-largest item, and `aiMiningCatalog.ts` (30 KB) still
+looks eager for a surface that may not need it.
+
+<details>
+<summary>Original analysis (kept for the method — sourcemap attribution)</summary>
+
+### 55% of Blanc's boot JS is the i18n catalog
 
 Measured 2026-07-21 by building with `--sourcemap` and attributing generated
 bytes to source modules via the mappings (99.7% of the chunk attributed):
@@ -303,6 +339,8 @@ both read this file and must keep passing across the split.
 Also note `grammarTaxonomy.ts` (42 KB) and `aiMiningCatalog.ts` (30 KB) are eager
 in Blanc boot; both look like data modules that only specific panels need, and
 both are probably cheap `lazy()` wins once the catalog work is done.
+
+</details>
 
 ### Budget: the rest is CSS, not JS
 
