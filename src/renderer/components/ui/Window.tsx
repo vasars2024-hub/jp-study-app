@@ -11,6 +11,7 @@
  */
 import { useRef, useState, type CSSProperties, type PointerEvent as RPE, type ReactNode } from 'react';
 import { appZoomFactor } from './zoom';
+import { useT } from '../../i18n';
 
 const MIN_W = 220;
 const MIN_H = 140;
@@ -54,6 +55,7 @@ export function Window({
   className = '',
   style,
 }: WindowProps) {
+  const { t } = useT();
   const [rect, setRect] = useState<Rect>({ x: initialX, y: initialY, w: initialWidth, h: initialHeight });
   const elRef = useRef<HTMLElement>(null);
 
@@ -120,17 +122,35 @@ export function Window({
         <div className="ui-window__controls">
           {controls}
           {onMinimize && (
-            <button type="button" className="ui-icon-btn ui-icon-btn--sm ui-focusable" aria-label="Minimize" onClick={onMinimize}>
+            <button
+              type="button"
+              className="ui-icon-btn ui-icon-btn--sm ui-focusable"
+              aria-label={t('desktop.minimize')}
+              title={t('desktop.minimize')}
+              onClick={onMinimize}
+            >
               ─
             </button>
           )}
           {onMaximize && (
-            <button type="button" className="ui-icon-btn ui-icon-btn--sm ui-focusable" aria-label="Maximize" onClick={onMaximize}>
+            <button
+              type="button"
+              className="ui-icon-btn ui-icon-btn--sm ui-focusable"
+              aria-label={t('desktop.maximize')}
+              title={t('desktop.maximize')}
+              onClick={onMaximize}
+            >
               ▢
             </button>
           )}
           {onClose && (
-            <button type="button" className="ui-icon-btn ui-icon-btn--sm ui-focusable" aria-label="Close" onClick={onClose}>
+            <button
+              type="button"
+              className="ui-icon-btn ui-icon-btn--sm ui-focusable"
+              aria-label={t('common.close')}
+              title={t('common.close')}
+              onClick={onClose}
+            >
               ✕
             </button>
           )}
