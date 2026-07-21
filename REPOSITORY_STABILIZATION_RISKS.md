@@ -31,6 +31,14 @@ Companion to `REPOSITORY_STABILIZATION_MANIFEST.md`. Status: pre-approval; no Gi
 - `../jp-study-app-stabilization/tracked.patch` (binary-safe) reproduces all tracked edits; `untracked-backup.tar.gz` (1243 files) + `untracked-checksums.txt` reproduce all untracked content.
 - No destructive Git used; original checkout untouched. To undo any future snapshot commit: `git reset --soft` back to `4b846f1` is **not** needed because we branch, not rewrite — worktrees are created on new branches from the snapshot SHA and can simply be removed.
 
+## Post-validation status (recorded after worktree creation)
+
+- **Accepted baseline failures (NOT snapshot-induced, do not "fix" during UI work):** TypeScript 1291 errors + ESLint 65 errors/171 warnings, all from the pinned-TS-4.5.5-vs-`satisfies` mismatch and vendored `.d.ts`. Green gates: Vitest 946/946, i18n, app launch, 0 runtime errors. UI phases must keep TS/lint from getting worse; new errors in a UI-edited file are blockers.
+- **Env-prep risk:** worktrees have no `node_modules`. Running checks there needs `npm ci` (lockfile-safe) or a `node_modules` junction to the main checkout. Using `npm install` risks a forbidden lockfile change.
+- **Aero verified only at resource level** (CSS + wallpaper resolve/parse, 0 errors). Full live theme switch intentionally skipped to protect the running session — treat as partially-verified, not a regression (Aero content is byte-identical to pre-commit).
+- **City feature:** committed assets resolve (512×512 image served); the interactive city UI was not driven end-to-end this session.
+- **TS-version fix is deferred** to a dedicated tooling phase (ideally post-UI-integration / pre-public-release), and must include dependency-compatibility checks — not a bare `typescript` bump.
+
 ## Open decisions requiring the user
 1. Binary assets (rows 12–13): INCLUDE in base (runnable, +86 MB) vs EXCLUDE (lean, needs Stage-13 access mechanism) vs LFS-later.
 2. Unrelated root audit docs (row 14): INCLUDE vs EXCLUDE.

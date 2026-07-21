@@ -8,9 +8,15 @@ would show up.
 
 ## Coordination header (fill in at kickoff)
 
-- Base commit SHA (both branches start here): `TBD`
+- Base commit SHA (both branches start here): `54fd5d99f07ce9af01e027003efdde98225606f3`
 - Approved Phase 1 commit/tag: `TBD` (`ui-phase1-approved`)
-- Base branch: `grammarx/phase-1-5` (confirm current)
+- Base branch: `grammarx/phase-1-5` (parent of canonical base: `4b846f1`)
+- Backup branch (pre-stabilization HEAD): `backup/pre-ui-stabilization` → `4b846f1`
+- Account A worktree (Core & Shell, `ui/core-shell`): `C:/Users/Arseniy/Projects/jp-study-app-core-shell`
+- Account B worktree (App Screens, `ui/app-screens`): `C:/Users/Arseniy/Projects/jp-study-app-app-screens`
+- Recovery artifacts: `C:/Users/Arseniy/Projects/jp-study-app-stabilization/`
+- **Accepted pre-UI validation baseline (UI phases must NOT worsen):** Vitest 946/946 pass (94 files) · i18n pass · app launches · 0 runtime errors · **TypeScript 1291 pre-existing errors** (1282 vendored `@huggingface/transformers` d.ts + 9 src `satisfies` unsupported by pinned TS 4.5.5) · **ESLint 65 errors + 171 warnings** pre-existing. Do NOT upgrade TypeScript/ESLint/deps/lockfile. New errors in files a UI agent edits are blockers.
+- Runtime asset validation: shimeji sprite loads (128×128) + renders live; city asset loads (512×512). Aero CSS + wallpaper resolve (full live theme switch not exercised to avoid disrupting the running session).
 
 ## Legend
 

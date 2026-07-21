@@ -58,6 +58,14 @@ Include (confident): rows 1–11 (+ 9,10). Exclude (confident): rows 15–19, 21
 - **If binaries INCLUDED (rows 12–14 in):** ~259 tracked + ~1174 untracked ≈ **1433 paths** vs HEAD; adds ~86 MB to the object store (one-time); worktrees are fully runnable.
 - **If binaries EXCLUDED (rows 12–13 out):** ~259 tracked + ~501 untracked ≈ **760 paths**; ~few MB; worktrees cannot render companion/city features unless assets are provided by a documented mechanism (Stage 13).
 
+## Post-commit outcome (recorded after Stage 10–13)
+
+- **Canonical base committed:** `54fd5d99f07ce9af01e027003efdde98225606f3` (parent `4b846f1`), 1439 files changed (247 M + 12 D + 1180 A).
+- **Worktrees created** from that exact SHA: `ui/core-shell` → `../jp-study-app-core-shell`; `ui/app-screens` → `../jp-study-app-app-screens`. Both clean, both HEAD = canonical SHA.
+- **Validation baseline (accepted, non-blocking):** Vitest 946/946 pass · i18n pass · app launches · 0 runtime errors · TypeScript 1291 pre-existing errors (1282 vendored + 9 `satisfies`) · ESLint 65 errors/171 warnings pre-existing. Root cause of TS/lint: repo pins `typescript ~4.5.4` but code uses `satisfies` (TS 4.9+); real build path is Vite/esbuild. Fix deferred to a separate tooling phase; **do not** bump TS during UI work.
+- **Asset validation:** shimeji `shime1.png` 128×128 loads + renders live; city `shelter_v01_base.png` 512×512 loads. Aero `frutiger-aero.css` + `secret-aero-network-wallpaper.jpg` (565×353) resolve/parse with 0 errors; **full live Aero theme switch not exercised** (would disrupt the user's running multi-window session) — documented as partially-verified.
+- **Env prep required per worktree:** `node_modules` is not present in either worktree. Before running `tsc`/`vitest`/build/electron there, run `npm ci` (respects the lockfile — do NOT use `npm install`, which could rewrite `package-lock.json`) **or** create a filesystem junction to the main checkout's `node_modules`. No install was performed during stabilization to avoid lockfile changes.
+
 ## Proposed `.gitignore` additions (only applied post-approval, as a separate documented edit)
 
 ```
