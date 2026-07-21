@@ -20995,6 +20995,33 @@ html.lockscreen-widget-root #root {
 .gx-notebook-lineage-label { color: inherit; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gx-notebook-lineage-count { font-weight: 700; }
 
+/* --- Notebook (Phase 3B) — calm/macOS refinement, default study-os only.
+   Two-cue cards (border + fill) collapse to a single surface cue; selection
+   drops the full accent ring for a restrained inset hairline. Guarded out of
+   Aero/Wired (baseline skin equivalence, master §4) and Blanc (its own
+   `[class^='gx-notebook']` re-skin in blanc-native.css). :where() keeps the
+   guard at 0 specificity so these win over the base rules on source order only,
+   and app/skin overrides still out-specify them. --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-count:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-count:where(:not(.blanc-root *)):hover {
+  background: var(--surface-3);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-count.active:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-item-btn:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-item-btn:where(:not(.blanc-root *)):hover {
+  background: var(--surface-3);
+}
+
 .tr-tabs { margin: 8px 0; }
 .tr-history { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .tr-history-empty { padding: 32px 12px; text-align: center; }
