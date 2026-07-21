@@ -11,7 +11,7 @@ import { bootMotionPrefs } from './motion/motionPrefs';
 import { installRewardBursts } from './motion/rewardBurst';
 import { bootWindowChrome } from './windowChrome';
 import { bootTheme, onThemeChanged } from './theme';
-import { applyLangAttribute } from './i18n';
+import { applyLangAttribute, initI18n } from './i18n';
 import { bootEnvironment } from './environment';
 import { installAmbientAudio } from './environment/ambientAudio';
 import { bootCustomCss } from './customCss';
@@ -250,25 +250,32 @@ if (!isCompanionHost && !isSysDictOverlay) {
 
 const container = document.getElementById('root');
 if (container) {
-  if (isSysDictOverlay) {
-    // Profile state powers the popup's Anki mining target; nothing else boots.
-    initProfileState().catch((err) => console.error('[profileState] init failed:', err));
-    createRoot(container).render(
-      <React.StrictMode>
-        <AppErrorBoundary>
-          <SystemDictOverlay />
-        </AppErrorBoundary>
-      </React.StrictMode>,
-    );
-  } else {
-    createRoot(container).render(
-      <React.StrictMode>
-        <AppErrorBoundary>
-          <App />
-        </AppErrorBoundary>
-      </React.StrictMode>,
-    );
-    // Re-apply after mount so compensated size is correct once #root is live.
-    applyZoom(loadZoom());
-  }
+  // Resolve the active UI catalog before the first render. Catalogs are
+  // per-language chunks now, and t() is synchronous — rendering first would
+  // paint English and then flip once the chunk landed, a visible flash on every
+  // boot in a non-English UI. English is the default and is already loaded, so
+  // for most sessions this costs a microtask, not a fetch.
+  void initI18n().then(() => {
+    if (isSysDictOverlay) {
+      // Profile state powers the popup's Anki mining target; nothing else boots.
+      initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+      createRoot(container).render(
+        <React.StrictMode>
+          <AppErrorBoundary>
+            <SystemDictOverlay />
+          </AppErrorBoundary>
+        </React.StrictMode>,
+      );
+    } else {
+      createRoot(container).render(
+        <React.StrictMode>
+          <AppErrorBoundary>
+            <App />
+          </AppErrorBoundary>
+        </React.StrictMode>,
+      );
+      // Re-apply after mount so compensated size is correct once #root is live.
+      applyZoom(loadZoom());
+    }
+  });
 }

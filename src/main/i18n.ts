@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { CATALOGS, en } from '../shared/i18n/catalogs';
+import { catalogFor, en, ensureCatalog } from '../shared/i18n/catalogs';
 import { DEFAULT_LANG, isUiLang, translate, type TVars, type UiLang } from '../shared/i18n/core';
 
 // Main-process side of Phase 2. The renderer owns the language *choice*
@@ -16,6 +16,11 @@ let currentLang: UiLang = DEFAULT_LANG;
 
 export function setMainLang(lang: UiLang): void {
   currentLang = lang;
+  // Catalogs are per-language chunks now, so main has to load one before mt()
+  // can return anything but English. Fire-and-forget: the renderer pushes the
+  // language at boot, well before any native dialog needs a title, and mt()
+  // falls back to English in the gap rather than blocking startup.
+  void ensureCatalog(lang);
 }
 
 export function getMainLang(): UiLang {
@@ -24,7 +29,7 @@ export function getMainLang(): UiLang {
 
 /** Main-process translate — same semantics as renderer's t(). */
 export function mt(key: string, vars?: TVars): string {
-  return translate(key, vars, { lang: currentLang, catalog: CATALOGS[currentLang], fallback: en });
+  return translate(key, vars, { lang: currentLang, catalog: catalogFor(currentLang), fallback: en });
 }
 
 export function registerMainI18nIpc(): void {

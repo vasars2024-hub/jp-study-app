@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
-import { CATALOGS, en } from '../shared/i18n/catalogs';
+import { catalogFor, en, ensureCatalog } from '../shared/i18n/catalogs';
 import {
   DEFAULT_LANG,
   LANG_TAGS,
@@ -51,16 +51,39 @@ export function getUiLang(): UiLang {
   return current;
 }
 
+/**
+ * Load the stored language's catalog. **Await this before the first render** —
+ * `t()` is synchronous, so a catalog that is not resolved yet renders English
+ * and then flips, which is a visible flash on every boot in a non-English UI.
+ */
+export async function initI18n(): Promise<void> {
+  await ensureCatalog(current);
+  applyLangAttribute(current);
+}
+
+/**
+ * Switch language.
+ *
+ * Stays synchronous for callers (it is wired to `onChange` handlers), but the
+ * switch itself lands once the catalog chunk resolves — otherwise the UI would
+ * repaint in English before the new strings arrived. For an already-loaded
+ * language `ensureCatalog` resolves on the microtask queue, so switching back
+ * and forth is instant after the first time.
+ */
 export function setUiLang(lang: UiLang): void {
   if (lang === current) return;
-  current = lang;
-  try {
-    localStorage.setItem(STORAGE_KEY, lang);
-  } catch {
-    // A language that cannot be persisted still applies for this session.
-  }
-  applyLangAttribute(lang);
-  for (const listener of listeners) listener();
+  void ensureCatalog(lang).then(() => {
+    // Re-check: a second switch may have landed while this chunk was loading.
+    if (lang === current) return;
+    current = lang;
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch {
+      // A language that cannot be persisted still applies for this session.
+    }
+    applyLangAttribute(lang);
+    for (const listener of listeners) listener();
+  });
 }
 
 function subscribe(listener: () => void): () => void {
@@ -71,7 +94,10 @@ function subscribe(listener: () => void): () => void {
 export function t(key: string, vars?: TVars): string {
   return translate(key, vars, {
     lang: current,
-    catalog: CATALOGS[current],
+    // Synchronous by design: catalogs are resolved before render (initI18n) and
+    // before a switch (setUiLang), so this never needs to await. A language that
+    // somehow is not loaded degrades to English rather than blocking.
+    catalog: catalogFor(current),
     fallback: en,
     onMissing: (missing, lang) => {
       if (lang !== DEFAULT_LANG) console.warn(`[i18n] missing ${lang} string: ${missing}`);

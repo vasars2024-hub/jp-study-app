@@ -16,7 +16,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 
-const CATALOGS_PATH = path.join(__dirname, '..', 'src', 'shared', 'i18n', 'catalogs.ts');
+// Reads the static aggregate, not the loader: catalogs.ts now lazy-imports
+// per-language chunks, so bundling it would yield only English.
+const CATALOGS_PATH = path.join(__dirname, '..', 'src', 'shared', 'i18n', 'catalogs', 'all.ts');
 const LANGS = ['en', 'ja', 'zh', 'ru'];
 
 function loadCatalogs() {

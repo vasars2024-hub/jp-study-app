@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CATALOGS, en } from '../i18n/catalogs';
+import { CATALOGS, en } from '../i18n/catalogs/all';
 import {
   LANG_TAGS,
   UI_LANGS,

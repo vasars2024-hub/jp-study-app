@@ -21,7 +21,7 @@ import { AppErrorBoundary } from './components/AppErrorBoundary';
 import ToastHost from './components/ToastHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
-import { applyLangAttribute } from './i18n';
+import { applyLangAttribute, initI18n } from './i18n';
 import { applyBlancModeClass } from './blancMode';
 import { bootTheme, onThemeChanged } from './theme';
 import { initProfileState } from './profileState';
@@ -113,12 +113,17 @@ function BlancRoot() {
 
 const container = document.getElementById('root');
 if (container) {
-  createRoot(container).render(
-    <React.StrictMode>
-      <AppErrorBoundary>
-        <BlancRoot />
-      </AppErrorBoundary>
-    </React.StrictMode>,
-  );
-  applyZoom(loadZoom());
+  // See main.tsx: catalogs are per-language chunks and t() is synchronous, so
+  // the active one must resolve before the first paint or a non-English UI
+  // flashes English. English is already loaded — a microtask for most sessions.
+  void initI18n().then(() => {
+    createRoot(container).render(
+      <React.StrictMode>
+        <AppErrorBoundary>
+          <BlancRoot />
+        </AppErrorBoundary>
+      </React.StrictMode>,
+    );
+    applyZoom(loadZoom());
+  });
 }
