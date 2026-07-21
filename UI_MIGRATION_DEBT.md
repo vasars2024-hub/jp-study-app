@@ -387,3 +387,12 @@ follow-up, not folded silently into an app commit.
 Video, Manga, Games, Calendar, CSV, Translate, Dictionary, Grammar, Immersion, Resources, Flashcards, Library
 carry **no** hardcoded legacy-red — they inherit Phase 1's calm tokens. Outstanding work for them is per-app
 §8 card polish (multi-cue → single-cue), assessed app-by-app.
+
+### Toolbar + shell-red + card-polish (every-app pass, cont.)
+| Item | What changed | Verification | Commit |
+|---|---|---|---|
+| `.ui-toolbar` (all apps) | Flattened the grey chrome band: default/named themes get transparent bg + no shadow + single hairline separator (macOS toolbar). Guarded; Aero glass/Wired/Blanc keep theirs. | computed style: study-os transparent/no-shadow, Aero sheen+shadow return | 657bb95 |
+| Shell red leftovers | `.fwin-frameless.focused` (P2 missed the frameless variant) → neutral elevation; `.os-start-backdrop.drop-ready` → accent; `.btn.danger:hover` brand-red → `--danger`. Guarded. | computed style: study-os neutral/accent/danger, Aero red returns | 24599e2 |
+| Per-app content cards | `.cs-card .gram-card .gram-item .bundle-card .bundle-download-card .media-card .cbh-card .guide-item .pl-item` two-cue (border+fill) → single `--surface-2` cue. EXCLUDED (border legit): `.cal-month-cell` (grid), `.consent-card` (modal), `.flash-card` (study surface), `card-*-menu` (dropdowns). Guarded. | computed style: 6/6 sampled study-os border 0/surface-2, Aero baseline returns | (this commit) |
+
+**Every-app pass outcome:** all app-surface hardcoded legacy-red eliminated (Novels/Media/Music) and shell-red leftovers closed; the grey toolbar band flattened app-wide; the two-cue content cards collapsed to one cue. Apps with no such issues (Video, Manga, Games, Immersion, Library, Dictionary body, Calendar grid) already inherit Phase 1's calm tokens and were left unchanged rather than churned.

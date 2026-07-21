@@ -21108,3 +21108,28 @@ html.lockscreen-widget-root #root {
 @media (max-width: 900px) {
   .gx-practice-layout, .gx-notebook-body { grid-template-columns: 1fr; }
 }
+
+/* ===================================================================
+   Every-app pass (user-requested) — per-app card polish.
+   Content cards across the long-tail apps carried two containment cues
+   (1px solid var(--border) + var(--panel) fill), a §8 violation. Collapse each
+   to a single surface cue (borderless raised --surface-2). Deliberately EXCLUDED:
+   .cal-month-cell (border = the calendar grid), .consent-card (prominent modal),
+   .flash-card (the study surface reads as a real card), the card-*-menu dropdowns
+   (menu border is structural). All rules guarded so Aero/Wired keep their skin
+   baseline and Blanc keeps its own re-skin (master §4); equal specificity to the
+   originals, so they win on source order only and app/skin overrides still out-
+   specify them.
+   =================================================================== */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .cs-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-item:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .bundle-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .bundle-download-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .media-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .cbh-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .guide-item:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .pl-item:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
