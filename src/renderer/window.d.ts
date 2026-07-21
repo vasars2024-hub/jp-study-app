@@ -19,6 +19,7 @@ import type {
   MineNoteRequest,
   MineNoteResult,
 } from '../shared/anki';
+import type { DueForecast } from '../shared/reviewForecast';
 import type { ApkgImportResult } from '../shared/apkgParse';
 import type { AssetError, AssetSpec, AssetStatus } from '../shared/assetRegistry';
 import type {
@@ -268,6 +269,8 @@ declare global {
       ankiEnsureModel(id?: ProfileId): Promise<EnsureModelResult>;
       ankiModelFields(modelName: string): Promise<{ ok: boolean; fields: string[]; error?: string }>;
       ankiGetIntervals(opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot>;
+      /** Read-only week-ahead due counts from Anki's own scheduler. */
+      ankiDueForecast(): Promise<DueForecast>;
       importApkg(filePath?: string): Promise<ApkgImportResult>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;

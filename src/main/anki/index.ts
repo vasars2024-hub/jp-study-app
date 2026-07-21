@@ -30,6 +30,7 @@ import type { AnkiAddRequest, AnkiAddResult, AnkiStatus } from '../../shared/typ
 import { fetchJapaneseAudio } from '../dictionary';
 import { getFrequency, getPitch } from '../dictionary/yomitan';
 import { resolveCustomFrequencyRanks } from '../mining';
+import { getDueForecast } from './forecast';
 import { getProfileStore } from '../profiles';
 import { loadProfileRules } from '../profileRules';
 import { invoke, isCollectionUnavailable, setAnkiUrlProvider, toUiError } from './client';
@@ -674,6 +675,10 @@ export function registerAnkiIpc(): void {
       return getCachedSnapshot() ?? emptySnapshot();
     }
   });
+
+  // Read-only due forecast (study-native item 7). On demand only — no timer, and
+  // no cache: the panel asks when it is opened or refreshed.
+  ipcMain.handle('anki:dueForecast', () => getDueForecast());
 
   // Legacy shims (byte-compatible, section 7).
   ipcMain.handle('anki:status', () => ankiStatusShim());

@@ -32,6 +32,16 @@ import {
 } from '../../../shared/japaneseNumbers';
 import { speak } from '../../tts';
 import {
+  dayLabel,
+  emptyForecast,
+  isDueForecast,
+  localBacklog,
+  summarizeForecast,
+  type DueForecast,
+} from '../../../shared/reviewForecast';
+import { loadDeck } from '../../flashcardDeck';
+import { WK_LEVELS, knowledgeCounts, type WkLevel } from '../../knownWords';
+import {
   CLASS_LABELS,
   DRILL_WORDS,
   FORMS,
@@ -496,6 +506,183 @@ export function BlancConjugationPanel() {
           Answers are checked against the same conjugation engine the dictionary uses to look words
           up, so the two can never disagree. い-adjectives skip the verb-only forms automatically.
         </p>
+      </fieldset>
+    </div>
+  );
+}
+
+const VERDICT_TEXT: Record<string, string> = {
+  clear: 'Nothing scheduled — a clear week.',
+  light: 'A light week.',
+  steady: 'A steady week.',
+  heavy: 'A heavy week — consider spreading it out.',
+};
+
+/**
+ * Study-native item 7 — review forecast.
+ *
+ * Read-only. Three views, kept separate because they measure different things
+ * and merging them would imply a shared schedule that does not exist:
+ *
+ *  - Local backlog: not-`known` cards in the Blanc/Study OS deck. A binary flag,
+ *    not a due date.
+ *  - Knowledge load: the New/Learning/Familiar/Known bands from knownWords.
+ *  - Week forecast: real due counts from Anki's scheduler. When Anki is not
+ *    connected this section says so — it never derives due dates from interval
+ *    lengths, because an interval says how long, not when.
+ */
+export function BlancForecastPanel() {
+  const [forecast, setForecast] = useState<DueForecast | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const backlog = useMemo(() => localBacklog(loadDeck()), []);
+  const knowledge = useMemo(() => knowledgeCounts(), []);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    const api = window.api?.ankiDueForecast;
+    if (!api) {
+      setForecast(emptyForecast('Anki bridge unavailable in this window.'));
+      setLoading(false);
+      return;
+    }
+    void api()
+      .then((f) =>
+        // Never trust the shape: a stubbed or unregistered channel resolves
+        // undefined, which would otherwise render as a blank section.
+        setForecast(
+          isDueForecast(f)
+            ? f
+            : emptyForecast('The Anki forecast channel returned no data (is this a dev harness?).'),
+        ),
+      )
+      .catch((e: unknown) =>
+        setForecast(emptyForecast(e instanceof Error ? e.message : String(e))),
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const summary = useMemo(() => (forecast?.ok ? summarizeForecast(forecast) : null), [forecast]);
+  const scale = summary?.peakCount || 1;
+  const knowledgeTotal = (Object.values(knowledge) as number[]).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="blanc-tool-detail blanc-forecast">
+      <fieldset>
+        <legend>This week</legend>
+        {loading && !forecast && <p className="blanc-note">Asking Anki…</p>}
+        {forecast && !forecast.ok && (
+          <>
+            <p className="blanc-warning">Anki is not answering.</p>
+            <p className="blanc-note">{forecast.error}</p>
+            <p className="blanc-note">
+              A day-by-day forecast needs Anki&rsquo;s scheduler. Interval lengths alone say how long
+              a card&rsquo;s gap is, not when it is next due, so no forecast is shown rather than a
+              made-up one. The backlog and knowledge views below work regardless.
+            </p>
+            {/* Retry must live here too: someone who starts Anki after opening
+                the panel would otherwise have to close and reopen the tool. */}
+            <div className="blanc-status-row">
+              <button type="button" disabled={loading} onClick={refresh}>
+                {loading ? 'Retrying…' : 'Try again'}
+              </button>
+            </div>
+          </>
+        )}
+        {forecast?.ok && summary && (
+          <>
+            <div className="blanc-forecast-chart">
+              {forecast.days.map((d) => (
+                <div key={d.offsetDays} className="blanc-forecast-col">
+                  <span className="blanc-forecast-count">{d.due}</span>
+                  <div
+                    className={`blanc-forecast-bar${summary.spikeDay === d.offsetDays ? ' spike' : ''}`}
+                    style={{ height: `${Math.round((d.due / scale) * 100)}%` }}
+                  />
+                  <span className="blanc-forecast-day">{dayLabel(d.offsetDays)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="blanc-status-row">
+              <span>{summary.total} due over {forecast.days.length} days</span>
+              <span>{summary.dailyAverage}/day average</span>
+              {summary.overdue > 0 && (
+                <span className="blanc-warning">{summary.overdue} overdue</span>
+              )}
+              <button type="button" disabled={loading} onClick={refresh}>
+                {loading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+            <p className="blanc-note">
+              {VERDICT_TEXT[summary.verdict]}
+              {summary.spikeDay !== null &&
+                ` ${dayLabel(summary.spikeDay)} is more than twice the daily average.`}
+            </p>
+            <p className="blanc-note">
+              Counts come from Anki&rsquo;s own scheduler, excluding suspended cards. &ldquo;Heavy&rdquo;
+              and &ldquo;steady&rdquo; are rough labels, not a recommendation — the numbers above are
+              the real answer.
+            </p>
+          </>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Local deck backlog</legend>
+        {backlog.total ? (
+          <>
+            <div className="blanc-status-row">
+              <span>{backlog.unknown} not yet known</span>
+              <span>{backlog.known} known</span>
+              <span>{backlog.total} cards total</span>
+            </div>
+            <ul className="blanc-reading-list">
+              {backlog.groups.slice(0, 12).map((g) => (
+                <li key={g.folder || '(unfiled)'}>
+                  <span className="blanc-reading-label">{g.folder || 'Unfiled'}</span>
+                  <span className="blanc-reading-surface">{g.total} cards</span>
+                  <span className="blanc-reading-kana">{g.unknown} to learn</span>
+                </li>
+              ))}
+            </ul>
+            {backlog.groups.length > 12 && (
+              <p className="blanc-note">
+                Showing the 12 folders with the most to learn, of {backlog.groups.length}.
+              </p>
+            )}
+            <p className="blanc-note">
+              Local cards carry a known / not-known flag rather than a review schedule, so this is a
+              backlog, not a due date.
+            </p>
+          </>
+        ) : (
+          <p className="blanc-note">No local deck cards.</p>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Knowledge load</legend>
+        {knowledgeTotal ? (
+          <ul className="blanc-reading-list">
+            {WK_LEVELS.map((label, i) => (
+              <li key={label}>
+                <span className="blanc-reading-label">{label}</span>
+                <span className="blanc-reading-surface">
+                  {knowledge[i as WkLevel] ?? 0} words
+                </span>
+                <span className="blanc-reading-kana">
+                  {Math.round(((knowledge[i as WkLevel] ?? 0) / knowledgeTotal) * 100)}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="blanc-note">No tracked words yet.</p>
+        )}
       </fieldset>
     </div>
   );

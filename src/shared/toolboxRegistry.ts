@@ -97,7 +97,8 @@ export type ToolboxModuleId =
   | 'youtube-library'
   | 'furigana'
   | 'counter-reader'
-  | 'conjugation-drill';
+  | 'conjugation-drill'
+  | 'review-forecast';
 
 export type ToolboxModuleCategory =
   | 'study'

@@ -164,6 +164,9 @@ const BlancCounterPanel = lazy(() =>
 const BlancConjugationPanel = lazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancConjugationPanel })),
 );
+const BlancForecastPanel = lazy(() =>
+  import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancForecastPanel })),
+);
 
 const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
   read: { label: 'Read', icon: 'library' },
@@ -850,12 +853,14 @@ type BlancToolId =
   | 'furigana'
   | 'counter-reader'
   | 'conjugation-drill'
+  | 'review-forecast'
 >;
 
 const BLANC_TOOL_IDS: BlancToolId[] = [
   'furigana',
   'counter-reader',
   'conjugation-drill',
+  'review-forecast',
   'coverage',
   'notebook',
   'translate',
@@ -895,6 +900,7 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   furigana: 'note',
   'counter-reader': 'app',
   'conjugation-drill': 'dice',
+  'review-forecast': 'stats',
   coverage: 'stats',
   notebook: 'note',
   translate: 'globe',
@@ -953,6 +959,7 @@ const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['quick', 'productivity', 'syst
 const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; description: string; shortcut?: string }> = {
   furigana: { category: 'language', description: 'Paste Japanese text and get ruby, Anki bracket furigana, or kana — offline.' },
   'counter-reader': { category: 'language', description: 'Numbers, counters, dates, and clock times to kana — 3本 → さんぼん, with audio.' },
+  'review-forecast': { category: 'language', description: 'Week-ahead review load from Anki, plus local backlog and knowledge bands — read-only.' },
   'conjugation-drill': { category: 'language', description: 'Drill ます, て, た, potential, passive, causative and more across all verb classes.' },
   coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
   notebook: { category: 'language', description: 'Everything you saved, mined, looked up, and read — one timeline with lineage.' },
@@ -1048,6 +1055,7 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'furigana') return <BlancFuriganaPanel />;
   if (tool === 'counter-reader') return <BlancCounterPanel />;
   if (tool === 'conjugation-drill') return <BlancConjugationPanel />;
+  if (tool === 'review-forecast') return <BlancForecastPanel />;
   if (tool === 'notebook') return <BlancNotebookPanel />;
   if (tool === 'translate') return <BlancTranslatePanel />;
   if (tool === 'music') return <BlancMusicPanel />;

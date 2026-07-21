@@ -28,6 +28,7 @@ import type {
   MineNoteRequest,
   MineNoteResult,
 } from './shared/anki';
+import type { DueForecast } from './shared/reviewForecast';
 import type { ApkgImportResult } from './shared/apkgParse';
 import type {
   AiEngineConfig,
@@ -389,6 +390,8 @@ const api = {
     ipcRenderer.invoke('anki:modelFields', modelName),
   ankiGetIntervals: (opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot> =>
     ipcRenderer.invoke('anki:getIntervals', opts),
+  /** Read-only week-ahead due counts from Anki's own scheduler. */
+  ankiDueForecast: (): Promise<DueForecast> => ipcRenderer.invoke('anki:dueForecast'),
   onAnkiIntervalsChanged: (cb: (s: IntervalSnapshot) => void): (() => void) => {
     const handler = (_e: unknown, s: IntervalSnapshot): void => cb(s);
     ipcRenderer.on('anki:intervalsChanged', handler);

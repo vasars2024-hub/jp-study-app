@@ -50,6 +50,9 @@ export interface AnkiActionMap {
   deleteNotes: { params: { notes: number[] }; result: null };
   storeMediaFile: { params: { filename: string; data: string }; result: string };
   findNotes: { params: { query: string }; result: number[] };
+  /** Read-only card search. Used by the due forecast, which lets Anki's own
+   *  scheduler resolve `prop:due=N` rather than deriving dates locally. */
+  findCards: { params: { query: string }; result: number[] };
   notesInfo: { params: { notes: number[] }; result: AnkiNoteInfo[] };
   cardsInfo: { params: { cards: number[] }; result: AnkiCardInfo[] };
 }
@@ -75,6 +78,7 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   deleteNotes: MUTATE_TIMEOUT_MS,
   storeMediaFile: MUTATE_TIMEOUT_MS,
   findNotes: BULK_TIMEOUT_MS,
+  findCards: BULK_TIMEOUT_MS,
   notesInfo: BULK_TIMEOUT_MS,
   cardsInfo: BULK_TIMEOUT_MS,
 };

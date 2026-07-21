@@ -1129,6 +1129,50 @@
   font-weight: 600;
 }
 
+/* Review forecast (study-native track item 7). */
+.blanc-forecast-chart {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: end;
+  gap: 6px;
+  height: 140px;
+  padding: 8px 0;
+}
+
+.blanc-forecast-col {
+  display: grid;
+  /* count / bar / label — the bar row absorbs the slack so every column's
+     baseline and label line up regardless of bar height. */
+  grid-template-rows: auto 1fr auto;
+  align-items: end;
+  justify-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.blanc-forecast-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--blanc-muted);
+  align-self: end;
+  transition: height 200ms ease;
+}
+
+/* A spike is the one signal here measured against the user's own average
+   rather than an absolute cutoff, so it earns the accent. */
+.blanc-forecast-bar.spike {
+  background: var(--blanc-danger);
+}
+
+.blanc-forecast-count,
+.blanc-forecast-day {
+  font-size: 0.8em;
+  color: var(--blanc-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Conjugation drill (study-native track item 4). */
 .blanc-drill-prompt {
   display: flex;
