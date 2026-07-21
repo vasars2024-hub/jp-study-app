@@ -53,7 +53,9 @@ export default function SettingsNav({
                   >
                     <Icon name={p.icon} size={16} />
                     <span>{t(p.labelKey)}</span>
-                    {p.advanced && <span className="os-set-adv-dot" title="Advanced" />}
+                    {p.advanced && (
+                      <span className="os-set-adv-dot" title={t('settings.nav.advanced')} />
+                    )}
                   </button>
                 </li>
               ))}
@@ -69,20 +71,18 @@ export default function SettingsNav({
           onClick={onToggleAdvanced}
           aria-pressed={advancedMode}
           title={
-            advancedMode
-              ? 'Advanced mode on — showing extra settings'
-              : 'Advanced mode off — extra settings hidden (still active in background)'
+            advancedMode ? t('settings.nav.advancedOn') : t('settings.nav.advancedOff')
           }
         >
           <span className="os-set-advanced-glyph" aria-hidden>
             <Icon name="wrench" size={15} />
           </span>
-          <span className="os-set-advanced-label">
-            {advancedMode ? 'Advanced' : 'Advanced'}
-          </span>
+          <span className="os-set-advanced-label">{t('settings.nav.advanced')}</span>
         </button>
         <p className="os-set-advanced-hint muted">
-          {advancedMode ? 'Extra pages unlocked' : 'Tap to unlock expert options'}
+          {advancedMode
+            ? t('settings.nav.advancedUnlocked')
+            : t('settings.nav.advancedHint')}
         </p>
       </div>
     </nav>
