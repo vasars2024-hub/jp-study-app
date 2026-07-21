@@ -108,11 +108,37 @@ Created 2026-07-20. Supersedes the "Blanc Toolbox module build-out" track in `TA
   accepted 教えない (1/2), restricting to い-adjective drew only adjectives with no
   verb-only forms offered, and the last-class guard holds.
 
-  **Remaining study-native items: 2 (pitch accent), 6 (audio transcribe-and-mine),
-  7 (review forecast).** Item 2 is the cheapest of the three, but unlike items
-  3/4/5 it is *not* self-contained: it gates on the downloadable `kanjium-accent`
-  asset and needs an honest "asset not installed" state, so budget for that rather
-  than assuming another pure-logic session.
+- **Study-native item 7 — review forecast shipped (2026-07-21).** Read-only, three
+  separate sections (local backlog / knowledge bands / Anki week), kept separate
+  because merging them would imply a schedule that does not exist.
+
+  The honest-data constraint from this plan drove the design and held: an Anki
+  interval says how *long* a card's gap is, not *when* it is next due, so the
+  forecast comes from Anki's scheduler or not at all. New `main/anki/forecast.ts`
+  asks `findCards` + `prop:due=N` rather than reading raw `due` fields —
+  AnkiConnect's `due` is days-since-collection-creation for review cards but a
+  unix timestamp for learning cards, and converting either needs the collection
+  creation day, which AnkiConnect does not expose. Letting Anki answer is both
+  correct across card types and immune to our arithmetic. Read-only by
+  construction; on demand, no timer.
+
+  Pure parts in `shared/reviewForecast.ts`, 20 tests. **Two bugs found only by
+  rendering it**, neither catchable by typechecking: the harness preload stub
+  *resolves undefined*, which made `forecast` falsy so neither the chart nor the
+  error rendered — a silent blank, the one outcome this feature must never
+  produce (fixed with an `isDueForecast()` shape guard); and the error branch had
+  no retry control, stranding anyone who started Anki after opening the panel.
+
+  **Not verified:** the live Anki query path. AnkiConnect was not running, so the
+  chart was verified against a stubbed response and the query layer is covered by
+  types and the action map, not by observation. Same caveat as the `anki` panel
+  on 2026-07-20.
+
+  **Remaining study-native items: 2 (pitch accent) and 6 (audio
+  transcribe-and-mine).** Neither is self-contained like 3/4/5 were: item 2 gates
+  on the downloadable `kanjium-accent` asset, item 6 on the Whisper model cache.
+  Both need a real "not installed" state, which is the bulk of the work — budget
+  for that rather than assuming another pure-logic session.
 
   One CSS fix found only by rendering it: ruby was styled `--blanc-accent`, which
   under the neutral macOS palette is `#e6e6ea` against `--blanc-text` `#f5f5f7` —
