@@ -9878,6 +9878,21 @@ mark.lookup-mark,
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+
+/* --- Statistics (Phase 3B) — calm/macOS refinement, default study-os only.
+   `.stats-card` and `.stats-chart` carried two containment cues (border + fill);
+   collapse each to a single surface cue. The chart bars keep accent — they are
+   meaningful data (§8 allows accent for data/progress). Guarded out of Aero
+   (its protected `aero-stats-*` render branch), Wired, and Blanc (its
+   `[class^='stats-']` re-skin in blanc-native.css). --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .stats-card:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .stats-chart:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
 .stats-section {
   margin-bottom: 26px;
 }
