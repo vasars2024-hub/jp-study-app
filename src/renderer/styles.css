@@ -22,6 +22,11 @@
   --border: #2d2b37;
   --accent: #ff2e4d;
   --accent-2: #ff6b81;
+  /* Subtle accent wash for hover fills on quiet controls (ghost buttons, etc.).
+     Derives from the live --accent (set by the accent-preset personalization),
+     so it re-tints automatically. Was referenced by .ui-btn--ghost:hover but
+     never defined (P1.4). */
+  --accent-weak: color-mix(in srgb, var(--accent) 14%, transparent);
   --red: #ff2e4d;
   --red-deep: #d21734;
   /* Destructive / danger family (P1.1 semantic split) — a DEEPER, less-saturated
@@ -815,6 +820,13 @@ h1 {
   font-size: 24px;
 }
 
+/* Base .btn kept verbatim as the skin-safe structural base: Aero
+   ([data-materials='aero']), Wired ([data-materials='wired']) and Blanc
+   (.blanc-root) override .btn COLORS at higher specificity and INHERIT this
+   structure, so leaving it unchanged keeps them pixel-identical to baseline.
+   The refined ui-btn-parity treatment for study-os + the named colour themes
+   is layered lower in this file under a zero-specificity :where() guard that
+   excludes the Aero/Wired material scopes (search "P1.4 refined .btn"). */
 .btn {
   background: var(--panel-2);
   color: var(--text);
@@ -13201,6 +13213,98 @@ html[data-taskbar-size='large'] .os-tray-btn {
   background: rgba(255, 46, 77, 0.12);
   border-color: var(--accent);
 }
+
+/* ==========================================================================
+   P1.4 refined .btn — reconcile legacy .btn tiers with the .ui-btn primitives
+   --------------------------------------------------------------------------
+   Applies ONLY to study-os + the named colour themes: the zero-specificity
+   guard excludes the three protected systems — Aero/Wired via the
+   `html:not([data-materials='aero']):not([data-materials='wired'])` ancestor,
+   and Blanc via the `:where(:not(.blanc-root *))` on the button itself (Blanc's
+   buttons all live under `.blanc-root`; the `blanc-mode-enabled` <html> flag is
+   NOT used because it is also set on the study-os main window). Protected
+   buttons keep the verbatim base .btn structure + their own in-scope overrides
+   and stay pixel-identical to baseline. Both `:where()` wrappers contribute 0
+   specificity, so these rules match the specificity of the original tier rules
+   above and win purely by source order — per-screen contextual overrides
+   (higher specificity) still win over them as before.
+   Result: ~500 bespoke .btn call-sites get the refined look with no TSX edits,
+   rendering identically to .ui-btn so Account B can adopt either class.
+   ========================================================================== */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  background: var(--control-bg);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  box-shadow: var(--elevation-1), inset 0 1px 0 var(--glass-highlight);
+  transition: filter var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):hover:not(:disabled) {
+  border-color: var(--glass-border);
+  filter: brightness(1.07);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):active:not(:disabled) {
+  transform: translateY(0.5px);
+  filter: brightness(0.96);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):disabled {
+  opacity: var(--alpha-disabled);
+  cursor: default;
+  pointer-events: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+/* Primary = the single filled brand action per region (matches .ui-btn--primary). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).primary {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 88%, #fff 12%), var(--accent));
+  color: #fff;
+  border-color: color-mix(in srgb, var(--accent) 60%, #000 12%);
+  box-shadow: var(--elevation-1), inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow: var(--elevation-2), inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
+}
+/* Destructive = the deeper --danger hue, distinct from brand (matches .ui-btn--danger under study-os). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).danger {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, #fff 12%), var(--danger));
+  color: #fff;
+  border-color: color-mix(in srgb, var(--danger) 60%, #000 12%);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).danger:hover:not(:disabled) {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, #fff 12%), var(--danger));
+  filter: brightness(1.07);
+}
+/* Quiet ghost tier (matches .ui-btn--ghost) — legacy had none. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).ghost {
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).ghost:hover:not(:disabled) {
+  background: var(--accent-weak);
+  filter: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).small {
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+}
+
 .memory-status {
   margin: 4px 0 0;
   font-size: 0.8rem;
