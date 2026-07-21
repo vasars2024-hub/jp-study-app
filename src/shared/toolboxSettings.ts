@@ -37,6 +37,17 @@ export interface ToolboxSettings {
   enabledTools: ToolboxModuleId[];
   hiddenTools: ToolboxModuleId[];
   favoriteTools: ToolboxModuleId[];
+  /**
+   * User's preferred tool order for the launcher rail.
+   *
+   * Deliberately a **partial** list: only tools the user has actually moved
+   * appear here, and everything else keeps registry order behind them (see
+   * `orderToolIds`). A full snapshot would be the obvious design and the wrong
+   * one — every tool added to the registry afterwards would be missing from the
+   * saved array, and a naive "render the saved order" would drop it from the UI
+   * entirely. Empty (the default) means pure registry order.
+   */
+  toolOrder: ToolboxModuleId[];
   searchToolsByTitle: boolean;
   searchToolDescriptions: boolean;
   searchCommands: boolean;
@@ -96,6 +107,7 @@ export const DEFAULT_TOOLBOX_SETTINGS: ToolboxSettings = {
   enabledTools: READY_MODULE_IDS,
   hiddenTools: [],
   favoriteTools: [],
+  toolOrder: [],
   searchToolsByTitle: true,
   searchToolDescriptions: true,
   searchCommands: true,
@@ -129,6 +141,7 @@ export const TOOLBOX_SETTING_DEFINITIONS: ToolboxSettingDefinition[] = [
   setting('enabledTools', 'tool-visibility', 'module-list', 'Tools visible and runnable in the launcher.', ['tools', 'enable']),
   setting('hiddenTools', 'tool-visibility', 'module-list', 'Tools hidden from the launcher but kept searchable if enabled.', ['tools', 'hide']),
   setting('favoriteTools', 'tool-visibility', 'module-list', 'Tools pinned to the favorites strip.', ['favorites', 'pin']),
+  setting('toolOrder', 'tool-visibility', 'module-list', 'User-defined order for the launcher rail; unlisted tools keep registry order.', ['order', 'reorder', 'sort', 'arrange']),
   setting('searchToolsByTitle', 'search', 'boolean', 'Match tool names during Toolbox search.', ['search', 'title']),
   setting('searchToolDescriptions', 'search', 'boolean', 'Match tool descriptions during Toolbox search.', ['search', 'description']),
   setting('searchCommands', 'search', 'boolean', 'Include registered Toolbox commands in search.', ['search', 'command']),
@@ -182,6 +195,7 @@ export function sanitizeToolboxSettings(input: unknown): ToolboxSettings {
   next.enabledTools = sanitizeModuleList(next.enabledTools, READY_MODULE_IDS);
   next.hiddenTools = sanitizeModuleList(next.hiddenTools, READY_MODULE_IDS).filter((id) => id !== 'calculator');
   next.favoriteTools = sanitizeModuleList(next.favoriteTools, READY_MODULE_IDS);
+  next.toolOrder = sanitizeModuleList(next.toolOrder, READY_MODULE_IDS);
   next.sidebarWidth = clampNumber(next.sidebarWidth, 160, 320, DEFAULT_TOOLBOX_SETTINGS.sidebarWidth);
   next.maxRecentTools = clampNumber(next.maxRecentTools, 0, 12, DEFAULT_TOOLBOX_SETTINGS.maxRecentTools);
   next.maxSearchResults = clampNumber(next.maxSearchResults, 5, 100, DEFAULT_TOOLBOX_SETTINGS.maxSearchResults);
@@ -247,4 +261,58 @@ export function searchToolboxSettingDefinitions(query: string): ToolboxSettingDe
       ...definition.keywords,
     ].join(' ').toLowerCase().includes(q),
   );
+}
+
+// ----- Launcher ordering (Pillar 4) -------------------------------------------
+//
+// `toolOrder` is a partial preference, not a snapshot. Everything here treats an
+// id missing from it as "unmoved", so a tool added to the registry later still
+// shows up — at the end, rather than not at all.
+
+/**
+ * Apply the user's order to a list of tool ids.
+ *
+ * Ids named in `order` come first, in that order. Everything else follows in the
+ * order it was given (registry order, in practice). Ids in `order` that are not
+ * in `ids` are ignored, which is what makes a stale preference harmless after a
+ * tool is removed or disabled.
+ */
+export function orderToolIds<T extends string>(ids: readonly T[], order: readonly string[]): T[] {
+  const present = new Set(ids);
+  const ranked: T[] = [];
+  const seen = new Set<T>();
+  for (const id of order) {
+    if (present.has(id as T) && !seen.has(id as T)) {
+      ranked.push(id as T);
+      seen.add(id as T);
+    }
+  }
+  return [...ranked, ...ids.filter((id) => !seen.has(id))];
+}
+
+/**
+ * Move one tool one slot up (-1) or down (+1) within `ids`, returning the new
+ * `toolOrder` to persist.
+ *
+ * Returns a **complete** ordering of `ids` rather than a minimal diff: expressing
+ * "swap these two" as a partial list is only possible if every tool before them
+ * is already pinned, so the honest thing is to write the resulting order down.
+ * `orderToolIds` still tolerates ids that later disappear, so this stays safe.
+ * Returns the current order unchanged when the move would fall off either end.
+ */
+export function moveToolInOrder<T extends string>(
+  ids: readonly T[],
+  id: T,
+  delta: -1 | 1,
+  order: readonly string[],
+): T[] {
+  const current = orderToolIds(ids, order);
+  const from = current.indexOf(id);
+  if (from < 0) return current;
+  const to = from + delta;
+  if (to < 0 || to >= current.length) return current;
+  const next = [...current];
+  next[from] = current[to];
+  next[to] = current[from];
+  return next;
 }

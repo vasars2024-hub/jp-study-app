@@ -44,6 +44,8 @@ import {
 } from '../../toolboxSettings';
 import {
   TOOLBOX_SETTING_DEFINITIONS,
+  moveToolInOrder,
+  orderToolIds,
   type ToolboxSettings,
   type ToolboxSettingsCategory,
 } from '../../../shared/toolboxSettings';
@@ -1139,7 +1141,7 @@ function BlancToolsPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => vo
       ? fuzzyIncludes(haystack.toLowerCase(), normalizedQuery)
       : haystack.toLowerCase().includes(normalizedQuery);
   const activeTool = BLANC_TOOLS.find((item) => item.id === tool) ?? BLANC_TOOLS[0];
-  const visibleTools = BLANC_TOOLS.filter((item) => {
+  const matchingTools = BLANC_TOOLS.filter((item) => {
     if (item.id !== 'coverage') {
       const moduleId = item.id as ToolboxModuleId;
       if (!toolboxSettings.enabledTools.includes(moduleId)) return false;
@@ -1154,7 +1156,23 @@ function BlancToolsPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => vo
       TOOL_CATEGORY_LABELS[item.category],
     ].join(' ');
     return matches(haystack);
-  }).slice(0, normalizedQuery ? toolboxSettings.maxSearchResults : undefined);
+  });
+  // The user's rail order (Pillar 4) applies to browsing, not to searching:
+  // reordering search hits before the maxSearchResults cap would let a pinned
+  // tool push a better match off the end.
+  const orderedTools = normalizedQuery
+    ? matchingTools
+    : (() => {
+      const byId = new Map(matchingTools.map((item) => [item.id, item]));
+      return orderToolIds(
+        matchingTools.map((item) => item.id),
+        toolboxSettings.toolOrder,
+      ).flatMap((id) => {
+        const item = byId.get(id);
+        return item ? [item] : [];
+      });
+    })();
+  const visibleTools = orderedTools.slice(0, normalizedQuery ? toolboxSettings.maxSearchResults : undefined);
   const commandBindings = useMemo(() => {
     const map = new Map<string, string>();
     for (const row of getBindings()) map.set(row.id, row.keys);
@@ -2448,6 +2466,29 @@ function BlancSettingsPanel({
     patchToolbox({ enabledTools: next });
   };
 
+  // Launcher order (Pillar 4). Buttons rather than drag: they are keyboard- and
+  // screen-reader-operable, and a pointer-only reorder would make this the one
+  // Blanc setting you cannot change without a mouse. Drag is worth adding on
+  // top later; it is not worth having instead.
+  const orderableTools = orderToolIds(
+    BLANC_TOOLS.map((item) => item.id).filter((id): id is ToolboxModuleId =>
+      id !== 'coverage' && toolboxSettings.enabledTools.includes(id as ToolboxModuleId),
+    ),
+    toolboxSettings.toolOrder,
+  );
+
+  const moveTool = (id: ToolboxModuleId, delta: -1 | 1): void => {
+    patchToolbox({ toolOrder: moveToolInOrder(orderableTools, id, delta, toolboxSettings.toolOrder) });
+  };
+
+  const resetToolOrder = (): void => {
+    patchToolbox({ toolOrder: [] });
+    // Plain string, not a t() key: adding one would mean editing all four
+    // catalog files, which a parallel session is currently writing to. Blanc
+    // chrome is outside the i18n sweep by policy anyway (plan, Pillar 8).
+    setSettingsMsg('Launcher order reset to the default.');
+  };
+
   const resetToolboxCategory = (category: ToolboxSettingsCategory): void => {
     setToolboxSettings(resetToolboxSettingsCategory(category));
     setSettingsMsg(t('blanc.settings.resetCategoryDone', { category: t(`blanc.settings.category.${category}`) }));
@@ -2770,6 +2811,48 @@ function BlancSettingsPanel({
             </table>
           </div>
         </details>
+      </fieldset>
+
+      <fieldset>
+        <legend>Launcher order</legend>
+        <p className="blanc-note">
+          The order tools appear in the launcher. Only enabled tools are listed; search results are
+          left in relevance order. Tools you never move keep their default position, so anything
+          added to Blanc later still shows up.
+        </p>
+        <ol className="blanc-order-list">
+          {orderableTools.map((id, index) => {
+            const entry = BLANC_TOOLS.find((item) => item.id === id);
+            return (
+              <li key={id}>
+                <span className="blanc-order-index">{index + 1}</span>
+                <span className="blanc-order-label">{entry?.label ?? id}</span>
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  aria-label={`Move ${entry?.label ?? id} up`}
+                  onClick={() => moveTool(id, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  disabled={index === orderableTools.length - 1}
+                  aria-label={`Move ${entry?.label ?? id} down`}
+                  onClick={() => moveTool(id, 1)}
+                >
+                  ↓
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="blanc-status-row">
+          <span>{orderableTools.length} tools</span>
+          <button type="button" disabled={!toolboxSettings.toolOrder.length} onClick={resetToolOrder}>
+            Reset to default order
+          </button>
+        </div>
       </fieldset>
 
       <fieldset>
