@@ -9050,6 +9050,33 @@ mark.lookup-mark,
 .jiten-row.active {
   background: rgba(180, 50, 58, 0.14);
 }
+
+/* --- Novels / Jiten browser (every-app pass) — calm/macOS refinement,
+   default + named themes only. Replaces the hardcoded legacy-maroon selection
+   tints (rgba(180,50,58,…), which ignore the theme accent and read red under an
+   amber accent) with a neutral hover wash + an accent-FOLLOWING active tint, and
+   repoints the muddy translucent workbench-panel fill onto the surface ladder.
+   All rules carry the Phase 1 guard so Aero/Wired keep their maroon baseline and
+   Blanc keeps its own skin (master §4). Panel border/radius are left intact —
+   a single hairline is a legitimate containment cue (§8). --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-filters:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-table-wrap:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-inspector:where(:not(.blanc-root *)) {
+  background: var(--surface-1);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-row:where(:not(.blanc-root *)):hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-row.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .aero-novels-command:where(:not(.blanc-root *)):hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .aero-novels-command.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-source-buttons button.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
 .jiten-row-title {
   min-width: 0;
   display: flex;
