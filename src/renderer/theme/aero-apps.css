@@ -230,24 +230,23 @@
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
-/* ---------- Buttons: smaller, tactile, lightly bevelled -------------------- */
+/* ---------- Buttons: smaller, flat, low-contrast --------------------------- */
 :root[data-materials='aero'] .ui-btn {
   padding: 4px 11px;
   border-radius: var(--radius-sm);
   font-weight: var(--font-weight-medium);
   letter-spacing: normal;
-  box-shadow: var(--elevation-1), inset 0 1px 0 var(--glass-highlight),
-    inset 0 -1px 0 color-mix(in srgb, var(--bg) 14%, transparent);
+  box-shadow: none;
 }
 :root[data-materials='aero'] .ui-btn--primary {
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.32), transparent 42%),
-    linear-gradient(to bottom, color-mix(in srgb, var(--accent) 82%, #ffffff), var(--accent));
-  border-color: color-mix(in srgb, var(--accent) 72%, #ffffff);
+  background: color-mix(in srgb, var(--accent) 12%, var(--control-bg));
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+  color: var(--text);
 }
 :root[data-materials='aero'] .ui-btn:active {
   transform: none;
-  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--bg) 30%, transparent);
+  box-shadow: none;
+  filter: brightness(0.96);
 }
 :root[data-materials='aero'] .ui-btn--sm { padding: 2px 8px; }
 :root[data-materials='aero'] .ui-icon-btn { width: 28px; height: 28px; border-radius: var(--radius-sm); }
@@ -421,6 +420,37 @@
   flex: none;
   min-height: 32px;
   border-bottom: 1px solid var(--glass-border);
+}
+
+:root[data-materials='aero'] .aero-flash-search {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  margin-right: 6px;
+  border: 1px solid var(--glass-border);
+  border-radius: 3px;
+  background: color-mix(in srgb, #ffffff 62%, transparent);
+  color: var(--muted);
+}
+
+:root[data-materials='aero'] .aero-flash-search:focus-within {
+  border-color: var(--accent);
+}
+
+:root[data-materials='aero'] .aero-flash-search input {
+  width: 150px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+:root[data-materials='aero'] .aero-flash-search input::-webkit-search-cancel-button {
+  display: none;
 }
 
 :root[data-materials='aero'] .aero-flash-layout {
@@ -994,10 +1024,10 @@
 }
 
 :root[data-materials='aero'] .aero-immersion-mode-btn.active {
-  color: #ffffff;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 64%, #ffffff), var(--accent));
-  border-color: color-mix(in srgb, var(--accent) 70%, #ffffff);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+  box-shadow: none;
 }
 
 :root[data-materials='aero'] .aero-immersion-main {
@@ -5763,11 +5793,10 @@
 
 :root[data-materials='aero'] .aero-anki-chrome .btn.primary,
 :root[data-materials='aero'] .aero-anki-chrome .ui-btn--primary {
-  border-color: #1e80c4;
-  background:
-    linear-gradient(180deg, #f8fdff, #9bdcff 50%, #2f94d8),
-    #69bdf0;
-  color: #063d70;
+  border-color: color-mix(in srgb, #1e80c4 36%, var(--border));
+  background: color-mix(in srgb, #69bdf0 14%, var(--control-bg, #eef6fa));
+  color: #17425f;
+  box-shadow: none;
 }
 
 :root[data-materials='aero'] .aero-anki-chrome .btn:disabled,

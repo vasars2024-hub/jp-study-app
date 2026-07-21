@@ -791,15 +791,15 @@ h1 {
   cursor: default;
 }
 .btn.primary {
-  background: var(--sidebar);
-  border-color: var(--accent);
-  /* var(--text), not #fff — --sidebar goes near-white in light themes, and
-     the theme's own text color is the one guaranteed to read on it. */
+  /* Flat muted CTA — same face as secondary, quieter accent edge, no glow. */
+  background: var(--panel-2);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
   color: var(--text);
 }
 .btn.primary:hover:not(:disabled) {
-  background: var(--panel-2);
-  box-shadow: 0 0 0 1px var(--accent), 0 2px 12px rgba(255, 46, 77, 0.25);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  box-shadow: none;
 }
 
 .mining-studio {
@@ -1170,12 +1170,10 @@ h1 {
 }
 
 .mining-actions .btn.primary:not(:disabled) {
-  background: rgba(255, 46, 77, 0.18);
-  border-color: var(--accent);
-  /* An 18%-alpha tint over the ambient panel — in light themes that's a pale
-     pink, not a dark wash, so #fff was going near-invisible. */
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
   color: var(--text);
-  box-shadow: 0 0 0 1px rgba(255, 46, 77, 0.35);
+  box-shadow: none;
 }
 
 .mining-actions .btn:not(:disabled):not(.primary) {
@@ -5187,6 +5185,64 @@ mark.lookup-mark,
   color: var(--text);
   border-color: var(--accent);
   background: var(--panel-2);
+}
+
+.flash-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 0 12px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.flash-search:focus-within {
+  border-color: var(--accent);
+}
+
+.flash-search-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.flash-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.flash-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.flash-search-count {
+  flex: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.flash-search-clear {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.flash-search-clear:hover {
+  color: var(--text);
 }
 
 .flash-section-title {
@@ -11844,17 +11900,15 @@ body.companion-host-body #root {
   align-items: center;
   justify-content: center;
   border-radius: 11px;
-  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--red);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 .os-desk-icon-img.action,
 .os-desk-icon-img.tone-add {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 28%, var(--panel-2)), color-mix(in srgb, var(--accent) 14%, var(--panel)));
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  /* Only 14-28% accent — the rest of this gradient is panel/panel-2, which
-     in light themes leaves a pale wash, not a dark one. */
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
   color: var(--text);
 }
 .os-desk-icon-img img {
@@ -12199,6 +12253,33 @@ html[data-taskbar-size='large'] .os-tray-btn {
 }
 .os-task-win.min {
   opacity: 0.6;
+}
+/* Close affordance. Space is reserved permanently and only the opacity
+   animates, so revealing it on hover never re-flows the taskbar. */
+.os-task-win .os-task-close {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+.os-task-win:hover .os-task-close,
+.os-task-win.active .os-task-close,
+.os-task-win .os-task-close:focus-visible {
+  opacity: 1;
+}
+.os-task-win .os-task-close:hover {
+  background: var(--red-deep);
+  color: #fff;
+  opacity: 1;
 }
 .os-tray {
   display: flex;
@@ -13495,9 +13576,9 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
 .wgt-btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--text);
 }
 .wgt-btn.danger {
   color: var(--accent-2);

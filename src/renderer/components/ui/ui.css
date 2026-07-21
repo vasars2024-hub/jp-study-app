@@ -33,22 +33,22 @@
   letter-spacing: var(--letter-spacing-wide);
   cursor: pointer;
   user-select: none;
-  box-shadow: var(--elevation-1), inset 0 1px 0 var(--glass-highlight);
+  box-shadow: none;
   transition: filter var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard),
     background-color var(--dur-fast) var(--ease-standard);
 }
-.ui-btn:hover { filter: brightness(1.07); }
-.ui-btn:active { transform: translateY(0.5px); filter: brightness(0.96); }
+.ui-btn:hover { filter: brightness(1.04); }
+.ui-btn:active { transform: none; filter: brightness(0.97); }
 .ui-btn--primary {
-  --_bg: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 88%, #fff 12%), var(--accent));
-  color: #fff;
-  border-color: color-mix(in srgb, var(--accent) 60%, #000 12%);
+  --_bg: color-mix(in srgb, var(--accent) 14%, var(--control-bg));
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
 .ui-btn--danger {
-  --_bg: linear-gradient(to bottom, color-mix(in srgb, var(--red) 88%, #fff 12%), var(--red));
-  color: #fff;
-  border-color: color-mix(in srgb, var(--red) 60%, #000 12%);
+  --_bg: color-mix(in srgb, var(--red) 14%, var(--control-bg));
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--red) 40%, var(--border));
 }
 .ui-btn--ghost { --_bg: transparent; box-shadow: none; border-color: transparent; }
 .ui-btn--ghost:hover { --_bg: var(--accent-weak); }

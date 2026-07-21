@@ -726,89 +726,74 @@
   width: calc(34px + 9px * var(--mini-scale, 1));
   height: calc(34px + 9px * var(--mini-scale, 1));
   border-radius: calc(8px + 2px * var(--mini-scale, 1));
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  --icon-c1: #4a8ec8;
-  --icon-c2: #1a4f82;
-  --icon-c3: #d8ecff;
-  color: #fff;
-  background:
-    radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.62), transparent 44%),
-    linear-gradient(165deg, var(--icon-c1) 0%, var(--icon-c2) 64%, color-mix(in srgb, var(--icon-c2) 88%, #081018));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -8px 16px rgba(10, 35, 48, 0.32),
-    0 3px 10px rgba(10, 29, 39, 0.36);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  --icon-c1: #5a7a88;
+  --icon-c2: #3d5560;
+  --icon-c3: #c8d6dc;
+  color: #e8eef1;
+  background: color-mix(in srgb, var(--icon-c2) 72%, var(--panel));
+  box-shadow: none;
 }
 
 :root[data-materials='aero'] .mini-slot-icon::after {
-  content: '';
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  top: 7%;
-  height: 34%;
-  border-radius: 999px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.06));
-  pointer-events: none;
+  display: none;
 }
 
 :root[data-materials='aero'] .mini-slot svg {
   position: relative;
   z-index: 1;
-  color: #fff;
-  stroke-width: 1.85;
-  filter:
-    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))
-    drop-shadow(0 0 4px color-mix(in srgb, var(--icon-c3) 52%, transparent));
+  color: #e8eef1;
+  stroke-width: 1.7;
+  filter: none;
 }
 
 :root[data-materials='aero'] .mini-slot-label {
   font-size: calc(11px + 2px * var(--mini-scale, 1));
-  font-weight: 600;
-  color: #f4fbff;
-  text-shadow: 0 1px 3px rgba(5, 27, 39, 0.82), 0 0 10px rgba(5, 27, 39, 0.45);
+  font-weight: 500;
+  color: #e8eef1;
+  text-shadow: none;
 }
 
-/* Aero mini per-app glossy plates */
+/* Aero mini per-app muted plates */
 :root[data-materials='aero'] .mini-slot-icon.app-library,
 :root[data-materials='aero'] .mini-slot-icon.app-novels,
 :root[data-materials='aero'] .mini-slot-icon.app-immersion {
-  --icon-c1: #4a9fd9;
-  --icon-c2: #1a5a9e;
-  --icon-c3: #c8e8ff;
+  --icon-c1: #5f7a92;
+  --icon-c2: #3d5166;
+  --icon-c3: #c8d4e0;
 }
 :root[data-materials='aero'] .mini-slot-icon.app-dictionary,
 :root[data-materials='aero'] .mini-slot-icon.app-grammar,
 :root[data-materials='aero'] .mini-slot-icon.app-translate {
-  --icon-c1: #2db89a;
-  --icon-c2: #087562;
-  --icon-c3: #b8f5e8;
+  --icon-c1: #5f8a80;
+  --icon-c2: #3d5e58;
+  --icon-c3: #c8ddd8;
 }
 :root[data-materials='aero'] .mini-slot-icon.app-music,
 :root[data-materials='aero'] .mini-slot-icon.app-musicwidget,
 :root[data-materials='aero'] .mini-slot-icon.app-player {
-  --icon-c1: #e84d6a;
-  --icon-c2: #9e1f45;
-  --icon-c3: #ffd0dc;
+  --icon-c1: #8a6a72;
+  --icon-c2: #5c4048;
+  --icon-c3: #dcc8ce;
 }
 :root[data-materials='aero'] .mini-slot-icon.app-anki,
 :root[data-materials='aero'] .mini-slot-icon.app-flashcards {
-  --icon-c1: #e8a830;
-  --icon-c2: #b84a22;
-  --icon-c3: #ffe8b8;
+  --icon-c1: #8a7a5a;
+  --icon-c2: #5c5040;
+  --icon-c3: #ddd4c4;
 }
 :root[data-materials='aero'] .mini-slot-icon.app-calendar,
 :root[data-materials='aero'] .mini-slot-icon.app-stats,
 :root[data-materials='aero'] .mini-slot-icon.app-resources {
-  --icon-c1: #7cb842;
-  --icon-c2: #3d8028;
-  --icon-c3: #d8f0b8;
+  --icon-c1: #6e8460;
+  --icon-c2: #485840;
+  --icon-c3: #d0dcc8;
 }
 :root[data-materials='aero'] .mini-slot-icon.app-settings,
 :root[data-materials='aero'] .mini-slot-icon.app-clipboard {
-  --icon-c1: #8ea8cc;
-  --icon-c2: #3d5278;
-  --icon-c3: #e4eeff;
+  --icon-c1: #6e7688;
+  --icon-c2: #484e5c;
+  --icon-c3: #d0d4dc;
 }
 
 :root[data-materials='aero'] .mini-panel {
@@ -1642,11 +1627,10 @@
   box-shadow: inset 0 1px 2px color-mix(in srgb, var(--bg) 22%, transparent);
 }
 :root[data-materials='aero'] .os-start-app-ic {
-  box-shadow: inset 0 1px 0 var(--glass-highlight),
-    0 1px 2px color-mix(in srgb, var(--bg) 20%, transparent);
+  box-shadow: none;
 }
 :root[data-materials='aero'] .os-start-app:hover .os-start-app-ic {
-  filter: brightness(1.08) saturate(1.1);
+  filter: brightness(1.06);
 }
 :root[data-materials='aero'] .os-start-foot-btn:hover {
   background: var(--glass-tint-strong);
@@ -1661,21 +1645,17 @@
   border-radius: 7px;
 }
 :root[data-materials='aero'] .os-desk-icon:hover {
-  background: color-mix(in srgb, var(--glass-tint-strong) 58%, transparent);
-  border-color: color-mix(in srgb, var(--glass-border) 56%, transparent);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  background: color-mix(in srgb, var(--glass-tint-strong) 40%, transparent);
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: none;
 }
 :root[data-materials='aero'] .os-desk-icon-img {
   width: 38px;
   height: 38px;
   border-radius: 8px;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.08) 42%),
-    color-mix(in srgb, var(--chrome-elevated) 82%, var(--aero-aqua) 10%);
-  border-color: color-mix(in srgb, var(--glass-border) 70%, rgba(18, 49, 67, 0.16));
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    0 2px 5px rgba(10, 29, 39, 0.22);
+  background: color-mix(in srgb, var(--chrome-elevated) 88%, var(--panel));
+  border-color: var(--border);
+  box-shadow: none;
 }
 :root[data-materials='aero'] .os-desk-icon-img svg {
   width: 21px;
@@ -1690,41 +1670,25 @@
   text-shadow: 0 1px 2px rgba(5, 27, 39, 0.72);
 }
 
-/* ---------- Representative original Aero icons (Phase 4.5 M11) -----------
-   Keep the existing original line glyphs, but put them on glossy, app-specific
-   plates so desktop / Start / taskbar identity reads as a personal OS icon set
-   instead of generic monochrome toolbar art. */
+/* ---------- Desktop icons: flat, muted plates (no gloss / candy gradients) - */
 :root[data-materials='aero'] .os-desk-icon-img,
 :root[data-materials='aero'] .os-start-app-ic,
 :root[data-materials='aero'] .os-start-aero-ic {
-  --icon-c1: #7bdff2;
-  --icon-c2: #0bbbd3;
-  --icon-c3: #eaffff;
+  --icon-c1: #5a7a88;
+  --icon-c2: #3d5560;
+  --icon-c3: #c8d6dc;
   position: relative;
   overflow: hidden;
-  color: #ffffff;
-  background:
-    radial-gradient(circle at 28% 20%, rgba(255,255,255,0.92), rgba(255,255,255,0.22) 28%, transparent 46%),
-    linear-gradient(135deg, var(--icon-c1), var(--icon-c2) 62%, color-mix(in srgb, var(--icon-c2) 72%, #123f56));
-  border-color: rgba(255,255,255,0.66);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.82),
-    inset 0 -8px 14px rgba(10,35,48,0.18),
-    0 2px 5px rgba(10, 29, 39, 0.24);
+  color: #e8eef1;
+  background: color-mix(in srgb, var(--icon-c2) 70%, var(--panel));
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  box-shadow: none;
 }
 
 :root[data-materials='aero'] .os-desk-icon-img::after,
 :root[data-materials='aero'] .os-start-app-ic::after,
 :root[data-materials='aero'] .os-start-aero-ic::after {
-  content: '';
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  top: 8%;
-  height: 36%;
-  border-radius: 999px;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.68), rgba(255,255,255,0.08));
-  pointer-events: none;
+  display: none;
 }
 
 :root[data-materials='aero'] .os-desk-icon-img svg,
@@ -1732,58 +1696,56 @@
 :root[data-materials='aero'] .os-start-aero-ic svg {
   position: relative;
   z-index: 1;
-  filter:
-    drop-shadow(0 1px 1px rgba(0,0,0,0.35))
-    drop-shadow(0 0 4px color-mix(in srgb, var(--icon-c3) 44%, transparent));
+  filter: none;
 }
 
 :root[data-materials='aero'] .app-player,
 :root[data-materials='aero'] .app-media,
 :root[data-materials='aero'] .app-music,
 :root[data-materials='aero'] .app-musicwidget {
-  --icon-c1: #ff7c8d;
-  --icon-c2: #c5265b;
-  --icon-c3: #ffe3ef;
+  --icon-c1: #8a6a72;
+  --icon-c2: #5c4048;
+  --icon-c3: #dcc8ce;
 }
 
 :root[data-materials='aero'] .app-dictionary,
 :root[data-materials='aero'] .app-grammar,
 :root[data-materials='aero'] .app-translate {
-  --icon-c1: #68e6c2;
-  --icon-c2: #0b9f90;
-  --icon-c3: #dffcf5;
+  --icon-c1: #5f8a80;
+  --icon-c2: #3d5e58;
+  --icon-c3: #c8ddd8;
 }
 
 :root[data-materials='aero'] .app-immersion,
 :root[data-materials='aero'] .app-library,
 :root[data-materials='aero'] .app-novels {
-  --icon-c1: #8fdcff;
-  --icon-c2: #287bd8;
-  --icon-c3: #e6f6ff;
+  --icon-c1: #5f7a92;
+  --icon-c2: #3d5166;
+  --icon-c3: #c8d4e0;
 }
 
 :root[data-materials='aero'] .app-anki,
 :root[data-materials='aero'] .app-flashcards {
-  --icon-c1: #ffd36a;
-  --icon-c2: #f06b49;
-  --icon-c3: #fff3cf;
+  --icon-c1: #8a7a5a;
+  --icon-c2: #5c5040;
+  --icon-c3: #ddd4c4;
 }
 
 :root[data-materials='aero'] .app-calendar,
 :root[data-materials='aero'] .app-stats,
 :root[data-materials='aero'] .app-resources {
-  --icon-c1: #b6e56e;
-  --icon-c2: #54a83e;
-  --icon-c3: #f1ffd8;
+  --icon-c1: #6e8460;
+  --icon-c2: #485840;
+  --icon-c3: #d0dcc8;
 }
 
 :root[data-materials='aero'] .app-settings,
 :root[data-materials='aero'] .app-visualizer,
 :root[data-materials='aero'] .app-city,
 :root[data-materials='aero'] .action-addapp {
-  --icon-c1: #d8e5ff;
-  --icon-c2: #7894c8;
-  --icon-c3: #ffffff;
+  --icon-c1: #6e7688;
+  --icon-c2: #484e5c;
+  --icon-c3: #d0d4dc;
 }
 
 :root[data-materials='aero'] .os-task-win svg,

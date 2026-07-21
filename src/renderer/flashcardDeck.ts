@@ -273,6 +273,23 @@ export function filterDeckCards(cards: DeckFlashcard[], filter: DeckFolderFilter
   return cards.filter((c) => c.folder === filter);
 }
 
+/**
+ * Free-text card search. Matches every field a user can read off a card —
+ * word, reading, meaning, front/back, sentence, and the source book title —
+ * so typing a book name narrows to that deck the same as typing a word does.
+ * Case-insensitive substring; kana/kanji need no folding since Japanese text
+ * is matched verbatim.
+ */
+export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlashcard[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return cards;
+  return cards.filter((c) =>
+    [c.word, c.reading, c.meaning, c.front, c.back, c.sentence, c.bookTitle].some((field) =>
+      field ? field.toLowerCase().includes(q) : false,
+    ),
+  );
+}
+
 export interface BookGroup {
   bookId: string;
   bookTitle: string;

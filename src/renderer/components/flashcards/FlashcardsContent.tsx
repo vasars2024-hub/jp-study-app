@@ -55,6 +55,7 @@ import {
   removeDeckCard,
   removeBookGroup,
   renameBookGroup,
+  searchDeckCards,
   setBookGroupFolder,
   setDeckCardFolder,
   setDeckCardKnown,
@@ -150,6 +151,8 @@ export interface FlashcardsState {
   setOverviewTab: (t: OverviewTab) => void;
   folderFilter: DeckFolderFilter;
   setFolderFilter: (f: DeckFolderFilter) => void;
+  search: string;
+  setSearch: (v: string) => void;
   collapsedBooks: Record<string, boolean>;
   toggleBookGroup: (key: string) => void;
   creatingFolder: boolean;
@@ -192,6 +195,7 @@ export interface FlashcardsState {
   bookGroups: BookGroup[];
   epubReviewBooks: BookGroup[];
   epubReviewCandidates: DeckFlashcard[];
+  filteredSaved: SavedWord[];
   unknownReviewCards: ReviewCard[];
   knownReviewCards: ReviewCard[];
   current: ReviewCard | null;
@@ -231,6 +235,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [mode, setMode] = useState<Mode>('overview');
   const [overviewTab, setOverviewTab] = useState<OverviewTab>('epub');
   const [folderFilter, setFolderFilter] = useState<DeckFolderFilter>('all');
+  const [search, setSearch] = useState('');
   const [collapsedBooks, setCollapsedBooks] = useState<Record<string, boolean>>({});
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -334,10 +339,20 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     [deck],
   );
   const recentStrip = useMemo(() => epubCards.slice(0, 24), [epubCards]);
+  // Search narrows the *visible* deck (explorer, counts, CSV export) but not the
+  // review pool below — a session is scoped by folder + book picker, not by
+  // whatever happens to be typed in the find box.
   const filteredDeck = useMemo(
-    () => filterDeckCards(epubCards, folderFilter),
-    [epubCards, folderFilter],
+    () => searchDeckCards(filterDeckCards(epubCards, folderFilter), search),
+    [epubCards, folderFilter, search],
   );
+  const filteredSaved = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return saved;
+    return saved.filter((w) =>
+      [w.word, w.reading, w.meaning].some((field) => field?.toLowerCase().includes(q)),
+    );
+  }, [saved, search]);
   const bookGroups = useMemo(() => groupDeckByBook(filteredDeck), [filteredDeck]);
   const epubReviewBooks = useMemo(() => groupDeckByBook(epubCards), [epubCards]);
   const epubReviewCandidates = useMemo(() => {
@@ -748,6 +763,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setOverviewTab,
     folderFilter,
     setFolderFilter,
+    search,
+    setSearch,
     collapsedBooks,
     toggleBookGroup,
     creatingFolder,
@@ -788,6 +805,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     bookGroups,
     epubReviewBooks,
     epubReviewCandidates,
+    filteredSaved,
     unknownReviewCards,
     knownReviewCards,
     current,
@@ -1158,6 +1176,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     folders,
     folderFilter,
     filteredDeck,
+    filteredSaved,
+    search,
     bookGroups,
     epubReviewBooks,
     epubReviewCandidates,
@@ -1219,6 +1239,33 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
         >
           {t('flash.tab.dictionary', { count: saved.length })}
         </button>
+      </div>
+
+      <div className="flash-search">
+        <Icon name="search" size={14} className="flash-search-icon" />
+        <input
+          type="search"
+          className="flash-search-input"
+          value={search}
+          onChange={(e) => state.setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') state.setSearch('');
+          }}
+          placeholder={t('flash.search.placeholder')}
+          aria-label={t('flash.search.aria')}
+        />
+        {search && (
+          <>
+            <span className="flash-search-count muted">
+              {overviewTab === 'epub'
+                ? t('flash.search.matchCount', { count: filteredDeck.length })
+                : t('flash.search.matchCount', { count: filteredSaved.length })}
+            </span>
+            <button type="button" className="flash-search-clear" title={t('flash.search.clear')} onClick={() => state.setSearch('')}>
+              ×
+            </button>
+          </>
+        )}
       </div>
 
       <DeckImportPanel onImported={() => state.setDeck(loadDeck())} />
@@ -1408,12 +1455,16 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             {folderErr && <div className="lib-folder-err">{folderErr}</div>}
 
             {filteredDeck.length === 0 ? (
-              <p className="muted">{t('flash.noCardsInView')}</p>
+              <p className="muted">
+                {search ? t('flash.search.noMatches', { query: search }) : t('flash.noCardsInView')}
+              </p>
             ) : (
               <div className="flash-groups">
                 {bookGroups.map((group) => {
                   const groupKey = `${group.bookId}::${group.bookTitle}`;
-                  const collapsed = collapsedBooks[groupKey] ?? false;
+                  // While searching, force groups open — a collapsed group would
+                  // hide the very match the user is looking for.
+                  const collapsed = search ? false : (collapsedBooks[groupKey] ?? false);
                   return (
                     <div key={groupKey} className="flash-group">
                       <div
@@ -1573,9 +1624,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
           <h2>{t('flash.noSavedWords')}</h2>
           <p className="muted">{t('flash.noSavedWords.hint')}</p>
         </div>
+      ) : filteredSaved.length === 0 ? (
+        <p className="muted">{t('flash.search.noMatches', { query: search })}</p>
       ) : (
         <div className="flash-list">
-          {saved.map((w) => (
+          {filteredSaved.map((w) => (
             <div className="flash-row" key={w.word}>
               <div className="flash-row-main">
                 <span className="flash-row-word" lang="ja">

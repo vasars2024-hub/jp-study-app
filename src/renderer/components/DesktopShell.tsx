@@ -1008,6 +1008,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   // background — right-clicks inside windows / taskbar / widgets / panels /
   // icons / editable fields fall through untouched.
   const [ctxPos, setCtxPos] = useState<{ x: number; y: number } | null>(null);
+  /** Right-click target on a taskbar entry — its own menu, separate from the desk's. */
+  const [taskCtx, setTaskCtx] = useState<{ x: number; y: number; win: Win } | null>(null);
   const onDesktopContextMenu = (e: RMouseEvent<HTMLDivElement>) => {
     const t = e.target as HTMLElement;
     if (
@@ -1221,6 +1223,12 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         }
         case 'closeAll':
           all.forEach((w) => closeRef.current(w.id));
+          return;
+        case 'closeOthers':
+          if (!topWin) return;
+          all.forEach((w) => {
+            if (w.id !== topWin.id) closeRef.current(w.id);
+          });
           return;
         default:
           return;
@@ -2250,9 +2258,41 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 className={`os-task-win app-${w.section} ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''} ${winAnim[w.id] ? `anim-${winAnim[w.id]}` : ''}`}
                 title={wired ? wiredModuleLabel(w.section) : label}
                 onClick={() => taskClick(w)}
+                // Middle-click closes, as it does on a real taskbar / browser tab.
+                onAuxClick={(e) => {
+                  if (e.button !== 1) return;
+                  e.preventDefault();
+                  close(w.id);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setTaskCtx({ x: e.clientX, y: e.clientY, win: w });
+                }}
               >
                 <Icon name={glyph} size={18} />
                 {label ? <span>{label}</span> : null}
+                {/* A nested <button> would be invalid inside this button, so the
+                    close affordance is a span with button semantics. */}
+                <span
+                  className="os-task-close"
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={t('desktop.task.close', { name: label || w.section })}
+                  title={t('desktop.task.close', { name: label || w.section })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    close(w.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.stopPropagation();
+                    e.preventDefault();
+                    close(w.id);
+                  }}
+                >
+                  ×
+                </span>
               </button>
             );
           })}
@@ -2315,6 +2355,38 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       <WiredArchiveBootOverlay />
       <WiredBreachOverlay />
       <ContextMenu
+        open={!!taskCtx}
+        x={taskCtx?.x ?? 0}
+        y={taskCtx?.y ?? 0}
+        onClose={() => setTaskCtx(null)}
+        items={
+          taskCtx
+            ? [
+                taskCtx.win.min
+                  ? { id: 'restore', label: t('desktop.task.restore'), onSelect: () => focus(taskCtx.win.id) }
+                  : { id: 'minimize', label: t('desktop.task.minimize'), onSelect: () => minimize(taskCtx.win.id) },
+                { id: 'sep-t1', separator: true, label: '' },
+                { id: 'close', label: t('desktop.task.closeThis'), danger: true, onSelect: () => close(taskCtx.win.id) },
+                {
+                  id: 'close-others',
+                  label: t('desktop.task.closeOthers'),
+                  disabled: wins.length < 2,
+                  onSelect: () =>
+                    winsRef.current.forEach((other) => {
+                      if (other.id !== taskCtx.win.id) close(other.id);
+                    }),
+                },
+                {
+                  id: 'close-all',
+                  label: t('desktop.task.closeAll'),
+                  danger: true,
+                  onSelect: () => winsRef.current.forEach((other) => close(other.id)),
+                },
+              ]
+            : []
+        }
+      />
+      <ContextMenu
         open={!!ctxPos}
         x={ctxPos?.x ?? 0}
         y={ctxPos?.y ?? 0}
@@ -2325,6 +2397,14 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           { id: 'sep1', separator: true, label: '' },
           { id: 'widgets', label: 'Widgets…', onSelect: () => setGalleryOpen(true) },
           { id: 'sep2', separator: true, label: '' },
+          {
+            id: 'close-all-apps',
+            label: t('desktop.task.closeAll'),
+            danger: true,
+            disabled: wins.length === 0,
+            onSelect: () => winsRef.current.forEach((w) => close(w.id)),
+          },
+          { id: 'sep3', separator: true, label: '' },
           { id: 'personalize', label: 'Personalize…', onSelect: () => open('settings') },
           { id: 'display', label: 'Desktop & display settings', onSelect: () => open('settings') },
         ]}

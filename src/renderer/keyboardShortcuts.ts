@@ -193,8 +193,19 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'window.closeAll',
     label: 'Close all windows',
     category: 'Window',
+    // Ctrl+Shift+W is the reader's copy-word and Ctrl+Alt+W is the Toolbox's
+    // close-active-tool, so this escalates Ctrl+W by one modifier — the same
+    // shape as Ctrl+Alt+Shift+D (restore all). osShortcutDefaults.test.ts
+    // guards the whole chord space against collisions.
+    defaultKeys: 'Ctrl+Alt+Shift+W',
+    note: 'Clears the desk and empties the taskbar. Ctrl+W closes just the focused app.',
+  },
+  {
+    id: 'window.closeOthers',
+    label: 'Close all but focused window',
+    category: 'Window',
     defaultKeys: '',
-    note: 'Unbound by default — bind it only if you want a one-key desk wipe.',
+    note: 'Unbound by default. Keeps the app in front and clears everything else off the taskbar.',
   },
   {
     id: 'nav.nextDesktop',
@@ -1095,6 +1106,7 @@ function builtinHandler(id: string): Handler | null {
     case 'window.restoreAll':
     case 'window.pinTop':
     case 'window.closeAll':
+    case 'window.closeOthers':
       return () =>
         void window.dispatchEvent(
           new CustomEvent('os:window', { detail: id.slice('window.'.length) }),
