@@ -42,6 +42,15 @@ import {
   resetToolboxSettingsCategory,
   saveToolboxSettings,
 } from '../../toolboxSettings';
+import { applyBlancTheme } from '../../blancThemeApply';
+import {
+  BLANC_THEME_PRESETS,
+  BLANC_THEME_TOKENS,
+  exportTheme,
+  isSafeThemeColor,
+  parseThemeExport,
+  presetById,
+} from '../../../shared/blancTheme';
 import {
   TOOLBOX_SETTING_DEFINITIONS,
   moveToolInOrder,
@@ -861,6 +870,25 @@ type BlancToolId =
   | 'review-forecast'
   | 'pitch-accent'
 >;
+
+
+/**
+ * Current value of a Blanc token, as a #rrggbb string for <input type="color">.
+ *
+ * The tokens are defined in blanc.css and can be rgba() or hsl(), which a colour
+ * input cannot display. Reading the computed value and normalising it means the
+ * swatch always shows what is actually on screen rather than an empty black box.
+ */
+function readComputedToken(token: string): string {
+  if (typeof document === 'undefined') return '#000000';
+  const root = document.querySelector('.blanc-root') ?? document.documentElement;
+  const raw = getComputedStyle(root).getPropertyValue(`--blanc-${token}`).trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return raw;
+  const m = raw.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+  if (!m) return '#000000';
+  const hex = (n: string): string => Number(n).toString(16).padStart(2, '0');
+  return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`;
+}
 
 const BLANC_TOOL_IDS: BlancToolId[] = [
   'furigana',
@@ -2470,6 +2498,32 @@ function BlancSettingsPanel({
     patchToolbox({ enabledTools: next });
   };
 
+  // Theme (Pillar 4). Applied on every settings change and once on mount, so a
+  // saved theme survives a reload and a switch takes effect without one.
+  useEffect(() => {
+    applyBlancTheme(toolboxSettings.themePreset, toolboxSettings.themeOverrides);
+  }, [toolboxSettings.themePreset, toolboxSettings.themeOverrides]);
+
+  const activePresetOverrides = presetById(toolboxSettings.themePreset)?.overrides ?? {};
+
+  const setThemePreset = (id: string): void => {
+    // Switching preset clears per-token overrides: keeping them would silently
+    // carry a colour from the old palette into the new one, which reads as the
+    // preset being broken rather than as an override surviving.
+    patchToolbox({ themePreset: id, themeOverrides: {} });
+  };
+
+  const setThemeToken = (token: string, value: string): void => {
+    if (!isSafeThemeColor(value)) return;
+    patchToolbox({ themeOverrides: { ...toolboxSettings.themeOverrides, [token]: value } });
+  };
+
+  const clearThemeToken = (token: string): void => {
+    const next = { ...toolboxSettings.themeOverrides };
+    delete next[token];
+    patchToolbox({ themeOverrides: next });
+  };
+
   // Launcher order (Pillar 4). Buttons rather than drag: they are keyboard- and
   // screen-reader-operable, and a pointer-only reorder would make this the one
   // Blanc setting you cannot change without a mouse. Drag is worth adding on
@@ -2826,6 +2880,107 @@ function BlancSettingsPanel({
             </table>
           </div>
         </details>
+      </fieldset>
+
+      <fieldset>
+        <legend>Theme</legend>
+        <div className="blanc-segmented">
+          {BLANC_THEME_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              title={preset.description}
+              className={toolboxSettings.themePreset === preset.id ? 'active' : ''}
+              onClick={() => setThemePreset(preset.id)}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <p className="blanc-note">
+          {presetById(toolboxSettings.themePreset)?.description ?? 'Custom palette.'}
+        </p>
+
+        <div className="blanc-theme-grid">
+          {BLANC_THEME_TOKENS.map((token) => {
+            const overridden = toolboxSettings.themeOverrides[token.id];
+            // Colour inputs only accept #rrggbb, so a preset's rgba() value
+            // cannot be shown in the swatch — read the resolved value off the
+            // element instead, which is what the user is actually looking at.
+            const shown =
+              overridden && /^#[0-9a-f]{6}$/i.test(overridden)
+                ? overridden
+                : readComputedToken(token.id);
+            return (
+              <label key={token.id} className="blanc-theme-row">
+                <input
+                  type="color"
+                  value={shown}
+                  onChange={(event) => setThemeToken(token.id, event.target.value)}
+                  aria-label={token.label}
+                />
+                <span className="blanc-theme-label">{token.label}</span>
+                {overridden ? (
+                  <button type="button" onClick={() => clearThemeToken(token.id)} title="Reset this colour">
+                    ×
+                  </button>
+                ) : (
+                  <span className="blanc-theme-inherit">
+                    {activePresetOverrides[token.id] ? 'preset' : 'default'}
+                  </span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="blanc-status-row">
+          <span>
+            {Object.keys(toolboxSettings.themeOverrides).length} of {BLANC_THEME_TOKENS.length} customised
+          </span>
+          <button
+            type="button"
+            disabled={!Object.keys(toolboxSettings.themeOverrides).length}
+            onClick={() => patchToolbox({ themeOverrides: {} })}
+          >
+            Clear customisations
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const json = JSON.stringify(
+                exportTheme(toolboxSettings.themePreset, toolboxSettings.themeOverrides),
+                null,
+                2,
+              );
+              void navigator.clipboard.writeText(json);
+              setSettingsMsg('Theme copied to the clipboard as JSON.');
+            }}
+          >
+            Copy theme
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.readText().then((text) => {
+                const parsed = parseThemeExport(text);
+                if (!parsed) {
+                  setSettingsMsg('Clipboard does not contain a Blanc theme.');
+                  return;
+                }
+                patchToolbox({ themePreset: parsed.preset, themeOverrides: parsed.overrides });
+                setSettingsMsg('Theme applied from the clipboard.');
+              });
+            }}
+          >
+            Paste theme
+          </button>
+        </div>
+        <p className="blanc-note">
+          Colours are validated before they reach the stylesheet — only hex, rgb(), hsl(), and a few
+          keywords are accepted, so a pasted theme cannot inject CSS or hide Blanc&rsquo;s own
+          controls.
+        </p>
       </fieldset>
 
       <fieldset>

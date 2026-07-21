@@ -2476,3 +2476,44 @@ html.blanc-mode-enabled.blanc-mode-dark body {
   min-width: 2em;
   padding: 2px 6px;
 }
+
+/* Theme editor (Pillar 4). */
+.blanc-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 4px 12px;
+  margin: 6px 0 8px;
+}
+
+.blanc-theme-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+/* Native colour inputs come with a chunky bezel; strip it back to a swatch so
+   the grid reads as a palette rather than a form. */
+.blanc-theme-row input[type='color'] {
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--blanc-border-strong);
+  border-radius: var(--blanc-radius-sm, 3px);
+  background: none;
+  cursor: pointer;
+}
+
+.blanc-theme-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "default" / "preset" markers sit where the reset button appears once a token
+   is customised, so the row does not reflow when you change one. */
+.blanc-theme-inherit {
+  color: var(--blanc-faint);
+  font-size: 0.8em;
+}

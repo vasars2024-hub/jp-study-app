@@ -1,3 +1,4 @@
+import { sanitizeThemeOverrides, type BlancThemeOverrides } from './blancTheme';
 import { TOOLBOX_MODULES, type ToolboxModuleId } from './toolboxRegistry';
 
 export type ToolboxSettingsCategory =
@@ -55,6 +56,10 @@ export interface ToolboxSettings {
    * enumerate — orderToolIds ignores anything unrecognised at apply time.
    */
   categoryOrder: string[];
+  /** Named theme preset id; overrides layer on top of it. */
+  themePreset: string;
+  /** Per-token colour overrides. Validated in blancTheme.ts, not here. */
+  themeOverrides: BlancThemeOverrides;
   searchToolsByTitle: boolean;
   searchToolDescriptions: boolean;
   searchCommands: boolean;
@@ -116,6 +121,8 @@ export const DEFAULT_TOOLBOX_SETTINGS: ToolboxSettings = {
   favoriteTools: [],
   toolOrder: [],
   categoryOrder: [],
+  themePreset: 'default',
+  themeOverrides: {},
   searchToolsByTitle: true,
   searchToolDescriptions: true,
   searchCommands: true,
@@ -151,6 +158,8 @@ export const TOOLBOX_SETTING_DEFINITIONS: ToolboxSettingDefinition[] = [
   setting('favoriteTools', 'tool-visibility', 'module-list', 'Tools pinned to the favorites strip.', ['favorites', 'pin']),
   setting('toolOrder', 'tool-visibility', 'module-list', 'User-defined order for the launcher rail; unlisted tools keep registry order.', ['order', 'reorder', 'sort', 'arrange']),
   setting('categoryOrder', 'tool-visibility', 'module-list', 'User-defined order for launcher category sections.', ['order', 'category', 'section', 'arrange']),
+  setting('themePreset', 'layout', 'select', 'Named Blanc colour preset.', ['theme', 'colour', 'color', 'preset', 'blood'], ['default', 'blood', 'ink', 'paper']),
+  setting('themeOverrides', 'layout', 'module-list', 'Per-token colour overrides layered over the preset.', ['theme', 'colour', 'color', 'token', 'custom']),
   setting('searchToolsByTitle', 'search', 'boolean', 'Match tool names during Toolbox search.', ['search', 'title']),
   setting('searchToolDescriptions', 'search', 'boolean', 'Match tool descriptions during Toolbox search.', ['search', 'description']),
   setting('searchCommands', 'search', 'boolean', 'Include registered Toolbox commands in search.', ['search', 'command']),
@@ -206,6 +215,8 @@ export function sanitizeToolboxSettings(input: unknown): ToolboxSettings {
   next.favoriteTools = sanitizeModuleList(next.favoriteTools, READY_MODULE_IDS);
   next.toolOrder = sanitizeModuleList(next.toolOrder, READY_MODULE_IDS);
   next.categoryOrder = sanitizeStringList(next.categoryOrder);
+  next.themePreset = typeof next.themePreset === 'string' && next.themePreset ? next.themePreset : 'default';
+  next.themeOverrides = sanitizeThemeOverrides(next.themeOverrides);
   next.sidebarWidth = clampNumber(next.sidebarWidth, 160, 320, DEFAULT_TOOLBOX_SETTINGS.sidebarWidth);
   next.maxRecentTools = clampNumber(next.maxRecentTools, 0, 12, DEFAULT_TOOLBOX_SETTINGS.maxRecentTools);
   next.maxSearchResults = clampNumber(next.maxSearchResults, 5, 100, DEFAULT_TOOLBOX_SETTINGS.maxSearchResults);
