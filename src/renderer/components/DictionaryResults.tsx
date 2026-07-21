@@ -718,7 +718,11 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // NOTE: no eslint-disable here. `react-hooks/exhaustive-deps` is not loaded
+    // in this config, so a disable comment for it is itself an eslint error
+    // ("Definition for rule ... was not found") — the same dead-directive case
+    // removed from MediaContent for `jsx-a11y/media-has-caption`. The dep list
+    // below is intentionally narrow: `translate` and the setters are stable.
   }, [examples, exLangs, exState, translateLimit]);
 
   function exTranslation(ex: ExampleSentence, code: TransLang): string {
