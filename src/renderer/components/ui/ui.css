@@ -97,13 +97,30 @@
    (§8: a standard card uses ≤1 strong containment cue). Built on the P1.2
    surface ladder so a card reads as "raised" above the window body in every
    theme. Base / --quiet / --interactive cover the small variant set the app
-   should converge on; app-owned *-card families (Account B) adopt these. */
+   should converge on; app-owned *-card families (Account B) adopt these.
+
+   NOTE: the .ui-card / .ui-panel rules immediately below are the ORIGINAL
+   baseline declarations, kept verbatim because Aero / Wired / Blanc do not
+   override these classes and would otherwise inherit the refinement. The
+   refined surface-contrast treatment is layered further down behind the skin
+   guard, so only study-os + named themes receive it. */
 .ui-card {
-  background: var(--surface-2);
-  border: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--elevation-2);
   padding: var(--space-lg);
+}
+/* Refinement for study-os + named themes only (Aero/Wired/Blanc excluded).
+   The guard conditions sit inside :where() so they add NO specificity — the
+   selector scores exactly (0,1,0), identical to `.ui-card` above, and wins on
+   source order alone. That keeps the variants below (and any app-level card
+   override) able to out-specify it, which a `:not()`-outside-:where() guard
+   would silently break: :not() contributes its argument's specificity. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .ui-card:where(:not(.blanc-root *)) {
+  background: var(--surface-2);
+  border: none;
 }
 /* Quiet: flat grouping surface, no shadow — relies on surface step alone. */
 .ui-card--quiet {
@@ -138,10 +155,16 @@
   padding: var(--space-lg);
 }
 .ui-panel {
-  background: var(--surface-1);
-  border: none;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-md);
+}
+/* Same guard/specificity contract as .ui-card above. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .ui-panel:where(:not(.blanc-root *)) {
+  background: var(--surface-1);
+  border: none;
 }
 
 /* ---------- Window ------------------------------------------------------- */

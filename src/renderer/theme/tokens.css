@@ -152,3 +152,18 @@
   /* Soft danger wash for destructive-control backgrounds / hover fills. */
   --danger-weak: color-mix(in srgb, var(--danger) 16%, transparent);
 }
+
+/* Aero and Wired must stay visually identical to baseline (master §4). Neither
+   skin overrides --status-error (and Wired does not override --status-info), so
+   they would otherwise inherit the P1.1 semantic split above. Pin them back to
+   their pre-refinement values here rather than editing the protected skin files.
+   Aero's own aero-*.css still overrides --status-info later in the cascade. */
+:root[data-materials='aero'],
+:root[data-materials='wired'] {
+  --status-error: var(--red);
+  --status-info: var(--accent);
+  /* `initial` on a custom property yields the guaranteed-invalid value, so the
+     four existing `var(--danger, #d8534f)` / `var(--danger, #e06c75)` call sites
+     fall back to their literal reds exactly as they did before P1.1. */
+  --danger: initial;
+}
