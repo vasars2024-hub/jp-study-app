@@ -11039,6 +11039,29 @@ mark.lookup-mark,
   border-color: var(--accent, #ff2e4d);
   background: rgba(255, 46, 77, 0.12);
 }
+
+/* --- Media & Music (every-app pass) — accent-consistency refinement.
+   These selection/active/on states hardcoded rgba(255,46,77) (the default accent
+   literal), so under a personalized amber accent they stayed red while the rest
+   of the UI followed the accent. Repointed to color-mix over var(--accent) so
+   they track the theme — visually identical in default study-os and Aero (both
+   accent #ff2e4d), amber under personalization. Guarded so Aero/Wired keep the
+   literal baseline and Blanc keeps its own skin (master §4). --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .media-folder-row.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .music-row.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .music-line.active:where(:not(.blanc-root *)) {
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .mwidget-btn.on:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .music-liked-chip.on:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
 .music-liked-chip + .music-sort {
   margin-left: 6px;
 }
