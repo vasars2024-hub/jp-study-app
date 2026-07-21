@@ -13436,6 +13436,51 @@ html[data-taskbar-size='large'] .os-tray-btn {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ============================================================================
+   Account B — Phase 3A (Settings). App-local: every selector below is scoped to
+   a B-owned `.os-set-*` class and redefines no shared component contract.
+
+   Guarded with the idiom Phase 1 established (see ui.css:59, 121, 165):
+   `:where()` contributes NO specificity, so each rule scores exactly the same
+   as the base rule it refines and wins on source order alone — while Aero
+   (which additionally has its own higher-specificity `:root[data-materials=
+   'aero']` rules), Wired (which inherits the base look and has no rules of its
+   own here) and Blanc are all excluded and keep their baselines untouched.
+   ========================================================================== */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .os-set-card:where(:not(.blanc-root *)) {
+  /* §8: a standard card gets ONE containment cue. Was border + fill together;
+     surface contrast now carries it alone. */
+  border: none;
+  background: var(--surface-2);
+}
+/* Advanced Mode re-tints cards indigo via `.os-settings-v2.is-advanced
+   .os-set-card` (styles.css:12528, specificity (0,3,0)). That is an existing
+   user-facing affordance, so it is preserved — just re-based onto the new
+   surface so Advanced Mode doesn't fall back to the old --panel-2 ladder. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .os-settings-v2.is-advanced
+  .os-set-card:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, #6366f1 5%, var(--surface-2));
+}
+/* Note the `.os-set-nav-v2` ancestor: the live rule that actually wins for the
+   active item is `.os-set-nav-v2 .os-set-nav-item.active` (styles.css:12699,
+   an accent-88%/#000 fill), not the bare `.os-set-nav-item.active` at :12491.
+   Matching that ancestor keeps this at the same (0,3,0) specificity so it wins
+   on source order; Aero's own `:root[data-materials='aero']` rule is likewise
+   (0,3,0) but loads later in aero-apps.css, so Aero still wins there. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .os-set-nav-v2
+  .os-set-nav-item.active:where(:not(.blanc-root *)) {
+  /* Was a near-full accent fill — the loudest accent use on the screen. Surface
+     contrast now carries selection, and accent is reduced to a 2px current-item
+     bar (§6: accent for active nav, not as a fill). */
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--elevation-1), inset 2px 0 0 0 var(--accent);
+}
+
 .os-zoom-row {
   display: flex;
   align-items: center;
