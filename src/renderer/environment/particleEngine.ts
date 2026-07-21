@@ -565,7 +565,7 @@ export function drawParticles(
       p.kind === 'snow' && !p.settled
         ? 1
         : Math.min(1, Math.max(0, p.life + 0.25));
-    let alpha = Math.max(0, Math.min(1, p.a * I * night * lifeFade));
+    const alpha = Math.max(0, Math.min(1, p.a * I * night * lifeFade));
     const R = p.r * S;
 
     if (p.kind === 'rain') {

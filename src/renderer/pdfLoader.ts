@@ -3,6 +3,9 @@
 // and reconstruct paragraphs; scanned/image-only PDFs have no text layer and
 // will come through mostly empty (a future OCR pass could fill those in).
 import * as pdfjsLib from 'pdfjs-dist';
+// `?url` is Vite's asset-URL import; eslint-plugin-import's resolver does not
+// understand query suffixes. The file ships with pdfjs-dist.
+// eslint-disable-next-line import/no-unresolved
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { LoadedEpub, EpubChapter, EpubTocEntry } from './epubLoader';
 

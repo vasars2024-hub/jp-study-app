@@ -83,7 +83,6 @@ export default function DictionaryPopup({ query, x, y, context, onClose }: Props
   // Ctrl+Shift+P (rebindable) plays pronunciation while this popup is open.
   useEffect(() => {
     return registerCommandHandler('dictionary.playPronunciation', () => playPronunciation());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, lang]);
 
   return (

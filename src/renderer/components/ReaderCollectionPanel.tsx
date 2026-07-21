@@ -761,7 +761,7 @@ export default function ReaderCollectionPanel({
                   title="Play recorded audio"
                   onClick={(e) => {
                     e.stopPropagation();
-                    new Audio(c.audioDataUrl).play().catch(() => {});
+                    new Audio(c.audioDataUrl).play().catch(() => undefined);
                   }}
                 >
                   <Icon name="player" size={12} />

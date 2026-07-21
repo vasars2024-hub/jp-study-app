@@ -83,7 +83,6 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
       reqRef.current++; // ignore any in-flight result after unmount
       onModelProgress(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, targetLang]);
 
   function handleTargetLangChange(code: string): void {

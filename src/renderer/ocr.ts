@@ -42,6 +42,7 @@ function getWorker(lang: OcrLang): Promise<Worker> {
 function cleanJapanese(text: string): string {
   return text
     .split('\n')
+    // eslint-disable-next-line no-irregular-whitespace -- U+3000 (ideographic space) is intentional: OCR output uses full-width spaces.
     .map((line) => line.replace(/[ \t　]+/g, ''))
     .filter((line) => line.length > 0)
     .join('\n');

@@ -58,6 +58,7 @@ export function stripFuriganaFragments(text: string, aggressive = false): string
   // Collapse leftover CJK-inter-glyph spaces (tesseract habit).
   t = t
     .split('\n')
+    // eslint-disable-next-line no-irregular-whitespace -- U+3000 (ideographic space) is intentional: manga OCR emits full-width spaces.
     .map((line) => line.replace(/[ \t　]+/g, ''))
     .filter((line) => line.length > 0)
     .join('\n');

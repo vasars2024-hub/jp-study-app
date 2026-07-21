@@ -99,7 +99,13 @@ export function BatteryWidget(_props: WidgetProps) {
   useEffect(() => {
     let dead = false;
     const nav = navigator as Navigator & {
-      getBattery?: () => Promise<{ level: number; charging: boolean; addEventListener: Function }>;
+      getBattery?: () => Promise<{
+        level: number;
+        charging: boolean;
+        // Narrower than `Function`: the BatteryManager events this reads are
+        // 'levelchange' and 'chargingchange', both of which take a bare handler.
+        addEventListener: (type: string, listener: () => void) => void;
+      }>;
     };
     if (!nav.getBattery) return;
     void nav.getBattery().then((b) => {

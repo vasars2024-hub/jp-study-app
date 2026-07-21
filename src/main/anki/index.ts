@@ -11,8 +11,7 @@ import type {
   IntervalSnapshot,
   MineNoteRequest,
   MineNoteResult,
-} from '../../shared/anki';
-import {
+
   ANKI_COLLECTION_UNAVAILABLE_MSG,
   APP_TAG,
   computeCloze,
@@ -22,8 +21,8 @@ import {
   renderFieldTemplate,
   resolveMiningTemplates,
   type ExampleCountLang,
-  type MiningValues,
-} from '../../shared/anki';
+  type MiningValues} from '../../shared/anki';
+
 import type { CardContent, ProfileId, StudyProfile } from '../../shared/profiles';
 import { buildRouteContext, resolveProfileMatch } from '../../shared/profileRules';
 import type { AnkiAddRequest, AnkiAddResult, AnkiStatus } from '../../shared/types';

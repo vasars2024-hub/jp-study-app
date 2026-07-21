@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => {
   const g = globalThis as unknown as { window?: unknown };
   if (!g.window) {
-    g.window = { addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => true };
+    g.window = { addEventListener: () => undefined, removeEventListener: () => undefined, dispatchEvent: () => true };
   }
 });
 

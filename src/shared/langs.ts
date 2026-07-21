@@ -93,7 +93,7 @@ export function textMatchesLang(code: string, text: string): boolean {
  * any language never interleaves the two scripts inside one word.
  */
 export function hasMixedScriptWord(text: string): boolean {
-  for (const word of text.split(/[\s,;/()\[\]{}"'«»—–-]+/)) {
+  for (const word of text.split(/[\s,;/()[\]{}"'«»—–-]+/)) {
     if (!word) continue;
     if (hasCyrillic(word) && hasLatin(word)) return true;
   }

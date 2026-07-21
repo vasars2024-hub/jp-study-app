@@ -315,7 +315,7 @@ export async function searchExamples(query: string, limit = DEFAULT_FETCH_LIMIT)
   if (!q) return { query: q, examples: [] };
 
   const offline = await searchOffline(q, cap);
-  let examples = offline.map((s) => ({ jp: s.jp, en: s.en }));
+  const examples = offline.map((s) => ({ jp: s.jp, en: s.en }));
 
   try {
     if (examples.length < cap) {
@@ -367,7 +367,7 @@ export function registerDictionaryIpc(): void {
   ipcMain.handle('examples:importOffline', async (_e, payload?: { sentencesPath?: string; linksPath?: string }) => {
     const { dialog } = await import('electron');
     let sentencesPath = payload?.sentencesPath;
-    let linksPath = payload?.linksPath;
+    const linksPath = payload?.linksPath;
     if (!sentencesPath) {
       const picked = await dialog.showOpenDialog({
         title: mt('dialog.importTatoebaCsv.title'),

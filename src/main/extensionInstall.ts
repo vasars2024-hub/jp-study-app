@@ -2,6 +2,12 @@
  * Materialize the Chrome extension on disk so "Load unpacked" always has a real folder.
  */
 
+/* eslint-disable import/no-unresolved --
+   The `?raw` suffix is Vite's inline-as-string import, resolved by the bundler at
+   build time. eslint-plugin-import's resolver does not understand query suffixes
+   and reports every one of these as unresolved; the files are all present in
+   ./chrome-extension/. Disabled for the file rather than 12 separate lines. */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';

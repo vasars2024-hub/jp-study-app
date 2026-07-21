@@ -172,7 +172,6 @@ export default function YouTubePlaylistsView() {
     newsBootstrapped.current = true;
     setMainTab('news');
     void runNewsRefresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const playlist = useMemo(() => {
@@ -182,7 +181,7 @@ export default function YouTubePlaylistsView() {
 
   useEffect(() => {
     if (playlist) setSort(playlist.sortDefault);
-  }, [playlist?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [playlist?.id]);
 
   const planVideos = useMemo(() => planToWatchVideos(store), [store]);
 
@@ -403,7 +402,6 @@ export default function YouTubePlaylistsView() {
         ],
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [t, lang, playlist, selectedVideoIds, store],
   );
 

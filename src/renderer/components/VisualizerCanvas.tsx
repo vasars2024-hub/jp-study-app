@@ -409,7 +409,6 @@ export default function VisualizerCanvas({ settings, className, idleBaseline }: 
       document.removeEventListener('visibilitychange', onVis);
     };
     // Settings object identity changes on every save; stringify for stability.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(settings), idleBaseline]);
 
   return <canvas ref={canvasRef} className={className} />;

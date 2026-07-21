@@ -77,7 +77,7 @@ export default function BookReader({ item, onClose }: Props) {
   const wikiNavRef = useRef<{
     navigate: (contents: unknown, url: string) => Promise<void>;
     goBack: (contents: unknown) => void;
-  }>({ navigate: async () => {}, goBack: () => {} });
+  }>({ navigate: async () => undefined, goBack: () => undefined });
 
   // The latest place the reader settled, captured from 'relocated'. Used as the
   // spot to save when you hit "Add here".
@@ -103,7 +103,7 @@ export default function BookReader({ item, onClose }: Props) {
     let dead = false;
     getTokenizer()
       .then(() => !dead && setHlTick((t) => t + 1))
-      .catch(() => {});
+      .catch(() => undefined);
     return () => {
       dead = true;
     };
@@ -547,7 +547,6 @@ export default function BookReader({ item, onClose }: Props) {
       }
       if (renditionRef.current === rendition) renditionRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookObj, settings.flow, settings.writingMode, bumpFont]);
 
   // ----- re-apply settings whenever they change, and auto-save them -----

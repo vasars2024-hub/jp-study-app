@@ -26,9 +26,9 @@ import {
 import { getLevel } from '../../knownWords';
 import { getTokenizer, tokenizeSync } from '../../tokenizer';
 import { parseSubtitles, type Cue } from '../../subtitles';
-import { addDeckCards } from '../../flashcardDeck';
+import { addDeckCards , loadDeck } from '../../flashcardDeck';
 import { loadSaved } from '../../savedWords';
-import { loadDeck } from '../../flashcardDeck';
+
 import { fuzzyScore } from '../../fuzzySearch';
 import { KANJI_RADICALS } from '../../../shared/kanjiRadicals';
 import { useAssets, type AssetView } from '../../assetStore';

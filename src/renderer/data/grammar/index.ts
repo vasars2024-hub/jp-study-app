@@ -20,7 +20,13 @@ import { HSK_EXTRA } from './hsk-extra';
 import { HSK_IMPORT } from './hsk-import';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
 
+// `GrammarFunctionId` is exported by both: it is *defined* in ./functions and
+// re-exported by ./types. eslint-plugin-import flags that as a duplicate export
+// without noticing both names resolve to the same binding, which is legal and
+// unambiguous in ESM — and it is a type, so nothing exists at runtime anyway.
+/* eslint-disable-next-line import/export */
 export * from './types';
+/* eslint-disable-next-line import/export */
 export * from './functions';
 export * from './taxonomy';
 export { GUIDES } from './guides';

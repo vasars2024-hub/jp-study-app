@@ -310,6 +310,6 @@ export function isDuplicateMetadataLine(
     if (t.includes(opts.publishedTime.slice(0, 10))) return true;
   }
   if (/^(published|updated|posted|by|author|source|credit)\s*[:：]/i.test(t)) return true;
-  if (/^\d{4}[年\/\-]\d{1,2}[月\/\-]\d{1,2}/.test(t) && t.length < 40) return true;
+  if (/^\d{4}[年/-]\d{1,2}[月/-]\d{1,2}/.test(t) && t.length < 40) return true;
   return false;
 }

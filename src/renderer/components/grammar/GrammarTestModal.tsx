@@ -222,7 +222,7 @@ export default function GrammarTestModal({
   const typeLabels = useMemo(
     () => QUESTION_TYPES.map((type) => ({ type, label: t(TYPE_KEY[type]) })),
     // `lang`, never `t` — t's identity is stable, so depending on it goes stale.
-    [lang], // eslint-disable-line react-hooks/exhaustive-deps
+    [lang],
   );
 
   return (

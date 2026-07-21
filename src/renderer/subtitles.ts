@@ -61,6 +61,7 @@ export function parseLrc(raw: string): Cue[] {
 }
 
 export function parseSubtitles(raw: string): Cue[] {
+  // eslint-disable-next-line no-irregular-whitespace -- U+FEFF is the BOM this line exists to strip from subtitle files.
   const clean = raw.replace(/^﻿/, '').replace(/\r/g, '');
   let cues: Cue[];
   if (/^\s*(?:\[Script Info\]|Dialogue:)/m.test(clean)) cues = parseAss(clean);

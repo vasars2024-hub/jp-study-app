@@ -150,7 +150,9 @@ export default function NovelReader({ item, onClose }: Props) {
   const bookTitleRef = useRef(item.title);
   bookTitleRef.current = title;
   /** Stable ref so keyboard handlers can call leaveLinkView before its declaration. */
-  const leaveLinkViewRef = useRef<() => void>(() => {});
+  // Initialised to a no-op so callers can invoke it before a real leave handler
+  // is installed; `undefined` keeps the () => void signature without an empty body.
+  const leaveLinkViewRef = useRef<() => void>(() => undefined);
 
   // Reload from storage when switching books; flush durable mirror on exit.
   useEffect(() => {
@@ -475,7 +477,6 @@ export default function NovelReader({ item, onClose }: Props) {
         percent: curGlobalRef.current,
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id]);
 
   // ----- track the viewport size -----
@@ -504,7 +505,7 @@ export default function NovelReader({ item, onClose }: Props) {
     let dead = false;
     getTokenizer()
       .then(() => !dead && setHlTick((t) => t + 1))
-      .catch(() => {});
+      .catch(() => undefined);
     return () => {
       dead = true;
     };
@@ -625,7 +626,6 @@ export default function NovelReader({ item, onClose }: Props) {
     const g2 = globalFor(partRef.current, localFracRef.current);
     updateGlobal(g2);
     setProgress(g2);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, part, size.w, size.h, paged, vertical, settings]);
 
   // ----- SCROLL layout: window anchoring + explicit targets -----
@@ -692,7 +692,6 @@ export default function NovelReader({ item, onClose }: Props) {
       if (off > max) setOffsetPx(max);
     }
     measureWin();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [win, loaded, paged, vertical, size.w, size.h, settings]);
 
   // Remeasure part geometry when content height changes (e.g. images finishing

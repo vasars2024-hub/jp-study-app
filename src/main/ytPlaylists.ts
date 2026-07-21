@@ -389,7 +389,7 @@ export async function addVideoByUrl(
   const youtubeId = parseYoutubeVideoId(trimmed);
   if (!youtubeId) return { ok: false, error: 'Not a valid YouTube video URL.' };
 
-  let store = readStore();
+  const store = readStore();
   let pl = store.playlists.find((p) => p.youtubePlaylistId === EXTENSION_PLAYLIST_KEY);
   if (!pl) {
     pl = {
