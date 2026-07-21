@@ -92,12 +92,41 @@
 .ui-icon-btn:disabled { opacity: var(--alpha-disabled); pointer-events: none; }
 
 /* ---------- Surfaces: Card / GlassCard / Panel --------------------------- */
+/* Shared card set (P1.5). Cards separate by SURFACE CONTRAST + a soft
+   elevation, not by a 1px border — borders are reserved for inputs/focus
+   (§8: a standard card uses ≤1 strong containment cue). Built on the P1.2
+   surface ladder so a card reads as "raised" above the window body in every
+   theme. Base / --quiet / --interactive cover the small variant set the app
+   should converge on; app-owned *-card families (Account B) adopt these. */
 .ui-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: none;
   border-radius: var(--radius-xl);
   box-shadow: var(--elevation-2);
   padding: var(--space-lg);
+}
+/* Quiet: flat grouping surface, no shadow — relies on surface step alone. */
+.ui-card--quiet {
+  background: var(--surface-1);
+  box-shadow: none;
+}
+/* Interactive: clickable card with a restrained hover lift (no accent). */
+.ui-card--interactive {
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.ui-card--interactive:hover {
+  background: var(--surface-3);
+  box-shadow: var(--elevation-3);
+}
+.ui-card--interactive:active {
+  transform: translateY(0.5px);
+}
+.ui-card--interactive:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 .ui-glass-card {
   background: var(--glass-tint);
@@ -109,8 +138,8 @@
   padding: var(--space-lg);
 }
 .ui-panel {
-  background: var(--panel-2);
-  border: 1px solid var(--border);
+  background: var(--surface-1);
+  border: none;
   border-radius: var(--radius-lg);
   padding: var(--space-md);
 }
