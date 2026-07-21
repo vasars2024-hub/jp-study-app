@@ -46,6 +46,43 @@
             return Promise.resolve({ target: 'C:\\Windows\\System32\\notepad.exe', name: 'notepad', icon: '' });
           },
           launchAutomationBuilder: function () { return Promise.resolve({ ok: false, error: 'Harness: no PowerShell here.' }); },
+
+          // --- Stubs added 2026-07-21 so the Deck and Cards tabs stop crashing ---
+          //
+          // The catch-all proxy below answers unknown calls with
+          // Promise.resolve(undefined), which is fine for fire-and-forget IPC but
+          // fatal wherever the caller destructures or reads a property off the
+          // result. Three modules did exactly that and took the whole shell down
+          // through the error boundary, which made the Deck and Cards tabs
+          // unverifiable in the harness:
+          //
+          //   profileState  `(await profileGet()).legacyMigrated`
+          //   assetStore    `assetsList().then(({ assets, statuses }) => …)`
+          //   playerBus     `await playerWindowId()` at module-eval time
+          //
+          // These return the shape each caller expects, with empty data — enough
+          // to render, never enough to look like real content.
+          profileGet: function () {
+            return Promise.resolve({
+              activeId: 'japanese',
+              profiles: [],
+              // True so init does not then call profileMigrateLegacy and read
+              // fields off *its* undefined result.
+              legacyMigrated: true,
+            });
+          },
+          profileMigrateLegacy: function () {
+            return Promise.resolve({ activeId: 'japanese', profiles: [], legacyMigrated: true });
+          },
+          profileSwitch: function () { return Promise.resolve({ ok: false, error: 'Harness: profiles are read-only.' }); },
+          profileUpdate: function () { return Promise.resolve({ ok: false, error: 'Harness: profiles are read-only.' }); },
+          profileCreate: function () { return Promise.resolve({ ok: false, error: 'Harness: profiles are read-only.' }); },
+          profileDelete: function () { return Promise.resolve({ ok: false, error: 'Harness: profiles are read-only.' }); },
+          assetsList: function () { return Promise.resolve({ assets: [], statuses: [] }); },
+          playerWindowId: function () { return Promise.resolve(0); },
+          // Read-only pitch data: available:false exercises the panel's
+          // "Kanjium not installed" branch, which is the honest harness answer.
+          dictPitch: function () { return Promise.resolve({ available: false, entries: [] }); },
         };
         window.api = new Proxy(explicit, {
           get: function (target, prop) {
