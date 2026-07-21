@@ -83,6 +83,32 @@ aesthetic).
 |---|---|---|---|---|---|
 | _(none yet)_ | | | | | |
 
+## Account B — Phase 1 synchronization + rendered verification of new primitives
+
+Merge commit `04e72c9` brings `ui-phase1-approved` (`d6b07c2`, 9 commits) into `ui/app-screens`. `git diff d6b07c2 HEAD -- src/` is **empty** — the shared layer is byte-identical to A's approved state; nothing was manually reproduced.
+
+**Post-merge validation:** vitest 946/946 · i18n 3976 clean · tsc 1291 total / 9 `src/` (**0 in any Phase-1-touched file**) · ESLint 63 err/171 warn (`src`) and 65/171 (repo-wide) — all at baseline.
+
+**Rendered inspection of the three computationally-validated primitives** (live app, `study-os`, no `data-materials`, 1280×860; temporary probe nodes injected then removed — DOM verified clean afterwards):
+
+| Primitive | Rendered result | Verdict |
+|---|---|---|
+| `.ui-card` (baseline) | `background rgb(39,36,51)` = `--surface-2`; `border 0/none`; `box-shadow` = `--elevation-2`; radius 16px | as designed — single containment cue (§8) |
+| `.ui-card--quiet` | `background rgb(26,24,35)` = `--surface-1`; `box-shadow: none`; no border | **works** — confirms A's specificity claim: the `:where()`-guarded `.ui-card` refinement scores (0,1,0) so the later variant wins on source order |
+| `.ui-card--interactive` | `cursor: pointer`; `transition-duration 0.14s`; all 4 rules (`base`/`:hover`/`:active`/`:focus-visible`) parsed with declarations intact | **works** — hover = `--surface-3` + `--elevation-3`, no accent |
+| `.ui-segmented` | wrap `rgb(10,9,16)` = `--surface-sunken`, radius 8px, inline-flex; idle item transparent + `--muted`, **no idle border**; selected = `--surface-2` + `--elevation-1` + inset 1px `--accent-weak` | **works** — satisfies §8 "no accent border on inactive" |
+
+- **All 20 token dependencies resolve** (`--surface-0..3`, `--surface-sunken/input`, `--elevation-1..3`, `--dur-fast`, `--ease-standard`, `--radius-md/xl`, `--accent-weak`, `--focus-ring-*`, `--font-*`).
+- **CSSOM parse check:** every rule present with non-zero declaration counts (`.ui-segmented__item` 46, selected 11, hover 10, focus-visible 4) — no silently-dropped/invalid declarations.
+- **Contrast (WCAG AA):** segmented idle text on sunken **6.99**, selected on surface-2 **13.82**, muted on surface-2 **5.35**, muted on surface-1 **6.18** — all PASS.
+- **Surface ladder measured:** sunken `#0a0910` → s0 `#0d0c12` → s1 `#1a1823` → s2 `#272433` → s3 (mix) — a real ≥3-level ramp (§8).
+- **Reduced motion:** covered — `theme/a11y.css:37-56` collapses `transition-duration` via a universal selector for both `prefers-reduced-motion` and `html.reduce-motion`. (`motion.css`'s own media block only targets `[class*='anim-']`/`[class*='trans-']`, which would *not* have matched these primitives; a11y.css is what covers them.)
+- **Non-defect observation (no action taken):** `.ui-card--interactive:active { transform: translateY(0.5px) }` is a static transform, so under reduced motion it applies instantly rather than animating. At 0.5px this is not a perceptible motion defect; **global contract left unchanged** per instruction.
+
+**Conclusion: no rendered defect demonstrated → no changes made to `.ui-card--quiet`, `.ui-card--interactive`, or `.ui-segmented`.**
+
+IR-1 (segmented control) appears addressed by `b7580ed`; IR-3/IR-4 (Blanc coupling) remain **open** and still gate Phase 3A/3B.
+
 ## Account B — preparation-mode audit (no code changed)
 
 Recorded during preparation mode at base `54fd5d9`. **No visual changes, no global CSS, no `ui/*` or token edits.**
