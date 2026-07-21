@@ -263,4 +263,17 @@ export const TOKEN_GROUPS: readonly TokenGroup[] = [
       { name: '--focus-ring-offset', value: '2px', description: 'Ring offset.' },
     ],
   },
+  {
+    tier: 'Status colours',
+    description:
+      'Semantic states, themeable. P1.1 split: error/danger use the deeper brick --danger ' +
+      '(defined in styles.css :root), NOT the brand --accent/--red; info is a calm blue.',
+    tokens: [
+      { name: '--status-success', value: '#38b26b', description: 'Success / connected.' },
+      { name: '--status-warning', value: '#e0a53a', description: 'Warning / caution (amber).' },
+      { name: '--status-error', value: 'var(--danger)', description: 'Error signal — deeper brick red, distinct from brand.' },
+      { name: '--status-info', value: '#3b82f6', description: 'Informational — calm blue, not accent.' },
+      { name: '--danger-weak', value: 'color-mix(danger 16%)', description: 'Soft danger wash for destructive backgrounds/hover.' },
+    ],
+  },
 ] as const;

@@ -8,9 +8,15 @@ would show up.
 
 ## Coordination header (fill in at kickoff)
 
-- Base commit SHA (both branches start here): `TBD`
+- Base commit SHA (both branches start here): `54fd5d99f07ce9af01e027003efdde98225606f3`
 - Approved Phase 1 commit/tag: `TBD` (`ui-phase1-approved`)
 - Base branch: `grammarx/phase-1-5` (confirm current)
+- Account A worktree: `C:/Users/Arseniy/Projects/jp-study-app-core-shell` on `ui/core-shell`
+- Baselines captured (`debug/shots/ui-refinement/baseline/`): 01 study-os medium+overlap, 02 launcher,
+  03 Settings home (cards/nav/quick-actions), 04 Blanc. Theme-regression before/after (classic-light,
+  wired, aero) reproduced via `git stash` toggle at the token checkpoint.
+- Accepted tooling baseline: vitest 946/946; i18n clean; tsc 1291 errors (0 in A-owned files);
+  eslint 65 errors / 171 warnings; runtime error log 0.
 
 ## Legend
 
@@ -28,7 +34,7 @@ would show up.
 
 | Screen / component | Owner | Impl type | Shared primitive adopted | Temp workaround | Missing primitive/token | Remaining inconsistency | Validation status | Deferred reason | Phase | Commit |
 |---|---|---|---|---|---|---|---|---|---|---|
-| _(seed — replace as work lands)_ | | | | | | | not-started | | | |
+| Semantic colour split (`--status-error`→`--danger`, `--status-info`→blue, new `--danger`/`--danger-2`/`--danger-deep`/`--danger-weak`) | A | css-propagated | tokens.css/styles.css `:root` + tokens.ts mirror | none | none | Aero inherits new `--status-error` (does not override it; only `--status-info`) — verify Aero error affordances at checkpoint theme sweep; Wired likewise inherits both. Blanc insulated (overrides both). | in-progress | Aero/Wired live verify pending until theme sweep | P1 | _pending_ |
 
 ## Integration requests (Account B → Account A)
 

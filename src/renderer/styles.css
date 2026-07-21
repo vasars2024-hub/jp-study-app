@@ -15,6 +15,15 @@
   --accent-2: #ff6b81;
   --red: #ff2e4d;
   --red-deep: #d21734;
+  /* Destructive / danger family (P1.1 semantic split) — a DEEPER, less-saturated
+     brick red, deliberately distinct from the brighter pink-leaning brand --accent
+     so a destructive action / error never reads as a primary action. --danger was
+     already consumed via var(--danger, <fallback>) in several places but never
+     defined; defining it here unifies those ad-hoc fallbacks. --red stays the brand
+     red (Aero/Wired depend on it) and is NOT the error signal anymore. */
+  --danger: #d13438;
+  --danger-2: #e35b5f;
+  --danger-deep: #a4262c;
 
   /* ---------- Design tokens ----------
      Single source of truth for spacing, radii, type and elevation. Component
