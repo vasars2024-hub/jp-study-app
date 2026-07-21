@@ -65,6 +65,9 @@ A-owned files; B removes any temporary workaround once the shared change lands a
 
 | # | Requested by | What's needed | Screen(s) blocked | Temp workaround in place | Status (`open`/`landed`/`removed-workaround`) | Notes |
 |---|---|---|---|---|---|---|
+| IR-3 | B | **Blanc class-name coupling** — see audit §3B/§4 | Anki (3A); Notebook/Stats/Reader (3B) | none | **strategy-proposed (NOT closed)** | Audit complete: `.anki-card`, `.stats-*`, `.gx-notebook-*`, `.reader-*` are Blanc-re-skinned; `os-set-*`, `rf-*`, `nov-*`, `res-*`, `status-banner`, `form-msg`, `gram-level-btn` are **not**. Proposed strategy = default-theme-scoped refinement using Phase 1's `:where(:not(.blanc-root *))` guard (`ui.css:59,121,165`). Stays open until the strategy is approved and verified in implementation. |
+| IR-4 | B | **Blanc component-import coupling** — see audit §3A/§3C | Anki (3A); Stats (3B) | none | **strategy-proposed (NOT closed)** | `BlancStudyPanels.tsx` renders 6 `AnkiContent` + 5 `StatsContent` exports (l.792-828, l.862-886). `AnkiContent` verified **frameless** (emits no `.anki-card`; framing from `AnkiView.tsx:54,67,77,86` / Blanc `fieldset`) → already presentation-neutral, so **no extraction needed** and all exports preserved. Stays open until verified in implementation. |
+| IR-7 | B | Account-B-controlled renderer + baselines | app-screen baselines | `debug/baseline-harness*.html` (gitignored, local-only) | **partially resolved (NOT closed)** | Isolated renderer achieved on port 5273 via the existing `PORT` option, zero disruption to A. **7 baselines captured** at 1280×601. **Not closed:** narrow ~940×600 unattainable on this display (dpr 1.5 / 1920×1080; window sizing proved non-deterministic), so §8's narrow criterion is not yet verifiable; Special page, Book Reader and Blanc Anki panel also uncaptured. |
 | IR-1 | B | **Segmented-control primitive** to replace the `.gram-level-btn` idiom | Reading Finder (JLPT level row, furigana/18+ filters) | none | open | **Not a B-exclusive selector.** `.gram-level-btn` is used by `DictionaryResults.tsx:900`, `grammar/GrammarContent.tsx:176`, `reading/ReadingFinderContent.tsx:217/282/288`, and is documented as an idiom by `translate-analysis/FormalityToggle.tsx:13`. Defined at `styles.css:5779-5793` and **re-scoped by protected `theme/wired-apps.css:38`**. Fails master §15 condition (1) → A must own this change; Wired equivalence must be re-verified. |
 | IR-2 | B | Confirm ownership + treatment of **`.anki-card`** | Anki (3A) | none | open | Used by **12 files**, only 2 of which are B-owned (`AiCardStudio`, `CsvEditorPanel`, `DeckActionMenu`, `DeckImportPanel`, `EpubMiningPanel`, `EpubMiningSimplePanel`, `FlashcardsContent`, `JitenMiningPanel`, `views/AnkiView`, `blanc/BlancStudyPanels`…). Also styled by **protected `theme/aero-apps.css`** at 8+ sites. Fails §15 condition (1) → A-owned. |
 | IR-3 | B | **Decision required:** how to migrate screens whose classNames Blanc re-skins | Anki (3A); Notebook + Statistics (3B) | none | **open — blocking design question** | `theme/blanc-native.css` re-skins Study OS classes **by class name / prefix**, scoped to `.blanc-root`: `.anki-card` (l.28/36), `.stats-card`, `.stats-section`, `.stats-level-estimate` (l.41), `.gx-notebook-item`, `.gx-notebook-count` (l.44), plus prefix matches `[class^='stats-']`, `[class^='gx-notebook']` (l.21/24). **Any structural migration of these screens to `ui/*` silently stops those selectors matching and visually breaks Blanc — which is protected (master §4).** The execution plan flags the Blanc seam for Anki only; it does **not** flag it for Notebook/Statistics, which are equally affected. Needs an explicit ruling before 3A/3B implementation. |
@@ -82,6 +85,87 @@ aesthetic).
 | # | Skin | What changed & why (genuine defect) | Approved by | Commit | Verified against baseline |
 |---|---|---|---|---|---|
 | _(none yet)_ | | | | | |
+
+## Account B — Phase 3A unblock: baselines + Blanc coupling audit (no UI implementation)
+
+### 1. Isolated Account-B renderer (IR-7)
+
+Account A's Phase 2 Electron instance holds **both** default ports (Vite 5173, debug bridge 39273). `src/main/debugBridge.ts:21` hardcodes `DEBUG_PORT` with no env override and degrades silently on collision (`server.on('error')` → `server = null`, no `bridge.json` write), and the MCP server resolves `bridge.json` from its own root (`tools/claude-app-bridge/server.mjs:20`), so a second Electron instance could never be reached anyway. **No committed build config or app source was modified.**
+
+Setup actually used (user-approved):
+- **Renderer:** `PORT=5273 npx vite --config vite.renderer.config.ts` from the `ui/app-screens` worktree. `PORT` is an **existing, documented runtime option** (`vite.renderer.config.ts`, "Honour an assigned PORT when one is set"). A's 5173/39273 untouched throughout.
+- **Boot shim:** `debug/baseline-harness.html` + `debug/baseline-harness-blanc.html` — **gitignored** (`.gitignore:121`), so they can never be committed. The renderer touches the Electron preload bridge at module init (`playerBus.ts:226-232`), which throws in a plain browser; the repo's own harnesses use the same idea (`src/renderer/__devharness__/motionHarness.tsx:31`, `window.api = {}`). A flat `{}` is insufficient for a full app boot, so the shim is a recursive proxy that is simultaneously **callable** (React effect cleanups require a function) and **thenable resolving to `[]`** (Blanc calls `.length`/`.legacyMigrated` on IPC results without null-guards; `null` crashes `BlancReadPanel` + `profileState`).
+- **Capture:** Chrome (Browser 2) via `?popout=<section>` deep links — no click automation needed.
+
+**Fidelity caveat (must be honoured for "after" shots):** these render in Chrome without Electron IPC, so data-backed panels are empty. Baselines are faithful for **chrome / layout / tokens / responsive width**, not for populated data. After-shots must use the identical harness, port, browser and viewport.
+
+### 2. Baseline screenshot inventory — `debug/shots/ui-refinement/baseline/`
+
+All at **viewport 1280×601 CSS, dpr 1.5, theme `study-os` (no `data-theme`), no `data-materials`**.
+
+| File | Screen | State |
+|---|---|---|
+| `01-anki-disconnected_studyos_1280x601.jpg` | Anki | **disconnected** — `status-banner bad` + red "Can't reach Anki." + numbered AnkiConnect setup |
+| `02-reading-finder_studyos_1280x601.jpg` | Reading Finder | default, 8 result cards, level row, filters |
+| `03-settings-home_studyos_1280x601.jpg` | Settings | home shell, nav + quick actions |
+| `04-notebook_studyos_1280x601.jpg` | Notebook | empty state, counters, tablist |
+| `05-statistics_studyos_1280x601.jpg` | Statistics | classic render path (not Aero branch) |
+| `06-blanc-stats-panel_shared-StatsContent_1280x601.jpg` | **Blanc** Stats | renders shared `StatsContent` — `.stats-card`×4, `[class^='stats-']`×19 |
+| `07-blanc-read-panel_1280x601.jpg` | **Blanc** Read | Blanc shell reference |
+
+**Not captured (disclosed, not silently skipped):**
+- **Narrow ~940×600** — the display is dpr 1.5 on 1920×1080; max CSS viewport is ~1269×596, and OS-level window sizing proved unreliable (identical calls returned 1280×601 then 627×303 as Chrome re-maximized / changed DPI handling). Retrying was stopped rather than looped. §8's narrow criterion is therefore **not yet verifiable** — see IR-7 status.
+- **Special page** — a Settings sub-page needing in-app navigation.
+- **Book Reader** — not a `?popout=` section; requires opening a book.
+- **Blanc Anki/Deck panel** — crashes under the shim (needs real IPC shapes). Anki↔Blanc coupling was therefore established **from source**, not screenshots.
+
+### 3. Blanc coupling — exact dependency graph
+
+**A. Component imports** — `blanc/BlancStudyPanels.tsx` imports and renders B-owned components directly:
+
+| From | Components | Rendered at |
+|---|---|---|
+| `anki/AnkiContent.tsx` | `AnkiDisconnected`, `AnkiDeckNoteType`, `AnkiFieldMapping`, `AnkiNoteCss`, `AnkiManualCardForm`, `AnkiPreviewPane`, `useAnkiConfig` | l.792–828 |
+| `stats/StatsContent.tsx` | `StatsCards`, `StatsChart`, `StatsBooks`, `WordKnowledge`, `useStats` | l.862–886 |
+
+**B. CSS re-skin coupling** — swept every B-owned class prefix against `theme/blanc*.css`:
+
+| Prefix | Blanc-coupled? | Selectors |
+|---|---|---|
+| `anki-card` | **YES** | `.anki-card` (blanc-native.css l.28, l.36) — but see note below |
+| `stats-*` | **YES** | `.stats-card`, `.stats-section`, `.stats-level-estimate`, `.stats-bar-fill`, `.blanc-stats-grid`, prefix `[class^='stats-']` (2 files) |
+| `gx-notebook*` | **YES** | `.gx-notebook-item`, `.gx-notebook-count`, prefix `[class^='gx-notebook']` |
+| `reader-*` | **YES** | `.reader-bar`, `.reader-controls`, `.reader-footer`, `.reader-panel`, `.reader-pct`, `.reader-title`, `.reader-toolbar`, `.reader-anno-*` |
+| `os-set-*` (Settings/Special) | **NO — zero rules** | — |
+| `rf-*`, `nov-*`, `res-*` (Reading Finder) | **NO — zero rules** | — |
+| `status-banner`, `form-msg`, `fm-*`, `wk-*`, `gram-level-btn` | **NO — zero rules** | — |
+
+**C. Presentation vs behaviour.** `AnkiContent` is **frameless** — it emits **no** `.anki-card` (its only mention is the explanatory comment at l.8). Framing is supplied by the shells: `views/AnkiView.tsx:54,67,77,86` (Study OS `.anki-card`) and `BlancStudyPanels` (`fieldset`). So the Anki components are already **presentation-neutral content/state**; `.anki-card` belongs to the shells, not to my component.
+
+**D. Two distinct risk modes** (both real, opposite directions):
+- Classes Blanc **does** re-skin → structural migration removes the class, Blanc's selectors stop matching, Blanc **loses its skin**.
+- Classes Blanc does **not** re-skin → Blanc currently **inherits** the Study OS look, so restyling them **leaks the new look into Blanc**.
+
+### 4. Recommended strategy per screen (evidence-based, least invasive)
+
+Phase 1 already established the exact idiom for this problem: default-theme-scoped rules guarded by `:where(:not(.blanc-root *))` inside a `:where(html:not([data-materials='aero']):not([data-materials='wired']))` wrapper — see `ui.css:59, 121, 165`. Reusing it costs no new system and no extraction.
+
+| Screen | Strategy | Rationale |
+|---|---|---|
+| **Anki** | **Keep structure; default-theme-scoped visual refinement.** Adopt `Notification`/`Button`/`Input`/`Select` **inside** the existing exported components, with Blanc-excluded scoping for any new visual rule. **No extraction, no export changes.** | Components are already presentation-neutral (frameless); exports are consumed by protected Blanc. Extraction would duplicate logic for zero benefit. |
+| **Settings + Special** | **Free migration** — adopt Phase 1 primitives structurally. | `os-set-*` has **zero** Blanc rules; `SettingsApp` already imports `AppChrome`/`Button`/`Toolbar`. No Blanc risk. |
+| **Reading Finder** | **Free migration** — shared `Dialog` for `nov-modal`, `.ui-segmented` for the level row, `SearchBox`/`Select` for filters. | `rf-*`/`nov-*`/`res-*`/`gram-level-btn` have **zero** Blanc rules. |
+| **Notebook, Statistics, Reader** (3B) | **Defer**; same scoped-refinement approach as Anki. | Blanc re-skins `.gx-notebook-*`, `.stats-*`, `.reader-*` by name/prefix. |
+
+**Extraction is NOT required anywhere** — the evidence does not support it, so it was not chosen.
+
+### 5. Phase 3A file scope (proposed)
+
+Modify: `anki/AnkiContent.tsx`; `reading/ReadingFinderContent.tsx`; `settings/SettingsApp.tsx`, `SettingsCard.tsx`, `SettingsNav.tsx`; `settings/pages/SpecialPage.tsx`; `shared/i18n/catalogs.ts` (additive EN keys for SpecialPage literals); app-local scoped sections of `styles.css` **only** under master §15's six conditions.
+
+Untouched (protected): all `theme/blanc*.css`, `theme/aero-*`, `theme/wired-*`, `blanc/BlancStudyPanels.tsx`, `views/AnkiView.tsx` (A/shared shell), `forge.config.*`, `vite.*.config.*`, `tsconfig.json`, `src/main/debugBridge.ts`.
+
+**Can Phase 3A proceed without modifying protected Blanc files? — YES**, provided every new Study OS visual rule carries the Phase 1 `:where(:not(.blanc-root *))` guard, and no exported component signature from `AnkiContent`/`StatsContent` changes.
 
 ## Account B — Phase 1 synchronization + rendered verification of new primitives
 
