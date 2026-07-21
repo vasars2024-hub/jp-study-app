@@ -86,10 +86,18 @@ Created 2026-07-20. Supersedes the "Blanc Toolbox module build-out" track in `TA
      matches no ichidan imperative (that is ろ), so the kanji form had no rule.
 
   Three one-line rules fixed both; the existing deinflect suite still passes and
-  regression tests live in `conjugate.test.ts`. **Worth noting for future work:**
-  this class of gap — a rule written for kana but not its kanji spelling — is
-  likely not limited to these two, and a systematic audit of `deinflect.ts`
-  against kanji spellings would probably find more.
+  regression tests live in `conjugate.test.ts`.
+
+  **Audit closed 2026-07-21 — the speculation here was wrong.** This note
+  originally guessed that kana-only rules were "likely not limited to these two"
+  and that an audit "would probably find more". It was checked instead of left
+  hanging: `deinflectRoundTrip.test.ts` widens the round-trip to 80 kanji-first
+  words covering every godan ending plus both irregulars, exercising **960
+  generated forms**, and finds **no further gaps**. 行く and 来い were the only
+  two. The gate is kept permanently (a kana-only rule is invisible to a kana-only
+  test) with a `checked >= 900` assertion so it cannot go vacuous, and it was
+  mutation-tested: removing the 行った rule makes it report exactly
+  `past: 行く → 行った`.
 
   Two documented non-guards: `conjugate()` trusts the caller's word class because
   the spelling cannot decide it (食べる is ichidan, 帰る is godan, same shape), and
