@@ -4395,6 +4395,20 @@ mark.lookup-mark,
   margin: 0 0 8px;
   color: var(--accent);
 }
+/* Account B — Phase 3A. `.anki-setup-msg` is used only by AnkiSetup.tsx (part
+   of the Anki screen) with no protected-skin overrides, so it is B-owned.
+   It carried the setup failure text ("Can't reach Anki.") in the BRAND hue —
+   §8 forbids brand and error sharing a treatment.
+
+   Blanc renders this text too (BlancStudyPanels → AnkiDisconnected → AnkiSetup)
+   and overrides --status-error inside .blanc-root, so it is excluded to stay
+   byte-identical. Under Aero/Wired the swap is a no-op by construction: Phase 1
+   (998c7f7) pins --status-error back to var(--red), which equals --accent
+   there — the guard is kept for consistency, not because it changes anything. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .anki-setup-msg:where(:not(.blanc-root *)) {
+  color: var(--status-error);
+}
 .anki-setup-sub {
   margin: 0 0 8px;
   color: var(--muted);
@@ -4586,6 +4600,56 @@ mark.lookup-mark,
 .status-dot.warn {
   background: #d4a04a;
 }
+
+/* ============================================================================
+   Account B — Phase 3A (Anki connection status).
+
+   `.status-banner` / `.status-dot` are used only by anki/AnkiContent.tsx and
+   views/AnkiView.tsx, so they are exclusively B-owned (master §15(1)).
+
+   Same Phase 1 guard as elsewhere: Aero and Wired carry their own overrides in
+   aero-apps.css / wired-apps.css and are excluded here, as is Blanc — all three
+   keep their baselines.
+
+   NOT touched here: `.form-msg.err` has the same brand-hue-as-error defect
+   (`color: var(--accent)`, styles.css:5145) but is shared with AiCardStudio,
+   ProfileSwitcher and SettingsView, so it fails §15(1). Filed as an integration
+   request for Account A rather than edited from this branch.
+   ========================================================================== */
+/* §8: one strong containment cue. Each variant previously had a tinted fill AND
+   a full 1px ring; the ring gives way to a status-hue bar, which reads calmer
+   and still carries the state non-verbally.
+
+   `border: none` must sit on the *variant* rules, not on the bare
+   `.status-banner`: the border is declared by `.status-banner.bad/.warn/.ok`
+   at (0,2,0), so a (0,1,0) reset would silently lose to it. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-banner.bad:where(:not(.blanc-root *)) {
+  /* Was hardcoded rgba(224,85,106). Now the semantic error token Phase 1 split
+     out from the brand hue. */
+  border: none;
+  background: color-mix(in srgb, var(--status-error) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--status-error);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-banner.warn:where(:not(.blanc-root *)) {
+  border: none;
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--status-warning);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-banner.ok:where(:not(.blanc-root *)) {
+  border: none;
+  background: color-mix(in srgb, var(--status-info) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--status-info);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-dot.bad:where(:not(.blanc-root *)) {
+  /* Was `var(--accent)` — the brand hue standing in for an error state, which
+     §8 forbids sharing between brand and error. */
+  background: var(--status-error);
+}
+
 .anki-card {
   background: var(--panel);
   border: 1px solid var(--border);
