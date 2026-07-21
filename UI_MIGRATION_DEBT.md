@@ -363,3 +363,27 @@ and `styles.css` auto-merged (Phase 2 edits and Phase 3A edits touch disjoint re
 
 Visual verification of the merged tree tracked in the session task list (shell via the live core-shell
 instance — byte-identical to integration's shell; app screens pending).
+
+---
+
+## Every-app pass (extension beyond the marquee plan, user-requested)
+
+Long-tail apps not covered by Phases 1–3B. Same guarded idiom as the marquee work.
+
+| App | What changed | Verification | Commit |
+|---|---|---|---|
+| Novels / Jiten | `.jiten-row`, `.aero-novels-command`, `.jiten-source-buttons button.active` used a hardcoded `rgba(180,50,58)` maroon that ignored the accent (read red under amber). → neutral hover wash + accent-following active; workbench panels (`.jiten-filters/.jiten-table-wrap/.jiten-inspector`) repointed off the muddy `rgba(8,8,10,.34)` to `--surface-1`. Guarded. | computed style: study-os follows `--accent`; under `data-materials='aero'` maroon returns | 9085cac |
+| Media / Music | `.media-folder-row.active`, `.music-row.active`, `.music-line.active` glow, `.mwidget-btn.on`, `.music-liked-chip.on` hardcoded `rgba(255,46,77)` → `color-mix` over `var(--accent)` (identical in default+Aero, amber under personalization). Guarded. | computed style: study-os follows `--accent`; Aero literal returns | 21ffcb4 |
+
+### Audit outcome — remaining hardcoded legacy-red is SHELL/shared, not app surfaces
+After the three app fixes, every remaining `rgba(255,46,77)` / `rgba(180,50,58)` literal in `styles.css`
+(>9000, excluding kept guarded-baseline originals and the literal `.anno-red` swatch) is in the **shell/shared
+layer**, not a long-tail app: `.fwin-frameless.focused` (10654 border+ring), `.fwin.focused` ring (12132),
+`.os-start-btn.active` glow (12327), `.os-start-backdrop.drop-ready` (12445), `.btn.danger:hover` (13357 —
+should be `--danger`, a semantic leftover). These are A-owned shell/Phase-2 territory; logged for a shell
+follow-up, not folded silently into an app commit.
+
+### Remaining long-tail apps
+Video, Manga, Games, Calendar, CSV, Translate, Dictionary, Grammar, Immersion, Resources, Flashcards, Library
+carry **no** hardcoded legacy-red — they inherit Phase 1's calm tokens. Outstanding work for them is per-app
+§8 card polish (multi-cue → single-cue), assessed app-by-app.
