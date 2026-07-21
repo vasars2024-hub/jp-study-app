@@ -2,6 +2,8 @@
 // Parsed indices live in userData/yomitan/<id>/ and are shared by the
 // dictionary pop-up (IPC) and the mining aggregator (gatherMiningValues).
 
+import { moraPitch, splitMorae as splitMoraeShared } from '../../shared/pitchAccent';
+import type { PitchEntry, PitchLookup } from '../../shared/pitchAccent';
 import { app, dialog, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -251,42 +253,23 @@ function normalizeQuery(q: string): string {
 }
 
 /** Split a kana reading into morae (small kana attach to the previous mora). */
-export function splitMorae(reading: string): string[] {
-  const s = reading.normalize('NFKC');
-  const morae: string[] = [];
-  let cur = '';
-  const small = new Set('ゃゅょぁぃぅぇぉゎャュョァィゥェォヮっッ');
-  for (const ch of s) {
-    if (small.has(ch) && cur) {
-      cur += ch;
-    } else {
-      if (cur) morae.push(cur);
-      cur = ch;
-    }
-  }
-  if (cur) morae.push(cur);
-  return morae;
-}
+// Moved to shared/pitchAccent.ts so the mining `{pitch}` field and the Blanc
+// pitch panel cannot disagree about what a mora is. Re-exported because callers
+// outside this file import it from here.
+export { splitMorae } from '../../shared/pitchAccent';
 
 /**
  * Tokyo-dialect pitch pattern as inline HTML (high morae get a top border).
  * `downstep` is the Yomitan mora index of the accent nucleus (0 = heiban).
  */
 export function pitchPatternHtml(reading: string, downstep: number): string {
-  const morae = splitMorae(reading);
+  const morae = splitMoraeShared(reading);
   if (!morae.length) return '';
+  // The high/low rule itself lives in shared/pitchAccent.ts; this function is
+  // only the HTML presentation of it.
+  const highs = moraPitch(reading, downstep);
   const parts = morae.map((m, i) => {
-    const n = i + 1;
-    // Tokyo-dialect pitch: heiban (0) = L then all H; atamadaka (1) = H then
-    // all L; nakadaka/odaka (n>=2) = L, H up to the accent mora, then L.
-    let high: boolean;
-    if (downstep === 0) {
-      high = n > 1;
-    } else if (downstep === 1) {
-      high = n === 1;
-    } else {
-      high = n > 1 && n <= downstep;
-    }
+    const high = highs[i] ?? false;
     const style = high
       ? 'border-top:2px solid currentColor;padding-top:1px;display:inline-block'
       : 'display:inline-block';
@@ -724,6 +707,31 @@ function broadcastDictUpdated(): void {
 
 // ----- Public lookup API -----------------------------------------------------
 
+/**
+ * Structured pitch data for the Blanc pitch panel.
+ *
+ * getPitch() returns presentation HTML, which is Study OS output; this returns
+ * the raw downstep positions so a renderer can draw its own contour. `available`
+ * is false when no pitch dictionary is loaded at all, which lets the panel say
+ * "install the Kanjium asset" instead of showing an empty result that looks like
+ * "this word has no accent data".
+ */
+export function getPitchData(term: string, reading?: string): PitchLookup {
+  const available = pitchByKey.size > 0;
+  const t = normalizeQuery(term);
+  const r = normalizeQuery(reading ?? term);
+  const entries: PitchEntry[] = [];
+  const seen = new Set<string>();
+  for (const key of [metaKey(t, r), metaKey(t, t), metaKey(r, r)]) {
+    const hit = pitchByKey.get(key);
+    if (!hit || !hit.positions.length) continue;
+    const id = `${hit.reading}${hit.positions.join(",")}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    entries.push({ reading: hit.reading || r, positions: [...hit.positions] });
+  }
+  return { available, entries };
+}
 export function getPitch(term: string, reading?: string): string {
   const t = normalizeQuery(term);
   const r = normalizeQuery(reading ?? term);

@@ -1161,6 +1161,47 @@ body {
   font-weight: 600;
 }
 
+/* Pitch accent (study-native track item 2). */
+.blanc-pitch-entry {
+  margin-bottom: 10px;
+}
+
+.blanc-pitch-contour {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 1.5em;
+  padding: 10px 0 4px;
+}
+
+/* A high mora is drawn with an overline and lifted; the low ones sit lower, so
+   the shape of the word's pitch reads at a glance rather than needing the
+   pattern name. */
+.blanc-pitch-mora {
+  padding: 2px 3px 0;
+  line-height: 1.3;
+  border-top: 2px solid transparent;
+}
+
+.blanc-pitch-mora.high {
+  border-top-color: var(--blanc-text);
+  transform: translateY(-4px);
+}
+
+.blanc-pitch-mora.low {
+  color: var(--blanc-muted);
+}
+
+/* The accent nucleus: the mora the pitch falls *after*. */
+.blanc-pitch-mora.drop {
+  border-right: 2px solid var(--blanc-danger);
+  padding-right: 2px;
+}
+
+.blanc-pitch-name {
+  color: var(--blanc-text);
+}
+
 /* Review forecast (study-native track item 7). */
 .blanc-forecast-chart {
   display: grid;

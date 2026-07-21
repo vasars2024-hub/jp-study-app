@@ -32,6 +32,14 @@ import {
 } from '../../../shared/japaneseNumbers';
 import { speak } from '../../tts';
 import {
+  PITCH_PATTERN_LABELS,
+  isPitchLookup,
+  moraPitch,
+  pitchPatternName,
+  splitMorae,
+  type PitchLookup,
+} from '../../../shared/pitchAccent';
+import {
   dayLabel,
   emptyForecast,
   isDueForecast,
@@ -690,6 +698,163 @@ export function BlancForecastPanel() {
         ) : (
           <p className="blanc-note">No tracked words yet.</p>
         )}
+      </fieldset>
+    </div>
+  );
+}
+
+/**
+ * Study-native item 2 — pitch accent lookup.
+ *
+ * Reads the Kanjium pitch data the app already downloads and mining already
+ * uses for `{pitch}`. The contour is drawn here from raw downstep positions
+ * (`shared/pitchAccent.ts`) rather than by injecting main's presentation HTML,
+ * which would be Study OS markup inside a Blanc panel.
+ *
+ * The data is an optional download, so "no accent for this word" and "you have
+ * no pitch dictionary installed" are reported as different things — the panel
+ * points at the asset instead of looking empty.
+ */
+export function BlancPitchPanel() {
+  const [term, setTerm] = useState('');
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState<PitchLookup | null>(null);
+  const [error, setError] = useState('');
+  const [spoke, setSpoke] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(term.trim()), 300);
+    return () => clearTimeout(id);
+  }, [term]);
+
+  useEffect(() => {
+    if (!query) {
+      setResult(null);
+      setError('');
+      return;
+    }
+    let alive = true;
+    const api = window.api?.dictPitch;
+    if (!api) {
+      setError('Dictionary bridge unavailable in this window.');
+      return;
+    }
+    void api(query)
+      .then((r) => {
+        if (!alive) return;
+        // Same shape guard as the forecast: a stubbed channel resolves undefined,
+        // which would otherwise render as "no accent data" — a wrong answer.
+        if (isPitchLookup(r)) {
+          setResult(r);
+          setError('');
+        } else {
+          setResult(null);
+          setError('The pitch channel returned no data (is this a dev harness?).');
+        }
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setResult(null);
+        setError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [query]);
+
+  const say = useCallback((text: string) => {
+    if (speak(text)) {
+      setSpoke(true);
+      setTimeout(() => setSpoke(false), 1200);
+    }
+  }, []);
+
+  return (
+    <div className="blanc-tool-detail blanc-pitch">
+      <fieldset>
+        <legend>Word</legend>
+        <div className="blanc-command-row">
+          <input
+            type="text"
+            lang="ja"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder="A word in kanji or kana — 箸, はし, 日本語"
+          />
+          {term && (
+            <button type="button" onClick={() => setTerm('')}>
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="blanc-status-row">
+          {['日本語', '箸', '学校', '卵'].map((ex) => (
+            <button key={ex} type="button" lang="ja" onClick={() => setTerm(ex)}>
+              {ex}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Accent</legend>
+        {error && <p className="blanc-warning">{error}</p>}
+        {!error && result && !result.available && (
+          <>
+            <p className="blanc-warning">No pitch-accent dictionary is installed.</p>
+            <p className="blanc-note">
+              Pitch data comes from the Kanjium accent dictionary, an optional download. Install it
+              from Settings → Models, then come back — nothing here works without it, and an empty
+              result would otherwise look like &ldquo;this word has no accent&rdquo;.
+            </p>
+          </>
+        )}
+        {!error && result?.available && !result.entries.length && query && (
+          <p className="blanc-note">
+            No accent data for <span lang="ja">{query}</span>. The dictionary is installed, so this
+            word is genuinely absent from it rather than unavailable.
+          </p>
+        )}
+        {!error && !query && <p className="blanc-note">Type a word to see its contour.</p>}
+        {!error &&
+          result?.entries.map((entry) => (
+            <div key={`${entry.reading}-${entry.positions.join(',')}`} className="blanc-pitch-entry">
+              {entry.positions.map((downstep) => {
+                const morae = splitMorae(entry.reading);
+                const highs = moraPitch(entry.reading, downstep);
+                const pattern = pitchPatternName(downstep, morae.length);
+                return (
+                  <div key={downstep} className="blanc-pitch-row">
+                    <div className="blanc-pitch-contour" lang="ja" aria-label={`Pitch pattern: ${pattern}`}>
+                      {morae.map((m, i) => (
+                        <span
+                          key={i}
+                          className={`blanc-pitch-mora${highs[i] ? ' high' : ' low'}${
+                            downstep > 0 && i + 1 === downstep ? ' drop' : ''
+                          }`}
+                        >
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="blanc-status-row">
+                      <span className="blanc-pitch-name">{PITCH_PATTERN_LABELS[pattern]}</span>
+                      <span>{downstep === 0 ? 'no downstep' : `downstep after mora ${downstep}`}</span>
+                      <button type="button" onClick={() => say(entry.reading)}>
+                        {spoke ? 'Speaking' : 'Hear'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        {!error && result?.entries.length ? (
+          <p className="blanc-note">
+            A raised mora is high. Tokyo dialect: the drop after the marked mora is what you hear —
+            for odaka it lands on the following particle, so the word alone sounds flat.
+          </p>
+        ) : null}
       </fieldset>
     </div>
   );

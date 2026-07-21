@@ -29,6 +29,7 @@ import type {
   MineNoteResult,
 } from './shared/anki';
 import type { DueForecast } from './shared/reviewForecast';
+import type { PitchLookup } from './shared/pitchAccent';
 import type { ApkgImportResult } from './shared/apkgParse';
 import type {
   AiEngineConfig,
@@ -300,6 +301,9 @@ const api = {
   lookupWord: (query: string): Promise<DictResult> => ipcRenderer.invoke('dict:lookup', query),
   /** Merged Yomitan offline lookup with Jisho fallback (Japanese). */
   lookupTerm: (query: string): Promise<DictResult> => ipcRenderer.invoke('dict:lookupTerm', query),
+  /** Structured pitch-accent data (downstep positions), for the Blanc pitch panel. */
+  dictPitch: (term: string, reading?: string): Promise<PitchLookup> =>
+    ipcRenderer.invoke('dict:pitch', term, reading),
   /** Offline-only Yomitan glossary lookup (no Jisho). */
   lookupTermOffline: (query: string): Promise<DictResult> =>
     ipcRenderer.invoke('dict:lookupTermOffline', query),

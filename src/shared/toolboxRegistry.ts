@@ -98,7 +98,8 @@ export type ToolboxModuleId =
   | 'furigana'
   | 'counter-reader'
   | 'conjugation-drill'
-  | 'review-forecast';
+  | 'review-forecast'
+  | 'pitch-accent';
 
 export type ToolboxModuleCategory =
   | 'study'
@@ -580,6 +581,32 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     },
     migrationNotes:
       'Study-native track item 3. Blanc-only for now: Study OS already renders furigana inline in readers and subtitles, so a second generator surface there would duplicate rather than add.',
+  },
+  {
+    id: 'pitch-accent',
+    label: 'Pitch Accent',
+    category: 'study',
+    status: 'ready',
+    capabilities: ['dictionary', 'japanese-analysis'],
+    permissions: [],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: false,
+    supportsGlobalShortcut: false,
+    supportsAutomation: true,
+    acceptsExternalInput: true,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation:
+      'Blanc panel over the Kanjium pitch data already used for the {pitch} mining field, via a new read-only dict:pitch IPC returning downstep positions. The contour is drawn from shared/pitchAccent.ts rather than main’s presentation HTML.',
+    externalAdapter: {
+      strategy: 'existing-service',
+      notes:
+        'Needs the optional kanjium-accent asset; reports it as missing rather than rendering an empty result that would read as "this word has no accent".',
+    },
+    migrationNotes:
+      'Study-native track item 2. Blanc-only: Study OS surfaces pitch inline in the dictionary popup; this is the dedicated lookup.',
   },
   {
     id: 'review-forecast',

@@ -20,6 +20,7 @@ import type {
   MineNoteResult,
 } from '../shared/anki';
 import type { DueForecast } from '../shared/reviewForecast';
+import type { PitchLookup } from '../shared/pitchAccent';
 import type { ApkgImportResult } from '../shared/apkgParse';
 import type { AssetError, AssetSpec, AssetStatus } from '../shared/assetRegistry';
 import type {
@@ -271,6 +272,8 @@ declare global {
       ankiGetIntervals(opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot>;
       /** Read-only week-ahead due counts from Anki's own scheduler. */
       ankiDueForecast(): Promise<DueForecast>;
+      /** Structured pitch-accent data for a term. */
+      dictPitch(term: string, reading?: string): Promise<PitchLookup>;
       importApkg(filePath?: string): Promise<ApkgImportResult>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;

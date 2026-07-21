@@ -304,6 +304,18 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     editable: true,
   },
   {
+    id: 'toolbox.openPitchAccent',
+    name: 'Open Pitch Accent',
+    description: 'Look up a word’s pitch-accent contour.',
+    category: 'Study',
+    feature: 'pitch-accent',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
+  },
+  {
     id: 'toolbox.openReviewForecast',
     name: 'Open Review Forecast',
     description: 'Open the read-only review load forecast.',

@@ -18,6 +18,7 @@ import {
   initYomitan,
   listYomitanDicts,
   lookupGlossary,
+  getPitchData,
   lookupOfflineDeinflected,
   lookupTermMerged,
   moveYomitanDict,
@@ -353,6 +354,8 @@ export async function searchExamples(query: string, limit = DEFAULT_FETCH_LIMIT)
 export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string) => lookupTerm(query));
+  // Read-only structured pitch data for the Blanc pitch panel.
+  ipcMain.handle('dict:pitch', (_e, term: string, reading?: string) => getPitchData(term, reading));
   ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));
   ipcMain.handle(
     'dict:lookupTermsBatch',

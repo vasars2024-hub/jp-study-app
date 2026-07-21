@@ -26,6 +26,7 @@ This document is intentionally stored under `src/` so it follows the project rul
 | `toolbox.openFocusTimer` | Open Focus Timer | Open the countdown and stopwatch workspace. | focus-timer | Alt+5 | toolbox | Yes |
 | `toolbox.openQuickNotes` | Open Quick Notes | Open the Blanc-local quick notes surface. | quick-notes | Alt+6 | toolbox | Yes |
 | `toolbox.openClipboard` | Open Clipboard | Open the shared clipboard history tool. | clipboard | Alt+7 | toolbox | Yes |
+| `toolbox.openPitchAccent` | Open Pitch Accent | Look up a word’s pitch-accent contour. | pitch-accent | Unbound | toolbox | Yes |
 | `toolbox.openReviewForecast` | Open Review Forecast | Open the read-only review load forecast. | review-forecast | Unbound | toolbox | Yes |
 | `toolbox.openConjugationDrill` | Open Conjugation Drill | Open the verb and adjective conjugation drill. | conjugation-drill | Unbound | toolbox | Yes |
 | `toolbox.openCounterReader` | Open Counter Reader | Open the counter and number reader. | counter-reader | Unbound | toolbox | Yes |
