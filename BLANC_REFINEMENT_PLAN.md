@@ -342,6 +342,54 @@ both are probably cheap `lazy()` wins once the catalog work is done.
 
 </details>
 
+### Pillar 1 CSS — DONE 2026-07-21. Boot stylesheet 420 KB → 67 KB.
+
+The analysis below was right about the cause and wrong about the cost: it called
+this "not a one-line fix", but it took one new file. `theme/studyos-compat.css`
+imports `styles.css` with `layer(studyos)` and is pulled by the four lazy panel
+modules that render Study OS class names, so the sheet rides their chunks
+instead of boot.
+
+Two details that are easy to get wrong, both found by measuring:
+
+1. **The layer is load-bearing.** A lazy stylesheet lands *after* `blanc.css`,
+   so Study OS would win every specificity tie and un-skin the panels — the
+   regression `blanc-native.css` exists to prevent, reintroduced via load order.
+   Unlayered rules beat layered ones, so `blanc.css` now wins every tie
+   regardless of arrival. Stricter than the import-order arrangement it
+   replaces, which only holds while the order does.
+2. **A static import puts it straight back in boot.** Imported statically from
+   four lazy panels, Rollup hoists the CSS to their common ancestor — which is
+   `BlancShell`, and `blancMain.tsx` imports that statically. It reappeared as a
+   354 KB `BlancShell-*.css`. A module-level `void import(...)` gives it its own
+   async chunk.
+
+What the shell actually needed from `styles.css` was ~10 lines (body background
+and colour, 14px base size, `overflow: hidden`) — verified by removing the
+import and diffing computed styles, which came out byte-identical for
+`.blanc-root` and `.blanc-taskbar`. Those now live in `blanc.css` as Blanc's own
+page baseline, deliberately duplicated rather than shared. `blanc.css`'s three
+`var(--accent)` references turned out to be **inside comments**; the real token
+dependency was zero.
+
+| | before | after |
+|---|---|---|
+| Blanc boot | 1.24 MB | **0.90 MB** (−27%) |
+| Blanc boot CSS | 420 KB | **67 KB** (−84%) |
+| Blanc vs Study OS | 70% smaller | **78% smaller** |
+
+**Session cumulative: Blanc boot 1.96 MB → 0.90 MB, −54%.** Budget re-recorded
+at 945,245 bytes. Study OS is untouched — `main.tsx` still imports `styles.css`
+eagerly, and extracting the subset it shares with Blanc is a separate, larger job
+with no measured payoff yet.
+
+**Remaining Pillar 1:** item 4 (virtualize long lists — music/media already use
+`VirtualList`/`VirtualGrid`; dictionary results, deck lists and file search are
+not verified), and `aiMiningCatalog.ts` (30 KB, still eager in boot).
+
+<details>
+<summary>Original analysis (kept — the diagnosis was correct)</summary>
+
 ### Budget: the rest is CSS, not JS
 
 **Finding: Blanc's boot payload includes the entire Study OS stylesheet.**
@@ -398,10 +446,20 @@ stashing `src/renderer` alone breaks the build against the branch's other
 uncommitted work. **Do not `--update` the budget until the 97 KB is attributed.**
 Silencing an unexplained regression is exactly what this gate exists to prevent.
 
+*Attributed and resolved 2026-07-21 — the 97 KB was CSS growth from each ported
+panel's styles landing in the one boot stylesheet. Both halves are fixed above,
+and the budget was re-recorded downward twice.*
+
+</details>
+
 **Not done — the remaining work-list:**
 
-- **Pillar 1 item 4** (virtualize long lists).
-- **Pillars 3–8** in full, and **study-native items 2–7**.
+- **Pillar 1 item 4** (virtualize long lists) — the only Pillar 1 work left,
+  plus `aiMiningCatalog.ts` (30 KB) still eager in boot. Pillars 1's two big
+  items (the i18n catalog and the Study OS stylesheet) are **done**: Blanc boot
+  went 1.96 MB → 0.90 MB this session.
+- **Pillars 3–8** in full, and **study-native items 2 and 6** (items 1, 3, 4, 5
+  and 7 have shipped).
 - **Pillar 2 parity: done.** `node tools/blanc-drift.cjs` reports **0 pending**
   and exits 0. There is no parity gap list any more; the drift script's value from
   here is as an *alarm* — a brand-new Study OS view shows up as unclassified on the
