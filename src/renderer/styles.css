@@ -5850,6 +5850,21 @@ mark.lookup-mark,
   border-color: var(--accent);
   color: var(--text);
 }
+/* P1.6: align .gram-level-btn to the shared .ui-segmented language for study-os
+   + named themes only (Aero/Wired/Blanc excluded via the zero-specificity
+   guard; Wired restyles it in-scope). Drops the accent idle-hover BORDER (§8);
+   the selected segment keeps a restrained accent cue, not a full accent ring. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-level-btn:where(:not(.blanc-root *)):hover {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--text) 6%, var(--panel));
+  color: var(--text);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-level-btn:where(:not(.blanc-root *)).active {
+  background: var(--surface-2);
+  border-color: transparent;
+  box-shadow: var(--elevation-1), inset 0 0 0 1px var(--accent-weak);
+  color: var(--text);
+}
 .gram-search {
   flex: 1;
   min-width: 200px;

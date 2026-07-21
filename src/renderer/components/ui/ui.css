@@ -342,6 +342,51 @@
 .ui-tab[aria-selected='true'] { color: var(--accent); border-bottom-color: var(--accent); }
 .ui-tab:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: -2px; }
 
+/* ---------- Segmented control (P1.6, previously missing) -----------------
+   A pill group of mutually-exclusive options. The selected segment reads as a
+   raised surface pill (surface contrast + soft elevation) — accent is used
+   only as a thin selected accent bar/text, never as an idle border. Ad-hoc
+   segmented controls (.gram-level-btn; seg() which is already .btn-based)
+   converge on this language. Selected via [aria-selected], .active or
+   .selected so existing markup can adopt it without JS changes. */
+.ui-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+}
+.ui-segmented__item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.ui-segmented__item:hover:not([aria-selected='true']):not(.active):not(.selected) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.ui-segmented__item[aria-selected='true'],
+.ui-segmented__item.active,
+.ui-segmented__item.selected {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--elevation-1), inset 0 0 0 1px var(--accent-weak);
+}
+.ui-segmented__item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -1px;
+}
+
 /* ---------- Tooltip (wrapper-relative; zoom-safe, no JS coords) ---------- */
 .ui-tooltip-wrap { position: relative; display: inline-flex; }
 .ui-tooltip {
