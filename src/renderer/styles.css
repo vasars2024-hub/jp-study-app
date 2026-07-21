@@ -13357,6 +13357,14 @@ html[data-taskbar-size='large'] .os-tray-btn {
   background: rgba(255, 46, 77, 0.12);
   border-color: var(--accent);
 }
+/* Danger button hover leaked the brand accent (red bg + accent border) instead
+   of the danger hue — a §8 semantic-state leak Phase 1 fixed on the base but not
+   the hover. Repoint to --danger in default/named themes; Aero/Wired/Blanc keep
+   the baseline above. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn.danger:where(:not(.blanc-root *)):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: var(--danger);
+}
 
 /* ==========================================================================
    P1.4 refined .btn — reconcile legacy .btn tiers with the .ui-btn primitives

@@ -779,6 +779,17 @@ html.reduce-motion .os-aero-boot *::after,
   border-color: color-mix(in srgb, var(--text) 20%, var(--border));
   box-shadow: var(--elevation-4);
 }
+/* Frameless windows (mini/pop-out shells) got the same red focus outline the
+   P2 window-chrome fix removed from `.fwin` but missed here — give them the
+   identical neutral elevation treatment. Guarded like the rest of this file. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin-frameless:where(:not(.blanc-root *)).focused {
+  border-color: color-mix(in srgb, var(--text) 20%, var(--border));
+  box-shadow: var(--elevation-4);
+}
+/* Start-menu file-drop backdrop hardcoded a brand-red wash; track the accent. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-backdrop.drop-ready:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
 
 /* Title bar: sits one step below the window body so the chrome reads as
    chrome, and carries the active/inactive signal in text contrast. */
