@@ -158,6 +158,9 @@ const BlancVisualizerPanel = lazy(() =>
 const BlancFuriganaPanel = lazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancFuriganaPanel })),
 );
+const BlancCounterPanel = lazy(() =>
+  import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancCounterPanel })),
+);
 
 const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
   read: { label: 'Read', icon: 'library' },
@@ -842,10 +845,12 @@ type BlancToolId =
   | 'kanji-inspector'
   | 'youtube-library'
   | 'furigana'
+  | 'counter-reader'
 >;
 
 const BLANC_TOOL_IDS: BlancToolId[] = [
   'furigana',
+  'counter-reader',
   'coverage',
   'notebook',
   'translate',
@@ -883,6 +888,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
 
 const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   furigana: 'note',
+  'counter-reader': 'app',
   coverage: 'stats',
   notebook: 'note',
   translate: 'globe',
@@ -940,6 +946,7 @@ const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['quick', 'productivity', 'syst
 
 const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; description: string; shortcut?: string }> = {
   furigana: { category: 'language', description: 'Paste Japanese text and get ruby, Anki bracket furigana, or kana — offline.' },
+  'counter-reader': { category: 'language', description: 'Numbers, counters, dates, and clock times to kana — 3本 → さんぼん, with audio.' },
   coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
   notebook: { category: 'language', description: 'Everything you saved, mined, looked up, and read — one timeline with lineage.' },
   translate: { category: 'language', description: 'Offline JA/ZH/EN/RU translation with history, re-run, and mine-to-deck.' },
@@ -1032,6 +1039,7 @@ function writeToolList(key: string, value: BlancToolId[]): void {
 function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => void): JSX.Element {
   if (tool === 'coverage') return <ToolboxCoveragePanel />;
   if (tool === 'furigana') return <BlancFuriganaPanel />;
+  if (tool === 'counter-reader') return <BlancCounterPanel />;
   if (tool === 'notebook') return <BlancNotebookPanel />;
   if (tool === 'translate') return <BlancTranslatePanel />;
   if (tool === 'music') return <BlancMusicPanel />;

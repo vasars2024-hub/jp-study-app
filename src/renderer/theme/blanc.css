@@ -1129,6 +1129,49 @@
   font-weight: 600;
 }
 
+/* Counter reader (study-native track item 5). */
+.blanc-reading-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.blanc-reading-list li {
+  display: grid;
+  /* Label and surface size to content; the kana reading takes the slack so the
+     Hear buttons stay in a column instead of stepping with each row's width. */
+  grid-template-columns: minmax(0, 12em) auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: var(--blanc-radius, 4px);
+}
+
+.blanc-reading-list li:nth-child(odd) {
+  background: var(--blanc-active, rgba(255, 255, 255, 0.03));
+}
+
+.blanc-reading-label {
+  color: var(--blanc-muted);
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blanc-reading-surface {
+  color: var(--blanc-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.blanc-reading-kana {
+  color: var(--blanc-text);
+  font-size: 1.05em;
+}
+
 /* Furigana generator (study-native track item 3). */
 .blanc-furigana-input,
 .blanc-furigana-output {

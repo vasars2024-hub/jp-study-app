@@ -95,7 +95,8 @@ export type ToolboxModuleId =
   | 'immersion-tracker'
   | 'context-search'
   | 'youtube-library'
-  | 'furigana';
+  | 'furigana'
+  | 'counter-reader';
 
 export type ToolboxModuleCategory =
   | 'study'
@@ -577,6 +578,32 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     },
     migrationNotes:
       'Study-native track item 3. Blanc-only for now: Study OS already renders furigana inline in readers and subtitles, so a second generator surface there would duplicate rather than add.',
+  },
+  {
+    id: 'counter-reader',
+    label: 'Counter Reader',
+    category: 'study',
+    status: 'ready',
+    capabilities: ['japanese-analysis', 'utility'],
+    permissions: [],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: false,
+    supportsGlobalShortcut: false,
+    supportsAutomation: true,
+    acceptsExternalInput: true,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation:
+      'Blanc panel over shared/japaneseNumbers.ts — numerals, counters with their sound changes (3本 → さんぼん), dates, and clock times to kana, with TTS via the shared speak().',
+    externalAdapter: {
+      strategy: 'built-in',
+      notes:
+        'Pure table-driven logic, no dependency and no network. Distinct from the Counter Quiz game, which is a static prompt set rather than a reader.',
+    },
+    migrationNotes:
+      'Study-native track item 5. Blanc-only: Study OS has the Counter Quiz game for practice, and this is the reference reader that game is not.',
   },
   {
     id: 'quick-notes',

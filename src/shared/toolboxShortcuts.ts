@@ -304,6 +304,18 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     editable: true,
   },
   {
+    id: 'toolbox.openCounterReader',
+    name: 'Open Counter Reader',
+    description: 'Open the counter and number reader.',
+    category: 'Study',
+    feature: 'counter-reader',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
+  },
+  {
     id: 'toolbox.openFurigana',
     name: 'Open Furigana Generator',
     description: 'Open the furigana generator for annotating pasted text.',

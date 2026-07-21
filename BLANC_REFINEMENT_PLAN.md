@@ -170,7 +170,51 @@ served from `http://localhost:5173/blanc.html?blanc=1`, the dedicated entry, not
 the `index.html?blanc=1` fallback. The verification note at the end of this Status
 section is therefore closed.
 
-### Budget: the 97 KB is attributed (2026-07-21) — it is CSS, not JS
+### Pillar 1, the real headline: 55% of Blanc's boot JS is the i18n catalog
+
+Measured 2026-07-21 by building with `--sourcemap` and attributing generated
+bytes to source modules via the mappings (99.7% of the chunk attributed):
+
+| Module | Bytes | Share of boot JS |
+|---|---|---|
+| `src/shared/i18n/catalogs.ts` | **698 KB** | **54.7%** |
+| `react-dom` | 173 KB | 13.5% |
+| `src/shared/i18n/grammarTaxonomy.ts` | 42 KB | 3.3% |
+| `src/shared/aiMiningCatalog.ts` | 30 KB | 2.3% |
+| `src/renderer/keyboardShortcuts.ts` | 26 KB | 2.0% |
+| `src/shared/toolboxRegistry.ts` | 24 KB | 1.9% |
+| `async` (kuromoji dep) | 24 KB | 1.9% |
+
+`catalogs.ts` is 1 MB of source carrying **all four languages**, and the built
+Blanc chunk contains `manga.` (715 keys), `wired.` (697), and `city.` (58)
+entries — namespaces for Study OS surfaces Blanc does not have, in the window
+whose own chrome is deliberately *untranslated*. It is ~36% of Blanc's entire
+1.95 MB boot payload: **larger than the CSS problem below by a wide margin**, and
+the single biggest lever in Pillar 1.
+
+Fixing it helps Study OS too, which pays the same 698 KB. Sketch, in order of
+payoff per unit of risk:
+
+1. **Split by language.** Keep `en` eager, move `ja`/`zh`/`ru` into sibling
+   modules loaded with a dynamic `import()` on language switch. Saves roughly
+   500 KB of boot for the default language. The catch is that `t()` is
+   synchronous by design (CLAUDE.md leans on that), so the active catalog must be
+   resolved *before* first paint — a boot-time `await` in `main.tsx` /
+   `blancMain.tsx`, not a lazy read inside `t()`.
+2. **Split by namespace**, so Blanc never loads `city.`/`wired.`/`manga.`.
+   Smaller win, and it needs a key-prefix convention the i18n tooling can verify.
+
+**Do not start this while another session holds `catalogs.ts`.** It was modified
+in the working tree on 2026-07-21 by the flashcard-search session; a 1 MB
+restructure would silently clobber their uncommitted additions. Check
+`git status` first. The `vitest` catalog-hygiene gate and `tools/i18n-check.cjs`
+both read this file and must keep passing across the split.
+
+Also note `grammarTaxonomy.ts` (42 KB) and `aiMiningCatalog.ts` (30 KB) are eager
+in Blanc boot; both look like data modules that only specific panels need, and
+both are probably cheap `lazy()` wins once the catalog work is done.
+
+### Budget: the rest is CSS, not JS
 
 **Finding: Blanc's boot payload includes the entire Study OS stylesheet.**
 `blancMain.tsx:36` imports `./styles.css` (468 KB of source), and `blanc.css`

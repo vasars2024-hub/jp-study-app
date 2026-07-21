@@ -25,6 +25,12 @@ import {
   type FuriganaSegment,
 } from '../../../shared/furigana';
 import { getTokenizer, tokenizeSync } from '../../tokenizer';
+import {
+  allCounterReadings,
+  readInput,
+  type NumberReading,
+} from '../../../shared/japaneseNumbers';
+import { speak } from '../../tts';
 
 type FuriganaFormat = 'ruby' | 'brackets' | 'kana';
 
@@ -188,6 +194,120 @@ export function BlancFuriganaPanel() {
           annotated rather than guessing a per-kanji split.
         </p>
       </fieldset>
+    </div>
+  );
+}
+
+const COUNTER_EXAMPLES = ['1234', '3本', '20歳', '5月5日', '3:45', '8'];
+
+/**
+ * Study-native item 5 — counter and number reader.
+ *
+ * Pure composition over `shared/japaneseNumbers.ts`. The app's existing Counter
+ * Quiz is a static prompt game; nothing converted an arbitrary numeral, counter
+ * phrase, date, or clock time to kana until now. Speaking uses the shared
+ * `speak()` so it picks the same Japanese voice as the rest of the app.
+ */
+export function BlancCounterPanel() {
+  const [text, setText] = useState('');
+  const [spoke, setSpoke] = useState('');
+
+  const readings = useMemo<NumberReading[]>(() => readInput(text), [text]);
+
+  // A bare number is the case where "every counter at once" is the useful view.
+  const counterTable = useMemo<NumberReading[]>(() => {
+    const n = Number(text.trim());
+    if (!/^\d+$/.test(text.trim()) || !Number.isSafeInteger(n) || n < 1) return [];
+    return allCounterReadings(n);
+  }, [text]);
+
+  const say = useCallback((reading: string) => {
+    if (speak(reading)) {
+      setSpoke(reading);
+      setTimeout(() => setSpoke(''), 1200);
+    }
+  }, []);
+
+  return (
+    <div className="blanc-tool-detail blanc-counter">
+      <fieldset>
+        <legend>Read</legend>
+        <div className="blanc-command-row">
+          <input
+            type="text"
+            value={text}
+            lang="ja"
+            onChange={(e) => setText(e.target.value)}
+            placeholder="A number, 3本, 20歳, 5月5日, or 3:45"
+          />
+          {text && (
+            <button type="button" onClick={() => setText('')}>
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="blanc-status-row">
+          <span>Try:</span>
+          {COUNTER_EXAMPLES.map((ex) => (
+            <button key={ex} type="button" onClick={() => setText(ex)}>
+              {ex}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Reading</legend>
+        {readings.length ? (
+          <ul className="blanc-reading-list">
+            {readings.map((r) => (
+              <li key={`${r.label}-${r.reading}`}>
+                <span className="blanc-reading-label">{r.label}</span>
+                <span className="blanc-reading-surface" lang="ja">
+                  {r.surface}
+                </span>
+                <span className="blanc-reading-kana" lang="ja">
+                  {r.reading}
+                </span>
+                <button type="button" onClick={() => say(r.reading)}>
+                  {spoke === r.reading ? 'Speaking' : 'Hear'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="blanc-note">
+            {text.trim() ? 'No reading for that input.' : 'Type a number or a counted phrase.'}
+          </p>
+        )}
+      </fieldset>
+
+      {counterTable.length > 0 && (
+        <fieldset>
+          <legend>All counters</legend>
+          <ul className="blanc-reading-list">
+            {counterTable.map((r) => (
+              <li key={r.surface}>
+                <span className="blanc-reading-label">{r.label}</span>
+                <span className="blanc-reading-surface" lang="ja">
+                  {r.surface}
+                </span>
+                <span className="blanc-reading-kana" lang="ja">
+                  {r.reading}
+                </span>
+                <button type="button" onClick={() => say(r.reading)}>
+                  {spoke === r.reading ? 'Speaking' : 'Hear'}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="blanc-note">
+            Counters whose reading at an exact hundred is irregular (100本 → ひゃっぽん) are omitted
+            rather than guessed, so a missing row means &ldquo;not certain&rdquo;, not
+            &ldquo;impossible&rdquo;.
+          </p>
+        </fieldset>
+      )}
     </div>
   );
 }
