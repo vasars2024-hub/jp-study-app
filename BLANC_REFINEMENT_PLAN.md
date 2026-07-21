@@ -71,10 +71,40 @@ Created 2026-07-20. Supersedes the "Blanc Toolbox module build-out" track in `TA
   ごがついつか, 3:45 → さんじよんじゅうごふん, 20歳 → はたち, 5つ → いつつ, and
   at 100 the all-counters list correctly shows only 枚/人/歳/冊/台.
 
-  **Remaining study-native items: 2 (pitch accent), 4 (conjugation drill), 6
-  (audio transcribe-and-mine), 7 (review forecast).** Items 2 and 4 are still the
-  cheapest — 4 in particular is pure logic beside `deinflect.ts` and needs no new
-  infrastructure.
+- **Study-native item 4 — conjugation drill shipped (2026-07-21).** New
+  `shared/conjugate.ts` is the forward direction of `deinflect.ts`, built on that
+  file's godan tables, which are now **exported rather than copied** — one source
+  of truth, so a fix to a row or an 音便 suffix corrects both directions.
+  `conjugate.test.ts` round-trips every generated form back through `deinflect()`.
+
+  **That round-trip found two real, user-facing bugs in existing `deinflect.ts`:**
+  1. `行った`/`行って` did not resolve to `行く`. The irregular 音便 was handled
+     only in kana (`いった → いく`), so the kanji spelling — the common one —
+     gave 行う/行つ/行る. `行った` is among the most frequent verb forms in the
+     language, so dictionary lookup on it was missing the verb entirely.
+  2. `来い` did not resolve to `来る`. The kana `こい` rule existed, but `来い`
+     matches no ichidan imperative (that is ろ), so the kanji form had no rule.
+
+  Three one-line rules fixed both; the existing deinflect suite still passes and
+  regression tests live in `conjugate.test.ts`. **Worth noting for future work:**
+  this class of gap — a rule written for kana but not its kanji spelling — is
+  likely not limited to these two, and a systematic audit of `deinflect.ts`
+  against kanji spellings would probably find more.
+
+  Two documented non-guards: `conjugate()` trusts the caller's word class because
+  the spelling cannot decide it (食べる is ichidan, 帰る is godan, same shape), and
+  です forms plus いい are excluded from the round-trip because `deinflect`'s scope
+  is narrower, not because the forms are wrong.
+
+  Verified live: 泳ぐ negative marked wrong showed 泳がない (0/1), 教える negative
+  accepted 教えない (1/2), restricting to い-adjective drew only adjectives with no
+  verb-only forms offered, and the last-class guard holds.
+
+  **Remaining study-native items: 2 (pitch accent), 6 (audio transcribe-and-mine),
+  7 (review forecast).** Item 2 is the cheapest of the three, but unlike items
+  3/4/5 it is *not* self-contained: it gates on the downloadable `kanjium-accent`
+  asset and needs an honest "asset not installed" state, so budget for that rather
+  than assuming another pure-logic session.
 
   One CSS fix found only by rendering it: ruby was styled `--blanc-accent`, which
   under the neutral macOS palette is `#e6e6ea` against `--blanc-text` `#f5f5f7` —
