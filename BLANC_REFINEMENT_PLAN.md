@@ -1195,8 +1195,17 @@ Chromium/Windows).
 
 ## Doc debt to clear alongside
 
-- `TOOLBOX_COMPLETION_AUDIT.md` says "51 modules / 30 adapter-needed"; it is now
-  **50 modules, 30 ready / 20 planned**.
-- Every planned module carries boilerplate `migrationNotes` claiming it needs a
-  native adapter. That is false for most of them (see above) and it misled a
-  session on 2026-07-20. Re-tier by actual blocker.
+- ~~`TOOLBOX_COMPLETION_AUDIT.md` says "51 modules / 30 adapter-needed"~~ —
+  **fixed 2026-07-21.** Both that doc's "50 modules" and this note's own
+  "50 modules, 30 ready / 20 planned" were wrong, and the latter used a `planned`
+  status that does not exist in the schema. Counted off the registry rather than
+  remembered: **56 modules — 35 `ready`, 20 `adapter-needed`, 1 `experimental`**,
+  36 with `appearsInBlanc`. Ready moved 30 → 35 when the study-native track
+  shipped this session. The audit doc now carries the table and a note to re-count
+  rather than restate.
+- **Still open:** every deferred module carries boilerplate `migrationNotes`
+  claiming it needs a native adapter. That is false for most of them (see
+  "Explicitly deferred" above) and it misled a session on 2026-07-20. The accurate
+  tiering is now cross-referenced from `TOOLBOX_COMPLETION_AUDIT.md`, but the 20
+  `migrationNotes` fields themselves are unedited — each needs a judgement call
+  about its real blocker, which is why this was not done unsupervised.

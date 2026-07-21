@@ -16,11 +16,37 @@ and error handling — not judged by its card or filename. Baseline before chang
 
 ## Architecture verdict (what is genuinely sound)
 
-- **Single feature registry** exists (`toolboxRegistry.ts`): 50 modules with stable
-  IDs, category, status, capabilities, permissions, launch contexts, adapter
+- **Single feature registry** exists (`toolboxRegistry.ts`): **56 modules** with
+  stable IDs, category, status, capabilities, permissions, launch contexts, adapter
   strategy. The launcher, settings tool-visibility list, default-tool select, and
-  shortcut validation all derive from it. Planned modules are `adapter-needed` and
+  shortcut validation all derive from it. Deferred modules are `adapter-needed` and
   render **no placeholder buttons** — only the honest Coverage table.
+
+  Counts as of 2026-07-21, read off the registry rather than remembered:
+
+  | Status | Count |
+  |---|---|
+  | `ready` | 35 |
+  | `adapter-needed` | 20 |
+  | `experimental` | 1 (`automation-builder`) |
+  | **total** | **56** |
+
+  36 have `appearsInBlanc`. This section previously said "50 modules", and
+  `BLANC_REFINEMENT_PLAN.md` corrected that to "50 modules, 30 ready / 20 planned"
+  — both are now stale, and the second used a `planned` status that does not exist
+  in the schema (the 20 are `adapter-needed`). The ready count moved 30 → 35 on
+  2026-07-21 when the study-native track shipped `furigana`, `counter-reader`,
+  `conjugation-drill`, `review-forecast`, and `pitch-accent`.
+
+  **Re-tier the deferred 20 by actual blocker.** Their `migrationNotes` still carry
+  boilerplate claiming each needs a native adapter, which is false for most and
+  misled a session on 2026-07-20. The accurate tiering is written up in
+  `BLANC_REFINEMENT_PLAN.md` → "Explicitly deferred": the OCR trio and
+  `shadowing-player` need only Electron built-ins the app already depends on;
+  `pdf-toolkit` and `qr-barcode` are dependency-gated; `hotkey-manager` and
+  `window-layouts` are blocked only at full scope; just `macro-recorder` and
+  `text-expander` genuinely need a native module. Editing those 20 fields is still
+  open — this note records where the truth lives in the meantime.
 - **Central shortcut system**: all Toolbox commands live in
   `TOOLBOX_SHORTCUT_COMMANDS`, are merged into the app-wide `COMMAND_CATALOG`
   (rebindable, conflict-detected, import/export with ID migration, reserved-combo
