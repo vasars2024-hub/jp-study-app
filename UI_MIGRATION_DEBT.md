@@ -396,3 +396,38 @@ carry **no** hardcoded legacy-red — they inherit Phase 1's calm tokens. Outsta
 | Per-app content cards | `.cs-card .gram-card .gram-item .bundle-card .bundle-download-card .media-card .cbh-card .guide-item .pl-item` two-cue (border+fill) → single `--surface-2` cue. EXCLUDED (border legit): `.cal-month-cell` (grid), `.consent-card` (modal), `.flash-card` (study surface), `card-*-menu` (dropdowns). Guarded. | computed style: 6/6 sampled study-os border 0/surface-2, Aero baseline returns | (this commit) |
 
 **Every-app pass outcome:** all app-surface hardcoded legacy-red eliminated (Novels/Media/Music) and shell-red leftovers closed; the grey toolbar band flattened app-wide; the two-cue content cards collapsed to one cue. Apps with no such issues (Video, Manga, Games, Immersion, Library, Dictionary body, Calendar grid) already inherit Phase 1's calm tokens and were left unchanged rather than churned.
+
+---
+
+## Integration final sign-off
+
+Branch `ui/integration` (worktree `jp-study-app-redesign`). Covers the merged marquee redesign
+(Phases 1→3B) plus the user-requested every-app extension (Novels, Media, Music, toolbar flatten,
+shell-red leftovers, per-app card polish).
+
+### Validation matrix
+| Gate | Baseline | Result | Verdict |
+|---|---|---|---|
+| Vitest | 946/946 | **946/946 (94 files)** | pass |
+| i18n check | clean | **clean, 4006 EN keys translated ja/zh/ru** | pass |
+| TypeScript | 1291 total / 9 src | **1291 / 9** (all pre-existing `satisfies`; 0 new — every change was CSS) | pass |
+| ESLint | 65 err / 171 warn | **65 / 171** (repo-wide) | pass (unchanged) |
+
+### Theme-regression (protected-skin equivalence, master §4)
+Every refinement in this effort carries the Phase 1 guard
+`:where(html:not([data-materials='aero']):not([data-materials='wired'])) …:where(:not(.blanc-root *))`.
+Consolidated computed-style sweep of representative changes (`.ui-toolbar`, `.gram-card`,
+`.jiten-row.active`, stat/notebook cards, media/music states, frameless-window focus):
+- **study-os** renders the refined values.
+- **Aero** and **Wired** both fall back to their own baselines (bordered cards return, maroon/red
+  selection returns, glass/skin toolbars intact) — the guard makes leakage structurally impossible.
+- **Blanc** excluded by `:where(:not(.blanc-root *))` (identical to the Phase 1 verified idiom).
+
+### Verification medium
+Pixel screenshots via the isolated preview time out on this heavy renderer, so verification is by
+computed-style fingerprinting (the plan's own most-reliable method — §16 note). The shell was also
+seen live on the core-shell Electron instance.
+
+### Sign-off
+Marquee redesign integrated and the every-app legacy-red/toolbar/card cleanup complete. All gates at
+or above baseline; protected skins provably unchanged. Ready for user review on `ui/integration`.
