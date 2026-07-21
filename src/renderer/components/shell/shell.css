@@ -966,6 +966,115 @@ html.reduce-motion .os-taskbar .os-tray-btn {
   transition: none !important;
 }
 
+/* ---- P2.3 launcher (legacy Start) -----------------------------------------
+   Scoped to `.os-start-legacy` throughout so the Aero/Wired start variant
+   (`.os-start-aero-menu`) is never reached — the execution plan requires
+   leaving it untouched, and it shares the `.os-start` root class.
+
+   Baseline problems: 20+ app tiles in ONE flat grid with no grouping, every
+   icon rendered in the same brand red (`.os-start-app-ic { color: var(--red) }`),
+   so the panel read as an undifferentiated wall of identical red squares.
+   -------------------------------------------------------------------------- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) {
+  width: 380px;
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-5);
+  /* Cap the panel so the added group headers can never push the footer off
+     screen at ~940x600; the group list scrolls instead. */
+  max-height: min(76vh, 720px);
+  display: flex;
+  flex-direction: column;
+  animation: osStartIn var(--dur-normal) var(--ease-decelerate);
+}
+@keyframes osStartIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Search: the primary way into the launcher, so it gets real weight — a filled
+   input-like field rather than a faint ghost row. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-search {
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-search:hover {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-search-ph {
+  color: var(--muted);
+}
+
+/* Grouping. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 calc(var(--space-xs) * -1);
+  padding: 0 var(--space-xs);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-group-label {
+  margin: 0 0 var(--space-xs);
+  font-size: 10.5px;
+  font-weight: var(--font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* Quieter identical icons. The default app tile is now a neutral raised
+   surface with a --text-toned glyph; brand red is no longer spent on 20
+   identical squares. The categorical `tone-*` tiles (widgets / note / add)
+   keep their distinct hues — they are genuinely different actions, and this
+   is the "Phase-2 icon-tone decision" Phase 1's accent audit deferred. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app-ic {
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: color-mix(in srgb, var(--text) 74%, transparent);
+  box-shadow: none;
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app:hover .os-start-app-ic {
+  background: var(--surface-3);
+  color: var(--text);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app {
+  border-color: transparent;
+  border-radius: var(--radius-md);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app:hover {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border-color: transparent;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+/* Pinned stays an accent cue (real state), just a quieter one. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-tile.pinned .os-start-app-ic {
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+html.reduce-motion .os-start-legacy,
+html.reduce-motion .os-start-legacy .os-start-search,
+html.reduce-motion .os-start-legacy .os-start-app-ic {
+  animation: none !important;
+  transition: none !important;
+}
+
 html.secret-lifecycle-suspended .os-env-stack,
 html.secret-lifecycle-suspended .os-wall-visualizer,
 html.secret-lifecycle-suspended .os-weather {

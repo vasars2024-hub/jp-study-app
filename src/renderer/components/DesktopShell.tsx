@@ -325,6 +325,46 @@ function appListForDesktop(_desktopIndex: DesktopIndex): { id: WinSection; label
   return APPS;
 }
 
+/**
+ * Presentational grouping for the Start menu (Phase 2). Purely a display
+ * concern: it reads app ids and does NOT alter the app-list contract shared by
+ * `APPS` / `DesktopWinSection` / `AppSection` / `POPOUT_SECTIONS`. Order here is
+ * the order the groups render in. Following the `widgets/registry.tsx` pattern,
+ * each group stores an i18n KEY and is resolved with `t()` at render time —
+ * a module-level array cannot call `useT()` at declaration time.
+ *
+ * Any app id missing from this map falls through to the `other` group, so
+ * adding an app to `APPS` can never make it disappear from the launcher.
+ */
+const START_GROUPS: { id: string; labelKey: string; sections: WinSection[] }[] = [
+  {
+    id: 'study',
+    labelKey: 'desktop.startCategory.study',
+    sections: ['dictionary', 'grammar', 'reading', 'translate', 'notebook', 'anki', 'flashcards'],
+  },
+  { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion'] },
+  { id: 'media', labelKey: 'desktop.startCategory.media', sections: ['player', 'video', 'youtube', 'music'] },
+  { id: 'progress', labelKey: 'desktop.startCategory.progress', sections: ['stats', 'calendar'] },
+  { id: 'system', labelKey: 'desktop.startCategory.system', sections: ['games', 'resources', 'city', 'settings'] },
+];
+
+type StartApp = { id: WinSection; labelKey: string; glyph: IconName };
+
+/** Bucket the catalog into the display groups above, preserving catalog order. */
+function groupStartApps(apps: StartApp[]): { id: string; labelKey: string; apps: StartApp[] }[] {
+  const claimed = new Set<WinSection>();
+  const groups = START_GROUPS.map((g) => {
+    const inGroup = apps.filter((a) => g.sections.includes(a.id));
+    inGroup.forEach((a) => claimed.add(a.id));
+    return { id: g.id, labelKey: g.labelKey, apps: inGroup };
+  }).filter((g) => g.apps.length > 0);
+  const rest = apps.filter((a) => !claimed.has(a.id));
+  if (rest.length > 0) {
+    groups.push({ id: 'other', labelKey: 'desktop.startCategory.other', apps: rest });
+  }
+  return groups;
+}
+
 /** Fresh / reset desktops start empty — apps are pinned from the Start menu. */
 function defaultIcons(_desktopIndex: DesktopIndex): DeskIcon[] {
   return [];
@@ -830,6 +870,9 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   });
 
   const desktopApps = useMemo(() => appListForDesktop(activeDesktop), [activeDesktop]);
+  // Grouping is pure data (ids only); labels are resolved with t() at render, so
+  // this does not need to react to a language switch.
+  const startGroups = useMemo(() => groupStartApps(desktopApps), [desktopApps]);
 
   const focus = (id: string) =>
     setWins((ws) => ws.map((w) => (w.id === id ? { ...w, z: ++zTop.current, min: false } : w)));
@@ -1975,70 +2018,82 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 <circle cx="11" cy="11" r="7" />
                 <path d="M21 21l-4.3-4.3" />
               </svg>
-              <span className="os-start-search-ph">Search apps, settings, books…</span>
+              <span className="os-start-search-ph">{t('desktop.startSearch')}</span>
               <kbd className="os-start-search-kbd">Ctrl P</kbd>
             </button>
-            <div className="os-start-grid">
-              {desktopApps.map((a) => {
-                const pinned = isAppPinned(a.id);
-                return (
-                  <div
-                    key={a.id}
-                    className={`os-start-tile${pinned ? ' pinned' : ''}${startAppDragging === a.id ? ' drag-source' : ''}`}
-                  >
-                    <button
-                      type="button"
-                      className="os-start-app"
-                      draggable
-                      title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
-                      onDragStart={(e) => beginStartAppDrag(a, e)}
-                      onDragEnd={endStartAppDrag}
-                      onClick={() => open(a.id)}
-                    >
-                      <span className={`os-start-app-ic app-${a.id}`}>
-                        <Icon name={a.glyph} size={24} />
-                      </span>
-                      {t(a.labelKey)}
-                    </button>
-                    <button
-                      type="button"
-                      className={`os-start-tile-pin${pinned ? ' on' : ''}`}
-                      title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
-                      draggable={false}
-                      onClick={() => togglePinApp(a)}
-                    >
-                      <Icon name="pin" size={12} />
-                    </button>
+            <div className="os-start-groups">
+              {startGroups.map((g) => (
+                <section key={g.id} className="os-start-group" aria-label={t(g.labelKey)}>
+                  <h3 className="os-start-group-label">{t(g.labelKey)}</h3>
+                  <div className="os-start-grid">
+                    {g.apps.map((a) => {
+                      const pinned = isAppPinned(a.id);
+                      return (
+                        <div
+                          key={a.id}
+                          className={`os-start-tile${pinned ? ' pinned' : ''}${startAppDragging === a.id ? ' drag-source' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            className="os-start-app"
+                            draggable
+                            title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
+                            onDragStart={(e) => beginStartAppDrag(a, e)}
+                            onDragEnd={endStartAppDrag}
+                            onClick={() => open(a.id)}
+                          >
+                            <span className={`os-start-app-ic app-${a.id}`}>
+                              <Icon name={a.glyph} size={24} />
+                            </span>
+                            {t(a.labelKey)}
+                          </button>
+                          <button
+                            type="button"
+                            className={`os-start-tile-pin${pinned ? ' on' : ''}`}
+                            title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
+                            draggable={false}
+                            onClick={() => togglePinApp(a)}
+                          >
+                            <Icon name="pin" size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-              <button
-                type="button"
-                className="os-start-app special"
-                onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
-              >
-                <span className="os-start-app-ic tone-widgets">
-                  <Icon name="widgets" size={24} />
-                </span>
-                Widgets
-              </button>
-              <button type="button" className="os-start-app special" onClick={openNote}>
-                <span className="os-start-app-ic tone-note">
-                  <Icon name="note" size={24} />
-                </span>
-                Sticky note
-              </button>
-              <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
-                <span className="os-start-app-ic tone-add">
-                  <Icon name="plus" size={24} />
-                </span>
-                Add app…
-              </button>
+                </section>
+              ))}
+              <section className="os-start-group" aria-label={t('desktop.startCategory.shortcuts')}>
+                <h3 className="os-start-group-label">{t('desktop.startCategory.shortcuts')}</h3>
+                <div className="os-start-grid">
+                  <button
+                    type="button"
+                    className="os-start-app special"
+                    onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
+                  >
+                    <span className="os-start-app-ic tone-widgets">
+                      <Icon name="widgets" size={24} />
+                    </span>
+                    {t('desktop.widgets')}
+                  </button>
+                  <button type="button" className="os-start-app special" onClick={openNote}>
+                    <span className="os-start-app-ic tone-note">
+                      <Icon name="note" size={24} />
+                    </span>
+                    {t('desktop.stickyNote')}
+                  </button>
+                  <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
+                    <span className="os-start-app-ic tone-add">
+                      <Icon name="plus" size={24} />
+                    </span>
+                    {t('desktop.addApp')}
+                  </button>
+                </div>
+              </section>
             </div>
             <div className="os-start-footer">
               <button type="button" className="os-start-foot-btn" onClick={() => open('settings')}>
                 <Icon name="settings" size={16} />
-                <span>Settings</span>
+                <span>{t('palette.section.settings')}</span>
               </button>
               <button
                 type="button"
@@ -2054,14 +2109,14 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                   <circle cx="9" cy="9" r="2.2" />
                   <circle cx="15" cy="15" r="2.2" />
                 </svg>
-                <span>Quick</span>
+                <span>{t('desktop.quick')}</span>
               </button>
               <span className="os-start-foot-spacer" />
               <button
                 type="button"
                 className="os-start-foot-btn power"
-                title="Restart shell"
-                aria-label="Restart shell"
+                title={t('desktop.restartShell')}
+                aria-label={t('desktop.restartShell')}
                 onClick={async () => {
                   const ok = await confirmDialog({
                     title: 'Restart shell',
