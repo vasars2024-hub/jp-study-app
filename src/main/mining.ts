@@ -46,16 +46,21 @@ import {
   isBundledFrequencyDictId,
 } from '../shared/bundledFrequencyDicts';
 import { getFrequencyRank, initYomitan, lookupGlossary } from './dictionary/yomitan';
+// Direct rather than via the shared/mining barrel: that barrel no longer
+// re-exports the AI catalog, because re-exporting it pulled 41 KB into Blanc's
+// boot chunk through storage.ts. See the note in shared/mining.ts.
 import {
   AI_MINING_FORMATS,
   AI_PROMPT_PRESETS,
+  formatsForPreset,
+} from '../shared/aiMiningCatalog';
+import {
   AI_PROVIDERS,
   DEFAULT_AI_LANGUAGE_OPTIONS,
   DEFAULT_AI_PROVIDER_ID,
   DEFAULT_MINING_LIMITS,
   DEFAULT_TRADITIONAL_MINING_CONFIG,
   applyLanguageOptionsToFormat,
-  formatsForPreset,
   languageOptionsForProfile,
   normalizeLanguageOptions,
   providerById,

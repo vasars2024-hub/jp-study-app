@@ -20,7 +20,13 @@ import { addSaved, loadSaved, onSavedChanged, removeSaved } from '../savedWords'
 import { lookupChinese } from '../chineseDict';
 import { getActiveProfile, onProfileChanged } from '../profileState';
 import { translateTo, type TransLang } from '../translator';
-import { firstGlossSegment, glossForLangFromEntries } from '../../shared/mining';
+// Imported from their defining modules rather than the `shared/mining` barrel.
+// That barrel re-exports `aiMiningCatalog` (41 KB of AI prompt presets), and
+// DictionaryResults is in Blanc's boot path — going through the barrel dragged
+// the whole catalog into the entry chunk. Same reason StatsContent imports
+// `confirmDialog` from `ui/dialogService` instead of the `ui` barrel.
+import { firstGlossSegment } from '../../shared/epubEnrichment';
+import { glossForLangFromEntries } from '../../shared/fieldRouter';
 import { recordDictionaryEntry } from '../clipboardHistory';
 import { useT } from '../i18n';
 

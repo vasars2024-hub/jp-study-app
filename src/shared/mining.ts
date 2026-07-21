@@ -382,11 +382,12 @@ export const DEFAULT_TRADITIONAL_MINING_CONFIG: TraditionalMiningConfig = {
   export: DEFAULT_EPUB_EXPORT_OPTIONS,
 };
 
-export {
-  AI_PROMPT_PRESETS,
-  AI_MINING_FORMATS,
-  formatsForPreset,
-} from './aiMiningCatalog';
+// AI_PROMPT_PRESETS / AI_MINING_FORMATS / formatsForPreset are deliberately NOT
+// re-exported here. This module is a barrel, and `renderer/storage/storage.ts`
+// imports DEFAULT_TRADITIONAL_MINING_CONFIG from it — storage.ts is in Blanc's
+// boot path, so the re-export dragged aiMiningCatalog's 41 KB of prompt presets
+// into the entry chunk even though nothing in Blanc uses them. Rollup could not
+// shake it out through the re-export. Import them from './aiMiningCatalog'.
 
 export {
   AI_PROVIDERS,

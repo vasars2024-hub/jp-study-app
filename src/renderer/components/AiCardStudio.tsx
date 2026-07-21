@@ -9,15 +9,16 @@ import type {
   AiMiningLanguage,
   AiPromptPreset,
 } from '../../shared/mining';
+// Direct rather than via the shared/mining barrel — see the note in
+// shared/mining.ts about Blanc's boot chunk.
+import { AI_PROMPT_PRESETS, formatsForPreset } from '../../shared/aiMiningCatalog';
 import {
   AI_LANGUAGE_DIRECTION_PRESETS,
   AI_MINING_LANGUAGES,
-  AI_PROMPT_PRESETS,
   AI_PROVIDERS,
   DEFAULT_AI_PROVIDER_ID,
   applyLanguageOptionsToFormat,
   effectiveLanguagePair,
-  formatsForPreset,
   languageOptionsForProfile,
   normalizeLanguageOptions,
   providerById,
