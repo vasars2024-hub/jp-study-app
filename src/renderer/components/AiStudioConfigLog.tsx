@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useT } from '../i18n';
 import CollapsibleSection from './CollapsibleSection';
 
 export type AiStudioLogLine = {
@@ -14,6 +15,7 @@ export default function AiStudioConfigLog({
   lines: readonly AiStudioLogLine[];
   onClear?: () => void;
 }) {
+  const { t } = useT();
   const tailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,24 +24,26 @@ export default function AiStudioConfigLog({
 
   return (
     <CollapsibleSection
-      title="Configuration log"
-      summary={lines.length ? `${lines.length} entries` : 'No changes yet'}
+      title={t('aiStudio.log.title')}
+      summary={
+        lines.length
+          ? t('aiStudio.log.summary.entries', { count: lines.length })
+          : t('aiStudio.log.summary.empty')
+      }
       defaultOpen={lines.length > 0}
       className="mining-collapse anki-card ai-studio-log"
     >
       <div className="ai-studio-log-toolbar">
-        <p className="muted collapse-lead">
-          Terminal-style trace of preset, language, output, mapping, and generation inputs.
-        </p>
+        <p className="muted collapse-lead">{t('aiStudio.log.lead')}</p>
         {lines.length > 0 && onClear && (
           <button className="btn" type="button" onClick={onClear}>
-            Clear log
+            {t('aiStudio.log.clear')}
           </button>
         )}
       </div>
       <div className="ai-studio-log-body" role="log" aria-live="polite">
         {lines.length === 0 ? (
-          <p className="muted ai-studio-log-empty">Changes to studio settings will appear here.</p>
+          <p className="muted ai-studio-log-empty">{t('aiStudio.log.empty')}</p>
         ) : (
           lines.map((line, index) => (
             <div className="ai-studio-log-line" key={`${line.time}-${line.field}-${index}`}>

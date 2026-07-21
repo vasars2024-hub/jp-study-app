@@ -1,24 +1,29 @@
 import { useMemo, useState } from 'react';
 import {
   CATEGORY_BY_ID,
+  GRAMMAR_REGISTERS,
   HSK_LEVELS,
   JLPT_LEVELS,
   categoriesByGroup,
   isUnofficialLevel,
   type GrammarLevel,
-  type GrammarRegister,
   type NormalizedGrammarPoint,
 } from '../../data/grammar';
+import { FUNCTIONS_BY_CATEGORY } from '../../data/grammar/taxonomy';
+import { GRAMMAR_FUNCTION_LABELS } from '../../data/grammar/functions';
 import {
   DEFAULT_PRACTICE_FILTERS,
   categoryCounts,
   familiarityFilterCounts,
+  functionCounts,
   type PracticeFilters,
 } from '../../data/grammar/practiceFilters';
 import type { GxLevel } from '../../grammarFamiliarity';
 import { useT } from '../../i18n';
 
-const REGISTERS: GrammarRegister[] = ['neutral', 'casual', 'business', 'literary'];
+// Sourced from types.ts rather than redeclared here — a local copy could drift
+// from the GrammarRegister union without failing to compile.
+const REGISTERS = GRAMMAR_REGISTERS;
 const FAMILIARITY_BANDS: GxLevel[] = [0, 1, 2, 3];
 const FAMILIARITY_KEYS = ['new', 'learning', 'familiar', 'known'] as const;
 
@@ -41,6 +46,7 @@ export default function GrammarFilterPanel({
   const { t, lang: uiLang } = useT();
   const [catSearch, setCatSearch] = useState('');
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set());
+  const [openCats, setOpenCats] = useState<Set<string>>(() => new Set());
   const [selectedOnly, setSelectedOnly] = useState(false);
 
   function patch(partial: Partial<PracticeFilters>) {
@@ -57,6 +63,18 @@ export default function GrammarFilterPanel({
     return [...JLPT_LEVELS, ...HSK_LEVELS];
   }, [filters.lang]);
 
+  /* Same options, split by framework so the two scales stay visually distinct. */
+  const levelBands: Array<{ labelKey: string; levels: GrammarLevel[] }> = useMemo(() => {
+    if (filters.lang === 'zh')
+      return [{ labelKey: 'grammar.filter.levels.hsk', levels: [...HSK_LEVELS] }];
+    if (filters.lang === 'ja')
+      return [{ labelKey: 'grammar.filter.levels.jlpt', levels: [...JLPT_LEVELS] }];
+    return [
+      { labelKey: 'grammar.filter.levels.jlpt', levels: [...JLPT_LEVELS] },
+      { labelKey: 'grammar.filter.levels.hsk', levels: [...HSK_LEVELS] },
+    ];
+  }, [filters.lang]);
+
   /* Counts exclude the category filter itself, so a chip's number is what
    * clicking it will actually yield rather than its global total. */
   const counts = useMemo(() => categoryCounts(corpus, filters), [corpus, filters]);
@@ -64,6 +82,8 @@ export default function GrammarFilterPanel({
   /* Same "count against the other active filters" rule as the categories, so a
    * band's number is what ticking it yields rather than its corpus-wide total. */
   const famCounts = useMemo(() => familiarityFilterCounts(corpus, filters), [corpus, filters]);
+
+  const fnCounts = useMemo(() => functionCounts(corpus, filters), [corpus, filters]);
 
   const groups = useMemo(() => {
     const langFilter = filters.lang === 'all' ? undefined : filters.lang;
@@ -104,6 +124,13 @@ export default function GrammarFilterPanel({
         key: `cat-${c}`,
         label: t(CATEGORY_BY_ID.get(c)?.labelKey ?? c),
         clear: () => patch({ categories: filters.categories.filter((x) => x !== c) }),
+      });
+    }
+    for (const f of filters.functions) {
+      chips.push({
+        key: `fn-${f}`,
+        label: GRAMMAR_FUNCTION_LABELS[f] ?? f,
+        clear: () => patch({ functions: filters.functions.filter((x) => x !== f) }),
       });
     }
     for (const c of filters.excludeCategories) {
@@ -186,8 +213,8 @@ export default function GrammarFilterPanel({
         </div>
       )}
 
-      <label className="gx-filters-field">
-        <span>{t('grammar.practice.lang')}</span>
+      <label className="gx-filters-section">
+        <span className="gx-filters-label">{t('grammar.practice.lang')}</span>
         <select
           value={filters.lang}
           onChange={(e) =>
@@ -206,41 +233,61 @@ export default function GrammarFilterPanel({
         </select>
       </label>
 
-      <fieldset className="gx-filters-field">
-        <legend>
+      {/*
+       * Levels are grouped by framework rather than listed flat. JLPT and HSK
+       * are separate scales that happen to share a filter — a single row of
+       * N5…N1 HSK1…HSK10 reads as one fifteen-step ladder, which is exactly
+       * what it is not. With a language selected only that framework's band
+       * shows, so the grouping cost is zero in the common case.
+       */}
+      <fieldset className="gx-filters-section">
+        <legend className="gx-filters-label">
           {filters.lang === 'zh'
             ? t('grammar.filter.levels.hsk')
             : filters.lang === 'ja'
               ? t('grammar.filter.levels.jlpt')
               : t('grammar.practice.levels')}
         </legend>
-        <div className="gx-filters-chiprow">
-          {levelOptions.map((lv) => (
-            <label key={lv} className="gx-chip">
-              <input
-                type="checkbox"
-                checked={filters.levels.includes(lv)}
-                onChange={() => patch({ levels: toggleIn(filters.levels, lv) })}
-              />
-              {lv}
-              {isUnofficialLevel(lv) && (
-                <abbr className="gx-chip-note" title={t('grammar.filter.unofficialLevel')}>
-                  *
-                </abbr>
-              )}
-            </label>
-          ))}
-        </div>
+        {levelBands.map((band) => (
+          <div key={band.labelKey} className="gx-filters-levelband">
+            {levelBands.length > 1 && (
+              <span className="gx-filters-sublabel">{t(band.labelKey)}</span>
+            )}
+            <div className="gx-filters-chiprow">
+              {band.levels.map((lv) => (
+                <label
+                  key={lv}
+                  className={`gx-chip${filters.levels.includes(lv) ? ' is-on' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={filters.levels.includes(lv)}
+                    onChange={() => patch({ levels: toggleIn(filters.levels, lv) })}
+                  />
+                  {lv}
+                  {isUnofficialLevel(lv) && (
+                    <abbr className="gx-chip-note" title={t('grammar.filter.unofficialLevel')}>
+                      *
+                    </abbr>
+                  )}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
         {filters.lang !== 'ja' && levelOptions.some(isUnofficialLevel) && (
           <p className="muted gx-filters-hint">{t('grammar.filter.unofficialLevel')}</p>
         )}
       </fieldset>
 
-      <fieldset className="gx-filters-field">
-        <legend>{t('grammar.practice.register')}</legend>
+      <fieldset className="gx-filters-section">
+        <legend className="gx-filters-label">{t('grammar.practice.register')}</legend>
         <div className="gx-filters-chiprow">
           {REGISTERS.map((r) => (
-            <label key={r} className="gx-chip">
+            <label
+              key={r}
+              className={`gx-chip${filters.registers.includes(r) ? ' is-on' : ''}`}
+            >
               <input
                 type="checkbox"
                 checked={filters.registers.includes(r)}
@@ -252,8 +299,8 @@ export default function GrammarFilterPanel({
         </div>
       </fieldset>
 
-      <fieldset className="gx-filters-field">
-        <legend>{t('grammar.familiarity.legend')}</legend>
+      <fieldset className="gx-filters-section">
+        <legend className="gx-filters-label">{t('grammar.familiarity.legend')}</legend>
         <div className="gx-filters-chiprow">
           {FAMILIARITY_BANDS.map((b) => {
             const n = famCounts[b] || 0;
@@ -261,7 +308,7 @@ export default function GrammarFilterPanel({
             return (
               <label
                 key={b}
-                className={`gx-chip gx-fam-chip gx-fam-${b}${n === 0 && !checked ? ' is-empty' : ''}`}
+                className={`gx-chip gx-fam-chip gx-fam-${b}${checked ? ' is-on' : ''}${n === 0 && !checked ? ' is-empty' : ''}`}
               >
                 <input
                   type="checkbox"
@@ -278,37 +325,39 @@ export default function GrammarFilterPanel({
         <p className="muted gx-filters-hint">{t('grammar.familiarity.hint')}</p>
       </fieldset>
 
-      <fieldset className="gx-filters-field">
-        <legend>{t('grammar.filter.quality')}</legend>
-        <label className="gx-chip gx-chip-block">
-          <input
-            type="checkbox"
-            checked={filters.verifiedTagsOnly}
-            onChange={(e) => patch({ verifiedTagsOnly: e.target.checked })}
-          />
-          {t('grammar.filter.verifiedOnly')}
-        </label>
-        <p className="muted gx-filters-hint">{t('grammar.filter.verifiedOnly.desc')}</p>
-        <label className="gx-chip gx-chip-block">
-          <input
-            type="checkbox"
-            checked={filters.studyReadyOnly}
-            onChange={(e) => patch({ studyReadyOnly: e.target.checked })}
-          />
-          {t('grammar.filter.studyReady')}
-        </label>
-        <label className="gx-chip gx-chip-block">
-          <input
-            type="checkbox"
-            checked={filters.requireExamples}
-            onChange={(e) => patch({ requireExamples: e.target.checked })}
-          />
-          {t('grammar.filter.hasExamples')}
-        </label>
+      <fieldset className="gx-filters-section">
+        <legend className="gx-filters-label">{t('grammar.filter.quality')}</legend>
+        <div className="gx-filters-checks">
+          <label className="gx-filters-check">
+            <input
+              type="checkbox"
+              checked={filters.verifiedTagsOnly}
+              onChange={(e) => patch({ verifiedTagsOnly: e.target.checked })}
+            />
+            <span>{t('grammar.filter.verifiedOnly')}</span>
+          </label>
+          <p className="muted gx-filters-hint">{t('grammar.filter.verifiedOnly.desc')}</p>
+          <label className="gx-filters-check">
+            <input
+              type="checkbox"
+              checked={filters.studyReadyOnly}
+              onChange={(e) => patch({ studyReadyOnly: e.target.checked })}
+            />
+            <span>{t('grammar.filter.studyReady')}</span>
+          </label>
+          <label className="gx-filters-check">
+            <input
+              type="checkbox"
+              checked={filters.requireExamples}
+              onChange={(e) => patch({ requireExamples: e.target.checked })}
+            />
+            <span>{t('grammar.filter.hasExamples')}</span>
+          </label>
+        </div>
       </fieldset>
 
-      <label className="gx-filters-field">
-        <span>{t('grammar.practice.search')}</span>
+      <label className="gx-filters-section">
+        <span className="gx-filters-label">{t('grammar.practice.search')}</span>
         <input
           type="search"
           value={filters.query}
@@ -317,9 +366,9 @@ export default function GrammarFilterPanel({
         />
       </label>
 
-      <div className="gx-filters-field">
+      <div className="gx-filters-section gx-filters-categories">
         <div className="gx-filters-cat-head">
-          <span>{t('grammar.filter.categories')}</span>
+          <span className="gx-filters-label">{t('grammar.filter.categories')}</span>
           {filters.categories.length > 0 && (
             <button
               type="button"
@@ -336,13 +385,13 @@ export default function GrammarFilterPanel({
           onChange={(e) => setCatSearch(e.target.value)}
           placeholder={t('grammar.filter.categorySearch')}
         />
-        <label className="gx-chip gx-chip-block">
+        <label className="gx-filters-check">
           <input
             type="checkbox"
             checked={selectedOnly}
             onChange={(e) => setSelectedOnly(e.target.checked)}
           />
-          {t('grammar.filter.selectedOnly')}
+          <span>{t('grammar.filter.selectedOnly')}</span>
         </label>
 
         <div className="gx-filters-groups">
@@ -356,7 +405,7 @@ export default function GrammarFilterPanel({
               filters.categories.includes(c.id),
             ).length;
             return (
-              <div key={group} className="gx-filters-group">
+              <div key={group} className={`gx-filters-group${open ? ' is-open' : ''}`}>
                 <button
                   type="button"
                   className="gx-filters-group-head"
@@ -370,7 +419,7 @@ export default function GrammarFilterPanel({
                     })
                   }
                 >
-                  <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+                  <span className="gx-filters-chevron" aria-hidden="true" />
                   <span className="gx-filters-group-name">{t(`grammar.catgroup.${group}`)}</span>
                   {activeInGroup > 0 && <span className="gx-filters-badge">{activeInGroup}</span>}
                   <span className="muted gx-filters-group-count">{groupTotal}</span>
@@ -380,21 +429,73 @@ export default function GrammarFilterPanel({
                     {categories.map((c) => {
                       const n = counts[c.id] || 0;
                       const checked = filters.categories.includes(c.id);
+                      const fns = (FUNCTIONS_BY_CATEGORY.get(c.id) ?? []).filter(
+                        (f) => (fnCounts[f] || 0) > 0 || filters.functions.includes(f),
+                      );
+                      const subOpen = openCats.has(c.id);
                       return (
-                        <label
-                          key={c.id}
-                          className={`gx-chip gx-chip-block${n === 0 && !checked ? ' is-empty' : ''}`}
-                          title={t(c.descKey)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={n === 0 && !checked}
-                            onChange={() => patch({ categories: toggleIn(filters.categories, c.id) })}
-                          />
-                          <span className="gx-filters-cat-label">{t(c.labelKey)}</span>
-                          <span className="muted gx-filters-cat-count">{n}</span>
-                        </label>
+                        <div key={c.id} className="gx-filters-cat">
+                          <label
+                            className={`gx-filters-check${n === 0 && !checked ? ' is-empty' : ''}`}
+                            title={t(c.descKey)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={n === 0 && !checked}
+                              onChange={() =>
+                                patch({ categories: toggleIn(filters.categories, c.id) })
+                              }
+                            />
+                            <span className="gx-filters-cat-label">{t(c.labelKey)}</span>
+                            {fns.length > 1 && (
+                              <button
+                                type="button"
+                                className={`gx-filters-sub-toggle${subOpen ? ' is-open' : ''}`}
+                                aria-expanded={subOpen}
+                                aria-label={t('grammar.filter.refine')}
+                                title={t('grammar.filter.refine')}
+                                onClick={(e) => {
+                                  // The row is a <label>; without this the click
+                                  // would toggle the category checkbox instead.
+                                  e.preventDefault();
+                                  setOpenCats((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(c.id)) next.delete(c.id);
+                                    else next.add(c.id);
+                                    return next;
+                                  });
+                                }}
+                              >
+                                {fns.length}
+                              </button>
+                            )}
+                            <span className="muted gx-filters-cat-count">{n}</span>
+                          </label>
+                          {subOpen && (
+                            <div className="gx-filters-subs">
+                              {fns.map((f) => {
+                                const fn = fnCounts[f] || 0;
+                                const on = filters.functions.includes(f);
+                                return (
+                                  <label key={f} className="gx-filters-check gx-filters-sub">
+                                    <input
+                                      type="checkbox"
+                                      checked={on}
+                                      onChange={() =>
+                                        patch({ functions: toggleIn(filters.functions, f) })
+                                      }
+                                    />
+                                    <span className="gx-filters-cat-label">
+                                      {GRAMMAR_FUNCTION_LABELS[f] ?? f}
+                                    </span>
+                                    <span className="muted gx-filters-cat-count">{fn}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

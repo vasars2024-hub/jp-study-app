@@ -19,11 +19,15 @@ import {
   type TransparencyId,
 } from '../../../displayPrefs';
 
+import { useT } from '../../../i18n';
+import type { WindowChromeMode } from '../../../windowChrome';
+
 function seg(active: boolean): string {
   return `btn small ${active ? 'primary' : ''}`;
 }
 
 export default function DisplayPage() {
+  const { t } = useT();
   const { zoom, setZoomValue, bumpZoomBy, focusSettingId } = useSettings();
   const [d, setD] = useState<DisplayPrefs>(loadDisplayPrefs);
 
@@ -31,12 +35,42 @@ export default function DisplayPage() {
 
   const patch = (p: Partial<DisplayPrefs>) => setD(saveDisplayPrefs(p));
 
+  const chromeOptions: { id: WindowChromeMode; labelKey: string }[] = [
+    { id: 'standard', labelKey: 'settings.display.chrome.standard' },
+    { id: 'borderless', labelKey: 'settings.display.chrome.borderless' },
+    { id: 'frameless', labelKey: 'settings.display.chrome.frameless' },
+  ];
+
   return (
     <>
       <SettingsCard
+        id="window-chrome"
+        title={t('settings.display.chrome.title')}
+        description={t('settings.display.chrome.desc')}
+        highlight={focusSettingId === 'window-chrome' || focusSettingId === 'borderless'}
+      >
+        <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
+          {chromeOptions.map(({ id, labelKey }) => (
+            <button
+              key={id}
+              type="button"
+              className={seg(d.windowChromeMode === id)}
+              onClick={() => patch({ windowChromeMode: id })}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
+        <p className="muted os-set-hint">{t('settings.display.chrome.hint')}</p>
+        {d.windowChromeMode === 'frameless' && (
+          <p className="muted os-set-hint">{t('settings.display.chrome.framelessHint')}</p>
+        )}
+      </SettingsCard>
+
+      <SettingsCard
         id="zoom"
-        title="App zoom"
-        description="Scale the entire interface. Independent of base text size below."
+        title={t('search.zoom')}
+        description={t('search.zoom.desc')}
         highlight={focusSettingId === 'zoom'}
       >
         <div className="os-zoom-row">
@@ -62,18 +96,18 @@ export default function DisplayPage() {
           disabled={Math.abs(zoom - ZOOM_DEFAULT) < 0.01}
           onClick={() => setZoomValue(ZOOM_DEFAULT)}
         >
-          Reset zoom to 100%
+          {t('settings.display.zoom.reset')}
         </button>
       </SettingsCard>
 
       <SettingsCard
         id="base-font"
-        title="Base text size"
-        description="Root font size before zoom. Useful if zoom makes icons too large but text is still small."
+        title={t('search.baseFont')}
+        description={t('search.baseFont.desc')}
         highlight={focusSettingId === 'base-font'}
       >
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Size</span>
+          <span className="os-viz-label muted">{t('settings.display.label.size')}</span>
           <input
             type="range"
             min={12}
@@ -86,42 +120,46 @@ export default function DisplayPage() {
         </div>
         <label className="os-toggle">
           <input type="checkbox" checked={d.boldText} onChange={(e) => patch({ boldText: e.target.checked })} />
-          <span>Bold UI text</span>
+          <span>{t('settings.display.boldText')}</span>
         </label>
       </SettingsCard>
 
       <SettingsCard
         id="contrast"
-        title="Contrast & spacing"
-        description="Improve readability without changing theme colors."
+        title={t('search.contrast')}
+        description={t('search.contrast.desc')}
         highlight={focusSettingId === 'contrast'}
       >
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Contrast</span>
-          {([
-            ['normal', 'Normal'],
-            ['medium', 'Medium'],
-            ['high', 'High'],
-          ] as [ContrastId, string][]).map(([id, label]) => (
+          <span className="os-viz-label muted">{t('settings.display.label.contrast')}</span>
+          {(
+            [
+              ['normal', 'settings.display.contrast.normal'],
+              ['medium', 'settings.display.contrast.medium'],
+              ['high', 'settings.display.contrast.high'],
+            ] as [ContrastId, string][]
+          ).map(([id, labelKey]) => (
             <button key={id} type="button" className={seg(d.contrast === id)} onClick={() => patch({ contrast: id })}>
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Letter spacing</span>
-          {([
-            ['tight', 'Tight'],
-            ['normal', 'Normal'],
-            ['loose', 'Loose'],
-          ] as [LetterSpacingId, string][]).map(([id, label]) => (
+          <span className="os-viz-label muted">{t('settings.display.label.letterSpacing')}</span>
+          {(
+            [
+              ['tight', 'settings.display.spacing.tight'],
+              ['normal', 'settings.display.spacing.normal'],
+              ['loose', 'settings.display.spacing.loose'],
+            ] as [LetterSpacingId, string][]
+          ).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
               className={seg(d.letterSpacing === id)}
               onClick={() => patch({ letterSpacing: id })}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -131,18 +169,18 @@ export default function DisplayPage() {
             checked={d.underlineLinks}
             onChange={(e) => patch({ underlineLinks: e.target.checked })}
           />
-          <span>Underline links</span>
+          <span>{t('settings.display.underlineLinks')}</span>
         </label>
       </SettingsCard>
 
       <SettingsCard
         id="night-light"
-        title="Night light"
-        description="Warm the screen for evening reading (CSS filter, not GPU night light)."
+        title={t('search.nightLight')}
+        description={t('search.nightLight.desc')}
         highlight={focusSettingId === 'night-light'}
       >
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Warmth</span>
+          <span className="os-viz-label muted">{t('settings.display.label.warmth')}</span>
           <input
             type="range"
             min={0}
@@ -157,12 +195,12 @@ export default function DisplayPage() {
 
       <SettingsCard
         id="brightness-sat"
-        title="Brightness & saturation"
-        description="Adjust overall screen look. Extreme values can hurt contrast."
+        title={t('search.brightnessSat')}
+        description={t('search.brightnessSat.desc')}
         highlight={focusSettingId === 'brightness-sat'}
       >
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Brightness</span>
+          <span className="os-viz-label muted">{t('settings.display.label.brightness')}</span>
           <input
             type="range"
             min={0.65}
@@ -174,7 +212,7 @@ export default function DisplayPage() {
           <span className="muted">{Math.round(d.brightness * 100)}%</span>
         </div>
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Saturation</span>
+          <span className="os-viz-label muted">{t('settings.display.label.saturation')}</span>
           <input
             type="range"
             min={0}
@@ -190,31 +228,33 @@ export default function DisplayPage() {
           className="btn small"
           onClick={() => patch({ brightness: 1, saturation: 1, nightLight: 0, colorFilter: 'none' })}
         >
-          Reset color filters
+          {t('settings.display.resetFilters')}
         </button>
       </SettingsCard>
 
       <SettingsCard
         id="color-filter"
-        title="Color filter"
-        description="Quick accessibility tints on top of your theme."
+        title={t('search.colorFilter')}
+        description={t('search.colorFilter.desc')}
         highlight={focusSettingId === 'color-filter'}
       >
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
-          {([
-            ['none', 'None'],
-            ['warm', 'Warm'],
-            ['cool', 'Cool'],
-            ['grayscale', 'Grayscale'],
-            ['high-contrast', 'High contrast'],
-          ] as [ColorFilterId, string][]).map(([id, label]) => (
+          {(
+            [
+              ['none', 'settings.display.filter.none'],
+              ['warm', 'settings.display.filter.warm'],
+              ['cool', 'settings.display.filter.cool'],
+              ['grayscale', 'settings.display.filter.grayscale'],
+              ['high-contrast', 'settings.display.filter.highContrast'],
+            ] as [ColorFilterId, string][]
+          ).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
               className={seg(d.colorFilter === id)}
               onClick={() => patch({ colorFilter: id })}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -222,23 +262,25 @@ export default function DisplayPage() {
 
       <SettingsCard
         id="transparency"
-        title="Transparency effects"
-        description="Frosted glass and backdrop blur. Off can improve performance and clarity."
+        title={t('search.transparency')}
+        description={t('search.transparency.desc')}
         highlight={focusSettingId === 'transparency'}
       >
         <div className="os-viz-row">
-          {([
-            ['full', 'Full'],
-            ['reduced', 'Reduced'],
-            ['off', 'Off'],
-          ] as [TransparencyId, string][]).map(([id, label]) => (
+          {(
+            [
+              ['full', 'settings.display.transparency.full'],
+              ['reduced', 'settings.display.transparency.reduced'],
+              ['off', 'settings.display.transparency.off'],
+            ] as [TransparencyId, string][]
+          ).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
               className={seg(d.transparency === id)}
               onClick={() => patch({ transparency: id })}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -246,18 +288,20 @@ export default function DisplayPage() {
 
       <SettingsCard
         id="focus-ring"
-        title="Focus indicator"
-        description="Keyboard focus outline strength for accessibility."
+        title={t('search.focusRing')}
+        description={t('search.focusRing.desc')}
         highlight={focusSettingId === 'focus-ring'}
       >
         <div className="os-viz-row">
-          {([
-            ['off', 'Off'],
-            ['normal', 'Normal'],
-            ['strong', 'Strong'],
-          ] as [FocusRingId, string][]).map(([id, label]) => (
+          {(
+            [
+              ['off', 'settings.display.focus.off'],
+              ['normal', 'settings.display.focus.normal'],
+              ['strong', 'settings.display.focus.strong'],
+            ] as [FocusRingId, string][]
+          ).map(([id, labelKey]) => (
             <button key={id} type="button" className={seg(d.focusRing === id)} onClick={() => patch({ focusRing: id })}>
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -265,23 +309,25 @@ export default function DisplayPage() {
 
       <SettingsCard
         id="scrollbars"
-        title="Scrollbars"
-        description="How scrollbars appear. Theme accent still colors visible thumbs."
+        title={t('search.scrollbars')}
+        description={t('search.scrollbars.desc')}
         highlight={focusSettingId === 'scrollbars'}
       >
         <div className="os-viz-row">
-          {([
-            ['auto', 'Auto-hide'],
-            ['always', 'Always'],
-            ['hidden', 'Hidden'],
-          ] as [ScrollbarModeId, string][]).map(([id, label]) => (
+          {(
+            [
+              ['auto', 'settings.display.scrollbar.auto'],
+              ['always', 'settings.display.scrollbar.always'],
+              ['hidden', 'settings.display.scrollbar.hidden'],
+            ] as [ScrollbarModeId, string][]
+          ).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
               className={seg(d.scrollbarMode === id)}
               onClick={() => patch({ scrollbarMode: id })}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -291,28 +337,30 @@ export default function DisplayPage() {
             checked={d.smoothScroll}
             onChange={(e) => patch({ smoothScroll: e.target.checked })}
           />
-          <span>Smooth scrolling</span>
+          <span>{t('settings.display.smoothScroll')}</span>
         </label>
       </SettingsCard>
 
       <SettingsCard
         id="pointer"
-        title="Pointer & targets"
-        description="Larger click targets for touch and accessibility."
+        title={t('search.pointer')}
+        description={t('search.pointer.desc')}
         highlight={focusSettingId === 'pointer'}
       >
         <div className="os-viz-row">
-          {([
-            ['normal', 'Normal'],
-            ['large', 'Large'],
-          ] as [PointerSizeId, string][]).map(([id, label]) => (
+          {(
+            [
+              ['normal', 'settings.display.pointer.normal'],
+              ['large', 'settings.display.pointer.large'],
+            ] as [PointerSizeId, string][]
+          ).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
               className={seg(d.pointerSize === id)}
               onClick={() => patch({ pointerSize: id })}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -320,23 +368,25 @@ export default function DisplayPage() {
 
       <SettingsCard
         id="animation-level"
-        title="Motion"
-        description="How much UI motion and atmosphere animation to allow."
+        title={t('search.animationLevel')}
+        description={t('search.animationLevel.desc')}
         highlight={focusSettingId === 'animation-level' || focusSettingId === 'reduce-motion'}
       >
         <div className="os-viz-row">
-          {([
-            ['full', 'Full'],
-            ['reduced', 'Reduced'],
-            ['none', 'None'],
-          ] as [AnimationLevelId, string][]).map(([id, label]) => (
+          {(
+            [
+              ['full', 'settings.display.motion.full'],
+              ['reduced', 'settings.display.motion.reduced'],
+              ['none', 'settings.display.motion.none'],
+            ] as [AnimationLevelId, string][]
+          ).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
               className={seg(d.animationLevel === id)}
               onClick={() => patch({ animationLevel: id })}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
@@ -346,26 +396,24 @@ export default function DisplayPage() {
             checked={d.reduceFlashes}
             onChange={(e) => patch({ reduceFlashes: e.target.checked })}
           />
-          <span>Reduce flashes & sparkles</span>
+          <span>{t('settings.display.reduceFlashes')}</span>
         </label>
-        <p className="muted os-set-hint">
-          Reduced/None also enables the legacy reduce-motion flag used by wallpapers and particles.
-        </p>
+        <p className="muted os-set-hint">{t('settings.display.motionHint')}</p>
       </SettingsCard>
 
       <SettingsCard
         id="display-reset"
-        title="Reset display"
-        description="Restore all display preferences on this page (does not change theme or accent)."
+        title={t('settings.display.reset.title')}
+        description={t('settings.display.reset.desc')}
       >
         <button
           type="button"
           className="btn"
           onClick={async () => {
             const ok = await confirmDialog({
-              title: 'Reset display settings',
-              message: 'Reset all display settings to defaults?',
-              confirmLabel: 'Reset',
+              title: t('settings.display.reset.dialogTitle'),
+              message: t('settings.display.reset.dialogMessage'),
+              confirmLabel: t('common.reset'),
               danger: true,
             });
             if (ok) {
@@ -374,7 +422,7 @@ export default function DisplayPage() {
             }
           }}
         >
-          Reset display settings
+          {t('settings.display.reset.button')}
         </button>
       </SettingsCard>
     </>

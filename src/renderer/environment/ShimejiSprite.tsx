@@ -1,69 +1,54 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CompanionMood } from './companionCatalog';
+import { getShimejiPack, type ShimejiMotion, type ShimejiPackId } from './shimejiPacks';
 
-export type ShimejiMotion = 'stand' | 'walk' | 'sit' | 'wall' | 'ceiling' | 'fall' | 'drag' | 'celebrate';
-
-const frameUrls = {
-  shime1: new URL('../assets/shimeji/miko/shime1.png', import.meta.url).href,
-  shime1b: new URL('../assets/shimeji/miko/shime1b.png', import.meta.url).href,
-  shime2b: new URL('../assets/shimeji/miko/shime2b.png', import.meta.url).href,
-  shime3b: new URL('../assets/shimeji/miko/shime3b.png', import.meta.url).href,
-  shime4: new URL('../assets/shimeji/miko/shime4.png', import.meta.url).href,
-  shime5: new URL('../assets/shimeji/miko/shime5.png', import.meta.url).href,
-  shime6: new URL('../assets/shimeji/miko/shime6.png', import.meta.url).href,
-  shime11: new URL('../assets/shimeji/miko/shime11.png', import.meta.url).href,
-  shime12: new URL('../assets/shimeji/miko/shime12.png', import.meta.url).href,
-  shime13: new URL('../assets/shimeji/miko/shime13.png', import.meta.url).href,
-  shime14: new URL('../assets/shimeji/miko/shime14.png', import.meta.url).href,
-  shime18: new URL('../assets/shimeji/miko/shime18.png', import.meta.url).href,
-  shime19: new URL('../assets/shimeji/miko/shime19.png', import.meta.url).href,
-  shime23: new URL('../assets/shimeji/miko/shime23.png', import.meta.url).href,
-  shime24: new URL('../assets/shimeji/miko/shime24.png', import.meta.url).href,
-  shime25: new URL('../assets/shimeji/miko/shime25.png', import.meta.url).href,
-  shime42: new URL('../assets/shimeji/miko/shime42.png', import.meta.url).href,
-  shime43: new URL('../assets/shimeji/miko/shime43.png', import.meta.url).href,
-  shime44: new URL('../assets/shimeji/miko/shime44.png', import.meta.url).href,
-  shime45: new URL('../assets/shimeji/miko/shime45.png', import.meta.url).href,
-  shime46: new URL('../assets/shimeji/miko/shime46.png', import.meta.url).href,
-};
-
-const sequences: Record<ShimejiMotion, string[]> = {
-  stand: [frameUrls.shime1],
-  walk: [frameUrls.shime1b, frameUrls.shime2b, frameUrls.shime3b],
-  sit: [frameUrls.shime11],
-  wall: [frameUrls.shime14, frameUrls.shime12, frameUrls.shime13, frameUrls.shime13, frameUrls.shime12],
-  ceiling: [frameUrls.shime25, frameUrls.shime23, frameUrls.shime24, frameUrls.shime24, frameUrls.shime23],
-  fall: [frameUrls.shime4],
-  drag: [frameUrls.shime5, frameUrls.shime6],
-  celebrate: [frameUrls.shime42, frameUrls.shime43, frameUrls.shime44, frameUrls.shime45, frameUrls.shime46],
-};
-
-function sequenceFor(motion: ShimejiMotion | undefined, mood: CompanionMood, dragging: boolean): string[] {
-  if (dragging) return sequences.drag;
-  if (mood === 'celebrate') return sequences.celebrate;
-  if (mood === 'sleepy') return sequences.sit;
-  return sequences[motion ?? 'stand'] ?? sequences.stand;
+function sequenceFor(
+  packId: ShimejiPackId | undefined,
+  motion: ShimejiMotion | undefined,
+  mood: CompanionMood,
+  dragging: boolean,
+): string[] {
+  const pack = getShimejiPack(packId);
+  if (!pack) return [];
+  if (dragging) return pack.drag;
+  if (mood === 'celebrate') return pack.celebrate;
+  if (mood === 'sleepy') return pack.sit;
+  return pack[motion ?? 'stand'] ?? pack.stand;
 }
 
-function delayFor(motion: ShimejiMotion | undefined, mood: CompanionMood, dragging: boolean): number {
-  if (dragging) return 90;
-  if (mood === 'celebrate') return 85;
-  if (motion === 'wall' || motion === 'ceiling') return 105;
-  if (motion === 'walk') return 120;
-  return 180;
+function delayFor(
+  motion: ShimejiMotion | undefined,
+  mood: CompanionMood,
+  dragging: boolean,
+  activeness: number,
+): number {
+  let base = 180;
+  if (dragging) base = 90;
+  else if (mood === 'celebrate') base = 85;
+  else if (motion === 'wall' || motion === 'ceiling') base = 105;
+  else if (motion === 'walk') base = 120;
+  // Higher activeness → snappier frames. Default 0.4 ≈ 1.37× slower than classic.
+  const a = Math.min(1, Math.max(0, activeness));
+  const scale = 1.75 - a * 0.95;
+  return Math.max(50, Math.round(base * scale));
 }
 
 export default function ShimejiSprite({
   motion,
   mood,
   dragging = false,
+  pack,
+  activeness = 0.4,
 }: {
   motion?: ShimejiMotion;
   mood: CompanionMood;
   dragging?: boolean;
+  pack?: ShimejiPackId;
+  /** 0–1 locomotion / frame pace from companion settings. */
+  activeness?: number;
 }) {
-  const seq = useMemo(() => sequenceFor(motion, mood, dragging), [dragging, mood, motion]);
-  const delay = delayFor(motion, mood, dragging);
+  const seq = useMemo(() => sequenceFor(pack, motion, mood, dragging), [dragging, mood, motion, pack]);
+  const delay = delayFor(motion, mood, dragging, activeness);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -71,17 +56,38 @@ export default function ShimejiSprite({
   }, [seq]);
 
   useEffect(() => {
-    if (document.documentElement.classList.contains('reduce-motion') || seq.length <= 1) return;
+    if (!pack || document.documentElement.classList.contains('reduce-motion') || seq.length <= 1) return;
     const id = window.setInterval(() => setTick((n) => n + 1), delay);
     return () => window.clearInterval(id);
-  }, [delay, seq.length]);
+  }, [delay, pack, seq.length]);
+
+  if (pack && seq.length > 0) {
+    return (
+      <img
+        className={`os-companion-sprite os-companion-sprite--${motion ?? 'stand'} os-companion-sprite--${pack}${dragging ? ' is-dragging' : ''}`}
+        src={seq[tick % seq.length]}
+        alt=""
+        draggable={false}
+      />
+    );
+  }
 
   return (
-    <img
-      className={`os-companion-sprite os-companion-sprite--${motion ?? 'stand'}`}
-      src={seq[tick % seq.length]}
-      alt=""
-      draggable={false}
-    />
+    <div className={`wired-shimeji wired-shimeji--${motion ?? 'stand'} mood-${mood}${dragging ? ' is-dragging' : ''}`} aria-hidden="true">
+      <span className="wired-shimeji-antenna" />
+      <span className="wired-shimeji-badge" />
+      <div className="wired-shimeji-head">
+        <span className="wired-shimeji-ear wired-shimeji-ear--left" />
+        <span className="wired-shimeji-ear wired-shimeji-ear--right" />
+        <span className="wired-shimeji-eye wired-shimeji-eye--left" />
+        <span className="wired-shimeji-eye wired-shimeji-eye--right" />
+        <span className="wired-shimeji-nose" />
+        <span className="wired-shimeji-mouth" />
+      </div>
+      <div className="wired-shimeji-body">
+        <span className="wired-shimeji-pocket" />
+      </div>
+      <span className="wired-shimeji-tail" />
+    </div>
   );
 }

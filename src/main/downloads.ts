@@ -203,6 +203,45 @@ export function assetPath(id: string): string | null {
   return spec.file ? path.join(dir, spec.file) : dir;
 }
 
+/** Find a readable text payload inside an installed asset (CEDICT `.u8`, etc.). */
+async function findTextFile(root: string): Promise<string | null> {
+  const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
+  const preferred = ['cedict_ts.u8', 'cedict.u8', 'cedict_1_0_ts_utf-8_mdbg.txt'];
+  for (const name of preferred) {
+    const full = path.join(root, name);
+    const st = await fsp.stat(full).catch(() => null);
+    if (st?.isFile()) return full;
+  }
+  for (const entry of entries) {
+    const full = path.join(root, entry.name);
+    if (entry.isDirectory()) {
+      const nested = await findTextFile(full);
+      if (nested) return nested;
+      continue;
+    }
+    if (/\.(u8|txt)$/i.test(entry.name)) return full;
+  }
+  return null;
+}
+
+/**
+ * Read an installed asset as UTF-8 text. Returns null when missing or unreadable.
+ * Used by the ZH dictionary to prefer Phase 6 CC-CEDICT over the bundled copy.
+ */
+export async function readAssetText(id: string): Promise<string | null> {
+  const loc = assetPath(id);
+  if (!loc) return null;
+  try {
+    const st = await fsp.stat(loc);
+    if (st.isFile()) return fsp.readFile(loc, 'utf8');
+    const file = await findTextFile(loc);
+    if (!file) return null;
+    return fsp.readFile(file, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 // ----- integrity ---------------------------------------------------------
 
 async function dirSize(dir: string): Promise<number> {
@@ -340,7 +379,11 @@ async function downloadToPartial(spec: AssetSpec, signal: AbortSignal): Promise<
     await fsp.rm(partial, { force: true });
   }
 
-  const headers: Record<string, string> = { 'User-Agent': 'jp-study-app' };
+  const headers: Record<string, string> = {
+    // HuggingFace rejects bare / empty UAs on some CDN paths; identify ourselves.
+    'User-Agent': 'jp-study-app/1.0 (Electron; asset-download)',
+    Accept: '*/*',
+  };
   if (startAt > 0) {
     headers.Range = `bytes=${startAt}-`;
     // Re-validate before appending: if the artifact changed since we paused,
@@ -349,7 +392,13 @@ async function downloadToPartial(spec: AssetSpec, signal: AbortSignal): Promise<
     else if (meta?.lastModified) headers['If-Range'] = meta.lastModified;
   }
 
-  const res = await fetch(spec.url, { headers, signal, redirect: 'follow' });
+  // Force the content endpoint on HuggingFace resolve URLs (avoids landing on
+  // the HTML model card when a redirect goes sideways).
+  const url = spec.url.includes('huggingface.co/') && !spec.url.includes('download=')
+    ? `${spec.url}${spec.url.includes('?') ? '&' : '?'}download=true`
+    : spec.url;
+
+  const res = await fetch(url, { headers, signal, redirect: 'follow' });
   if (!res.ok && res.status !== 206) {
     throw new DownloadFailure(
       { key: 'assetError.httpFailed', vars: { status: res.status } },
@@ -594,7 +643,13 @@ export interface StartResult {
 
 const UNKNOWN_ASSET: AssetError = { key: 'assetError.unknownAsset' };
 
-export async function startDownload(id: string): Promise<StartResult> {
+export async function startDownload(
+  id: string,
+  seen: Set<string> = new Set(),
+): Promise<StartResult> {
+  if (seen.has(id)) return { ok: true };
+  seen.add(id);
+
   const spec = catalog.find((a) => a.id === id);
   if (!spec) return { ok: false, error: UNKNOWN_ASSET };
   const status = statusOf(id);
@@ -603,10 +658,23 @@ export async function startDownload(id: string): Promise<StartResult> {
     return { ok: true };
   }
 
+  // Companion graphs (e.g. Manga OCR decoder/vocab) must be queued first so a
+  // single "Download" on the parent pulls the whole set.
+  for (const depId of spec.requires ?? []) {
+    const depStatus = statusOf(depId);
+    if (depStatus && depStatus.state !== 'installed') {
+      const depResult = await startDownload(depId, seen);
+      if (!depResult.ok) return depResult;
+    }
+  }
+
+  if (status.state === 'installed') return { ok: true };
+
   ensureDirs();
 
   // Pre-flight: only the bytes we still have to fetch need room, but the temp
   // copy and extraction do not care that we resumed, so bill the full size.
+  // Dependencies run their own pre-flight above when cascading.
   const free = await freeBytesOnVolume(modelsRoot());
   const pre = preflightDiskSpace(spec.sizeBytes, free);
   if (!pre.ok) {
@@ -797,6 +865,9 @@ export function registerDownloadIpc(): void {
   );
   ipcMain.handle('assets:path', (_e, id: unknown) =>
     typeof id === 'string' ? assetPath(id) : null,
+  );
+  ipcMain.handle('assets:readText', (_e, id: unknown) =>
+    typeof id === 'string' ? readAssetText(id) : null,
   );
   ipcMain.handle('assets:freeSpace', () => freeBytesOnVolume(modelsRoot()));
   ipcMain.handle('assets:root', () => modelsRoot());

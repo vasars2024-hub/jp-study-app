@@ -7,6 +7,7 @@ import {
   type LookupHistoryEntry,
 } from '../lookupHistory';
 import { loadClipboardHistory, onClipboardHistoryChanged, type ClipboardEntry } from '../clipboardHistory';
+import { useT } from '../i18n';
 
 interface Metrics {
   cpuLoad: number;
@@ -62,24 +63,26 @@ function Meter({ label, pct, detail }: { label: string; pct: number; detail: str
 }
 
 export function CpuWidget(_props: WidgetProps) {
+  const { t } = useT();
   const m = useSystemMetrics();
   const load = m?.cpuLoad ?? 0;
   return (
     <div className="wgt wgt-sys">
-      <Meter label="CPU" pct={load} detail={m ? `${Math.round(load * 100)}%` : '…'} />
+      <Meter label={t('widgets.title.cpu-usage')} pct={load} detail={m ? `${Math.round(load * 100)}%` : '…'} />
       {m && <div className="wgt-sys-meta muted">{m.platform}</div>}
     </div>
   );
 }
 
 export function MemoryWidget(_props: WidgetProps) {
+  const { t } = useT();
   const m = useSystemMetrics();
   const used = m ? m.totalmem - m.freemem : 0;
   const pct = m && m.totalmem > 0 ? used / m.totalmem : 0;
   return (
     <div className="wgt wgt-sys">
       <Meter
-        label="Memory"
+        label={t('widgets.title.memory-usage')}
         pct={pct}
         detail={m ? `${formatBytes(used)} / ${formatBytes(m.totalmem)}` : '…'}
       />
@@ -88,6 +91,7 @@ export function MemoryWidget(_props: WidgetProps) {
 }
 
 export function BatteryWidget(_props: WidgetProps) {
+  const { t } = useT();
   const m = useSystemMetrics();
   const [level, setLevel] = useState<number | null>(null);
   const [charging, setCharging] = useState<boolean | null>(null);
@@ -121,15 +125,15 @@ export function BatteryWidget(_props: WidgetProps) {
         <div className="wgt-sys-meta muted">
           {m?.onBattery != null
             ? m.onBattery
-              ? 'On battery (level unknown)'
-              : 'Plugged in'
-            : 'Battery status unavailable'}
+              ? t('widgets.battery.onBatteryUnknown')
+              : t('widgets.battery.pluggedIn')
+            : t('widgets.battery.unavailable')}
         </div>
       ) : (
         <Meter
-          label="Battery"
+          label={t('widgets.title.battery')}
           pct={pct}
-          detail={`${Math.round(pct * 100)}%${onBat ? '' : ' · AC'}`}
+          detail={`${Math.round(pct * 100)}%${onBat ? '' : t('widgets.battery.acSuffix')}`}
         />
       )}
     </div>
@@ -137,6 +141,7 @@ export function BatteryWidget(_props: WidgetProps) {
 }
 
 export function NetworkWidget(_props: WidgetProps) {
+  const { t } = useT();
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
     const on = () => setOnline(true);
@@ -152,27 +157,28 @@ export function NetworkWidget(_props: WidgetProps) {
     <div className="wgt wgt-sys">
       <div className={`wgt-sys-net ${online ? 'on' : 'off'}`}>
         <span className="wgt-sys-dot" />
-        {online ? 'Online' : 'Offline'}
+        {online ? t('widgets.network.online') : t('widgets.network.offline')}
       </div>
     </div>
   );
 }
 
 export function RecentLookupsWidget(_props: WidgetProps) {
+  const { t } = useT();
   const [list, setList] = useState<LookupHistoryEntry[]>(() => loadLookupHistory());
   useEffect(() => onLookupHistoryChanged(() => setList(loadLookupHistory())), []);
   return (
     <div className="wgt wgt-recent">
       <div className="wgt-recent-head">
-        <span className="muted">Recent lookups</span>
+        <span className="muted">{t('widgets.recentLookups.title')}</span>
         {list.length > 0 && (
-          <button type="button" className="wgt-btn-icon sm" title="Clear" onClick={() => clearLookupHistory()}>
+          <button type="button" className="wgt-btn-icon sm" title={t('widgets.recentLookups.clear')} onClick={() => clearLookupHistory()}>
             ×
           </button>
         )}
       </div>
       {list.length === 0 ? (
-        <p className="muted wgt-recent-empty">Look up a word to populate this list.</p>
+        <p className="muted wgt-recent-empty">{t('widgets.recentLookups.emptyHint')}</p>
       ) : (
         <ul className="wgt-recent-list">
           {list.slice(0, 12).map((e) => (
@@ -192,6 +198,7 @@ export function RecentLookupsWidget(_props: WidgetProps) {
  * logic itself. Clicking an entry, or the header, opens the full panel.
  */
 export function ClipboardWidget(_props: WidgetProps) {
+  const { t } = useT();
   const [entries, setEntries] = useState<ClipboardEntry[]>(() => loadClipboardHistory());
   useEffect(() => onClipboardHistoryChanged(() => setEntries(loadClipboardHistory())), []);
   const openFull = () => window.dispatchEvent(new CustomEvent('clipboard:open'));
@@ -199,13 +206,13 @@ export function ClipboardWidget(_props: WidgetProps) {
   return (
     <div className="wgt wgt-clip">
       <div className="wgt-recent-head">
-        <span className="muted">Clipboard history</span>
-        <button type="button" className="wgt-btn-icon sm" title="Open clipboard history" onClick={openFull}>
+        <span className="muted">{t('widgets.clipboardWidget.title')}</span>
+        <button type="button" className="wgt-btn-icon sm" title={t('widgets.clipboardWidget.open')} onClick={openFull}>
           ⤢
         </button>
       </div>
       {recent.length === 0 ? (
-        <p className="muted wgt-recent-empty">Copy something to get started.</p>
+        <p className="muted wgt-recent-empty">{t('widgets.clipboardWidget.emptyHint')}</p>
       ) : (
         <ul className="wgt-recent-list">
           {recent.map((e) => (

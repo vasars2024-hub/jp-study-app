@@ -128,18 +128,18 @@ function beginEntry(reason: SecretLifecycleReason = 'entry'): void {
   sequenceId += 1;
   const reducedMotion = prefersReducedMotion();
   const id = sequenceId;
-  const bootAt = reducedMotion ? 60 : 650;
-  const soundAt = reducedMotion ? 120 : 1500;
-  const welcomeAt = reducedMotion ? 260 : 3600;
-  const revealAt = reducedMotion ? 640 : 5200;
-  const activeAt = revealAt + (reducedMotion ? 180 : 1100);
-  const fallbackAt = reducedMotion ? 2400 : 12000;
+  const bootAt = reducedMotion ? 60 : 900;
+  const soundAt = reducedMotion ? 120 : 2100;
+  const welcomeAt = reducedMotion ? 260 : 6200;
+  const revealAt = reducedMotion ? 640 : 8200;
+  const activeAt = revealAt + (reducedMotion ? 180 : 1400);
+  const fallbackAt = reducedMotion ? 2400 : 15000;
 
   publish({
     phase: 'preboot',
     reason,
     canSkip: false,
-    message: reason === 'restart' ? 'Restarting Secret Study OS' : 'Preparing Secret Study OS',
+    message: reason === 'restart' ? 'Restarting Secret GrammarX' : 'Preparing Secret GrammarX',
     sequenceId: id,
     startedAt: Date.now(),
   });
@@ -154,7 +154,7 @@ function beginEntry(reason: SecretLifecycleReason = 'entry'): void {
   });
   after(welcomeAt, () => {
     if (state.sequenceId !== id) return;
-    publish({ phase: 'welcome', canSkip: true, message: 'Welcome to Secret Study OS' });
+    publish({ phase: 'welcome', canSkip: true, message: 'Welcome to Secret GrammarX' });
   });
   after(revealAt, () => {
     if (state.sequenceId !== id) return;

@@ -1,0 +1,562 @@
+/**
+ * WIRED ARCHIVE — shared motion library (WIRED_BESPOKE_SPEC §1–§2).
+ * -----------------------------------------------------------------------------
+ * Every keyframe is prefixed `wm-`. Nothing eases smoothly: CRT hardware does
+ * not tween, so all timing uses steps() or 2-frame holds. Idle loops run ≥4s
+ * at low opacity. Scoped to :root[data-materials='wired'] throughout; the
+ * clean-CRT / reduced-static attributes soften, and the OS reduced-motion
+ * media block at the end of this file kills everything.
+ */
+
+/* ---- Core keyframes ------------------------------------------------------ */
+
+@keyframes wm-scan-reveal {
+  0% { clip-path: inset(0 0 100% 0); }
+  100% { clip-path: inset(0 0 0 0); }
+}
+
+@keyframes wm-scan-collapse {
+  0% { clip-path: inset(0 0 0 0); transform: scaleY(1); opacity: 1; }
+  82% { clip-path: inset(0 0 96% 0); transform: scaleY(0.5); opacity: 0.9; }
+  100% { clip-path: inset(0 0 100% 0); transform: scaleY(0.02); opacity: 0; }
+}
+
+@keyframes wm-type-in {
+  0% { max-width: 0; }
+  100% { max-width: 100%; }
+}
+
+@keyframes wm-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes wm-relay-blink {
+  0%, 40%, 100% { opacity: 1; }
+  20%, 60% { opacity: 0.2; }
+}
+
+@keyframes wm-rail-pulse {
+  0% { transform: translateX(-8%); opacity: 1; }
+  100% { transform: translateX(104%); opacity: 0.7; }
+}
+
+@keyframes wm-phosphor-settle {
+  0% { filter: brightness(2.2) blur(1px); }
+  100% { filter: brightness(1) blur(0); }
+}
+
+@keyframes wm-sync-wobble {
+  0%, 96%, 100% { transform: translateX(0) skewX(0deg); }
+  97% { transform: translateX(1.5px) skewX(0.4deg); }
+  98% { transform: translateX(-1.5px) skewX(-0.4deg); }
+}
+
+@keyframes wm-decrypt-noise {
+  0% { letter-spacing: 0.4em; opacity: 0.25; filter: blur(1px); }
+  60% { letter-spacing: 0.12em; opacity: 0.8; filter: blur(0.4px); }
+  100% { letter-spacing: 0; opacity: 1; filter: blur(0); }
+}
+
+@keyframes wm-trace-draw {
+  0% { stroke-dashoffset: var(--wm-trace-len, 400); }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes wm-gauge-sweep {
+  0% { transform: rotate(-120deg); }
+  84% { transform: rotate(calc(var(--wm-gauge-target, 0deg) + 6deg)); }
+  100% { transform: rotate(var(--wm-gauge-target, 0deg)); }
+}
+
+@keyframes wm-frame-power {
+  0% { box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.7), 0 0 22px rgba(109, 241, 255, 0.3); }
+  100% { box-shadow: none; }
+}
+
+@keyframes wm-bar-grow {
+  0% { transform: scaleY(0); }
+  100% { transform: scaleY(1); }
+}
+
+/* Wrong answer: 2-frame amber wobble — never red (§5.5). */
+@keyframes wm-resync-shake {
+  0%, 100% { transform: translateX(0); box-shadow: none; }
+  25% { transform: translateX(2px); box-shadow: 0 0 0 1px rgba(255, 177, 59, 0.65); }
+  75% { transform: translateX(-2px); box-shadow: 0 0 0 1px rgba(255, 177, 59, 0.65); }
+}
+
+/* ---- §2 Window lifecycle ------------------------------------------------- */
+
+/* Open: ghost frame → body scan-reveal → phosphor settle (620ms total).
+   The backwards fill of wm-scan-reveal hides the body during the 180ms
+   border-only ghost phase; no extra keyframe needed. */
+:root[data-materials='wired'] .fwin.fwin-anim-opening {
+  animation: wm-frame-power 0.62s steps(4) both;
+}
+
+:root[data-materials='wired'] .fwin-anim-opening .fwin-body {
+  animation:
+    wm-scan-reveal 0.28s steps(6) 0.18s both,
+    wm-phosphor-settle 0.16s steps(3) 0.46s both;
+}
+
+:root[data-materials='wired'] .fwin-anim-opening .fwin-title-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  animation: wm-type-in 0.26s steps(14) 0.3s both;
+}
+
+:root[data-materials='wired'] .fwin-anim-opening .fwin-title-text::after {
+  content: '▌';
+  animation: wm-cursor-blink 0.24s steps(1) 2;
+}
+
+:root[data-materials='wired'] .fwin-anim-opening .fwin-wired-status {
+  animation: wm-scan-reveal 0.12s steps(3) 0.46s both;
+}
+
+/* Close: power down to a horizontal line (360ms). */
+:root[data-materials='wired'] .fwin.fwin-anim-closing {
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  animation: wm-scan-collapse 0.34s steps(6) both;
+}
+
+:root[data-materials='wired'] .fwin-anim-closing .fwin-wired-status span:first-child {
+  visibility: hidden;
+}
+
+:root[data-materials='wired'] .fwin-anim-closing .fwin-wired-status::before {
+  content: 'UNMOUNTING…';
+  color: var(--wired-amber);
+}
+
+/* Minimize: cartridge docks toward the taskbar rail. */
+:root[data-materials='wired'] .fwin.fwin-anim-minimizing {
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  animation: wm-scan-collapse 0.34s steps(6) both;
+}
+
+/* Taskbar slot relay lamps during lifecycle phases. */
+:root[data-materials='wired'] .os-task-win.anim-opening {
+  animation: wm-relay-blink 0.24s steps(1) 2;
+}
+
+:root[data-materials='wired'] .os-task-win.anim-minimizing,
+:root[data-materials='wired'] .os-task-win.anim-closing {
+  animation: wm-relay-blink 0.24s steps(1) 1;
+}
+
+/* App switch: one 24px cyan hotspot sweeps the rail (retriggered by stamping
+   data-pulse on the taskbar). The bar is already position:absolute (anchored
+   bottom:0 in styles.css), which anchors the overlay — do NOT re-position it. */
+:root[data-materials='wired'] .os-taskbar {
+  overflow: hidden;
+}
+
+:root[data-materials='wired'] .os-taskbar::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 24px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(109, 241, 255, 0.32), transparent);
+  z-index: 1;
+}
+
+:root[data-materials='wired'] .os-taskbar[data-pulse]::before {
+  animation: wm-rail-pulse 0.5s steps(12) 1 both;
+}
+
+/* ---- §3 Shell life: lamps, globe, clock, workspace rail ------------------ */
+
+.wired-tray-lamps {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px;
+  align-self: stretch;
+}
+
+.wired-lamp {
+  width: 4px;
+  height: 4px;
+  border-radius: 0;
+  background: rgba(216, 251, 255, 0.14);
+  box-shadow: none;
+}
+
+.wired-lamp.wired-lamp-link.on {
+  background: var(--wired-cyan, #6df1ff);
+  box-shadow: 0 0 6px rgba(109, 241, 255, 0.55);
+}
+
+.wired-lamp.wired-lamp-pending.on {
+  background: var(--wired-amber, #ffb13b);
+  box-shadow: 0 0 6px rgba(255, 177, 59, 0.55);
+}
+
+.wired-lamp.wired-lamp-pending.blink {
+  animation: wm-relay-blink 1.4s steps(1) infinite;
+}
+
+.wired-lamp.wired-lamp-error.on {
+  background: var(--wired-red, #df2732);
+  box-shadow: 0 0 6px rgba(223, 39, 50, 0.55);
+}
+
+.wired-globe {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  opacity: 0.85;
+}
+
+.wired-globe svg {
+  display: block;
+}
+
+.wired-globe-outline,
+.wired-globe-lat,
+.wired-globe-lon {
+  fill: none;
+  stroke: rgba(109, 241, 255, 0.5);
+  stroke-width: 0.7;
+}
+
+.wired-globe-outline {
+  stroke: rgba(109, 241, 255, 0.7);
+}
+
+.wired-globe-spin {
+  transform-origin: 20px 20px;
+  animation: wm-globe-spin 12s steps(48) infinite;
+}
+
+@keyframes wm-globe-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.wired-globe-arc {
+  fill: none;
+  stroke: var(--wired-amber, #ffb13b);
+  stroke-width: 1.1;
+  stroke-dasharray: 100;
+  --wm-trace-len: 100;
+  animation: wm-trace-draw 0.8s steps(10) both, wm-arc-fade 2.4s steps(3) forwards;
+}
+
+@keyframes wm-arc-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Clock: resync flicker every 9s + block cursor after the seconds. */
+:root[data-materials='wired'] .os-clock {
+  animation: wm-sync-wobble 9s steps(2) infinite;
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-materials='wired'] .os-clock > span:first-child::after {
+  content: ' ▮';
+  color: var(--wired-cyan, #6df1ff);
+  animation: wm-cursor-blink 2s steps(1) infinite;
+}
+
+/* Workspace switch: brief ROUTING… stamp over the engaged rail button. */
+:root[data-materials='wired'] .os-desktop-switch {
+  position: relative;
+}
+
+:root[data-materials='wired'] .os-desktop-switch.active::after {
+  content: 'ROUTING…';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wired-amber, #ffb13b);
+  background: rgba(0, 9, 14, 0.94);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+  opacity: 0;
+  animation: wm-flash-out 0.4s steps(2) both;
+}
+
+@keyframes wm-flash-out {
+  0%, 99% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- §4 Bulletin channel: toasts + center entries ------------------------ */
+
+:root[data-materials='wired'] .ui-toast {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  animation: wm-scan-reveal 0.18s steps(6) both, wm-edge-flash 0.5s steps(3) both;
+}
+
+:root[data-materials='wired'] .ui-toast--warning {
+  --wm-edge: rgba(255, 177, 59, 0.8);
+}
+
+:root[data-materials='wired'] .ui-toast--error {
+  --wm-edge: rgba(223, 39, 50, 0.8);
+}
+
+@keyframes wm-edge-flash {
+  0% { box-shadow: 0 0 0 1px var(--wm-edge, rgba(109, 241, 255, 0.8)), 0 0 16px var(--wm-edge, rgba(109, 241, 255, 0.5)); }
+  100% { box-shadow: none; }
+}
+
+:root[data-materials='wired'] .ui-toast__title {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
+  vertical-align: bottom;
+  animation: wm-type-in 0.24s steps(12) both;
+}
+
+:root[data-materials='wired'] .ui-toast__msg {
+  animation: wm-scan-reveal 0.2s steps(5) 0.08s both;
+}
+
+:root[data-materials='wired'] .wired-notif-closing {
+  transform-origin: 50% 0;
+  animation: wm-scan-collapse 0.2s steps(4) both;
+}
+
+/* ---- §7 Boot / lockscreen / wallpaper polish ----------------------------- */
+
+/* One-frame white flash at the aero→wired handoff, before the black cut. */
+.wired-boot.phase-reveal::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  animation: wm-white-flash 0.36s steps(2) both;
+}
+
+.wired-boot.reduced.phase-reveal::before {
+  animation: none;
+}
+
+@keyframes wm-white-flash {
+  0% { opacity: 0.9; }
+  33%, 100% { opacity: 0; }
+}
+
+/* Lockscreen: slow radar sweep over the map layer; amber flash on failure,
+   red only after repeated failures (is-error-hard). */
+.lockscreen-wired .lockscreen-wired-map {
+  position: relative;
+}
+
+.lockscreen-wired .lockscreen-wired-map::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    rgba(109, 241, 255, 0.14) 0deg,
+    transparent 48deg,
+    transparent 360deg
+  );
+  animation: wm-radar-sweep 11s steps(48) infinite;
+  opacity: 0.7;
+}
+
+@keyframes wm-radar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.lockscreen-wired.is-error .lockscreen-wired-panel {
+  animation: wm-lock-deny 0.42s steps(3) both;
+}
+
+@keyframes wm-lock-deny {
+  0% { box-shadow: 0 0 0 1px rgba(255, 177, 59, 0.8), 0 0 26px rgba(255, 177, 59, 0.3); }
+  100% { box-shadow: none; }
+}
+
+.lockscreen-wired.is-error-hard .lockscreen-wired-panel {
+  animation: wm-lock-deny-hard 0.42s steps(3) both;
+}
+
+@keyframes wm-lock-deny-hard {
+  0% { box-shadow: 0 0 0 1px rgba(223, 39, 50, 0.85), 0 0 26px rgba(223, 39, 50, 0.35); }
+  100% { box-shadow: none; }
+}
+
+/* Wallpaper: 40s parallax drift on the atmosphere polygon; node-b cycles its
+   status readout on a 90s content-swap loop. */
+.wired-wall-atmosphere::before {
+  animation: wm-wall-drift 40s steps(24) infinite alternate;
+}
+
+@keyframes wm-wall-drift {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(6px, 4px); }
+}
+
+:root[data-materials='wired'] .wired-wall-node.node-b::after {
+  content: ' / LISTENING';
+  color: rgba(255, 177, 59, 0.6);
+  animation: wm-node-status 90s steps(1) infinite;
+}
+
+@keyframes wm-node-status {
+  0%, 32% { content: ' / LISTENING'; }
+  33%, 65% { content: ' / IDLE'; }
+  66%, 100% { content: ' / SYNCING'; }
+}
+
+/* ---- Clean CRT / reduced static: calm variants --------------------------- */
+
+:root[data-wired-crt='clean'] .fwin.fwin-anim-opening,
+:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-body,
+:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-title-text,
+:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-title-text::after,
+:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-wired-status {
+  animation-duration: 0.12s;
+  animation-delay: 0s;
+}
+
+:root[data-wired-crt='clean'] .fwin.fwin-anim-closing,
+:root[data-wired-crt='clean'] .fwin.fwin-anim-minimizing {
+  animation: wm-scan-collapse 0.16s steps(3) both;
+}
+
+:root[data-wired-static='reduced'] .fwin-anim-opening .fwin-body {
+  animation-name: wm-scan-reveal;
+  animation-duration: 0.2s;
+}
+
+/* ---- OS reduced motion: everything dies ---------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='wired'] .fwin.fwin-anim-opening,
+  :root[data-materials='wired'] .fwin-anim-opening .fwin-body,
+  :root[data-materials='wired'] .fwin-anim-opening .fwin-title-text,
+  :root[data-materials='wired'] .fwin-anim-opening .fwin-title-text::after,
+  :root[data-materials='wired'] .fwin-anim-opening .fwin-wired-status,
+  :root[data-materials='wired'] .fwin.fwin-anim-closing,
+  :root[data-materials='wired'] .fwin.fwin-anim-minimizing,
+  :root[data-materials='wired'] .os-task-win.anim-opening,
+  :root[data-materials='wired'] .os-task-win.anim-minimizing,
+  :root[data-materials='wired'] .os-task-win.anim-closing,
+  :root[data-materials='wired'] .os-taskbar[data-pulse]::before {
+    animation: none;
+  }
+
+  :root[data-materials='wired'] .fwin.fwin-anim-closing,
+  :root[data-materials='wired'] .fwin.fwin-anim-minimizing {
+    opacity: 0;
+  }
+
+  .wired-lamp.wired-lamp-pending.blink,
+  .wired-globe-spin,
+  .wired-globe-arc,
+  :root[data-materials='wired'] .os-clock,
+  :root[data-materials='wired'] .os-clock > span:first-child::after,
+  :root[data-materials='wired'] .os-desktop-switch.active::after,
+  :root[data-materials='wired'] .ui-toast,
+  :root[data-materials='wired'] .ui-toast__title,
+  :root[data-materials='wired'] .ui-toast__msg,
+  :root[data-materials='wired'] .wired-notif-closing,
+  .wired-boot.phase-reveal::before,
+  .lockscreen-wired .lockscreen-wired-map::after,
+  .lockscreen-wired.is-error .lockscreen-wired-panel,
+  .lockscreen-wired.is-error-hard .lockscreen-wired-panel,
+  .wired-wall-atmosphere::before,
+  :root[data-materials='wired'] .wired-wall-node.node-b::after,
+  :root[data-materials='wired'] .flash-card.is-decrypt .flash-answer,
+  :root[data-materials='wired'] .flash-card.is-resync,
+  :root[data-materials='wired'] .flash-done::before,
+  :root[data-materials='wired'] .stats-bar-fill,
+  :root[data-materials='wired'] .stats-section,
+  :root[data-materials='wired'] .stats-cards .stats-card:first-child .stats-card-val,
+  :root[data-materials='wired'] .immersion-stage.is-settle,
+  :root[data-materials='wired'] .dict-results article,
+  :root[data-materials='wired'] .dict-hint::after,
+  :root[data-materials='wired'] .tr-output > .muted::after,
+  :root[data-materials='wired'] .gram-detail > section:nth-child(1),
+  :root[data-materials='wired'] .gram-detail > section:nth-child(2),
+  :root[data-materials='wired'] .gram-detail > section:nth-child(3) {
+    animation: none;
+  }
+
+  :root[data-materials='wired'] .os-desktop-switch.active::after {
+    opacity: 0;
+  }
+}
+
+/* Motion-level gate (§9 motionLevel setting → data-wired-motion). 'reduced'
+   behaves like clean CRT timing; 'off' kills lifecycle + interaction motion
+   the same way OS reduced-motion does. */
+:root[data-wired-motion='reduced'] .fwin.fwin-anim-opening,
+:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-body,
+:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-title-text,
+:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-title-text::after,
+:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-wired-status {
+  animation-duration: 0.12s;
+  animation-delay: 0s;
+}
+
+:root[data-wired-motion='reduced'] .fwin.fwin-anim-closing,
+:root[data-wired-motion='reduced'] .fwin.fwin-anim-minimizing {
+  animation: wm-scan-collapse 0.16s steps(3) both;
+}
+
+:root[data-wired-motion='off'] .fwin.fwin-anim-opening,
+:root[data-wired-motion='off'] .fwin-anim-opening .fwin-body,
+:root[data-wired-motion='off'] .fwin-anim-opening .fwin-title-text,
+:root[data-wired-motion='off'] .fwin-anim-opening .fwin-title-text::after,
+:root[data-wired-motion='off'] .fwin-anim-opening .fwin-wired-status,
+:root[data-wired-motion='off'] .fwin.fwin-anim-closing,
+:root[data-wired-motion='off'] .fwin.fwin-anim-minimizing,
+:root[data-wired-motion='off'] .os-task-win.anim-opening,
+:root[data-wired-motion='off'] .os-task-win.anim-minimizing,
+:root[data-wired-motion='off'] .os-task-win.anim-closing,
+:root[data-wired-motion='off'] .os-taskbar[data-pulse]::before,
+:root[data-wired-motion='off'] .ui-toast,
+:root[data-wired-motion='off'] .ui-toast__title,
+:root[data-wired-motion='off'] .ui-toast__msg,
+:root[data-wired-motion='off'] .wired-notif-closing,
+:root[data-wired-motion='off'] .flash-card.is-decrypt .flash-answer,
+:root[data-wired-motion='off'] .flash-card.is-resync,
+:root[data-wired-motion='off'] .stats-bar-fill,
+:root[data-wired-motion='off'] .stats-section,
+:root[data-wired-motion='off'] .dict-results article,
+:root[data-wired-motion='off'] .immersion-stage.is-settle,
+:root[data-wired-motion='off'] .widget-frame.widget-anim-mounting,
+:root[data-wired-motion='off'] .widget-frame.widget-anim-mounting .widget-title {
+  animation: none;
+}
+
+:root[data-wired-motion='off'] .fwin.fwin-anim-closing,
+:root[data-wired-motion='off'] .fwin.fwin-anim-minimizing {
+  opacity: 0;
+}
+
+/* Idle-animation gate (§9 idleAnimations setting → data-wired-idle='off'). */
+:root[data-wired-idle='off'] .wired-globe-spin,
+:root[data-wired-idle='off'] .wired-wall-atmosphere::before,
+:root[data-wired-idle='off'] .wired-wall-node.node-b::after,
+:root[data-wired-idle='off'] .os-clock {
+  animation: none;
+}

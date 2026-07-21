@@ -19,15 +19,31 @@ import { onThemeChanged } from '../../theme/engine';
 import { MenuBar, type MenuBarMenu } from './MenuBar';
 import { StatusBar } from './StatusBar';
 
-function readAero(): boolean {
-  return typeof document !== 'undefined' && document.documentElement.getAttribute('data-materials') === 'aero';
+export type AppMaterialSet = 'aero' | 'wired' | null;
+
+function readMaterialSet(): AppMaterialSet {
+  if (typeof document === 'undefined') return null;
+  const material = document.documentElement.getAttribute('data-materials');
+  return material === 'aero' || material === 'wired' ? material : null;
 }
 
 /** True while the secret Aero material set is active; updates on theme switch. */
 export function useAeroMaterials(): boolean {
-  const [aero, setAero] = useState(readAero);
-  useEffect(() => onThemeChanged(() => setAero(readAero())), []);
-  return aero;
+  const [material, setMaterial] = useState(readMaterialSet);
+  useEffect(() => onThemeChanged(() => setMaterial(readMaterialSet())), []);
+  return material === 'aero';
+}
+
+export function useWiredMaterials(): boolean {
+  const [material, setMaterial] = useState(readMaterialSet);
+  useEffect(() => onThemeChanged(() => setMaterial(readMaterialSet())), []);
+  return material === 'wired';
+}
+
+export function useAppMaterialSet(): AppMaterialSet {
+  const [material, setMaterial] = useState(readMaterialSet);
+  useEffect(() => onThemeChanged(() => setMaterial(readMaterialSet())), []);
+  return material;
 }
 
 export interface AppChromeProps {
@@ -42,10 +58,14 @@ export interface AppChromeProps {
 }
 
 export function AppChrome({ menus, menuEnd, status, className = '', children }: AppChromeProps) {
-  const aero = useAeroMaterials();
-  if (!aero) return <>{children}</>;
+  const material = useAppMaterialSet();
+  if (!material) return <>{children}</>;
   return (
-    <div className={['ui-app-chrome', className].filter(Boolean).join(' ')} data-app-chrome="">
+    <div
+      className={['ui-app-chrome', `ui-app-chrome--${material}`, className].filter(Boolean).join(' ')}
+      data-app-chrome=""
+      data-app-material={material}
+    >
       {menus && menus.length > 0 && <MenuBar menus={menus} end={menuEnd} />}
       <div className="ui-app-chrome__body">{children}</div>
       {status != null && <StatusBar>{status}</StatusBar>}

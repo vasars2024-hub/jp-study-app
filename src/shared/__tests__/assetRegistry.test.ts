@@ -12,6 +12,8 @@ import {
   isResumable,
   mergeRegistry,
   preflightDiskSpace,
+  starterAssetIds,
+  starterAssetsForLang,
   totalSize,
   verifyAsset,
   type AssetSpec,
@@ -109,11 +111,23 @@ describe('verifyAsset', () => {
     expect(outcome.actualSha256).toBe('c'.repeat(64));
   });
 
-  it('rejects a truncated download under the size check', () => {
-    const outcome = verifyAsset(spec(), 'c'.repeat(64), 400);
+  it('rejects an empty or HTML-sized body when the catalog expects a large file', () => {
+    const large = spec({ sizeBytes: 50_000_000 });
+    const outcome = verifyAsset(large, 'c'.repeat(64), 2_000);
     expect(outcome.ok).toBe(false);
     expect(outcome.reason?.key).toBe('assetError.sizeMismatch');
-    expect(outcome.reason?.vars).toEqual({ expected: '1000 B', actual: '400 B' });
+  });
+
+  it('rejects a fully empty download', () => {
+    const outcome = verifyAsset(spec({ sizeBytes: 50_000_000 }), 'c'.repeat(64), 0);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.reason?.key).toBe('assetError.sizeMismatch');
+  });
+
+  it('allows size drift on unpinned assets (GitHub latest / HF remuxes)', () => {
+    // Catalog listed ~63 MB; current JMdict zip is ~15 MB — still a real payload.
+    const outcome = verifyAsset(spec({ sizeBytes: 62_914_560 }), 'c'.repeat(64), 15_487_771);
+    expect(outcome.ok).toBe(true);
   });
 
   it('tolerates small upstream size drift', () => {
@@ -240,6 +254,13 @@ describe('language sets', () => {
       77_691_713 + 147_951_465,
     );
     expect(totalSize(ASSET_CATALOG, ['nope'])).toBe(0);
+  });
+
+  it('starter set excludes whispers and is ZH-only for Phase 8', () => {
+    expect(starterAssetIds('ja')).toEqual([]);
+    expect(starterAssetIds('zh')).toEqual(['cc-cedict']);
+    expect(starterAssetsForLang(ASSET_CATALOG, 'zh').map((a) => a.id)).toEqual(['cc-cedict']);
+    expect(starterAssetsForLang(ASSET_CATALOG, 'ja')).toEqual([]);
   });
 });
 

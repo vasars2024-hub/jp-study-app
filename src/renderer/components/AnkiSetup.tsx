@@ -1,5 +1,6 @@
 import { ANKI_COLLECTION_UNAVAILABLE_MSG } from '../../shared/anki';
 import type { AnkiStatus } from '../../shared/types';
+import { useT } from '../i18n';
 
 interface Props {
   status: AnkiStatus | null;
@@ -10,45 +11,38 @@ interface Props {
   waitingCollection?: boolean;
 }
 
+const ANKI_CONNECT_CODE = '2055492159';
+
 // Shown whenever AnkiConnect can't be reached or the collection isn't ready.
 export default function AnkiSetup({ status, onRetry, onBack, waitingCollection }: Props) {
+  const { t } = useT();
   const collectionWait =
     waitingCollection || status?.error === ANKI_COLLECTION_UNAVAILABLE_MSG;
 
   return (
     <div className="anki-setup">
-      <p className="anki-setup-msg">{status?.error ?? "Can't reach Anki."}</p>
+      <p className="anki-setup-msg">{status?.error ?? t('ankiSetup.cantReach')}</p>
       {collectionWait ? (
-        <p className="anki-setup-sub">
-          AnkiConnect responded, but your decks are not available yet. The app retries
-          automatically — wait until Anki finishes opening, or close duplicate Anki windows
-          and reopen.
-        </p>
+        <p className="anki-setup-sub">{t('ankiSetup.collectionWait')}</p>
       ) : (
         <>
-          <p className="anki-setup-sub">To add cards, install the free AnkiConnect add-on (one time):</p>
+          <p className="anki-setup-sub">{t('ankiSetup.installLead')}</p>
           <ol className="anki-steps">
-            <li>
-              Open the <b>Anki</b> desktop app and keep it running.
-            </li>
-            <li>
-              Menu: <b>Tools → Add-ons → Get Add-ons…</b>
-            </li>
-            <li>
-              Paste this code: <code>2055492159</code>
-            </li>
-            <li>Click OK and restart Anki, then Retry.</li>
+            <li>{t('ankiSetup.step1')}</li>
+            <li>{t('ankiSetup.step2')}</li>
+            <li>{t('ankiSetup.step3', { code: ANKI_CONNECT_CODE })}</li>
+            <li>{t('ankiSetup.step4')}</li>
           </ol>
         </>
       )}
       <div className="anki-setup-actions">
         {onBack && (
           <button className="btn small" onClick={onBack}>
-            Back
+            {t('ankiSetup.back')}
           </button>
         )}
         <button className="btn small primary" onClick={onRetry}>
-          {collectionWait ? 'Check now' : 'Retry'}
+          {collectionWait ? t('ankiSetup.checkNow') : t('ankiSetup.retry')}
         </button>
       </div>
     </div>

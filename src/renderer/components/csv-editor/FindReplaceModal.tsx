@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useT } from '../../i18n';
 import { Button } from '../ui';
 import { Dialog } from '../ui/Dialog';
 
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export default function FindReplaceModal({ columnHeaders, onClose, onApply }: Props) {
+  const { t } = useT();
   const [find, setFind] = useState('');
   const [replace, setReplace] = useState('');
   const [useRegex, setUseRegex] = useState(false);
@@ -35,30 +37,30 @@ export default function FindReplaceModal({ columnHeaders, onClose, onApply }: Pr
     <Dialog
       open
       onClose={onClose}
-      title="Find and replace"
+      title={t('csv.find.title')}
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={handleApply} disabled={!find.trim()}>
-            Replace all
+            {t('csv.find.replaceAll')}
           </Button>
         </>
       }
     >
         <label className="csv-editor-field">
-          <span>Find</span>
+          <span>{t('csv.find.find')}</span>
           <input type="text" value={find} onChange={(e) => setFind(e.target.value)} autoFocus />
         </label>
         <label className="csv-editor-field">
-          <span>Replace with</span>
+          <span>{t('csv.find.replaceWith')}</span>
           <input type="text" value={replace} onChange={(e) => setReplace(e.target.value)} />
         </label>
         <label className="csv-editor-check">
           <input type="checkbox" checked={useRegex} onChange={(e) => setUseRegex(e.target.checked)} />
-          Use regular expressions
+          {t('csv.find.useRegex')}
         </label>
         <fieldset className="csv-editor-fieldset">
-          <legend>Scope</legend>
+          <legend>{t('csv.find.scope')}</legend>
           <label className="csv-editor-check">
             <input
               type="radio"
@@ -66,7 +68,7 @@ export default function FindReplaceModal({ columnHeaders, onClose, onApply }: Pr
               checked={scope === 'all'}
               onChange={() => setScope('all')}
             />
-            All columns
+            {t('csv.find.allColumns')}
           </label>
           <label className="csv-editor-check">
             <input
@@ -75,7 +77,7 @@ export default function FindReplaceModal({ columnHeaders, onClose, onApply }: Pr
               checked={scope === 'selected'}
               onChange={() => setScope('selected')}
             />
-            Selected columns
+            {t('csv.find.selectedColumns')}
           </label>
         </fieldset>
         {scope === 'selected' && (
@@ -87,7 +89,7 @@ export default function FindReplaceModal({ columnHeaders, onClose, onApply }: Pr
                   checked={selectedCols.has(i)}
                   onChange={() => toggleCol(i)}
                 />
-                {h || `Column ${i + 1}`}
+                {h || t('csv.columnN', { n: i + 1 })}
               </label>
             ))}
           </div>

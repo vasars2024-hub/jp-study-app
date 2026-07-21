@@ -14,12 +14,23 @@ import {
   resolveSecondaryRoutineId,
   runBuddyRoutine,
   sanitizeStep,
+  sanitizeTrigger,
   type BuddyRoutine,
   type BuddyStep,
+  type BuddyTrigger,
 } from '../../../environment/buddyRoutines';
+import { speakBeepLine, voiceForType } from '../../../environment/beepSpeech';
+import { defFor } from '../../../environment/companionCatalog';
 import { COMMAND_CATALOG, SHORTCUT_OPEN_APPS } from '../../../keyboardShortcuts';
 import { useT } from '../../../i18n';
 import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
+import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../../../wiredDiscovery';
+import { forceCompanionsOff } from '../../../findingReadouts';
+import { exitSecretAero } from '../../../theme/SecretAeroTrigger';
+import { AERO_THEME_ID } from '../../../theme/frutiger-aero';
+import { WIRED_ARCHIVE_THEME_ID } from '../../../theme/wired-archive';
+import { loadThemeId, onThemeChanged } from '../../../theme';
+import { requestWiredArchiveShutdown } from '../../../wiredArchiveLifecycle';
 
 function blankStep(type: BuddyStep['type']): BuddyStep {
   switch (type) {
@@ -54,13 +65,23 @@ export default function CompanionsPage() {
   const { t } = useT();
   const { env, patchEnv, deskPrefs, patchDesk, seg, focusSettingId } = useSettings();
   const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
+  const [wiredDiscovered, setWiredDiscovered] = useState(hasDiscoveredWired);
+  const [activeThemeId, setActiveThemeId] = useState(loadThemeId);
   useEffect(() => onAeroDiscoveryChanged(setAeroDiscovered), []);
-  const companionDefs = useMemo(() => COMPANION_DEFS(), [aeroDiscovered]);
+  useEffect(() => onWiredDiscoveryChanged(setWiredDiscovered), []);
+  useEffect(() => onThemeChanged(setActiveThemeId), []);
+  const companionDefs = useMemo(() => COMPANION_DEFS(), [aeroDiscovered, wiredDiscovered]);
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
   const [editId, setEditId] = useState<string>(routines[0]?.id ?? '');
   const [testMsg, setTestMsg] = useState('');
+  const [testingId, setTestingId] = useState<string | null>(null);
   const selectedType = companionDefs.find((d) => d.id === 'study-buddy')?.id ?? 'study-buddy';
   const [assignType, setAssignType] = useState<CompanionTypeId>(selectedType);
+  const companionLabelById = useMemo(() => {
+    const map = new Map<CompanionTypeId, string>();
+    for (const def of companionDefs) map.set(def.id, def.label);
+    return map;
+  }, [companionDefs]);
 
   const STEP_TYPES: { id: BuddyStep['type']; label: string }[] = [
     { id: 'openApp', label: t('settings.companions.step.openApp') },
@@ -135,6 +156,7 @@ export default function CompanionsPage() {
       forType: assignType,
       steps: [blankStep('openApp'), blankStep('setMood')],
       builtin: false,
+      trigger: { kind: 'none' },
     };
     setRoutines([...routines, r]);
     setEditId(id);
@@ -168,35 +190,111 @@ export default function CompanionsPage() {
     patchEnv({ companions });
   };
 
+  const testRunRoutine = async (routine: BuddyRoutine) => {
+    setTestingId(routine.id);
+    setEditId(routine.id);
+    setTestMsg(t('settings.companions.testRunning'));
+    const typeId =
+      routine.forType && routine.forType !== '*'
+        ? (routine.forType as CompanionTypeId)
+        : assignType;
+    const sampleFor =
+      (env.companions ?? []).find((c) => c.typeId === typeId) ??
+      ({
+        id: `template-${typeId}`,
+        typeId,
+        x: 0,
+        y: 0,
+        facing: 1 as const,
+        mood: 'calm' as const,
+      });
+    const res = await runBuddyRoutine(routine.id, {
+      companionId: sampleFor.id,
+      typeId,
+      patchCompanion: () => undefined,
+      speak: (text) => {
+        const profile = defFor(typeId).voice ?? voiceForType(typeId);
+        void speakBeepLine(sampleFor.id, text, profile);
+      },
+    });
+    setTestMsg(
+      res.ok ? t('settings.companions.testOk') : res.error ?? t('settings.companions.testFailed'),
+    );
+    setTestingId(null);
+  };
+
   const testRun = async () => {
     if (!editing) return;
-    setTestMsg(t('settings.companions.testRunning'));
-    const res = await runBuddyRoutine(editing.id, {
-      companionId: sample.id,
-      typeId: assignType,
-      patchCompanion: () => undefined,
+    await testRunRoutine(editing);
+  };
+
+  const triggerLabel = (trigger?: BuddyTrigger) => {
+    if (!trigger || trigger.kind === 'none') return t('settings.companions.trigger.none');
+    if (trigger.kind === 'musicPlaying') return t('settings.companions.trigger.music');
+    if (trigger.kind === 'idle') {
+      return t('settings.companions.trigger.idle', { seconds: Math.round(trigger.afterMs / 1000) });
+    }
+    return t('settings.companions.trigger.timeOfDay', {
+      start: trigger.startHour,
+      end: trigger.endHour,
     });
-    setTestMsg(res.ok ? t('settings.companions.testOk') : res.error ?? t('settings.companions.testFailed'));
+  };
+
+  const setTrigger = (trigger: BuddyTrigger) => {
+    if (!editing) return;
+    updateRoutine(editing.id, { trigger: sanitizeTrigger(trigger) ?? { kind: 'none' } });
   };
 
   const typeRoutines = routines.filter(
     (r) => !r.forType || r.forType === '*' || r.forType === assignType,
   );
+  const routineTypeLabel = (routine: BuddyRoutine) =>
+    routine.forType && routine.forType !== '*'
+      ? companionLabelById.get(routine.forType as CompanionTypeId) ?? routine.forType
+      : t('settings.companions.any');
 
   return (
     <>
+      {(activeThemeId === AERO_THEME_ID || activeThemeId === WIRED_ARCHIVE_THEME_ID) && (
+        <SettingsCard
+          id="companions-leave-secret"
+          title={t('special.leave.title')}
+          description={t('special.leave.desc')}
+          highlight={focusSettingId === 'companions-leave-secret'}
+        >
+          {activeThemeId === AERO_THEME_ID && (
+            <button type="button" className="btn" onClick={() => exitSecretAero()}>
+              {t('special.leave.aero')}
+            </button>
+          )}
+          {activeThemeId === WIRED_ARCHIVE_THEME_ID && (
+            <button type="button" className="btn" onClick={() => requestWiredArchiveShutdown()}>
+              {t('special.leave.wired')}
+            </button>
+          )}
+          <p className="muted os-set-hint">{t('special.leave.hint')}</p>
+        </SettingsCard>
+      )}
       <SettingsCard
         id="companions"
         title={t('settings.companions.title')}
         description={t('settings.companions.desc')}
-        highlight={focusSettingId === 'companions'}
+        highlight={focusSettingId === 'companions' || focusSettingId === 'companion-activeness'}
         trailing={
           <label className="os-toggle os-toggle-compact">
             <input
               type="checkbox"
               checked={env.companionsEnabled}
-              disabled={!env.enabled}
-              onChange={(e) => patchEnv({ companionsEnabled: e.target.checked })}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  patchEnv({
+                    enabled: true,
+                    companionsEnabled: true,
+                  });
+                } else {
+                  forceCompanionsOff();
+                }
+              }}
               aria-label={t('settings.companions.showInApp')}
             />
             <span>{env.companionsEnabled ? t('common.on') : t('common.off')}</span>
@@ -247,6 +345,23 @@ export default function CompanionsPage() {
             </button>
           ))}
         </div>
+        <div className="os-viz-row">
+          <span className="os-viz-label muted">{t('settings.companions.activeness')}</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={env.companionActiveness ?? 0.4}
+            disabled={!env.enabled || !env.companionsEnabled}
+            onChange={(e) => patchEnv({ companionActiveness: Number(e.target.value) })}
+            aria-label={t('search.companionActiveness')}
+          />
+          <span className="muted">{Math.round((env.companionActiveness ?? 0.4) * 100)}%</span>
+        </div>
+        <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>
+          {t('settings.companions.activeness.hint')}
+        </p>
         <label className="os-toggle">
           <input
             type="checkbox"
@@ -330,7 +445,7 @@ export default function CompanionsPage() {
                 <option key={r.id} value={r.id}>
                   {r.name}
                   {r.builtin ? t('settings.companions.builtinSuffix') : ''}
-                  {r.forType && r.forType !== '*' ? ` · ${r.forType}` : ''}
+                  {r.forType && r.forType !== '*' ? ` · ${routineTypeLabel(r)}` : ''}
                 </option>
               ))}
             </select>
@@ -364,6 +479,32 @@ export default function CompanionsPage() {
         </div>
         {testMsg && <p className="muted os-set-hint">{testMsg}</p>}
 
+        <ul className="buddy-routine-list">
+          {routines.map((r) => (
+            <li key={r.id} className={`buddy-routine-row${editId === r.id ? ' is-active' : ''}`}>
+              <button type="button" className="buddy-routine-select" onClick={() => setEditId(r.id)}>
+                <span className="buddy-routine-name">
+                  {r.name}
+                  {r.builtin ? t('settings.companions.builtinSuffix') : ''}
+                </span>
+                <span className="muted buddy-routine-meta">
+                  {routineTypeLabel(r)} · {triggerLabel(r.trigger)}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="btn small"
+                disabled={testingId === r.id}
+                onClick={() => void testRunRoutine(r)}
+              >
+                {testingId === r.id
+                  ? t('settings.companions.testRunning')
+                  : t('settings.companions.test')}
+              </button>
+            </li>
+          ))}
+        </ul>
+
         {editing && (
           <div className="buddy-prog-editor">
             <div className="buddy-prog-toolbar">
@@ -395,6 +536,84 @@ export default function CompanionsPage() {
                   ))}
                 </select>
               </label>
+            </div>
+
+            <div className="buddy-prog-toolbar">
+              <label className="pl-field">
+                <span className="muted">{t('settings.companions.trigger')}</span>
+                <select
+                  className="set-select"
+                  value={editing.trigger?.kind ?? 'none'}
+                  disabled={editing.builtin}
+                  onChange={(e) => {
+                    const kind = e.target.value;
+                    if (kind === 'musicPlaying') setTrigger({ kind: 'musicPlaying' });
+                    else if (kind === 'idle') setTrigger({ kind: 'idle', afterMs: 90_000 });
+                    else if (kind === 'timeOfDay')
+                      setTrigger({ kind: 'timeOfDay', startHour: 5, endHour: 11 });
+                    else setTrigger({ kind: 'none' });
+                  }}
+                >
+                  <option value="none">{t('settings.companions.trigger.none')}</option>
+                  <option value="timeOfDay">{t('settings.companions.trigger.timeOfDayOption')}</option>
+                  <option value="musicPlaying">{t('settings.companions.trigger.music')}</option>
+                  <option value="idle">{t('settings.companions.trigger.idleOption')}</option>
+                </select>
+              </label>
+              {editing.trigger?.kind === 'timeOfDay' && (
+                <>
+                  <label className="pl-field">
+                    <span className="muted">{t('settings.companions.trigger.startHour')}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={23}
+                      disabled={editing.builtin}
+                      value={editing.trigger.startHour}
+                      onChange={(e) =>
+                        setTrigger({
+                          kind: 'timeOfDay',
+                          startHour: Number(e.target.value),
+                          endHour: editing.trigger?.kind === 'timeOfDay' ? editing.trigger.endHour : 11,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="pl-field">
+                    <span className="muted">{t('settings.companions.trigger.endHour')}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={24}
+                      disabled={editing.builtin}
+                      value={editing.trigger.endHour}
+                      onChange={(e) =>
+                        setTrigger({
+                          kind: 'timeOfDay',
+                          startHour:
+                            editing.trigger?.kind === 'timeOfDay' ? editing.trigger.startHour : 5,
+                          endHour: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              )}
+              {editing.trigger?.kind === 'idle' && (
+                <label className="pl-field">
+                  <span className="muted">{t('settings.companions.trigger.idleSeconds')}</span>
+                  <input
+                    type="number"
+                    min={15}
+                    max={3600}
+                    disabled={editing.builtin}
+                    value={Math.round(editing.trigger.afterMs / 1000)}
+                    onChange={(e) =>
+                      setTrigger({ kind: 'idle', afterMs: Number(e.target.value) * 1000 })
+                    }
+                  />
+                </label>
+              )}
             </div>
 
             <p className="muted os-set-hint">{t('settings.companions.stepsHint')}</p>
@@ -449,12 +668,13 @@ export default function CompanionsPage() {
                 className="btn small"
                 onClick={() => {
                   const id = `br-user-${Date.now().toString(36)}`;
+                  const steps = editing.steps.map((s) => sanitizeStep(s)).filter((s): s is BuddyStep => !!s);
                   const fork: BuddyRoutine = {
                     ...editing,
                     id,
                     name: `${editing.name}${t('settings.companions.copySuffix')}`,
                     builtin: false,
-                    steps: editing.steps.map((s) => sanitizeStep(s)!).filter(Boolean),
+                    steps,
                   };
                   setRoutines([...routines, fork]);
                   setEditId(id);

@@ -47,6 +47,28 @@ function cleanJapanese(text: string): string {
     .join('\n');
 }
 
+const TESS_NOISY_WARNING = /^Parameter not found:/;
+
+/**
+ * The bundled LSTM-only tesseract core still gets the full legacy parameter
+ * set pushed at init (upstream tesseract.js behavior, not something set in
+ * this file), so every recognize() call logs a "Parameter not found: ..."
+ * warning per unrecognized legacy key. Drop just those during the call so
+ * DevTools doesn't fill with noise; nothing else is silenced.
+ */
+async function withoutTesseractParamWarnings<T>(fn: () => Promise<T>): Promise<T> {
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && TESS_NOISY_WARNING.test(args[0])) return;
+    original(...args);
+  };
+  try {
+    return await fn();
+  } finally {
+    console.warn = original;
+  }
+}
+
 /** Recognize Japanese text in a base64 image data URL. Returns cleaned text. */
 export async function runOcr(
   dataUrl: string,
@@ -56,7 +78,7 @@ export async function runOcr(
   activeProgress = onProgress ?? null;
   try {
     const worker = await getWorker(lang);
-    const { data } = await worker.recognize(dataUrl);
+    const { data } = await withoutTesseractParamWarnings(() => worker.recognize(dataUrl));
     return cleanJapanese(data.text);
   } finally {
     activeProgress = null;

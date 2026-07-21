@@ -18,6 +18,7 @@ import {
   initYomitan,
   listYomitanDicts,
   lookupGlossary,
+  lookupOfflineDeinflected,
   lookupTermMerged,
   moveYomitanDict,
   removeYomitanDict,
@@ -116,12 +117,13 @@ export async function lookupTerm(query: string): Promise<DictResult> {
   return lookupTermMerged(query, lookupWord);
 }
 
-/** Offline-only Yomitan glossary lookup — no Jisho HTTP. */
+/** Offline-only Yomitan glossary lookup (de-inflection aware) — no Jisho HTTP. */
 export async function lookupTermOffline(query: string): Promise<DictResult> {
   await initYomitan();
   const q = (query ?? '').trim();
   if (!q) return { query: q, entries: [] };
-  return { query: q, entries: lookupGlossary(q) };
+  const local = lookupOfflineDeinflected(q);
+  return { query: q, entries: local.entries, deinflection: local.deinflection };
 }
 
 // ----- Persistent gloss cache ----------------------------------------------

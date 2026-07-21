@@ -19,6 +19,14 @@ export interface JpToken {
   lemma: string;
   /** True for vocabulary worth tracking (nouns/verbs/adjectives/adverbs). */
   content: boolean;
+  /** True for 名詞,固有名詞 (proper nouns) — filtered out of comprehensibility scoring. */
+  proper: boolean;
+  /** IPADIC part of speech, e.g. 名詞 / 動詞 / 助詞. */
+  pos: string;
+  /** IPADIC pos_detail_1 subtype, e.g. 格助詞 / 係助詞 ('*' when absent). */
+  posDetail: string;
+  /** Katakana reading from IPADIC when present. */
+  reading?: string;
 }
 
 // The fork ships no types; model just what we use.
@@ -27,6 +35,7 @@ interface IpadicFeatures {
   basic_form: string;
   pos: string;
   pos_detail_1: string;
+  reading?: string;
 }
 interface Tokenizer {
   tokenize(text: string): IpadicFeatures[];
@@ -115,6 +124,10 @@ export function tokenizeSync(text: string): JpToken[] {
     surface: t.surface_form,
     lemma: t.basic_form && t.basic_form !== '*' ? t.basic_form : t.surface_form,
     content: isContent(t),
+    proper: t.pos === '名詞' && t.pos_detail_1 === '固有名詞',
+    pos: t.pos,
+    posDetail: t.pos_detail_1,
+    reading: t.reading && t.reading !== '*' ? t.reading : undefined,
   }));
 }
 

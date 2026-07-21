@@ -1,16 +1,11 @@
 import type { MiningEnrichHealth, MiningEnrichProgress } from '../../shared/mining';
+import { useT } from '../i18n';
 
 type Props = {
   progress: MiningEnrichProgress | null;
-  active: boolean;
+  /** Defaults to true when omitted (simple mining pass). */
+  active?: boolean;
   compact?: boolean;
-};
-
-const PHASE_LABELS: Record<MiningEnrichProgress['phase'], string> = {
-  tokenize: 'Tokenize',
-  gloss: 'Dictionary',
-  translation: 'Translate',
-  export: 'Export',
 };
 
 function phasePercent(progress: MiningEnrichProgress): number {
@@ -36,11 +31,18 @@ function healthSegments(health: MiningEnrichHealth): {
   };
 }
 
-export default function MiningProgressPanel({ progress, active, compact }: Props) {
+export default function MiningProgressPanel({ progress, active = true, compact }: Props) {
+  const { t } = useT();
   if (!active || !progress) return null;
 
+  const PHASE_KEYS: Record<MiningEnrichProgress['phase'], string> = {
+    tokenize: 'mining.progress.phase.tokenize',
+    gloss: 'mining.progress.phase.gloss',
+    translation: 'mining.progress.phase.translation',
+    export: 'mining.progress.phase.export',
+  };
   const pct = phasePercent(progress);
-  const phaseLabel = PHASE_LABELS[progress.phase] ?? progress.phase;
+  const phaseLabel = t(PHASE_KEYS[progress.phase] ?? 'mining.progress.phase.export');
   const health = progress.health;
   const segments = health ? healthSegments(health) : null;
 
@@ -73,20 +75,24 @@ export default function MiningProgressPanel({ progress, active, compact }: Props
           <div className="mining-health-legend">
             {health!.dictFields > 0 && (
               <span>
-                <i className="mining-health-dot dict" /> Dictionary {health!.dictFields.toLocaleString()}
+                <i className="mining-health-dot dict" />{' '}
+                {t('mining.progress.legend.dictionary', { count: health!.dictFields })}
               </span>
             )}
             <span>
-              <i className="mining-health-dot ok" /> Translated {health!.translated.toLocaleString()}
+              <i className="mining-health-dot ok" />{' '}
+              {t('mining.progress.legend.translated', { count: health!.translated })}
             </span>
             {health!.failed > 0 && (
               <span>
-                <i className="mining-health-dot fail" /> Failed {health!.failed.toLocaleString()}
+                <i className="mining-health-dot fail" />{' '}
+                {t('mining.progress.legend.failed', { count: health!.failed })}
               </span>
             )}
             {health!.pending > 0 && (
               <span>
-                <i className="mining-health-dot pending" /> Queued {health!.pending.toLocaleString()}
+                <i className="mining-health-dot pending" />{' '}
+                {t('mining.progress.legend.queued', { count: health!.pending })}
               </span>
             )}
           </div>

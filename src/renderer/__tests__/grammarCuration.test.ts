@@ -176,19 +176,34 @@ describe('against the shipped corpus', () => {
   });
 
   it('approving the whole queue verifies it and nothing else', () => {
+    /*
+     * Some modules ship `verified` before any review happens — hsk-extra is
+     * authored against the canonical taxonomy with its own examples, so nothing
+     * in it is waiting on a verdict. Curation must leave those alone, which is
+     * why this compares id *sets* against that baseline rather than counting:
+     * a count check would pass just as well if approval quietly re-verified a
+     * record the queue never contained.
+     */
+    const alreadyVerified = GRAMMAR
+      .filter((p) => p.provenance.verification === 'verified')
+      .map((p) => p.id);
+
     const queue = curationQueue(GRAMMAR, {}, 'imported-unreviewed');
     const state = setVerdict({}, queue.map((p) => p.id), 'approved', 1);
     const applied = applyCuration(GRAMMAR, state);
 
     const verified = applied.filter((p) => p.provenance.verification === 'verified');
-    expect(verified.length).toBe(queue.length);
+    expect(new Set(verified.map((p) => p.id))).toEqual(
+      new Set([...alreadyVerified, ...queue.map((p) => p.id)]),
+    );
 
     // Rejecting the same set must return the corpus to where it started.
     const rejected = applyCuration(
       GRAMMAR,
       setVerdict({}, queue.map((p) => p.id), 'rejected', 1),
     );
-    expect(rejected.filter((p) => p.provenance.verification === 'verified')).toEqual([]);
+    expect(rejected.filter((p) => p.provenance.verification === 'verified').map((p) => p.id))
+      .toEqual(alreadyVerified);
     expect(rejected.some((p) => p.examples.some((e) => e.source === 'tatoeba'))).toBe(false);
   });
 });

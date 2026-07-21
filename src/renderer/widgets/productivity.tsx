@@ -8,6 +8,7 @@ import {
   onCalendarChanged,
   type EventOccurrence,
 } from '../calendar';
+import { useT } from '../i18n';
 
 // ---------- Digital clock ----------
 export function DigitalClock({ settings, size }: WidgetProps) {
@@ -87,6 +88,7 @@ export function AnalogClock({ size }: WidgetProps) {
 // the full Calendar app on click. Never duplicates calendar logic — the month
 // grid here is pure display, events/recurrence live only in calendar.ts.
 export function CalendarWidget() {
+  const { t } = useT();
   const [view, setView] = useState(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() };
@@ -114,11 +116,11 @@ export function CalendarWidget() {
     d === today.getDate() && view.m === today.getMonth() && view.y === today.getFullYear();
   const openFull = () => window.dispatchEvent(new CustomEvent('os:open', { detail: 'calendar' }));
   return (
-    <div className="wgt wgt-cal" onClick={openFull} role="button" tabIndex={0} title="Open Calendar">
+    <div className="wgt wgt-cal" onClick={openFull} role="button" tabIndex={0} title={t('widgets.calendarWidget.openTitle')}>
       <div className="wgt-cal-head">
-        <button className="wgt-btn-icon" onClick={(e) => shift(-1, e)} title="Previous month">‹</button>
+        <button className="wgt-btn-icon" onClick={(e) => shift(-1, e)} title={t('widgets.calendarWidget.prevMonth')}>‹</button>
         <span>{monthLabel}</span>
-        <button className="wgt-btn-icon" onClick={(e) => shift(1, e)} title="Next month">›</button>
+        <button className="wgt-btn-icon" onClick={(e) => shift(1, e)} title={t('widgets.calendarWidget.nextMonth')}>›</button>
       </div>
       <div className="wgt-cal-grid">
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
@@ -149,6 +151,7 @@ export function CalendarWidget() {
 
 // ---------- Pomodoro ----------
 export function Pomodoro({ settings, setSettings }: WidgetProps) {
+  const { t } = useT();
   const workMin = readSetting(settings, 'workMin', 25);
   const breakMin = readSetting(settings, 'breakMin', 5);
   const [mode, setMode] = useState<'work' | 'break'>('work');
@@ -181,11 +184,11 @@ export function Pomodoro({ settings, setSettings }: WidgetProps) {
   const pct = total > 0 ? 1 - left / total : 0;
   return (
     <div className="wgt wgt-pomo">
-      <div className="wgt-pomo-mode">{mode === 'work' ? 'Focus' : 'Break'}</div>
+      <div className="wgt-pomo-mode">{mode === 'work' ? t('widgets.pomodoro.focus') : t('widgets.pomodoro.break')}</div>
       <div className="wgt-pomo-time">{mm}:{ss}</div>
       <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${pct * 100}%` }} /></div>
       <div className="wgt-row">
-        <button className="wgt-btn" onClick={() => setRunning((r) => !r)}>{running ? 'Pause' : 'Start'}</button>
+        <button className="wgt-btn" onClick={() => setRunning((r) => !r)}>{running ? t('common.pause') : t('common.start')}</button>
         <button
           className="wgt-btn"
           onClick={() => {
@@ -193,15 +196,15 @@ export function Pomodoro({ settings, setSettings }: WidgetProps) {
             setLeft((mode === 'work' ? workMin : breakMin) * 60);
           }}
         >
-          Reset
+          {t('common.reset')}
         </button>
       </div>
       <div className="wgt-row wgt-pomo-cfg">
-        <label>Focus
+        <label>{t('widgets.pomodoro.focus')}
           <input type="number" min={1} max={90} value={workMin}
             onChange={(e) => setSettings({ workMin: Math.max(1, Number(e.target.value) || 25) })} />
         </label>
-        <label>Break
+        <label>{t('widgets.pomodoro.break')}
           <input type="number" min={1} max={60} value={breakMin}
             onChange={(e) => setSettings({ breakMin: Math.max(1, Number(e.target.value) || 5) })} />
         </label>
@@ -212,6 +215,7 @@ export function Pomodoro({ settings, setSettings }: WidgetProps) {
 
 // ---------- Stopwatch ----------
 export function Stopwatch() {
+  const { t } = useT();
   const [ms, setMs] = useState(0);
   const [running, setRunning] = useState(false);
   const startRef = useRef(0);
@@ -238,8 +242,8 @@ export function Stopwatch() {
     <div className="wgt wgt-stopwatch">
       <div className="wgt-pomo-time">{label}</div>
       <div className="wgt-row">
-        <button className="wgt-btn" onClick={() => (running ? stop() : setRunning(true))}>{running ? 'Stop' : 'Start'}</button>
-        <button className="wgt-btn" onClick={reset}>Reset</button>
+        <button className="wgt-btn" onClick={() => (running ? stop() : setRunning(true))}>{running ? t('common.stop') : t('common.start')}</button>
+        <button className="wgt-btn" onClick={reset}>{t('common.reset')}</button>
       </div>
     </div>
   );
@@ -247,6 +251,7 @@ export function Stopwatch() {
 
 // ---------- Countdown ----------
 export function Countdown({ settings, setSettings }: WidgetProps) {
+  const { t } = useT();
   const minutes = readSetting(settings, 'minutes', 10);
   const [left, setLeft] = useState(minutes * 60);
   const [running, setRunning] = useState(false);
@@ -265,9 +270,9 @@ export function Countdown({ settings, setSettings }: WidgetProps) {
     <div className="wgt wgt-countdown">
       <div className={`wgt-pomo-time ${done ? 'wgt-flash' : ''}`}>{mm}:{ss}</div>
       <div className="wgt-row">
-        <button className="wgt-btn" onClick={() => setRunning((r) => !r)}>{running ? 'Pause' : 'Start'}</button>
-        <button className="wgt-btn" onClick={() => { setRunning(false); setLeft(minutes * 60); }}>Reset</button>
-        <label className="wgt-inline-cfg">min
+        <button className="wgt-btn" onClick={() => setRunning((r) => !r)}>{running ? t('common.pause') : t('common.start')}</button>
+        <button className="wgt-btn" onClick={() => { setRunning(false); setLeft(minutes * 60); }}>{t('common.reset')}</button>
+        <label className="wgt-inline-cfg">{t('widgets.countdown.minLabel')}
           <input type="number" min={1} max={999} value={minutes}
             onChange={(e) => setSettings({ minutes: Math.max(1, Number(e.target.value) || 10) })} />
         </label>
@@ -283,6 +288,7 @@ interface Todo {
   done: boolean;
 }
 export function TodoList({ settings, setSettings }: WidgetProps) {
+  const { t } = useT();
   const items = readSetting<Todo[]>(settings, 'items', []);
   const [draft, setDraft] = useState('');
   const write = (next: Todo[]) => setSettings({ items: next });
@@ -297,14 +303,14 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
       <div className="wgt-todo-add">
         <input
           value={draft}
-          placeholder="Add a task…"
+          placeholder={t('widgets.todo.addPlaceholder')}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
         />
-        <button className="wgt-btn-icon" onClick={add} title="Add">+</button>
+        <button className="wgt-btn-icon" onClick={add} title={t('common.add')}>+</button>
       </div>
       <ul className="wgt-todo-list">
-        {items.length === 0 && <li className="wgt-empty">No tasks yet.</li>}
+        {items.length === 0 && <li className="wgt-empty">{t('widgets.todo.emptyHint')}</li>}
         {items.map((it) => (
           <li key={it.id} className={it.done ? 'done' : ''}>
             <label>
@@ -315,7 +321,7 @@ export function TodoList({ settings, setSettings }: WidgetProps) {
               />
               <span>{it.text}</span>
             </label>
-            <button className="wgt-btn-icon" title="Remove" onClick={() => write(items.filter((x) => x.id !== it.id))}>×</button>
+            <button className="wgt-btn-icon" title={t('common.remove')} onClick={() => write(items.filter((x) => x.id !== it.id))}>×</button>
           </li>
         ))}
       </ul>

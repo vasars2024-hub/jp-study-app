@@ -14,8 +14,9 @@
   --glass-blur: 26px;
 }
 
-/* ---------- Performance: lighter blur, keep motion ----------------------- */
-:root[data-perf='performance'] {
+/* ---------- Performance/Balanced: lighter blur, keep motion -------------- */
+:root[data-perf='performance'],
+:root[data-perf='balanced'] {
   --glass-blur: 8px;
   --blur-md: 6px;
   --blur-lg: 8px;

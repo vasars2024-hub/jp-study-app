@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import Icon from '../Icons';
 import { groupLabelKey, pageMeta, SETTINGS_NAV } from './settingsRegistry';
 import { getRecentPages } from './settingsRecent';
@@ -5,6 +6,9 @@ import { useSettings } from './SettingsContext';
 import { loadThemeId, THEMES } from '../../theme';
 import type { SettingsPageId } from './types';
 import { useT } from '../../i18n';
+import { LANG_LABELS, LANG_TAGS } from '../../../shared/i18n/core';
+import { useAeroMaterials } from '../ui';
+import { requestWiredArchiveEntry } from '../../wiredArchiveLifecycle';
 
 const QUICK: {
   page: SettingsPageId;
@@ -12,10 +16,11 @@ const QUICK: {
   icon: (typeof SETTINGS_NAV)[0]['icon'];
   settingId?: string;
 }[] = [
-  { page: 'wallpaper', labelKey: 'settings.home.quick.wallpaper', icon: 'image' },
-  { page: 'shortcuts', labelKey: 'settings.home.quick.shortcuts', icon: 'command' },
-  { page: 'lockscreen', labelKey: 'Lockscreen & PIN', icon: 'lock', settingId: 'lockscreen-enable' },
   { page: 'appearance', labelKey: 'settings.home.quick.theme', icon: 'sparkle', settingId: 'theme' },
+  { page: 'appearance', labelKey: 'settings.home.quick.language', icon: 'globe', settingId: 'ui-language' },
+  { page: 'study', labelKey: 'settings.home.quick.extension', icon: 'globe', settingId: 'extension-bridge' },
+  { page: 'special', labelKey: 'settings.home.quick.blancMode', icon: 'wrench', settingId: 'blanc-mode' },
+  { page: 'wallpaper', labelKey: 'settings.home.quick.wallpaper', icon: 'image' },
   { page: 'companions', labelKey: 'settings.home.quick.companions', icon: 'heart' },
   {
     page: 'atmosphere',
@@ -23,12 +28,19 @@ const QUICK: {
     icon: 'flame',
     settingId: 'particles',
   },
+  { page: 'shortcuts', labelKey: 'settings.home.quick.shortcuts', icon: 'command' },
+  { page: 'lockscreen', labelKey: 'settings.home.quick.lockscreen', icon: 'lock', settingId: 'lockscreen-enable' },
   { page: 'memory', labelKey: 'settings.home.quick.memory', icon: 'folder', settingId: 'backup' },
 ];
 
 export default function SettingsHome() {
   const s = useSettings();
-  const { t } = useT();
+  const { t, lang } = useT();
+  const aero = useAeroMaterials();
+  const [diagArmed, setDiagArmed] = useState(false);
+  const [diagCode, setDiagCode] = useState('');
+  const [diagMessage, setDiagMessage] = useState('SERVICE PORT SEALED');
+  const diagClickRef = useRef({ count: 0, last: 0 });
   const recent = getRecentPages();
   const themeLabel = THEMES.find((th) => th.id === (s.theme || loadThemeId()))?.label ?? s.theme;
   const wallLabel =
@@ -46,6 +58,10 @@ export default function SettingsHome() {
       </header>
 
       <section className="os-set-home-status" aria-label={t('settings.home.statusAria')}>
+        <div className="os-set-status-chip">
+          <span className="muted">{t('settings.home.language')}</span>
+          <strong lang={LANG_TAGS[lang]}>{LANG_LABELS[lang]}</strong>
+        </div>
         <div className="os-set-status-chip">
           <span className="muted">{t('settings.home.theme')}</span>
           <strong>{s.look.autoTheme ? t('settings.home.auto') : themeLabel}</strong>
@@ -71,6 +87,62 @@ export default function SettingsHome() {
           </strong>
         </div>
       </section>
+
+      {aero && (
+        <section className={`wired-access-card${diagArmed ? ' is-armed' : ''}`} aria-label="CRT diagnostic access">
+          <button
+            type="button"
+            className="wired-access-tile"
+            onClick={() => {
+              const now = Date.now();
+              const prev = diagClickRef.current;
+              const count = now - prev.last < 1200 ? prev.count + 1 : 1;
+              diagClickRef.current = { count, last: now };
+              if (count >= 3) {
+                setDiagArmed(true);
+                setDiagMessage('LAYER ACCESS PORT OPEN');
+              } else {
+                setDiagMessage(`CRT DIAG PULSE ${count}/3`);
+              }
+            }}
+          >
+            <Icon name="monitor" size={18} />
+            <span>
+              <strong>CRT DIAG / LAYER ACCESS</strong>
+              <small>{diagMessage}</small>
+            </span>
+          </button>
+          {diagArmed && (
+            <form
+              className="wired-access-command"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (diagCode.trim().toUpperCase() === 'WIRED') {
+                  setDiagMessage('SUBSYSTEM HANDOFF ACCEPTED');
+                  requestWiredArchiveEntry();
+                } else {
+                  setDiagMessage('ACCESS CODE REJECTED');
+                  setDiagCode('');
+                }
+              }}
+            >
+              <label htmlFor="wired-access-command">SERVICE COMMAND</label>
+              <div>
+                <span aria-hidden="true">&gt;</span>
+                <input
+                  id="wired-access-command"
+                  value={diagCode}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => setDiagCode(event.currentTarget.value)}
+                  placeholder="ENTER CODE"
+                />
+                <button type="submit">RUN</button>
+              </div>
+            </form>
+          )}
+        </section>
+      )}
 
       <section aria-label={t('settings.home.quickActionsAria')}>
         <h3 className="os-set-home-section-title">{t('settings.home.quickActions')}</h3>

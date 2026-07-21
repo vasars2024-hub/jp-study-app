@@ -3,6 +3,7 @@ doc_id: noctis.citizen_system
 tier: 7
 authority: domain_specification
 role: citizen_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -34,7 +35,7 @@ ECOLOGY_SYSTEM.md              Tier 7 — Ecological Domain Blueprint
 CITIZEN_SYSTEM.md              Tier 7 — Citizen Domain Blueprint (this file)
 ```
 
-`ECOLOGY_SYSTEM.md` and this document are Tier 7 peers. In the per-evaluation dependency topology of `SIMULATION_SYSTEMS.md` Section 11, the citizen layer sits *downstream* of the ecological layer — population emerges from ecological prosperity — and *upstream* of culture and memory, which read what the Noctae express. This document therefore treats ecology as an input and culture and memory as consumers, and it may specialize citizen behavior only; it may not redefine civilization philosophy.
+`ECOLOGY_SYSTEM.md` and this document are Tier 7 peers. In the per-evaluation dependency topology of `SIMULATION_SYSTEMS.md` Section 13, the citizen layer sits *downstream* of the ecological layer — population emerges from ecological prosperity — and *upstream* of culture and memory, which read what the Noctae express. This document therefore treats ecology as an input and culture and memory as consumers, and it may specialize citizen behavior only; it may not redefine civilization philosophy.
 
 ### The Identity Guardrail
 
@@ -44,7 +45,7 @@ The Noctae are not NPC workers, not controllable units, not a population statist
 
 **Binds:** the citizen philosophy; the behavioral specialization of the Noctae atop their fixed canon anatomy; the abstract citizen-state projection; the emergence law and its monotone guarantee; the social and communication model; the catalogue of symbolic roles; the mapping from learning to citizen expression; the citizen-side consequences of the four canonical events; the citizen-to-culture and citizen-to-memory edges; the citizen reading of the time model; the citizen validation rules.
 
-**Refuses to bind:** Noctae anatomy, which is fixed by `NOCTIS_ECOLOGICAL_ENGINE.md` Section 1 and only *reused* here, never extended; the population physics values and thresholds (`SIMULATION_SYSTEMS.md` Section 8, bound at implementation, each value carrying a canon citation); the exact field identifiers of any state; the rendering, sprite, motion, and lore-prose behavior through which citizens are shown (property of `ART_DIRECTION.md`, the Tier 8 pipelines, and — for lore capture — `MEMORY_SYSTEM.md`); the deterministic event-flag set, closed at Tier 5/6; any code or type definition. No numeric anchors appear here beyond the three the canon locks: the three-consecutive-day consistency trigger, the five-day absence horizon, and the ten-minute reawakening session.
+**Refuses to bind:** Noctae anatomy, which is fixed by `NOCTIS_ECOLOGICAL_ENGINE.md` Section 1 and only *reused* here, never extended; the population physics values and thresholds (`SIMULATION_SYSTEMS.md` Sections 2 and 19, bound at implementation, each value carrying a canon citation); the exact field identifiers of any state; the rendering, sprite, motion, and lore-prose behavior through which citizens are shown (property of `ART_DIRECTION.md`, the Tier 8 pipelines, and — for lore capture — `MEMORY_SYSTEM.md`); the deterministic event-flag set, closed at Tier 5/6; any code or type definition. No numeric anchors appear here beyond the three the canon locks: the three-consecutive-day consistency trigger, the five-day absence horizon, and the ten-minute reawakening session.
 
 ### Notation
 
@@ -107,6 +108,10 @@ CitizenState  (a projection over the canonical population variables P and A_P)
 }
 ```
 
+### Era-Readiness Projection
+
+Citizen exposes `x_citizen ∈ [0, 1]`, a secured-maturity projection consumed only by `ERA_PROGRESSION.md`. It is derived from adaptation breadth, role differentiation, institutional participation, and skill-transmission depth. Population count `P` alone can never raise or satisfy this reading: a numerous but undifferentiated citizenry remains institutionally immature. `x_citizen` records maturity already achieved and therefore does not fall through ordinary user absence; active population expression `A_P` may still dim. Citizen owns this derivation, while Era Progression owns its weight, floor, and use in the six-domain gate (`SIMULATION_SYSTEMS.md` Section 15).
+
 ### Individuality Is Rendered, Not Stored
 
 This is the load-bearing architectural fidelity point of the citizen layer. The simulation state tracks population as **count `P`, activity `A_P`, and aggregate distributions** — not as a database of individual Noctae. An individual citizen — the one the user hovers, the one whose evening routine they watch, the one whose semaphore they capture — is a **deterministic expression rendered from that aggregate state**, exactly as `SIMULATION_SYSTEMS.md` Section 1 permits: "which path a citizen walks — that variety is either a deterministic function of existing state or a presentation choice made entirely inside the rendering layer."
@@ -130,7 +135,7 @@ P(t+1) = P(t) + growth( π )          growth >= 0, always
                 illumination, energy sufficiency )
 ```
 
-Growth is zero below the flourishing threshold and rises, with saturation, above it. As accumulated knowledge deepens, the ecology matures (the succession stages of `ECOLOGY_SYSTEM.md` Section 5) and the eras turn (`SIMULATION_SYSTEMS.md` Section 9); with that maturity the citizenry gains new biological complexity, forms social structures, and expresses more specialized symbolic roles (Section 6). Knowledge does not recruit citizens — it creates the conditions in which more life becomes possible, and life follows.
+Growth is zero below the flourishing threshold and rises, with saturation, above it. As accumulated knowledge deepens, the ecology matures (the succession stages of `ECOLOGY_SYSTEM.md` Section 5) and the eras turn (`SIMULATION_SYSTEMS.md` Section 15); with that maturity the citizenry gains new biological complexity, forms social structures, and expresses more specialized symbolic roles (Section 6). Knowledge does not recruit citizens — it creates the conditions in which more life becomes possible, and life follows.
 
 ### Population And Absence
 
@@ -144,7 +149,7 @@ One guarantee is permanent canon and never negotiable: **user absence never redu
 
 ### A Society That Does Not Speak
 
-The Noctae interact without vocal speech. Their entire social fabric is carried by the three channels of their biology (Section 2): **photophore signaling** (shuttered semaphore flashes at gatherings), **tactile information exchange** (lateral-line reading of cords and scrolls, and the felt air of a crowded plaza), and **resonance patterns** (in later eras, communication industrialized into phononic vibration and shutter-semaphore towers, per `SIMULATION_SYSTEMS.md` Section 9 — the detail of which is era territory for `TECHNOLOGY_SYSTEM.md`).
+The Noctae interact without vocal speech. Their entire social fabric is carried by the three channels of their biology (Section 2): **photophore signaling** (shuttered semaphore flashes at gatherings), **tactile information exchange** (lateral-line reading of cords and scrolls, and the felt air of a crowded plaza), and **resonance patterns** (in later eras, communication industrialized into phononic vibration and shutter-semaphore towers, per `SIMULATION_SYSTEMS.md` Section 15 — the detail of which is era territory for `TECHNOLOGY_SYSTEM.md`).
 
 Social structures emerge from three shared things, never from user arrangement:
 
@@ -197,13 +202,13 @@ Every one of these is a cross-time-step consequence of metabolized study, read f
 
 ## SECTION 8 — CITIZEN EVENTS
 
-This document defines **no new engine events**. The observable event set is closed at four flags, fixed by `ARCHITECTURE.md` Section 6 and `SIMULATION_SYSTEMS.md` Section 10 and emitted in canonical order: `THE_PHEROMONE_PLUME`, `BAROMETRIC_SHOCK_WAVE`, `ABYSSAL_DOUSE`, `BENTHIC_BLOOM`. What follows is the *citizen-side consequence* of each — behavior read from the same flags, adding no signal and no state the generator does not already produce.
+This document defines **no new engine events**. The observable event set is closed at four flags, fixed by `ARCHITECTURE.md` Section 6 and `SIMULATION_SYSTEMS.md` Section 12 and emitted in canonical order: `THE_PHEROMONE_PLUME`, `BAROMETRIC_SHOCK_WAVE`, `ABYSSAL_DOUSE`, `BENTHIC_BLOOM`. What follows is the *citizen-side consequence* of each — behavior read from the same flags, adding no signal and no state the generator does not already produce.
 
 **The Pheromone Plume — participation.** When high consistency opens the spore-moth season, the citizenry participates in migration observation: the Migration Observer role activates, citizens gather to witness the silver moth-lines crossing the world, and participation rhythm rises with circulation. The user's discipline becomes a visible civic season.
 
 **Barometric Shock Wave — protection.** When difficulty and failure depress atmospheric stability, the Noctae feel the cognitive pressure directly through their cranial lateral-lines. They retreat indoors, dim their photophores to the steady dark-crimson calm-sign, and settle into the fortification posture — pausing consumption and shoring foundations (`NOCTIS_ECOLOGICAL_ENGINE.md` Section 7; the valve-keeper of `GAME_DESIGN.md` Section 9 who "flashed the calm-sign to her whole tier, dark crimson and steady, until the pressure passed"). Nothing is lost; a hard week is met with endurance, never grief.
 
-**Abyssal Douse — preservation.** When extended absence carries the world into hibernation, citizen activity enters a preservation state: `A_P` settles to its dormant floor, the citizens go indoors to tend memory, and the population count is preserved exactly. No citizen is removed and none is shown dying (`SIMULATION_SYSTEMS.md` Sections 4 and 8). The city keeps a quiet night watch and waits.
+**Abyssal Douse — preservation.** When extended absence carries the world into hibernation, citizen activity enters a preservation state: `A_P` settles to its dormant floor, the citizens go indoors to tend memory, and the population count is preserved exactly. No citizen is removed and none is shown dying (`SIMULATION_SYSTEMS.md` Sections 5, 19, and 25). The city keeps a quiet night watch and waits.
 
 **Benthic Bloom — synchronization.** When a milestone fires the bloom, collective synchronization increases: the citizenry gathers at the civic core and its photophores pulse in unison with the rising neon-teal wave, a moment of the user's real achievement witnessed as one unified light.
 
@@ -211,7 +216,7 @@ This document defines **no new engine events**. The observable event set is clos
 
 ## SECTION 9 — CULTURAL RELATIONSHIP
 
-The citizen layer is the upstream source of culture. `CULTURE_SYSTEM.md` reads what the Noctae express and specializes it into cultural measure; this document supplies the living behavior, and the direction is one-way within any evaluation (`SIMULATION_SYSTEMS.md` Section 11). Citizen systems feed culture through:
+The citizen layer is the upstream source of culture. `CULTURE_SYSTEM.md` reads what the Noctae express and specializes it into cultural measure; this document supplies the living behavior, and the direction is one-way within any evaluation (`SIMULATION_SYSTEMS.md` Section 13). Citizen systems feed culture through:
 
 - **Communication evolution** — the semaphore-dialect drift of Section 5, the substrate on which dialect complexity is later measured.
 - **Rituals** — the gathering behaviors at hearths, pools, and plazas, and the seasonal observances around moths, vault processions, and blooms.
@@ -232,7 +237,7 @@ The permanence guarantees and the ledger itself are owned by Memory State (`SIMU
 
 ## SECTION 11 — TIME MODEL
 
-Citizens inherit their relationship to time from `ARCHITECTURE.md` Section 5 and `SIMULATION_SYSTEMS.md` Section 3: **event-driven updates, deterministic state changes, lazy offline progression, and no constant simulation ticking.** No citizen runs on a timer. The citizenry's state is evaluated with the world — on a learning input, or once per checkpoint over elapsed time — and between evaluations it simply holds. The ambient motion of citizens on screen during quiet minutes is the rendering layer breathing over a constant state, not per-citizen simulation.
+Citizens inherit their relationship to time from `ARCHITECTURE.md` Section 5 and `SIMULATION_SYSTEMS.md` Section 4: **event-driven updates, deterministic state changes, lazy offline progression, and no constant simulation ticking.** No citizen runs on a timer. The citizenry's state is evaluated with the world — on a learning input, or once per checkpoint over elapsed time — and between evaluations it simply holds. The ambient motion of citizens on screen during quiet minutes is the rendering layer breathing over a constant state, not per-citizen simulation.
 
 Offline, the citizen layer follows the decay model: `A_P` dims through the exponential decay of renewable activity while the count `P` holds untouched, and the first canonical ten-minute reawakening session lifts activity back toward presence. Because individual Noctae are deterministic expressions of aggregate state (Section 3), they are re-expressed on evaluation rather than persistently ticked — five days of absence and five hundred produce the same sleeping, preserved citizenry, waking to the same lives.
 

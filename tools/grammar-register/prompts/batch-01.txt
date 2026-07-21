@@ -1,0 +1,192 @@
+You are labelling Japanese grammar patterns by REGISTER — the speech level a
+pattern belongs to. Batch 1 of 14.
+
+## The four values
+
+neutral   - works at any speech level. THE DEFAULT AND MOST COMMON ANSWER.
+casual    - only natural in informal speech between equals or intimates
+            (contractions, blunt sentence-final particles, slang endings).
+business  - honorific / humble / formal-polite. Would appear in a business
+            email, an announcement, or speech to a customer or superior.
+literary  - written or classical. Would appear in an essay, a legal notice, or
+            fiction, but sounds archaic or stiff spoken aloud.
+
+## Rules — read these before answering
+
+- **Most patterns are neutral, and neutral is a real answer, not a fallback.**
+  Japanese politeness is carried by the sentence-final predicate, not by the
+  grammar pattern. 〜ながら is identical in 食べながら見た and 食べながら見ました,
+  so it is neutral.
+  If you find yourself labelling more than about a fifth of a batch as
+  non-neutral, you are over-assigning.
+- Do NOT infer register from the English meaning text. A gloss reading "a less
+  formal way to say X" describes the pattern's *meaning*; it does not make the
+  pattern casual. Judge from the Japanese form itself.
+- Politeness is not register. A pattern shown in its 〜ます form is still
+  neutral unless the pattern *itself* is honorific or humble.
+- If you are unsure, answer neutral and append "?" to flag it for review.
+  A flagged guess is useful; a confident wrong answer is not.
+- Every input line must produce exactly one output line. Do not skip, merge,
+  or reorder.
+
+## Patterns (id, then pattern, then structure, then meaning)
+
+n1x-tomiete	〜とみえて / 〜とみえる	Plain form + とみえて	it seems that ~ (judging from evidence)
+n1x-toareba	〜とあれば	Noun / plain form + とあれば	if it is the case that ~ (then naturally)
+n1x-katagata	〜かたがた	Noun + かたがた	while ~ / for the purpose of ~ as well
+n1x-tomonaku	〜ともなく / 〜ともなしに	Verb dictionary + ともなく	without consciously ~ / absentmindedly ~
+n1x-gurumi	〜ぐるみ	Noun + ぐるみ	together with ~ / the whole ~
+n1x-nami	〜並み	Noun + 並み（なみ）	on par with ~ / the same level as ~
+n1x-tokitara	〜ときたら	Noun + ときたら	when it comes to ~ (often complaining)
+n1x-kotonashini	〜ことなしに	Verb dictionary + ことなしに	without doing ~
+n1x-houdai	〜放題	Verb ます-stem / Noun + 放題（ほうだい）	freely ~ / all-you-can ~ / left unchecked
+n1x-madademonai	〜までもない / 〜までもなく	Verb dictionary + までもない	there's no need to ~
+n1x-nitaru	〜に足る / 〜に足りない	Verb dictionary / Noun + に足る（たる）	worth ~ing / not worth ~ing
+n1x-meku	〜めく	Noun + めく	to show signs of ~ / to become ~-like
+n1x-tatokorode	〜たところで	Verb た-form + ところで	even if ~, it’s useless
+n1x-buru	〜ぶる	Noun / Adjective stem + ぶる	to put on airs / to act like ~
+n1x-wokagirini	〜を限りに	Noun + を限りに（をかぎりに）	with ~ as the limit / from ~ on (ending)
+n1x-atteno	〜あっての	Noun + あっての + Noun	which exists only thanks to ~
+n1x-tekaratoiumono	〜てからというもの	Verb て-form + からというもの	ever since ~ (a marked change followed)
+n1x-narini	〜なりに / 〜なりの	Noun + なりに / なりの	in one’s own way (suited to ~)
+n1x-wokawakirini	〜を皮切りに（して）	Noun + を皮切りに（をかわきりに）	starting with ~ (and spreading)
+n1x-nikakawaru	〜にかかわる	Noun + にかかわる	to affect ~ / to be a matter of ~
+n1x-naidewasumanai	〜ないではすまない / 〜ずにはすまない	Verb ない-form + ではすまない	can't get away without ~ing
+n1x-naidewaokanai	〜ないではおかない / 〜ずにはおかない	Verb ない-form + ではおかない	will surely ~ / cannot help but cause ~
+n1x-niataisuru	〜に値する / 〜に値しない	Noun / Verb dictionary + に値する（あたいする）	to be worthy of ~ / to deserve ~
+n1x-gasaigo	〜が最後 / 〜たら最後	Verb た-form + が最後 / たら最後	once ~ happens, (an inevitable bad result)
+n1x-tarasoremadeda	〜たらそれまでだ	Verb た-form + らそれまでだ	if ~ then that’s the end of it
+n1x-wonukinishite	〜を抜きにして（は）	Noun + を抜きにして	leaving ~ aside / without ~
+n1x-nishite	〜にして	Noun (time / number / stage) + にして	at ~ (a notable point) / only at ~
+n1x-toiutokoroda	〜というところだ / 〜といったところだ	Noun / plain form + といったところだ	at most ~ / about ~
+n1x-toittaranai	〜といったらない / 〜といったらありはしない	Noun / Adjective + といったらない	indescribably ~ / extremely ~
+n1x-kotokonouenai	〜ことこの上ない	Adjective + ことこの上ない（ことこのうえない）	could not be more ~ / extremely ~
+n1x-toshitatokorode	〜としたところで / 〜にしたところで	Noun / plain form + としたところで	even if ~ / even from the standpoint of ~
+n1m-g-0f01e6	としたところで/としたって/にしたところで/にしたって	としたところで/としたって/にしたところで/にしたって	Even if; Even supposing that ~
+n1m-g-7c114e	ことのないように	ことのないように	so as not to; to not ~
+n1m-g-c9645a	ならでは	ならでは	distinctive of; uniquely applying to; special to ~
+n1m-g-86d2c6	をよそに	をよそに	despite; without regards to ~
+n1m-g-59525e	にして	にして	at / on / under certain conditions (time, position, age, number of times)
+n1m-g-10e4fb	ばこそ	ばこそ	only because ~
+n1m-g-0dd7a7	というところだ/といったところだ	というところだ/といったところだ	at the most; no more than​; at best; roughl
+n1m-g-4ed4e0	とみると	とみると	as soon as one realizes ..., then ~
+n1m-g-f722aa	もさることながら	もさることながら	one may well say so, but~; not only... but also ~
+n1m-g-e87b14	に堪えない	に堪えない	not worth doing; can't do; cannot bear doing ~
+n1m-g-c936d4	なりとも/せめて～だけでも	なりとも/せめて～だけでも	at least; even just a little (adverbial particle)
+n1m-g-1f0de7	こそあれ	こそあれ	and; although; but ~
+n1m-g-390df6	ときているから/ときているので	ときているから/ときているので	because of ~
+n1m-g-1c7da5	すら/ですら	すら/ですら	even ~ (with emphasis)
+n1m-g-4c739f	が早いか	が早いか	no sooner than; as soon as ~
+n1m-g-e84bfb	かたわら	かたわら	while; besides; at the same time; in addition
+n1m-g-071752	に限る	に限る	is best; nothing is better than ~
+n1m-g-6ae8a2	ぶり	ぶり	style; manner; way​
+n1m-g-3557d1	に先駆けて	に先駆けて	prior to; to be the first (pioneer); being ahead of ~
+n1m-g-ddd61b	びる	びる	to seem to be; to appear; to behave as ~
+n1m-g-492211	なくして(は)～ない	なくして(は)～ない	cannot do without ~
+n1m-g-2eecc9	手前	手前	considering; before; in front of; one’s standpoint
+n1m-g-85b300	ものとして	ものとして	to assume; to suppose; on the presumption that ~
+n1m-g-0666a2	なしに(は)/なしで(は)	なしに(は)/なしで(は)	without; without doing ~
+n1m-g-4e74e5	くらいなら/ぐらいなら	くらいなら/ぐらいなら	rather than (do …)​
+n1m-g-d12fbe	限りだ	限りだ	to feel strongly
+n1m-g-0fd538	を限りに/限りで	を限りに/限りで	starting from; the last time (ending a continued action)
+n1m-g-7e3a0f	あっての	あっての	which owes everything to; which can exist solely due to the presence of; whose existence is determined ...
+n1m-g-ec6c8c	～かくして	～かくして	thus...
+n1m-g-7bf23b	ためしがない	ためしがない	is never the case; has never happened; I have never seen or heard of ~
+n1m-g-5030e8	～のは...ゆえである	～のは...ゆえである	dare to do this in the current difficult situation because …
+n1m-g-c96517	～やたらに	～やたらに	randomly; recklessly; blindly
+n1m-g-787614	～ないではおかない	～ないではおかない	will definitely/certainly do something; cannot not
+n1m-g-ef7cb6	わ...わ	わ...わ	so much, so many
+n1m-g-38d930	むやみに	むやみに	thoughtlessly, recklessly, rashly, indiscriminately, indiscreetly, at random
+n1m-g-f5675c	～べく	～べく	in order to; for the purpose of ~
+n1m-g-c86069	～にも程がある	～にも程がある	there is a limit to what is acceptable; to go too far
+n1m-g-f09d79	～すればいいものを	～すればいいものを	if only (someone) would do (something), should have done (something)
+n1m-g-c77ad5	～べくして	～べくして	as it is bound to (happen); following the natural course
+n1m-g-60b03f	～かと思いきや	～かと思いきや	contrary to expectations; or so we thought, but ~
+n1m-g-f24fa5	これまでだ	これまでだ	only; just; nothing else
+n1m-g-2bda66	にいわせれば	にいわせれば	if you ask...; if one may say...
+n1m-g-8a8058	～でなくてなんだろう	～でなくてなんだろう	must be; is definitely ~
+n1m-g-05ac06	～なにしろ	～なにしろ	at any rate; after all; anyhow; anyway; in any case; because; as you know ~
+n1m-g-334538	～べからざる	～べからざる	must not; should not; do not ~
+n1m-g-43953a	～ところを...	～ところを...	～While, at the moment
+n1m-g-d263a0	にかかっては	にかかっては	For...
+n1m-g-306de2	～ものとおもう	～ものとおもう	Believe~
+n1m-g-288ea1	いずれ	いずれ	anyhow; anyway; either way; in any case ~
+n1m-g-2f452a	～ たら … で	～ たら … で	if / in the case… of course / should ~
+n1m-g-7750d8	～かとなれば	～かとなれば	when it comes to; in such a case; if that happens
+n1m-g-9fc633	にかまけて	にかまけて	to be too busy; to focus / concentrate only on; obsessed with ~
+n1m-g-c58757	～こと請け合い	～こと請け合い	I guarantee ...
+n1m-g-59158e	～ぬまに	～ぬまに	without one's knowledge, without noticing
+n1m-g-f7fa7b	～からとおもって	～からとおもって	Because I think...
+n1m-g-1486bb	～かとおもえば...も	～かとおもえば...も	no sooner than
+n1m-v-ff330e	～Vず  して	～Vず  して	without doing ~
+n1m-g-937111	~ といっても間違いない	~ といっても間違いない	although I say; although one might say ~ it doesn't matter ...
+n1m-g-de0cdf	その...その	その...その	Every...
+n1m-g-7d744b	～ても ... れない	～ても ... れない	Even if I want to... I can't...
+n1m-g-6f8b36	～ないでいる／～ずにいる	～ないでいる／～ずにいる	～Still not...
+n1m-g-42c80f	～ひいては	～ひいては	by extension
+n1m-g-1c5217	～といわんばかり	～といわんばかり	as if to say
+n1m-g-50fafc	～に至る	～に至る	leads to; come to a conclusion
+n1m-g-a2e53c	～やまない	～やまない	always; never stop; can't help but ~
+n1m-g-d72766	... とされている	... とされている	to be considered as (A)
+n1m-g-68b837	～ようによっては	～ようによっては	depending on the way; depending on how; according to how ~
+n1m-g-06549b	にあっても	にあっても	Even in the situation...
+n1m-g-f007d1	気にもならない	気にもならない	it's no use; can't do
+n1m-g-7cc461	いうまでもないことだが	いうまでもないことだが	it goes without saying; there is no need to say so, but of course; it is needless to say
+n1m-g-3119f9	を前提に	を前提に	On the premise of
+n1m-g-f4882a	～いはしまいか	～いはしまいか	whether or not; considering options
+n1m-g-c25933	～なるべくなら	～なるべくなら	as much as possible
+n1m-g-fe6841	～みこみがある	～みこみがある	There is hope, there is prospect.
+n1m-g-f25ae2	～からある	～からある	at least; as much as; as many as ~
+n1m-g-f030cf	～ならでは（の）	～ならでは（の）	distinctive of; characteristic of; uniquely applying to; special to ~
+n1m-g-734b71	～とはいえ	～とはいえ	though; although; be that as it may; nonetheless
+n1m-g-79a6b0	～きわまる／きわまりない（～極まる／極まりない）	～きわまる／きわまりない（～極まる／極まりない）	extremely; very ~
+n1m-g-5bade3	～にかこつけて	～にかこつけて	to use as a pretext; to use as an excuse
+n1m-g-2362af	～に（は）あたらない	～に（は）あたらない	it's not worth; there's no need to; does not correspond to ~
+n1m-g-ccef46	～にかたくない	～にかたくない	easy to do; it's not hard to ~
+n1m-g-9bb317	～をきんじえない（～を禁じ得ない）	～をきんじえない（～を禁じ得ない）	can't help but; can't refrain from ~
+n1m-g-8a1d47	～しまつだ	～しまつだ	end up; in the end; as a result (negative)
+n1m-g-4d2b58	～かいもなく／～がいもなく	～かいもなく／～がいもなく	despite; even though ~. I tried hard / hard but unfortunately ~
+n1m-g-c6b012	～をたて（～を経て）	～をたて（～を経て）	through; after; via
+n1m-g-87b14c	～ではあるまいし	～ではあるまいし	it's not like; it isn't as if ~
+n1m-g-b9feaf	～てからというもの	～てからというもの	ever since ~
+n1m-g-7a2cb8	～はおろか	～はおろか	let alone; not to mention; needless to say ~
+n1m-g-2ede5c	～あかつきには	～あかつきには	After A, good thing/result B will happen/occur
+n1m-g-cce3be	～こととて	～こととて	because; since ~
+n1m-g-545bea	～すべがない	～すべがない	there is no way, cannot do
+n1m-g-9d2f8b	～づめだ	～づめだ	full of
+n1m-g-1abc6e	～てしかるべきだ	～てしかるべきだ	should; appropriate; it is natural to do ~
+n1m-g-479c80	～てはばからない	～てはばからない	reckless; fearless …
+n1m-g-61a77a	～でもしたら	～でもしたら	If … then
+n1m-g-a3fbf7	～でもなんでもない	～でもなんでもない	not in the least; nothing like that
+n1m-g-49c382	～といい～といい	～といい～といい	both ... and; not only ... also; whether it be ... or ~
+n1m-g-9e12b6	～というか~というか／～といおうか～といおうか	～というか~というか／～といおうか～といおうか	(I’m not sure if it’s) A or B, Or perhaps, Or maybe
+n1m-g-d4b72c	～といったらない	～といったらない	extremely; very; nothing more … than this; as … as it could possibly be; beyond words
+n1m-g-70e061	～とて	～とて	even; even if/though
+n1m-g-c9665e	～とばかり（に）	～とばかり（に）	as if to say; as though~
+n1m-g-69bef5	～とみるや	～とみるや	at the sight of; upon seeing; right after confirming ~
+n1m-g-031bfc	～ともあろうものが	～ともあろうものが	of all people (expression showing surprise at a high standing person's misbehavior)
+n1m-g-bf1b5c	～とも～ともつかぬ／ともつかない	～とも～ともつかぬ／ともつかない	whether A or B (shows doubt or uncertainty between the two things)
+n1m-g-0f21db	～もってのほかだ	～もってのほかだ	not tolerable; strictly forbidden; not allowed
+n1m-g-d5e7c1	～なまじ～（ものだ）から	～なまじ～（ものだ）から	so; therefore; the reason for something
+n1m-g-10e913	～なりに／～なりの	～なりに／～なりの	suitable; in one's own way / style
+n1m-g-16f79c	～にいたって（～に至って）	～にいたって（～に至って）	when it comes to A, even more / already B
+n1m-g-4c7ecf	～にしてはじめて	～にしてはじめて	since at ~
+n1m-g-748b1b	～にしのびない (～に忍びない)	～にしのびない (～に忍びない)	cannot bring oneself (to do); unable to bear ~
+n1m-g-6c7929	～にたえる (耐える)	～にたえる (耐える)	bear doing ~
+n1m-g-b124bd	～にてらして（に照らして）	～にてらして（に照らして）	according to; in view of; in light of ~
+n1m-g-6f586d	～はいわずもがなだ	～はいわずもがなだ	need not to say
+n1m-g-acda24	～はどう（で）あれ	～はどう（で）あれ	however; whatever​ ~.
+n1m-g-e0c188	～はめになる（～羽目になる）	～はめになる（～羽目になる）	to get stuck with (some job); to end up with (something unpleasant)
+n1m-g-3ac443	～もそこそこに	～もそこそこに	do …. hurry
+n1m-v-b2cb21	こともV-ない	こともV-ない	I can't help but give up...(things that have been decided)
+n1m-g-5d5790	～これ以上...ば	～これ以上...ば	if ~ any more than this
+n1m-g-ea292e	～ぶん (だけ)	～ぶん (だけ)	in proportion to; just as much as
+
+## Output format
+
+Return ONLY lines of `id<TAB>register`, one per input line, no header, no
+commentary, no code fence. Example:
+
+n3m-g-1a2b3c	neutral
+n1m-g-0f01e6	literary
+n2m-g-b0bf1e	casual?

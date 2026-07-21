@@ -240,6 +240,21 @@ function bumpMetrics(delta: ImmersionMetricsDelta): ImmersionDayMetrics {
   return next;
 }
 
+/** Extension bridge / non-IPC callers — same semantics as `immersion:recordVisit`. */
+export function recordVisitFromBridge(
+  input: ImmersionVisitInput,
+): { ok: true; site: ImmersionSite } | { ok: false; error: string } {
+  try {
+    const site = upsertVisit(input);
+    if ((input.seconds && input.seconds > 0) || (input.chars && input.chars > 0)) {
+      bumpMetrics({ seconds: input.seconds, chars: input.chars });
+    }
+    return { ok: true, site };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export function registerImmersionIpc(): void {
   immersionDir();
 
@@ -259,15 +274,7 @@ export function registerImmersionIpc(): void {
   });
 
   ipcMain.handle('immersion:recordVisit', async (_e, input: ImmersionVisitInput) => {
-    try {
-      const site = upsertVisit(input);
-      if ((input.seconds && input.seconds > 0) || (input.chars && input.chars > 0)) {
-        bumpMetrics({ seconds: input.seconds, chars: input.chars });
-      }
-      return { ok: true as const, site };
-    } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
-    }
+    return recordVisitFromBridge(input);
   });
 
   ipcMain.handle('immersion:getSession', async () => loadSession());

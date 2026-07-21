@@ -106,6 +106,504 @@
   transform: translateY(-1px);
 }
 
+.aero-found-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+  color: #123047;
+  font-family: 'Tahoma', 'Segoe UI', sans-serif;
+}
+
+.aero-found-bubbles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.aero-found-bubbles span {
+  position: absolute;
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(94, 190, 230, 0.42));
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.44);
+  animation: aeroFoundBubble 5.8s ease-out infinite;
+}
+
+.aero-found-lyric {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 35%;
+  height: 170px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aero-found-lyric > div {
+  position: absolute;
+  top: 48%;
+  left: 0;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.aero-found-lyric span {
+  display: inline-block;
+  padding: 10px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 8px;
+  color: #f9fdff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(71, 158, 205, 0.46)),
+    rgba(29, 112, 173, 0.62);
+  box-shadow: 0 12px 34px rgba(23, 72, 106, 0.22), inset 0 1px 0 #fff;
+  font-size: clamp(38px, 6vw, 88px);
+  font-weight: 700;
+  text-shadow: 0 2px 3px rgba(19, 70, 105, 0.35);
+}
+
+.aero-found-lyric.is-pop span {
+  animation: aeroFoundPop 520ms ease-out;
+}
+
+.aero-found-cmd {
+  position: absolute;
+  left: 18px;
+  bottom: 72px;
+  width: min(420px, calc(100vw - 36px));
+  border: 1px solid rgba(25, 52, 74, 0.42);
+  border-radius: 6px 6px 3px 3px;
+  background: #07131f;
+  box-shadow: 0 18px 38px rgba(20, 57, 86, 0.22);
+  pointer-events: auto;
+  opacity: 0.78;
+}
+
+.aero-found-titlebar {
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 5px 5px 0 0;
+  color: #fff;
+  background: linear-gradient(180deg, #4ca4e8, #1d5eab 55%, #174f99);
+  font-size: 11px;
+}
+
+.aero-found-screen {
+  max-height: 104px;
+  overflow: hidden;
+  padding: 8px;
+  color: #d8f7ff;
+  font-family: 'Lucida Console', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.aero-found-assistant,
+.aero-found-security,
+.aero-found-network,
+.aero-found-gadgets button {
+  border: 1px solid rgba(86, 139, 188, 0.34);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(205, 231, 249, 0.58)),
+    rgba(196, 225, 245, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 12px 26px rgba(47, 91, 123, 0.16);
+  pointer-events: auto;
+}
+
+.aero-found-assistant {
+  position: absolute;
+  right: 18px;
+  bottom: 78px;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 9px;
+  width: min(280px, calc(100vw - 36px));
+  padding: 10px;
+  opacity: 0.86;
+}
+
+.aero-found-assistant-head {
+  position: relative;
+  width: 46px;
+  height: 54px;
+  border-radius: 50% 50% 42% 42%;
+  background: linear-gradient(180deg, #fff, #94d6f5);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(86, 139, 188, 0.32);
+}
+
+.aero-found-assistant-head::before,
+.aero-found-assistant-head::after {
+  content: '';
+  position: absolute;
+  top: 22px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #13334b;
+}
+
+.aero-found-assistant-head::before { left: 14px; }
+.aero-found-assistant-head::after { right: 14px; }
+
+.aero-found-assistant strong,
+.aero-found-assistant span {
+  display: block;
+  font-size: 11px;
+}
+
+.aero-found-assistant strong {
+  color: #17324a;
+}
+
+.aero-found-assistant span {
+  margin-top: 4px;
+  color: #4f6b80;
+  line-height: 1.35;
+}
+
+.aero-found-security {
+  position: absolute;
+  right: 22px;
+  top: 92px;
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  width: 150px;
+  padding: 10px;
+  opacity: 0.7;
+  font-size: 10px;
+  text-align: center;
+}
+
+.aero-found-shield {
+  width: 46px;
+  height: 54px;
+  background: linear-gradient(90deg, #3a9fe3 0 50%, #f3c743 50% 100%);
+  clip-path: polygon(50% 0, 90% 15%, 84% 70%, 50% 100%, 16% 70%, 10% 15%);
+  /* --fx/--fy come from usePointerParallax on the overlay root, written once
+     per animation frame. Keeping the tracking in CSS avoids re-rendering the
+     React tree on every mousemove. */
+  transform: translate(calc((var(--fx, 0.5) - 0.5) * 7px), calc((var(--fy, 0.5) - 0.5) * 5px));
+}
+
+.aero-found-network {
+  position: absolute;
+  right: 186px;
+  top: 112px;
+  display: grid;
+  gap: 6px;
+  width: 210px;
+  padding: 9px;
+  opacity: 0.62;
+  font-size: 11px;
+}
+
+.aero-found-network i {
+  height: 44px;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 20% 50%, #4ca4e8 0 5px, transparent 6px),
+    radial-gradient(circle at 50% 42%, #74c971 0 5px, transparent 6px),
+    radial-gradient(circle at 80% 58%, #f3c743 0 5px, transparent 6px),
+    linear-gradient(90deg, transparent 18%, rgba(44, 118, 172, 0.45) 19% 21%, transparent 22% 48%, rgba(44, 118, 172, 0.45) 49% 51%, transparent 52%);
+}
+
+.aero-found-gadgets {
+  position: absolute;
+  left: 18px;
+  top: 86px;
+  display: grid;
+  gap: 7px;
+  width: min(250px, calc(100vw - 36px));
+  pointer-events: auto;
+}
+
+.aero-found-gadgets button {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  min-height: 42px;
+  padding: 8px 10px;
+  color: #17324a;
+  text-align: left;
+  font-size: 11px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.aero-found-gadgets button span,
+.aero-found-gadgets button b {
+  color: #527087;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.aero-found-gadgets button.is-meter > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #74c971, #4ca4e8);
+  transform-origin: left center;
+}
+
+/* ---------------------------------------------------------------------------
+   Gadget panels — update advisor / setup wizard / capsule meter / MSN nudge /
+   Minesweeper board / desktop buddy. Each reads real session data (see
+   findingModules.ts). Glass, gloss and rounded geometry per the Aero vision:
+   daylight rather than neon, nothing flat or harsh.
+   --------------------------------------------------------------------------- */
+
+.aero-found-gadget {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 9px;
+  color: #17324a;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(226, 241, 252, 0.62)),
+    rgba(255, 255, 255, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 10px rgba(37, 90, 133, 0.16);
+  font-size: 11px;
+}
+.aero-found-gadget > header {
+  color: #1d4d76;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.aero-found-gadget > footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #527087;
+  font-size: 10px;
+}
+.aero-found-gadget-empty {
+  margin: 0;
+  color: #7a93a6;
+  font-size: 10px;
+}
+.aero-found-gadget button {
+  padding: 5px 8px;
+  border: 1px solid rgba(120, 172, 212, 0.7);
+  border-radius: 6px;
+  color: #17324a;
+  background: linear-gradient(180deg, #ffffff, #dcecf9);
+  font-size: 10px;
+  text-align: center;
+  cursor: pointer;
+}
+.aero-found-gadget button:hover:not(:disabled) {
+  border-color: #4ca4e8;
+  background: linear-gradient(180deg, #ffffff, #cbe4f7);
+}
+
+/* Update advisor — one row per unit vote. */
+.aero-found-update-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.aero-found-update-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+}
+.aero-found-update-list b {
+  flex: 0 0 auto;
+  color: #527087;
+  font-weight: 400;
+  /* The label is a fixed phrase; only the recommendation should ever wrap.
+     Without this, "Update 3 of 3" breaks across lines next to a long action. */
+  white-space: nowrap;
+}
+.aero-found-update-list span {
+  flex: 1 1 auto;
+  color: #1d4d76;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Setup wizard — a reading quiz on the user's own kanji. */
+.aero-found-wizard-q {
+  margin: 0;
+  color: #527087;
+  font-size: 10px;
+}
+.aero-found-wizard-word {
+  padding: 2px 0;
+  color: #12405f;
+  font-size: 24px;
+  line-height: 1.15;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.aero-found-wizard-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.aero-found-wizard-choice {
+  width: 100%;
+}
+.aero-found-wizard-choice.is-right {
+  border-color: #74c971;
+  background: linear-gradient(180deg, #ffffff, #d8f2d5);
+}
+.aero-found-wizard-choice.is-wrong {
+  border-color: #e8a33a;
+  background: linear-gradient(180deg, #ffffff, #fbe6c8);
+}
+.aero-found-wizard-next {
+  justify-self: end;
+}
+
+/* Capsule meter — today's minutes against the daily target. */
+.aero-found-meter-bar {
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(120, 172, 212, 0.6);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.aero-found-meter-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #74c971, #4ca4e8);
+  transform-origin: left center;
+}
+.aero-found-meter[data-band='overdrive'] .aero-found-meter-bar i {
+  background: linear-gradient(90deg, #f3c743, #e8863a);
+}
+
+/* MSN nudge — one withheld term. */
+.aero-found-nudge-word {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #12405f;
+  font-size: 17px;
+}
+.aero-found-nudge-word em {
+  color: #527087;
+  font-size: 10px;
+  font-style: normal;
+}
+
+/* Minesweeper board — weakest words, priced. */
+.aero-found-mines-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Term + score on one row, meaning below — see the WIRED bounty list for why a
+   single three-column row is not survivable with long deck entries. */
+.aero-found-mines-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1px 6px;
+  font-size: 10px;
+}
+.aero-found-mines-list b {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #12405f;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aero-found-mines-list i {
+  grid-column: 2;
+  grid-row: 1;
+}
+.aero-found-mines-list span {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: #7a93a6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aero-found-mines-list i {
+  color: #2c76ac;
+  font-style: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aero-found-bubbles,
+  .aero-found-bubbles span {
+    animation: none;
+  }
+
+  .aero-found-ticker > div,
+  .aero-found-lyric > div {
+    animation: none;
+  }
+}
+
+.aero-found-ticker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 50px;
+  height: 24px;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.62);
+  border-bottom: 1px solid rgba(86, 139, 188, 0.26);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(186, 223, 246, 0.66));
+  opacity: 0.62;
+}
+
+.aero-found-ticker div {
+  display: flex;
+  gap: 42px;
+  width: max-content;
+  padding: 4px 18px;
+  color: #17324a;
+  font-size: 11px;
+  white-space: nowrap;
+  animation: aeroFoundTicker 18s linear infinite;
+}
+
+@keyframes aeroFoundBubble {
+  from { transform: translate3d(0, 24px, 0); opacity: 0; }
+  20% { opacity: 0.65; }
+  to { transform: translate3d(0, -82px, 0); opacity: 0; }
+}
+
+@keyframes aeroFoundPop {
+  0% { filter: brightness(1); transform: scale(1); }
+  45% { filter: brightness(1.26); transform: scale(1.035); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+@keyframes aeroFoundTicker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 /* ---------- Floating windows: glass with a sheened titlebar --------------- */
 :root[data-materials='aero'] .fwin {
   background:
@@ -595,7 +1093,7 @@
   inset: 0;
   z-index: 999999;
   background:
-    linear-gradient(135deg, rgba(0, 168, 200, 0.3), rgba(215, 36, 95, 0.15)),
+    linear-gradient(135deg, rgba(0, 168, 200, 0.3), rgba(53, 168, 107, 0.15)),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.1) 26%),
     var(--shell-glass-strong);
   backdrop-filter: blur(var(--blur-xl)) saturate(1.25);
@@ -1343,7 +1841,7 @@
   border-radius: 8px 8px 6px 6px;
   background:
     linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.04) 26%),
-    linear-gradient(135deg, rgba(0, 168, 200, 0.2), rgba(215, 36, 95, 0.12)),
+    linear-gradient(135deg, rgba(0, 168, 200, 0.2), rgba(53, 168, 107, 0.12)),
     var(--shell-glass-strong);
 }
 :root[data-materials='aero'] .os-start-aero-head {
@@ -1356,7 +1854,7 @@
   color: #ffffff;
   background:
     linear-gradient(to bottom, rgba(255, 255, 255, 0.34), transparent 46%),
-    linear-gradient(120deg, var(--red-deep), var(--accent) 52%, var(--aero-aqua));
+    linear-gradient(120deg, #007a94, var(--accent) 52%, var(--aero-aqua));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.58),
     inset 0 -1px 0 rgba(9, 33, 45, 0.24);
@@ -1679,17 +2177,24 @@
 
 /* ---------- Sticky notes (Phase 4 · M10) ----------------------------------
    Give desktop sticky notes a soft Aero "glass paper" feel — a bright top
-   gloss and a warmer soft shadow — WITHOUT overriding the user's chosen note
-   colour (that's an inline style and stays authoritative). Polish only. */
+   gloss and a warmer soft shadow. The inline pastel note colour is overridden
+   here (hence !important) so notes sit in the Aero glass palette. */
 :root[data-materials='aero'] .fwin-note {
   box-shadow: var(--elevation-3), inset 0 1px 0 rgba(255, 255, 255, 0.55);
   border-radius: var(--radius-md);
 }
+:root[data-materials='aero'] .fwin-note .fwin-bar {
+  background: var(--aero-chrome-glass-strong) !important;
+  border-bottom: 1px solid var(--aero-frame-active) !important;
+}
 :root[data-materials='aero'] .fwin-note .fwin-body-note {
-  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.28), transparent 42%);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.06) 42%),
+    var(--aero-chrome-glass);
 }
 :root[data-materials='aero'] .fwin-note .desk-note-text {
-  background: transparent;
+  background: transparent !important;
+  color: var(--text);
 }
 
 /* =============================================================================
@@ -1736,7 +2241,7 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(209, 229, 236, 0.7)),
     color-mix(in srgb, var(--glass-tint) 72%, #ffffff);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  color: color-mix(in srgb, var(--text) 88%, #10384d);
+  color: color-mix(in srgb, var(--text) 88%, #17425f);
   font-size: 12px;
   font-weight: var(--font-weight-semibold);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
@@ -2039,7 +2544,7 @@
 }
 
 :root[data-materials='aero'] .os-flyout .ui-toggle input:focus-visible + .ui-toggle__track {
-  outline: 1px dotted #10384d;
+  outline: 1px dotted #17425f;
   outline-offset: 1px;
 }
 
@@ -2089,7 +2594,7 @@
 }
 
 :root[data-materials='aero'] .os-flyout .ui-slider:focus-visible {
-  outline: 1px dotted #10384d;
+  outline: 1px dotted #17425f;
   outline-offset: 2px;
   border-radius: 0;
 }
@@ -2170,7 +2675,7 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,0.74), rgba(209,229,236,0.7)),
     color-mix(in srgb, var(--glass-tint) 72%, #ffffff);
-  color: color-mix(in srgb, var(--text) 88%, #10384d);
+  color: color-mix(in srgb, var(--text) 88%, #17425f);
   font-size: 12px;
   font-weight: var(--font-weight-semibold);
   text-shadow: 0 1px 0 rgba(255,255,255,0.72);
@@ -2538,7 +3043,7 @@
   border: 1px solid #7aa5c6;
   border-radius: 2px;
   background: #ffffff;
-  color: #12364d;
+  color: #17425f;
   box-shadow: inset 1px 1px 2px rgba(35,84,118,0.18);
   font: 11px Tahoma, "MS Sans Serif", sans-serif;
 }
@@ -2569,7 +3074,7 @@
   border: 1px solid transparent;
   border-bottom: 0;
   border-radius: 3px 3px 0 0;
-  color: #17435f;
+  color: #17425f;
   background: transparent;
   font: 11px Tahoma, "MS Sans Serif", sans-serif;
   white-space: nowrap;
@@ -2607,7 +3112,7 @@
   border-bottom: 1px solid #d1e1ec;
   border-radius: 0;
   background: #ffffff;
-  color: #12364d;
+  color: #17425f;
   box-shadow: none;
 }
 
@@ -2700,7 +3205,7 @@
 }
 
 :root[data-materials='aero'] .widget-gallery-subhead {
-  color: #17435f;
+  color: #17425f;
   font: 11px Tahoma, "MS Sans Serif", sans-serif;
   letter-spacing: 0;
   text-transform: none;
@@ -2781,7 +3286,7 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,0.86), rgba(242,250,255,0.76)),
     rgba(255,255,255,0.72);
-  color: #12364d;
+  color: #17425f;
 }
 
 :root[data-materials='aero'] .widget-menu {
@@ -2799,7 +3304,7 @@
   min-height: 22px;
   padding: 3px 8px;
   border-radius: 0;
-  color: #12364d;
+  color: #17425f;
   font: 11px Tahoma, "MS Sans Serif", sans-serif;
 }
 
@@ -2818,7 +3323,7 @@
 
 :root[data-materials='aero'] .wgt {
   gap: 6px;
-  color: #12364d;
+  color: #17425f;
   font-family: Tahoma, "MS Sans Serif", sans-serif;
 }
 
@@ -2837,7 +3342,7 @@
   border-radius: 2px;
   background:
     linear-gradient(180deg, #ffffff 0%, #e8f7ff 46%, #bddff6 100%);
-  color: #12364d;
+  color: #17425f;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
   font-family: Tahoma, "MS Sans Serif", sans-serif;
 }
@@ -2867,7 +3372,7 @@
   border: 1px solid #7aa5c6;
   border-radius: 2px;
   background: #ffffff;
-  color: #12364d;
+  color: #17425f;
   box-shadow: inset 1px 1px 2px rgba(35,84,118,0.18);
   font-family: Tahoma, "MS Sans Serif", sans-serif;
 }

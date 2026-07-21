@@ -201,6 +201,7 @@ export default function ReaderCollectionPanel({
       const deck = (deckOverride ?? prefsRef.current.ankiDeck).trim() || undefined;
       try {
         const res = await window.api.ankiMineNote({
+          route: { source: 'reader', cardKind: c.sentence ? 'sentence' : 'word' },
           term: c.word,
           reading: c.reading || undefined,
           meaning: c.meaning || undefined,
@@ -753,6 +754,19 @@ export default function ReaderCollectionPanel({
                   </span>
                 )}
               </button>
+              {c.audioDataUrl && (
+                <button
+                  type="button"
+                  className="btn small icon-btn"
+                  title="Play recorded audio"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    new Audio(c.audioDataUrl).play().catch(() => {});
+                  }}
+                >
+                  <Icon name="player" size={12} />
+                </button>
+              )}
               <button
                 type="button"
                 className="btn small icon-btn"

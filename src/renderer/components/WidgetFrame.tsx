@@ -1,8 +1,11 @@
-import { useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { WidgetSnapshot } from '../../shared/desktop';
 import { getWidgetDef } from '../widgets/registry';
 import { readSetting } from '../widgets/types';
 import { getZoomFactor } from '../appZoom';
+import { useT } from '../i18n';
+import { useWiredMaterials } from './ui';
+import { wiredWidgetTitle } from '../widgets/wiredLabels';
 
 // Home Workspace widget host. A lighter cousin of the desktop's FloatingWindow:
 // free-positioned, drag + resize done with a compositor-only transform during
@@ -41,9 +44,19 @@ export interface WidgetFrameProps {
 export default function WidgetFrame({
   widget, deskRef, focused, onFocus, onPatch, onRemove, onDuplicate,
 }: WidgetFrameProps) {
+  const { t } = useT();
+  const wired = useWiredMaterials();
   const def = getWidgetDef(widget.type);
   const frameRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // §6 module-rack mount: scan-reveal + title lamp blink, wired only.
+  const [mounting, setMounting] = useState(wired);
+  useEffect(() => {
+    if (!mounting) return;
+    window.dispatchEvent(new CustomEvent('shell:widgetMount'));
+    const timer = setTimeout(() => setMounting(false), 640);
+    return () => clearTimeout(timer);
+  }, [mounting]);
 
   if (!def) {
     // Unknown type (e.g. a saved layout from a newer build) — show a stub the
@@ -54,10 +67,10 @@ export default function WidgetFrame({
         style={{ left: widget.x, top: widget.y, width: widget.w, height: 90, zIndex: widget.z }}
       >
         <div className="widget-bar">
-          <span className="widget-title">Unknown widget</span>
-          <button className="widget-b" title="Remove" onClick={onRemove}>×</button>
+          <span className="widget-title">{t('widgetFrame.unknownWidget')}</span>
+          <button className="widget-b" title={t('common.remove')} onClick={onRemove}>×</button>
         </div>
-        <div className="widget-body">This widget type isn’t available.</div>
+        <div className="widget-body">{t('widgetFrame.notAvailable')}</div>
       </section>
     );
   }
@@ -149,7 +162,7 @@ export default function WidgetFrame({
   return (
     <section
       ref={frameRef}
-      className={`widget-frame ${focused ? 'focused' : ''} ${blur ? 'blur' : ''} ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''}`}
+      className={`widget-frame ${focused ? 'focused' : ''} ${blur ? 'blur' : ''} ${collapsed ? 'collapsed' : ''} ${locked ? 'locked' : ''} ${wired && mounting ? 'widget-anim-mounting' : ''}`}
       style={{
         left: widget.x,
         top: widget.y,
@@ -161,12 +174,12 @@ export default function WidgetFrame({
       onPointerDown={onFocus}
     >
       <div className="widget-bar" onPointerDown={dragStart} onDoubleClick={() => onPatch({ collapsed: !collapsed })}>
-        <span className="widget-title">{def.title}</span>
+        <span className="widget-title">{wired ? wiredWidgetTitle(widget.type, t(def.titleKey)) : t(def.titleKey)}</span>
         <span className="widget-btns">
-          {locked && <span className="widget-lock" title="Locked" aria-hidden>⌧</span>}
+          {locked && <span className="widget-lock" title={t('widgetFrame.locked')} aria-hidden>⌧</span>}
           <button
             className="widget-b"
-            title="Widget options"
+            title={t('widgetFrame.options')}
             onClick={(ev) => { ev.stopPropagation(); setMenuOpen((o) => !o); }}
           >
             ⋯
@@ -176,13 +189,13 @@ export default function WidgetFrame({
           <>
             <div className="widget-menu-backdrop" onPointerDown={(ev) => { ev.stopPropagation(); setMenuOpen(false); }} />
             <div className="widget-menu" onPointerDown={(ev) => ev.stopPropagation()}>
-              <button onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? 'Unlock' : 'Lock'}</button>
-              <button onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? 'Expand' : 'Collapse'}</button>
-              <button onClick={() => { setSettings({ __blur: !blur }); setMenuOpen(false); }}>{blur ? 'Disable blur' : 'Enable blur'}</button>
-              <button onClick={() => { setSettings({ __opacity: opacity > 0.85 ? 0.7 : 1 }); setMenuOpen(false); }}>{opacity > 0.85 ? 'Make transparent' : 'Make solid'}</button>
-              <button onClick={() => { onDuplicate(); setMenuOpen(false); }}>Duplicate</button>
-              <button onClick={() => { onPatch({ hidden: true }); setMenuOpen(false); }}>Hide</button>
-              <button className="danger" onClick={() => { onRemove(); setMenuOpen(false); }}>Remove</button>
+              <button onClick={() => { onPatch({ locked: !locked }); setMenuOpen(false); }}>{locked ? t('widgetFrame.unlock') : t('widgetFrame.lock')}</button>
+              <button onClick={() => { onPatch({ collapsed: !collapsed }); setMenuOpen(false); }}>{collapsed ? t('widgetFrame.expand') : t('widgetFrame.collapse')}</button>
+              <button onClick={() => { setSettings({ __blur: !blur }); setMenuOpen(false); }}>{blur ? t('widgetFrame.disableBlur') : t('widgetFrame.enableBlur')}</button>
+              <button onClick={() => { setSettings({ __opacity: opacity > 0.85 ? 0.7 : 1 }); setMenuOpen(false); }}>{opacity > 0.85 ? t('widgetFrame.makeTransparent') : t('widgetFrame.makeSolid')}</button>
+              <button onClick={() => { onDuplicate(); setMenuOpen(false); }}>{t('widgetFrame.duplicate')}</button>
+              <button onClick={() => { onPatch({ hidden: true }); setMenuOpen(false); }}>{t('widgetFrame.hide')}</button>
+              <button className="danger" onClick={() => { onRemove(); setMenuOpen(false); }}>{t('common.remove')}</button>
             </div>
           </>
         )}
@@ -192,7 +205,7 @@ export default function WidgetFrame({
           <Body settings={widget.settings ?? {}} setSettings={setSettings} size={{ w: widget.w, h: contentH }} />
         </div>
       )}
-      {!collapsed && !locked && <div className="widget-resize" title="Resize" onPointerDown={resizeStart} />}
+      {!collapsed && !locked && <div className="widget-resize" title={t('widgetFrame.resize')} onPointerDown={resizeStart} />}
     </section>
   );
 }

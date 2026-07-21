@@ -3,6 +3,7 @@ doc_id: noctis.simulation_systems
 tier: 6
 authority: simulation_physics
 role: deterministic_world_model
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -18,7 +19,7 @@ depends_on:
 
 This document is the physics specification of the Noctis civilization simulation: the shared, deterministic model from which every domain behavior derives. It defines what the civilization state *is*, how real-world learning becomes civilizational change, how time acts on the world, how domains propose and commit change without contradiction, and which laws no future system may break.
 
-It is a **shared-physics** document, not a domain design. Tier 6 defines the platform; the Tier 7 blueprints (`CITIZEN_SYSTEM.md`, `ECOLOGY_SYSTEM.md`, `TECHNOLOGY_SYSTEM.md`, `CULTURE_SYSTEM.md`, `MEMORY_SYSTEM.md`, and the reserved `ECONOMY_SYSTEM.md`, `LEARNING_INTEGRATION.md`, `ERA_PROGRESSION.md`) specialize it. Where an earlier draft of this file pre-authored domain-specific rules, this revision replaces them with a shared constraint or a deferred domain contract, so that each Tier 7 domain can develop correctly without contradiction.
+It is a **shared-physics** document, not a domain design. Tier 6 defines the platform; the completed Tier 7 blueprints (`CITIZEN_SYSTEM.md`, `ECOLOGY_SYSTEM.md`, `TECHNOLOGY_SYSTEM.md`, `CULTURE_SYSTEM.md`, `MEMORY_SYSTEM.md`, `ECONOMY_SYSTEM.md`, `LEARNING_INTEGRATION.md`, and `ERA_PROGRESSION.md`) specialize it. Where an earlier draft of this file pre-authored domain-specific rules, this revision replaces them with a shared constraint or a domain contract, so that each Tier 7 domain can develop correctly without contradiction.
 
 It sits beneath the full canon and the technical architecture, and may never contradict them:
 
@@ -501,7 +502,7 @@ Tier 6 defines the *protocol*; `ERA_PROGRESSION.md` binds the *conditions*.
 era advances when  readiness( contributions ) ≥ Θ_era(next)      eras never regress
 ```
 
-**No single hidden score defines an era.** The readiness that carries a civilization across an era boundary is a combination of contributions from multiple domains — learning maturity in the canon's full sense (breadth, consistency, depth, difficulty, reflection — `VISION.md`, The Meaning Of Eras), technological capability (Technology), cultural development (Culture), ecological succession (Ecology), population and institutional maturity (Citizen), and historical accumulation (Memory). Research readiness `R` is one contributor, load-bearing but not sole. The weights, the threshold `Θ_era`, and the final formula bind in `ERA_PROGRESSION.md`. Tier 6 requires only that the readiness be monotone, that no single domain silently define the era, and that the transition be a committed state change evaluated like any other (its staging as gradual overnight metamorphosis is a rendering concern).
+**No single hidden score defines an era.** The readiness that carries a civilization across an era boundary combines six domain-owned secured-maturity readings: technological capability (Technology), ecological succession (Ecology), population and institutional maturity (Citizen), cultural maturity in its relationship to knowledge (Culture), historical accumulation (Memory), and coordination maturity (Economy). Learning maturity in the canon's full sense — breadth, consistency, depth, difficulty, and reflection — is the sole upstream source feeding all six domains through Learning Integration; it is never a direct seventh gate term. Research readiness `R` is a principal input to Technology's contribution, load-bearing but never sufficient. The weights, per-domain floors, threshold `Θ_era`, and geometric-mean formula bind in `ERA_PROGRESSION.md`. Tier 6 requires that the readiness projection be monotone, that no single domain silently define the era, and that the transition be a committed state change evaluated like any other (its staging as gradual overnight metamorphosis is a presentation concern).
 
 ### Capability Envelopes, Not Guaranteed Packages
 
@@ -567,7 +568,7 @@ Citizen is a fully authored Tier 7 peer (`CITIZEN_SYSTEM.md`) and is not modifie
 
 ## SECTION 20 — ECONOMY CONTRACT
 
-Economy is a reserved domain (`ECONOMY_SYSTEM.md`, placeholder) and is not authored here. Tier 6 defines only its boundary and a strong canon caution.
+Economy is a fully authored Tier 7 peer (`ECONOMY_SYSTEM.md`). Tier 6 defines its shared boundary and a strong canon caution; Economy owns the internal model.
 
 Economy owns production, allocation, exchange, scarcity, ownership, distribution, and labor/material constraints. **Canon caution:** Noctis has no coin, no market the user shops in, and no user-facing spending; resources are metabolic states, not currencies (`GAME_DESIGN.md` Section 6), and the terms coin, gold, xp, and score are forbidden tokens (`ARCHITECTURE.md` Trope Guard; `DOCUMENT_ARCHITECTURE.md` terminology lock). Any economic mechanic must therefore express allocation, scarcity, and production as *civilizational conditions and pressures*, never as a price the user pays or a currency they accumulate. What technology and ecology emit toward Economy are production-capability and demand-pressure signals; what Economy resolves is distribution and sufficiency, under conservation (Section 9) and non-management (Law 10).
 
@@ -575,7 +576,7 @@ Economy owns production, allocation, exchange, scarcity, ownership, distribution
 
 ## SECTION 21 — MEMORY CONTRACT
 
-Memory is a reserved domain (`MEMORY_SYSTEM.md`, placeholder) and is not authored here. Tier 6 binds the permanence physics; Memory owns the model.
+Memory is a fully authored Tier 7 peer (`MEMORY_SYSTEM.md`). Tier 6 binds the permanence physics; Memory owns the internal model and exposes the secured historical-accumulation reading consumed by Era Progression.
 
 Memory holds the legacy family (Section 10): historical records, remembered events, monuments, public narratives, and — as Memory defines them — distortion, forgetting, access, and interpretation. The distinction Tier 6 requires is between **historical record** (that something existed or happened, once validly recorded — permanent) and **active capability** (that the civilization can currently use it — subject to loss and revival). Memory may preserve a technique no one reproduces, a ritual no one practices, or an institution that has collapsed; it may let recorded meaning expand through interpretation without minting physical stock (Section 9). What Memory records, absence never erases and no later transition deletes (`GAME_DESIGN.md` Section 9, Rules of Memory; Laws 4–5). Memory decides how records persist, distort, or fade *as records*; it never resurrects an active capability by fiat — revival is a domain event that reads Memory as a precondition.
 
@@ -583,7 +584,7 @@ Memory holds the legacy family (Section 10): historical records, remembered even
 
 ## SECTION 22 — LEARNING INTEGRATION CONTRACT
 
-Learning Integration is a reserved domain (`LEARNING_INTEGRATION.md`, placeholder) and is not authored here. It owns the interpretation of raw study activity, subject classification, retention and mastery signals, interdisciplinary connection, telemetry boundaries, and the delivery of the interpreted learning signals this document consumes (Section 3).
+Learning Integration is a fully authored Tier 7 peer (`LEARNING_INTEGRATION.md`). It owns the interpretation of raw study activity, subject classification, retention and mastery signals, interdisciplinary connection, telemetry boundaries, and the delivery of the interpreted learning signals this document consumes (Section 3).
 
 The boundary is firm in both directions. Tier 6 (and every domain below it) receives **already-interpreted** signals — the interpreted learning profile — never raw telemetry, never a subject taxonomy to switch on. Learning Integration receives, from the world, nothing it can spend: **learning is the source of possibility, not a currency** (`VISION.md`, Light Economy; `GAME_DESIGN.md` Section 11, Principle 2). No mechanic converts study minutes into a spendable stock, and no domain infers a fixed outcome from a single subject (Section 7).
 
@@ -651,26 +652,27 @@ Any future simulation concept enters by this protocol: pass the tiered validatio
 
 ---
 
-## SECTION 28 — KNOWN DOWNSTREAM AUDIT REQUIREMENTS
+## SECTION 28 — DOWNSTREAM RECONCILIATION RECORD
 
-This revision changed shared laws that the already-written Tier 7 siblings were authored against. Those documents are **not** modified by this task; the clauses that inherit the superseded assumptions are catalogued here so a later surgical compatibility pass can be precise. Until that pass, the siblings remain valid where stricter than Tier 6 (a Tier 7 domain may always be more restrictive than the platform permits).
+This revision changed shared laws that the already-written Tier 7 siblings were authored against. The compatibility pass is complete. The resolutions below are binding context for implementation and replace the earlier open audit list.
 
-**`ECOLOGY_SYSTEM.md` — clauses to audit against the revised Tier 6:**
+**`ECOLOGY_SYSTEM.md` — reconciled resolutions:**
 
-- reliance on the old "population produces nothing" wording (now narrowed to "no primary external input"; ecology may treat citizens as actors within Section 8);
-- fully monotone ecological network masses (`X_myc`, `X_cry` "never shrink") — audit against the legacy/active-possession distinction (Section 10): the *record* is permanent, but active habitat form may transform;
-- fixed cultural consequences produced directly by ecology — audit against the Culture contract (Section 17): ecology emits reception context, not a fixed culture amount;
-- vault breaches that automatically yield blueprint schemas — audit against the capability distinction (Law 9): a recovered record is legacy, not automatic active capability;
-- rigid subject-to-ecology phrasing — confirm it reads as symbolic tendency, not unlock equation (Section 7);
-- the closed four-event framing — confirm ecology's internal transitions are expressed as committed-state domain transitions (Section 12), which they already are;
-- any implication that all local ecological change is irreversible — audit against Law 8 (living change).
+- Citizens may observe, tend, maintain, and transform ecological conditions but never mint primary external input (Section 8).
+- `X_myc` and `X_cry` are cumulative legacy projections; active habitat form may reroute, succeed, recede, or transform through internal causality (Sections 10, 18; Law 8).
+- Ecology emits environmental conditions and reception context; Culture alone resolves meaning (Section 17).
+- A vault-breached schema is an exposed record and possibility, never automatic active capability (Laws 1 and 9; Sections 16, 21).
+- Subject mappings are symbolic pathway tendencies mediated by Learning Integration, never unlock equations (Sections 7, 22).
+- The four engine flags remain closed while ecological transitions are typed committed-state changes (Section 12).
 
-**`CITIZEN_SYSTEM.md` — clauses to audit:**
+**`CITIZEN_SYSTEM.md` — reconciled resolutions:**
 
-- citizen immortality and strictly monotone population as *physics law* — now permitted-but-not-required; audit whether Citizen wishes to adopt a life cycle under the new latitude (Section 19), keeping absence-driven reduction forbidden;
-- "roles produce nothing / citizens are consequence, never source" — reconcile with the agency boundary (Section 8): the correct statement is "roles mint no primary value," not "citizens take no action";
-- "individuality is rendered, not stored" — confirm this remains compatible with citizen agency (an acting citizen may need committed identity for seeded variation, Section 11);
-- skill transmission, teaching, maintenance, and succession — confirm Citizen can now express these as genuine actions.
+- Citizen chooses a monotone aggregate population model for this implementation generation. Tier 6 still permits a future biological life cycle, but absence-driven loss remains forbidden (Sections 10, 19).
+- Roles mint no primary value; citizens remain genuine actors who observe, teach, maintain, invent, preserve, and sometimes lose active practice (Section 8).
+- Ambient individuality is a deterministic rendering expression of aggregate state. Identity is committed only when a durable consequence or Memory record requires reproducibility (Section 11).
+- Skill transmission, teaching, maintenance, and succession are lawful Citizen actions resolved across committed evaluations.
+
+**Cross-domain era reconciliation:** Economy is the sixth peer contribution; Learning Integration is upstream and never a seventh term. Ecology, Citizen, Culture, Memory, Technology, and Economy each expose a secured-maturity projection. Memory both contributes historical accumulation before the gate and records an era transition after the gate. `ERA_PROGRESSION.md` owns their combination and nothing else.
 
 `GAME_DESIGN.md` (Tier 4) is **not** in scope and was not found to contain a concrete contradiction requiring change; its per-era descriptions are reclassified in place by Section 15 as envelope-plus-representative-examples rather than rewritten.
 

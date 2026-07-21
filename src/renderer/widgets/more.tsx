@@ -3,6 +3,10 @@ import type { WidgetProps } from './types';
 import { readSetting } from './types';
 import { useNow } from './hooks';
 import { getSummary, formatDuration } from '../stats';
+import { useT } from '../i18n';
+import WorldHeatMap from '../components/resources/WorldHeatMap';
+import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
+import { sendTelemetryPingIfNeeded } from '../telemetryPing';
 
 // ---------- World clock (multiple time zones) ----------
 interface Zone {
@@ -16,6 +20,7 @@ const DEFAULT_ZONES: Zone[] = [
   { id: 'z3', label: 'New York', tz: 'America/New_York' },
 ];
 export function WorldClock({ settings, setSettings }: WidgetProps) {
+  const { t } = useT();
   const now = useNow(1000);
   const zones = readSetting<Zone[]>(settings, 'zones', DEFAULT_ZONES);
   const [tz, setTz] = useState('');
@@ -30,25 +35,25 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
     <div className="wgt wgt-world">
       <ul className="wgt-world-list">
         {zones.map((z) => {
-          let time = '—';
+          let time = 'â€”';
           try {
             time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: z.tz });
           } catch {
-            time = 'bad tz';
+            time = t('widgets.worldClock.badTz');
           }
           return (
             <li key={z.id}>
               <span className="wgt-world-label">{z.label}</span>
               <span className="wgt-world-time">{time}</span>
-              <button className="wgt-btn-icon sm" title="Remove" onClick={() => setSettings({ zones: zones.filter((x) => x.id !== z.id) })}>×</button>
+              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => setSettings({ zones: zones.filter((x) => x.id !== z.id) })}>Ã—</button>
             </li>
           );
         })}
       </ul>
       <div className="wgt-row wgt-world-add">
-        <input placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} />
-        <input placeholder="Area/City (IANA tz)" value={tz} onChange={(e) => setTz(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
-        <button className="wgt-btn-icon" onClick={add} title="Add zone">+</button>
+        <input placeholder={t('widgets.worldClock.labelPlaceholder')} value={label} onChange={(e) => setLabel(e.target.value)} />
+        <input placeholder={t('widgets.worldClock.areaPlaceholder')} value={tz} onChange={(e) => setTz(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <button className="wgt-btn-icon" onClick={add} title={t('widgets.worldClock.addZone')}>+</button>
       </div>
     </div>
   );
@@ -62,6 +67,7 @@ interface Goal {
   done: number;
 }
 export function DailyGoals({ settings, setSettings }: WidgetProps) {
+  const { t } = useT();
   const goals = readSetting<Goal[]>(settings, 'goals', []);
   const [draft, setDraft] = useState('');
   const write = (next: Goal[]) => setSettings({ goals: next });
@@ -76,11 +82,11 @@ export function DailyGoals({ settings, setSettings }: WidgetProps) {
   return (
     <div className="wgt wgt-goals">
       <div className="wgt-todo-add">
-        <input value={draft} placeholder="Add a goal…" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
-        <button className="wgt-btn-icon" onClick={add} title="Add">+</button>
+        <input value={draft} placeholder={t('widgets.dailyGoals.addPlaceholder')} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <button className="wgt-btn-icon" onClick={add} title={t('common.add')}>+</button>
       </div>
       <ul className="wgt-goals-list">
-        {goals.length === 0 && <li className="wgt-empty">Set a goal or two for today.</li>}
+        {goals.length === 0 && <li className="wgt-empty">{t('widgets.dailyGoals.emptyHint')}</li>}
         {goals.map((g) => (
           <li key={g.id} className={g.done >= g.target ? 'reached' : ''}>
             <div className="wgt-goal-top">
@@ -89,10 +95,10 @@ export function DailyGoals({ settings, setSettings }: WidgetProps) {
             </div>
             <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${(g.done / g.target) * 100}%` }} /></div>
             <div className="wgt-goal-ctrls">
-              <button className="wgt-btn-icon sm" onClick={() => bump(g.id, -1)}>−</button>
+              <button className="wgt-btn-icon sm" onClick={() => bump(g.id, -1)}>âˆ’</button>
               <button className="wgt-btn-icon sm" onClick={() => bump(g.id, 1)}>+</button>
-              <button className="wgt-btn-icon sm" title="Raise target" onClick={() => write(goals.map((x) => (x.id === g.id ? { ...x, target: x.target + 1 } : x)))}>+T</button>
-              <button className="wgt-btn-icon sm" title="Remove" onClick={() => write(goals.filter((x) => x.id !== g.id))}>×</button>
+              <button className="wgt-btn-icon sm" title={t('widgets.dailyGoals.raiseTarget')} onClick={() => write(goals.map((x) => (x.id === g.id ? { ...x, target: x.target + 1 } : x)))}>+T</button>
+              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => write(goals.filter((x) => x.id !== g.id))}>Ã—</button>
             </div>
           </li>
         ))}
@@ -117,6 +123,7 @@ function last7(): string[] {
   return out;
 }
 export function HabitTracker({ settings, setSettings }: WidgetProps) {
+  const { t } = useT();
   const habits = readSetting<Habit[]>(settings, 'habits', []);
   const [draft, setDraft] = useState('');
   const days = last7();
@@ -132,16 +139,16 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
   return (
     <div className="wgt wgt-habits">
       <div className="wgt-todo-add">
-        <input value={draft} placeholder="Add a habit…" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
-        <button className="wgt-btn-icon" onClick={add} title="Add">+</button>
+        <input value={draft} placeholder={t('widgets.habitTracker.addPlaceholder')} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <button className="wgt-btn-icon" onClick={add} title={t('common.add')}>+</button>
       </div>
       <ul className="wgt-habit-list">
-        {habits.length === 0 && <li className="wgt-empty">Track a daily habit.</li>}
+        {habits.length === 0 && <li className="wgt-empty">{t('widgets.habitTracker.emptyHint')}</li>}
         {habits.map((h) => (
           <li key={h.id}>
             <div className="wgt-habit-top">
               <span className="wgt-habit-text">{h.text}</span>
-              <button className="wgt-btn-icon sm" title="Remove" onClick={() => write(habits.filter((x) => x.id !== h.id))}>×</button>
+              <button className="wgt-btn-icon sm" title={t('common.remove')} onClick={() => write(habits.filter((x) => x.id !== h.id))}>Ã—</button>
             </div>
             <div className="wgt-habit-days">
               {days.map((d) => (
@@ -164,6 +171,7 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
 
 // ---------- Learning heatmap (last 14 days reading time) ----------
 export function LearningHeatmap() {
+  const { t } = useT();
   const s = getSummary();
   const max = Math.max(1, ...s.recent.map((d) => d.seconds));
   const level = (sec: number) => (sec <= 0 ? 0 : Math.min(4, Math.ceil((sec / max) * 4)));
@@ -174,7 +182,47 @@ export function LearningHeatmap() {
           <div key={d.date} className={`wgt-heat-cell l${level(d.seconds)}`} title={`${d.date}: ${formatDuration(d.seconds)}`} />
         ))}
       </div>
-      <div className="wgt-stat-sub">Last {s.recent.length} days · {formatDuration(s.totalSeconds)} total</div>
+      <div className="wgt-stat-sub">
+        {t('widgets.heatmap.summary', { days: s.recent.length, duration: formatDuration(s.totalSeconds) })}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Learner map (anonymous country choropleth) ----------
+export function LearnerMapWidget(_props: WidgetProps) {
+  const { t } = useT();
+  const [consent, setConsent] = useState<'yes' | 'no' | null>(() => {
+    try {
+      const v = localStorage.getItem(TELEMETRY_CONSENT_KEY);
+      return v === 'yes' || v === 'no' ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const shareCountry = () => {
+    try {
+      localStorage.setItem(TELEMETRY_CONSENT_KEY, 'yes');
+      void sendTelemetryPingIfNeeded();
+    } catch {
+      /* storage unavailable */
+    }
+    setConsent('yes');
+    setRefreshToken((n) => n + 1);
+  };
+
+  return (
+    <div className="wgt wgt-learner-map">
+      {consent !== 'yes' ? (
+        <div className="wgt-row wgt-learner-map-share">
+          <button type="button" className="wgt-btn" onClick={shareCountry}>
+            {t('widgets.learner-map.share')}
+          </button>
+        </div>
+      ) : null}
+      <WorldHeatMap compact refreshToken={refreshToken} />
     </div>
   );
 }

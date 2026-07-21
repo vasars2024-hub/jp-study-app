@@ -23,13 +23,15 @@ import {
   type CompanionTypeId,
 } from './companionCatalog';
 import ShimejiSprite from './ShimejiSprite';
-import { hasDiscoveredAero } from '../aeroDiscovery';
+import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../aeroDiscovery';
+import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../wiredDiscovery';
 import { onCompanionEvent, type CompanionEventDetail } from './companionEvents';
 import { onPlayingChanged, isPlaying as musicIsPlaying } from '../audioBus';
 import { READING_RECORDED_EVENT } from '../stats';
 import { saveEnvironment } from './environmentStore';
 import { pushCompanionOsState } from './companionOsBridge';
 import { getZoomFactor } from '../appZoom';
+import { companionPhysics, loadMotionPrefs, onMotionPrefsChanged } from '../motion/motionPrefs';
 import {
   BUDDY_RUN_EVENT,
   getDefaultBuddyRoutines,
@@ -37,119 +39,95 @@ import {
   resolvePrimaryRoutineId,
   resolveSecondaryRoutineId,
   runBuddyRoutine,
+  routinesMatchingTrigger,
+  syncBuddyTimeSchedule,
+  type BuddyTriggerKind,
 } from './buddyRoutines';
+import {
+  companionChromeCounterScale,
+  companionCssTransform,
+  clampThrowVelocity,
+  updateShimejiMotion,
+} from './shimejiPhysics';
+import { BUDDY_SPEECH_EVENT, speakBeepLine, voiceForType, type BuddySpeechDetail } from './beepSpeech';
+import { pickDialogueLine, type DialogueContext } from './dialoguePools';
+import { getUserLevel, onLevelChange } from '../levelService';
 
 const SIZE = 52;
 const SHIMEJI_SIZE = 96;
+const WIRED_SHIMEJI_SIZE = 100;
 const DRAG_THRESHOLD = 6;
-
-/** Avoid re-firing morning/night on every CompanionLayer remount within the same period. */
-let lastHourPulseKind: 'morning' | 'night' | null = null;
-let lastHourPulseDay = '';
+const IDLE_DEFAULT_MS = 90_000;
 
 function clamp(n: number, a: number, b: number) {
   return Math.min(b, Math.max(a, n));
 }
 
 function companionSize(c: Pick<CompanionInstance, 'typeId'>): number {
-  return c.typeId === 'miko-shimeji' ? SHIMEJI_SIZE : SIZE;
+  return defFor(c.typeId).spritePack
+    ? c.typeId === 'wired-navi'
+      ? WIRED_SHIMEJI_SIZE
+      : SHIMEJI_SIZE
+    : SIZE;
 }
 
 function isShimeji(c: CompanionInstance): boolean {
-  return c.typeId === 'miko-shimeji';
+  return Boolean(defFor(c.typeId).spritePack);
 }
 
-function setMotion(c: CompanionInstance, motion: CompanionMotion): boolean {
-  if (c.motion === motion) return false;
-  c.motion = motion;
-  return true;
+function applyDomPos(el: HTMLElement | null, c: CompanionInstance): void {
+  if (!el) return;
+  el.style.transform = companionCssTransform(c);
 }
 
-function updateShimejiMotion(c: CompanionInstance, w: number, h: number, dt: number, speed: number): boolean {
-  const size = companionSize(c);
-  const pad = 8;
-  const floorY = Math.max(pad, h - size - pad);
-  const rightX = Math.max(pad, w - size - pad);
-  let changed = false;
-  const moveSpeed = Math.max(speed, 26);
-
-  if (!c.motion || c.motion === 'stand' || c.motion === 'sit' || c.motion === 'drag' || c.motion === 'celebrate') {
-    changed = setMotion(c, 'walk') || changed;
+/**
+ * Drag stretch (Phase 4.5): the sprite elongates along the drag vector and
+ * thins across it, preserving apparent volume — the squash-and-stretch rule.
+ * Written as CSS vars the sprite consumes, so the position transform above
+ * stays untouched and there is no transform to fight over.
+ */
+function applyDragStretch(el: HTMLElement | null, vx: number, vy: number, weight: number): void {
+  if (!el) return;
+  const speed = Math.hypot(vx, vy);
+  const k = Math.min(0.28, (speed / 2600) * (0.7 + weight * 0.8));
+  if (k < 0.005) {
+    el.style.removeProperty('--stretch');
+    el.style.removeProperty('--squash');
+    return;
   }
-
-  if (c.motion === 'fall') {
-    c.y = clamp(c.y + moveSpeed * 2.4 * dt, pad, floorY);
-    if (c.y >= floorY - 1) {
-      c.y = floorY;
-      c.motionTargetX = c.facing === 1 ? rightX : pad;
-      changed = setMotion(c, 'walk') || changed;
-    }
-    return changed;
-  }
-
-  if (c.motion === 'wall') {
-    const side = c.motionSide ?? (c.x < w / 2 ? 'left' : 'right');
-    c.motionSide = side;
-    c.x = side === 'left' ? pad : rightX;
-    c.facing = side === 'left' ? -1 : 1;
-    const targetY = clamp(c.motionTargetY ?? pad, pad, floorY);
-    const dir = targetY < c.y ? -1 : 1;
-    c.y = clamp(c.y + dir * moveSpeed * 0.82 * dt, pad, floorY);
-    if (Math.abs(c.y - targetY) <= 2) {
-      c.y = targetY;
-      if (targetY <= pad + 1) {
-        c.motionTargetX = side === 'left' ? rightX : pad;
-        changed = setMotion(c, 'ceiling') || changed;
-      } else {
-        c.motionTargetX = side === 'left' ? rightX : pad;
-        c.facing = side === 'left' ? 1 : -1;
-        changed = setMotion(c, 'walk') || changed;
-      }
-    }
-    return changed;
-  }
-
-  if (c.motion === 'ceiling') {
-    c.y = pad;
-    const targetX = clamp(c.motionTargetX ?? (c.facing === 1 ? rightX : pad), pad, rightX);
-    const dir = targetX >= c.x ? 1 : -1;
-    c.facing = dir === 1 ? 1 : -1;
-    c.x = clamp(c.x + dir * moveSpeed * 0.72 * dt, pad, rightX);
-    if (Math.abs(c.x - targetX) <= 2 || c.x <= pad + 1 || c.x >= rightX - 1) {
-      c.x = clamp(targetX, pad, rightX);
-      c.motionSide = c.x < w / 2 ? 'left' : 'right';
-      c.motionTargetY = Math.random() < 0.35 ? floorY : pad + Math.random() * Math.max(40, floorY - pad);
-      changed = setMotion(c, 'wall') || changed;
-    } else if (Math.random() < dt * 0.035) {
-      c.motionTargetY = undefined;
-      c.motionSide = undefined;
-      changed = setMotion(c, 'fall') || changed;
-    }
-    return changed;
-  }
-
-  c.y = floorY;
-  changed = setMotion(c, 'walk') || changed;
-  if (typeof c.motionTargetX !== 'number') c.motionTargetX = c.facing === 1 ? rightX : pad;
-  const targetX = clamp(c.motionTargetX, pad, rightX);
-  const dir = targetX >= c.x ? 1 : -1;
-  c.facing = dir === 1 ? 1 : -1;
-  c.x = clamp(c.x + dir * moveSpeed * dt, pad, rightX);
-  if (Math.abs(c.x - targetX) <= 2 || c.x <= pad + 1 || c.x >= rightX - 1) {
-    c.x = clamp(targetX, pad, rightX);
-    c.motionSide = c.x < w / 2 ? 'left' : 'right';
-    c.motionTargetY = pad;
-    changed = setMotion(c, 'wall') || changed;
-  } else if (Math.random() < dt * 0.025) {
-    c.motionTargetX = c.facing === 1 ? pad + Math.random() * rightX * 0.42 : rightX - Math.random() * rightX * 0.42;
-  }
-  return changed;
+  const vertical = Math.abs(vy) >= Math.abs(vx);
+  const long = 1 + k;
+  const thin = 1 / long;
+  el.style.setProperty('--stretch', String(vertical ? thin : long));
+  el.style.setProperty('--squash', String(vertical ? long : thin));
 }
 
-function wanderSpeed(reactivity: CompanionReactivity): number {
-  if (reactivity === 'quiet') return 12;
-  if (reactivity === 'playful') return 38;
-  return 22;
+function clearDragStretch(el: HTMLElement | null): void {
+  if (!el) return;
+  el.style.removeProperty('--stretch');
+  el.style.removeProperty('--squash');
+}
+
+function secretLifecycleSuspended(): boolean {
+  return document.documentElement.classList.contains('secret-lifecycle-suspended');
+}
+
+const TREASURE_MSG = 'You have to first find my treasure.';
+
+function isTreasureLockedBonzi(c: CompanionInstance): boolean {
+  return c.typeId === 'miko-shimeji' && !hasDiscoveredAero();
+}
+
+function wanderSpeed(reactivity: CompanionReactivity, activeness = 0.4): number {
+  const a = Math.min(1, Math.max(0, activeness));
+  // Calmer base speeds than classic shimeji; dial scales 0.28×…1.33×.
+  const base = reactivity === 'quiet' ? 8 : reactivity === 'playful' ? 26 : 14;
+  return base * (0.28 + a * 1.05);
+}
+
+function bobDurationSec(activeness = 0.4): number {
+  const a = Math.min(1, Math.max(0, activeness));
+  return 2.8 * (1.55 - a * 0.75);
 }
 
 function reactionChance(reactivity: CompanionReactivity): number {
@@ -161,12 +139,11 @@ function reactionChance(reactivity: CompanionReactivity): number {
 /** Keep saved instances for active types; seed any missing active types. */
 function seedOrLoad(env: EnvironmentSettings, w: number, h: number): CompanionInstance[] {
   const now = Date.now();
+  const visibleTypes = new Set(COMPANION_DEFS().map((d) => d.id));
   const active = new Set<CompanionTypeId>(
-    env.companionTypes?.length
-      ? (env.companionTypes as CompanionTypeId[])
-      : COMPANION_DEFS().map((d) => d.id),
+    (env.companionTypes?.length ? (env.companionTypes as CompanionTypeId[]) : COMPANION_DEFS().map((d) => d.id))
+      .filter((typeId) => visibleTypes.has(typeId)),
   );
-  active.add('miko-shimeji');
   const saved = (env.companions ?? [])
     .filter((c) => active.has(c.typeId))
     .filter((c) => !c.hiddenUntil || c.hiddenUntil < now)
@@ -181,30 +158,21 @@ function seedOrLoad(env: EnvironmentSettings, w: number, h: number): CompanionIn
   return [...saved, ...seeded];
 }
 
-function applyDomPos(el: HTMLElement | null, c: CompanionInstance): void {
-  if (!el) return;
-  // Compositor path: avoid left/top layout thrash every wander frame.
-  el.style.transform = `translate3d(${c.x}px, ${c.y}px, 0) scaleX(${c.facing})`;
-}
-
-function secretLifecycleSuspended(): boolean {
-  return document.documentElement.classList.contains('secret-lifecycle-suspended');
-}
-
-const TREASURE_MSG = 'You have to first find my treasure.';
-
-function isTreasureLockedMiko(c: CompanionInstance): boolean {
-  return c.typeId === 'miko-shimeji' && !hasDiscoveredAero();
-}
-
 export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [list, setList] = useState<CompanionInstance[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [shakeId, setShakeId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
+  const [wiredDiscovered, setWiredDiscovered] = useState(hasDiscoveredWired);
   const listRef = useRef<CompanionInstance[]>([]);
   const envRef = useRef(env);
+  // Physics is read every frame from a ref so the weight slider applies live
+  // without restarting the wander loop (which would reset motion state), and
+  // without re-parsing localStorage on every frame / pointermove.
+  const physicsRef = useRef(companionPhysics(loadMotionPrefs()));
+  const weightRef = useRef(loadMotionPrefs().companionWeight);
   const dragRef = useRef<{
     id: string;
     ox: number;
@@ -212,39 +180,88 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     sx: number;
     sy: number;
     moved: boolean;
+    /** Last pointermove timestamp — drag velocity for squash/stretch + throw. */
+    lastT?: number;
+    lastVx?: number;
+    lastVy?: number;
   } | null>(null);
   const dirtyRef = useRef(false);
   const menuIdRef = useRef<string | null>(null);
   const lastClickRef = useRef<{ id: string; t: number } | null>(null);
 
   const patchCompanion = useCallback(
-    (id: string, patch: { mood?: CompanionMood; status?: string }) => {
-      const next = listRef.current.map((c) => (c.id === id ? { ...c, ...patch } : c));
+    (id: string, patch: { mood?: CompanionMood; status?: string; speechBubble?: string | null }) => {
+      const next = listRef.current.map((c) => {
+        if (c.id !== id) return c;
+        const merged = { ...c, ...patch };
+        if (patch.speechBubble === null) delete merged.speechBubble;
+        return merged;
+      });
       listRef.current = next;
       setList(next);
-      // Soft persist mood/status without thrashing: mark dirty for 2s flush
       dirtyRef.current = true;
+    },
+    [],
+  );
+
+  const speakLine = useCallback(
+    (c: CompanionInstance, text: string) => {
+      const profile = defFor(c.typeId).voice ?? voiceForType(c.typeId);
+      void speakBeepLine(c.id, text, profile);
     },
     [],
   );
 
   const runRoutine = useCallback(
     (c: CompanionInstance, routineId: string) => {
-      if (isTreasureLockedMiko(c)) return;
+      if (isTreasureLockedBonzi(c)) return;
       void runBuddyRoutine(routineId, {
         companionId: c.id,
         typeId: c.typeId,
         patchCompanion: (patch) => patchCompanion(c.id, patch),
+        speak: (text) => speakLine(c, text),
       }).then((res) => {
         if (!res.ok && res.error && res.error !== 'Too fast.') {
           patchCompanion(c.id, { status: res.error });
         }
       });
     },
-    [patchCompanion],
+    [patchCompanion, speakLine],
   );
 
-  // Host / external: buddy:run { companionId, routineId }
+  const runTriggeredRoutines = useCallback(
+    (kind: BuddyTriggerKind, opts?: { afterMs?: number }) => {
+      const envNow = envRef.current;
+      const routines = envNow.buddyRoutines?.length ? envNow.buddyRoutines : getDefaultBuddyRoutines();
+      const matched = routinesMatchingTrigger(routines, kind, opts);
+      if (!matched.length) return;
+      for (const routine of matched) {
+        const candidates = listRef.current.filter(
+          (c) =>
+            (!c.hiddenUntil || c.hiddenUntil <= Date.now()) &&
+            (!routine.forType || routine.forType === '*' || routine.forType === c.typeId),
+        );
+        const target = candidates[0];
+        if (target) runRoutine(target, routine.id);
+      }
+    },
+    [runRoutine],
+  );
+
+  const maybeSpeakContext = useCallback(
+    (ctx: DialogueContext, preferType?: CompanionTypeId) => {
+      const pool = listRef.current.filter((c) => !c.hiddenUntil || c.hiddenUntil <= Date.now());
+      if (!pool.length) return;
+      const preferred = preferType ? pool.find((c) => c.typeId === preferType) : undefined;
+      const c = preferred ?? pool[Math.floor(Math.random() * pool.length)];
+      if (!c) return;
+      const line = pickDialogueLine(c.typeId, ctx, c.id);
+      if (line) speakLine(c, line);
+    },
+    [speakLine],
+  );
+
+  // Host / external: buddy:run { companionId, routineId } + time-trigger IPC
   useEffect(() => {
     const onRun = (ev: Event) => {
       const d = (ev as CustomEvent<{ companionId?: string; routineId?: string }>).detail;
@@ -252,22 +269,74 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       const c = listRef.current.find((x) => x.id === d.companionId);
       if (c) runRoutine(c, d.routineId);
     };
+    const onTrigger = (ev: Event) => {
+      const d = (ev as CustomEvent<{ routineId?: string; forType?: string }>).detail;
+      if (!d?.routineId) return;
+      const candidates = listRef.current.filter(
+        (c) =>
+          (!c.hiddenUntil || c.hiddenUntil <= Date.now()) &&
+          (!d.forType || d.forType === '*' || d.forType === c.typeId),
+      );
+      const target = candidates[0];
+      if (target) runRoutine(target, d.routineId);
+    };
     window.addEventListener(BUDDY_RUN_EVENT, onRun);
+    window.addEventListener('buddy:trigger', onTrigger);
     const unsubIpc =
       typeof window.api?.onBuddyRun === 'function'
         ? window.api.onBuddyRun((payload) => {
             window.dispatchEvent(new CustomEvent(BUDDY_RUN_EVENT, { detail: payload }));
           })
         : () => undefined;
+    const unsubTrigger =
+      typeof window.api?.onBuddyTrigger === 'function'
+        ? window.api.onBuddyTrigger((payload) => {
+            window.dispatchEvent(new CustomEvent('buddy:trigger', { detail: payload }));
+          })
+        : () => undefined;
     return () => {
       window.removeEventListener(BUDDY_RUN_EVENT, onRun);
+      window.removeEventListener('buddy:trigger', onTrigger);
       unsubIpc();
+      unsubTrigger();
     };
   }, [runRoutine]);
+
+  // Speech bubble from beep engine
+  useEffect(() => {
+    const onSpeech = (ev: Event) => {
+      const d = (ev as CustomEvent<BuddySpeechDetail>).detail;
+      if (!d?.companionId) return;
+      patchCompanion(d.companionId, { speechBubble: d.text });
+    };
+    window.addEventListener(BUDDY_SPEECH_EVENT, onSpeech);
+    return () => window.removeEventListener(BUDDY_SPEECH_EVENT, onSpeech);
+  }, [patchCompanion]);
+
+  // Push time-of-day triggers to the single main-process scheduler
+  useEffect(() => {
+    if (!env.enabled || !env.companionsEnabled) {
+      syncBuddyTimeSchedule([]);
+      return;
+    }
+    const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
+    syncBuddyTimeSchedule(routines);
+  }, [env.enabled, env.companionsEnabled, env.buddyRoutines]);
 
   useEffect(() => {
     envRef.current = env;
   }, [env]);
+
+  useEffect(() => onAeroDiscoveryChanged(setAeroDiscovered), []);
+  useEffect(() => onWiredDiscoveryChanged(setWiredDiscovered), []);
+  useEffect(
+    () =>
+      onMotionPrefsChanged((p) => {
+        physicsRef.current = companionPhysics(p);
+        weightRef.current = p.companionWeight;
+      }),
+    [],
+  );
 
   useEffect(() => {
     menuIdRef.current = menuId;
@@ -302,7 +371,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     listRef.current = next;
     setList(next);
     dirtyRef.current = true;
-  }, [env.enabled, env.companionsEnabled, env.companionTypes?.join(',')]);
+  }, [env.enabled, env.companionsEnabled, env.companionTypes?.join(','), aeroDiscovered, wiredDiscovered]);
 
   // Wander: DOM-only motion. Disk persist is rare (was every 2s → UI freezes).
   useEffect(() => {
@@ -357,7 +426,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       const root = rootRef.current;
       const w = root?.clientWidth ?? 900;
       const h = root?.clientHeight ?? 500;
-      const speed = wanderSpeed(envRef.current.companionReactivity ?? 'normal');
+      const speed = wanderSpeed(
+        envRef.current.companionReactivity ?? 'normal',
+        envRef.current.companionActiveness ?? 0.4,
+      );
       const pauseStudy = envRef.current.companionPauseWhenStudying;
       const prev = listRef.current;
       if (!prev.length) {
@@ -377,7 +449,15 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
         let facing = c.facing;
 
         if (isShimeji(c)) {
-          const motionChanged = updateShimejiMotion(c, w, h, dt, speed);
+          const motionChanged = updateShimejiMotion(
+            c,
+            w,
+            h,
+            dt,
+            speed,
+            physicsRef.current,
+            companionSize(c),
+          );
           moved = true;
           needsReact = needsReact || motionChanged;
           applyDomPos(elFor(root, c.id), c);
@@ -582,35 +662,71 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     const onReading = (ev: Event) => {
       const d = (ev as CustomEvent<{ title?: string }>).detail;
       react('study', d?.title);
+      maybeSpeakContext('study', 'study-buddy');
     };
     window.addEventListener(READING_RECORDED_EVENT, onReading);
 
-    const onCards = () => react('flashcard');
+    const onCards = () => {
+      react('flashcard');
+      maybeSpeakContext('flashcard', 'study-buddy');
+    };
     window.addEventListener('flashcard-deck-changed', onCards);
 
     const unsubMusic = onPlayingChanged((playing) => {
       react(playing ? 'music-play' : 'music-stop');
+      if (playing) {
+        runTriggeredRoutines('musicPlaying');
+        maybeSpeakContext('music', 'critter');
+      }
     });
 
-    // Time-of-day pulse once per day-period (module-level debounce survives remounts)
-    const hourPulse = () => {
-      const now = new Date();
-      const day = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-      const h = now.getHours();
-      let kind: 'morning' | 'night' | null = null;
-      if (h >= 5 && h < 11) kind = 'morning';
-      else if (h >= 21 || h < 5) kind = 'night';
-      if (!kind) {
-        lastHourPulseKind = null;
-        return;
-      }
-      if (lastHourPulseDay === day && lastHourPulseKind === kind) return;
-      lastHourPulseDay = day;
-      lastHourPulseKind = kind;
-      react(kind);
+    // Mood-only daypart pulse (time routines fire from main buddyScheduler)
+    const moodPulse = () => {
+      const h = new Date().getHours();
+      if (h >= 5 && h < 11) react('morning');
+      else if (h >= 21 || h < 5) react('night');
     };
-    hourPulse();
-    const tid = window.setInterval(hourPulse, 10 * 60_000);
+    moodPulse();
+    const tid = window.setInterval(moodPulse, 30 * 60_000);
+
+    // Idle trigger: no pointer/key activity for afterMs
+    let lastActive = Date.now();
+    let idleArmed = true;
+    const bump = () => {
+      lastActive = Date.now();
+      idleArmed = true;
+    };
+    const onPtr = () => bump();
+    const onKey = () => bump();
+    window.addEventListener('pointerdown', onPtr, { passive: true });
+    window.addEventListener('keydown', onKey, { passive: true });
+    const idleTid = window.setInterval(() => {
+      if (!idleArmed) return;
+      const idleFor = Date.now() - lastActive;
+      const routines = envRef.current.buddyRoutines?.length
+        ? envRef.current.buddyRoutines
+        : getDefaultBuddyRoutines();
+      const idleOnes = routinesMatchingTrigger(routines, 'idle');
+      const threshold = idleOnes.reduce(
+        (min, r) => Math.min(min, r.trigger?.kind === 'idle' ? r.trigger.afterMs : IDLE_DEFAULT_MS),
+        IDLE_DEFAULT_MS,
+      );
+      if (idleFor >= threshold) {
+        idleArmed = false;
+        runTriggeredRoutines('idle', { afterMs: idleFor });
+        maybeSpeakContext('idle');
+      }
+    }, 5_000);
+
+    let lastLevel = getUserLevel();
+    const unsubLevel = onLevelChange(() => {
+      const next = getUserLevel();
+      if (next > lastLevel) {
+        maybeSpeakContext('levelUp', 'study-buddy');
+        react('achievement', 'Level up');
+      }
+      lastLevel = next;
+    });
 
     return () => {
       unsub();
@@ -618,8 +734,12 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       window.removeEventListener('flashcard-deck-changed', onCards);
       unsubMusic();
       clearInterval(tid);
+      clearInterval(idleTid);
+      window.removeEventListener('pointerdown', onPtr);
+      window.removeEventListener('keydown', onKey);
+      unsubLevel();
     };
-  }, [env.enabled, env.companionsEnabled, react]);
+  }, [env.enabled, env.companionsEnabled, react, runTriggeredRoutines, maybeSpeakContext]);
 
   // Avoid music-play spam on every remount: only if actually playing when first enabled
   useEffect(() => {
@@ -627,7 +747,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     if (musicIsPlaying()) react('music-play');
   }, [env.enabled, env.companionsEnabled]);
 
-  const rejectTreasureMiko = useCallback(
+  const rejectTreasureBonzi = useCallback(
     (c: CompanionInstance) => {
       setShakeId(c.id);
       window.setTimeout(() => setShakeId((id) => (id === c.id ? null : id)), 420);
@@ -641,9 +761,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
   const onPointerDown = (c: CompanionInstance) => (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
-    if (isTreasureLockedMiko(c)) {
+    if (isTreasureLockedBonzi(c)) {
       e.stopPropagation();
-      rejectTreasureMiko(c);
+      rejectTreasureBonzi(c);
       return;
     }
     if (c.locked) return;
@@ -670,11 +790,20 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       const nx = clamp(d.ox + dx, 8, w - size);
       const ny = clamp(d.oy + dy, 8, h - size);
       if (cur) {
+        const now = performance.now();
+        const elapsed = Math.max(1, now - (d.lastT || now));
+        const vx = ((nx - cur.x) / elapsed) * 1000;
+        const vy = ((ny - cur.y) / elapsed) * 1000;
+        d.lastT = now;
+        d.lastVx = vx;
+        d.lastVy = vy;
         cur.x = nx;
         cur.y = ny;
         cur.motion = 'drag';
+        cur.edge = 'floor';
         const el = root?.querySelector(`[data-companion-id="${d.id}"]`) as HTMLElement | null;
         applyDomPos(el, cur);
+        applyDragStretch(el, vx, vy, weightRef.current);
       }
     };
     const up = () => {
@@ -682,9 +811,22 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       if (!d) return;
       dragRef.current = null;
       setDraggingId(null);
+      clearDragStretch(
+        rootRef.current?.querySelector(`[data-companion-id="${d.id}"]`) as HTMLElement | null,
+      );
       if (d.moved) {
+        const throwVx = clampThrowVelocity(d.lastVx ?? 0);
+        const throwVy = clampThrowVelocity(d.lastVy ?? 0);
         const snapshot = listRef.current.map((c) =>
-          c.id === d.id && c.typeId === 'miko-shimeji' ? { ...c, motion: 'fall' as CompanionMotion } : { ...c },
+          c.id === d.id && isShimeji(c)
+            ? {
+                ...c,
+                motion: 'fall' as CompanionMotion,
+                edge: 'floor' as const,
+                motionVx: throwVx,
+                motionVy: throwVy,
+              }
+            : { ...c },
         );
         listRef.current = snapshot;
         setList(snapshot);
@@ -701,8 +843,8 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
 
   const onBuddyClick = (c: CompanionInstance) => (e: RMouseEvent) => {
     e.stopPropagation();
-    if (isTreasureLockedMiko(c)) {
-      rejectTreasureMiko(c);
+    if (isTreasureLockedBonzi(c)) {
+      rejectTreasureBonzi(c);
       return;
     }
     if (dragRef.current?.moved) return;
@@ -726,8 +868,8 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const onBuddyContext = (c: CompanionInstance) => (e: RMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isTreasureLockedMiko(c)) {
-      rejectTreasureMiko(c);
+    if (isTreasureLockedBonzi(c)) {
+      rejectTreasureBonzi(c);
       return;
     }
     setMenuId((id) => (id === c.id ? null : c.id));
@@ -739,12 +881,18 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
 
   return (
-    <div ref={rootRef} className="os-companion-layer">
+    <div
+      ref={rootRef}
+      className="os-companion-layer"
+      style={{
+        ['--companion-bob-dur' as string]: `${bobDurationSec(env.companionActiveness ?? 0.4)}s`,
+      }}
+    >
       {visible.map((c) => {
         const def = defFor(c.typeId);
         const size = companionSize(c);
         const menuRoutines = resolveMenuRoutineIds(c, routines);
-        const lockedTreasure = isTreasureLockedMiko(c);
+        const lockedTreasure = isTreasureLockedBonzi(c);
         return (
           <div
             key={c.id}
@@ -755,7 +903,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
               top: 0,
               width: size,
               height: size,
-              transform: `translate3d(${c.x}px, ${c.y}px, 0) scaleX(${c.facing})`,
+              transform: companionCssTransform(c),
               ['--c-body' as string]: def.color,
               ['--c-accent' as string]: def.accent,
             }}
@@ -768,8 +916,14 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
             onClick={onBuddyClick(c)}
             onContextMenu={onBuddyContext(c)}
           >
-            {def.sprite === 'miko-shimeji' ? (
-              <ShimejiSprite motion={c.motion} mood={c.mood} dragging={draggingId === c.id} />
+            {def.spritePack ? (
+              <ShimejiSprite
+                motion={c.motion}
+                mood={c.mood}
+                dragging={draggingId === c.id}
+                pack={def.spritePack}
+                activeness={env.companionActiveness ?? 0.4}
+              />
             ) : (
               <div className="os-companion-body">
                 <span className="os-companion-eye" />
@@ -777,11 +931,22 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                 <span className={`os-companion-mouth mood-${c.mood}`} />
               </div>
             )}
+            {c.speechBubble && (
+              <div
+                className="os-companion-bubble"
+                style={{
+                  transform: `translateX(-50%) ${companionChromeCounterScale(c.facing, c.edge)}`,
+                }}
+              >
+                {c.speechBubble}
+              </div>
+            )}
             {c.mood === 'celebrate' && <span className="os-companion-spark" />}
             {!lockedTreasure && (
             <button
               type="button"
               className="os-companion-menu-btn"
+              style={{ transform: companionChromeCounterScale(c.facing, c.edge) }}
               title="Buddy menu"
               aria-label={`${def.label} menu`}
               onPointerDown={(e) => e.stopPropagation()}
@@ -796,7 +961,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
             {menuId === c.id && !lockedTreasure && (
               <div
                 className="os-companion-menu"
-                style={{ transform: `translateX(-50%) scaleX(${c.facing === -1 ? -1 : 1})` }}
+                style={{
+                  transform: `translateX(-50%) ${companionChromeCounterScale(c.facing, c.edge)}`,
+                }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
               >

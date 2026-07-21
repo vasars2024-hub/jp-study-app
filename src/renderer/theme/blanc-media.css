@@ -1,0 +1,63 @@
+/*
+ * Blanc panel styles owned by the **Media & Cards** work stream
+ * (player / video / flashcards). See BLANC_REFINEMENT_PLAN.md, "Parallel split".
+ *
+ * The Library & Arcade stream must not edit this file; it has blanc-library.css.
+ * Neither stream appends to blanc.css — that file is shared and frozen.
+ *
+ * Use the existing Blanc tokens (--blanc-bg, --blanc-panel, --blanc-border,
+ * --blanc-text, --blanc-accent, --blanc-danger). Do not hardcode new colours:
+ * Pillar 4 ships a theme editor bound to those tokens.
+ */
+
+/* Media panel: the folder rail and the card grid need bounded, independently
+   scrolling boxes. VirtualGrid measures its own scroller, so it must have a
+   real height rather than growing the whole panel. */
+.blanc-media-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.blanc-media-body.has-folders {
+  grid-template-columns: minmax(120px, 200px) 1fr;
+}
+
+.blanc-media-folders {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--blanc-border);
+  border-radius: 6px;
+}
+
+.blanc-media-grid {
+  height: 320px;
+  min-width: 0;
+  border: 1px solid var(--blanc-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* The player stage sits inside a fieldset, so cap it rather than letting a
+   tall video push the library off-screen. */
+.blanc-tool-detail .media-stage {
+  max-height: 420px;
+}
+
+.blanc-tool-detail .media-video {
+  max-height: 260px;
+}
+
+/* Flashcards embed: the Study OS mode components are full-screen; inside a Blanc
+   panel they need a bounded, scrolling frame so the deck explorer and the
+   review card don't push the taskbar off-screen. */
+.blanc-flashcards-embed {
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+/* The review mode centres a card in a full viewport; keep it readable but
+   contained when embedded. */
+.blanc-flashcards-embed .flash-view.review {
+  min-height: 0;
+}

@@ -25,6 +25,9 @@ let quality: PerfSnapshot['quality'] = 'high';
 let lastSample = performance.now();
 let frames = 0;
 let emaFrame = 16.7;
+let globalInteractionInstalled = false;
+let globalInteractionTimer = 0;
+let explicitInteractionDepth = 0;
 
 /** Rolling frame time sample from any rAF loop (particles preferred). */
 export function perfSampleFrame(now: number, dtMs: number): void {
@@ -108,6 +111,35 @@ function emit(): void {
 
 /** Begin/end interaction (window drag, icon drag). */
 export function perfSetInteracting(on: boolean): void {
-  document.documentElement.classList.toggle('os-interacting', on);
+  if (on) explicitInteractionDepth += 1;
+  else explicitInteractionDepth = Math.max(0, explicitInteractionDepth - 1);
+  document.documentElement.classList.toggle('os-interacting', explicitInteractionDepth > 0);
   emit();
+}
+
+/**
+ * Short global input budget: ambient rAF layers already yield while
+ * `os-interacting` is present, but clicks/keyboard navigation previously did
+ * not set it. This gives app opens, menus, and form controls a brief clear lane.
+ */
+export function installGlobalInteractionBudget(): void {
+  if (globalInteractionInstalled) return;
+  globalInteractionInstalled = true;
+
+  const mark = () => {
+    document.documentElement.classList.add('os-interacting');
+    if (globalInteractionTimer) window.clearTimeout(globalInteractionTimer);
+    globalInteractionTimer = window.setTimeout(() => {
+      globalInteractionTimer = 0;
+      if (explicitInteractionDepth === 0) {
+        document.documentElement.classList.remove('os-interacting');
+        emit();
+      }
+    }, 850);
+    emit();
+  };
+
+  window.addEventListener('pointerdown', mark, { capture: true, passive: true });
+  window.addEventListener('keydown', mark, { capture: true, passive: true });
+  window.addEventListener('wheel', mark, { capture: true, passive: true });
 }

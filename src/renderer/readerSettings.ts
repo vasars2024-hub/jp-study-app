@@ -3,7 +3,7 @@
 
 import { WK_HIGHLIGHT_CSS } from './wordHighlight';
 
-export type ReaderTheme = 'light' | 'sepia' | 'cream' | 'gray' | 'dark' | 'black';
+export type ReaderTheme = 'light' | 'sepia' | 'cream' | 'gray' | 'dark' | 'black' | 'wired';
 export type ReaderFont = 'default' | 'serif' | 'sans' | 'rounded';
 /** Page-flip columns vs. one long scrolling page. */
 export type ReaderFlow = 'paginated' | 'scrolled';
@@ -26,6 +26,11 @@ export interface ReaderSettings {
   paragraphIndent: number;
   /** Blank space on each side, as a % of width (0 = none). */
   sideMargin: number;
+  /**
+   * Max width of the text column in horizontal scrolled mode, in rem.
+   * Independent of font size — raise this to keep lines long when zoomed in.
+   */
+  contentWidth: number;
   /** Stretch lines to both edges (justified) instead of a ragged edge. */
   justify: boolean;
   /** Fine letter-pair spacing (font-kerning). */
@@ -63,6 +68,7 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   lineHeight: 1.8,
   paragraphIndent: 0,
   sideMargin: 0,
+  contentWidth: 46,
   justify: false,
   kerning: false,
   vpal: false,
@@ -81,6 +87,8 @@ export const LINE_HEIGHT_MIN = 1.0;
 export const LINE_HEIGHT_MAX = 2.6;
 export const INDENT_MAX = 3;
 export const MARGIN_MAX = 30;
+export const CONTENT_WIDTH_MIN = 20;
+export const CONTENT_WIDTH_MAX = 120;
 
 const STORAGE_KEY = 'jp-reader-settings';
 
@@ -134,6 +142,9 @@ export function clampIndent(n: number): number {
 export function clampMargin(n: number): number {
   return Math.min(MARGIN_MAX, Math.max(0, Math.round(n)));
 }
+export function clampContentWidth(n: number): number {
+  return Math.min(CONTENT_WIDTH_MAX, Math.max(CONTENT_WIDTH_MIN, Math.round(n)));
+}
 
 export const THEMES: Record<ReaderTheme, { bg: string; fg: string; link: string }> = {
   light: { bg: '#fbf7ee', fg: '#1b1b1b', link: '#1c5fb0' },
@@ -142,6 +153,8 @@ export const THEMES: Record<ReaderTheme, { bg: string; fg: string; link: string 
   gray: { bg: '#cfd2d6', fg: '#1c1d20', link: '#1c5fb0' },
   dark: { bg: '#15151b', fg: '#d9d9e3', link: '#6c9bff' },
   black: { bg: '#000000', fg: '#cacace', link: '#6c9bff' },
+  // WIRED PHOSPHOR (§5.11) — lets the page itself opt into the terminal look.
+  wired: { bg: '#02070d', fg: '#d8fbff', link: '#6df1ff' },
 };
 
 const FONT_STACKS: Record<ReaderFont, string> = {

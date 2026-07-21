@@ -17,12 +17,13 @@ function seed(
   pack: ProfileFieldPack,
   lookup: StudyProfile['lookup'] = { pipeline: 'jmdict-jisho' },
   noteCss: string = DEFAULT_CARD_CSS,
+  targetLang?: StudyProfile['targetLang'],
 ): StudyProfile {
   return {
     id,
     label,
     description,
-    targetLang: 'ja',
+    targetLang: targetLang ?? (lookup.pipeline === 'cedict-local' ? 'zh' : 'ja'),
     card,
     anki: { ...packToAnki(pack), deckName },
     deckParams,
@@ -33,8 +34,13 @@ function seed(
 }
 
 /** Grouped profile folders for the picker UI. */
-export const PROFILE_GROUPS: ReadonlyArray<{ label: string; ids: readonly ProfileId[] }> = [
+export const PROFILE_GROUPS: ReadonlyArray<{
+  id: 'jaEn' | 'enJa' | 'russian' | 'chinese' | 'specialty';
+  label: string;
+  ids: readonly ProfileId[];
+}> = [
   {
+    id: 'jaEn',
     label: 'Japanese ↔ English',
     ids: [
       'p1-ja-focus',
@@ -47,10 +53,12 @@ export const PROFILE_GROUPS: ReadonlyArray<{ label: string; ids: readonly Profil
     ],
   },
   {
+    id: 'enJa',
     label: 'English → Japanese',
     ids: ['p2-en-ja', 'seed-en-n5', 'seed-en-n3', 'seed-en-n1', 'seed-en-examples', 'seed-en-pairs'],
   },
   {
+    id: 'russian',
     label: 'Russian',
     ids: [
       'p3-ru-ja',
@@ -62,10 +70,12 @@ export const PROFILE_GROUPS: ReadonlyArray<{ label: string; ids: readonly Profil
     ],
   },
   {
+    id: 'chinese',
     label: 'Chinese',
     ids: ['seed-chinese-bridge', 'seed-zh-en', 'seed-zh-ja', 'seed-zh-examples', 'seed-zh-pairs'],
   },
   {
+    id: 'specialty',
     label: 'Specialty mining',
     ids: ['seed-frequency', 'seed-image-mine', 'seed-audio', 'seed-speed-review'],
   },

@@ -14,6 +14,9 @@
           blancOpen: function () { return Promise.resolve({ ok: true }); },
           blancClose: function () { return Promise.resolve({ ok: true }); },
           syncLibrary: function () { return Promise.resolve([]); },
+          // Reading Finder and the Read tab both read the library; without this
+          // the catch-all proxy hands back undefined and they render empty.
+          listLibrary: function () { return Promise.resolve([]); },
           getLibraryFolders: function () { return Promise.resolve([]); },
           getWatchFolder: function () { return Promise.resolve(null); },
           importFiles: function () { return Promise.resolve([]); },
@@ -37,6 +40,11 @@
           toolboxPickSearchFolder: function () { return Promise.resolve(null); },
           toolboxFileSearch: function () { return Promise.resolve({ ok: true, results: [], scanned: 0, truncated: false }); },
           launchTarget: function () { return Promise.resolve('Harness: launching files is disabled.'); },
+          pickShortcut: function () {
+            // Stands in for the native file dialog so Workspace Launcher's
+            // picker path is clickable here; the real one returns null on cancel.
+            return Promise.resolve({ target: 'C:\\Windows\\System32\\notepad.exe', name: 'notepad', icon: '' });
+          },
           launchAutomationBuilder: function () { return Promise.resolve({ ok: false, error: 'Harness: no PowerShell here.' }); },
         };
         window.api = new Proxy(explicit, {
@@ -53,6 +61,12 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/renderer/__devharness__/blancHarness.tsx"></script>
+    <!--
+      Loads the REAL Blanc entry (src/renderer/blancMain.tsx), the same module
+      the packaged Blanc window boots via blanc.html. It used to load a
+      harness-only module that mounted BlancShell directly, which meant the
+      harness never exercised the actual boot path.
+    -->
+    <script type="module" src="/src/renderer/blancMain.tsx"></script>
   </body>
 </html>

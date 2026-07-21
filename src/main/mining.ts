@@ -1,9 +1,10 @@
-import { app, dialog, ipcMain, BrowserWindow } from 'electron';
+import { app, dialog, ipcMain, BrowserWindow, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import AdmZip from 'adm-zip';
 import { mt } from './i18n';
+import { extractEpubTitleFromOpf } from './epubMeta';
 import type {
   AiApiKeysSet,
   AiEngineConfig,
@@ -27,6 +28,7 @@ import type {
   DEFAULT_TRADITIONAL_MINING_CONFIG,
 } from '../shared/mining';
 import { buildAiPromptPreview, renderAiTemplate } from '../shared/aiPromptBuilder';
+import { callAiProvider, parseAiJson } from './aiProviderClient';
 import {
   needsEnrichmentLookup,
   resolveTraditionalTemplates,
@@ -86,29 +88,80 @@ function languageOptionsFromRaw(raw?: Partial<MiningConfigFile>): AiLanguageOpti
   });
 }
 
+// AI provider keys were previously stored as plain JSON strings in
+// api-keys.json (PHASE_6_5_AUDIT.md §3/§8, Medium finding). They're now
+// encrypted at rest via Electron's safeStorage (OS keychain/DPAPI-backed)
+// when available. `_encrypted: true` marks a store written in the new
+// format; a store without that flag is legacy plaintext and gets
+// transparently migrated (re-encrypted and rewritten) on first read.
+interface ApiKeyStoreFile {
+  gemini?: string;
+  deepseek?: string;
+  _encrypted?: boolean;
+}
+
+let warnedNoEncryption = false;
+
+function encryptApiKeyValue(value: string): string {
+  if (!value) return '';
+  if (!safeStorage.isEncryptionAvailable()) {
+    if (!warnedNoEncryption) {
+      console.warn(
+        '[mining] OS-level encryption unavailable (safeStorage) — API keys will be stored in plaintext.',
+      );
+      warnedNoEncryption = true;
+    }
+    return value;
+  }
+  return safeStorage.encryptString(value).toString('base64');
+}
+
+function decryptApiKeyValue(stored: string, encrypted: boolean): string {
+  if (!stored) return '';
+  if (!encrypted) return stored.trim();
+  try {
+    return safeStorage.decryptString(Buffer.from(stored, 'base64')).trim();
+  } catch {
+    // OS keychain unavailable or key was encrypted on a different machine/user —
+    // fail closed (no key) rather than crash the mining/translate-analysis flow.
+    return '';
+  }
+}
+
 function readApiKeyStore(): Record<AiProviderKeyBucket, string> {
   ensureMiningRoot();
   const storePath = path.join(miningRoot(), 'api-keys.json');
-  let store: Partial<Record<AiProviderKeyBucket, string>> = {};
+  let raw: ApiKeyStoreFile = {};
   try {
-    store = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as Partial<Record<AiProviderKeyBucket, string>>;
+    raw = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as ApiKeyStoreFile;
   } catch {
-    store = {};
+    raw = {};
   }
+  const wasEncrypted = raw._encrypted === true;
+  let gemini = decryptApiKeyValue(typeof raw.gemini === 'string' ? raw.gemini : '', wasEncrypted);
+  const deepseek = decryptApiKeyValue(typeof raw.deepseek === 'string' ? raw.deepseek : '', wasEncrypted);
+
   const legacyGemini = readLegacyGeminiApiKey();
-  if (legacyGemini && !store.gemini) {
-    store.gemini = legacyGemini;
-    atomicWrite(storePath, JSON.stringify({ gemini: legacyGemini, deepseek: store.deepseek ?? '' }, null, 2));
+  if (legacyGemini && !gemini) gemini = legacyGemini;
+
+  // Migrate: legacy plaintext store (or one that just picked up the legacy
+  // .txt mirror) gets rewritten in encrypted form immediately.
+  if (!wasEncrypted && (gemini || deepseek)) {
+    writeApiKeyStore({ gemini, deepseek });
   }
-  return {
-    gemini: typeof store.gemini === 'string' ? store.gemini.trim() : '',
-    deepseek: typeof store.deepseek === 'string' ? store.deepseek.trim() : '',
-  };
+
+  return { gemini, deepseek };
 }
 
 function writeApiKeyStore(store: Record<AiProviderKeyBucket, string>): void {
   ensureMiningRoot();
-  atomicWrite(path.join(miningRoot(), 'api-keys.json'), JSON.stringify(store, null, 2));
+  const encryptedAvailable = safeStorage.isEncryptionAvailable();
+  const payload: ApiKeyStoreFile = {
+    gemini: encryptApiKeyValue(store.gemini ?? ''),
+    deepseek: encryptApiKeyValue(store.deepseek ?? ''),
+    _encrypted: encryptedAvailable,
+  };
+  atomicWrite(path.join(miningRoot(), 'api-keys.json'), JSON.stringify(payload, null, 2));
 }
 
 function readLegacyGeminiApiKey(): string {
@@ -159,11 +212,15 @@ function setApiKeyForBucket(bucket: AiProviderKeyBucket, value: unknown): void {
   store[bucket] = apiKey;
   writeApiKeyStore(store);
   if (bucket === 'gemini') {
+    // api-keys.json (encrypted) is now the sole source of truth — remove the
+    // legacy plaintext mirror instead of keeping it in sync (it previously
+    // held the same secret in plaintext, defeating the point of encrypting
+    // the primary store). readLegacyGeminiApiKey() still exists for one-way
+    // migration from installs that only ever wrote this file.
     try {
-      if (store.gemini) atomicWrite(path.join(miningRoot(), 'gemini-api-key.txt'), store.gemini);
-      else fs.unlinkSync(path.join(miningRoot(), 'gemini-api-key.txt'));
+      fs.unlinkSync(path.join(miningRoot(), 'gemini-api-key.txt'));
     } catch {
-      /* ignore legacy mirror errors */
+      /* ignore — file may not exist */
     }
   }
 }
@@ -186,6 +243,16 @@ function aiEngineConfigFromFile(config: MiningConfigFile): AiEngineConfig {
     outputFormat: config.outputFormat,
     ...lang,
   };
+}
+
+/**
+ * Minimal accessor for other main-process modules (translate analysis) that
+ * need the active cloud provider + key without the full mining config surface.
+ */
+export function getConfiguredAiProvider(): { providerId: AiProviderId; apiKey: string } {
+  const config = readMiningConfig();
+  const providerId = config.providerId ?? DEFAULT_AI_PROVIDER_ID;
+  return { providerId, apiKey: readApiKeyForProvider(providerId) };
 }
 
 interface TokenCandidate {
@@ -458,9 +525,7 @@ function extractEpubText(epubPath: string): { title: string; text: string } {
   const spineIds = [...opfXml.matchAll(/<itemref\b[^>]*>/gi)]
     .map((match) => parseXmlTagAttr(match[0], 'idref'))
     .filter((id): id is string => Boolean(id));
-  const title =
-    (opfXml.match(/<dc:title[^>]*>([\s\S]*?)<\/dc:title>/i) ?? [])[1]?.replace(/<[^>]+>/g, '').trim() ||
-    'EPUB';
+  const title = extractEpubTitleFromOpf(opfXml) ?? 'EPUB';
   const parts: string[] = [];
   for (const id of spineIds) {
     const href = manifest.get(id);
@@ -1012,143 +1077,7 @@ function buildBatchSchema(): unknown {
   };
 }
 
-function jsonSchemaHint(): string {
-  return `\n\nReturn a single JSON object with these string fields:\n${JSON.stringify(buildSchema(), null, 2)}`;
-}
-
 const AI_INVENT_CHUNK_SIZE = 10;
-const AI_PROVIDER_TIMEOUT_MS = 120_000;
-
-function maxTokensForItemCount(itemCount: number): number {
-  return Math.min(16384, Math.max(2048, itemCount * 450));
-}
-
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs = AI_PROVIDER_TIMEOUT_MS,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(
-        `AI request timed out after ${Math.round(timeoutMs / 1000)}s. Try fewer items or check your connection.`,
-      );
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function parseAiJson<T>(text: string, context: string): T {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error(`${context} returned invalid JSON. Try fewer items or switch provider.`);
-  }
-}
-
-async function callGeminiApi(
-  apiKey: string,
-  prompt: string,
-  schema?: unknown,
-  options?: { itemCount?: number; timeoutMs?: number },
-): Promise<string> {
-  const itemCount = Math.max(1, options?.itemCount ?? 1);
-  const response = await fetchWithTimeout(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: schema ?? buildSchema(),
-          maxOutputTokens: maxTokensForItemCount(itemCount),
-        },
-      }),
-    },
-    options?.timeoutMs ?? AI_PROVIDER_TIMEOUT_MS,
-  );
-  if (response.status === 429) throw new Error('Gemini rate limit reached. Wait a moment and try again.');
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('Gemini rejected the API key. Check the key and API access.');
-  }
-  if (!response.ok) throw new Error(`Gemini returned ${response.status}.`);
-  const json = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!text) throw new Error('Gemini returned an empty response.');
-  return text;
-}
-
-async function callDeepSeekApi(
-  providerId: AiProviderId,
-  apiKey: string,
-  prompt: string,
-  schema?: unknown,
-  options?: { itemCount?: number; timeoutMs?: number },
-): Promise<string> {
-  const model = providerId === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash';
-  const itemCount = Math.max(1, options?.itemCount ?? 1);
-  const schemaHint = schema
-    ? `\n\nReturn valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}`
-    : jsonSchemaHint();
-  const response = await fetchWithTimeout(
-    'https://api.deepseek.com/chat/completions',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are a language-learning card generator. Respond with valid JSON only. Include the word json in your reasoning and follow the schema exactly.' +
-              schemaHint,
-          },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: maxTokensForItemCount(itemCount),
-        stream: false,
-      }),
-    },
-    options?.timeoutMs ?? AI_PROVIDER_TIMEOUT_MS,
-  );
-  if (response.status === 429) throw new Error('DeepSeek rate limit reached. Wait a moment and try again.');
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('DeepSeek rejected the API key. Check the key at platform.deepseek.com.');
-  }
-  if (!response.ok) throw new Error(`DeepSeek returned ${response.status}.`);
-  const json = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const text = json.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error('DeepSeek returned an empty response.');
-  return text;
-}
-
-async function callAiProvider(
-  providerId: AiProviderId,
-  apiKey: string,
-  prompt: string,
-  schema?: unknown,
-  options?: { itemCount?: number; timeoutMs?: number },
-): Promise<string> {
-  if (providerId === 'gemini-2.5-flash') return callGeminiApi(apiKey, prompt, schema, options);
-  return callDeepSeekApi(providerId, apiKey, prompt, schema, options);
-}
 
 function presetById(id: string): AiPromptPreset {
   return AI_PROMPT_PRESETS.find((preset) => preset.id === id) ?? AI_PROMPT_PRESETS[0];
@@ -1230,7 +1159,7 @@ async function enrichWithAi(req: AiEnrichmentRequest): Promise<AiEnrichmentResul
     targetLang: profile.targetLang,
     sampleTerm: req,
   });
-  const text = await callAiProvider(providerId, apiKey, prompt);
+  const text = await callAiProvider(providerId, apiKey, prompt, buildSchema());
   const parsed = JSON.parse(text) as Partial<AiEnrichmentResult>;
   const image = await findImageHtml(parsed.imageQuery || req.term, preset.label);
   const values = {

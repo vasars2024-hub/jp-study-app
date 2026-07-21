@@ -8,6 +8,7 @@ import path from 'node:path';
 
 let host: BrowserWindow | null = null;
 let latestState: unknown = null;
+let hostClickThrough = true;
 /** 'primary' | 'all' — last requested span mode. */
 let spanMode: 'primary' | 'all' = 'primary';
 let powerHooksInstalled = false;
@@ -39,6 +40,8 @@ function unionDisplayBounds(useWorkArea: boolean): Electron.Rectangle {
   let maxX = -Infinity;
   let maxY = -Infinity;
   for (const d of displays) {
+    // Prefer workArea so pets climb usable desktop edges (taskbar / dock excluded)
+    // and never sit in the dead gap between mixed-DPI monitors.
     const b = useWorkArea ? d.workArea : d.bounds;
     minX = Math.min(minX, b.x);
     minY = Math.min(minY, b.y);
@@ -55,8 +58,8 @@ function unionDisplayBounds(useWorkArea: boolean): Electron.Rectangle {
 
 function placeHost(win: BrowserWindow, mode: 'primary' | 'all' = spanMode): void {
   if (mode === 'all') {
-    // Full virtual desktop (bounds) so companions can sit on any monitor.
-    win.setBounds(unionDisplayBounds(false));
+    // Union of work areas (DIP) — physical edges per display, not raw bounds gaps.
+    win.setBounds(unionDisplayBounds(true));
   } else {
     const { workArea } = screen.getPrimaryDisplay();
     win.setBounds({
@@ -70,6 +73,7 @@ function placeHost(win: BrowserWindow, mode: 'primary' | 'all' = spanMode): void
   if (!win.isDestroyed()) {
     win.setAlwaysOnTop(true, 'floating');
     win.setIgnoreMouseEvents(true, { forward: true });
+    hostClickThrough = true;
   }
 }
 
@@ -111,6 +115,7 @@ function createHostWindow(): BrowserWindow {
 
   placeHost(win, spanMode);
   win.setIgnoreMouseEvents(true, { forward: true });
+  hostClickThrough = true;
   win.setAlwaysOnTop(true, 'floating');
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
 
@@ -212,6 +217,7 @@ export function registerCompanionHostIpc(): void {
     bounds: Electron.Rectangle;
     workArea: Electron.Rectangle;
     primary: boolean;
+    scaleFactor: number;
   }[] => {
     const primaryId = screen.getPrimaryDisplay().id;
     return screen.getAllDisplays().map((d) => ({
@@ -219,6 +225,7 @@ export function registerCompanionHostIpc(): void {
       bounds: d.bounds,
       workArea: d.workArea,
       primary: d.id === primaryId,
+      scaleFactor: d.scaleFactor,
     }));
   });
 
@@ -230,7 +237,7 @@ export function registerCompanionHostIpc(): void {
   } => {
     const primaryWorkArea = screen.getPrimaryDisplay().workArea;
     const bounds =
-      spanMode === 'all' ? unionDisplayBounds(false) : { ...primaryWorkArea };
+      spanMode === 'all' ? unionDisplayBounds(true) : { ...primaryWorkArea };
     return { span: spanMode, bounds, primaryWorkArea };
   });
 
@@ -244,8 +251,11 @@ export function registerCompanionHostIpc(): void {
   ipcMain.on('companionHost:setClickThrough', (e, through: unknown) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win || win.isDestroyed()) return;
-    if (through === false) win.setIgnoreMouseEvents(false);
-    else win.setIgnoreMouseEvents(true, { forward: true });
+    const next = through !== false;
+    if (next === hostClickThrough) return;
+    hostClickThrough = next;
+    if (next) win.setIgnoreMouseEvents(true, { forward: true });
+    else win.setIgnoreMouseEvents(false);
   });
 
   ipcMain.handle('companionHost:focusMain', (): void => {

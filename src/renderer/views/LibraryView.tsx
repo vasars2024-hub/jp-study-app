@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import {
   confirmDialog,
   AppChrome,
@@ -11,10 +11,26 @@ import {
   useAeroMaterials,
 } from '../components/ui';
 import type { LibraryItem } from '../../shared/types';
+import type { BookLevelEstimate } from '../../shared/bookLevelEstimate';
 import Icon from '../components/Icons';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
 import { fetchReadableArticle, articleBodyHtml } from '../wikiArticle';
 import { getActiveProfile } from '../profileState';
+import { enrichInboxItems } from '../inboxEnrich';
+import {
+  enrichBookLevelEstimates,
+  getCachedBookLevel,
+  onBookLevelInputsChanged,
+} from '../bookLevelEstimate';
+import { openExtensionSettings, openYoutubePlaylists } from '../extensionBridgeUi';
+import { useT } from '../i18n';
+import { INBOX_FOLDER } from '../../shared/inboxMeta';
+import {
+  effectiveLang,
+  effectiveLevelEstimate,
+  levelSortKey,
+} from '../../shared/libraryLevel';
+import { coverStyleFor } from '../utils/coverArt';
 
 interface Props {
   onOpen: (item: LibraryItem) => void;
@@ -23,15 +39,77 @@ interface Props {
 /** 'all' and 'unfiled' are reserved views; anything else is a folder name. */
 type FolderFilter = 'all' | 'unfiled' | string;
 
-export default function LibraryView({ onOpen }: Props) {
+type LibrarySort =
+  | 'date-desc'
+  | 'date-asc'
+  | 'title'
+  | 'lang'
+  | 'length'
+  | 'level'
+  | 'source';
+
+type LibraryGroup = 'none' | 'lang' | 'level' | 'source';
+type InboxLangFilter = 'all' | 'ja' | 'zh' | 'en' | 'unknown';
+
+function hostOf(url: string | undefined): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+/** Compact lang · L# chip for covers / table (Inbox or file-book levelMeta). */
+function levelChipLabel(item: LibraryItem): string | null {
+  const lv = effectiveLevelEstimate(item);
+  const lang = effectiveLang(item);
+  if (lv == null && !item.inboxMeta && !item.levelMeta) return null;
+  const parts: string[] = [];
+  if (lang !== 'unknown' || item.inboxMeta || item.levelMeta) parts.push(lang.toUpperCase());
+  if (lv != null) parts.push(`L${lv}`);
+  if (item.inboxMeta && item.inboxMeta.estMinutes > 0) parts.push(`${item.inboxMeta.estMinutes}m`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+function inboxGroupKey(
+  item: LibraryItem,
+  group: LibraryGroup,
+  bookEstimate?: BookLevelEstimate,
+): string {
+  if (group === 'lang') return effectiveLang(item);
+  if (group === 'level') {
+    const lv = levelSortKey(item, bookEstimate);
+    return lv < 99 ? `L${lv}` : '—';
+  }
+  if (group === 'source') return hostOf(item.inboxMeta?.sourceUrl ?? item.sourcePath) || '—';
+  return '';
+}
+
+export default function LibraryView({ onOpen: onOpenProp }: Props) {
+  // §5.10 ARCH: opening a book plays the tape-seek cue (wired pack only).
+  const onOpen = (item: LibraryItem) => {
+    if (document.documentElement.getAttribute('data-materials') === 'wired') {
+      window.dispatchEvent(new CustomEvent('wired:tape-seek'));
+    }
+    onOpenProp(item);
+  };
+  const { t, lang } = useT();
   const aero = useAeroMaterials();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [active, setActive] = useState<FolderFilter>('all');
+  const [sortBy, setSortBy] = useState<LibrarySort>('date-desc');
+  const [groupBy, setGroupBy] = useState<LibraryGroup>('none');
+  const [langFilter, setLangFilter] = useState<InboxLangFilter>('all');
+  const [levelFilter, setLevelFilter] = useState<'all' | '1' | '2' | '3' | '4' | '5' | '6' | '7'>('all');
   const [watchFolder, setWatchFolder] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** Item id whose "file into folder…" menu is open. */
   const [fileMenu, setFileMenu] = useState<string | null>(null);
+  /** Manga item id whose "set as cover" thumbnail picker is open. */
+  const [coverMenu, setCoverMenu] = useState<string | null>(null);
+  const [coverMenuPages, setCoverMenuPages] = useState<string[]>([]);
   /** Inline "new folder" creator (window.prompt doesn't exist in Electron). */
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -51,21 +129,74 @@ export default function LibraryView({ onOpen }: Props) {
   const [wikiBusy, setWikiBusy] = useState(false);
   const [wikiErr, setWikiErr] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** JLPT/HSK cover badges keyed by library item id. */
+  const [bookLevels, setBookLevels] = useState<Record<string, BookLevelEstimate>>({});
+  const levelEnrichCancel = useRef({ cancelled: false });
 
   useEffect(() => {
     // Scan the watch folder for anything new, then load.
-    window.api.syncLibrary().then(setItems);
+    window.api.syncLibrary().then(async (list) => {
+      setItems(await enrichInboxItems(list));
+    });
     window.api.getWatchFolder().then(setWatchFolder);
-    window.api.getLibraryFolders().then(setFolders);
+    window.api.getLibraryFolders().then((fs) => {
+      setFolders(fs.includes(INBOX_FOLDER) ? fs : [...fs, INBOX_FOLDER]);
+    });
+    // Deep-link from Chrome extension settings / capture UI.
+    try {
+      const focus = sessionStorage.getItem('jp-library-focus-folder');
+      if (focus) {
+        sessionStorage.removeItem('jp-library-focus-folder');
+        setActive(focus);
+      }
+    } catch {
+      /* ignore */
+    }
     // Live updates when files are dropped into the watch folder while open.
-    const unsub = window.api.onLibraryChanged(setItems);
+    const unsub = window.api.onLibraryChanged((list) => {
+      void enrichInboxItems(list).then(setItems);
+    });
     return unsub;
+  }, []);
+
+  // Seed badges from cache, then idle-enrich missing EPUB estimates.
+  useEffect(() => {
+    const seed: Record<string, BookLevelEstimate> = {};
+    for (const it of items) {
+      if (it.kind !== 'book') continue;
+      const cached = getCachedBookLevel(it.id);
+      if (cached) seed[it.id] = cached;
+    }
+    setBookLevels(seed);
+
+    levelEnrichCancel.current.cancelled = true;
+    const signal = { cancelled: false };
+    levelEnrichCancel.current = signal;
+    void enrichBookLevelEstimates(
+      items,
+      (bookId, estimate) => {
+        if (signal.cancelled) return;
+        setBookLevels((prev) => (prev[bookId] === estimate ? prev : { ...prev, [bookId]: estimate }));
+      },
+      signal,
+    );
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [items]);
+
+  useEffect(() => {
+    return onBookLevelInputsChanged(() => {
+      setBookLevels({});
+      // Re-trigger enrich by cloning items reference via functional update.
+      setItems((prev) => [...prev]);
+    });
   }, []);
 
   async function importFiles() {
     setBusy(true);
     try {
-      setItems(await window.api.importFiles());
+      setItems(await enrichInboxItems(await window.api.importFiles()));
     } finally {
       setBusy(false);
     }
@@ -74,7 +205,7 @@ export default function LibraryView({ onOpen }: Props) {
   async function importFolder() {
     setBusy(true);
     try {
-      setItems(await window.api.importFolder());
+      setItems(await enrichInboxItems(await window.api.importFolder()));
     } finally {
       setBusy(false);
     }
@@ -85,7 +216,7 @@ export default function LibraryView({ onOpen }: Props) {
     try {
       const res = await window.api.setWatchFolder();
       setWatchFolder(res.folder);
-      setItems(res.items);
+      setItems(await enrichInboxItems(res.items));
     } finally {
       setBusy(false);
     }
@@ -99,7 +230,7 @@ export default function LibraryView({ onOpen }: Props) {
   async function syncNow() {
     setBusy(true);
     try {
-      setItems(await window.api.syncLibrary());
+      setItems(await enrichInboxItems(await window.api.syncLibrary()));
     } finally {
       setBusy(false);
     }
@@ -107,9 +238,9 @@ export default function LibraryView({ onOpen }: Props) {
 
   async function removeItem(id: string) {
     const ok = await confirmDialog({
-      title: 'Remove from library',
-      message: 'Remove this item from your library? The imported copy will be deleted.',
-      confirmLabel: 'Remove',
+      title: t('library.remove.title'),
+      message: t('library.remove.message'),
+      confirmLabel: t('common.remove'),
       danger: true,
     });
     if (ok) {
@@ -134,7 +265,7 @@ export default function LibraryView({ onOpen }: Props) {
       return;
     }
     if (name.toLowerCase() === 'all' || name.toLowerCase() === 'unfiled') {
-      setFolderErr('That name is reserved — pick another one.');
+      setFolderErr(t('library.folder.reserved'));
       return;
     }
     if (folders.includes(name)) {
@@ -183,11 +314,13 @@ export default function LibraryView({ onOpen }: Props) {
     } catch (err) {
       return err instanceof Error ? err.message : String(err);
     }
-    const next = await window.api.importGenerated({
-      title: art.title,
-      html: articleBodyHtml(art.title, art.html, art.meta),
-      source: art.url,
-    });
+    const next = await enrichInboxItems(
+      await window.api.importGenerated({
+        title: art.title,
+        html: articleBodyHtml(art.title, art.html, art.meta),
+        source: art.url,
+      }),
+    );
     setItems(next);
     return next;
   }
@@ -234,18 +367,20 @@ export default function LibraryView({ onOpen }: Props) {
   }
 
   async function importFromText() {
-    const t = pasteText.trim();
-    if (!t) return;
+    const body = pasteText.trim();
+    if (!body) return;
     const esc = (s: string) =>
       s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const html = t
+    const html = body
       .split(/\r?\n\s*\r?\n/)
       .map((pg) => `<p>${pg.split(/\r?\n/).map(esc).join('<br/>')}</p>`)
       .join('');
-    const next = await window.api.importGenerated({
-      title: pasteTitle.trim() || t.replace(/\s+/g, ' ').slice(0, 28),
-      html,
-    });
+    const next = await enrichInboxItems(
+      await window.api.importGenerated({
+        title: pasteTitle.trim() || body.replace(/\s+/g, ' ').slice(0, 28),
+        html,
+      }),
+    );
     setItems(next);
     setImportOpen(false);
     setPasteTitle('');
@@ -256,8 +391,8 @@ export default function LibraryView({ onOpen }: Props) {
   function chipDropProps(folder: string | null, allowReorder: boolean) {
     return {
       onDragOver: (e: React.DragEvent) => {
-        const t = e.dataTransfer.types;
-        if (t.includes('app/lib-item') || (allowReorder && t.includes('app/lib-folder'))) {
+        const types = e.dataTransfer.types;
+        if (types.includes('app/lib-item') || (allowReorder && types.includes('app/lib-folder'))) {
           e.preventDefault();
         }
       },
@@ -277,9 +412,9 @@ export default function LibraryView({ onOpen }: Props) {
 
   async function deleteFolder(name: string) {
     const ok = await confirmDialog({
-      title: 'Delete folder',
-      message: `Delete the folder “${name}”? The books inside stay in your library (unfiled).`,
-      confirmLabel: 'Delete',
+      title: t('library.deleteFolder.title'),
+      message: t('library.deleteFolder.message', { name }),
+      confirmLabel: t('library.deleteFolder.confirm'),
       danger: true,
     });
     if (!ok) return;
@@ -295,6 +430,31 @@ export default function LibraryView({ onOpen }: Props) {
     setItems(await window.api.setItemFolder(id, folder));
   }
 
+  async function openCoverMenu(e: MouseEvent, id: string) {
+    e.stopPropagation();
+    if (coverMenu === id) {
+      setCoverMenu(null);
+      return;
+    }
+    setCoverMenu(id);
+    setCoverMenuPages([]);
+    const pages = await window.api.getMangaPages(id);
+    setCoverMenuPages(pages.slice(0, 20));
+  }
+
+  function relPathFromMediaUrl(url: string): string | null {
+    const m = /^media:\/\/[^/]+\/(.+)$/.exec(url);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  async function setCoverFromPage(e: MouseEvent, id: string, pageUrl: string) {
+    e.stopPropagation();
+    setCoverMenu(null);
+    const rel = relPathFromMediaUrl(pageUrl);
+    if (!rel) return;
+    setItems(await window.api.setLibraryCover(id, rel));
+  }
+
   const counts = useMemo(() => {
     const c = new Map<string, number>();
     let unfiled = 0;
@@ -306,57 +466,141 @@ export default function LibraryView({ onOpen }: Props) {
   }, [items, folders]);
 
   const visible = useMemo(() => {
-    if (active === 'all') return items;
-    if (active === 'unfiled') return items.filter((it) => !it.folder || !folders.includes(it.folder));
-    return items.filter((it) => it.folder === active);
-  }, [items, active, folders]);
+    let list: LibraryItem[];
+    if (active === 'all') list = items;
+    else if (active === 'unfiled') {
+      list = items.filter((it) => !it.folder || !folders.includes(it.folder));
+    } else list = items.filter((it) => it.folder === active);
+
+    if (langFilter !== 'all') {
+      list = list.filter((it) => effectiveLang(it) === langFilter);
+    }
+    if (levelFilter !== 'all') {
+      const lv = Number(levelFilter);
+      list = list.filter((it) => levelSortKey(it, bookLevels[it.id]) === lv);
+    }
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-asc':
+          return (a.inboxMeta?.receivedAt ?? a.createdAt) - (b.inboxMeta?.receivedAt ?? b.createdAt);
+        case 'title':
+          return a.title.localeCompare(b.title);
+        case 'lang':
+          return effectiveLang(a).localeCompare(effectiveLang(b));
+        case 'length':
+          return (b.inboxMeta?.charCount ?? 0) - (a.inboxMeta?.charCount ?? 0);
+        case 'level':
+          return levelSortKey(a, bookLevels[a.id]) - levelSortKey(b, bookLevels[b.id]);
+        case 'source':
+          return hostOf(a.inboxMeta?.sourceUrl ?? a.sourcePath).localeCompare(
+            hostOf(b.inboxMeta?.sourceUrl ?? b.sourcePath),
+          );
+        case 'date-desc':
+        default:
+          return (b.inboxMeta?.receivedAt ?? b.createdAt) - (a.inboxMeta?.receivedAt ?? a.createdAt);
+      }
+    });
+    return sorted;
+  }, [items, active, folders, sortBy, langFilter, levelFilter, bookLevels]);
+
+  const groupedVisible = useMemo(() => {
+    if (groupBy === 'none') return [{ key: '', items: visible }];
+    const map = new Map<string, LibraryItem[]>();
+    for (const it of visible) {
+      const key = inboxGroupKey(it, groupBy, bookLevels[it.id]);
+      const bucket = map.get(key);
+      if (bucket) bucket.push(it);
+      else map.set(key, [it]);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, groupItems]) => ({ key, items: groupItems }));
+  }, [visible, groupBy, bookLevels]);
+
+  const hasLevelFilters = useMemo(
+    () =>
+      items.some(
+        (it) =>
+          effectiveLevelEstimate(it) != null ||
+          Boolean(bookLevels[it.id]) ||
+          Boolean(it.inboxMeta),
+      ),
+    [items, bookLevels],
+  );
   const selectedItem = visible.find((it) => it.id === selectedId) ?? visible[0] ?? null;
-  const activeLabel = active === 'all' ? 'All items' : active === 'unfiled' ? 'Unfiled' : String(active);
+  const activeLabel =
+    active === 'all'
+      ? t('library.filter.allItems')
+      : active === 'unfiled'
+        ? t('library.filter.unfiled')
+        : String(active);
 
   // Digital Library chrome — Aero only (AppChrome pass-through in default theme).
-  // File menu drives the existing import handlers; status bar shows the shelf.
+  // Rebuild each render so t() stays current after language / shelf changes.
   const libMenus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('library.menu.file'),
       items: [
-        { id: 'import-files', label: 'Import file(s)…', disabled: busy, onSelect: importFiles },
-        { id: 'import-folder', label: 'Import image folder…', disabled: busy, onSelect: importFolder },
+        { id: 'import-files', label: t('library.menu.importFiles'), disabled: busy, onSelect: importFiles },
+        { id: 'import-folder', label: t('library.menu.importFolder'), disabled: busy, onSelect: importFolder },
         { separator: true, label: '' },
-        { id: 'import-web', label: 'Import from web…', disabled: busy, onSelect: () => setImportOpen(true) },
-        { id: 'import-wiki', label: 'Random Wikipedia…', disabled: busy, onSelect: () => setWikiOpen(true) },
+        {
+          id: 'import-web',
+          label: t('library.menu.importWeb'),
+          disabled: busy,
+          onSelect: () => setImportOpen(true),
+        },
+        {
+          id: 'import-wiki',
+          label: t('library.menu.importWiki'),
+          disabled: busy,
+          onSelect: () => setWikiOpen(true),
+        },
       ],
     },
     {
       id: 'library',
-      label: 'Library',
+      label: t('palette.section.library'),
       items: [
-        { id: 'sync', label: 'Sync now', disabled: busy, onSelect: syncNow },
+        { id: 'sync', label: t('library.menu.syncNow'), disabled: busy, onSelect: syncNow },
         {
           id: 'watch-folder',
-          label: watchFolder ? 'Change auto-import folder…' : 'Set auto-import folder…',
+          label: watchFolder ? t('library.menu.changeWatchFolder') : t('library.menu.setWatchFolder'),
           disabled: busy,
           onSelect: chooseWatchFolder,
         },
-        { id: 'stop-watch', label: 'Stop auto-import', disabled: busy || !watchFolder, onSelect: stopWatching },
+        {
+          id: 'stop-watch',
+          label: t('library.menu.stopWatch'),
+          disabled: busy || !watchFolder,
+          onSelect: stopWatching,
+        },
         { separator: true, label: '' },
-        { id: 'new-folder', label: 'New folder', onSelect: () => setCreating(true) },
+        { id: 'new-folder', label: t('library.menu.newFolder'), onSelect: () => setCreating(true) },
       ],
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('library.menu.view'),
       items: [
-        { id: 'view-all', label: `All items (${items.length})`, disabled: active === 'all', onSelect: () => setActive('all') },
+        {
+          id: 'view-all',
+          label: t('library.menu.viewAll', { count: items.length }),
+          disabled: active === 'all',
+          onSelect: () => setActive('all'),
+        },
         {
           id: 'view-unfiled',
-          label: `Unfiled (${counts.unfiled})`,
+          label: t('library.menu.viewUnfiled', { count: counts.unfiled }),
           disabled: active === 'unfiled' || counts.unfiled === 0,
           onSelect: () => setActive('unfiled'),
         },
         ...folders.map((f) => ({
           id: `view-folder-${f}`,
-          label: `${f} (${counts.byFolder.get(f) ?? 0})`,
+          label: t('library.menu.viewFolder', { name: f, count: counts.byFolder.get(f) ?? 0 }),
           disabled: active === f,
           onSelect: () => setActive(f),
         })),
@@ -365,11 +609,15 @@ export default function LibraryView({ onOpen }: Props) {
   ];
   const libStatus = (
     <>
-      <StatusBarField>{items.length} items</StatusBarField>
+      <StatusBarField>{t('library.status.items', { count: items.length })}</StatusBarField>
       <StatusBarField>{activeLabel}</StatusBarField>
       <StatusBarSpacer />
-      {visible.length !== items.length && <StatusBarField>{visible.length} shown</StatusBarField>}
-      {watchFolder && <StatusBarField title={watchFolder}>Auto-import on</StatusBarField>}
+      {visible.length !== items.length && (
+        <StatusBarField>{t('library.status.shown', { count: visible.length })}</StatusBarField>
+      )}
+      {watchFolder && (
+        <StatusBarField title={watchFolder}>{t('library.status.autoImportOn')}</StatusBarField>
+      )}
     </>
   );
 
@@ -377,22 +625,22 @@ export default function LibraryView({ onOpen }: Props) {
     <AppChrome menus={libMenus} status={libStatus} className="aero-library-chrome">
     <div className={`library${aero ? ' aero-library' : ''}`} onClick={() => setFileMenu(null)}>
       <header className="view-head">
-        <p className="muted">Your books and manga. Import files to start reading.</p>
+        <p className="muted">{t('library.intro')}</p>
         <div className="actions">
           <button className="btn primary" disabled={busy} onClick={importFiles}>
-            + Import file(s)
+            {t('library.btn.importFiles')}
           </button>
           <button className="btn" disabled={busy} onClick={importFolder}>
             <Icon name="folder" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            Import image folder
+            {t('library.btn.importFolder')}
           </button>
           <button className="btn" disabled={busy} onClick={() => setImportOpen(true)}>
             <Icon name="globe" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            Web / paste
+            {t('library.btn.webPaste')}
           </button>
           <button className="btn" disabled={busy} onClick={() => setWikiOpen(true)}>
             <Icon name="dice" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            Random Wikipedia
+            {t('library.btn.randomWiki')}
           </button>
         </div>
       </header>
@@ -403,36 +651,33 @@ export default function LibraryView({ onOpen }: Props) {
           <div className="lib-import">
             <h3>
               <Icon name="dice" size={16} style={{ marginRight: 6, verticalAlign: '-3px' }} />
-              Random Wikipedia
+              {t('library.wiki.title')}
             </h3>
-            <p className="muted lib-import-note">
-              Pick a topic and get a random Japanese Wikipedia article as a book — a reading
-              roulette. Dictionary, highlighting and progress all work on it.
-            </p>
+            <p className="muted lib-import-note">{t('library.wiki.note')}</p>
             <div className="wiki-cats">
               {WIKI_CATEGORIES.map((c, i) => (
                 <button
-                  key={c.label}
+                  key={c.labelKey}
                   className={`lib-folder-chip ${wikiCat === i ? 'active' : ''}`}
                   disabled={wikiBusy}
                   onClick={() => setWikiCat(i)}
                 >
-                  {c.label}
+                  {t(c.labelKey)}
                 </button>
               ))}
             </div>
             {wikiErr && <div className="lib-import-err">{wikiErr}</div>}
             <div className="lib-import-actions">
               <button className="btn" disabled={wikiBusy} onClick={() => setWikiOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button className="btn primary" disabled={wikiBusy} onClick={() => void rollWiki()}>
                 {wikiBusy ? (
-                  '記事を探しています…'
+                  t('library.wiki.rolling')
                 ) : (
                   <>
                     <Icon name="dice" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                    Roll an article
+                    {t('library.wiki.roll')}
                   </>
                 )}
               </button>
@@ -445,47 +690,44 @@ export default function LibraryView({ onOpen }: Props) {
         <>
           <div className="lib-import-backdrop" onClick={() => !webBusy && setImportOpen(false)} />
           <div className="lib-import">
-            <h3>Import from the web</h3>
+            <h3>{t('library.import.title')}</h3>
             <div className="lib-import-row">
               <input
                 type="text"
                 className="gram-search"
-                placeholder="https:// article, blog post, news page…"
+                placeholder={t('library.import.urlPlaceholder')}
                 value={webUrl}
                 onChange={(e) => setWebUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void importFromUrl()}
                 disabled={webBusy}
               />
               <button className="btn primary" disabled={webBusy || !webUrl.trim()} onClick={() => void importFromUrl()}>
-                {webBusy ? 'Fetching…' : 'Import'}
+                {webBusy ? t('library.import.fetching') : t('library.import.import')}
               </button>
             </div>
             {webErr && <div className="lib-import-err">{webErr}</div>}
-            <p className="muted lib-import-note">
-              The readable article is extracted and saved as a book — dictionary, highlighting and
-              progress all work on it.
-            </p>
-            <h3>…or paste text</h3>
+            <p className="muted lib-import-note">{t('library.import.note')}</p>
+            <h3>{t('library.import.pasteHeading')}</h3>
             <input
               type="text"
               className="gram-search lib-import-title"
-              placeholder="Title (optional)"
+              placeholder={t('library.import.titlePlaceholder')}
               value={pasteTitle}
               onChange={(e) => setPasteTitle(e.target.value)}
             />
             <textarea
               className="lib-import-text"
-              placeholder="Paste Japanese or Chinese text here… (Ctrl+V)"
+              placeholder={t('library.import.textPlaceholder')}
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
               lang={getActiveProfile().targetLang}
             />
             <div className="lib-import-actions">
               <button className="btn" onClick={() => setImportOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button className="btn primary" disabled={!pasteText.trim()} onClick={() => void importFromText()}>
-                Import text
+                {t('library.import.importText')}
               </button>
             </div>
           </div>
@@ -494,8 +736,8 @@ export default function LibraryView({ onOpen }: Props) {
 
       {aero ? (
         <div className="aero-library-workbench">
-          <aside className="aero-library-tree" aria-label="Library folders">
-            <div className="aero-library-pane-title">Shelves</div>
+          <aside className="aero-library-tree" aria-label={t('library.aero.foldersAria')}>
+            <div className="aero-library-pane-title">{t('library.aero.shelves')}</div>
             <button
               type="button"
               className={`aero-library-tree-row ${active === 'all' ? 'active' : ''} ${dropHover === '__all__' ? 'dragover' : ''}`}
@@ -503,7 +745,7 @@ export default function LibraryView({ onOpen }: Props) {
               {...chipDropProps(null, false)}
             >
               <Icon name="library" size={15} />
-              <span>All items</span>
+              <span>{t('library.filter.allItems')}</span>
               <strong>{items.length}</strong>
             </button>
             {folders.map((f) => (
@@ -532,7 +774,7 @@ export default function LibraryView({ onOpen }: Props) {
                 {...chipDropProps(null, false)}
               >
                 <Icon name="folder" size={15} />
-                <span>Unfiled</span>
+                <span>{t('library.filter.unfiled')}</span>
                 <strong>{counts.unfiled}</strong>
               </button>
             )}
@@ -544,7 +786,7 @@ export default function LibraryView({ onOpen }: Props) {
                     className="lib-folder-input"
                     type="text"
                     value={newName}
-                    placeholder="Folder name"
+                    placeholder={t('library.folderName')}
                     onChange={(e) => {
                       setNewName(e.target.value);
                       setFolderErr('');
@@ -559,69 +801,142 @@ export default function LibraryView({ onOpen }: Props) {
                     }}
                   />
                   <Button size="sm" onClick={() => void createFolder()}>
-                    OK
+                    {t('library.ok')}
                   </Button>
                 </>
               ) : (
                 <Button size="sm" leftIcon={<Icon name="plus" size={13} />} onClick={() => setCreating(true)}>
-                  New folder
+                  {t('library.newFolder')}
                 </Button>
               )}
               {folderErr && <span className="lib-folder-err">{folderErr}</span>}
             </div>
             <div className="aero-library-watch">
-              <div className="aero-library-pane-title">Auto-import</div>
-              <p title={watchFolder ?? undefined}>{watchFolder ? watchFolder : 'No watch folder selected'}</p>
+              <div className="aero-library-pane-title">{t('library.aero.autoImport')}</div>
+              <p title={watchFolder ?? undefined}>
+                {watchFolder ? watchFolder : t('library.aero.noWatchFolder')}
+              </p>
               <div className="aero-library-watch-actions">
                 <Button size="sm" disabled={busy} leftIcon={<Icon name="refresh" size={13} />} onClick={syncNow}>
-                  Sync
+                  {t('library.aero.sync')}
                 </Button>
                 <Button size="sm" disabled={busy} onClick={chooseWatchFolder}>
-                  {watchFolder ? 'Change' : 'Set'}
+                  {watchFolder ? t('library.aero.change') : t('library.aero.set')}
                 </Button>
               </div>
             </div>
           </aside>
 
           <main className="aero-library-main">
-            <Toolbar className="aero-library-toolbar" aria-label="Library commands">
+            <Toolbar className="aero-library-toolbar" aria-label={t('library.aero.commandsAria')}>
               <Button size="sm" disabled={busy} leftIcon={<Icon name="plus" size={14} />} onClick={importFiles}>
-                Import
+                {t('library.aero.toolbar.import')}
               </Button>
               <Button size="sm" disabled={busy} leftIcon={<Icon name="folder" size={14} />} onClick={importFolder}>
-                Folder
+                {t('library.aero.toolbar.folder')}
               </Button>
               <Button size="sm" disabled={busy} leftIcon={<Icon name="globe" size={14} />} onClick={() => setImportOpen(true)}>
-                Web
+                {t('library.aero.toolbar.web')}
+              </Button>
+              <Button size="sm" leftIcon={<Icon name="folder" size={14} />} onClick={() => setActive(INBOX_FOLDER)}>
+                {t('library.toolbar.inbox')}
+              </Button>
+              <Button size="sm" leftIcon={<Icon name="download" size={14} />} onClick={() => openExtensionSettings()}>
+                {t('library.toolbar.extension')}
+              </Button>
+              <Button size="sm" leftIcon={<Icon name="player" size={14} />} onClick={() => openYoutubePlaylists()}>
+                {t('library.toolbar.youtube')}
               </Button>
               <ToolbarSpacer />
+              <label className="muted" htmlFor="aero-lib-sort" style={{ fontSize: 11 }}>
+                {t('library.sort.label')}
+              </label>
+              <select
+                id="aero-lib-sort"
+                className="media-model-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as LibrarySort)}
+              >
+                <option value="date-desc">{t('library.sort.dateDesc')}</option>
+                <option value="date-asc">{t('library.sort.dateAsc')}</option>
+                <option value="title">{t('library.sort.title')}</option>
+                <option value="source">{t('library.sort.source')}</option>
+                <option value="lang">{t('library.sort.lang')}</option>
+                <option value="length">{t('library.sort.length')}</option>
+                <option value="level">{t('library.sort.level')}</option>
+              </select>
+              <label className="muted" htmlFor="aero-lib-group" style={{ fontSize: 11 }}>
+                {t('library.group.label')}
+              </label>
+              <select
+                id="aero-lib-group"
+                className="media-model-select"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as LibraryGroup)}
+              >
+                <option value="none">{t('library.group.none')}</option>
+                <option value="lang">{t('library.group.lang')}</option>
+                <option value="level">{t('library.group.level')}</option>
+                <option value="source">{t('library.group.source')}</option>
+              </select>
               <span className="aero-library-filter-label">{activeLabel}</span>
             </Toolbar>
-            {busy && <div className="banner">Importing… this can take a moment for large manga.</div>}
+            {hasLevelFilters && (
+              <div className="lib-inbox-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 12px 8px' }}>
+                {(['all', 'ja', 'zh', 'en', 'unknown'] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    type="button"
+                    className={`lib-folder-chip${langFilter === lang ? ' active' : ''}`}
+                    onClick={() => setLangFilter(lang)}
+                  >
+                    {lang === 'all' ? t('library.filter.all') : t(`library.inbox.lang.${lang}`)}
+                  </button>
+                ))}
+                {(['all', '1', '2', '3', '4', '5', '6', '7'] as const).map((lv) => (
+                  <button
+                    key={lv}
+                    type="button"
+                    className={`lib-folder-chip${levelFilter === lv ? ' active' : ''}`}
+                    onClick={() => setLevelFilter(lv)}
+                  >
+                    {lv === 'all' ? t('library.filter.all') : `L${lv}`}
+                  </button>
+                ))}
+              </div>
+            )}
+            {busy && <div className="banner">{t('library.busy')}</div>}
             {items.length === 0 ? (
               <div className="aero-library-empty">
                 <Icon name="library" size={38} />
-                <h2>Your library is empty</h2>
-                <p className="muted">Import an EPUB, PDF, CBZ/ZIP, or image folder.</p>
+                <h2>{t('library.empty.title')}</h2>
+                <p className="muted">{t('library.empty.desc')}</p>
                 <Button variant="primary" onClick={importFiles}>
-                  Import your first file
+                  {t('library.empty.cta')}
                 </Button>
               </div>
             ) : visible.length === 0 ? (
               <div className="aero-library-empty">
                 <Icon name="folder" size={38} />
-                <h2>This folder is empty</h2>
-                <p className="muted">Drop books onto the shelf or switch back to All items.</p>
+                <h2>{t('library.emptyFolder.title')}</h2>
+                <p className="muted">{t('library.emptyFolder.desc')}</p>
               </div>
             ) : (
-              <div className="aero-library-table" role="table" aria-label="Library items">
+              <div className="aero-library-table" role="table" aria-label={t('library.table.aria')}>
                 <div className="aero-library-row aero-library-row-head" role="row">
-                  <span>Title</span>
-                  <span>Type</span>
-                  <span>Progress</span>
-                  <span>Folder</span>
+                  <span>{t('library.table.title')}</span>
+                  <span>{t('library.table.type')}</span>
+                  <span>{t('library.table.progress')}</span>
+                  <span>{t('library.table.folder')}</span>
                 </div>
-                {visible.map((it) => {
+                {groupedVisible.map((group) => (
+                  <div key={group.key || 'flat'} className="lib-group">
+                    {groupBy !== 'none' && group.key ? (
+                      <div className="lib-group-head muted" style={{ fontSize: 12, padding: '8px 10px 4px', fontWeight: 600 }}>
+                        {group.key}
+                      </div>
+                    ) : null}
+                    {group.items.map((it) => {
                   const pct = Math.round((it.progress?.percent ?? 0) * 100);
                   const selected = selectedItem?.id === it.id;
                   return (
@@ -641,53 +956,64 @@ export default function LibraryView({ onOpen }: Props) {
                         <span className="aero-library-thumb" style={coverStyle(it)} />
                         <span title={it.title}>{it.title}</span>
                       </span>
-                      <span>{libraryKindLabel(it)}</span>
-                      <span>{pct > 0 ? `${pct}%` : 'Not started'}</span>
-                      <span>{it.folder && folders.includes(it.folder) ? it.folder : 'Unfiled'}</span>
+                      <span>
+                        {levelChipLabel(it) ?? libraryKindLabel(it, t)}
+                      </span>
+                      <span>{pct > 0 ? `${pct}%` : t('library.progress.notStarted')}</span>
+                      <span>
+                        {it.folder && folders.includes(it.folder) ? it.folder : t('library.filter.unfiled')}
+                      </span>
                     </button>
                   );
-                })}
+                    })}
+                  </div>
+                ))}
               </div>
             )}
           </main>
 
-          <aside className="aero-library-inspector" aria-label="Selected item">
-            <div className="aero-library-pane-title">Details</div>
+          <aside className="aero-library-inspector" aria-label={t('library.inspector.aria')}>
+            <div className="aero-library-pane-title">{t('library.inspector.details')}</div>
             {selectedItem ? (
               <>
                 <div className="aero-library-preview" style={coverStyle(selectedItem)}>
                   {!selectedItem.coverPath && <span>{selectedItem.title}</span>}
+                  <CoverLevelBadge estimate={bookLevels[selectedItem.id]} t={t} lang={lang} />
                 </div>
                 <h3 title={selectedItem.title}>{selectedItem.title}</h3>
                 <dl className="aero-library-meta">
                   <div>
-                    <dt>Type</dt>
-                    <dd>{libraryKindLabel(selectedItem)}</dd>
+                    <dt>{t('library.table.type')}</dt>
+                    <dd>{libraryKindLabel(selectedItem, t)}</dd>
                   </div>
                   <div>
-                    <dt>Progress</dt>
+                    <dt>{t('library.table.progress')}</dt>
                     <dd>{Math.round((selectedItem.progress?.percent ?? 0) * 100)}%</dd>
                   </div>
                   <div>
-                    <dt>Folder</dt>
-                    <dd>{selectedItem.folder && folders.includes(selectedItem.folder) ? selectedItem.folder : 'Unfiled'}</dd>
+                    <dt>{t('library.table.folder')}</dt>
+                    <dd>
+                      {selectedItem.folder && folders.includes(selectedItem.folder)
+                        ? selectedItem.folder
+                        : t('library.filter.unfiled')}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Added</dt>
+                    <dt>{t('library.inspector.added')}</dt>
                     <dd>{new Date(selectedItem.createdAt).toLocaleDateString()}</dd>
                   </div>
                 </dl>
                 <div className="aero-library-inspector-actions">
                   <Button variant="primary" leftIcon={<Icon name="novels" size={14} />} onClick={() => onOpen(selectedItem)}>
-                    Open
+                    {t('library.open')}
                   </Button>
                   <Button leftIcon={<Icon name="close" size={14} />} onClick={() => void removeItem(selectedItem.id)}>
-                    Remove
+                    {t('common.remove')}
                   </Button>
                 </div>
               </>
             ) : (
-              <p className="muted">Select an item to see details.</p>
+              <p className="muted">{t('library.inspector.selectHint')}</p>
             )}
           </aside>
         </div>
@@ -700,25 +1026,23 @@ export default function LibraryView({ onOpen }: Props) {
         {watchFolder ? (
           <>
             <span className="watch-label">
-              Auto-importing from <code>{watchFolder}</code>
+              {t('library.watch.autoFrom')} <code>{watchFolder}</code>
             </span>
             <button className="btn small" disabled={busy} onClick={syncNow}>
-              Sync now
+              {t('library.menu.syncNow')}
             </button>
             <button className="btn small" disabled={busy} onClick={chooseWatchFolder}>
-              Change
+              {t('library.aero.change')}
             </button>
             <button className="btn small" disabled={busy} onClick={stopWatching}>
-              Stop
+              {t('common.stop')}
             </button>
           </>
         ) : (
           <>
-            <span className="watch-label muted">
-              Pick a folder and any book or manga you drop in will import automatically.
-            </span>
+            <span className="watch-label muted">{t('library.watch.hint')}</span>
             <button className="btn small" disabled={busy} onClick={chooseWatchFolder}>
-              Set auto-import folder…
+              {t('library.watch.setFolder')}
             </button>
           </>
         )}
@@ -729,17 +1053,17 @@ export default function LibraryView({ onOpen }: Props) {
         <button
           className={`lib-folder-chip ${active === 'all' ? 'active' : ''} ${dropHover === '__all__' ? 'dragover' : ''}`}
           onClick={() => setActive('all')}
-          title="Everything (drop a book here to take it out of its folder)"
+          title={t('library.chip.allTitle')}
           {...chipDropProps(null, false)}
         >
-          All <span className="lib-chip-count">{items.length}</span>
+          {t('library.filter.all')} <span className="lib-chip-count">{items.length}</span>
         </button>
         {folders.map((f) => (
           <button
             key={f}
             className={`lib-folder-chip ${active === f ? 'active' : ''} ${dropHover === f ? 'dragover' : ''}`}
             onClick={() => setActive(f)}
-            title={`${f} — drop books here to file them; drag to reorder`}
+            title={t('library.chip.folderTitle', { name: f })}
             draggable
             onDragStart={(e) => {
               e.dataTransfer.setData('app/lib-folder', f);
@@ -752,7 +1076,7 @@ export default function LibraryView({ onOpen }: Props) {
             {active === f && (
               <span
                 className="lib-chip-del"
-                title="Delete this folder (books stay)"
+                title={t('library.chip.deleteTitle')}
                 onClick={(e) => {
                   e.stopPropagation();
                   void deleteFolder(f);
@@ -769,7 +1093,7 @@ export default function LibraryView({ onOpen }: Props) {
             onClick={() => setActive('unfiled')}
             {...chipDropProps(null, false)}
           >
-            Unfiled <span className="lib-chip-count">{counts.unfiled}</span>
+            {t('library.filter.unfiled')} <span className="lib-chip-count">{counts.unfiled}</span>
           </button>
         )}
         {creating ? (
@@ -779,7 +1103,7 @@ export default function LibraryView({ onOpen }: Props) {
               className="lib-folder-input"
               type="text"
               value={newName}
-              placeholder="Folder name…"
+              placeholder={t('library.folderNameEllipsis')}
               onChange={(e) => {
                 setNewName(e.target.value);
                 setFolderErr('');
@@ -793,32 +1117,102 @@ export default function LibraryView({ onOpen }: Props) {
                 }
               }}
             />
-            <span className="lib-chip-del" title="Create" onClick={() => void createFolder()}>
+            <span className="lib-chip-del" title={t('library.chip.createTitle')} onClick={() => void createFolder()}>
               <Icon name="check" size={11} />
             </span>
           </span>
         ) : (
           <button className="lib-folder-chip lib-folder-new" onClick={() => setCreating(true)}>
-            + New folder
+            {t('library.newFolderPlus')}
           </button>
         )}
         {folderErr && <span className="lib-folder-err">{folderErr}</span>}
       </div>
 
-      {busy && <div className="banner">Importing… this can take a moment for large manga.</div>}
+      <div className="lib-sort-row" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <label className="muted" htmlFor="lib-sort" style={{ fontSize: 12 }}>
+          {t('library.sort.label')}
+        </label>
+        <select
+          id="lib-sort"
+          className="media-model-select"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as LibrarySort)}
+          aria-label={t('library.sort.label')}
+        >
+          <option value="date-desc">{t('library.sort.dateDesc')}</option>
+          <option value="date-asc">{t('library.sort.dateAsc')}</option>
+          <option value="title">{t('library.sort.title')}</option>
+          <option value="source">{t('library.sort.source')}</option>
+          <option value="lang">{t('library.sort.lang')}</option>
+          <option value="length">{t('library.sort.length')}</option>
+          <option value="level">{t('library.sort.level')}</option>
+        </select>
+        <label className="muted" htmlFor="lib-group" style={{ fontSize: 12 }}>
+          {t('library.group.label')}
+        </label>
+        <select
+          id="lib-group"
+          className="media-model-select"
+          value={groupBy}
+          onChange={(e) => setGroupBy(e.target.value as LibraryGroup)}
+          aria-label={t('library.group.label')}
+        >
+          <option value="none">{t('library.group.none')}</option>
+          <option value="lang">{t('library.group.lang')}</option>
+          <option value="level">{t('library.group.level')}</option>
+          <option value="source">{t('library.group.source')}</option>
+        </select>
+        <button type="button" className="btn small" onClick={() => setActive(INBOX_FOLDER)}>
+          {t('library.toolbar.inbox')}
+        </button>
+        <button type="button" className="btn small" onClick={() => openExtensionSettings()}>
+          {t('library.toolbar.extension')}
+        </button>
+        <button type="button" className="btn small" onClick={() => openYoutubePlaylists()}>
+          {t('library.toolbar.youtube')}
+        </button>
+      </div>
+
+      {hasLevelFilters && (
+        <div className="lib-inbox-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          {(['all', 'ja', 'zh', 'en', 'unknown'] as const).map((lang) => (
+            <button
+              key={lang}
+              type="button"
+              className={`lib-folder-chip${langFilter === lang ? ' active' : ''}`}
+              onClick={() => setLangFilter(lang)}
+            >
+              {lang === 'all' ? t('library.filter.all') : t(`library.inbox.lang.${lang}`)}
+            </button>
+          ))}
+          <span className="muted" style={{ fontSize: 12, alignSelf: 'center', marginLeft: 4 }}>
+            {t('library.inbox.levelChips')}
+          </span>
+          {(['all', '1', '2', '3', '4', '5', '6', '7'] as const).map((lv) => (
+            <button
+              key={lv}
+              type="button"
+              className={`lib-folder-chip${levelFilter === lv ? ' active' : ''}`}
+              onClick={() => setLevelFilter(lv)}
+            >
+              {lv === 'all' ? t('library.filter.all') : `L${lv}`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {busy && <div className="banner">{t('library.busy')}</div>}
 
       {items.length === 0 ? (
         <div className="empty">
           <div className="empty-emoji">
             <Icon name="library" size={44} />
           </div>
-          <h2>Your library is empty</h2>
-          <p className="muted">
-            Import an <strong>EPUB</strong> book, a <strong>PDF</strong>, or a{' '}
-            <strong>CBZ/ZIP</strong> manga archive — or a folder of images.
-          </p>
+          <h2>{t('library.empty.title')}</h2>
+          <p className="muted">{t('library.empty.descClassic')}</p>
           <button className="btn primary" onClick={importFiles}>
-            Import your first file
+            {t('library.empty.cta')}
           </button>
         </div>
       ) : visible.length === 0 ? (
@@ -826,15 +1220,22 @@ export default function LibraryView({ onOpen }: Props) {
           <div className="empty-emoji">
             <Icon name="folder" size={44} />
           </div>
-          <h2>This folder is empty</h2>
-          <p className="muted">
-            Use the folder button on any book to file it here, or switch back to <b>All</b>.
-          </p>
+          <h2>{t('library.emptyFolder.title')}</h2>
+          <p className="muted">{t('library.emptyFolder.descClassic')}</p>
         </div>
       ) : (
-        <div className="grid">
-          {visible.map((it) => {
+        <div className="lib-groups">
+          {groupedVisible.map((group) => (
+            <div key={group.key || 'flat'} className="lib-group">
+              {groupBy !== 'none' && group.key ? (
+                <div className="lib-group-head muted" style={{ fontSize: 12, margin: '8px 0 6px', fontWeight: 600 }}>
+                  {group.key}
+                </div>
+              ) : null}
+              <div className="grid">
+                {group.items.map((it) => {
             const pct = Math.round((it.progress?.percent ?? 0) * 100);
+            const chip = levelChipLabel(it);
             return (
               <div
                 key={it.id}
@@ -848,7 +1249,38 @@ export default function LibraryView({ onOpen }: Props) {
               >
                 <div className="cover" style={coverStyle(it)}>
                   {!it.coverPath && <span className="cover-title">{it.title}</span>}
-                  <span className="kind-badge">{it.kind === 'book' ? 'BOOK' : 'MANGA'}</span>
+                  <span className="kind-badge">
+                    {it.kind === 'book' ? t('library.kind.book') : t('library.kind.manga')}
+                  </span>
+                  {chip && (
+                    <span className="kind-badge" style={{ top: 28 }}>
+                      {chip}
+                    </span>
+                  )}
+                  {it.kind === 'manga' &&
+                    it.ocrMeta &&
+                    (it.ocrMeta.completedAt || it.ocrMeta.ocrPages > 0) && (
+                    <span
+                      className={`manga-ocr-badge${it.ocrMeta.completedAt ? ' manga-ocr-badge--done' : ''}`}
+                      title={
+                        it.ocrMeta.completedAt
+                          ? t('library.manga.ocrDoneTitle')
+                          : t('library.manga.ocrPartialTitle', {
+                              ocr: it.ocrMeta.ocrPages,
+                              tr: it.ocrMeta.translatedPages,
+                              total: it.pageCount ?? it.ocrMeta.ocrPages,
+                            })
+                      }
+                    >
+                      {it.ocrMeta.completedAt
+                        ? t('library.manga.ocrDone')
+                        : t('library.manga.ocrPartial', {
+                            n: it.ocrMeta.ocrPages,
+                            total: it.pageCount ?? it.ocrMeta.ocrPages,
+                          })}
+                    </span>
+                  )}
+                  <CoverLevelBadge estimate={bookLevels[it.id]} t={t} lang={lang} />
                   {pct > 0 && (
                     <div className="card-progress">
                       <div style={{ width: `${pct}%` }} />
@@ -856,14 +1288,14 @@ export default function LibraryView({ onOpen }: Props) {
                   )}
                   <button
                     className="card-remove"
-                    title="Remove from library"
+                    title={t('library.card.removeTitle')}
                     onClick={(e) => remove(e, it.id)}
                   >
                     <Icon name="close" size={13} />
                   </button>
                   <button
                     className="card-file"
-                    title="File into a folder"
+                    title={t('library.card.fileTitle')}
                     onClick={(e) => {
                       e.stopPropagation();
                       setFileMenu(fileMenu === it.id ? null : it.id);
@@ -874,7 +1306,7 @@ export default function LibraryView({ onOpen }: Props) {
                   {fileMenu === it.id && (
                     <div className="card-file-menu" onClick={(e) => e.stopPropagation()}>
                       {folders.length === 0 && (
-                        <div className="card-file-empty muted">No folders yet — create one above.</div>
+                        <div className="card-file-empty muted">{t('library.card.noFolders')}</div>
                       )}
                       {folders.map((f) => (
                         <button
@@ -889,8 +1321,34 @@ export default function LibraryView({ onOpen }: Props) {
                       {it.folder && (
                         <button className="card-file-opt" onClick={(e) => fileInto(e, it.id, null)}>
                           <Icon name="close" size={12} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                          Remove from “{it.folder}”
+                          {t('library.card.removeFrom', { name: it.folder })}
                         </button>
+                      )}
+                    </div>
+                  )}
+                  {it.kind === 'manga' && (
+                    <button
+                      className="card-cover-btn"
+                      title={t('library.card.setCoverTitle')}
+                      onClick={(e) => void openCoverMenu(e, it.id)}
+                    >
+                      <Icon name="image" size={13} />
+                    </button>
+                  )}
+                  {coverMenu === it.id && (
+                    <div className="card-cover-menu" onClick={(e) => e.stopPropagation()}>
+                      {coverMenuPages.length === 0 ? (
+                        <div className="card-file-empty muted">{t('library.card.loadingPages')}</div>
+                      ) : (
+                        coverMenuPages.map((pageUrl) => (
+                          <button
+                            key={pageUrl}
+                            className="card-cover-thumb"
+                            onClick={(e) => void setCoverFromPage(e, it.id, pageUrl)}
+                          >
+                            <img src={pageUrl} alt="" draggable={false} />
+                          </button>
+                        ))
                       )}
                     </div>
                   )}
@@ -900,10 +1358,10 @@ export default function LibraryView({ onOpen }: Props) {
                 </div>
                 <div className="card-sub muted">
                   {it.kind === 'manga'
-                    ? `${it.pageCount ?? 0} pages`
+                    ? t('library.pages', { count: it.pageCount ?? 0 })
                     : it.epubFile?.endsWith('.pdf')
-                      ? 'PDF'
-                      : 'EPUB'}
+                      ? t('library.kind.pdf')
+                      : t('library.kind.epub')}
                   {pct > 0 ? ` · ${pct}%` : ''}
                   {it.folder && folders.includes(it.folder) && (
                     <>
@@ -914,7 +1372,10 @@ export default function LibraryView({ onOpen }: Props) {
                 </div>
               </div>
             );
-          })}
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
         </>
@@ -924,18 +1385,50 @@ export default function LibraryView({ onOpen }: Props) {
   );
 }
 
-function libraryKindLabel(it: LibraryItem): string {
-  if (it.kind === 'manga') return `${it.pageCount ?? 0} pages`;
-  return it.epubFile?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB';
+function libraryKindLabel(
+  it: LibraryItem,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (it.kind === 'manga') return t('library.pages', { count: it.pageCount ?? 0 });
+  return it.epubFile?.toLowerCase().endsWith('.pdf') ? t('library.kind.pdf') : t('library.kind.epub');
 }
 
 function coverStyle(it: LibraryItem): CSSProperties {
-  if (it.coverPath) {
-    return { backgroundImage: `url("media://${it.id}/${it.coverPath}")` };
-  }
-  // Deterministic gradient derived from the title, so each book looks distinct.
-  const hue = [...it.title].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-  return {
-    background: `linear-gradient(135deg, hsl(${hue} 45% 32%), hsl(${(hue + 40) % 360} 50% 18%))`,
-  };
+  return coverStyleFor(it.title, it.coverPath, it.id);
+}
+
+/** Bottom-right JLPT/HSK badge on a book cover; flashes once when it first appears. */
+function CoverLevelBadge({
+  estimate,
+  t,
+  lang,
+}: {
+  estimate: BookLevelEstimate | undefined;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  lang: string;
+}) {
+  const [flash, setFlash] = useState(false);
+  const seen = useRef(false);
+
+  useEffect(() => {
+    if (!estimate) {
+      seen.current = false;
+      return;
+    }
+    if (seen.current) return;
+    seen.current = true;
+    setFlash(true);
+    const id = window.setTimeout(() => setFlash(false), 900);
+    return () => window.clearTimeout(id);
+  }, [estimate, lang]);
+
+  if (!estimate) return null;
+  return (
+    <span
+      className={`cover-level-badge${flash ? ' cover-level-badge--flash' : ''}`}
+      aria-label={t('library.cover.levelAria', { level: estimate.label })}
+    >
+      {estimate.label}
+    </span>
+  );
 }

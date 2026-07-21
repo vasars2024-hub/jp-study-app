@@ -10,8 +10,17 @@ import type {
   MediaOpen,
   Progress,
   SubtitlePick,
+  YouTubeDownloadOptions,
   YomitanDictInfo,
 } from './shared/types';
+import type {
+  YtPlaylist,
+  YtPlaylistFolder,
+  YtPlaylistSort,
+  YtPlaylistsStore,
+  YtStudyLang,
+  YtSubLang,
+} from './shared/ytPlaylists';
 import type {
   AnkiLinkStatus,
   EnsureModelResult,
@@ -55,12 +64,32 @@ import type {
 } from './shared/immersion';
 import type { AppReleaseInfo } from './shared/release';
 import type { AssetError, AssetSpec, AssetStatus } from './shared/assetRegistry';
-import type { InterpretedLearningInput } from './main/city/engine/types';
-import type { CityStateMessage } from './main/city/ipc/channels';
+import type {
+  JitenConfig,
+  JitenDeck,
+  JitenDeckDownloadOptions,
+  JitenDeckStats,
+  JitenImportDirectRequest,
+  JitenImportDirectResult,
+  JitenPlanEntry,
+  JitenSearchRequest,
+  JitenSearchResult,
+  JitenSourceProfile,
+  JitenStore,
+} from './shared/jiten';
+import type { CitySessionPacket, CityStateMessage } from './main/city/ipc/channels';
 
 // The single, safe bridge between the sandboxed renderer (React UI) and the
 // Electron main process. The UI can only call exactly these functions.
 const api = {
+  relaunchApp: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:relaunch'),
+  launchAutomationBuilder: (): Promise<import('./shared/automationBuilder').AutomationBuilderLaunchResult> =>
+    ipcRenderer.invoke('toolbox:launchAutomationBuilder'),
+  toolboxPickSearchFolder: (): Promise<string | null> => ipcRenderer.invoke('toolbox:pickSearchFolder'),
+  toolboxFileSearch: (
+    request: import('./shared/toolboxFileSearch').ToolboxFileSearchRequest,
+  ): Promise<import('./shared/toolboxFileSearch').ToolboxFileSearchResponse> =>
+    ipcRenderer.invoke('toolbox:fileSearch', request),
   listLibrary: (): Promise<LibraryItem[]> => ipcRenderer.invoke('library:list'),
   importFiles: (): Promise<LibraryItem[]> => ipcRenderer.invoke('library:importFiles'),
   importFolder: (): Promise<LibraryItem[]> => ipcRenderer.invoke('library:importFolder'),
@@ -70,6 +99,8 @@ const api = {
     ipcRenderer.invoke('library:setFolders', folders),
   setItemFolder: (id: string, folder: string | null): Promise<LibraryItem[]> =>
     ipcRenderer.invoke('library:setItemFolder', id, folder),
+  setLibraryCover: (id: string, pageRelPath: string): Promise<LibraryItem[]> =>
+    ipcRenderer.invoke('library:setCover', id, pageRelPath),
   /** Absolute path of a File dropped onto the window (File.path was removed). */
   getFilePath: (file: File): string => webUtils.getPathForFile(file),
   importPaths: (paths: string[]): Promise<LibraryItem[]> =>
@@ -93,6 +124,29 @@ const api = {
     };
     error?: string;
   }> => ipcRenderer.invoke('net:extractReadableArticle', url),
+  /** Reading Finder: fetch a candidate's readable content (follows same-text pagination). */
+  fetchReadingContent: (
+    url: string,
+    opts?: { maxPages?: number; followPagination?: boolean },
+  ): Promise<{
+    ok: boolean;
+    title?: string;
+    content?: string;
+    text?: string;
+    url?: string;
+    pages?: number;
+    partial?: boolean;
+    nextPageUrl?: string;
+    meta?: {
+      byline?: string | null;
+      publishedTime?: string | null;
+      excerpt?: string | null;
+      siteName?: string | null;
+      lang?: string | null;
+      dir?: string | null;
+    };
+    error?: string;
+  }> => ipcRenderer.invoke('reading:fetchContent', url, opts),
   /** Fetch JSON from the Japanese Wikipedia API (main process, no CORS). */
   fetchJson: (url: string): Promise<{ ok: boolean; data?: unknown; error?: string }> =>
     ipcRenderer.invoke('net:fetchJson', url),
@@ -101,6 +155,15 @@ const api = {
     html: string;
     source?: string;
   }): Promise<LibraryItem[]> => ipcRenderer.invoke('library:importGenerated', payload),
+  updateInboxMeta: (
+    id: string,
+    patch: Partial<NonNullable<LibraryItem['inboxMeta']>>,
+  ): Promise<LibraryItem[]> => ipcRenderer.invoke('library:updateInboxMeta', id, patch),
+  updateLevelMeta: (
+    id: string,
+    patch: NonNullable<LibraryItem['levelMeta']>,
+    opts?: { broadcast?: boolean },
+  ): Promise<LibraryItem[]> => ipcRenderer.invoke('library:updateLevelMeta', id, patch, opts),
   addMediaPaths: (paths: string[]): Promise<MediaItem[]> =>
     ipcRenderer.invoke('media:addPaths', paths),
   getWallpaper: (): Promise<string | null> => ipcRenderer.invoke('desktop:getWallpaper'),
@@ -139,7 +202,91 @@ const api = {
   /** Read one manga page (by its media:// URL) as a base64 data URL, for OCR. */
   readMangaPage: (mediaUrl: string): Promise<string | null> =>
     ipcRenderer.invoke('manga:readPage', mediaUrl),
+
+  mangaOcrAvailable: (): Promise<boolean> => ipcRenderer.invoke('mangaOcr:available'),
+  mangaOcrLoadCache: (
+    itemId: string,
+    mediaUrl: string,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:loadCache', itemId, mediaUrl),
+  mangaOcrScanPage: (
+    req: import('./shared/mangaOcrIpc').MangaOcrScanRequest,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage> => ipcRenderer.invoke('mangaOcr:scanPage', req),
+  mangaOcrSaveCorrection: (
+    req: import('./shared/mangaOcrIpc').MangaOcrCorrectionRequest,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:saveCorrection', req),
+  mangaOcrRescanRegion: (
+    req: import('./shared/mangaOcrIpc').MangaOcrRegionRescanRequest,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:rescanRegion', req),
+  mangaOcrMergeRegions: (
+    req: import('./shared/mangaOcrIpc').MangaOcrMergeRequest,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:mergeRegions', req),
+  mangaOcrSplitRegion: (
+    req: import('./shared/mangaOcrIpc').MangaOcrSplitRequest,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:splitRegion', req),
+  mangaOcrAddRegion: (
+    req: import('./shared/mangaOcrIpc').MangaOcrAddRegionRequest,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:addRegion', req),
+  mangaOcrSaveOrder: (
+    req: import('./shared/mangaOcrIpc').MangaOcrOrderRequest,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:saveOrder', req),
+  mangaOcrRecognizeImage: (dataUrl: string): Promise<string> =>
+    ipcRenderer.invoke('mangaOcr:recognizeImage', dataUrl),
+  onMangaOcrProgress: (cb: (p: import('./shared/mangaOcrIpc').MangaOcrProgress) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: import('./shared/mangaOcrIpc').MangaOcrProgress) =>
+      cb(p);
+    ipcRenderer.on('mangaOcr:progress', handler);
+    return () => ipcRenderer.removeListener('mangaOcr:progress', handler);
+  },
+  mangaOcrLoadTranslateCache: (
+    itemId: string,
+    mediaUrl: string,
+    targetLang?: string,
+  ): Promise<import('./shared/mokuroTypes').MokuroPage | null> =>
+    ipcRenderer.invoke('mangaOcr:loadTranslateCache', itemId, mediaUrl, targetLang ?? 'en'),
+  mangaOcrSaveTranslateCache: (
+    itemId: string,
+    mediaUrl: string,
+    targetLang: string,
+    page: import('./shared/mokuroTypes').MokuroPage,
+  ): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('mangaOcr:saveTranslateCache', itemId, mediaUrl, targetLang, page),
+  mangaOcrAnalyzeVolume: (
+    req: import('./shared/mangaOcrIpc').MangaOcrVolumeRequest,
+  ): Promise<{
+    ok: boolean;
+    cancelled?: boolean;
+    error?: string;
+    ocrMeta?: import('./shared/types').LibraryItem['ocrMeta'];
+  }> => ipcRenderer.invoke('mangaOcr:analyzeVolume', req),
+  mangaOcrCancelVolume: (itemId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('mangaOcr:cancelVolume', itemId),
+  mangaOcrRefreshMeta: (
+    itemId: string,
+    targetLang?: string,
+  ): Promise<import('./shared/types').LibraryItem['ocrMeta'] | null> =>
+    ipcRenderer.invoke('mangaOcr:refreshMeta', itemId, targetLang ?? 'en'),
+  onMangaOcrVolumeProgress: (
+    cb: (p: import('./shared/mangaOcrIpc').MangaOcrVolumeProgress) => void,
+  ): (() => void) => {
+    const handler = (
+      _: Electron.IpcRendererEvent,
+      p: import('./shared/mangaOcrIpc').MangaOcrVolumeProgress,
+    ) => cb(p);
+    ipcRenderer.on('mangaOcr:volumeProgress', handler);
+    return () => ipcRenderer.removeListener('mangaOcr:volumeProgress', handler);
+  },
+
   readBook: (id: string): Promise<ArrayBuffer | null> => ipcRenderer.invoke('library:readBook', id),
+  /** Plain-text sample from an EPUB (capped) for JLPT/HSK cover level badges. */
+  sampleBookText: (id: string, maxChars?: number): Promise<string | null> =>
+    ipcRenderer.invoke('library:sampleBookText', id, maxChars),
 
   // Auto-import (watch) folder
   getWatchFolder: (): Promise<string | null> => ipcRenderer.invoke('config:getWatchFolder'),
@@ -272,7 +419,7 @@ const api = {
   },
 
   // Pop an app out into its own borderless OS window (same app, second window).
-  // The main process dedupes by section — calling this again for an already-open
+  // The main process dedupes by section â€” calling this again for an already-open
   // section just focuses that window instead of opening a duplicate.
   popOut: (section: string): Promise<void> => ipcRenderer.invoke('popout:open', section),
   /** Sections currently open in their own pop-out window. */
@@ -287,7 +434,7 @@ const api = {
   popoutControl: (action: 'minimize' | 'maximize' | 'close'): Promise<void> =>
     ipcRenderer.invoke('popout:control', action),
 
-  /** Floating Mini Widget Mode — borderless transparent always-on-top craft window. */
+  /** Floating Mini Widget Mode â€” borderless transparent always-on-top craft window. */
   miniOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('mini:open', size),
   miniClose: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('mini:close'),
@@ -296,7 +443,17 @@ const api = {
   miniIsOpen: (): Promise<boolean> => ipcRenderer.invoke('mini:isOpen'),
   miniFocusMain: (): Promise<void> => ipcRenderer.invoke('mini:focusMain'),
 
-  /** Floating lock widget — frameless, transparent, no OS shadow. */
+  /** Blanc Toolbox Mode: compact side window that runs beside Study OS. */
+  blancOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('blanc:open', size),
+  blancClose: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('blanc:close'),
+  blancIsOpen: (): Promise<boolean> => ipcRenderer.invoke('blanc:isOpen'),
+  blancSetFullScreen: (on: boolean): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('blanc:setFullScreen', on),
+  blancSetGlobalShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('blanc:setGlobalShortcut', chord),
+
+  /** Floating lock widget â€” frameless, transparent, no OS shadow. */
   lockscreenOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('lockscreen:open', size),
   lockscreenUnlock: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('lockscreen:unlock'),
@@ -309,7 +466,7 @@ const api = {
     return () => ipcRenderer.removeListener('lockscreen:unlocked', handler);
   },
 
-  // L4 — transparent OS companion host over the real desktop
+  // L4 â€” transparent OS companion host over the real desktop
   companionHostSetEnabled: (
     enabled: boolean,
     span?: 'primary' | 'all',
@@ -323,6 +480,7 @@ const api = {
       bounds: { x: number; y: number; width: number; height: number };
       workArea: { x: number; y: number; width: number; height: number };
       primary: boolean;
+      scaleFactor: number;
     }[]
   > => ipcRenderer.invoke('companionHost:getDisplays'),
   companionHostGetViewport: (): Promise<{
@@ -356,6 +514,19 @@ const api = {
     ipcRenderer.on('buddy:run', handler);
     return () => ipcRenderer.removeListener('buddy:run', handler);
   },
+  buddySchedulerSync: (
+    entries: Array<{ routineId: string; forType?: string; startHour: number; endHour: number }>,
+  ): void => {
+    ipcRenderer.send('buddyScheduler:sync', entries);
+  },
+  onBuddyTrigger: (
+    cb: (payload: { routineId: string; forType?: string }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { routineId: string; forType?: string }): void =>
+      cb(payload);
+    ipcRenderer.on('buddy:trigger', handler);
+    return () => ipcRenderer.removeListener('buddy:trigger', handler);
+  },
 
   playerWindowId: (): Promise<number> => ipcRenderer.invoke('player:windowId'),
   playerGetSnapshot: (): Promise<import('./shared/playerSync').PlayerSnapshot | null> =>
@@ -379,8 +550,84 @@ const api = {
 
   /** Open an http/https link in the system browser. */
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openExternal', url),
+  getWindowBorderless: (): Promise<boolean> => ipcRenderer.invoke('shell:getWindowBorderless'),
+  setWindowBorderless: (borderless: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('shell:setWindowBorderless', borderless),
+  getWindowChromeMode: (): Promise<string> => ipcRenderer.invoke('shell:getWindowChromeMode'),
+  setWindowChromeMode: (mode: string): Promise<string> =>
+    ipcRenderer.invoke('shell:setWindowChromeMode', mode),
   appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   checkAppRelease: (): Promise<AppReleaseInfo | null> => ipcRenderer.invoke('release:check'),
+
+  // Remote Resources catalogue (fetched from GitHub, cached in userData)
+  catalogGet: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>
+    ipcRenderer.invoke('catalog:get'),
+  catalogRefresh: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>
+    ipcRenderer.invoke('catalog:refresh'),
+  novelsGet: (): Promise<import('./shared/resourcesCatalog').NovelsCatalog | null> =>
+    ipcRenderer.invoke('novels:get'),
+  novelsRefresh: (): Promise<import('./shared/resourcesCatalog').NovelsCatalog | null> =>
+    ipcRenderer.invoke('novels:refresh'),
+
+  // Jiten-backed novel catalogue, source staging, and deck mining
+  jitenGetStore: (): Promise<JitenStore> => ipcRenderer.invoke('jiten:getStore'),
+  jitenUpdateConfig: (patch: Partial<JitenConfig>): Promise<JitenStore> =>
+    ipcRenderer.invoke('jiten:updateConfig', patch),
+  jitenSetSourceProfiles: (profiles: JitenSourceProfile[]): Promise<JitenStore> =>
+    ipcRenderer.invoke('jiten:setSourceProfiles', profiles),
+  jitenSearchDecks: (request: JitenSearchRequest): Promise<JitenSearchResult> =>
+    ipcRenderer.invoke('jiten:searchDecks', request),
+  jitenGetDeckDetail: (deckId: number): Promise<JitenDeck | null> =>
+    ipcRenderer.invoke('jiten:getDeckDetail', deckId),
+  jitenGetDeckStats: (deckId: number): Promise<JitenDeckStats | null> =>
+    ipcRenderer.invoke('jiten:getDeckStats', deckId),
+  jitenPlanFromDeck: (deck: JitenDeck): Promise<JitenPlanEntry | null> =>
+    ipcRenderer.invoke('jiten:planFromDeck', deck),
+  jitenUpsertPlan: (entry: JitenPlanEntry): Promise<JitenStore> =>
+    ipcRenderer.invoke('jiten:upsertPlan', entry),
+  jitenUpdatePlan: (id: string, patch: Partial<JitenPlanEntry>): Promise<JitenStore> =>
+    ipcRenderer.invoke('jiten:updatePlan', id, patch),
+  jitenRemovePlan: (id: string): Promise<JitenStore> =>
+    ipcRenderer.invoke('jiten:removePlan', id),
+  jitenImportDirectEpub: (input: JitenImportDirectRequest): Promise<JitenImportDirectResult> =>
+    ipcRenderer.invoke('jiten:importDirectEpub', input),
+  jitenDownloadDeck: (
+    deckId: number,
+    options?: Partial<JitenDeckDownloadOptions>,
+  ): Promise<{ ok: boolean; content?: string; contentType?: string; filename?: string; error?: string }> =>
+    ipcRenderer.invoke('jiten:downloadDeck', deckId, options),
+  jitenCacheCover: (
+    planId: string,
+    deckId: number,
+    coverUrl: string,
+  ): Promise<{ ok: boolean; relPath?: string; error?: string }> =>
+    ipcRenderer.invoke('jiten:cacheCover', planId, deckId, coverUrl),
+
+  // Collected tools (saved from the Immersion browser)
+  toolsList: (): Promise<import('./shared/collectedTools').CollectedToolsStore> =>
+    ipcRenderer.invoke('tools:list'),
+  toolsAdd: (
+    input: import('./shared/collectedTools').CollectToolInput,
+  ): Promise<{
+    ok: boolean;
+    tool?: import('./shared/collectedTools').CollectedTool;
+    duplicate?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke('tools:add', input),
+  toolsRemove: (
+    id: string,
+  ): Promise<{ ok: boolean; store?: import('./shared/collectedTools').CollectedToolsStore; error?: string }> =>
+    ipcRenderer.invoke('tools:remove', id),
+  toolsUpdate: (
+    id: string,
+    patch: import('./shared/collectedTools').UpdateToolInput,
+  ): Promise<{ ok: boolean; tool?: import('./shared/collectedTools').CollectedTool; error?: string }> =>
+    ipcRenderer.invoke('tools:update', id, patch),
+
+  // Anonymous download heat-map telemetry
+  statsPing: (): Promise<{ ok: boolean; sent: boolean }> => ipcRenderer.invoke('stats:ping'),
+  statsCounts: (): Promise<import('./shared/stats').CountryCounts | null> =>
+    ipcRenderer.invoke('stats:counts'),
 
   // Offline translation (Qwen3 in main process)
   translateRun: (req: {
@@ -396,6 +643,14 @@ const api = {
     ipcRenderer.invoke('translate:runBatch', req),
   translateStatus: (): Promise<{ ready: boolean; modelFound: boolean; modelPath: string | null }> =>
     ipcRenderer.invoke('translate:status'),
+  // Cloud-LLM linguistic analysis of a completed translation (needs an API key)
+  translateAnalyze: (
+    req: import('./shared/translateAnalysisCore').TranslateAnalyzeRequest,
+  ): Promise<{
+    ok: boolean;
+    result?: import('./shared/translateAnalysisCore').TranslateAnalysisResult;
+    error?: string;
+  }> => ipcRenderer.invoke('translate:analyze', req),
   onTranslateModelProgress: (
     cb: (p: { status?: string; file?: string; progress?: number }) => void,
   ): (() => void) => {
@@ -426,13 +681,15 @@ const api = {
   clearMediaLibrary: (): Promise<MediaItem[]> => ipcRenderer.invoke('media:clearAll'),
   setMediaPosition: (id: string, sec: number): Promise<void> =>
     ipcRenderer.invoke('media:setPosition', id, sec),
+  setMediaSubOffset: (id: string, sec: number): Promise<void> =>
+    ipcRenderer.invoke('media:setSubOffset', id, sec),
   /** Decode a file's audio to 16 kHz mono PCM (for Whisper), via ffmpeg. */
   extractAudio: (url: string): Promise<ArrayBuffer> => ipcRenderer.invoke('media:extractAudio', url),
   /** Convert a non-playable file (e.g. MKV) to a playable MP4; returns a new URL. */
   convertMedia: (url: string): Promise<MediaOpen | null> => ipcRenderer.invoke('media:convert', url),
   /** Download a YouTube video (or just its audio) via yt-dlp into the library. */
-  downloadYouTube: (url: string, audioOnly?: boolean): Promise<MediaOpen | { error: string }> =>
-    ipcRenderer.invoke('media:youtube', url, audioOnly),
+  downloadYouTube: (url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }> =>
+    ipcRenderer.invoke('media:youtube', url, audioOnly, options),
   /** Subscribe to yt-dlp download progress. Returns an unsubscribe fn. */
   onYoutubeProgress: (cb: (p: { stage: string; percent: number }) => void): (() => void) => {
     const handler = (_e: unknown, p: { stage: string; percent: number }): void => cb(p);
@@ -450,6 +707,95 @@ const api = {
     const handler = (_e: unknown, items: MediaItem[]): void => cb(items);
     ipcRenderer.on('media:changed', handler);
     return () => ipcRenderer.removeListener('media:changed', handler);
+  },
+
+  // YouTube immersion playlists (metadata sync; download is explicit)
+  ytList: (): Promise<YtPlaylistsStore> => ipcRenderer.invoke('yt:list'),
+  ytSaveFolders: (folders: YtPlaylistFolder[]): Promise<YtPlaylistsStore> =>
+    ipcRenderer.invoke('yt:saveFolders', folders),
+  ytSaveFolder: (folder: YtPlaylistFolder): Promise<YtPlaylistsStore> =>
+    ipcRenderer.invoke('yt:saveFolder', folder),
+  ytDeleteFolder: (folderId: string): Promise<YtPlaylistsStore> =>
+    ipcRenderer.invoke('yt:deleteFolder', folderId),
+  ytAddPlaylist: (
+    url: string,
+  ): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> =>
+    ipcRenderer.invoke('yt:addPlaylist', url),
+  ytRefreshPlaylist: (
+    playlistId: string,
+  ): Promise<{ store: YtPlaylistsStore; playlist: YtPlaylist } | { error: string }> =>
+    ipcRenderer.invoke('yt:refreshPlaylist', playlistId),
+  ytRemovePlaylist: (playlistId: string): Promise<YtPlaylistsStore> =>
+    ipcRenderer.invoke('yt:removePlaylist', playlistId),
+  ytSetPlaylistPrefs: (
+    playlistId: string,
+    prefs: Partial<{
+      lang: YtStudyLang;
+      preferSubs: YtSubLang[];
+      autoUpdate: boolean;
+      sortDefault: YtPlaylistSort;
+      folderId: string | null;
+      title: string;
+    }>,
+  ): Promise<YtPlaylistsStore | { error: string }> =>
+    ipcRenderer.invoke('yt:setPlaylistPrefs', playlistId, prefs),
+  ytDownloadVideos: (
+    videoIds: string[],
+  ): Promise<{
+    store: YtPlaylistsStore;
+    results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
+  }> => ipcRenderer.invoke('yt:downloadVideos', videoIds),
+  ytFetchSubsOnly: (
+    videoIds: string[],
+  ): Promise<{
+    store: YtPlaylistsStore;
+    results: Array<{ videoId: string; ok: boolean; error?: string }>;
+  }> => ipcRenderer.invoke('yt:fetchSubsOnly', videoIds),
+  ytMarkTranscribed: (
+    youtubeId: string,
+    cuesJson: string,
+  ): Promise<YtPlaylistsStore | { error: string }> =>
+    ipcRenderer.invoke('yt:markTranscribed', youtubeId, cuesJson),
+  ytAutoUpdateDue: (): Promise<YtPlaylistsStore> => ipcRenderer.invoke('yt:autoUpdateDue'),
+  ytRefreshAll: (): Promise<{
+    store: YtPlaylistsStore;
+    newVideoIds: string[];
+    errors: Array<{ playlistId: string; title: string; error: string }>;
+  }> => ipcRenderer.invoke('yt:refreshAll'),
+  ytAddToPlanToWatch: (videoIds: string[]): Promise<YtPlaylistsStore> =>
+    ipcRenderer.invoke('yt:addToPlanToWatch', videoIds),
+  ytRemoveFromPlanToWatch: (videoIds: string[]): Promise<YtPlaylistsStore> =>
+    ipcRenderer.invoke('yt:removeFromPlanToWatch', videoIds),
+  onYtChanged: (cb: (store: YtPlaylistsStore) => void): (() => void) => {
+    const handler = (_e: unknown, store: YtPlaylistsStore): void => cb(store);
+    ipcRenderer.on('yt:changed', handler);
+    return () => ipcRenderer.removeListener('yt:changed', handler);
+  },
+  onYtDownloadProgress: (
+    cb: (p: { videoId: string; index: number; total: number; stage: string; percent: number }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      p: { videoId: string; index: number; total: number; stage: string; percent: number },
+    ): void => cb(p);
+    ipcRenderer.on('yt:downloadProgress', handler);
+    return () => ipcRenderer.removeListener('yt:downloadProgress', handler);
+  },
+  onYtRefreshProgress: (
+    cb: (p: {
+      playlistId: string;
+      index: number;
+      total: number;
+      stage: string;
+      title: string;
+    }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      p: { playlistId: string; index: number; total: number; stage: string; title: string },
+    ): void => cb(p);
+    ipcRenderer.on('yt:refreshProgress', handler);
+    return () => ipcRenderer.removeListener('yt:refreshProgress', handler);
   },
 
   /** Subscribe to live library updates from the watch folder. Returns an unsubscribe fn. */
@@ -630,6 +976,46 @@ const api = {
     onBattery?: boolean | null;
   }> => ipcRenderer.invoke('system:getMetrics'),
   clipboardReadText: (): Promise<string> => ipcRenderer.invoke('clipboard:readText'),
+  logRendererError: (payload: { subsystem?: string; operation?: string; detail?: string }): Promise<void> =>
+    ipcRenderer.invoke('diagnostics:logRendererError', payload),
+
+  // System-wide popup dictionary (global hotkey + tray + floating overlay).
+  sysDictGetSettings: (): Promise<{
+    enabled: boolean;
+    hotkey: string;
+    supported: boolean;
+    registered: boolean;
+  }> => ipcRenderer.invoke('sysdict:getSettings'),
+  sysDictSetEnabled: (
+    enabled: boolean,
+  ): Promise<{ enabled: boolean; hotkey: string; supported: boolean; registered: boolean }> =>
+    ipcRenderer.invoke('sysdict:setEnabled', enabled),
+  sysDictSetHotkey: (
+    hotkey: string,
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    status: { enabled: boolean; hotkey: string; supported: boolean; registered: boolean };
+  }> => ipcRenderer.invoke('sysdict:setHotkey', hotkey),
+  /** The overlay renderer pulls the pending query on mount (avoids a load race). */
+  sysDictGetPending: (): Promise<string> => ipcRenderer.invoke('sysdict:getPending'),
+  sysDictClose: (): Promise<void> => ipcRenderer.invoke('sysdict:close'),
+  sysDictLookupClipboard: (): Promise<void> => ipcRenderer.invoke('sysdict:lookupClipboard'),
+  onSysDictQuery: (cb: (query: string) => void): (() => void) => {
+    const handler = (_e: unknown, query: string): void => cb(query);
+    ipcRenderer.on('sysdict:query', handler);
+    return () => ipcRenderer.removeListener('sysdict:query', handler);
+  },
+  onSysDictSettingsChanged: (
+    cb: (status: { enabled: boolean; hotkey: string; supported: boolean; registered: boolean }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      status: { enabled: boolean; hotkey: string; supported: boolean; registered: boolean },
+    ): void => cb(status);
+    ipcRenderer.on('sysdict:settings-changed', handler);
+    return () => ipcRenderer.removeListener('sysdict:settings-changed', handler);
+  },
 
   // Downloadable models & dictionaries (Phase 6). Nothing heavy ships in the
   // installer; every consumer checks assetsIsInstalled() before using an asset.
@@ -643,6 +1029,7 @@ const api = {
     ipcRenderer.invoke('assets:remove', id),
   assetsIsInstalled: (id: string): Promise<boolean> => ipcRenderer.invoke('assets:isInstalled', id),
   assetsPath: (id: string): Promise<string | null> => ipcRenderer.invoke('assets:path', id),
+  assetsReadText: (id: string): Promise<string | null> => ipcRenderer.invoke('assets:readText', id),
   assetsFreeSpace: (): Promise<number> => ipcRenderer.invoke('assets:freeSpace'),
   assetsRoot: (): Promise<string> => ipcRenderer.invoke('assets:root'),
   onAssetStatus: (cb: (status: AssetStatus) => void): (() => void) => {
@@ -660,7 +1047,7 @@ const api = {
   // Tells the main process which UI language is active, so native dialog
   // titles/filters (file pickers) aren't stuck in English. See main/i18n.ts.
   // Fire-and-forget: main's handler is a `handle()`, so this must be an
-  // `invoke()` call to actually reach it — a plain `send()` would silently
+  // `invoke()` call to actually reach it â€” a plain `send()` would silently
   // go nowhere.
   setUiLang: (lang: string): void => {
     void ipcRenderer.invoke('i18n:setLang', lang);
@@ -669,15 +1056,205 @@ const api = {
   // Noctis Civilization Module (src/main/city). The renderer holds a
   // read-only mirror of committed civilization state, refreshed by push.
   // recordSession carries the already-interpreted learning input (no raw
-  // telemetry, title, or word crosses — LEARNING_INTEGRATION.md Section 9).
+  // telemetry, title, or word crosses â€” LEARNING_INTEGRATION.md Section 9).
   cityGetState: (): Promise<CityStateMessage> => ipcRenderer.invoke('city:getState'),
-  cityRecordSession: (input: InterpretedLearningInput): Promise<CityStateMessage> =>
-    ipcRenderer.invoke('city:recordSession', input),
+  cityRecordSession: (packet: CitySessionPacket): Promise<CityStateMessage> =>
+    ipcRenderer.invoke('city:recordSession', packet),
   onCityChanged: (cb: (message: CityStateMessage) => void): (() => void) => {
     const handler = (_e: unknown, message: CityStateMessage): void => cb(message);
     ipcRenderer.on('city:changed', handler);
     return () => ipcRenderer.removeListener('city:changed', handler);
   },
+
+  // Chrome extension bridge (Phase 9) — loopback HTTP server status / token.
+  extensionStatus: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
+    ipcRenderer.invoke('extension:status'),
+  extensionRegenerateToken: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
+    ipcRenderer.invoke('extension:regenerateToken'),
+  extensionRevealFolder: (): Promise<string | null> => ipcRenderer.invoke('extension:revealFolder'),
+  onExtensionMined: (
+    cb: (payload: {
+      mode: 'word' | 'sentence';
+      term: string;
+      sentence?: string;
+      text: string;
+      url?: string;
+      title?: string;
+      folder?: string;
+      audioDataUrl?: string;
+      profileId?: string;
+      anki: { ok: boolean; noteId?: number; error?: string };
+    }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: {
+        mode: 'word' | 'sentence';
+        term: string;
+        sentence?: string;
+        text: string;
+        url?: string;
+        title?: string;
+        folder?: string;
+        audioDataUrl?: string;
+        profileId?: string;
+        anki: { ok: boolean; noteId?: number; error?: string };
+      },
+    ): void => cb(payload);
+    ipcRenderer.on('extension:mined', handler);
+    return () => ipcRenderer.removeListener('extension:mined', handler);
+  },
+  onExtensionTranscribeRequest: (
+    cb: (payload: { id: string; pcmBase64: string }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; pcmBase64: string }): void => cb(payload);
+    ipcRenderer.on('extension:transcribe-request', handler);
+    return () => ipcRenderer.removeListener('extension:transcribe-request', handler);
+  },
+  replyExtensionTranscribe: (id: string, result: { ok: boolean; text?: string; error?: string }): void => {
+    ipcRenderer.send('extension:transcribe-reply', { id, ...result });
+  },
+  onExtensionClipboardAppend: (
+    cb: (payload: { text: string; type?: string; url?: string; title?: string }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: { text: string; type?: string; url?: string; title?: string },
+    ): void => cb(payload);
+    ipcRenderer.on('extension:clipboard-append', handler);
+    return () => ipcRenderer.removeListener('extension:clipboard-append', handler);
+  },
+  onExtensionUiOpen: (
+    cb: (payload: {
+      target: string;
+      functions?: string | string[];
+      level?: string;
+      levels?: string[];
+      lang?: string;
+    }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: {
+        target: string;
+        functions?: string | string[];
+        level?: string;
+        levels?: string[];
+        lang?: string;
+      },
+    ): void => cb(payload);
+    ipcRenderer.on('extension:ui-open', handler);
+    return () => ipcRenderer.removeListener('extension:ui-open', handler);
+  },
+  extensionFocusMainAndOpen: (target: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('extension:focus-main-and-open', target),
+  onKnownLevelsRequest: (
+    cb: (payload: { id: string; terms: string[] }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; terms: string[] }): void => cb(payload);
+    ipcRenderer.on('extension:known-levels-request', handler);
+    return () => ipcRenderer.removeListener('extension:known-levels-request', handler);
+  },
+  replyKnownLevels: (id: string, levels: Record<string, number>): void => {
+    ipcRenderer.send('extension:known-levels-reply', { id, levels });
+  },
+  onKnownLevelSet: (
+    cb: (payload: { id: string; term: string; level: number }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; term: string; level: number }): void =>
+      cb(payload);
+    ipcRenderer.on('extension:known-level-set', handler);
+    return () => ipcRenderer.removeListener('extension:known-level-set', handler);
+  },
+  replyKnownLevelSet: (id: string, result: { ok: boolean; error?: string }): void => {
+    ipcRenderer.send('extension:known-level-set-reply', { id, ...result });
+  },
+  onComprehensibilityRequest: (
+    cb: (payload: { id: string; text: string }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; text: string }): void => cb(payload);
+    ipcRenderer.on('extension:comprehensibility-request', handler);
+    return () => ipcRenderer.removeListener('extension:comprehensibility-request', handler);
+  },
+  replyComprehensibility: (
+    id: string,
+    result: { ok: boolean; percent?: number; known?: number; total?: number; error?: string },
+  ): void => {
+    ipcRenderer.send('extension:comprehensibility-reply', { id, ...result });
+  },
+  onGrammarMatchRequest: (cb: (payload: { id: string; text: string }) => void): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; text: string }): void => cb(payload);
+    ipcRenderer.on('extension:grammar-match-request', handler);
+    return () => ipcRenderer.removeListener('extension:grammar-match-request', handler);
+  },
+  replyGrammarMatch: (
+    id: string,
+    result: {
+      ok: boolean;
+      matches?: Array<{ id: string; title: string; level: string; meaning: string }>;
+      error?: string;
+    },
+  ): void => {
+    ipcRenderer.send('extension:grammar-match-reply', { id, ...result });
+  },
+  onExtensionTranslationResult: (
+    cb: (payload: {
+      sourceLang: string;
+      targetLang: string;
+      sourceText: string;
+      resultText: string;
+    }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: {
+        sourceLang: string;
+        targetLang: string;
+        sourceText: string;
+        resultText: string;
+      },
+    ): void => cb(payload);
+    ipcRenderer.on('extension:translation-result', handler);
+    return () => ipcRenderer.removeListener('extension:translation-result', handler);
+  },
+  onLevelEstimateRequest: (cb: (payload: { id: string; text: string }) => void): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; text: string }): void => cb(payload);
+    ipcRenderer.on('extension:level-estimate-request', handler);
+    return () => ipcRenderer.removeListener('extension:level-estimate-request', handler);
+  },
+  replyLevelEstimate: (
+    id: string,
+    result: {
+      ok: boolean;
+      badge: string;
+      empty?: boolean;
+      noLists?: boolean;
+      lang?: 'ja' | 'zh' | null;
+      scheme?: 'jlpt' | 'hsk' | null;
+      label?: string;
+      confidence?: number;
+      error?: string;
+    },
+  ): void => {
+    ipcRenderer.send('extension:level-estimate-reply', { id, result });
+  },
+  onClipboardListRequest: (cb: (payload: { id: string }) => void): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string }): void => cb(payload);
+    ipcRenderer.on('extension:clipboard-list-request', handler);
+    return () => ipcRenderer.removeListener('extension:clipboard-list-request', handler);
+  },
+  replyClipboardList: (
+    id: string,
+    entries: Array<{ id: string; type: string; text: string; createdAt: number }>,
+  ): void => {
+    ipcRenderer.send('extension:clipboard-list-reply', { id, entries });
+  },
+  profileRulesGet: (): Promise<{ schemaVersion: 1; rules: Array<Record<string, unknown>> }> =>
+    ipcRenderer.invoke('profileRules:get'),
+  profileRulesSet: (
+    store: unknown,
+  ): Promise<{ schemaVersion: 1; rules: Array<Record<string, unknown>> }> =>
+    ipcRenderer.invoke('profileRules:set', store),
 };
 
 contextBridge.exposeInMainWorld('api', api);

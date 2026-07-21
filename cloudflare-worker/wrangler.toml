@@ -1,0 +1,10 @@
+name = "jp-study-pings"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+workers_dev = true
+preview_urls = false
+
+# Paste the id printed by:  wrangler kv namespace create COUNTS
+[[kv_namespaces]]
+binding = "COUNTS"
+id = "114bc2d9a497424893e1db3593b4ff7c"

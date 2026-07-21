@@ -1,0 +1,192 @@
+You are labelling Japanese grammar patterns by REGISTER — the speech level a
+pattern belongs to. Batch 3 of 14.
+
+## The four values
+
+neutral   - works at any speech level. THE DEFAULT AND MOST COMMON ANSWER.
+casual    - only natural in informal speech between equals or intimates
+            (contractions, blunt sentence-final particles, slang endings).
+business  - honorific / humble / formal-polite. Would appear in a business
+            email, an announcement, or speech to a customer or superior.
+literary  - written or classical. Would appear in an essay, a legal notice, or
+            fiction, but sounds archaic or stiff spoken aloud.
+
+## Rules — read these before answering
+
+- **Most patterns are neutral, and neutral is a real answer, not a fallback.**
+  Japanese politeness is carried by the sentence-final predicate, not by the
+  grammar pattern. 〜ながら is identical in 食べながら見た and 食べながら見ました,
+  so it is neutral.
+  If you find yourself labelling more than about a fifth of a batch as
+  non-neutral, you are over-assigning.
+- Do NOT infer register from the English meaning text. A gloss reading "a less
+  formal way to say X" describes the pattern's *meaning*; it does not make the
+  pattern casual. Judge from the Japanese form itself.
+- Politeness is not register. A pattern shown in its 〜ます form is still
+  neutral unless the pattern *itself* is honorific or humble.
+- If you are unsure, answer neutral and append "?" to flag it for review.
+  A flagged guess is useful; a confident wrong answer is not.
+- Every input line must produce exactly one output line. Do not skip, merge,
+  or reorder.
+
+## Patterns (id, then pattern, then structure, then meaning)
+
+n1m-g-eaea45	をいいことに	をいいことに	to take advantage of ~
+n1m-g-417ade	～からする	～からする	at least; as much as; as many as ~
+n1m-g-1a9ac9	～となく	～となく	on countless occasions; many a time
+n1m-g-ea1103	～いざ～となると / いざ～となれば / いざ～となったら	～いざ～となると / いざ～となれば / いざ～となったら	When it comes to; in such a case; if that happens
+n1m-g-77afed	…との	…との	...is..., ...that...
+n1m-g-11ab71	～くさい	～くさい	full of N / looks like N
+n1m-g-2b8897	...なりなんなり...	...なりなんなり...	any,anything,whatever
+n1m-g-10996d	…からいいようなものの	…からいいようなものの	It’s a good thing that… this time…
+n1m-g-4729f2	～ は...なり	～ は...なり	～In a way (to the best of my ability...)
+n1m-g-20b712	～てもしかたがない	～てもしかたがない	There's no point to~; it's no use to~; it cannot be helped
+n1m-v-e00cbd	～Vずにはおかない	～Vずにはおかない	will definitely/certainly do something; cannot not ~
+n1m-g-c3ef98	～且つ（かつ）	～且つ（かつ）	and
+n1m-g-cd5eda	～がかる	～がかる	close to, leaning towards...
+n1m-g-ae036f	～たらどんなに…か	～たらどんなに…か	It will be great if something is done
+n1m-g-42007d	～が ... だから	～が ... だから	Because..so (Emphasis)
+n1m-g-567667	～すむことではない	～すむことではない	~ is not enough to solve the problem; cannot be resolved by ~
+n1m-g-8fcf53	～ さも	～ さも	really (seem, appear, etc.); truly; as if ~
+n1m-g-e012f7	… からとて	… からとて	just because; even if; even though ~
+n1m-g-082cf1	～としたことが	～としたことが	～ surprised
+n1m-g-edefa4	～このぶんでは	～このぶんでは	as affairs stand; judging from the present situation; as things are now
+n1m-g-db797a	～ぬうちに	～ぬうちに	While not....; before...
+n1m-g-3d53de	～とうてい…ない	～とうてい…ない	can't possibly~; there's no way~
+n1m-g-6b4233	～なにげない	～なにげない	like nothing happened
+n1m-v-e4bdc9	～Vた + せつな	～Vた + せつな	moment, instant, juncture
+n1m-g-3599cf	～からいって	～からいって	just because; even if; even though ~
+n1m-g-2f9d51	～ような...ような	～ような...ような	like; as; similar to ~.
+n1m-g-a95fba	～しいしい	～しいしい	Every once in a while... (Repeat situation)
+n1m-v-9a2ec0	～V + たなり	～V + たなり	While... ~ing, Remaining, Not or ever since, Keep or leave
+n1m-g-80f0e0	～と言ってもせいぜい～だけだ	～と言ってもせいぜい～だけだ	Even if it’s said that…but it’s just….
+n1m-g-4e2e7d	～とて (も)	～とて (も)	even; even if; even though ~
+n1m-g-d6bde6	昼となく夜となく	昼となく夜となく	day and night
+n1m-g-b0a176	～せめてもの	～せめてもの	at least, at most
+n1m-g-d720d9	には…なり	には…なり	suitable; in one's own way / style
+n1m-g-a843a7	とあいまって	とあいまって	together with..., more; because of the influence of..., more ~
+n1m-g-b091f5	〜がさいご(が最後)	〜がさいご(が最後)	if you do... negative result
+n1-ya-inaya	〜や否や	Verb dictionary form + や否や（やいなや）	as soon as ~ / no sooner than ~
+n1-ga-hayai-ka	〜が早いか	Verb dictionary / た-form + が早いか（がはやいか）	as soon as ~ / the instant ~
+n1-nari	〜なり	Verb dictionary form + なり	as soon as ~ (and surprisingly)
+n1-sobakara	〜そばから	Verb dictionary / た-form + そばから	no sooner ~ than (again and again)
+n1-tokoro-o	〜ところを	Plain form / Noun + の + ところを	at a time when ~ / (caught) in the act of ~
+n1-zu-ni-wa-irarenai	〜ずにはいられない	Verb ない-form (drop ない) + ずにはいられない（する→せずには）	can't help but ~
+n1-o-kinjienai	〜を禁じ得ない	Noun (emotion) + を禁じ得ない（きんじえない）	can't suppress (an emotion)
+n1-ni-taenai	〜に堪えない	Verb dictionary / Noun + に堪えない（にたえない）	can't bear to ~ / not worth ~ing
+n1-kagiri-da	〜限りだ	い-adj / な-adj + な + 限りだ（かぎりだ）	extremely ~ / couldn't be more ~
+n1-kiwamarinai	〜極まりない	な-adj / い-adj + こと + 極まりない（きわまりない）	extremely ~ (boundlessly)
+n1-naradewa	〜ならでは	Noun + ならでは（の）	unique to ~ / only possible for ~
+n1-o-oite	〜をおいて	Noun + をおいて（〜ない）	other than ~ / except for ~
+n1-o-monotomosezu	〜をものともせず	Noun + をものともせず（に）	undaunted by ~ / in defiance of ~
+n1-o-yoso-ni	〜をよそに	Noun + をよそに	ignoring ~ / in defiance of ~
+n1-ni-atte	〜にあって	Noun + にあって	in (a special situation) ~
+n1-ni-itaru-made	〜に至るまで	Noun + に至るまで（にいたるまで）	down to / even to the point of ~
+n1-ni-kataku-nai	〜に難くない	Verb dictionary / Noun + に難くない（にかたくない）	not hard to ~ (easy to imagine)
+n1-ni-soku-shite	〜に即して	Noun + に即して（にそくして）	in line with ~ / based on (the facts) ~
+n1-ni-hikikae	〜にひきかえ	Plain form + の / Noun + にひきかえ	in contrast to ~ / unlike ~
+n1-ni-mo-mashite	〜にもまして	Noun + にもまして	more than ~ / even more than ~
+n1-to-atte	〜とあって	Plain form / Noun + とあって	because of the special situation ~
+n1-towa-ie	〜とはいえ	Plain form / Noun + とはいえ	although ~ / that said ~
+n1-to-iedomo	〜といえども	Noun / plain form + といえども	even ~ / although one says ~
+n1-to-bakari-ni	〜とばかりに	Quote / plain form + とばかりに	as if to say ~
+n1-to-omoikiya	〜と思いきや	Plain form + と思いきや（とおもいきや）	contrary to expectation ~
+n1-madeda	〜までだ / 〜までのことだ	Verb dictionary / た-form + までだ	will simply ~ / that's all ~
+n1-temaeru	〜手前	Verb dictionary / た-form / Noun + の + 手前（てまえ）	given that ~ (and to save face) ~
+n1-gatera	〜がてら	Verb stem / Noun + がてら	while also ~ / on the way to ~
+n1-katawara	〜かたわら	Verb dictionary / Noun + の + かたわら	while also ~ (alongside main activity)
+n1-mamire	〜まみれ	Noun + まみれ	covered in ~ (dirt, sweat…)
+n1-zukume	〜ずくめ	Noun + ずくめ	entirely ~ / nothing but ~
+n1-sura	〜すら / 〜ですら	Noun + すら / ですら	even ~
+n1-dani	〜だに	Verb dictionary / Noun + だに	even just ~ (to do X)
+n1-nakushite	〜なくして（は）	Noun + なくして（は）	without ~ (there can be no) ~
+n1-tomonaru-to	〜ともなると / 〜ともなれば	Verb dictionary / Noun + ともなると / ともなれば	when it comes to ~ / once you become ~
+n1-you-ga-mai-ga	〜（よ）うが／〜まいが	Volitional + が + verb まい + が	whether or not ~
+n1-wa-oroka	〜はおろか	Noun + はおろか	let alone ~ / not to mention ~
+n1-mo-saru-koto-nagara	〜もさることながら	Noun + もさることながら	not to mention ~ / ~ as well as ~
+n1-shimatsu-da	〜始末だ	Verb dictionary form + 始末だ（しまつだ）	end up (badly) ~ / come to the point of ~
+n1-mono-o	〜ものを	Plain form + ものを	if only ~ (but) / and yet ~
+n1-mbakari	〜んばかり	Verb ない-form (drop ない) + んばかり（する→せんばかり）	almost ~ / as if about to ~
+n1-te-yamanai	〜てやまない	Verb て-form + やまない	to ~ deeply (lasting emotion)
+n1-to-aimatte	〜と相まって	Noun + と相まって（とあいまって）	coupled with ~ / combined with ~
+n2x-karatoitte	〜からといって	Plain form + からといって	just because ~ (doesn't mean)
+n2x-toiumonoda	〜というものだ	Noun / plain form + というものだ	that is exactly ~ / that is what you call ~
+n2x-toiumonodewanai	〜というものではない / 〜というものでもない	Plain form + というものではない	it doesn't necessarily mean ~
+n2x-nisuginai	〜にすぎない / 〜に過ぎない	Noun / plain form + にすぎない	merely ~ / nothing more than ~
+n2x-nihokanaranai	〜にほかならない	Noun + にほかならない	is nothing but ~ / is precisely ~
+n2x-nishiro-nishiro	〜にしろ〜にしろ / 〜にせよ〜にせよ	Noun / plain + にしろ + … + にしろ	whether ~ or ~
+n2x-nishiro	〜にしろ / 〜にせよ / 〜にしても	Plain form + にしろ / にせよ / にしても	even if ~ / granting that ~
+n2x-tehajimete	〜てはじめて	Verb て-form + はじめて	not until ~ / only after ~
+n2x-wo-toshite	〜を〜として / 〜とする	Noun を + Noun + として / とする	regard ~ as ~ / take ~ as ~
+n2x-nisaishite	〜に際して	Noun / Verb dictionary + に際して	on the occasion of ~ / when ~
+n2x-niatatte	〜に当たって	Noun / Verb dictionary + に当たって	at the time of ~ / on (undertaking) ~
+n2x-nisakidatte	〜に先立って	Noun / Verb dictionary + に先立って	prior to ~ / in advance of ~
+n2x-wokikkakeni	〜をきっかけに（して）	Noun + をきっかけに	with ~ as a trigger / prompted by ~
+n2x-wokeikini	〜を契機に（して）	Noun + を契機に	taking ~ as a turning point
+n2x-teirai	〜て以来	Verb て-form + 以来（いらい）	ever since ~
+n2x-karatoiumono	〜からというもの	Verb て-form / plain + からというもの	ever since ~ (a lasting change followed)
+n2x-mokamawazu	〜も構わず	Noun / plain form + も構わず	without caring about ~
+n2x-naraizashirazu	〜ならいざしらず / 〜はいざしらず	Noun + ならいざしらず	if it were ~ that'd be one thing, but ~
+n2x-osoregaaru	〜おそれがある	Noun の / Verb dictionary + おそれがある	there is a risk / fear that ~
+n2x-nikimatteiru	〜に決まっている	Plain form + に決まっている	surely ~ / bound to be ~
+n2x-teshouganai	〜てしょうがない / 〜てしかたがない	Verb て / Adjective + てしょうがない	can't help ~ / unbearably ~
+n2x-tetamaranai	〜てたまらない	Verb て / Adjective + てたまらない	unbearably ~ / dying to ~
+n2x-tenaranai	〜てならない	Verb て / Adjective + てならない	can't help feeling ~
+n2x-naidewairarenai	〜ないではいられない	Verb ない-form + ではいられない	can't help but ~
+n2x-gatai	〜がたい	Verb ます-stem + がたい	hard to ~ / difficult to ~
+n2x-dokorodewanai	〜どころではない	Noun / Verb dictionary + どころではない	not the situation for ~ / far from ~
+n2x-warini	〜わりに（は）	Plain form / Noun の + わりに	considering ~ / for ~
+n2x-nishitewa	〜にしては	Noun / plain form + にしては	for ~ / considering it's ~
+n2x-dakenokotowaaru	〜だけのことはある	Plain form / Noun + だけのことはある	no wonder ~ / worthy of ~
+n2x-nominarazu	〜のみならず	Noun / plain form + のみならず	not only ~ but also ~
+n2x-bakarika	〜ばかりか	Plain form / Noun + ばかりか	not only ~ but even ~
+n2x-hamotoyori	〜はもとより	Noun + はもとより	not to mention ~ / let alone ~
+n2x-karaniwa	〜からには	Plain form + からには	now that ~ / since ~ (so naturally)
+n2x-nikakawarazu	〜にかかわらず	Noun / plain (pair) + にかかわらず	regardless of ~ / whether or not ~
+n2x-nomotode	〜のもとで / 〜のもとに	Noun + のもとで / のもとに	under (the guidance / conditions of) ~
+n2x-nisotte	〜に沿って	Noun + に沿って	along ~ / in accordance with ~
+n2x-nihanshite	〜に反して	Noun + に反して	contrary to ~ / against ~
+n2x-tsuke-tsuke	〜につけ（〜につけ）	Verb dictionary + につけ	every time ~ / whether ~ or ~
+n2x-mo-ba-mo	〜も〜ば〜も	Noun も + Verb/Adj ば-form + Noun も	both ~ and ~ / not only ~ but also ~
+n2x-kkiri	〜きり / 〜っきり	Noun + きり / Verb た-form + きり	only ~ / and that was the last ~
+n2x-ge	〜げ	Adjective stem / ます-stem + げ	seeming ~ / looking ~
+n2x-sae	〜さえ	Noun (+ particle) + さえ	even ~
+n2x-nuku	〜抜く	Verb ます-stem + 抜く（ぬく）	do ~ thoroughly to the very end
+n2m-g-65eafc	というものだ	というものだ	something like; something called ~
+n2m-g-31f6cd	得る	得る	can; to be able to; is possible to~
+n2m-g-591e0c	と考えられる/と考えられている	と考えられる/と考えられている	one can think that; it is conceivable that; considered ~
+n2m-g-1fc005	ろくに～ない	ろくに～ない	not well; not enough; improperly; insufficiently; unsatisfactorily ​~
+n2m-g-b8cb69	どうやら	どうやら	possibly; apparently; seems like; somehow; barely ~
+n2m-g-8385bd	ばかりだ	ばかりだ	continue to (go in negative direction)
+n2m-g-b7ac6e	気味	気味	-like; -looking; -looked; tending to ~
+n2m-g-b40189	からといって	からといって	just because; even if; even though ~
+n2m-g-ff2882	にて	にて	in, at, with, by (formal particle)
+n2m-g-879998	につけ～につけ	につけ～につけ	each time, whenever, either way
+n2m-g-bdfe3e	において	において	in; at (place); regarding; as for; in relation to ~
+n2m-g-ad42d6	にともなって	にともなって	as; due to; with; along with; following; accordingly ~
+n2m-g-35040d	ことなく	ことなく	without doing something even once
+n2m-g-475861	をきっかけに/を契機に	をきっかけに/を契機に	with… as a start; as a result of; taking advantage of
+n2m-g-6e693f	からいうと/からいえば/からいって	からいうと/からいえば/からいって	in terms of; from the point of view of ~
+n2m-g-7ce26a	から見ると/から見れば/から見て/から見ても	から見ると/から見れば/から見て/から見ても	from the point of view of; by the look of; judging from ~
+n2m-g-9b08ec	の上で(は)/～上	の上で(は)/～上	according to; from the viewpoint of ~
+n2m-g-f763c8	っぽい	っぽい	seems like; somewhat; -ish; easily does; often does ~
+n2m-g-9a5624	まま(に)	まま(に)	as, to do as ~
+n2m-g-5cc605	折には	折には	when the chance to 〜 comes
+n2m-g-806f32	上に	上に	as well; besides; in addition to; not only… but also ~
+n2m-g-912f4b	ずに済む	ずに済む	get by without doing ~
+n2m-g-360465	からすると/からすれば/からしたら	からすると/からすれば/からしたら	judging from; considering; by the look of ~
+n2m-g-ea9a33	にしたら	にしたら	from one's perspective; from the point of view of ~
+n2m-g-4312a7	ては～ては	ては～ては	repetitive situations/actions
+n2m-g-707325	ばかりか	ばかりか	not only… but also; as well as ~
+n2m-g-b1ac40	てはならない	てはならない	must not; cannot; should not ~
+n2m-g-69f9c4	からして	からして	judging from; based on; since; from; even ~
+n2m-g-7b947b	ふしがある	ふしがある	Seem
+
+## Output format
+
+Return ONLY lines of `id<TAB>register`, one per input line, no header, no
+commentary, no code fence. Example:
+
+n3m-g-1a2b3c	neutral
+n1m-g-0f01e6	literary
+n2m-g-b0bf1e	casual?

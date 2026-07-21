@@ -183,9 +183,15 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     category: 'Study',
     lsKeys: [
       'jp-word-knowledge',
+      'jp-word-knowledge-ja',
+      'jp-word-knowledge-zh',
       'jp-level-lists',
       'jp-saved-words',
+      'jp-saved-words-ja',
+      'jp-saved-words-zh',
       'jp-study-stats-v1',
+      'jp-study-stats-v1-ja',
+      'jp-study-stats-v1-zh',
       'jp-novels-planned',
     ],
     clearable: true,
@@ -301,6 +307,27 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     category: 'Study',
     hostKey: 'profiles',
     clearable: false,
+  },
+  {
+    id: 'blanc-toolbox',
+    label: 'Blanc Toolbox (local)',
+    description:
+      'Blanc-only launcher/tab state, quick notes, and toolbox settings — shared storage engine, but not treated as study memory.',
+    category: 'Data',
+    lsPrefixes: ['jp-study.blanc.', 'jp-blanc-'],
+    lsKeys: ['jp-study.toolbox.settings.v1'],
+    clearable: true,
+    clearConfirm: 'Clear Blanc Toolbox local state (quick notes, tabs, layout)?',
+  },
+  {
+    id: 'game-arena-progress',
+    label: 'Game Arena progress',
+    description:
+      'XP, streaks, high scores, and per-game seen-item coverage — intentionally separate from study memory; not shared between Blanc and Study OS beyond being the same install.',
+    category: 'Data',
+    lsPrefixes: ['jp-game-'],
+    clearable: true,
+    clearConfirm: 'Reset all Game Arena progress and high scores?',
   },
 ];
 

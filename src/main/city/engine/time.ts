@@ -1,126 +1,72 @@
-/**
- * Noctis Simulation Engine — elapsed-time evaluation D(S, delta-t).
- *
- * Implements SIMULATION_SYSTEMS.md Section 5 exactly: cushion before decay,
- * dormancy last, and hibernation as a fixed point of further evaluation.
- * Duration enters the engine exactly once, as the argument here; nothing
- * ticks, waits, or schedules (Section 1, hidden timers forbidden).
- *
- * Every process is composable: evaluating over delta-t equals evaluating over
- * any partition of delta-t into consecutive sub-intervals (Section 4), so the
- * lazy checkpoint model is exact, not approximate.
- *
- * D acts on the renewable-expression class only. It never touches legacy —
- * kTotal, memory, era, succession, network masses, population count all pass
- * through untouched (Law 5) — and the difference between presence and absence
- * is luminosity and active vitality, never legacy (Section 5).
- */
-
-import { CivilizationState, InterpretedLearningInput } from './types';
 import {
-  CRYSTAL_DAMP_MAX,
-  CRYSTAL_DAMP_SCALE,
-  DORMANCY_ILLUMINATION_THRESHOLD,
+  ACTIVE_DOMAIN_DECAY_RATE,
+  ACTIVITY_DECAY_RATE,
+  CIRCULATION_DECAY_RATE,
+  CRYSTAL_DAMPING_MAX,
+  DORMANCY_ILLUMINATION,
   ENERGY_DISCHARGE_PER_MINUTE,
-  LAMBDA_ACTIVITY,
-  LAMBDA_CIRCULATION,
-  LAMBDA_ILLUMINATION,
-  LAMBDA_MOMENTUM,
-  LAMBDA_RESERVOIR,
-  LAMBDA_STABILITY,
+  ILLUMINATION_DECAY_RATE,
   REAWAKENING_MINUTES,
+  RESERVOIR_DECAY_RATE,
 } from './constants';
 import { cloneState } from './state';
+import { CivilizationState, InterpretedLearningInput } from './types';
+import { clamp, saturating, unit } from './math';
 
-/**
- * Protective damping from accumulated crystal structure:
- * lambda_effective = lambda * (1 - damp), 0 <= damp < 1
- * (SIMULATION_SYSTEMS.md Section 5, Phase 2). Deep lattices slow the dimming;
- * they never stop it.
- */
-function crystalDamping(crystalMass: number): number {
-  return (CRYSTAL_DAMP_MAX * crystalMass) / (crystalMass + CRYSTAL_DAMP_SCALE);
+function decay(value: number, rate: number, minutes: number): number {
+  return value * Math.exp(-rate * minutes);
 }
 
-function decayFactor(lambda: number, damping: number, minutes: number): number {
-  return Math.exp(-lambda * (1 - damping) * minutes);
-}
-
-/**
- * The elapsed-time evaluation D(S, delta-t). Pure: returns a fresh snapshot,
- * never mutating its input (ARCHITECTURE.md Section 2 immutability).
- */
-export function applyElapsedTime(
-  state: CivilizationState,
-  elapsedMinutes: number,
-): CivilizationState {
-  // Hibernation is a fixed point: D(S_hibernating, dt) = S_hibernating for
-  // every dt. Dormancy never compounds, never deepens, never accrues debt.
-  if (state.status === 'hibernating') return state;
-  if (!(elapsedMinutes > 0)) return state;
-
+export function applyElapsedTime(state: CivilizationState, elapsedMinutes: number): CivilizationState {
   const next = cloneState(state);
-  const env = next.environment;
+  const elapsed = Number.isFinite(elapsedMinutes) ? Math.max(0, elapsedMinutes) : 0;
+  if (elapsed === 0 || next.status === 'hibernating') return next;
 
-  // Phase 1 — the energy cushion. Stored cognitive energy absorbs decay
-  // first, discharging linearly (a battery supplying a constant need).
-  const shieldableMinutes = env.energy / ENERGY_DISCHARGE_PER_MINUTE;
-  const shieldedMinutes = Math.min(elapsedMinutes, shieldableMinutes);
-  env.energy = Math.max(0, env.energy - ENERGY_DISCHARGE_PER_MINUTE * shieldedMinutes);
-  const decayMinutes = elapsedMinutes - shieldedMinutes;
+  const shielded = Math.min(elapsed, next.ecology.energy / ENERGY_DISCHARGE_PER_MINUTE);
+  next.ecology.energy = Math.max(0, next.ecology.energy - shielded * ENERGY_DISCHARGE_PER_MINUTE);
+  const exposed = elapsed - shielded;
+  if (exposed <= 0) return next;
 
-  if (decayMinutes > 0) {
-    // Phase 2 — renewable decay, damped by protective crystal structure.
-    const damping = crystalDamping(env.crystalMass);
+  const damping = clamp(saturating(next.ecology.crystalRecord, 140) * CRYSTAL_DAMPING_MAX, 0, CRYSTAL_DAMPING_MAX);
+  const factor = 1 - damping;
+  next.ecology.illumination = unit(decay(next.ecology.illumination, ILLUMINATION_DECAY_RATE * factor, exposed));
+  next.ecology.circulation = unit(decay(next.ecology.circulation, CIRCULATION_DECAY_RATE * factor, exposed));
+  next.ecology.reservoirs.brine = decay(next.ecology.reservoirs.brine, RESERVOIR_DECAY_RATE * factor, exposed);
+  next.ecology.reservoirs.glucans = decay(next.ecology.reservoirs.glucans, RESERVOIR_DECAY_RATE * factor, exposed);
+  next.ecology.reservoirs.catalysts = decay(next.ecology.reservoirs.catalysts, RESERVOIR_DECAY_RATE * factor, exposed);
+  next.ecology.mycelialActivity = decay(next.ecology.mycelialActivity, ACTIVITY_DECAY_RATE * factor, exposed);
+  next.ecology.crystalActivity = decay(next.ecology.crystalActivity, ACTIVITY_DECAY_RATE * factor, exposed);
+  next.citizen.activity = unit(decay(next.citizen.activity, ACTIVITY_DECAY_RATE * factor, exposed));
+  next.technology.activePractice = unit(decay(next.technology.activePractice, ACTIVE_DOMAIN_DECAY_RATE * factor, exposed));
+  next.culture.activeExpression = unit(decay(next.culture.activeExpression, ACTIVE_DOMAIN_DECAY_RATE * factor, exposed));
+  next.economy.activeCoordination = unit(decay(next.economy.activeCoordination, ACTIVE_DOMAIN_DECAY_RATE * factor, exposed));
 
-    env.illumination *= decayFactor(LAMBDA_ILLUMINATION, damping, decayMinutes);
-    env.circulation *= decayFactor(LAMBDA_CIRCULATION, damping, decayMinutes);
-    env.reservoirs.brine *= decayFactor(LAMBDA_RESERVOIR, damping, decayMinutes);
-    env.reservoirs.glucans *= decayFactor(LAMBDA_RESERVOIR, damping, decayMinutes);
-    env.reservoirs.catalysts *= decayFactor(LAMBDA_RESERVOIR, damping, decayMinutes);
-    next.citizens.activity *= decayFactor(LAMBDA_ACTIVITY, damping, decayMinutes);
-    next.learning.momentum *= decayFactor(LAMBDA_MOMENTUM, damping, decayMinutes);
-
-    // Stability is the exception: absence is quiet, not turbulence. The
-    // fortification posture relaxes back toward calm (1) over elapsed time —
-    // recovery, never loss, and still composable exponential form.
-    env.stability = 1 - (1 - env.stability) * decayFactor(LAMBDA_STABILITY, 0, decayMinutes);
-
-    // Phase 3 — the hibernation transition, a single structural change once
-    // illumination falls beneath theta_dormancy. Population, memory, era,
-    // succession, kTotal, and network masses hold exactly.
-    if (env.illumination < DORMANCY_ILLUMINATION_THRESHOLD) {
-      next.status = 'hibernating';
-      env.illumination = 0;
-      env.circulation = 0; // circulation is still
-      next.citizens.activity = 0; // the citizens keep a quiet night watch indoors
-      next.learning.momentum = 0;
-    }
-  }
-
+  if (next.ecology.illumination < DORMANCY_ILLUMINATION) enterHibernation(next);
   return next;
 }
 
-/**
- * Reawakening (SIMULATION_SYSTEMS.md Section 5): the first study session of
- * the canonical ten-minute length processed while hibernating transitions the
- * status back to active before the learning evaluation applies. A shorter
- * session is honored — its influence banks quietly — but the structural wake
- * awaits the canonical session, so the city does not flicker awake at a stray
- * half-minute of attention.
- */
-export function wakeIfEligible(
-  state: CivilizationState,
-  input: InterpretedLearningInput,
-): CivilizationState {
-  if (state.status !== 'hibernating') return state;
-  if (input.focusDuration < REAWAKENING_MINUTES) return state;
+function enterHibernation(state: CivilizationState): void {
+  state.status = 'hibernating';
+  state.ecology.illumination = 0;
+  state.ecology.circulation = 0;
+  state.ecology.mycelialActivity = 0;
+  state.ecology.crystalActivity = 0;
+  state.citizen.activity = 0;
+  state.technology.activePractice = 0;
+  state.culture.activeExpression = 0;
+  state.economy.activeCoordination = 0;
+}
 
+export function canWake(input: InterpretedLearningInput): boolean {
+  return input.focusDuration >= REAWAKENING_MINUTES;
+}
+
+export function wake(state: CivilizationState, input: InterpretedLearningInput): CivilizationState {
   const next = cloneState(state);
+  if (next.status !== 'hibernating' || !canWake(input)) return next;
   next.status = 'active';
-  // The world relights from its preserved structure: the first hearth-glow
-  // returns at the dormancy threshold; the learning evaluation that follows
-  // raises it further.
-  next.environment.illumination = DORMANCY_ILLUMINATION_THRESHOLD;
+  next.ecology.illumination = unit(0.16 + Math.min(0.24, input.focusDuration / 180));
+  next.ecology.circulation = unit(0.08 + Math.min(0.2, input.focusDuration / 240));
+  next.citizen.activity = unit(0.12 + input.profile.sustainedAttention * 0.25);
   return next;
 }

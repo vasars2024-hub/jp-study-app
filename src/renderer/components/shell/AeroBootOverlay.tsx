@@ -13,6 +13,8 @@
  * Mounted by DesktopShell and driven by the Phase 5 lifecycle state module.
  */
 import { useEffect, useState } from 'react';
+import { useT } from '../../i18n';
+import AeroBootGlobe from './AeroBootGlobe';
 import {
   getSecretLifecycleState,
   reduceSecretLifecycleMotion,
@@ -26,49 +28,49 @@ import {
 const HIDDEN = new Set<SecretLifecyclePhase>(['inactive', 'active']);
 const BOOT_ORDER: SecretLifecyclePhase[] = ['preboot', 'boot', 'welcome', 'reveal'];
 
-function phaseSub(phase: SecretLifecyclePhase): string {
+function phaseSubKey(phase: SecretLifecyclePhase): string {
   switch (phase) {
     case 'preboot':
-      return 'Checking desktop profile';
+      return 'aero.boot.sub.preboot';
     case 'boot':
-      return 'Forming coastline kernel';
+      return 'aero.boot.sub.boot';
     case 'welcome':
-      return 'Desktop profile ready';
+      return 'aero.boot.sub.welcome';
     case 'reveal':
-      return 'Opening desktop';
+      return 'aero.boot.sub.reveal';
     case 'sleeping':
-      return 'Press any key or click to wake';
+      return 'aero.boot.sub.sleeping';
     case 'waking':
-      return 'Restoring desktop light';
+      return 'aero.boot.sub.waking';
     case 'shutting-down':
-      return 'Saving session and closing';
+      return 'aero.boot.sub.shuttingDown';
     case 'safe-fallback':
-      return 'Safe fallback';
+      return 'aero.boot.sub.safeFallback';
     default:
-      return 'Frutiger Aero';
+      return 'aero.boot.sub.default';
   }
 }
 
-function phaseKicker(phase: SecretLifecyclePhase): string {
+function phaseKickerKey(phase: SecretLifecyclePhase): string {
   switch (phase) {
     case 'preboot':
-      return 'Secret gate';
+      return 'aero.boot.kicker.preboot';
     case 'boot':
-      return 'Aero edition';
+      return 'aero.boot.kicker.boot';
     case 'welcome':
-      return 'Welcome';
+      return 'aero.boot.kicker.welcome';
     case 'reveal':
-      return 'Desktop reveal';
+      return 'aero.boot.kicker.reveal';
     case 'sleeping':
-      return 'Quiet mode';
+      return 'aero.boot.kicker.sleeping';
     case 'waking':
-      return 'Restoring';
+      return 'aero.boot.kicker.waking';
     case 'shutting-down':
-      return 'Session close';
+      return 'aero.boot.kicker.shuttingDown';
     case 'safe-fallback':
-      return 'Fallback';
+      return 'aero.boot.kicker.safeFallback';
     default:
-      return 'Secret OS';
+      return 'aero.boot.kicker.default';
   }
 }
 
@@ -81,13 +83,14 @@ function bootStepState(phase: SecretLifecyclePhase, step: SecretLifecyclePhase):
   return '';
 }
 
-function primaryControlLabel(phase: SecretLifecyclePhase): string {
-  if (phase === 'welcome') return 'Enter desktop';
-  if (phase === 'waking') return 'Restore now';
-  return 'Skip';
+function primaryControlKey(phase: SecretLifecyclePhase): string {
+  if (phase === 'welcome') return 'aero.boot.enterDesktop';
+  if (phase === 'waking') return 'aero.boot.restoreNow';
+  return 'aero.boot.skip';
 }
 
 export default function AeroBootOverlay() {
+  const { t } = useT();
   const [lifecycle, setLifecycle] = useState(getSecretLifecycleState);
 
   useEffect(() => subscribeSecretLifecycle(setLifecycle), []);
@@ -129,8 +132,8 @@ export default function AeroBootOverlay() {
   const exiting = phase === 'reveal' || phase === 'waking';
   const isSystemClose = phase === 'shutting-down' || phase === 'sleeping';
   const showBootSteps = BOOT_ORDER.includes(phase);
-  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const date = new Date().toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  const now = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const date = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   const classes = [
     'os-aero-boot',
     `phase-${phase}`,
@@ -164,8 +167,9 @@ export default function AeroBootOverlay() {
             <span />
           </div>
           <div className="os-aero-boot-orb">
-            <span className="os-aero-boot-leaf" />
+            <AeroBootGlobe reducedMotion={lifecycle.reducedMotion} />
           </div>
+          <div className="os-aero-boot-webmark">{t('aero.boot.webmark')}</div>
           <div className="os-aero-boot-bubbles">
             <span />
             <span />
@@ -173,10 +177,10 @@ export default function AeroBootOverlay() {
             <span />
           </div>
         </div>
-        <div className="os-aero-boot-kicker">{phaseKicker(phase)}</div>
-        <div className="os-aero-boot-title">Secret Study OS</div>
-        <div className="os-aero-boot-edition">Aero Edition</div>
-        <div className="os-aero-boot-sub">{phaseSub(phase)}</div>
+        <div className="os-aero-boot-kicker">{t(phaseKickerKey(phase))}</div>
+        <div className="os-aero-boot-title">{t('aero.boot.title')}</div>
+        <div className="os-aero-boot-edition">{t('aero.boot.edition')}</div>
+        <div className="os-aero-boot-sub">{t(phaseSubKey(phase))}</div>
         {showBootSteps && !isSystemClose && (
           <div className="os-aero-boot-steps" aria-hidden="true">
             {BOOT_ORDER.map((step) => (
@@ -187,47 +191,47 @@ export default function AeroBootOverlay() {
         {phase === 'welcome' && (
           <div className="os-aero-boot-welcome os-aero-boot-welcome-panel">
             <div>
-              <span>Desktop profile</span>
-              <strong>Personal study desktop</strong>
+              <span>{t('aero.boot.profileLabel')}</span>
+              <strong>{t('aero.boot.profileValue')}</strong>
             </div>
             <div>
               <span>{date}</span>
               <strong>{now}</strong>
             </div>
             <div>
-              <span>Motion</span>
-              <strong>{lifecycle.reducedMotion ? 'Reduced' : 'Full'}</strong>
+              <span>{t('aero.boot.motionLabel')}</span>
+              <strong>{lifecycle.reducedMotion ? t('aero.boot.motionReducedShort') : t('aero.boot.motionFull')}</strong>
             </div>
             <div>
-              <span>Sound</span>
-              <strong>{lifecycle.muted ? 'Muted' : 'On'}</strong>
+              <span>{t('aero.boot.soundLabel')}</span>
+              <strong>{lifecycle.muted ? t('aero.boot.soundMuted') : t('aero.boot.soundOn')}</strong>
             </div>
           </div>
         )}
         {phase === 'sleeping' && (
           <div className="os-aero-boot-sleep-card">
             <span className="os-aero-boot-sleep-line" aria-hidden />
-            <strong>Secret OS is asleep</strong>
-            <span>Desktop animation, particles, and companions are paused.</span>
+            <strong>{t('aero.boot.sleepTitle')}</strong>
+            <span>{t('aero.boot.sleepBody')}</span>
           </div>
         )}
         {phase === 'waking' && (
           <div className="os-aero-boot-welcome os-aero-boot-resume-panel">
-            <span>Restoring session</span>
+            <span>{t('aero.boot.resumeLabel')}</span>
             <strong>{now}</strong>
           </div>
         )}
         {phase === 'shutting-down' && (
           <div className="os-aero-boot-sleep-card">
             <span className="os-aero-boot-sleep-line" aria-hidden />
-            <strong>Closing Secret OS</strong>
-            <span>Saving desktop state before returning to Study OS.</span>
+            <strong>{t('aero.boot.shutdownTitle')}</strong>
+            <span>{t('aero.boot.shutdownBody')}</span>
           </div>
         )}
         {phase === 'safe-fallback' && (
           <div className="os-aero-boot-welcome">
-            <span>Effects bypassed</span>
-            <strong>Safe reveal</strong>
+            <span>{t('aero.boot.fallbackLabel')}</span>
+            <strong>{t('aero.boot.fallbackValue')}</strong>
           </div>
         )}
         <div className="os-aero-boot-controls">
@@ -238,7 +242,7 @@ export default function AeroBootOverlay() {
               onPointerDown={(e) => e.stopPropagation()}
               onClick={requestSecretLifecycleWake}
             >
-              Wake
+              {t('aero.boot.wake')}
             </button>
           ) : (
             <button
@@ -248,7 +252,7 @@ export default function AeroBootOverlay() {
               onPointerDown={(e) => e.stopPropagation()}
               onClick={skipSecretLifecycle}
             >
-              {primaryControlLabel(phase)}
+              {t(primaryControlKey(phase))}
             </button>
           )}
           <button
@@ -257,7 +261,7 @@ export default function AeroBootOverlay() {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setSecretLifecycleMuted(!lifecycle.muted)}
           >
-            {lifecycle.muted ? 'Unmute' : 'Mute'}
+            {lifecycle.muted ? t('aero.boot.unmute') : t('aero.boot.mute')}
           </button>
           <button
             type="button"
@@ -266,7 +270,7 @@ export default function AeroBootOverlay() {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={reduceSecretLifecycleMotion}
           >
-            {lifecycle.reducedMotion ? 'Motion reduced' : 'Reduce motion'}
+            {lifecycle.reducedMotion ? t('aero.boot.motionReduced') : t('aero.boot.reduceMotion')}
           </button>
         </div>
       </div>

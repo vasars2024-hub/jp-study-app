@@ -20,6 +20,12 @@ export interface ShellNotification {
   read: boolean;
   source?: string;
   priority?: NotificationPriority;
+  /** Optional deep-link / release page opened from the notification center. */
+  actionUrl?: string;
+  /** In-app action when the notice is not an external URL. */
+  clientAction?: 'extension-settings';
+  /** Stable client key used to replace an earlier notice for the same event. */
+  clientId?: string;
 }
 
 const LS_KEY = 'jp-os-notifications-v1';
@@ -80,19 +86,36 @@ export interface NotifyInput {
   kind?: NotificationKind;
   source?: string;
   priority?: NotificationPriority;
+  actionUrl?: string;
+  clientAction?: 'extension-settings';
+  /**
+   * When set, replaces any existing unread/read notice with the same clientId
+   * so repeated release checks do not spam the center.
+   */
+  id?: string;
+  /**
+   * Passive log-only entry (WIRED ARCHIVE bulletin fiction): recorded in the
+   * center's history already-read, with no sound/arc dispatch and no badge.
+   */
+  silent?: boolean;
 }
 
 export function notify(input: NotifyInput): ShellNotification {
+  const { silent, id: clientId, ...rest } = input;
+  if (clientId) {
+    items = items.filter((n) => n.clientId !== clientId);
+  }
   const item: ShellNotification = {
     id: ++seq,
     ts: Date.now(),
-    read: false,
+    read: !!silent,
     kind: 'default',
-    ...input,
+    clientId,
+    ...rest,
   };
   items = [item, ...items].slice(0, CAP);
   persist();
-  if (!isDnd()) {
+  if (!silent && !isDnd()) {
     window.dispatchEvent(new CustomEvent<ShellNotification>(SOUND_EVENT, { detail: item }));
   }
   return item;

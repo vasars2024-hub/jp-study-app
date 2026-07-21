@@ -672,7 +672,7 @@ export default function NovelReader({ item, onClose }: Props) {
       measureWin();
       return;
     }
-    const typoKey = `${settings.fontSize}|${settings.lineHeight}|${settings.sideMargin}|${settings.fontWeight}`;
+    const typoKey = `${settings.fontSize}|${settings.lineHeight}|${settings.sideMargin}|${settings.contentWidth}|${settings.fontWeight}`;
     const typoReflow = typoKeyRef.current !== typoKey;
     typoKeyRef.current = typoKey;
     if (typoReflow) {
@@ -1920,7 +1920,7 @@ export default function NovelReader({ item, onClose }: Props) {
   } else {
     contentStyle = {
       ...contentStyle,
-      maxWidth: '46rem',
+      maxWidth: `${settings.contentWidth}rem`,
       margin: '0 auto',
       padding: `${GUTTER}px calc(${settings.sideMargin}% + ${GUTTER}px)`,
     };
@@ -2187,6 +2187,7 @@ export default function NovelReader({ item, onClose }: Props) {
               noteLookupPointerDown(e);
               lastPointerRef.current = { x: e.clientX, y: e.clientY };
             }}
+            data-dict-owner=""
             onMouseUp={onMouseUp}
           >
             <div
@@ -2210,6 +2211,7 @@ export default function NovelReader({ item, onClose }: Props) {
             onMouseMove={(e) => {
               lastPointerRef.current = { x: e.clientX, y: e.clientY };
             }}
+            data-dict-owner=""
             onMouseUp={onMouseUp}
           >
             {paged ? (

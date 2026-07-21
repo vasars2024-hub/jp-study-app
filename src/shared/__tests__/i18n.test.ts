@@ -133,4 +133,35 @@ describe('catalog hygiene', () => {
       expect(missing, `${lang} is missing translations for: ${missing.join(', ')}`).toEqual([]);
     }
   });
+
+  it('actually translates the grammar taxonomy, not just fills the keys in', () => {
+    /*
+     * Key-presence checks (this file's test above, and tools/i18n-check.cjs)
+     * both report clean when a block is spread into all four catalogs as one
+     * shared object — GAME_ARENA_CHROME does exactly that, leaving 105 games.*
+     * keys as English in ja/zh/ru while every checker says "fully translated".
+     *
+     * The taxonomy block is authored as four separate per-language records
+     * specifically to avoid that. This asserts it stayed that way. Scoped to
+     * grammar.* on purpose: it is a guard for the block that was written
+     * correctly, not a claim that the rest of the catalog is clean.
+     */
+    const taxonomyKeys = Object.keys(en).filter(
+      (k) =>
+        k.startsWith('grammar.cat') ||
+        k.startsWith('grammar.filter') ||
+        k.startsWith('grammar.register') ||
+        k.startsWith('grammar.flag'),
+    );
+    expect(taxonomyKeys.length).toBeGreaterThan(150);
+
+    const untranslated = taxonomyKeys.filter(
+      (k) =>
+        CATALOGS.ja[k] === en[k] && CATALOGS.zh[k] === en[k] && CATALOGS.ru[k] === en[k],
+    );
+    expect(
+      untranslated,
+      `these grammar keys are still English in every language: ${untranslated.join(', ')}`,
+    ).toEqual([]);
+  });
 });

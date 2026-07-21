@@ -2,12 +2,32 @@ import { describe, expect, it } from 'vitest';
 import {
   FIELD_SEP,
   extractExpressions,
+  looksLikeUpgradeStub,
   parseModels,
   pickExpressionOrd,
   splitFields,
   stripFieldHtml,
   type AnkiModels,
 } from '../apkgParse';
+
+// A modern .apkg ships a decoy `collection.anki2` next to the real zstd
+// `collection.anki21b`, holding one note that tells old clients to upgrade.
+// Reading the decoy imports exactly one bogus word and looks like a successful
+// import — this is what produced "1 cards → 1 words" on a real deck.
+describe('legacy upgrade-stub detection', () => {
+  it('flags the single-note upgrade decoy', () => {
+    expect(
+      looksLikeUpgradeStub(['Please update to the latest Anki version to view this deck.'], 1),
+    ).toBe(true);
+    expect(looksLikeUpgradeStub(['Update Anki to open this file'], 1)).toBe(true);
+  });
+
+  it('does not flag a real deck', () => {
+    expect(looksLikeUpgradeStub(['食べる', '飲む', '新しい'], 3)).toBe(false);
+    // A tiny real deck must still import, even at one note.
+    expect(looksLikeUpgradeStub(['食べる'], 1)).toBe(false);
+  });
+});
 
 describe('stripFieldHtml', () => {
   it('strips [sound:…] tags', () => {

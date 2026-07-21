@@ -1,3 +1,4 @@
+import { useT } from '../../i18n';
 import { Button } from '../ui';
 import { Dialog } from '../ui/Dialog';
 
@@ -8,24 +9,24 @@ type Props = {
 };
 
 export default function ImportMergeModal({ rowCount, onClose, onChoose }: Props) {
+  const { t } = useT();
   return (
     <Dialog
       open
       onClose={onClose}
-      title="Import data"
+      title={t('csv.import.title')}
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={() => onChoose('append')}>Append to bottom</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={() => onChoose('append')}>{t('csv.import.append')}</Button>
           <Button variant="primary" onClick={() => onChoose('overwrite')}>
-            Overwrite grid
+            {t('csv.import.overwrite')}
           </Button>
         </>
       }
     >
       <p className="muted csv-editor-modal-lead">
-        The grid already has data. Choose how to merge the incoming {rowCount} row
-        {rowCount === 1 ? '' : 's'}.
+        {t('csv.import.mergeLead', { count: rowCount })}
       </p>
     </Dialog>
   );

@@ -60,9 +60,21 @@ export interface YomitanDictInfo {
   glossLangOverride?: string;
 }
 
+/** Conjugation trace when the query was matched via de-inflection (see shared/deinflect.ts). */
+export interface DeinflectionInfo {
+  /** The surface form the user looked up (e.g. 食べさせられた). */
+  source: string;
+  /** The dictionary form matched (e.g. 食べる). */
+  term: string;
+  /** Reasons inner→outer (e.g. ['causative', 'passive/potential', 'past']). */
+  reasons: string[];
+}
+
 export interface DictResult {
   query: string;
   entries: DictEntry[];
+  /** Present when `entries` were found by de-inflecting a conjugated `query`. */
+  deinflection?: DeinflectionInfo;
   /** Set when the lookup itself failed (e.g. offline). */
   error?: string;
 }
@@ -99,6 +111,18 @@ export interface MediaItem {
   lastPlayedAt?: number;
   /** Resume position in seconds. */
   positionSec?: number;
+  /** Phase 5b: video vs audio vs long-form audio. */
+  kind?: import('./mediaKind').MediaKind;
+  /** Optional duration from probe (seconds). */
+  durationSec?: number;
+  /** Detected / user language tag (e.g. ja, zh). */
+  lang?: string;
+  /** Per-file subtitle sync offset in seconds (Phase 5b). */
+  subOffsetSec?: number;
+  /** Original remote URL when imported from YouTube / web. */
+  sourceUrl?: string;
+  /** YouTube video id when known (playlist manager / yt-dlp). */
+  youtubeId?: string;
 }
 
 /** Returned when a media file is opened: the library item + a playable URL. */
@@ -106,12 +130,24 @@ export interface MediaOpen {
   item: MediaItem;
   /** A playfile:// URL the renderer can put in a <video>/<audio> src. */
   url: string;
+  /** Optional subtitle file downloaded beside remote media. */
+  subtitle?: SubtitlePick;
 }
 
 export interface SubtitlePick {
   name: string;
   /** Raw subtitle file text (.srt/.vtt/.ass), parsed in the renderer. */
   text: string;
+}
+
+export type YouTubeSubtitleLang = 'none' | 'ja' | 'zh' | 'en' | 'ru';
+
+export interface YouTubeDownloadOptions {
+  audioOnly?: boolean;
+  /** Download existing creator-provided subtitles only; auto captions are not requested. */
+  subtitleLang?: YouTubeSubtitleLang;
+  /** Multiple official subtitle langs (playlist manager preferSubs). */
+  subtitleLangs?: Array<Exclude<YouTubeSubtitleLang, 'none'>>;
 }
 
 // ----- Anki (AnkiConnect) -------------------------------------------------
@@ -159,6 +195,49 @@ export interface LibraryItem {
 
   /** User-made library folder this item is filed under (undefined = unfiled). */
   folder?: string;
+
+  /**
+   * Chrome-extension Inbox metadata (Phase 9). Present on articles sent via
+   * the loopback bridge; omitted for normal file imports.
+   */
+  inboxMeta?: {
+    sourceUrl: string;
+    contentHash: string;
+    lang: 'ja' | 'zh' | 'en' | 'unknown';
+    charCount: number;
+    estMinutes: number;
+    /** 0..1 — filled by renderer enrich pass. */
+    knownRatio: number;
+    levelEstimate: 1 | 2 | 3 | 4 | 5 | 6 | 7 | null;
+    receivedAt: number;
+    /** Plain-text sample for comprehensibility enrich (capped). */
+    textSample?: string;
+  };
+
+  /**
+   * Level stats for file-imported EPUBs (no inboxMeta). Filled by the same
+   * known-ratio enrich path used for Inbox articles so sort/filter/chips work.
+   */
+  levelMeta?: {
+    lang: 'ja' | 'zh' | 'en' | 'unknown';
+    knownRatio: number;
+    levelEstimate: 1 | 2 | 3 | 4 | 5 | 6 | 7 | null;
+  };
+
+  /**
+   * Manga OCR / translate volume status (denormalized for library cover badges).
+   * Source of truth for page data remains under `<item>/_ocr/`.
+   */
+  ocrMeta?: {
+    /** Pages with an OCR cache file. */
+    ocrPages: number;
+    /** Pages with a persisted translation for `targetLang`. */
+    translatedPages: number;
+    targetLang?: string;
+    /** Set when the volume is fully OCR'd and (if requested) translated. */
+    completedAt?: number;
+    updatedAt: number;
+  };
 
   progress?: Progress;
 }

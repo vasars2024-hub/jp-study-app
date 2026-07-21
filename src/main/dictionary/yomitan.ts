@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
-import type { DictEntry, DictResult, DictSense, YomitanDictInfo } from '../../shared/types';
+import type { DeinflectionInfo, DictEntry, DictResult, DictSense, YomitanDictInfo } from '../../shared/types';
+import { deinflect } from '../../shared/deinflect';
 import { mt } from '../i18n';
 
 interface StoredGlossaryEntry {
@@ -793,6 +794,32 @@ export function lookupGlossary(term: string): DictEntry[] {
   return lookupOffline(term);
 }
 
+/**
+ * Offline glossary lookup that first tries the exact query, then de-inflects a
+ * conjugated form and looks up each candidate dictionary root (ranked shortest
+ * chain first) — returning the first that exists, tagged with its conjugation
+ * path. This is what makes 食べさせられた resolve to 食べる offline; before it,
+ * only the online Jisho fallback deinflected, so offline conjugated lookups
+ * silently failed.
+ */
+export function lookupOfflineDeinflected(query: string): {
+  entries: DictEntry[];
+  deinflection?: DeinflectionInfo;
+} {
+  const q = normalizeQuery(query);
+  if (!q) return { entries: [] };
+  const direct = lookupOffline(q);
+  if (direct.length) return { entries: direct };
+  for (const cand of deinflect(q)) {
+    if (cand.reasons.length === 0) continue; // identity == the exact miss above
+    const hit = lookupOffline(cand.term);
+    if (hit.length) {
+      return { entries: hit, deinflection: { source: q, term: cand.term, reasons: cand.reasons } };
+    }
+  }
+  return { entries: [] };
+}
+
 /** Hash of enabled glossary dictionaries — used to invalidate gloss cache. */
 export function getDictRegistryHash(): string {
   const enabled = dictList.filter((d) => d.enabled !== false && d.hasTerms);
@@ -807,10 +834,14 @@ export async function lookupTermMerged(
   const q = normalizeQuery(query);
   if (!q) return { query: q, entries: [] };
 
-  const offline = lookupOffline(q);
-  if (offline.length) return { query: q, entries: offline };
+  // Exact match, then de-inflected candidates, against the offline glossary dicts.
+  const local = lookupOfflineDeinflected(q);
+  if (local.entries.length) {
+    return { query: q, entries: local.entries, deinflection: local.deinflection };
+  }
 
-  // No glossary dict — try enriching a Jisho hit with local pitch/freq.
+  // No offline hit — try enriching a Jisho hit with local pitch/freq. Jisho does
+  // its own server-side de-inflection, so the surface form is the right query.
   const jisho = await jishoFallback(q);
   if (!jisho.entries.length) return jisho;
 

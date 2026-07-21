@@ -3,6 +3,9 @@ import type { GrammarPoint } from './types';
 export const N4: GrammarPoint[] = [
   {
     id: 'n4-nakereba-naranai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['necessary-obligation'],
     categories: ['obligation.necessity'],
     level: 'N4',
     title: '〜なければならない',
@@ -17,6 +20,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-nakutemo-ii',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['allow'],
     categories: ['obligation.necessity', 'possibility.permission'],
     level: 'N4',
     title: '〜なくてもいい',
@@ -29,6 +35,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ta-hou-ga-ii',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['advice'],
     categories: ['request.advice'],
     level: 'N4',
     title: '〜ほうがいい',
@@ -43,6 +52,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-tsumori',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['intent'],
     categories: ['purpose.intention', 'volition.will'],
     level: 'N4',
     title: '〜つもりだ',
@@ -56,6 +68,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-yotei',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['plan'],
     categories: ['purpose.plan'],
     level: 'N4',
     title: '〜予定だ',
@@ -69,6 +84,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-potential',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['ability'],
     categories: ['possibility.ability', 'voice.form'],
     level: 'N4',
     title: 'Potential form (〜られる / 〜える)',
@@ -83,6 +101,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-koto-ga-dekiru',
+    functions: ['finish'],
     categories: ['possibility.ability'],
     level: 'N4',
     title: '〜ことができる',
@@ -96,6 +115,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ta-koto-ga-aru',
+    functions: ['experience'],
     categories: ['time.experience'],
     level: 'N4',
     title: '〜たことがある',
@@ -110,6 +130,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-volitional',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['intent'],
     categories: ['volition.will', 'request.invite'],
     level: 'N4',
     title: 'Volitional 〜よう / 〜おう',
@@ -123,6 +146,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-to-omou',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['intent'],
     categories: ['purpose.intention', 'volition.will'],
     level: 'N4',
     title: '〜ようと思う',
@@ -136,6 +162,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-tara',
+    functions: ['condition-contrary'],
     categories: ['condition.general', 'time.sequence'],
     level: 'N4',
     title: '〜たら (conditional)',
@@ -150,6 +177,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ba',
+    functions: ['condition'],
     categories: ['condition.hypothetical', 'condition.general'],
     level: 'N4',
     title: '〜ば (conditional)',
@@ -164,6 +192,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-to-conditional',
+    functions: ['condition'],
     categories: ['condition.general', 'cause.result'],
     level: 'N4',
     title: '〜と (natural consequence)',
@@ -178,6 +207,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-nara',
+    functions: ['condition'],
     categories: ['condition.general', 'discourse.topic'],
     level: 'N4',
     title: '〜なら',
@@ -191,6 +221,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-temo',
+    functions: ['concessions'],
     categories: ['contrast.concession', 'condition.general'],
     level: 'N4',
     title: '〜ても / 〜でも',
@@ -205,6 +236,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-node',
+    functions: ['cause-reason'],
     categories: ['cause.reason'],
     level: 'N4',
     title: '〜ので',
@@ -218,6 +250,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-noni',
+    functions: ['unexpected-outcome'],
     categories: ['contrast.concession', 'contrast.unexpected'],
     level: 'N4',
     title: '〜のに',
@@ -231,6 +264,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-shi',
+    functions: ['queue-listing'],
     categories: ['examples.listing', 'cause.reason'],
     level: 'N4',
     title: '〜し',
@@ -244,6 +278,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-sou-appearance',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['heard'],
     categories: ['judgment.conjecture', 'evidence.source'],
     level: 'N4',
     title: '〜そうだ (looks like)',
@@ -258,6 +295,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-sou-hearsay',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['heard'],
     categories: ['evidence.hearsay'],
     level: 'N4',
     title: '〜そうだ (hearsay)',
@@ -271,6 +311,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-da',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['speculation'],
     categories: ['judgment.conjecture', 'comparison.similarity'],
     level: 'N4',
     title: '〜ようだ / 〜みたいだ',
@@ -285,6 +328,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-rashii',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['speculation'],
     categories: ['evidence.hearsay', 'judgment.conjecture'],
     level: 'N4',
     title: '〜らしい',
@@ -299,6 +345,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-kamoshirenai',
+    functions: ['speculation'],
     categories: ['judgment.conjecture'],
     level: 'N4',
     title: '〜かもしれない',
@@ -312,6 +359,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-hazu',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['of-course'],
     categories: ['judgment.certainty'],
     level: 'N4',
     title: '〜はずだ',
@@ -325,6 +375,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-jita-pairs',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['conjugated-from'],
     categories: ['voice.form'],
     level: 'N4',
     title: 'Transitive / intransitive pairs',
@@ -339,6 +392,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-aru',
+    functions: ['action-status'],
     categories: ['state.result', 'voice.passive'],
     level: 'N4',
     title: '〜てある',
@@ -352,6 +406,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-oku',
+    functions: ['action-status'],
     categories: ['time.sequence', 'purpose.plan'],
     level: 'N4',
     title: '〜ておく',
@@ -365,6 +420,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-shimau',
+    functions: ['finish'],
     categories: ['time.completion', 'emotion.regret'],
     level: 'N4',
     title: '〜てしまう',
@@ -379,6 +435,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-miru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['action-effort'],
     categories: ['state.effort'],
     level: 'N4',
     title: '〜てみる',
@@ -391,6 +450,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-iku-kuru',
+    functions: ['action-effort'],
     categories: ['state.change', 'time.duration'],
     level: 'N4',
     title: '〜ていく / 〜てくる',
@@ -405,6 +465,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-ageru-kureru-morau',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['give'],
     categories: ['voice.benefactive'],
     level: 'N4',
     title: 'あげる / くれる / もらう',
@@ -419,6 +482,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-te-favors',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['concessions'],
     categories: ['voice.benefactive'],
     level: 'N4',
     title: '〜てあげる / 〜てくれる / 〜てもらう',
@@ -433,6 +499,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-passive',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['ability'],
     categories: ['voice.passive'],
     level: 'N4',
     title: 'Passive 〜られる',
@@ -446,6 +515,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-causative',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['forced'],
     categories: ['voice.form'],
     level: 'N4',
     title: 'Causative 〜させる',
@@ -459,6 +531,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-nasai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['order'],
     categories: ['volition.command'],
     level: 'N4',
     title: '〜なさい',
@@ -472,6 +547,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['purpose-goal'],
     categories: ['purpose.goal'],
     level: 'N4',
     title: '〜ように (so that)',
@@ -485,6 +563,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-ni-suru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['action-effort'],
     categories: ['state.effort', 'purpose.intention'],
     level: 'N4',
     title: '〜ようにする',
@@ -498,6 +579,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-you-ni-naru',
+    functions: ['intent'],
     categories: ['state.change'],
     level: 'N4',
     title: '〜ようになる',
@@ -511,6 +593,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-koto-ni-suru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['decision'],
     categories: ['purpose.decision'],
     level: 'N4',
     title: '〜ことにする',
@@ -524,6 +609,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-koto-ni-naru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['results-state'],
     categories: ['purpose.decision', 'state.result'],
     level: 'N4',
     title: '〜ことになる',
@@ -537,6 +625,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-tagaru',
+    functions: ['desire'],
     categories: ['volition.desire', 'evidence.source'],
     level: 'N4',
     title: '〜たがる',
@@ -550,6 +639,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-yasui-nikui',
+    functions: ['ability'],
     categories: ['judgment.evaluation', 'degree.extent'],
     level: 'N4',
     title: '〜やすい / 〜にくい',
@@ -563,6 +653,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-sugiru',
+    functions: ['extremes'],
     categories: ['degree.extreme'],
     level: 'N4',
     title: '〜すぎる',
@@ -576,6 +667,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-kata',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['means-methods'],
     categories: ['method.means'],
     level: 'N4',
     title: '〜方 (かた)',
@@ -588,6 +682,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-imperative',
+    register: 'casual',
+    provenance: { registerSource: 'classified' },
+    functions: ['order'],
     categories: ['volition.command', 'obligation.prohibition'],
     level: 'N4',
     title: 'Imperative & prohibition (〜ろ / 〜な)',
@@ -602,6 +699,7 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-o-ni-naru',
+    functions: ['reverent-humble'],
     categories: ['register.honorific'],
     level: 'N4',
     title: 'Honorific お〜になる / Humble お〜する',
@@ -616,6 +714,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-to-omou',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['time-direction'],
     categories: ['judgment.conjecture'],
     level: 'N4',
     title: '〜と思う',
@@ -629,6 +730,9 @@ export const N4: GrammarPoint[] = [
   },
   {
     id: 'n4-to-iu',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['condition'],
     categories: ['explanation.definition', 'method.communication'],
     level: 'N4',
     title: '〜という',

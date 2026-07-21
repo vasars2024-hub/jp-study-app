@@ -1,0 +1,1617 @@
+/**
+ * Flashcards: saved-word + mined-deck management, the review session, and the
+ * mining / CSV / AI-studio sub-tools — shared by Study OS's `FlashcardsView`
+ * and Blanc's `BlancFlashcardsPanel`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * OWNERSHIP: **Media & Cards** work stream. See BLANC_REFINEMENT_PLAN.md,
+ * "Parallel split". The Library & Arcade stream must not edit this file.
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Pillar 0: `flashcards` was a tab bail-out that mounted `FlashcardsView` inside
+ * `BlancViewHost`, dragging `AppChrome` into a Blanc window. This is the largest
+ * view in the app and has five mode branches, so it decomposes as one
+ * `useFlashcards` hook plus one component per mode. `useFlashcards` owns every
+ * bit of state, every deck mutation, and the review-session logic; the mode
+ * components render bodies only.
+ *
+ * Pillar 7: mining is the app's core loop and must stay first-class — the mining
+ * sub-tool composes the same `EpubMiningPanel` / `EpubMiningSimplePanel` /
+ * `JitenMiningPanel` and the same `flashcards:openEpubMining` handoff, so Blanc
+ * mines through the identical path, not a parallel one.
+ *
+ * `confirmDialog` / `promptDialog` are imported from `ui/dialogService` rather
+ * than the `ui` barrel — the barrel re-exports `AppChrome`, which would pull
+ * chrome into Blanc's bundle transitively. Nothing here may import
+ * `AppChrome`/`MenuBar`/`StatusBar`, nor the aero-only `Toolbar`/`Button`
+ * (Study OS's aero overview keeps those and stays in `FlashcardsView`).
+ */
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+} from 'react';
+import { confirmDialog, promptDialog } from '../ui/dialogService';
+import Icon from '../Icons';
+import EpubMiningPanel from '../EpubMiningPanel';
+import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
+import JitenMiningPanel from '../JitenMiningPanel';
+import DeckActionMenu from '../DeckActionMenu';
+import AiCardStudio from '../AiCardStudio';
+import CsvEditorPanel from '../CsvEditorPanel';
+import DeckImportPanel from '../DeckImportPanel';
+import {
+  createDeckFolder,
+  deleteDeckFolder,
+  filterDeckCards,
+  filterDeckByBook,
+  groupDeckByBook,
+  loadDeck,
+  loadDeckFolders,
+  onDeckChanged,
+  removeDeckCard,
+  removeBookGroup,
+  renameBookGroup,
+  setBookGroupFolder,
+  setDeckCardFolder,
+  setDeckCardKnown,
+  setDeckFolders,
+  type DeckFlashcard,
+  type DeckFolderFilter,
+  type BookGroup,
+} from '../../flashcardDeck';
+import { deckCardsToCsv } from '../../deckExport';
+import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
+import { registerCommandHandler } from '../../keyboardShortcuts';
+import { useT } from '../../i18n';
+import { useWiredMaterials } from '../ui';
+import type { LibraryItem } from '../../../shared/types';
+import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
+import type { JitenStore } from '../../../shared/jiten';
+import { coverStyleFor } from '../../utils/coverArt';
+import {
+  deckContentFingerprint,
+  deckGroupKey,
+  enrichDeckLevelEstimates,
+  getCachedDeckLevel,
+  onDeckLevelInputsChanged,
+} from '../../deckLevelEstimate';
+
+export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
+export type OverviewTab = 'dictionary' | 'epub';
+export type EpubMiningUi = 'simple' | 'advanced' | 'jiten';
+
+export interface ReviewCard {
+  id: string;
+  word: string;
+  reading: string;
+  meaning: string;
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Small cover-art tile for a book group, shared by every group-header layout. */
+export function BookCoverThumb({
+  style,
+  className = '',
+  level,
+  levelAria,
+}: {
+  style: CSSProperties;
+  className?: string;
+  level?: BookLevelEstimate;
+  levelAria?: string;
+}) {
+  return (
+    <div className={`flash-book-cover ${className}`.trim()} style={style}>
+      {level && (
+        <span className="cover-level-badge cover-level-badge--thumb" aria-label={levelAria}>
+          {level.label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const EPUB_MINING_PENDING_KEY = 'jp-pending-epub-mining';
+const JITEN_MINING_PENDING_KEY = 'jp-pending-jiten-mining';
+
+function takePendingJson<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    localStorage.removeItem(key);
+    return JSON.parse(raw) as T;
+  } catch {
+    localStorage.removeItem(key);
+    return null;
+  }
+}
+
+export interface FlashcardsState {
+  hideAiStudio: boolean;
+  saved: SavedWord[];
+  deck: DeckFlashcard[];
+  setDeck: React.Dispatch<React.SetStateAction<DeckFlashcard[]>>;
+  folders: string[];
+  mode: Mode;
+  setMode: (m: Mode) => void;
+  overviewTab: OverviewTab;
+  setOverviewTab: (t: OverviewTab) => void;
+  folderFilter: DeckFolderFilter;
+  setFolderFilter: (f: DeckFolderFilter) => void;
+  collapsedBooks: Record<string, boolean>;
+  toggleBookGroup: (key: string) => void;
+  creatingFolder: boolean;
+  setCreatingFolder: (v: boolean) => void;
+  newFolderName: string;
+  setNewFolderName: (v: string) => void;
+  folderErr: string;
+  setFolderErr: (v: string) => void;
+  dropHover: string | null;
+  setDropHover: (v: string | null) => void;
+  fileMenu: string | null;
+  setFileMenu: (v: string | null) => void;
+  // review session
+  sessionCards: ReviewCard[];
+  reviewIndex: number;
+  masteredIds: Set<string>;
+  exploredIds: Set<string>;
+  flipped: boolean;
+  cardFx: 'decrypt' | 'resync' | null;
+  reviewed: number;
+  total: number;
+  reviewSource: 'dictionary' | 'epub';
+  reviewBookKey: string;
+  setReviewBookKey: (v: string) => void;
+  reviewUnknownOnly: boolean;
+  setReviewUnknownOnly: (v: boolean) => void;
+  bookFolderMenu: string | null;
+  deckMenuGroup: BookGroup | null;
+  setDeckMenuGroup: (g: BookGroup | null) => void;
+  epubMiningUi: EpubMiningUi;
+  setEpubMiningUi: (v: EpubMiningUi) => void;
+  initialMiningBookId: string;
+  initialJitenDeckId: number | null;
+  deckLevels: Record<string, BookLevelEstimate>;
+  stripRef: React.RefObject<HTMLDivElement>;
+  // derived
+  epubCards: DeckFlashcard[];
+  recentStrip: DeckFlashcard[];
+  filteredDeck: DeckFlashcard[];
+  bookGroups: BookGroup[];
+  epubReviewBooks: BookGroup[];
+  epubReviewCandidates: DeckFlashcard[];
+  unknownReviewCards: ReviewCard[];
+  knownReviewCards: ReviewCard[];
+  current: ReviewCard | null;
+  sessionComplete: boolean;
+  // handlers
+  bookCoverStyle: (bookId: string, bookTitle: string) => CSSProperties;
+  refreshJitenCovers: () => void;
+  createFolder: () => void;
+  removeFolder: (name: string) => void;
+  reorderFolder: (dragged: string, target: string) => void;
+  onCardDragStart: (e: DragEvent, cardId: string) => void;
+  onBookGroupDragStart: (e: DragEvent, bookId: string, bookTitle: string) => void;
+  onFolderDrop: (e: DragEvent, folder: string | null) => void;
+  startReview: () => void;
+  startEpubReview: () => void;
+  restartReview: () => void;
+  endReview: () => void;
+  goToReviewIndex: (index: number) => void;
+  shuffleReview: () => void;
+  flip: () => void;
+  gotIt: () => void;
+  again: () => void;
+  openEpubMining: (ui: EpubMiningUi) => void;
+  startReviewForGroup: (group: BookGroup) => void;
+  saveGroupCsv: (group: BookGroup) => Promise<void>;
+  exportAllEpubCsv: () => Promise<void>;
+  removeBookDeck: (bookId: string, bookTitle: string) => Promise<void>;
+  moveBookToFolder: (bookId: string, bookTitle: string, folder: string | null) => void;
+  renameBookDeck: (bookId: string, bookTitle: string) => Promise<void>;
+}
+
+export function useFlashcards(hideAiStudio = false): FlashcardsState {
+  const { t } = useT();
+  const [saved, setSaved] = useState<SavedWord[]>(() => loadSaved());
+  const [deck, setDeck] = useState<DeckFlashcard[]>(() => loadDeck());
+  const [folders, setFolders] = useState<string[]>(() => loadDeckFolders());
+  const [mode, setMode] = useState<Mode>('overview');
+  const [overviewTab, setOverviewTab] = useState<OverviewTab>('epub');
+  const [folderFilter, setFolderFilter] = useState<DeckFolderFilter>('all');
+  const [collapsedBooks, setCollapsedBooks] = useState<Record<string, boolean>>({});
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [folderErr, setFolderErr] = useState('');
+  const [dropHover, setDropHover] = useState<string | null>(null);
+  const [fileMenu, setFileMenu] = useState<string | null>(null);
+
+  const [sessionCards, setSessionCards] = useState<ReviewCard[]>([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [masteredIds, setMasteredIds] = useState<Set<string>>(() => new Set());
+  const [exploredIds, setExploredIds] = useState<Set<string>>(() => new Set());
+  const [flipped, setFlipped] = useState(false);
+  // WIRED decrypt/resync card effects (§5.5) — transient class, wired-gated.
+  const wiredFx = useWiredMaterials();
+  const [cardFx, setCardFx] = useState<'decrypt' | 'resync' | null>(null);
+  const cardFxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fireCardFx = (fx: 'decrypt' | 'resync', ms: number): void => {
+    if (!wiredFx) return;
+    if (cardFxTimer.current) clearTimeout(cardFxTimer.current);
+    setCardFx(fx);
+    window.dispatchEvent(new CustomEvent(fx === 'decrypt' ? 'wired:decrypt' : 'wired:sync-fail'));
+    cardFxTimer.current = setTimeout(() => setCardFx(null), ms);
+  };
+  useEffect(
+    () => () => {
+      if (cardFxTimer.current) clearTimeout(cardFxTimer.current);
+    },
+    [],
+  );
+  const [reviewed, setReviewed] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [reviewSource, setReviewSource] = useState<'dictionary' | 'epub'>('dictionary');
+  const [reviewBookKey, setReviewBookKey] = useState<string>('all');
+  const [reviewUnknownOnly, setReviewUnknownOnly] = useState(true);
+  const [bookFolderMenu] = useState<string | null>(null);
+  const [deckMenuGroup, setDeckMenuGroup] = useState<BookGroup | null>(null);
+  const [epubMiningUi, setEpubMiningUi] = useState<EpubMiningUi>('simple');
+  const [initialMiningBookId, setInitialMiningBookId] = useState('');
+  const [initialJitenDeckId, setInitialJitenDeckId] = useState<number | null>(null);
+  /** JLPT/HSK badges keyed by deck group id (`bookId::bookTitle`). */
+  const [deckLevels, setDeckLevels] = useState<Record<string, BookLevelEstimate>>({});
+  const levelEnrichCancel = useRef({ cancelled: false });
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  // Cover art sources for book-group thumbnails: local Library covers keyed
+  // by LibraryItem.id, and cached Jiten deck covers keyed by jitenDeckId
+  // (see main/jiten.ts's cacheDeckCover). Both are looked up by DeckFlashcard.bookId.
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
+  const [jitenCoverPaths, setJitenCoverPaths] = useState<Record<number, string>>({});
+
+  const libraryCoverById = useMemo(() => {
+    const map = new Map<string, string | undefined>();
+    for (const item of libraryItems) map.set(item.id, item.coverPath);
+    return map;
+  }, [libraryItems]);
+
+  function refreshJitenCovers(): void {
+    void window.api.jitenGetStore().then((store: JitenStore) => {
+      const next: Record<number, string> = {};
+      for (const entry of store.plan) {
+        if (entry.jitenDeckId != null && entry.coverCachePath)
+          next[entry.jitenDeckId] = entry.coverCachePath;
+      }
+      setJitenCoverPaths(next);
+    });
+  }
+
+  function bookCoverStyle(bookId: string, bookTitle: string): CSSProperties {
+    const deckId = bookId.startsWith('jiten-') ? Number(bookId.slice('jiten-'.length)) : NaN;
+    const coverPath = Number.isFinite(deckId)
+      ? jitenCoverPaths[deckId]
+      : libraryCoverById.get(bookId);
+    return coverStyleFor(bookTitle, coverPath, bookId);
+  }
+
+  useEffect(() => onSavedChanged(() => setSaved(loadSaved())), []);
+  useEffect(
+    () =>
+      onDeckChanged(() => {
+        setDeck(loadDeck());
+        setFolders(loadDeckFolders());
+      }),
+    [],
+  );
+  useEffect(() => {
+    void window.api.listLibrary().then(setLibraryItems);
+    return window.api.onLibraryChanged(setLibraryItems);
+  }, []);
+  useEffect(refreshJitenCovers, []);
+
+  const epubCards = useMemo(
+    () =>
+      deck.filter(
+        (c) =>
+          c.source === 'epub' ||
+          c.source === 'epub-ai' ||
+          c.source === 'import' ||
+          c.source === 'csv' ||
+          c.source === 'jiten',
+      ),
+    [deck],
+  );
+  const recentStrip = useMemo(() => epubCards.slice(0, 24), [epubCards]);
+  const filteredDeck = useMemo(
+    () => filterDeckCards(epubCards, folderFilter),
+    [epubCards, folderFilter],
+  );
+  const bookGroups = useMemo(() => groupDeckByBook(filteredDeck), [filteredDeck]);
+  const epubReviewBooks = useMemo(() => groupDeckByBook(epubCards), [epubCards]);
+  const epubReviewCandidates = useMemo(() => {
+    const pool = filterDeckByBook(filterDeckCards(epubCards, folderFilter), reviewBookKey);
+    if (!reviewUnknownOnly) return pool;
+    return pool.filter((c) => !c.known);
+  }, [epubCards, folderFilter, reviewBookKey, reviewUnknownOnly]);
+
+  // Seed deck level badges from cache, then idle-enrich missing estimates.
+  useEffect(() => {
+    const seed: Record<string, BookLevelEstimate> = {};
+    for (const g of bookGroups) {
+      const id = deckGroupKey(g.bookId, g.bookTitle);
+      const cached = getCachedDeckLevel(id, deckContentFingerprint(g.cards));
+      if (cached) seed[id] = cached;
+    }
+    setDeckLevels(seed);
+
+    levelEnrichCancel.current.cancelled = true;
+    const signal = { cancelled: false };
+    levelEnrichCancel.current = signal;
+    void enrichDeckLevelEstimates(
+      bookGroups,
+      (deckId, estimate) => {
+        if (signal.cancelled) return;
+        setDeckLevels((prev) => (prev[deckId] === estimate ? prev : { ...prev, [deckId]: estimate }));
+      },
+      signal,
+    );
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [bookGroups]);
+
+  useEffect(() => {
+    return onDeckLevelInputsChanged(() => {
+      setDeckLevels({});
+      // Re-trigger enrich by cloning the deck reference.
+      setDeck((prev) => [...prev]);
+    });
+  }, []);
+
+  const unknownReviewCards = useMemo(
+    () => sessionCards.filter((c) => !masteredIds.has(c.id)),
+    [sessionCards, masteredIds],
+  );
+  const knownReviewCards = useMemo(
+    () => sessionCards.filter((c) => masteredIds.has(c.id)),
+    [sessionCards, masteredIds],
+  );
+
+  const current = sessionCards[reviewIndex] ?? null;
+  const sessionComplete = sessionCards.length > 0 && masteredIds.size >= sessionCards.length;
+
+  function savedToReviewCards(words: SavedWord[]): ReviewCard[] {
+    return words.map((w) => ({
+      id: `dict:${w.word}`,
+      word: w.word,
+      reading: w.reading,
+      meaning: w.meaning,
+    }));
+  }
+
+  function deckToReviewCards(cards: DeckFlashcard[]): ReviewCard[] {
+    return cards.map((c) => ({
+      id: c.id,
+      word: c.word,
+      reading: c.reading,
+      meaning: c.meaning || c.back || '',
+    }));
+  }
+
+  function markExplored(id: string): void {
+    setExploredIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
+  function orderReviewCards(cards: ReviewCard[], initialMastered: Set<string>): ReviewCard[] {
+    const unknown = shuffle(cards.filter((c) => !initialMastered.has(c.id)));
+    const known = cards.filter((c) => initialMastered.has(c.id));
+    return [...unknown, ...known];
+  }
+
+  function startReviewSession(
+    cards: ReviewCard[],
+    source: 'dictionary' | 'epub',
+    initialMastered: Set<string> = new Set(),
+  ): void {
+    if (!cards.length) return;
+    const ordered = orderReviewCards(cards, initialMastered);
+    setReviewSource(source);
+    setSessionCards(ordered);
+    setReviewIndex(0);
+    setMasteredIds(new Set(initialMastered));
+    setExploredIds(new Set(ordered[0] ? [ordered[0].id] : []));
+    setTotal(ordered.length);
+    setReviewed(initialMastered.size);
+    setFlipped(false);
+    setMode('review');
+  }
+
+  function startReview(): void {
+    startReviewSession(savedToReviewCards(loadSaved()), 'dictionary');
+  }
+
+  function startEpubReview(): void {
+    const pool = epubReviewCandidates;
+    const initialMastered = reviewUnknownOnly
+      ? new Set<string>()
+      : new Set(pool.filter((c) => c.known).map((c) => c.id));
+    startReviewSession(deckToReviewCards(pool), 'epub', initialMastered);
+  }
+
+  function restartReview(): void {
+    if (reviewSource === 'epub') {
+      const pool = epubReviewCandidates;
+      const initialMastered = reviewUnknownOnly
+        ? new Set<string>()
+        : new Set(pool.filter((c) => c.known).map((c) => c.id));
+      startReviewSession(deckToReviewCards(pool), 'epub', initialMastered);
+      return;
+    }
+    startReviewSession(savedToReviewCards(loadSaved()), 'dictionary');
+  }
+
+  function endReview(): void {
+    setMode('overview');
+    setSessionCards([]);
+    setReviewIndex(0);
+    setMasteredIds(new Set());
+    setExploredIds(new Set());
+    setFlipped(false);
+  }
+
+  function goToReviewIndex(index: number): void {
+    if (!sessionCards.length) return;
+    const next = Math.max(0, Math.min(index, sessionCards.length - 1));
+    setReviewIndex(next);
+    const card = sessionCards[next];
+    if (card) markExplored(card.id);
+    setFlipped(false);
+  }
+
+  function shuffleReview(): void {
+    if (sessionCards.length < 2) return;
+    const next = orderReviewCards(sessionCards, masteredIds);
+    setSessionCards(next);
+    setReviewIndex(0);
+    setFlipped(false);
+    if (next[0]) setExploredIds(new Set([next[0].id]));
+  }
+
+  function flip(): void {
+    if (!flipped) fireCardFx('decrypt', 320);
+    setFlipped((f) => !f);
+  }
+
+  function gotIt(): void {
+    const card = sessionCards[reviewIndex];
+    if (!card || masteredIds.has(card.id)) return;
+    if (wiredFx) window.dispatchEvent(new CustomEvent('wired:sync-ok'));
+    const nextMastered = new Set(masteredIds);
+    nextMastered.add(card.id);
+    setMasteredIds(nextMastered);
+    setReviewed((n) => n + 1);
+    setFlipped(false);
+    if (reviewSource === 'epub') setDeck(setDeckCardKnown(card.id, true));
+    setSessionCards((cards) => {
+      const unknown = cards.filter((c) => !nextMastered.has(c.id));
+      const known = cards.filter((c) => nextMastered.has(c.id));
+      return [...unknown, ...known];
+    });
+    if (nextMastered.size >= sessionCards.length) return;
+    setReviewIndex(0);
+    const firstUnknown = sessionCards.find((c) => !nextMastered.has(c.id));
+    if (firstUnknown) markExplored(firstUnknown.id);
+  }
+
+  function again(): void {
+    const card = sessionCards[reviewIndex];
+    if (!card || sessionCards.length < 2) return;
+    fireCardFx('resync', 260);
+    if (masteredIds.has(card.id)) {
+      const nextMastered = new Set(masteredIds);
+      nextMastered.delete(card.id);
+      setMasteredIds(nextMastered);
+      setReviewed((n) => Math.max(0, n - 1));
+      if (reviewSource === 'epub') setDeck(setDeckCardKnown(card.id, false));
+      setSessionCards((cards) => {
+        const unknown = cards.filter((c) => !nextMastered.has(c.id));
+        const known = cards.filter((c) => nextMastered.has(c.id));
+        return [...unknown, ...known];
+      });
+    } else {
+      setSessionCards((cards) => {
+        const next = [...cards];
+        const [picked] = next.splice(reviewIndex, 1);
+        const knownStart = next.findIndex((c) => masteredIds.has(c.id));
+        const insertAt = knownStart === -1 ? next.length : knownStart;
+        next.splice(insertAt, 0, picked);
+        return next;
+      });
+    }
+    setFlipped(false);
+  }
+
+  function openEpubMining(ui: EpubMiningUi): void {
+    setEpubMiningUi(ui);
+    setMode('epub-mining');
+  }
+
+  useEffect(() => {
+    function consumeMiningHandoff(): void {
+      const epub = takePendingJson<{ bookId?: string; ui?: 'simple' | 'advanced' }>(
+        EPUB_MINING_PENDING_KEY,
+      );
+      if (epub?.bookId) {
+        setInitialMiningBookId(epub.bookId);
+        setEpubMiningUi(epub.ui === 'advanced' ? 'advanced' : 'simple');
+        setOverviewTab('epub');
+        setMode('epub-mining');
+      }
+
+      const jiten = takePendingJson<{ deckId?: number; title?: string }>(JITEN_MINING_PENDING_KEY);
+      if (typeof jiten?.deckId === 'number') {
+        setInitialJitenDeckId(jiten.deckId);
+        setEpubMiningUi('jiten');
+        setOverviewTab('epub');
+        setMode('epub-mining');
+      }
+    }
+
+    consumeMiningHandoff();
+    window.addEventListener('flashcards:openEpubMining', consumeMiningHandoff);
+    return () => window.removeEventListener('flashcards:openEpubMining', consumeMiningHandoff);
+  }, []);
+
+  useEffect(() => {
+    if (hideAiStudio && mode === 'ai-studio') setMode('overview');
+  }, [hideAiStudio, mode]);
+
+  function toggleBookGroup(key: string): void {
+    setCollapsedBooks((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function createFolder(): void {
+    const name = newFolderName.trim();
+    if (!name) {
+      setCreatingFolder(false);
+      setNewFolderName('');
+      setFolderErr('');
+      return;
+    }
+    if (name.toLowerCase() === 'all' || name.toLowerCase() === 'unfiled') {
+      setFolderErr(t('flash.reservedName'));
+      return;
+    }
+    if (folders.includes(name)) {
+      setFolderFilter(name);
+      setCreatingFolder(false);
+      setNewFolderName('');
+      setFolderErr('');
+      return;
+    }
+    setFolders(createDeckFolder(name));
+    setFolderFilter(name);
+    setCreatingFolder(false);
+    setNewFolderName('');
+    setFolderErr('');
+  }
+
+  function removeFolder(name: string): void {
+    const result = deleteDeckFolder(name);
+    setFolders(result.folders);
+    setDeck(result.cards);
+    if (folderFilter === name) setFolderFilter('all');
+  }
+
+  function reorderFolder(dragged: string, target: string): void {
+    if (dragged === target || !folders.includes(dragged)) return;
+    const next = folders.filter((f) => f !== dragged);
+    const idx = next.indexOf(target);
+    next.splice(idx === -1 ? next.length : idx, 0, dragged);
+    setFolders(setDeckFolders(next));
+  }
+
+  function onCardDragStart(e: DragEvent, cardId: string): void {
+    e.dataTransfer.setData('app/flashcard', cardId);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onBookGroupDragStart(e: DragEvent, bookId: string, bookTitle: string): void {
+    e.dataTransfer.setData('app/flash-book', `${bookId}::${bookTitle}`);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onFolderDrop(e: DragEvent, folder: string | null): void {
+    e.preventDefault();
+    setDropHover(null);
+    const bookKey = e.dataTransfer.getData('app/flash-book');
+    if (bookKey) {
+      const sep = bookKey.indexOf('::');
+      const bookId = sep >= 0 ? bookKey.slice(0, sep) : 'unknown';
+      const bookTitle = sep >= 0 ? bookKey.slice(sep + 2) : 'Unknown source';
+      setDeck(setBookGroupFolder(bookId, bookTitle, folder));
+      return;
+    }
+    const cardId = e.dataTransfer.getData('app/flashcard');
+    if (!cardId) return;
+    setDeck(setDeckCardFolder(cardId, folder));
+  }
+
+  function startReviewForGroup(group: BookGroup): void {
+    setReviewBookKey(`${group.bookId}::${group.bookTitle}`);
+    setReviewUnknownOnly(false);
+    const initialMastered = new Set(group.cards.filter((c) => c.known).map((c) => c.id));
+    startReviewSession(deckToReviewCards(group.cards), 'epub', initialMastered);
+    setDeckMenuGroup(null);
+    setMode('review');
+  }
+
+  async function saveGroupCsv(group: BookGroup): Promise<void> {
+    const csv = deckCardsToCsv(group.cards);
+    const safe = group.bookTitle.replace(/[^\w -]+/g, '').trim() || 'deck';
+    const res = await window.api.miningSaveEpubDeckFile(csv, safe, 'csv');
+    if (res.ok && res.path) setDeckMenuGroup(null);
+  }
+
+  // File → Export: all EPUB cards in the current folder filter, as one CSV.
+  async function exportAllEpubCsv(): Promise<void> {
+    if (!filteredDeck.length) return;
+    const csv = deckCardsToCsv(filteredDeck);
+    await window.api.miningSaveEpubDeckFile(csv, 'flashcards-deck', 'csv');
+  }
+
+  async function removeBookDeck(bookId: string, bookTitle: string): Promise<void> {
+    const ok = await confirmDialog({
+      title: t('flash.deleteDeck'),
+      message: t('flash.deleteConfirm', { title: bookTitle }),
+      confirmLabel: t('common.remove'),
+      danger: true,
+    });
+    if (!ok) return;
+    setDeck(removeBookGroup(bookId, bookTitle));
+  }
+
+  function moveBookToFolder(bookId: string, bookTitle: string, folder: string | null): void {
+    setDeck(setBookGroupFolder(bookId, bookTitle, folder));
+  }
+
+  async function renameBookDeck(bookId: string, bookTitle: string): Promise<void> {
+    const next = await promptDialog({
+      title: t('flash.renameBook'),
+      message: t('flash.renameBook.prompt'),
+      defaultValue: bookTitle,
+    });
+    if (next == null) return;
+    setDeck(renameBookGroup(bookId, bookTitle, next));
+  }
+
+  useEffect(() => {
+    if (mode !== 'review') return;
+    const el = stripRef.current?.querySelector<HTMLElement>('[data-review-active="true"]');
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [mode, reviewIndex, sessionCards.length]);
+
+  // Review shortcuts — central manager (Settings → Shortcuts rebindable).
+  useEffect(() => {
+    if (mode !== 'review') return;
+    const offs = [
+      registerCommandHandler('flashcards.flip', () => {
+        flip();
+      }),
+      registerCommandHandler('flashcards.end', () => {
+        endReview();
+      }),
+      registerCommandHandler('flashcards.prev', () => {
+        goToReviewIndex(reviewIndex - 1);
+      }),
+      registerCommandHandler('flashcards.next', () => {
+        goToReviewIndex(reviewIndex + 1);
+      }),
+      registerCommandHandler('flashcards.again', () => {
+        if (flipped) again();
+        else return false;
+      }),
+      registerCommandHandler('flashcards.gotIt', () => {
+        if (flipped) gotIt();
+        else return false;
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [mode, flipped, reviewIndex, sessionCards, masteredIds]);
+
+  return {
+    hideAiStudio,
+    saved,
+    deck,
+    setDeck,
+    folders,
+    mode,
+    setMode,
+    overviewTab,
+    setOverviewTab,
+    folderFilter,
+    setFolderFilter,
+    collapsedBooks,
+    toggleBookGroup,
+    creatingFolder,
+    setCreatingFolder,
+    newFolderName,
+    setNewFolderName,
+    folderErr,
+    setFolderErr,
+    dropHover,
+    setDropHover,
+    fileMenu,
+    setFileMenu,
+    sessionCards,
+    reviewIndex,
+    masteredIds,
+    exploredIds,
+    flipped,
+    cardFx,
+    reviewed,
+    total,
+    reviewSource,
+    reviewBookKey,
+    setReviewBookKey,
+    reviewUnknownOnly,
+    setReviewUnknownOnly,
+    bookFolderMenu,
+    deckMenuGroup,
+    setDeckMenuGroup,
+    epubMiningUi,
+    setEpubMiningUi,
+    initialMiningBookId,
+    initialJitenDeckId,
+    deckLevels,
+    stripRef,
+    epubCards,
+    recentStrip,
+    filteredDeck,
+    bookGroups,
+    epubReviewBooks,
+    epubReviewCandidates,
+    unknownReviewCards,
+    knownReviewCards,
+    current,
+    sessionComplete,
+    bookCoverStyle,
+    refreshJitenCovers,
+    createFolder,
+    removeFolder,
+    reorderFolder,
+    onCardDragStart,
+    onBookGroupDragStart,
+    onFolderDrop,
+    startReview,
+    startEpubReview,
+    restartReview,
+    endReview,
+    goToReviewIndex,
+    shuffleReview,
+    flip,
+    gotIt,
+    again,
+    openEpubMining,
+    startReviewForGroup,
+    saveGroupCsv,
+    exportAllEpubCsv,
+    removeBookDeck,
+    moveBookToFolder,
+    renameBookDeck,
+  };
+}
+
+/** The review session: the flip card, the progress strip, and the done state. */
+export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
+  const { t } = useT();
+  const {
+    current,
+    sessionComplete,
+    total,
+    reviewed,
+    reviewSource,
+    reviewBookKey,
+    epubReviewBooks,
+    sessionCards,
+    reviewIndex,
+    exploredIds,
+    unknownReviewCards,
+    knownReviewCards,
+    flipped,
+    cardFx,
+  } = state;
+
+  function reviewStripCard(card: ReviewCard, mastered: boolean): JSX.Element {
+    const i = sessionCards.findIndex((c) => c.id === card.id);
+    const active = i === reviewIndex;
+    return (
+      <button
+        key={card.id}
+        type="button"
+        role="listitem"
+        data-review-active={active ? 'true' : undefined}
+        className={`flash-strip-card flash-review-strip-card${active ? ' active' : ''}${mastered ? ' mastered' : ''}`}
+        onClick={() => state.goToReviewIndex(i)}
+        title={card.word}
+      >
+        <span className="flash-strip-word" lang="ja">
+          {card.word}
+        </span>
+        {card.reading && card.reading !== card.word && (
+          <span className="flash-strip-reading" lang="ja">
+            {card.reading}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  if (sessionComplete || !current) {
+    return (
+      <div className="flash-view">
+        <div className="flash-done">
+          <div className="flash-done-emoji">
+            <Icon name="confetti" size={44} />
+          </div>
+          <h2>{t('flash.sessionComplete')}</h2>
+          <p className="muted">{t('flash.reviewedCount', { count: total })}</p>
+          <div className="flash-done-actions">
+            <button className="btn primary" onClick={state.restartReview}>
+              {t('flash.reviewAgain')}
+            </button>
+            <button className="btn" onClick={state.endReview}>
+              {t('flash.done')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const pct = total ? (reviewed / total) * 100 : 0;
+  const reviewTitle =
+    reviewSource === 'epub' && reviewBookKey !== 'all'
+      ? epubReviewBooks.find((g) => `${g.bookId}::${g.bookTitle}` === reviewBookKey)?.bookTitle
+      : null;
+
+  return (
+    <div className="flash-view review">
+      <div className="flash-review-shell">
+        <div className="flash-review-top">
+          <button className="btn small" onClick={state.endReview}>
+            <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
+            {t('flash.exit')}
+          </button>
+          {reviewTitle && <span className="flash-review-source muted">{reviewTitle}</span>}
+          <div className="flash-progress">
+            <div className="flash-progress-bar">
+              <span style={{ width: `${pct}%` }} />
+            </div>
+            <span className="flash-progress-text">
+              {reviewed} / {total}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn small flash-review-shuffle"
+            onClick={state.shuffleReview}
+            disabled={sessionCards.length < 2}
+            title={t('flash.shuffleTitle')}
+          >
+            <Icon name="shuffle" size={14} />
+            {t('flash.shuffle')}
+          </button>
+        </div>
+
+        <p className="flash-review-explored">
+          {t('flash.exploredCount', { explored: exploredIds.size, total: sessionCards.length })}
+        </p>
+
+        <div className="flash-review-nav" ref={state.stripRef}>
+          {unknownReviewCards.length > 0 && (
+            <div className="flash-review-group flash-review-group-unknown">
+              <span className="flash-review-group-label">
+                {t('flash.dontKnowGroup', { count: unknownReviewCards.length })}
+              </span>
+              <div className="flash-strip flash-review-strip" role="list">
+                {unknownReviewCards.map((card) => reviewStripCard(card, false))}
+              </div>
+            </div>
+          )}
+          {knownReviewCards.length > 0 && (
+            <div className="flash-review-group flash-review-group-known">
+              <span className="flash-review-group-label">
+                {t('flash.knowGroup', { count: knownReviewCards.length })}
+              </span>
+              <div className="flash-strip flash-review-strip" role="list">
+                {knownReviewCards.map((card) => reviewStripCard(card, true))}
+              </div>
+            </div>
+          )}
+          {sessionCards.length > 1 && (
+            <label className="flash-review-slider">
+              <span className="muted">{t('flash.slideToCard')}</span>
+              <input
+                type="range"
+                min={0}
+                max={sessionCards.length - 1}
+                value={reviewIndex}
+                onChange={(e) => state.goToReviewIndex(Number(e.target.value))}
+              />
+              <span className="flash-review-slider-pos">
+                {reviewIndex + 1} / {sessionCards.length}
+              </span>
+            </label>
+          )}
+        </div>
+
+        <div className={`flash-card${cardFx ? ` is-${cardFx}` : ''}`} onClick={flipped ? undefined : state.flip}>
+          <span className="flash-word" lang="ja">
+            {current.word}
+          </span>
+          {flipped ? (
+            <div className="flash-answer">
+              {current.reading && current.reading !== current.word && (
+                <span className="flash-reading" lang="ja">
+                  {current.reading}
+                </span>
+              )}
+              <span className="flash-meaning">{current.meaning || t('flash.noMeaningSaved')}</span>
+            </div>
+          ) : (
+            <span className="flash-tap-hint">{t('flash.tapToReveal')}</span>
+          )}
+        </div>
+
+        {flipped ? (
+          <div className="flash-actions">
+            <button className="btn flash-again" onClick={state.again}>
+              {t('flash.dontKnow')}
+            </button>
+            <button className="btn primary flash-got" onClick={state.gotIt}>
+              {t('flash.know')}
+            </button>
+          </div>
+        ) : (
+          <div className="flash-actions">
+            <button className="btn primary" onClick={state.flip}>
+              {t('flash.showAnswer')}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** EPUB / advanced / Jiten mining sub-tool. */
+export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
+  const { t } = useT();
+  const { epubMiningUi, hideAiStudio } = state;
+
+  return (
+    <div className="flash-view flash-view-mining">
+      <div className="view-head">
+        <p className="muted">{t('flash.mining.intro')}</p>
+        <div className="actions">
+          <button className="btn" onClick={() => state.setMode('overview')}>
+            {t('flash.backToDecks')}
+          </button>
+          {!hideAiStudio && (
+            <button className="btn" onClick={() => state.setMode('ai-studio')}>
+              {t('flash.aiCardStudio')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flash-tabs epub-mining-mode-tabs">
+        <button
+          type="button"
+          className={`flash-tab${epubMiningUi === 'simple' ? ' active' : ''}`}
+          onClick={() => state.setEpubMiningUi('simple')}
+        >
+          {t('flash.tab.simple')}
+        </button>
+        <button
+          type="button"
+          className={`flash-tab${epubMiningUi === 'advanced' ? ' active' : ''}`}
+          onClick={() => state.setEpubMiningUi('advanced')}
+        >
+          {t('flash.tab.advanced')}
+        </button>
+        <button
+          type="button"
+          className={`flash-tab${epubMiningUi === 'jiten' ? ' active' : ''}`}
+          onClick={() => state.setEpubMiningUi('jiten')}
+        >
+          Jiten
+        </button>
+      </div>
+
+      <p className="epub-mining-mode-lead muted">
+        {epubMiningUi === 'simple'
+          ? t('flash.mining.simpleLead')
+          : epubMiningUi === 'advanced'
+            ? t('flash.mining.advancedLead')
+            : 'Download a Jiten vocabulary deck for a planned title and save it into your local deck library.'}
+      </p>
+
+      {epubMiningUi === 'simple' ? (
+        <EpubMiningSimplePanel
+          initialBookId={state.initialMiningBookId}
+          onDeckSaved={() => {
+            state.setMode('overview');
+            state.setOverviewTab('epub');
+          }}
+        />
+      ) : epubMiningUi === 'advanced' ? (
+        <EpubMiningPanel
+          initialBookId={state.initialMiningBookId}
+          onDeckSaved={() => {
+            state.setMode('overview');
+            state.setOverviewTab('epub');
+          }}
+        />
+      ) : (
+        <JitenMiningPanel
+          initialDeckId={state.initialJitenDeckId}
+          onDeckSaved={() => {
+            state.setMode('overview');
+            state.setOverviewTab('epub');
+            state.setDeck(loadDeck());
+            state.refreshJitenCovers();
+            // The deck's cover finishes downloading shortly after this fires
+            // (JitenMiningPanel caches it fire-and-forget) — pick it up once it lands.
+            setTimeout(state.refreshJitenCovers, 2500);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** CSV editor sub-tool. */
+export function FlashcardCsvMode({ state }: { state: FlashcardsState }) {
+  const { t } = useT();
+  return (
+    <div className="flash-view flash-view-mining">
+      <div className="view-head">
+        <p className="muted">{t('flash.csv.intro')}</p>
+        <div className="actions">
+          <button className="btn" onClick={() => state.setMode('overview')}>
+            {t('flash.backToDecks')}
+          </button>
+          <button className="btn" onClick={() => state.openEpubMining('advanced')}>
+            {t('flash.epubMining')}
+          </button>
+        </div>
+      </div>
+      <CsvEditorPanel
+        onDeckImported={() => {
+          state.setMode('overview');
+          state.setOverviewTab('epub');
+        }}
+      />
+    </div>
+  );
+}
+
+/** AI card studio sub-tool. Renders nothing when hidden (Blanc mode). */
+export function FlashcardAiMode({ state }: { state: FlashcardsState }) {
+  const { t } = useT();
+  if (state.hideAiStudio) return null;
+  return (
+    <div className="flash-view flash-view-mining">
+      <div className="view-head">
+        <p className="muted">{t('flash.aiStudio.intro')}</p>
+        <div className="actions">
+          <button className="btn" onClick={() => state.setMode('overview')}>
+            {t('flash.backToDecks')}
+          </button>
+          <button className="btn" onClick={() => state.openEpubMining('advanced')}>
+            {t('flash.epubMining')}
+          </button>
+        </div>
+      </div>
+      <AiCardStudio
+        onDeckImported={() => {
+          state.setDeck(loadDeck());
+          state.setMode('overview');
+          state.setOverviewTab('epub');
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * The default (non-aero) deck overview: import panel, mining promo, review
+ * setup, recent strip, and the deck explorer with folders and book groups.
+ * Study OS's aero overview is a distinct layout that keeps `Toolbar`/`Button`
+ * and stays in `FlashcardsView`; both shells share this one.
+ */
+export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
+  const { t } = useT();
+  const {
+    saved,
+    epubCards,
+    overviewTab,
+    folders,
+    folderFilter,
+    filteredDeck,
+    bookGroups,
+    epubReviewBooks,
+    epubReviewCandidates,
+    recentStrip,
+    reviewBookKey,
+    reviewUnknownOnly,
+    collapsedBooks,
+    creatingFolder,
+    newFolderName,
+    folderErr,
+    dropHover,
+    fileMenu,
+    bookFolderMenu,
+    deckLevels,
+    deckMenuGroup,
+    hideAiStudio,
+  } = state;
+
+  return (
+    <div className="flash-view flash-view-decks">
+      <div className="view-head">
+        <p className="muted">{t('flash.overview.intro')}</p>
+        <div className="actions">
+          <button className="btn primary" onClick={() => state.openEpubMining('simple')}>
+            {t('flash.simpleEpubMining')}
+          </button>
+          <button className="btn" onClick={() => state.openEpubMining('advanced')}>
+            {t('flash.advancedEpub')}
+          </button>
+          <button className="btn" onClick={() => state.openEpubMining('jiten')}>
+            Jiten vocab
+          </button>
+          <button className="btn" onClick={() => state.setMode('csv-tool')}>
+            {t('flash.csvTool')}
+          </button>
+          {!hideAiStudio && (
+            <button className="btn" onClick={() => state.setMode('ai-studio')}>
+              {t('flash.aiCardStudio')}
+            </button>
+          )}
+          <button className="btn primary" onClick={state.startReview} disabled={saved.length === 0}>
+            {saved.length ? t('flash.reviewDictionaryCount', { count: saved.length }) : t('flash.reviewDictionary')}
+          </button>
+        </div>
+      </div>
+
+      <div className="flash-tabs">
+        <button
+          type="button"
+          className={`flash-tab ${overviewTab === 'epub' ? 'active' : ''}`}
+          onClick={() => state.setOverviewTab('epub')}
+        >
+          {t('flash.tab.epubDecks', { count: epubCards.length })}
+        </button>
+        <button
+          type="button"
+          className={`flash-tab ${overviewTab === 'dictionary' ? 'active' : ''}`}
+          onClick={() => state.setOverviewTab('dictionary')}
+        >
+          {t('flash.tab.dictionary', { count: saved.length })}
+        </button>
+      </div>
+
+      <DeckImportPanel onImported={() => state.setDeck(loadDeck())} />
+
+      {overviewTab === 'epub' ? (
+        <>
+          <section className="anki-card epub-mine-promo">
+            <div className="flash-strip-head">
+              <h2 className="flash-section-title">{t('flash.mineFromEpub')}</h2>
+              <span className="muted">{t('flash.mineFromEpub.hint')}</span>
+            </div>
+            <p className="epub-mine-promo-text">{t('flash.mineFromEpub.text')}</p>
+            <button type="button" className="btn primary epub-mine-promo-btn" onClick={() => state.openEpubMining('simple')}>
+              {t('flash.openSimpleMining')}
+            </button>
+          </section>
+
+          <section className="anki-card flash-review-setup">
+            <div className="flash-strip-head">
+              <h2 className="flash-section-title">{t('flash.studySession')}</h2>
+              <span className="muted">{t('flash.studySession.hint')}</span>
+            </div>
+            <div className="flash-review-setup-grid">
+              <label>
+                {t('flash.epubSource')}
+                <select value={reviewBookKey} onChange={(e) => state.setReviewBookKey(e.target.value)}>
+                  <option value="all">{t('flash.allInFolder', { count: filteredDeck.length })}</option>
+                  {epubReviewBooks.map((group) => {
+                    const key = `${group.bookId}::${group.bookTitle}`;
+                    const inFolder = filterDeckByBook(filteredDeck, key).length;
+                    return (
+                      <option key={key} value={key}>
+                        {group.bookTitle} ({inFolder || group.cards.length})
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <label className="flash-review-setup-check">
+                <input
+                  type="checkbox"
+                  checked={reviewUnknownOnly}
+                  onChange={(e) => state.setReviewUnknownOnly(e.target.checked)}
+                />
+                {t('flash.unknownOnly')}
+              </label>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={epubReviewCandidates.length === 0}
+                onClick={state.startEpubReview}
+              >
+                {epubReviewCandidates.length
+                  ? t('flash.startReviewCount', { count: epubReviewCandidates.length })
+                  : t('flash.startReview')}
+              </button>
+            </div>
+          </section>
+
+          <section className="flash-strip-section anki-card">
+            <div className="flash-strip-head">
+              <h2 className="flash-section-title">{t('flash.recentCards')}</h2>
+              <span className="muted">{t('flash.recentCards.hint')}</span>
+            </div>
+            {recentStrip.length === 0 ? (
+              <p className="muted flash-strip-empty">{t('flash.recentCards.empty')}</p>
+            ) : (
+              <div className="flash-strip" role="list">
+                {recentStrip.map((card) => (
+                  <article key={card.id} className="flash-strip-card" role="listitem">
+                    <span className="flash-strip-word" lang="ja">
+                      {card.word}
+                    </span>
+                    {card.reading && card.reading !== card.word && (
+                      <span className="flash-strip-reading" lang="ja">
+                        {card.reading}
+                      </span>
+                    )}
+                    <span className="flash-strip-meaning">{card.meaning || card.back || '—'}</span>
+                    {card.bookTitle && <span className="flash-strip-source muted">{card.bookTitle}</span>}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="flash-explorer anki-card">
+            <div className="flash-explorer-head">
+              <h2 className="flash-section-title">{t('flash.deckExplorer')}</h2>
+              <span className="muted">{t('flash.deckExplorer.hint')}</span>
+            </div>
+
+            <div className="lib-folders flash-folders">
+              <button
+                type="button"
+                className={`lib-folder-chip ${folderFilter === 'all' ? 'active' : ''}`}
+                onClick={() => state.setFolderFilter('all')}
+              >
+                {t('flash.all')}
+                <span className="lib-chip-count">{epubCards.length}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => state.setFolderFilter('unfiled')}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  state.setDropHover('unfiled');
+                }}
+                onDragLeave={() => state.setDropHover(null)}
+                onDrop={(e) => state.onFolderDrop(e, null)}
+                className={`lib-folder-chip ${folderFilter === 'unfiled' ? 'active' : ''} ${dropHover === 'unfiled' ? 'dragover' : ''}`}
+              >
+                {t('flash.unfiled')}
+                <span className="lib-chip-count">{epubCards.filter((c) => !c.folder).length}</span>
+              </button>
+              {folders.map((folder) => (
+                <button
+                  key={folder}
+                  type="button"
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData('app/flash-folder', folder)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    state.setDropHover(folder);
+                  }}
+                  onDragLeave={() => state.setDropHover(null)}
+                  onDrop={(e) => {
+                    const draggedFolder = e.dataTransfer.getData('app/flash-folder');
+                    if (draggedFolder && draggedFolder !== folder) {
+                      void state.reorderFolder(draggedFolder, folder);
+                      return;
+                    }
+                    state.onFolderDrop(e, folder);
+                  }}
+                  className={`lib-folder-chip ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
+                  onClick={() => state.setFolderFilter(folder)}
+                >
+                  {folder}
+                  <span className="lib-chip-count">{epubCards.filter((c) => c.folder === folder).length}</span>
+                  <span
+                    className="lib-chip-del"
+                    role="button"
+                    tabIndex={0}
+                    title={t('flash.deleteFolder')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      state.removeFolder(folder);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation();
+                        state.removeFolder(folder);
+                      }
+                    }}
+                  >
+                    ×
+                  </span>
+                </button>
+              ))}
+              {creatingFolder ? (
+                <span className="lib-folder-chip lib-folder-editor">
+                  <input
+                    className="lib-folder-input"
+                    value={newFolderName}
+                    onChange={(e) => state.setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') state.createFolder();
+                      if (e.key === 'Escape') {
+                        state.setCreatingFolder(false);
+                        state.setNewFolderName('');
+                        state.setFolderErr('');
+                      }
+                    }}
+                    placeholder={t('flash.folderNamePlaceholder')}
+                    autoFocus
+                  />
+                  <button type="button" className="btn small" onClick={state.createFolder}>
+                    {t('flash.add')}
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="lib-folder-chip lib-folder-new" onClick={() => state.setCreatingFolder(true)}>
+                  {t('flash.newFolder')}
+                </button>
+              )}
+            </div>
+            {folderErr && <div className="lib-folder-err">{folderErr}</div>}
+
+            {filteredDeck.length === 0 ? (
+              <p className="muted">{t('flash.noCardsInView')}</p>
+            ) : (
+              <div className="flash-groups">
+                {bookGroups.map((group) => {
+                  const groupKey = `${group.bookId}::${group.bookTitle}`;
+                  const collapsed = collapsedBooks[groupKey] ?? false;
+                  return (
+                    <div key={groupKey} className="flash-group">
+                      <div
+                        className="flash-group-head flash-group-head-row"
+                        draggable
+                        onDragStart={(e) => state.onBookGroupDragStart(e, group.bookId, group.bookTitle)}
+                      >
+                        <div
+                          className="flash-group-head-toggle"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => state.toggleBookGroup(groupKey)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') state.toggleBookGroup(groupKey);
+                          }}
+                          aria-expanded={!collapsed}
+                        >
+                          <span className="flash-group-chevron" aria-hidden />
+                          <BookCoverThumb
+                            className="flash-group-cover"
+                            style={state.bookCoverStyle(group.bookId, group.bookTitle)}
+                            level={deckLevels[groupKey]}
+                            levelAria={
+                              deckLevels[groupKey]
+                                ? t('flash.deck.levelAria', { level: deckLevels[groupKey].label })
+                                : undefined
+                            }
+                          />
+                          <span
+                            className="flash-group-title flash-group-title-btn"
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              state.setDeckMenuGroup(group);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                state.setDeckMenuGroup(group);
+                              }
+                            }}
+                          >
+                            {group.bookTitle}
+                          </span>
+                          <span className="muted flash-group-count">{t('flash.cardsCount', { count: group.cards.length })}</span>
+                          <span className="muted flash-group-known">
+                            {t('flash.knownCount', { count: group.cards.filter((c) => c.known).length })}
+                          </span>
+                        </div>
+                        <div className="flash-group-head-actions">
+                          <button
+                            type="button"
+                            className="btn small"
+                            onClick={() => state.setDeckMenuGroup(group)}
+                          >
+                            {t('flash.options')}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn small flash-group-delete"
+                            onClick={() => state.removeBookDeck(group.bookId, group.bookTitle)}
+                          >
+                            {t('flash.deleteDeck')}
+                          </button>
+                          {bookFolderMenu === groupKey && (
+                            <div className="flash-file-menu flash-book-folder-menu">
+                              <button type="button" onClick={() => state.moveBookToFolder(group.bookId, group.bookTitle, null)}>
+                                {t('flash.unfiled')}
+                              </button>
+                              {folders.map((folder) => (
+                                <button
+                                  key={folder}
+                                  type="button"
+                                  onClick={() => state.moveBookToFolder(group.bookId, group.bookTitle, folder)}
+                                >
+                                  {folder}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {!collapsed && (
+                        <div className="flash-group-body">
+                          {group.cards.map((card) => (
+                            <div
+                              key={card.id}
+                              className="flash-row flash-row-draggable"
+                              draggable
+                              onDragStart={(e) => state.onCardDragStart(e, card.id)}
+                            >
+                              <div className="flash-row-main">
+                                <span className="flash-row-word" lang="ja">
+                                  {card.word}
+                                </span>
+                                {card.reading && card.reading !== card.word && (
+                                  <span className="flash-row-reading" lang="ja">
+                                    {card.reading}
+                                  </span>
+                                )}
+                                <span className="flash-row-meaning">{card.meaning || card.back || '—'}</span>
+                                {card.sentence && <span className="flash-row-sentence muted">{card.sentence}</span>}
+                                {card.folder && <span className="flash-row-folder muted">{card.folder}</span>}
+                              </div>
+                              <div className="flash-row-actions">
+                                <button
+                                  type="button"
+                                  className="btn small"
+                                  onClick={() => state.setFileMenu(fileMenu === card.id ? null : card.id)}
+                                >
+                                  {t('flash.file')}
+                                </button>
+                                {fileMenu === card.id && (
+                                  <div className="flash-file-menu">
+                                    <button type="button" onClick={() => { state.setDeck(setDeckCardFolder(card.id, null)); state.setFileMenu(null); }}>
+                                      {t('flash.unfiled')}
+                                    </button>
+                                    {folders.map((folder) => (
+                                      <button
+                                        key={folder}
+                                        type="button"
+                                        onClick={() => {
+                                          state.setDeck(setDeckCardFolder(card.id, folder));
+                                          state.setFileMenu(null);
+                                        }}
+                                      >
+                                        {folder}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                <button
+                                  className="flash-row-x"
+                                  title={t('common.remove')}
+                                  onClick={() => state.setDeck(removeDeckCard(card.id))}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : saved.length === 0 ? (
+        <div className="flash-empty">
+          <div className="flash-empty-emoji">
+            <Icon name="flashcards" size={40} />
+          </div>
+          <h2>{t('flash.noSavedWords')}</h2>
+          <p className="muted">{t('flash.noSavedWords.hint')}</p>
+        </div>
+      ) : (
+        <div className="flash-list">
+          {saved.map((w) => (
+            <div className="flash-row" key={w.word}>
+              <div className="flash-row-main">
+                <span className="flash-row-word" lang="ja">
+                  {w.word}
+                </span>
+                {w.reading && w.reading !== w.word && (
+                  <span className="flash-row-reading" lang="ja">
+                    {w.reading}
+                  </span>
+                )}
+                <span className="flash-row-meaning">{w.meaning}</span>
+              </div>
+              <button className="flash-row-x" title={t('common.remove')} onClick={() => removeSaved(w.word)}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {deckMenuGroup && (
+        <DeckActionMenu
+          group={deckMenuGroup}
+          folders={folders}
+          onClose={() => state.setDeckMenuGroup(null)}
+          onReview={() => state.startReviewForGroup(deckMenuGroup)}
+          onSaveCsv={() => void state.saveGroupCsv(deckMenuGroup)}
+          onMoveFolder={(folder) => {
+            state.setDeck(setBookGroupFolder(deckMenuGroup.bookId, deckMenuGroup.bookTitle, folder));
+            state.setDeckMenuGroup(null);
+          }}
+          onDelete={() => {
+            state.removeBookDeck(deckMenuGroup.bookId, deckMenuGroup.bookTitle);
+            state.setDeckMenuGroup(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}

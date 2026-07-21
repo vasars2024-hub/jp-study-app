@@ -2,30 +2,31 @@ import Icon from '../../Icons';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import type { ColorTheme, FreqTarget, VizMode, VizSettings, VizStyle } from '../../../visualizerSettings';
-import { setUseAlbumInSearch } from '../../../lyricsSettings';
+import { useT } from '../../../i18n';
 
-const VIZ_MODES: { id: VizMode; label: string }[] = [
-  { id: 'wallpaper', label: 'Wallpaper' },
-  { id: 'widget', label: 'Widget' },
-  { id: 'both', label: 'Both' },
+const VIZ_MODES: { id: VizMode; labelKey: string }[] = [
+  { id: 'wallpaper', labelKey: 'settings.visualizer.mode.wallpaper' },
+  { id: 'widget', labelKey: 'settings.visualizer.mode.widget' },
+  { id: 'both', labelKey: 'settings.visualizer.mode.both' },
 ];
-const VIZ_STYLES: { id: VizStyle; label: string }[] = [
-  { id: 'spectrum', label: 'Spectrum' },
-  { id: 'wave', label: 'Waveform' },
-  { id: 'particles', label: 'Particles' },
+const VIZ_STYLES: { id: VizStyle; labelKey: string }[] = [
+  { id: 'spectrum', labelKey: 'settings.visualizer.style.spectrum' },
+  { id: 'wave', labelKey: 'settings.visualizer.style.wave' },
+  { id: 'particles', labelKey: 'settings.visualizer.style.particles' },
 ];
-const VIZ_FREQ: { id: FreqTarget; label: string }[] = [
-  { id: 'full', label: 'Whole track' },
-  { id: 'bass', label: 'Bass only' },
+const VIZ_FREQ: { id: FreqTarget; labelKey: string }[] = [
+  { id: 'full', labelKey: 'settings.visualizer.freq.full' },
+  { id: 'bass', labelKey: 'settings.visualizer.freq.bass' },
 ];
-const VIZ_COLORS: { id: ColorTheme; label: string }[] = [
-  { id: 'accent', label: 'Accent' },
-  { id: 'album', label: 'Album art' },
-  { id: 'custom', label: 'Custom' },
+const VIZ_COLORS: { id: ColorTheme; labelKey: string }[] = [
+  { id: 'accent', labelKey: 'settings.visualizer.color.accent' },
+  { id: 'album', labelKey: 'settings.visualizer.color.album' },
+  { id: 'custom', labelKey: 'settings.visualizer.color.custom' },
 ];
 const FFT_SIZES = [256, 512, 1024, 2048] as const;
 
 export default function VisualizerPage() {
+  const { t } = useT();
   const s = useSettings();
   const { viz, patchViz, lyricsSettings, setLyricsAlbumSearch, focusSettingId } = s;
 
@@ -33,8 +34,8 @@ export default function VisualizerPage() {
     <>
       <SettingsCard
         id="visualizer"
-        title="Music visualizer"
-        description="React to music playing in the Music app."
+        title={t('search.visualizer')}
+        description={t('search.visualizer.desc')}
         highlight={focusSettingId === 'visualizer'}
         trailing={
           <label className="os-toggle os-toggle-compact">
@@ -42,16 +43,16 @@ export default function VisualizerPage() {
               type="checkbox"
               checked={viz.enabled}
               onChange={() => patchViz({ enabled: !viz.enabled })}
-              aria-label="Enable music visualizer"
+              aria-label={t('settings.visualizer.enableAria')}
             />
-            <span>{viz.enabled ? 'On' : 'Off'}</span>
+            <span>{viz.enabled ? t('settings.visualizer.on') : t('settings.visualizer.off')}</span>
           </label>
         }
         advanced={
           viz.enabled ? (
             <>
               <div className="os-viz-row">
-                <span className="os-viz-label muted">Where</span>
+                <span className="os-viz-label muted">{t('settings.visualizer.label.where')}</span>
                 {VIZ_MODES.map((m) => (
                   <button
                     key={m.id}
@@ -59,12 +60,12 @@ export default function VisualizerPage() {
                     className={`btn small ${viz.mode === m.id ? 'primary' : ''}`}
                     onClick={() => patchViz({ mode: m.id })}
                   >
-                    {m.label}
+                    {t(m.labelKey)}
                   </button>
                 ))}
               </div>
               <div className="os-viz-row">
-                <span className="os-viz-label muted">Style</span>
+                <span className="os-viz-label muted">{t('settings.visualizer.label.style')}</span>
                 {VIZ_STYLES.map((st) => (
                   <button
                     key={st.id}
@@ -72,12 +73,12 @@ export default function VisualizerPage() {
                     className={`btn small ${viz.style === st.id ? 'primary' : ''}`}
                     onClick={() => patchViz({ style: st.id })}
                   >
-                    {st.label}
+                    {t(st.labelKey)}
                   </button>
                 ))}
               </div>
               <div className="os-viz-row">
-                <span className="os-viz-label muted">React to</span>
+                <span className="os-viz-label muted">{t('settings.visualizer.label.reactTo')}</span>
                 {VIZ_FREQ.map((f) => (
                   <button
                     key={f.id}
@@ -85,12 +86,12 @@ export default function VisualizerPage() {
                     className={`btn small ${viz.freqTarget === f.id ? 'primary' : ''}`}
                     onClick={() => patchViz({ freqTarget: f.id })}
                   >
-                    {f.label}
+                    {t(f.labelKey)}
                   </button>
                 ))}
               </div>
               <div className="os-viz-row">
-                <span className="os-viz-label muted">Sensitivity</span>
+                <span className="os-viz-label muted">{t('settings.visualizer.label.sensitivity')}</span>
                 <input
                   type="range"
                   min={0.1}
@@ -102,12 +103,12 @@ export default function VisualizerPage() {
                 <span className="muted">{Math.round(viz.intensity * 100)}%</span>
               </div>
               <div className="os-viz-row">
-                <span className="os-viz-label muted">Detail</span>
+                <span className="os-viz-label muted">{t('settings.visualizer.label.detail')}</span>
                 <select
                   className="os-viz-select"
                   value={viz.fftSize}
                   onChange={(e) => patchViz({ fftSize: Number(e.target.value) as VizSettings['fftSize'] })}
-                  title="FFT size"
+                  title={t('settings.visualizer.fftTitle')}
                 >
                   {FFT_SIZES.map((n) => (
                     <option key={n} value={n}>
@@ -117,7 +118,7 @@ export default function VisualizerPage() {
                 </select>
               </div>
               <div className="os-viz-row">
-                <span className="os-viz-label muted">Colors</span>
+                <span className="os-viz-label muted">{t('settings.visualizer.label.colors')}</span>
                 {VIZ_COLORS.map((c) => (
                   <button
                     key={c.id}
@@ -125,7 +126,7 @@ export default function VisualizerPage() {
                     className={`btn small ${viz.colorTheme === c.id ? 'primary' : ''}`}
                     onClick={() => patchViz({ colorTheme: c.id })}
                   >
-                    {c.label}
+                    {t(c.labelKey)}
                   </button>
                 ))}
                 {viz.colorTheme === 'custom' && (
@@ -134,13 +135,13 @@ export default function VisualizerPage() {
                       type="color"
                       value={viz.customColors[0]}
                       onChange={(e) => patchViz({ customColors: [e.target.value, viz.customColors[1]] })}
-                      title="Gradient start"
+                      title={t('settings.visualizer.gradStart')}
                     />
                     <input
                       type="color"
                       value={viz.customColors[1]}
                       onChange={(e) => patchViz({ customColors: [viz.customColors[0], e.target.value] })}
-                      title="Gradient end"
+                      title={t('settings.visualizer.gradEnd')}
                     />
                   </>
                 )}
@@ -149,24 +150,24 @@ export default function VisualizerPage() {
                 {(viz.mode === 'widget' || viz.mode === 'both') && (
                   <button type="button" className="btn small" onClick={s.onOpenVisualizer}>
                     <Icon name="monitor" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                    Open visualizer widget
+                    {t('settings.visualizer.openViz')}
                   </button>
                 )}
                 <button type="button" className="btn small" onClick={s.onOpenMusicWidget}>
                   <Icon name="music" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                  Open music widget
+                  {t('settings.visualizer.openMusic')}
                 </button>
               </div>
             </>
           ) : null
         }
-        advancedLabel="options"
+        advancedLabel={t('settings.visualizer.options')}
       />
 
       <SettingsCard
         id="lyrics"
-        title="Lyrics lookup"
-        description="When enabled, lyrics search uses album and parent folder names."
+        title={t('search.lyrics')}
+        description={t('search.lyrics.desc')}
         highlight={focusSettingId === 'lyrics'}
       >
         <label className="os-toggle">
@@ -175,7 +176,7 @@ export default function VisualizerPage() {
             checked={lyricsSettings.useAlbumInSearch}
             onChange={(e) => setLyricsAlbumSearch(e.target.checked)}
           />
-          <span>Use album / folder names in lyrics search</span>
+          <span>{t('settings.visualizer.lyricsUseAlbum')}</span>
         </label>
       </SettingsCard>
     </>

@@ -211,6 +211,58 @@ class SoundEngine {
     return 0.82;
   }
 
+  /**
+   * Synthesised one-shot blip (Phase 4.5) — for motion feedback like the score
+   * ticker, where a sample would be silent under the default SILENT pack and a
+   * per-tick fetch/decode would be absurd for a 30ms sine.
+   *
+   * Reuses this engine's context and category gains, so volume, mute, the perf
+   * tier and reduced-sensory scaling all apply exactly as they do to samples,
+   * and there is still only one AudioContext for SFX. The oscillator disposes
+   * itself on `ended` — per-shot nodes without cleanup are the documented leak.
+   */
+  playTone(
+    category: SoundCategory,
+    opts: { freq?: number; durationMs?: number; volume?: number; type?: OscillatorType } = {},
+  ): void {
+    if (!this.enabled || this.muted) return;
+    if (!this.perfAllows(category)) return;
+    const ctx = this.ensureCtx();
+    if (!ctx) return;
+    const destination = this.catGain.get(category) ?? this.master;
+    if (!destination) return;
+    // A suspended context needs a gesture; a tick is not worth awaiting a resume.
+    if (ctx.state === 'suspended') return;
+
+    const durationMs = Math.min(400, Math.max(8, opts.durationMs ?? 28));
+    const now = ctx.currentTime;
+    const end = now + durationMs / 1000;
+    const peak =
+      Math.min(1, Math.max(0, opts.volume ?? 0.18)) * this.reducedSensoryGain(category);
+    if (peak <= 0) return;
+
+    const osc = ctx.createOscillator();
+    osc.type = opts.type ?? 'sine';
+    osc.frequency.value = Math.min(12_000, Math.max(40, opts.freq ?? 1180));
+    const g = ctx.createGain();
+    // Short attack + exponential decay: a click-free tick.
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(peak, now + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    osc.connect(g);
+    g.connect(destination);
+    osc.onended = () => {
+      try {
+        osc.disconnect();
+        g.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+    };
+    osc.start(now);
+    osc.stop(end);
+  }
+
   private async load(url: string): Promise<AudioBuffer | null> {
     if (this.buffers.has(url)) return this.buffers.get(url) ?? null;
     const ctx = this.ensureCtx();
@@ -245,6 +297,7 @@ class SoundEngine {
       } catch {
         /* ignore */
       }
+      if (ctx.state !== 'running') return;
     }
     const buf = await this.load(url);
     if (!buf) return;
@@ -304,6 +357,10 @@ class SoundEngine {
         /* needs a user gesture */
       }
     }
+    // Still suspended means no gesture yet. Starting the loop anyway queues it
+    // silently, and the user's next click anywhere resumes the context — audio
+    // they never asked for appears out of nowhere. Bail instead.
+    if (ctx.state !== 'running') return silent;
     const buf = await this.load(url);
     if (!buf) return silent;
     const src = ctx.createBufferSource();

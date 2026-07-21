@@ -1,9 +1,10 @@
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   EPUB_CARD_LAYOUT_PRESETS,
   applyEpubCardLayoutPreset,
   type EpubCardLayoutPreset,
 } from '../../shared/mining';
+import { useT } from '../i18n';
 import EpubVariablePalette from './EpubVariablePalette';
 
 type Side = 'front' | 'back';
@@ -15,15 +16,33 @@ type Props = {
   onApply: (next: { preset: EpubCardLayoutPreset; front: string; back: string }) => void;
 };
 
+const PRESET_LABEL_KEYS: Record<Exclude<EpubCardLayoutPreset, 'custom'>, string> = {
+  'ja-en': 'epub.layout.preset.ja-en',
+  'en-ja': 'epub.layout.preset.en-ja',
+  'expression-reading': 'epub.layout.preset.expression-reading',
+  'reading-expression': 'epub.layout.preset.reading-expression',
+  'ja-sentence': 'epub.layout.preset.ja-sentence',
+};
+
 export default function EpubCardLayoutEditor({
   preset,
   front,
   back,
   onApply,
 }: Props) {
+  const { t, lang } = useT();
   const frontRef = useRef<HTMLInputElement>(null);
   const backRef = useRef<HTMLInputElement>(null);
   const lastFocused = useRef<Side>('front');
+
+  const presetOptions = useMemo(
+    () =>
+      EPUB_CARD_LAYOUT_PRESETS.map((item) => ({
+        id: item.id,
+        label: t(PRESET_LABEL_KEYS[item.id]),
+      })),
+    [t, lang],
+  );
 
   function insertVar(varKey: string) {
     const token = `{${varKey}}`;
@@ -67,20 +86,20 @@ export default function EpubCardLayoutEditor({
   return (
     <div className="epub-card-layout-editor">
       <label className="epub-layout-preset">
-        Preset
+        {t('epub.layout.preset')}
         <select value={preset} onChange={(e) => applyPreset(e.target.value as EpubCardLayoutPreset)}>
-          {EPUB_CARD_LAYOUT_PRESETS.map((item) => (
+          {presetOptions.map((item) => (
             <option key={item.id} value={item.id}>
               {item.label}
             </option>
           ))}
-          <option value="custom">Custom</option>
+          <option value="custom">{t('epub.layout.custom')}</option>
         </select>
       </label>
 
       <div className="fm-rows">
         <label className="fm-row">
-          <span className="fm-field-name">Front</span>
+          <span className="fm-field-name">{t('epub.layout.front')}</span>
           <input
             ref={frontRef}
             className="fm-input"
@@ -96,7 +115,7 @@ export default function EpubCardLayoutEditor({
           />
         </label>
         <label className="fm-row">
-          <span className="fm-field-name">Back</span>
+          <span className="fm-field-name">{t('epub.layout.back')}</span>
           <input
             ref={backRef}
             className="fm-input"

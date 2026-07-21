@@ -3,6 +3,8 @@
  * Applied as CSS variables / data attributes on <html>; small state in localStorage.
  */
 
+import { writeLocalStorage, writeLocalStorageJson } from './localStorageWrite';
+
 export type DensityId = 'compact' | 'comfortable' | 'spacious';
 export type RadiusId = 'sharp' | 'soft' | 'round';
 export type ChromeMaterialId = 'solid' | 'frosted';
@@ -116,7 +118,33 @@ export function applyAccentColors(accent: string, light?: string, deep?: string)
   r.setProperty('--red-deep', deep ?? mixHex(a, 'black', 0.22));
 }
 
+/** Inline custom properties this module owns, so it can hand them back. */
+const ACCENT_VARS = ['--accent', '--accent-2', '--red', '--red-deep'];
+
+/**
+ * Themes that ship their own accent palette: Frutiger Aero and WIRED ARCHIVE.
+ *
+ * Both stamp `data-materials`, and both define `--accent`/`--accent-2` in their
+ * stylesheets. Personalization writes those same properties INLINE on <html>,
+ * and an inline property beats any stylesheet — so the Study OS accent (crimson
+ * by default) was silently overriding both secret themes. Every `var(--accent)`
+ * surface inside them rendered pink, which is why WIRED's locked cyan/amber
+ * palette leaked red and Aero's aqua did too.
+ */
+function themeOwnsAccent(): boolean {
+  if (typeof document === 'undefined') return false;
+  const material = document.documentElement.getAttribute('data-materials');
+  return material === 'aero' || material === 'wired';
+}
+
 function applyAccentFromSettings(s: OsPersonalization): void {
+  if (themeOwnsAccent()) {
+    // Release the inline properties so the theme's own stylesheet wins. They
+    // are re-applied the moment the user returns to a Study OS theme.
+    const st = document.documentElement.style;
+    for (const v of ACCENT_VARS) st.removeProperty(v);
+    return;
+  }
   if (s.accentMode === 'custom') {
     applyAccentColors(s.customAccent);
     return;
@@ -188,12 +216,12 @@ export function applyPersonalization(s: OsPersonalization): void {
   }
 }
 
-/** Apply OS light/dark when autoTheme is enabled. */
+/** Apply OS light/dark when autoTheme is enabled — visual only; does not overwrite jp-os-theme. */
 export function applyAutoThemeIfEnabled(s: OsPersonalization = loadPersonalization()): void {
   if (!s.autoTheme) return;
   const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   void import('./theme').then(({ applyTheme, DEFAULT_THEME_ID }) => {
-    applyTheme(dark ? DEFAULT_THEME_ID : 'classic-light');
+    applyTheme(dark ? DEFAULT_THEME_ID : 'classic-light', { persist: false });
   });
 }
 
@@ -204,18 +232,23 @@ export function savePersonalization(partial: Partial<OsPersonalization>): OsPers
     ...partial,
     wallpaperDim: clampDim(partial.wallpaperDim ?? prev.wallpaperDim),
   };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-    if (next.accentMode === 'preset') localStorage.setItem(ACCENT_KEY, next.accentPreset);
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(KEY, next);
+  if (next.accentMode === 'preset') writeLocalStorage(ACCENT_KEY, next.accentPreset);
   applyPersonalization(next);
-  if (partial.autoTheme != null || next.autoTheme) applyAutoThemeIfEnabled(next);
+  const autoTurnedOff = partial.autoTheme === false && prev.autoTheme;
+  if (autoTurnedOff) {
+    // Re-apply the persisted manual theme that auto-theme had been masking.
+    void import('./theme').then(({ applyTheme, loadThemeId }) => {
+      applyTheme(loadThemeId());
+    });
+  } else if (partial.autoTheme != null || next.autoTheme) {
+    applyAutoThemeIfEnabled(next);
+  }
   window.dispatchEvent(new CustomEvent<OsPersonalization>(EVENT, { detail: next }));
   return next;
 }
 
+let themeListenerBound = false;
 let autoThemeMql: MediaQueryList | null = null;
 let autoThemeHandler: (() => void) | null = null;
 
@@ -229,6 +262,17 @@ export function bootPersonalization(): void {
   autoThemeMql = window.matchMedia('(prefers-color-scheme: dark)');
   autoThemeHandler = () => applyAutoThemeIfEnabled(loadPersonalization());
   autoThemeMql.addEventListener('change', autoThemeHandler);
+
+  // Whether the theme owns the accent is decided by `data-materials`, which
+  // only changes on a theme switch. Without this the inline accent stays
+  // whatever it was at boot: entering a secret theme kept Study OS crimson,
+  // and leaving one left the accent released and unstyled.
+  if (!themeListenerBound) {
+    themeListenerBound = true;
+    void import('./theme/engine').then(({ onThemeChanged }) => {
+      onThemeChanged(() => applyAccentFromSettings(loadPersonalization()));
+    });
+  }
 }
 
 export function onPersonalizationChanged(cb: (s: OsPersonalization) => void): () => void {

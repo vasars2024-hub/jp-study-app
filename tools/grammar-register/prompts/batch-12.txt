@@ -1,0 +1,192 @@
+You are labelling Japanese grammar patterns by REGISTER — the speech level a
+pattern belongs to. Batch 12 of 14.
+
+## The four values
+
+neutral   - works at any speech level. THE DEFAULT AND MOST COMMON ANSWER.
+casual    - only natural in informal speech between equals or intimates
+            (contractions, blunt sentence-final particles, slang endings).
+business  - honorific / humble / formal-polite. Would appear in a business
+            email, an announcement, or speech to a customer or superior.
+literary  - written or classical. Would appear in an essay, a legal notice, or
+            fiction, but sounds archaic or stiff spoken aloud.
+
+## Rules — read these before answering
+
+- **Most patterns are neutral, and neutral is a real answer, not a fallback.**
+  Japanese politeness is carried by the sentence-final predicate, not by the
+  grammar pattern. 〜ながら is identical in 食べながら見た and 食べながら見ました,
+  so it is neutral.
+  If you find yourself labelling more than about a fifth of a batch as
+  non-neutral, you are over-assigning.
+- Do NOT infer register from the English meaning text. A gloss reading "a less
+  formal way to say X" describes the pattern's *meaning*; it does not make the
+  pattern casual. Judge from the Japanese form itself.
+- Politeness is not register. A pattern shown in its 〜ます form is still
+  neutral unless the pattern *itself* is honorific or humble.
+- If you are unsure, answer neutral and append "?" to flag it for review.
+  A flagged guess is useful; a confident wrong answer is not.
+- Every input line must produce exactly one output line. Do not skip, merge,
+  or reorder.
+
+## Patterns (id, then pattern, then structure, then meaning)
+
+n4m-g-853b65	[事「こと」]ができる	[事「こと」]ができる	Be able to A; can do A, Can A; be possible to A;
+n4m-g-b0be0a	んだい	んだい	Turns sentence A into a question (casual).
+n4m-g-bc00ae	より~の[方「ほう」]が~	より~の[方「ほう」]が~	B is more C than A
+n4m-g-75e9f6	[可能系「かのうけい」]	[可能系「かのうけい」]	Can, be able to, be possible to
+n4m-g-431e94	ことになる	ことになる	To decide that A
+n4m-g-adbdf2	にかえる	にかえる	Return to do something
+n4m-g-8c8cbd	[下「くだ」]さる	[下「くだ」]さる	Give B to A (A is you, your friends, your family, etc.)
+n4m-g-3b40e1	てはいけない	てはいけない	May not A, must not A
+n4m-g-cd8f61	[禁止「きんし」]	[禁止「きんし」]	Don't do
+n4m-g-bc7723	ことにする	ことにする	Decide to
+n4m-g-4e5029	[使「し」][役「えき」]	[使「し」][役「えき」]	Coercive, permission, allow, make
+n4m-g-bf56de	やる	やる	Give B to A
+n4m-g-fdb449	た[方「ほう」]がいい	た[方「ほう」]がいい	It would be better to A
+n4m-g-a6d361	[使「し」][役「えき」][受「う」]け[身「み」]	[使「し」][役「えき」][受「う」]け[身「み」]	Imperative
+n4m-g-e5e54c	つもりだ	つもりだ	Plan to, be going to
+n4m-g-689bf9	[見「み」]える	[見「み」]える	Can be seen; is visible
+n4m-g-0bcfde	かた	かた	How to A
+n4m-g-c6b2bd	ようにする	ようにする	Try to A, make sure to A
+n4m-g-667067	だす	だす	A (suddenly) begins, To A out
+n4m-g-8fe31d	てくれてありがとう	てくれてありがとう	Thank you for doing A
+n4m-g-7a44d0	てやる	てやる	Do for someone
+n4m-g-9adc60	ずに	ずに	Without A..ing
+n4m-g-454699	さしあげる	さしあげる	Give B to A (A is a third party, not yourself)
+n4m-g-c3ba56	だろうと[思「おも」]う	だろうと[思「おも」]う	I think probably A
+n4m-g-5f45fe	ようと[思「おも」]う	ようと[思「おも」]う	I think I will A
+n4m-g-de9413	そうだ	そうだ	Seem, like…
+n4m-g-b29713	なくてはいけない	なくてはいけない	Must do A; have to A
+n4m-g-fef869	にくる	にくる	Come (here) in order to A
+n4m-g-880bef	さ	さ	Changes A into a noun
+n4m-g-5f256e	てみる	てみる	Try to A
+n4m-g-d6b231	がっている	がっている	Want, like
+n4m-g-e61c66	ほど~ない	ほど~ない	A is not as C as B
+n4m-g-1f5f5a	てくれる	てくれる	Do for someone.
+n4m-g-da772c	にいく	にいく	Go somewhere
+n4m-g-380f6b	... はいけません	... はいけません	must not; may not; cannot
+n4m-g-b1808f	...を...みる	...を...みる	judging from; seeing that ~
+n4m-g-20c0d4	やなにか	やなにか	the same, equivalent to
+n4m-g-1fc82b	まだ...	まだ...	Still (comparison)
+n4m-g-714094	...ないか?	...ないか?	right? isn't it?, I think...., do you think so too?
+n4m-g-8a3a93	ちょっと	ちょっと	A little (Slightly reduced)
+n4m-g-bf554b	...を...にする	...を...にする	to make something ~
+n4m-g-ec9260	…ば ....	…ば ....	If...
+n4m-g-82f47e	させてもらう	させてもらう	Allow me to do (favor)
+n4m-g-d48d92	と思っている	と思っている	Plan to do something
+n4m-v-e4e2ef	...はV-ている	...はV-ている	The state of the thing being mentioned in the sentence
+n4m-g-fdb567	する	する	become ...
+n4m-g-5bc145	... のだから	... のだから	Because ...
+n4m-g-5cd347	... いぜん	... いぜん	Before talking about... (Stage)
+n4m-g-6fe160	いちど　....  ば／... たら	いちど　....  ば／... たら	Just... once
+n4m-g-3cbaf4	もうすこし	もうすこし	A little more (level)
+n4m-g-ef2736	なければ～た	なければ～た	If only it weren't... then...
+n4m-g-f9381b	てもみない	てもみない	one has never thought...
+n4m-g-1d42a2	というてん	というてん	in terms of; with respect to; from the perspective of
+n4m-g-e1039f	たいへんだ	たいへんだ	It is hard, serious
+n4m-g-c8319d	て も～なくても	て も～なくても	even if not,even without
+n4m-g-86bfae	たら…	たら…	If only, for example
+n4m-g-4df930	ではないだろうか	ではないだろうか	I think ... isn't it?, It might be that..., Don't you agree?
+n4m-g-439fda	てほしい	てほしい	I want (person, thing) A to B (action)
+n4m-g-cf4ee1	なくてもいい	なくてもいい	Don't have to A
+n4m-g-ba468f	の[上「うえ」]では	の[上「うえ」]では	As…
+n4m-g-a98f3e	くれる	くれる	Give B to A (A is you, your friends, your family, etc.)
+n4m-g-4eb1b3	はずだ	はずだ	It should be A, it ought to be A
+n4m-g-ef1cc5	て[頂「いただ」]く	て[頂「いただ」]く	Do for
+n4m-g-ceecfc	かい	かい	Really?
+n4m-g-42ef5a	てあげる	てあげる	Help, do for
+n4m-g-1b2c16	受身形	受身形	Passive voice
+n4m-g-3db9ae	丁寧語	丁寧語	polite form
+n4m-g-e95831	命令形	命令形	Imperative form
+n4m-g-c1afba	たぶん	たぶん	perhaps; probably
+n4m-g-4ba01b	という意味だ	という意味だ	This means...
+n4m-g-0e387c	あいだ	あいだ	while; during; between ~
+n4m-g-6e52a5	可能形	可能形	Potential form
+n4m-g-c3c3d6	さすが	さすが	as one would expect; as is to be expected; even ~
+n4m-g-c6c98d	意向形	意向形	volitional form​
+n4m-g-8ba08f	もしかしたら	もしかしたら	perhaps; maybe; perchance; by any chance ~
+n4m-g-141d2c	条件形	条件形	Conditional form
+n4m-v-d578df	もうV-てあります	もうV-てあります	is/has been done (resulting state)
+n4m-g-a83836	ままにする	ままにする	as, to do as ~
+n4m-v-f93222	に...がV-てあります	に...がV-てあります	Object status
+n4m-g-23b6fe	... こと	... こと	thing (Truth)
+n4m-n-nghi-v-n-t-a470be	Nか＋nghi vấn từ＋ か	Nか＋nghi vấn từ＋ か	Or N...or+interrogative word
+n4m-g-94bd50	...か	...か	question particle
+n4m-g-002e2f	そんな	そんな	Like that
+n4m-g-b4dfbc	.... の	.... の	possessive particle
+n4m-tr-t-1f578a	Trợ từ + なら	Trợ từ + なら	If...
+n4m-g-44bb8a	のは…からだ	のは…からだ	The reason... is because...
+n4m-g-2b3562	なれた	なれた	to be used to something
+n4m-g-4eb310	... ても	... ても	even; even if; even though ~
+n4m-g-98d04b	...がまま	...がまま	as it is; current state; without changing
+n4m-g-9d6e58	…か…かで	…か…かで	either…or
+n4m-g-e82d84	とおり	とおり	Several ways
+n4m-g-6a687c	いくら	いくら	no matter how (Undetermined)
+n4m-nnv-b20ece	NがNをV-させる	NがNをV-させる	to make somebody do something. to let somebody do something
+n4m-g-b8dfaa	なん...も...ない	なん...も...ない	nothing; (not) ~ at all; there's no need to ~
+n4m-g-4249d0	...もあり...もある	...もあり...もある	to also be; both… and ~
+n4m-g-d2eb58	も …たら	も …たら	if; in the case; supposing ~
+n4m-nghi-v-n-t-tr-t-845fac	Nghi vấn từ＋(trợ từ) + も	Nghi vấn từ＋(trợ từ) + も	Also (affirmative),...both (negative)
+n4m-g-02ee44	...もあれば...もある	...もあれば...もある	and; also; as well; either/or; neither/nor
+n4m-nn-v-b50aa4	NがNを/にV-させる	NがNを/にV-させる	Who (N) makes...who (N) do what
+n4m-v-8059b2	まだV-られない	まだV-られない	Not yet ~
+n4m-g-a4cfe0	…とおなじ	…とおなじ	Like, similar to, unlike, dissimilar to
+n4m-g-efbf50	がり	がり	tend to, sensitive to
+n4m-g-531745	だけで	だけで	just by; just by doing; with only
+n4m-g-3c8852	必要がある	必要がある	Need/Need to
+n4m-g-2d824f	おきに	おきに	Repeated at intervals, every ~
+n4m-g-a16f6c	予定だ	予定だ	plan to, intend to
+n4m-g-f01527	急に	急に	quickly; immediately; hastily; suddenly; abruptly; unexpectedly ~
+n4m-g-6f1635	しか～ない	しか～ない	only; nothing but
+n4m-g-17bd5c	からつくる/でつくる	からつくる/でつくる	made from; made with
+n4m-g-b26282	のを知っていますか	のを知っていますか	Do you know...?
+n4m-g-131499	まだ～ていない	まだ～ていない	have not yet ~
+n4m-g-7d606c	または	または	or
+n4m-g-3b1ad7	んですが	んですが	opening the story
+n4m-g-8324d3	たらいいですか	たらいいですか	what should I do?
+n4m-g-1d7b8d	謙譲語	謙譲語	Humble form
+n4m-g-9d6e1c	に気がつく	に気がつく	to notice; to realize
+n4m-g-862814	くする/にする/ようにする	くする/にする/ようにする	to make something ~, to decide on, to try to; to make sure that ~
+n4m-g-1c7b93	によって～られる	によって～られる	by means of; due to; owing to; because of ~
+n4m-g-6ddc2a	かどうか	かどうか	whether or not ~
+n4m-g-f40c61	みえる	みえる	it seems that ~
+n4m-g-f687bb	まだ	まだ	still; not yet
+n4m-g-1a9ed2	ように	ように	in order to, so that ~
+n4m-g-0bcaec	始める	始める	to start; to begin to ~
+n4m-g-c1d329	出す	出す	to begin to; to start to; to burst into; ... out (e.g. to jump out, to carry out)​
+n4m-g-99480d	やっと	やっと	Eventually...
+n4m-g-67b83f	終わる	終わる	to finish; to end
+n4m-g-2e314e	間に	間に	while; during~ something happened
+n4m-g-f03b64	とか～とか	とか～とか	among other things; such as; like ~
+n4m-g-deed27	づらい	づらい	difficult to do ~
+n4m-g-2f084c	のが～です	のが～です	to be
+n4m-g-212f50	それで	それで	and; thereupon; because of that​.
+n4m-g-7e4f98	それは	それは	That/That's it
+n4m-g-d315ba	使役形	使役形	Causative form
+n4m-g-d6fe4f	て/なくて	て/なくて	Because/Because not
+n4m-g-f96343	禁止形	禁止形	Negative imperative form
+n4m-g-f2d09a	それに	それに	besides; in addition; also; moreover ~
+n4m-g-370071	...から...まで	...から...まで	From N to N
+n4m-g-d10ff2	もう	もう	more
+n4m-g-32542e	いただきます	いただきます	to receive
+n4m-g-cb3a40	などと	などと	such as, things like, the likes of
+n4m-g-ec0098	ところだ	ところだ	be about to
+n4m-g-395f84	続ける	続ける	to continue; to keep up; to keep on.
+n4m-g-1b9ece	頃 (ころ/ごろ)	頃 (ころ/ごろ)	around; about; when
+n4m-g-10a134	きっと	きっと	surely; undoubtedly; almost certainly; most likely
+n4m-g-d092bf	にする	にする	にする
+n4m-g-9c64f8	し～し	し～し	and; and what's more ~ (emphasis)
+n4m-g-8f3dfd	場合(は)	場合(は)	in the event of; in the case that ~
+n4m-g-518e40	ようにする/ようにしている/ようにしてください	ようにする/ようにしている/ようにしてください	to try to; to make sure that ~
+n4m-g-3a5e09	尊敬語	尊敬語	Honorifics
+n4m-g-8385bd	ばかりだ	ばかりだ	just done, just
+
+## Output format
+
+Return ONLY lines of `id<TAB>register`, one per input line, no header, no
+commentary, no code fence. Example:
+
+n3m-g-1a2b3c	neutral
+n1m-g-0f01e6	literary
+n2m-g-b0bf1e	casual?

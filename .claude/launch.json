@@ -6,6 +6,19 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8091"],
       "port": 8091
+    },
+    {
+      "name": "renderer",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--config", "vite.renderer.config.ts", "--port", "5174", "--strictPort"],
+      "port": 5174
+    },
+    {
+      "name": "motion-harness",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--config", "vite.renderer.config.ts"],
+      "autoPort": true,
+      "port": 5185
     }
   ]
 }

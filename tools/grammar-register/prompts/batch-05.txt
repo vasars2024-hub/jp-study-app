@@ -1,0 +1,192 @@
+You are labelling Japanese grammar patterns by REGISTER — the speech level a
+pattern belongs to. Batch 5 of 14.
+
+## The four values
+
+neutral   - works at any speech level. THE DEFAULT AND MOST COMMON ANSWER.
+casual    - only natural in informal speech between equals or intimates
+            (contractions, blunt sentence-final particles, slang endings).
+business  - honorific / humble / formal-polite. Would appear in a business
+            email, an announcement, or speech to a customer or superior.
+literary  - written or classical. Would appear in an essay, a legal notice, or
+            fiction, but sounds archaic or stiff spoken aloud.
+
+## Rules — read these before answering
+
+- **Most patterns are neutral, and neutral is a real answer, not a fallback.**
+  Japanese politeness is carried by the sentence-final predicate, not by the
+  grammar pattern. 〜ながら is identical in 食べながら見た and 食べながら見ました,
+  so it is neutral.
+  If you find yourself labelling more than about a fifth of a batch as
+  non-neutral, you are over-assigning.
+- Do NOT infer register from the English meaning text. A gloss reading "a less
+  formal way to say X" describes the pattern's *meaning*; it does not make the
+  pattern casual. Judge from the Japanese form itself.
+- Politeness is not register. A pattern shown in its 〜ます form is still
+  neutral unless the pattern *itself* is honorific or humble.
+- If you are unsure, answer neutral and append "?" to flag it for review.
+  A flagged guess is useful; a confident wrong answer is not.
+- Every input line must produce exactly one output line. Do not skip, merge,
+  or reorder.
+
+## Patterns (id, then pattern, then structure, then meaning)
+
+n2m-g-d4c1b9	向け/向き	向け/向き	to be suitable for
+n2m-g-d773f9	せめて	せめて	at least; at most ~
+n2m-g-8197fa	以上(は)	以上(は)	because; since; seeing that ~
+n2m-g-71fc28	ふうに	ふうに	this way; that way; in such a way; how
+n2m-g-73fe3e	わずかに	わずかに	slightly; only; barely; narrowly ~
+n2m-g-e32b9a	次第だ	次第だ	depending on; so ~
+n2m-g-03a236	次第	次第	as soon as ~
+n2m-g-35a298	わけだ	わけだ	for that reason; no wonder; as you’d expect; the fact is; so you mean ~
+n2m-g-e7881f	ようではないか/ようじゃないか	ようではないか/ようじゃないか	Let’s do (something); Why don’t we ~
+n2m-g-f9882e	もう少しで	もう少しで	almost; nearly, close to ~
+n2m-g-16b175	たまらない	たまらない	can't help but; dying to; extremely ~
+n2m-g-298f1e	恐らく	恐らく	perhaps; likely; probably; I dare say ~
+n2m-g-849818	とっくに	とっくに	long ago; already; a long time ago
+n2m-g-7f5694	果たして	果たして	as was expected; sure enough; really; actually ~
+n2m-g-54f6a7	としても	としても	assuming; even if ~
+n2m-g-3c69f9	も構わず	も構わず	without caring; without worrying about ~
+n2m-g-db1245	を頼りに	を頼りに	to rely on / with the aid of something
+n2m-g-01ebf5	一気に	一気に	in one go; without stopping; all at once; immediately; instantly; right away ~
+n2m-g-8cbfe3	につれて	につれて	as; in proportion to; with; as… then ~
+n2m-g-e476cf	と同時に	と同時に	at the same time as; while; simultaneously ~
+n2m-g-0c7c7a	というものでもない	というものでもない	there is no guarantee that…; not necessarily ~
+n2m-g-ed0602	にあたり/にあたって	にあたり/にあたって	at the time; on the occasion of ~
+n2m-g-c87628	どころではない	どころではない	not the time for; not the place for; far from; anything but ~
+n2m-g-c48d44	に関わらず/に関わりなく	に関わらず/に関わりなく	in spite of; regardless of ~
+n2m-g-afe74a	からでないと/からでなければ	からでないと/からでなければ	must first do; cannot do without first doing ~
+n2m-g-6ed837	を通じて/を通して	を通じて/を通して	through; via; throughout; by ~
+n2m-g-b44660	ないことはない	ないことはない	is not impossible to ~.
+n2m-g-1acdbd	てならない	てならない	can't help but; dying to; extremely ~
+n2m-g-0eed02	に越したことはない	に越したことはない	It’s best that, There’s nothing better than ~
+n2m-g-36c84f	に反して	に反して	against; contrary to; in contrast to ~
+n2m-g-37ddd6	いきなり	いきなり	abruptly; suddenly; all of a sudden; without warning
+n2m-g-8625ef	あまり(に)	あまり(に)	too much; so much… that; excessively ~
+n2m-g-de0373	甲斐がある	甲斐がある	It’s worth one’s efforts to do something
+n2m-g-e771a5	を込めて	を込めて	filled with; full of
+n2m-g-e6db45	ないものか	ないものか	isn't there; can’t we…?; can’t I…?
+n2m-g-062b53	にしても～にしても/にしろ～にしろ/にせよ～にせよ	にしても～にしても/にしろ～にしろ/にせよ～にせよ	whether… or ~, regardless of whether ~
+n2m-g-c9123b	ばかりはいられない	ばかりはいられない	can’t keep doing ~
+n2m-g-fb0342	だけ(のことは)あって/だけのことはある	だけ(のことは)あって/だけのことはある	no wonder; as expected of; not ... for nothing; not ... with nothing to show for it
+n2m-g-28abd3	にわたって	にわたって	throughout; over a period of ~
+n2m-g-336932	少なくとも	少なくとも	at least ~
+n2m-g-83a192	以外	以外	with the exception of; excepting ~
+n2m-g-171580	ところを/ところに/ところへ	ところを/ところに/ところへ	Right on time/At the right time
+n2m-g-ae555c	ことから	ことから	from the fact that ~
+n2m-g-0c3f57	ものではない	ものではない	shouldn’t do something; it’s impossible to ~
+n2m-g-91f3cb	とともに	とともに	together with; at the same time as; as well as ~
+n2m-g-ba56af	再び	再び	again; once more
+n2m-g-0ddfc9	のに対して	のに対して	towards; against; regarding; in contrast with ~
+n2m-g-90f69b	抜く	抜く	to do something from beginning to end
+n2m-g-303491	かえって	かえって	on the contrary
+n2m-g-b9b267	逆に	逆に	conversely; on the contrary ~
+n2m-g-9ee620	に際して	に際して	on the occasion of; at the time of ~
+n2m-g-90abb5	当然だ/当たり前だ	当然だ/当たり前だ	natural; as a matter of course
+n2m-g-ed12f6	からには	からには	so long as
+n2m-g-22ec2d	にしたがって	にしたがって	as; therefore; in accordance with; according to; consequently ~
+n2m-g-77ff92	がたい	がたい	very difficult to; hard to ~
+n2m-g-42bc5d	くせして	くせして	Although; Despite the fact that; Even though ~
+n2m-g-26783b	にほかならない/からにほかならない	にほかならない/からにほかならない	nothing but; none other than ~
+n2m-g-03a641	限り(は)/限り(では)	限り(は)/限り(では)	as long as; while… is the case; as far as; while ~
+n2m-g-e39322	上は	上は	now that; since; as long as ~
+n2m-g-bc9c8e	からこそ/～ばこそ/こそ	からこそ/～ばこそ/こそ	precisely because ~
+n2m-g-91fc1c	以来	以来	since; henceforth ~
+n2m-g-b6e1b2	あげく	あげく	to end up; in the end; finally; after all ~
+n2m-g-6973bb	通り (とおり/どおり)	通り (とおり/どおり)	in the same way as; in the way; as ~
+n2m-g-46da8d	に応じて	に応じて	depending on; in accordance with ~
+n2m-g-81d5a6	に過ぎない	に過ぎない	no more than; just; merely; only ~
+n2m-g-8bcde2	ないではいられない	ないではいられない	can't help but feel; can't help but do ~
+n2m-g-fb6963	よほど	よほど	very; greatly; much; to a large extent
+n2m-g-f4a7d1	ものか/ものですか	ものか/ものですか	there's no way ~
+n2m-g-d4a075	にこたえ(て)	にこたえ(て)	in response to ~
+n2m-g-549838	を中心に	を中心に	focused on; centered on~
+n2m-g-2a83fa	なくて済む/ないで済む	なくて済む/ないで済む	get by without doing ~
+n2m-g-b3a3b1	ものがある	ものがある	there is such a thing; to be the case that​; feels like ~
+n2m-g-d3a00b	きり	きり	only; just; since; after ~
+n2m-g-933df4	～がい	～がい	It's worth one's efforts to do something
+n2m-g-94aee1	ものだから	ものだから	so; therefore; the reason for something
+n2m-g-a9f59a	かと思ったら/かと思うと	かと思ったら/かと思うと	just when; no sooner than ~
+n2m-g-cb382f	に沿って	に沿って	along with; in accordance with ~
+n2m-g-5d2244	いよいよ	いよいよ	at last; finally; beyond doubt
+n2m-g-318809	だけましだ	だけましだ	It’s better than; One should feel grateful for ~
+n2m-g-690edd	うちに	うちに	While; Before ~
+n2m-g-425c83	のみならず/のみか	のみならず/のみか	not only; besides; as well as ~
+n2m-g-33fb71	～てまで/までして	～てまで/までして	even; will go far so as to ~
+n2m-g-d75703	に限り/に限って/に限らず	に限り/に限って/に限らず	only if
+n2m-g-07745f	も同然	も同然	just like; same as ~
+n2m-g-feadf0	に基づいて	に基づいて	based on; on the basis of ~
+n2m-g-d982f4	まい	まい	will not; will probably not; intend not to; must not
+n2m-g-6f214e	末	末	finally; after; following; at the end/ conclusion of ~
+n2m-g-a62613	をもとに	をもとに	based on; derived from; building on; beginning with ~
+n2m-g-8fbfa0	にもかかわらず	にもかかわらず	despite; in spite of; nevertheless; although ~
+n2m-g-7ae5e1	幸いなことに	幸いなことに	fortunately; luckily; thankfully ~
+n2m-g-9cb9c3	ねばならない/ねばならぬ/ねば	ねばならない/ねばならぬ/ねば	have to do; must; should ~
+n2m-g-2b84af	に決まっている	に決まっている	certainly; I’m sure/certain that; it must be the case that ~
+n2m-g-d277bb	につき	につき	due to; because of; per; each
+n2m-g-48657c	ちっとも～ない	ちっとも～ない	(not) at all; (not) in the least ~
+n2m-g-c30b4d	抜きにして/ 抜きにしては～れない	抜きにして/ 抜きにしては～れない	without; leaving out; cutting out ~
+n2m-g-d97ffc	を除いて	を除いて	except; with the exception of; excluding ~
+n2m-g-34fb4b	ことに	ことに	emphasize speaker's feelings; to my (surprise/etc)
+n2m-g-bc9153	上で	上で	upon; after; when; for; in order to
+n2m-g-7c0079	直ちに	直ちに	at once; immediately; directly; in person; automatically ~
+n2m-g-ee03b7	一方	一方	on one hand, on the other hand; although ~ (conjunction)
+n2m-g-0e20ef	いわゆる	いわゆる	what is called; as it is called; the so-called; so to speak​
+n2m-g-a2d554	ようでは	ようでは	if ~ (bad result)
+n2m-g-dc80ea	の下で/の下に	の下で/の下に	under; with ~
+n2m-g-775475	ものの	ものの	but, although
+n2m-g-45611b	をはじめ	をはじめ	for example; starting with ~
+n2m-g-59525e	にして	にして	At, Over, In, Only (after, when, or because)
+n2m-g-4f8e4a	あえて～ば	あえて～ば	If I dare to say, trying to find a way...
+n2m-g-454367	なにも～わけではない	なにも～わけではない	it doesn't mean that; it is not the case that; I don't mean that; it is not true that
+n2m-g-d5adb0	いまでこそ	いまでこそ	An event is currently clear and obvious, but it wasn’t in the past
+n2m-g-77449a	..... ばかりもいられない	..... ばかりもいられない	can't keep doing ~
+n2m-g-7ee803	ことはならない	ことはならない	forbidden, not allowed to do anything
+n2m-g-b1c08d	ことだろう	ことだろう	how…!; what…!
+n2m-g-916c97	…のではなかったか	…のではなかったか	..., isn't it (Criticism)
+n2m-g-26f7e6	どうりで	どうりで	indeed,it's no wonder
+n2m-g-895cf5	…とは	…とは	I was surprised that
+n2m-g-4f28a6	…とすると	…とすると	If it were the case that, Assuming that...(Assumed conditions)
+n2m-g-8cb832	はとにかく (として)	はとにかく (として)	setting aside, regardless of
+n2m-g-3ef897	...たら	...たら	if; after; when ~
+n2m-g-a1602e	とはいいながら	とはいいながら	with these words; while saying
+n2m-g-5154ca	にきまっている	にきまっている	certainly; I'm sure/certain that; it must be the case that ~
+n2m-g-8ff0bc	とんだ	とんだ	unthinkable; unimaginable; inconceivable; unexpected
+n2m-g-2c23bc	いまに	いまに	Soon, in the near future
+n2m-g-0c065e	ことだし	ことだし	Because...so...
+n2m-g-d7896c	...といけない	...といけない	If ... then it would be troublesome
+n2m-g-d2f9f7	…てもともとだ	…てもともとだ	originally, by nature, from the start
+n2m-g-b438a7	なにやら	なにやら	something, some kind of
+n2m-g-6a39d4	ではあるまいか	ではあるまいか	isn't it; I wonder if it's not ~
+n2m-g-b6630a	... ところで	... ところで	Even though
+n2m-g-fc7549	そもそもの...	そもそもの...	...First, truly, first of all (due to)
+n2m-g-2ccf59	...そのもの	...そのもの	Myself...
+n2m-g-3329c8	それどころか	それどころか	on the contrary
+n2m-g-c975c0	ひとり ... だけでなく	ひとり ... だけでなく	not only…, not just…
+n2m-g-ae4a18	…ばあいをのぞいて	…ばあいをのぞいて	Except for
+n2m-g-c54654	だから…のだ	だから…のだ	No wonder...
+n2m-g-83b546	事と次第によって	事と次第によって	Depending on the progress of the situation
+n2m-g-283e49	もらえまいか	もらえまいか	Help...
+n2m-g-cadeaa	抜きで	抜きで	without; leaving out; cutting out ~
+n2m-g-2ba291	にめんして	にめんして	having a space looking towards N
+n2m-g-194e30	…となれば	…となれば	if that happens
+n2m-g-a1bd9c	にどと～ない	にどと～ない	No...second time
+n2m-g-573801	とかく…がちだ	とかく…がちだ	apt to do, tend to do
+n2m-g-66e4be	...というのも	...というのも	The reason is
+n2m-g-a0f289	... にと思って	... にと思って	To do..., to let...
+n2m-g-b74095	へたに	へたに	Careless
+n2m-g-8cc040	それを	それを	Despite that ...
+n2m-g-eb6ef4	…どうりがない	…どうりがない	No reason...
+n2m-g-ed1654	それにしては	それにしては	yet, notwithstanding, nevertheless
+n2m-g-1a877b	どうにか	どうにか	in some way or other; one way or another
+n2m-g-d1ade8	いちがいに…ない	いちがいに…ない	Impossible... in general
+n2m-g-89e645	... ばかり...	... ばかり...	It is said that, seem ...
+
+## Output format
+
+Return ONLY lines of `id<TAB>register`, one per input line, no header, no
+commentary, no code fence. Example:
+
+n3m-g-1a2b3c	neutral
+n1m-g-0f01e6	literary
+n2m-g-b0bf1e	casual?

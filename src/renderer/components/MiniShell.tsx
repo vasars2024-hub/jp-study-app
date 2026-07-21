@@ -31,7 +31,7 @@ import {
   miniAppLabel,
 } from '../miniMode';
 import { ClipboardWidget } from '../widgets/system';
-import { useAeroMaterials } from './ui';
+import { useAeroMaterials, useWiredMaterials } from './ui';
 
 /** Base craft window size — height follows from locked aspect ratio. */
 const BASE_W = 352;
@@ -42,6 +42,29 @@ const ASPECT_INLINE = 0.4;
 const SCALE_MIN = 0.72;
 const SCALE_MAX = 1.55;
 const SCALE_KEY = 'jp-mini-frame-scale-v1';
+
+const WIRED_MINI_LABELS: Record<string, string> = {
+  library: 'ARCH',
+  novels: 'DOC',
+  dictionary: 'LEX',
+  grammar: 'SYN',
+  translate: 'TRN',
+  player: 'SIG-VID',
+  music: 'AUD-DAT',
+  musicwidget: 'AUD-MINI',
+  clipboard: 'BUFFER',
+  anki: 'MEM',
+  flashcards: 'SIM',
+  stats: 'TEL',
+  resources: 'LINK',
+  immersion: 'FEED',
+  calendar: 'OPS',
+  settings: 'SYS',
+};
+
+function wiredMiniLabel(id: MiniAppId, fallback: string): string {
+  return WIRED_MINI_LABELS[id] ?? fallback;
+}
 
 function loadScale(): number {
   try {
@@ -97,6 +120,7 @@ export default function MiniShell({
   const resizeStart = useRef({ y: 0, scale: 1 });
   const clock = useClock(cfg.showClock);
   const aeroMini = useAeroMaterials();
+  const wiredMini = useWiredMaterials();
 
   useEffect(() => onMiniModeChanged(setCfg), []);
 
@@ -146,9 +170,13 @@ export default function MiniShell({
       if (!dead) setDesktopWall(next);
     };
     void load();
-    return onMiniDesktopWallpaperChanged(() => {
+    const unsubscribe = onMiniDesktopWallpaperChanged(() => {
       void load();
     });
+    return () => {
+      dead = true;
+      unsubscribe();
+    };
   }, [cfg.wallpaperMode]);
 
   const flash = (text: string) => {
@@ -388,13 +416,13 @@ export default function MiniShell({
     cfg.wallpaperMode === 'desktop' && desktopWall.kind === 'image'
       ? desktopWall.url
       : wallSrc || cfg.wallpaperUrl;
-  const slotIconSize = aeroMini ? Math.round(18 + scale * 9) : Math.round(16 + scale * 7);
+  const slotIconSize = aeroMini || wiredMini ? Math.round(18 + scale * 9) : Math.round(16 + scale * 7);
 
   return (
     <div
       className={`mini-shell mini-tint-${cfg.tint}${widgetMode ? ' is-widget' : ''}${
-        aeroMini ? ' is-aero-mini' : ' is-modern-mini'
-      }${cfg.monoMode && !aeroMini ? ' mini-mono' : ''}`}
+        wiredMini ? ' is-wired-mini' : aeroMini ? ' is-aero-mini' : ' is-modern-mini'
+      }${cfg.monoMode && !aeroMini && !wiredMini ? ' mini-mono' : ''}`}
       data-mini="1"
       data-widget={widgetMode ? '1' : undefined}
     >
@@ -449,7 +477,7 @@ export default function MiniShell({
       <div
         className={`mini-frame ${densityClass}${widgetMode ? ' is-widget-frame' : ''}${
           showImageWall || cfg.wallpaperMode === 'icons' || showPresetWall ? ' has-wall' : ''
-        }`}
+        }${panelOpen ? ' has-panel-open' : ''}`}
         style={
           widgetMode
             ? { width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', ['--mini-scale' as string]: scale }
@@ -509,7 +537,7 @@ export default function MiniShell({
         <header className="mini-frame-bar mini-drag-region">
           <span className="mini-frame-brand">
             <span className="mini-brand-mark" aria-hidden />
-            Mini
+            {wiredMini ? 'WIRED MINI' : 'Mini'}
           </span>
           {cfg.showClock && <span className="mini-clock">{clock}</span>}
           <div className="mini-frame-tools mini-no-drag">
@@ -570,18 +598,19 @@ export default function MiniShell({
               }
               const meta = miniAppMeta(id);
               const on = isMiniSlotActive(id, popped, activeInline);
+              const label = wiredMini ? wiredMiniLabel(id, meta.label) : meta.label;
               return (
                 <button
                   key={id}
                   type="button"
                   className={`mini-slot${on ? ' is-active' : ''}`}
-                  title={`${meta.label} (${i + 1})`}
+                  title={wiredMini ? `${label} / ${meta.label} (${i + 1})` : `${meta.label} (${i + 1})`}
                   onClick={() => selectSlot(id)}
                 >
                   <span className={`mini-slot-icon app-${id}`} aria-hidden>
                     <Icon name={meta.icon as IconName} size={slotIconSize} />
                   </span>
-                  <span className="mini-slot-label">{meta.label}</span>
+                  <span className="mini-slot-label">{label}</span>
                 </button>
               );
             })}
@@ -609,7 +638,9 @@ export default function MiniShell({
 
         {!widgetMode && !activeInline && (
           <footer className="mini-footer mini-no-drag" aria-hidden>
-            <span className="mini-footer-hint">Slots open widgets or pop-out apps</span>
+            <span className="mini-footer-hint">
+              {wiredMini ? 'Mounted modules open pop-out nodes' : 'Slots open widgets or pop-out apps'}
+            </span>
           </footer>
         )}
 
@@ -713,7 +744,7 @@ export default function MiniShell({
                 />
                 <span>Auto-open first</span>
               </label>
-              {!aeroMini && (
+              {!aeroMini && !wiredMini && (
                 <label className="mini-check">
                   <input
                     type="checkbox"

@@ -6,23 +6,23 @@
  */
 
 export interface WikiCategory {
-  /** Chip label shown in the UI. */
-  label: string;
+  /** i18n key for the chip label (library.wiki.cat.*). */
+  labelKey: string;
   /** Japanese Wikipedia category page, or null for "anything". */
   wikiCategory: string | null;
 }
 
 export const WIKI_CATEGORIES: WikiCategory[] = [
-  { label: 'なんでも (Anything)', wikiCategory: null },
-  { label: '食べ物 (Food)', wikiCategory: 'Category:日本の食文化' },
-  { label: '歴史 (History)', wikiCategory: 'Category:日本の歴史' },
-  { label: 'アニメ (Anime)', wikiCategory: 'Category:アニメ作品 あ' },
-  { label: '科学 (Science)', wikiCategory: 'Category:自然科学' },
-  { label: 'スポーツ (Sports)', wikiCategory: 'Category:日本のスポーツ' },
-  { label: '音楽 (Music)', wikiCategory: 'Category:日本の音楽' },
-  { label: '動物 (Animals)', wikiCategory: 'Category:動物' },
-  { label: '地理 (Places)', wikiCategory: 'Category:日本の地理' },
-  { label: '文化 (Culture)', wikiCategory: 'Category:日本の文化' },
+  { labelKey: 'library.wiki.cat.anything', wikiCategory: null },
+  { labelKey: 'library.wiki.cat.food', wikiCategory: 'Category:日本の食文化' },
+  { labelKey: 'library.wiki.cat.history', wikiCategory: 'Category:日本の歴史' },
+  { labelKey: 'library.wiki.cat.anime', wikiCategory: 'Category:アニメ作品 あ' },
+  { labelKey: 'library.wiki.cat.science', wikiCategory: 'Category:自然科学' },
+  { labelKey: 'library.wiki.cat.sports', wikiCategory: 'Category:日本のスポーツ' },
+  { labelKey: 'library.wiki.cat.music', wikiCategory: 'Category:日本の音楽' },
+  { labelKey: 'library.wiki.cat.animals', wikiCategory: 'Category:動物' },
+  { labelKey: 'library.wiki.cat.places', wikiCategory: 'Category:日本の地理' },
+  { labelKey: 'library.wiki.cat.culture', wikiCategory: 'Category:日本の文化' },
 ];
 
 const API = 'https://ja.wikipedia.org/w/api.php';

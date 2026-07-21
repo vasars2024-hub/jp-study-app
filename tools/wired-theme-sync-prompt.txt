@@ -1,0 +1,26 @@
+You are in jp-study-app. WIRED ARCHIVE only. Work in SMALL file writes; save early and often.
+
+## This session goal (chunk 1 — finish completely before expanding)
+1) i18n chrome in:
+   - src/renderer/components/shell/WiredArchiveBootOverlay.tsx
+   - src/renderer/components/shell/WiredFindingOverlay.tsx
+   - src/renderer/widgets/wiredLabels.ts (if UI labels live here)
+2) Add keys under `wired.*` in src/shared/i18n/catalogs.ts with en + ja + zh + ru.
+3) Color pass ONLY in:
+   - src/renderer/theme/wired-archive.css
+   - src/renderer/theme/wired-shell.css
+   - src/renderer/theme/wired-apps.css
+   Keep CRT cyan/terminal look; fix any leftover Study OS red accent misuse for primary chrome (danger stays red).
+
+## Conflict fences
+OWN: wired-*.ts/css, Wired*.tsx, wiredArchiveLifecycle.ts, wiredDiscovery.ts, terminalModeSettings.ts, wiredArchivePack.ts, wiredLabels.ts
+SHARED allowed: catalogs.ts (wired.* keys only), SpecialPage.tsx Wired/NAVI sections only
+NEVER TOUCH: frutiger-aero*, aero-*, SecretAeroTrigger, Aero*, secretLifecycle, aeroDiscovery/Environment/FeatureSettings, engine.ts, tokens.*, main.tsx, App.tsx, Aero explorer views
+
+## Rules
+- src/ only; no emojis; useT()/t() for chrome; run `node tools/i18n-check.cjs` and fix.
+- Do not commit.
+- Prefer finishing chunk 1 fully over starting chunk 2.
+- If stream is unstable, prioritize writing catalogs + overlay i18n first.
+
+End with a short file list of what you changed.

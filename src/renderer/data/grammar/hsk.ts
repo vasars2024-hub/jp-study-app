@@ -13,6 +13,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Links a subject to a noun identity. Negated with 不是.',
     functions: ['definition', 'describe'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [
       { jp: '我是学生。', reading: 'wǒ shì xuéshēng', en: 'I am a student.' },
       { jp: '这不是书。', reading: 'zhè bú shì shū', en: 'This is not a book.' },
@@ -28,6 +29,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Possession or existence. Negated with 没有.',
     functions: ['status', 'describe'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [
       { jp: '我有一个朋友。', reading: 'wǒ yǒu yí ge péngyou', en: 'I have a friend.' },
     ],
@@ -42,6 +44,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Turns a statement into a polar question.',
     functions: ['confirm', 'asked'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '你是老师吗？', reading: 'nǐ shì lǎoshī ma', en: 'Are you a teacher?' }],
   },
   {
@@ -54,6 +57,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'General negation for present/future and adjectival predicates.',
     functions: ['negative'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我不喜欢咖啡。', reading: 'wǒ bù xǐhuan kāfēi', en: 'I do not like coffee.' }],
   },
   {
@@ -66,6 +70,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Marks completion or a new situation. Distinct from sentence-final 了.',
     functions: ['completed', 'change-the-way'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我吃了饭。', reading: 'wǒ chī le fàn', en: 'I ate (a meal).' }],
   },
   {
@@ -78,6 +83,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Location or ongoing action.',
     functions: ['place', 'action-status'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他在家。', reading: 'tā zài jiā', en: 'He is at home.' }],
   },
   {
@@ -90,6 +96,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Marks possession or turns phrases into modifiers.',
     functions: ['characteristics', 'modify'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '这是我的书。', reading: 'zhè shì wǒ de shū', en: 'This is my book.' }],
   },
   {
@@ -102,6 +109,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Often a neutral linker rather than strong “very”.',
     functions: ['describe', 'similarity-degree'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '天气很好。', reading: 'tiānqì hěn hǎo', en: 'The weather is good.' }],
   },
   {
@@ -114,6 +122,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Adds the same predicate to another subject or situation.',
     functions: ['add', 'similarity-degree'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我也是学生。', reading: 'wǒ yě shì xuéshēng', en: 'I am also a student.' }],
   },
   {
@@ -126,6 +135,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Quantifies over a plural/topic set.',
     functions: ['amount', 'range'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他们都来了。', reading: 'tāmen dōu lái le', en: 'They all came.' }],
   },
   {
@@ -138,6 +148,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Coordinates nouns; not used between clauses like English “and”.',
     functions: ['add', 'companion'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我和朋友去商店。', reading: 'wǒ hé péngyou qù shāngdiàn', en: 'I go to the shop with a friend.' }],
   },
   {
@@ -149,7 +160,8 @@ export const HSK: GrammarPoint[] = [
     structure: 'N + 呢？ / Statement + 呢',
     explanation: 'Returns a question or softens a progressive state.',
     functions: ['asked', 'situation'],
-    register: 'casual',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我很好，你呢？', reading: 'wǒ hěn hǎo, nǐ ne', en: 'I am fine — and you?' }],
   },
 
@@ -164,6 +176,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Desire, near future, or necessity depending on context.',
     functions: ['desire', 'plan', 'necessary-obligation'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我要去北京。', reading: 'wǒ yào qù Běijīng', en: 'I want/am going to Beijing.' }],
   },
   {
@@ -176,6 +189,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Learned ability or predicted future.',
     functions: ['ability', 'future-time'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我会说中文。', reading: 'wǒ huì shuō Zhōngwén', en: 'I can speak Chinese.' }],
   },
   {
@@ -188,6 +202,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Capability under circumstances or permission.',
     functions: ['ability', 'allow'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '明天我能来。', reading: 'míngtiān wǒ néng lái', en: 'I can come tomorrow.' }],
   },
   {
@@ -201,7 +216,8 @@ export const HSK: GrammarPoint[] = [
     functions: ['ban', 'advice'],
     // Standard negative imperative at every register (别动 appears on official
     // signage); 不要 is the more formal variant, not 别's opposite number.
-    register: 'neutral',
+    register: 'casual',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '别说话！', reading: 'bié shuōhuà', en: "Don't talk!" }],
   },
   {
@@ -215,6 +231,7 @@ export const HSK: GrammarPoint[] = [
     functions: ['emphasize', 'evaluate'],
     // Plain degree intensifier, unmarked for register.
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '今天真热。', reading: 'jīntiān zhēn rè', en: 'It is really hot today.' }],
   },
   {
@@ -227,6 +244,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Small degree or amount.',
     functions: ['amount', 'similarity-degree'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我有一点儿累。', reading: 'wǒ yǒu yìdiǎnr lèi', en: 'I am a little tired.' }],
   },
   {
@@ -239,6 +257,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Action in progress right now.',
     functions: ['action-status', 'simultaneous'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他正在看书。', reading: 'tā zhèngzài kàn shū', en: 'He is reading.' }],
   },
   {
@@ -250,20 +269,9 @@ export const HSK: GrammarPoint[] = [
     structure: 'Statement + 吧',
     explanation: 'Softens suggestions, guesses, and invitations.',
     functions: ['invite-suggest', 'speculation'],
-    register: 'casual',
-    examples: [{ jp: '我们走吧。', reading: 'wǒmen zǒu ba', en: "Let's go." }],
-  },
-  {
-    id: 'hsk2-yinwei',
-    lang: 'zh',
-    level: 'HSK2',
-    title: '因为…所以…',
-    meaning: 'because… therefore…',
-    structure: '因为 + Cause，所以 + Result',
-    explanation: 'Basic causal pair; 所以 can stand alone.',
-    functions: ['cause-reason', 'result'],
     register: 'neutral',
-    examples: [{ jp: '因为下雨，所以我没去。', reading: 'yīnwèi xiàyǔ, suǒyǐ wǒ méi qù', en: "Because it rained, I didn't go." }],
+    provenance: { registerSource: 'classified' },
+    examples: [{ jp: '我们走吧。', reading: 'wǒmen zǒu ba', en: "Let's go." }],
   },
   {
     id: 'hsk2-bi',
@@ -275,6 +283,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Compares two entities on a quality.',
     functions: ['compare'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他比我高。', reading: 'tā bǐ wǒ gāo', en: 'He is taller than me.' }],
   },
 
@@ -289,6 +298,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Highlights how the object is handled/changed.',
     functions: ['act', 'result'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '请把门打开。', reading: 'qǐng bǎ mén dǎkāi', en: 'Please open the door.' }],
   },
   {
@@ -301,6 +311,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Marks the patient as subject; often adverse.',
     functions: ['passive'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我的手机被偷了。', reading: 'wǒ de shǒujī bèi tōu le', en: 'My phone was stolen.' }],
   },
   {
@@ -313,6 +324,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Describes how an action is performed or its degree.',
     functions: ['describe', 'evaluate'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他说得很好。', reading: 'tā shuō de hěn hǎo', en: 'He speaks very well.' }],
   },
   {
@@ -325,6 +337,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Indicates past experience, not a specific time focus.',
     functions: ['experience', 'past-state'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我去过中国。', reading: 'wǒ qù guo Zhōngguó', en: 'I have been to China.' }],
   },
   {
@@ -337,6 +350,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Later than expected, or condition just met.',
     functions: ['time', 'emphasize', 'condition'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他十点才来。', reading: 'tā shí diǎn cái lái', en: 'He only came at ten.' }],
   },
   {
@@ -349,6 +363,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Earlier than expected, immediate sequence, or soft emphasis.',
     functions: ['time-sequence', 'emphasize'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '吃完饭就走。', reading: 'chī wán fàn jiù zǒu', en: 'Leave right after eating.' }],
   },
   {
@@ -361,6 +376,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Concessive pair.',
     functions: ['concessions', 'contrast'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '虽然很累，但是我很开心。', reading: 'suīrán hěn lèi, dànshì wǒ hěn kāixīn', en: 'Although tired, I am happy.' }],
   },
   {
@@ -373,6 +389,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Hypothetical condition.',
     functions: ['condition', 'condition-assumption'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '如果下雨，我就不去。', reading: 'rúguǒ xiàyǔ, wǒ jiù bú qù', en: "If it rains, I won't go." }],
   },
   {
@@ -385,6 +402,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Marks that a change has already occurred.',
     functions: ['completed', 'past-state'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我已经吃饭了。', reading: 'wǒ yǐjīng chī fàn le', en: 'I have already eaten.' }],
   },
   {
@@ -397,6 +415,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Continuation, addition, or mild surprise.',
     functions: ['continuity', 'add'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他还在睡觉。', reading: 'tā hái zài shuìjiào', en: 'He is still sleeping.' }],
   },
 
@@ -411,19 +430,8 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Highlights known-event details (when/where/how).',
     functions: ['emphasize', 'explain'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我是昨天来的。', reading: 'wǒ shì zuótiān lái de', en: 'It was yesterday that I came.' }],
-  },
-  {
-    id: 'hsk4-ba-result',
-    lang: 'zh',
-    level: 'HSK4',
-    title: '越…越…',
-    meaning: 'the more… the more…',
-    structure: '越 + A，越 + B',
-    explanation: 'Proportional change.',
-    functions: ['proportional', 'trend'],
-    register: 'neutral',
-    examples: [{ jp: '天气越来越冷。', reading: 'tiānqì yuè lái yuè lěng', en: 'The weather is getting colder and colder.' }],
   },
   {
     id: 'hsk4-budan',
@@ -435,6 +443,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Additive emphasis.',
     functions: ['add', 'emphasize'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他不但聪明，而且努力。', reading: 'tā bùdàn cōngmíng, érqiě nǔlì', en: 'He is not only smart but also hardworking.' }],
   },
   {
@@ -447,6 +456,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Sufficient condition.',
     functions: ['condition-sufficient', 'condition'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '只要努力，就能成功。', reading: 'zhǐyào nǔlì, jiù néng chénggōng', en: 'As long as you work hard, you can succeed.' }],
   },
   {
@@ -459,6 +469,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Exclusion or inclusion (“besides”) depending on context.',
     functions: ['exception', 'add'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '除了他以外，大家都来了。', reading: 'chúle tā yǐwài, dàjiā dōu lái le', en: 'Everyone came except him.' }],
   },
   {
@@ -471,6 +482,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Extreme inclusion for emphasis.',
     functions: ['emphasize', 'extremes'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '连小孩子都知道。', reading: 'lián xiǎo háizi dōu zhīdào', en: 'Even children know.' }],
   },
   {
@@ -483,6 +495,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Unbroken duration.',
     functions: ['continuity', 'period'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我一直在等你。', reading: 'wǒ yìzhí zài děng nǐ', en: 'I have been waiting for you the whole time.' }],
   },
   {
@@ -494,7 +507,8 @@ export const HSK: GrammarPoint[] = [
     structure: '根据 + N，…',
     explanation: 'Basis for a statement; common in formal writing.',
     functions: ['grounds', 'information-resource'],
-    register: 'business',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '根据计划，我们下周开始。', reading: 'gēnjù jìhuà, wǒmen xià zhōu kāishǐ', en: 'According to the plan, we start next week.' }],
   },
 
@@ -508,7 +522,8 @@ export const HSK: GrammarPoint[] = [
     structure: 'Clause，并/并且 + Clause',
     explanation: 'Formal additive connector between clauses.',
     functions: ['add', 'explain'],
-    register: 'business',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他同意了，并且表示支持。', reading: 'tā tóngyì le, bìngqiě biǎoshì zhīchí', en: 'He agreed and expressed support.' }],
   },
   {
@@ -521,6 +536,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Literary/contrastive “while/but”.',
     functions: ['contrast', 'compare-contrast'],
     register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他喜欢安静，而我喜欢热闹。', reading: 'tā xǐhuan ānjìng, ér wǒ xǐhuan rènào', en: 'He likes quiet, while I like lively places.' }],
   },
   {
@@ -532,7 +548,8 @@ export const HSK: GrammarPoint[] = [
     structure: '…以至于 + Result',
     explanation: 'Result reaches an extreme degree.',
     functions: ['result', 'extremes'],
-    register: 'neutral',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他忙得以至于忘了吃饭。', reading: 'tā máng de yǐzhìyú wàng le chīfàn', en: 'He was so busy that he forgot to eat.' }],
   },
   {
@@ -545,6 +562,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Universal concessive.',
     functions: ['concessions', 'invariant'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '无论多难，都要坚持。', reading: 'wúlùn duō nán, dōu yào jiānchí', en: 'No matter how hard, keep going.' }],
   },
   {
@@ -557,19 +575,8 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Strong concession.',
     functions: ['concessions', 'condition-contrary'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '就是下雨，我也去。', reading: 'jiùshì xiàyǔ, wǒ yě qù', en: "Even if it rains, I'll go." }],
-  },
-  {
-    id: 'hsk5-fangbian',
-    lang: 'zh',
-    level: 'HSK5',
-    title: '以便',
-    meaning: 'so as to / in order that',
-    structure: '…，以便 + Purpose',
-    explanation: 'Formal purpose connector.',
-    functions: ['purpose-goal'],
-    register: 'business',
-    examples: [{ jp: '请提前准备，以便顺利开会。', reading: 'qǐng tíqián zhǔnbèi, yǐbiàn shùnlì kāihuì', en: 'Please prepare early so the meeting goes smoothly.' }],
   },
   {
     id: 'hsk5-buguan',
@@ -581,6 +588,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Concessive with persistent outcome.',
     functions: ['concessions', 'continuity'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '尽管很晚，他还是来了。', reading: 'jǐnguǎn hěn wǎn, tā háishì lái le', en: 'Even though it was late, he still came.' }],
   },
   {
@@ -592,7 +600,8 @@ export const HSK: GrammarPoint[] = [
     structure: '由于 + Cause，…',
     explanation: 'Formal cause; often sentence-initial.',
     functions: ['cause-reason'],
-    register: 'business',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '由于天气原因，航班取消了。', reading: 'yóuyú tiānqì yuányīn, hángbān qǔxiāo le', en: 'Due to weather, the flight was cancelled.' }],
   },
 
@@ -607,19 +616,8 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Result opposite to expectation.',
     functions: ['unexpected-outcome', 'contrast'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他休息后，病反而加重了。', reading: 'tā xiūxi hòu, bìng fǎnér jiāzhòng le', en: 'After resting, his illness got worse instead.' }],
-  },
-  {
-    id: 'hsk6-bishang',
-    lang: 'zh',
-    level: 'HSK6',
-    title: '与其…不如…',
-    meaning: 'rather than A, better B',
-    structure: '与其 + A，不如 + B',
-    explanation: 'Preferential comparison.',
-    functions: ['compare', 'advice'],
-    register: 'neutral',
-    examples: [{ jp: '与其抱怨，不如行动。', reading: 'yǔqí bàoyuàn, bùrú xíngdòng', en: 'Rather than complain, take action.' }],
   },
   {
     id: 'hsk6-jiushi-emp',
@@ -630,7 +628,8 @@ export const HSK: GrammarPoint[] = [
     structure: '恰恰 + V/是',
     explanation: 'Emphasizes exact match or irony.',
     functions: ['emphasize', 'confirm'],
-    register: 'neutral',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '这恰恰说明问题。', reading: 'zhè qiàqià shuōmíng wèntí', en: 'This precisely shows the problem.' }],
   },
   {
@@ -643,6 +642,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Strong negation of past experience; 何曾 is literary.',
     functions: ['negative', 'emphasize-negative'],
     register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '我从未见过这样的事。', reading: 'wǒ cóng wèi jiàn guo zhèyàng de shì', en: 'I have never seen such a thing.' }],
   },
   {
@@ -655,6 +655,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Hypothetical concession.',
     functions: ['concessions', 'condition-contrary'],
     register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '即便失败，也不放弃。', reading: 'jíbiàn shībài, yě bù fàngqì', en: "Even if I fail, I won't give up." }],
   },
   {
@@ -666,7 +667,8 @@ export const HSK: GrammarPoint[] = [
     structure: '…，从而 + Result',
     explanation: 'Formal result connector after a means/process.',
     functions: ['result', 'means-methods'],
-    register: 'business',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他努力学习，从而取得了进步。', reading: 'tā nǔlì xuéxí, cóngér qǔdé le jìnbù', en: 'He studied hard and thereby made progress.' }],
   },
   {
@@ -678,7 +680,8 @@ export const HSK: GrammarPoint[] = [
     structure: '关于/至于 + Topic，…',
     explanation: 'Topic framing; 至于 often shifts topic.',
     functions: ['story-topic', 'perspective-way'],
-    register: 'business',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '关于这个问题，我们以后再谈。', reading: 'guānyú zhège wèntí, wǒmen yǐhòu zài tán', en: 'Regarding this issue, we will talk later.' }],
   },
   {
@@ -690,15 +693,17 @@ export const HSK: GrammarPoint[] = [
     structure: '无非 + 是 + N/Clause',
     explanation: 'Downplays something as merely X.',
     functions: ['limit', 'evaluate'],
-    register: 'neutral',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '他无非是想帮忙。', reading: 'tā wúfēi shì xiǎng bāngmáng', en: 'He merely wants to help.' }],
   },
 
-  // —— HSK7 ——
+  // —— HSK7-9 (single combined band in HSK 3.0) ——
   {
     id: 'hsk7-jiishi',
     lang: 'zh',
-    level: 'HSK7',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK7' },
     title: '岂不 / 岂非',
     meaning: 'rhetorical “isn’t it…?”',
     structure: '岂不/岂非 + Predicate',
@@ -710,7 +715,8 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk7-weimian',
     lang: 'zh',
-    level: 'HSK7',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK7' },
     title: '未免',
     meaning: 'rather too… / unavoidably a bit…',
     structure: '未免 + Adj/过度',
@@ -722,7 +728,8 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk7-heku',
     lang: 'zh',
-    level: 'HSK7',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK7' },
     title: '何苦',
     meaning: 'why go to the trouble of…',
     structure: '何苦 + V',
@@ -737,19 +744,21 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk7-ningke',
     lang: 'zh',
-    level: 'HSK7',
+    level: 'HSK7-9',
     title: '宁可…也…',
     meaning: 'would rather… than…',
     structure: '宁可 + A，也 + (不) B',
     explanation: 'Preferential resolve under cost.',
     functions: ['determination-decision', 'compare'],
-    register: 'neutral',
+    register: 'literary',
+    provenance: { registerSource: 'classified', sourceLevel: 'HSK7' },
     examples: [{ jp: '我宁可迟到，也不闯红灯。', reading: 'wǒ nìngkě chídào, yě bù chuǎng hóngdēng', en: "I'd rather be late than run a red light." }],
   },
   {
     id: 'hsk7-jianzhi',
     lang: 'zh',
-    level: 'HSK7',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK7' },
     title: '简直',
     meaning: 'simply / practically',
     structure: '简直 + Predicate',
@@ -762,7 +771,8 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk7-suowei',
     lang: 'zh',
-    level: 'HSK7',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK7' },
     title: '所谓',
     meaning: 'so-called',
     structure: '所谓 + N',
@@ -771,12 +781,11 @@ export const HSK: GrammarPoint[] = [
     register: 'neutral',
     examples: [{ jp: '所谓成功，因人而异。', reading: 'suǒwèi chénggōng, yīn rén ér yì', en: 'So-called success differs by person.' }],
   },
-
-  // —— HSK8 ——
   {
     id: 'hsk8-feidan',
     lang: 'zh',
-    level: 'HSK8',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK8' },
     title: '非但…反而…',
     meaning: 'not only not A, but on the contrary B',
     structure: '非但 + Neg，反而 + Result',
@@ -788,7 +797,8 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk8-wuyi',
     lang: 'zh',
-    level: 'HSK8',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK8' },
     title: '无异于',
     meaning: 'tantamount to / no different from',
     structure: 'A 无异于 B',
@@ -798,33 +808,10 @@ export const HSK: GrammarPoint[] = [
     examples: [{ jp: '放弃努力无异于认输。', reading: 'fàngqì nǔlì wú yì yú rènshū', en: 'Giving up effort is tantamount to admitting defeat.' }],
   },
   {
-    id: 'hsk8-heqi',
-    lang: 'zh',
-    level: 'HSK8',
-    title: '何况',
-    meaning: 'let alone / moreover',
-    structure: '…，何况 + EvenHarder',
-    explanation: 'A fortiori argument.',
-    functions: ['much-less-on-level', 'arguments-affirmative'],
-    register: 'neutral',
-    examples: [{ jp: '大人都做不到，何况孩子。', reading: 'dàrén dōu zuò bú dào, hékuàng háizi', en: "Adults can't do it, let alone children." }],
-  },
-  {
-    id: 'hsk8-yizhi-yi',
-    lang: 'zh',
-    level: 'HSK8',
-    title: '一…就…',
-    meaning: 'as soon as… then…',
-    structure: '一 + V1，就 + V2',
-    explanation: 'Immediate succession.',
-    functions: ['immediately-after', 'time-sequence'],
-    register: 'neutral',
-    examples: [{ jp: '他一到家就睡觉。', reading: 'tā yí dào jiā jiù shuìjiào', en: 'As soon as he gets home, he sleeps.' }],
-  },
-  {
     id: 'hsk8-moufei',
     lang: 'zh',
-    level: 'HSK8',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK8' },
     title: '莫非',
     meaning: 'could it be that…?',
     structure: '莫非 + Clause',
@@ -836,7 +823,8 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk8-budao',
     lang: 'zh',
-    level: 'HSK8',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK8' },
     title: '不至于',
     meaning: 'not to the extent of…',
     structure: '不至于 + Extreme',
@@ -845,12 +833,11 @@ export const HSK: GrammarPoint[] = [
     register: 'neutral',
     examples: [{ jp: '情况还不至于那么糟。', reading: 'qíngkuàng hái bùzhìyú nàme zāo', en: "It's not that bad yet." }],
   },
-
-  // —— HSK9 ——
   {
     id: 'hsk9-ningyuan',
     lang: 'zh',
-    level: 'HSK9',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK9' },
     title: '未尝不可',
     meaning: 'it wouldn’t hurt / not impermissible',
     structure: '…未尝不可',
@@ -862,19 +849,21 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk9-qishi',
     lang: 'zh',
-    level: 'HSK9',
+    level: 'HSK7-9',
     title: '其实不然',
     meaning: 'actually not so',
     structure: '…，其实不然',
     explanation: 'Corrects a prior assumption.',
     functions: ['corrections', 'contrast'],
-    register: 'business',
+    register: 'literary',
+    provenance: { registerSource: 'classified', sourceLevel: 'HSK9' },
     examples: [{ jp: '看起来简单，其实不然。', reading: 'kàn qǐlái jiǎndān, qíshí bùrán', en: 'It looks simple — actually not.' }],
   },
   {
     id: 'hsk9-congci',
     lang: 'zh',
-    level: 'HSK9',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK9' },
     title: '由此可见',
     meaning: 'thus it can be seen that…',
     structure: '由此可见，…',
@@ -886,31 +875,34 @@ export const HSK: GrammarPoint[] = [
   {
     id: 'hsk9-buci',
     lang: 'zh',
-    level: 'HSK9',
+    level: 'HSK7-9',
     title: '不辞而别',
     meaning: 'leave without saying goodbye',
     structure: '不辞而别',
     explanation: 'Fixed literary expression for abrupt departure.',
     functions: ['describe', 'situation'],
     register: 'literary',
+    provenance: { registerSource: 'classified', sourceLevel: 'HSK9' },
     examples: [{ jp: '他昨夜不辞而别。', reading: 'tā zuó yè bù cí ér bié', en: 'He left last night without saying goodbye.' }],
   },
   {
     id: 'hsk9-wany',
     lang: 'zh',
-    level: 'HSK9',
+    level: 'HSK7-9',
     title: '万万不可',
     meaning: 'absolutely must not',
     structure: '万万不可 + V',
     explanation: 'Strong prohibition.',
     functions: ['ban', 'warning'],
-    register: 'business',
+    register: 'literary',
+    provenance: { registerSource: 'classified', sourceLevel: 'HSK9' },
     examples: [{ jp: '此事万万不可外传。', reading: 'cǐ shì wànwàn bùkě wài chuán', en: 'This matter must absolutely not be leaked.' }],
   },
   {
     id: 'hsk9-heyi',
     lang: 'zh',
-    level: 'HSK9',
+    level: 'HSK7-9',
+    provenance: { sourceLevel: 'HSK9' },
     title: '何以见得',
     meaning: 'how can one tell / on what grounds',
     structure: '何以见得？',
@@ -943,6 +935,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Cautious double-negative approval.',
     functions: ['allow', 'speculation'],
     register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '换个思路未始不可。', reading: 'huàn ge sīlù wèi shǐ bùkě', en: 'Changing approach may well be fine.' }],
   },
   {
@@ -955,6 +948,7 @@ export const HSK: GrammarPoint[] = [
     explanation: 'Classical rhetorical disbelief.',
     functions: ['surprise', 'speculation'],
     register: 'literary',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '宁有此理乎？', reading: 'nìng yǒu cǐ lǐ hū', en: 'How could such a thing be reasonable?' }],
   },
   {
@@ -1002,7 +996,8 @@ export const HSK: GrammarPoint[] = [
     structure: '再 + Adj + 不过',
     explanation: 'Colloquial superlative praise/blame.',
     functions: ['highest-level', 'evaluate'],
-    register: 'casual',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
     examples: [{ jp: '这样再好不过了。', reading: 'zhèyàng zài hǎo bùguò le', en: 'This couldn’t be better.' }],
   },
   {

@@ -1,0 +1,1807 @@
+:root[data-materials='wired'] .ui-app-chrome {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--text);
+  background: rgba(2, 13, 20, 0.96);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .ui-app-chrome__body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.03) 1px, transparent 1px),
+    rgba(2, 13, 20, 0.96);
+  background-size: 20px 20px;
+}
+
+:root[data-materials='wired'] .ui-menubar,
+:root[data-materials='wired'] .ui-toolbar,
+:root[data-materials='wired'] .ui-statusbar {
+  color: var(--wired-cyan);
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.07) 0 1px, transparent 1px 18px),
+    rgba(0, 9, 14, 0.92);
+  border-color: rgba(109, 241, 255, 0.24);
+  box-shadow: none;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .ui-menubar__btn,
+:root[data-materials='wired'] .ui-statusbar__field,
+:root[data-materials='wired'] .ui-btn,
+:root[data-materials='wired'] .btn,
+:root[data-materials='wired'] .gram-level-btn,
+:root[data-materials='wired'] .sp-seg-btn {
+  border-radius: 2px;
+  color: var(--wired-cyan);
+  background: rgba(2, 22, 31, 0.84);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(109, 241, 255, 0.06);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .ui-btn--primary,
+:root[data-materials='wired'] .btn.primary,
+:root[data-materials='wired'] .gram-level-btn.active,
+:root[data-materials='wired'] .sp-seg-btn.active {
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.15);
+  border-color: rgba(109, 241, 255, 0.58);
+}
+
+:root[data-materials='wired'] input,
+:root[data-materials='wired'] textarea,
+:root[data-materials='wired'] select,
+:root[data-materials='wired'] .ui-input,
+:root[data-materials='wired'] .ui-select,
+:root[data-materials='wired'] .ui-textarea {
+  border-radius: 0;
+  color: #e9feff;
+  background: rgba(0, 8, 13, 0.86);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] input::placeholder,
+:root[data-materials='wired'] textarea::placeholder {
+  color: rgba(216, 251, 255, 0.42);
+}
+
+:root[data-materials='wired'] .view-head {
+  border-bottom: 1px solid rgba(109, 241, 255, 0.22);
+  background: rgba(2, 18, 27, 0.66);
+}
+
+:root[data-materials='wired'] .view-head h1,
+:root[data-materials='wired'] .view-head h2,
+:root[data-materials='wired'] .view-head h3 {
+  color: #e9feff;
+}
+
+:root[data-materials='wired'] .view-head::before {
+  content: 'MODULE STATUS / READY';
+  display: block;
+  color: var(--wired-amber);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+:root[data-materials='wired'] .muted {
+  color: rgba(216, 251, 255, 0.62) !important;
+}
+
+:root[data-materials='wired'] code,
+:root[data-materials='wired'] kbd {
+  color: var(--wired-amber);
+  background: rgba(0, 8, 13, 0.88);
+  border: 1px solid rgba(255, 177, 59, 0.22);
+  border-radius: 0;
+}
+
+/* Dictionary: LEX / Lexeme Analyzer -------------------------------------- */
+:root[data-materials='wired'] .aero-dict-chrome .view-head::before,
+:root[data-materials='wired'] .dict-view .view-head::before {
+  content: 'LEX / LEXEME ANALYZER / INDEX READY';
+}
+
+:root[data-materials='wired'] .dict-search {
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: rgba(0, 8, 13, 0.8);
+  padding: 10px;
+}
+
+:root[data-materials='wired'] .dict-search::before {
+  content: '> probe ';
+  color: var(--wired-amber);
+  align-self: center;
+}
+
+:root[data-materials='wired'] .dict-hint,
+:root[data-materials='wired'] .dict-result,
+:root[data-materials='wired'] .dict-card,
+:root[data-materials='wired'] .dict-results article {
+  border-radius: 0;
+  background: rgba(2, 18, 27, 0.78);
+  border: 1px solid rgba(109, 241, 255, 0.18);
+}
+
+/* Media and music --------------------------------------------------------- */
+:root[data-materials='wired'] .aero-media-chrome .view-head::before {
+  content: 'SIG-VID / SIGNAL ARCHIVE / ACQUIRING FEED';
+}
+
+:root[data-materials='wired'] .aero-music-chrome .view-head::before {
+  content: 'AUD-DAT / AUDIO DECK / CHANNEL 02';
+}
+
+:root[data-materials='wired'] video,
+:root[data-materials='wired'] .media-player,
+:root[data-materials='wired'] .music-stage,
+:root[data-materials='wired'] .music-now,
+:root[data-materials='wired'] .music-player {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.26);
+  background: #00070b;
+  box-shadow: inset 0 0 28px rgba(109, 241, 255, 0.08);
+}
+
+:root[data-materials='wired'] .music-row,
+:root[data-materials='wired'] .media-row,
+:root[data-materials='wired'] .media-file-row {
+  border-radius: 0;
+  border-color: rgba(109, 241, 255, 0.14);
+}
+
+/* Grammar, flashcards, memory ------------------------------------------- */
+:root[data-materials='wired'] .aero-gram-chrome .view-head::before,
+:root[data-materials='wired'] .gram-view .view-head::before {
+  content: 'SYN / SYNTAX DIAGNOSTICS / PARSE UNIT';
+}
+
+:root[data-materials='wired'] .aero-flash-chrome .view-head::before,
+:root[data-materials='wired'] .flash-view .view-head::before {
+  content: 'SIM / TRAINING SIMULATOR / RETENTION DRILL';
+}
+
+:root[data-materials='wired'] .aero-anki-chrome .view-head::before,
+:root[data-materials='wired'] .anki-view .view-head::before {
+  content: 'MEM / MEMORY SYNC / SRS BRIDGE';
+}
+
+:root[data-materials='wired'] .flash-card,
+:root[data-materials='wired'] .flash-deck-card,
+:root[data-materials='wired'] .anki-card,
+:root[data-materials='wired'] .gram-card,
+:root[data-materials='wired'] .gram-detail,
+:root[data-materials='wired'] .aero-gram-panel,
+:root[data-materials='wired'] .aero-flash-panel {
+  border-radius: 0;
+  background: rgba(2, 18, 27, 0.82);
+  border: 1px solid rgba(109, 241, 255, 0.2);
+}
+
+:root[data-materials='wired'] .flash-review-actions button:nth-child(1)::before { content: 'FAIL / RESYNC '; }
+:root[data-materials='wired'] .flash-review-actions button:nth-child(2)::before { content: 'HARD / UNSTABLE '; }
+:root[data-materials='wired'] .flash-review-actions button:nth-child(3)::before { content: 'GOOD / STORED '; }
+:root[data-materials='wired'] .flash-review-actions button:nth-child(4)::before { content: 'EASY / STABLE '; }
+
+/* Classic flash tree has two verdict buttons. */
+:root[data-materials='wired'] .flash-actions .flash-again::before { content: 'FAIL / RESYNC '; }
+:root[data-materials='wired'] .flash-actions .flash-got::before { content: 'GOOD / STORED '; }
+
+/* Library, novels, resources -------------------------------------------- */
+:root[data-materials='wired'] .aero-library-chrome .view-head::before {
+  content: 'ARCH / ARCHIVE BAY / LOCAL MOUNTS';
+}
+
+:root[data-materials='wired'] .aero-reader-chrome .view-head::before,
+:root[data-materials='wired'] .aero-novels-chrome .view-head::before,
+:root[data-materials='wired'] .jiten-novels .view-head::before {
+  content: 'DOC / CLASSIFIED TEXT VIEWER';
+}
+
+:root[data-materials='wired'] .aero-resources-chrome .view-head::before,
+:root[data-materials='wired'] .res-view .view-head::before {
+  content: 'LINK / UPLINK DIRECTORY / RELAY NODES';
+}
+
+:root[data-materials='wired'] .library-card,
+:root[data-materials='wired'] .novel-card,
+:root[data-materials='wired'] .resource-card,
+:root[data-materials='wired'] .res-card {
+  border-radius: 0;
+  background: rgba(2, 18, 27, 0.82);
+  border: 1px solid rgba(109, 241, 255, 0.18);
+}
+
+/* Translate, stats, calendar, settings ----------------------------------- */
+:root[data-materials='wired'] .aero-translate-chrome .view-head::before,
+:root[data-materials='wired'] .tr-view .view-head::before {
+  content: 'TRN / SIGNAL TRANSLATOR / PACKET DECODER';
+}
+
+:root[data-materials='wired'] .aero-stats-chrome .view-head::before,
+:root[data-materials='wired'] .stats-view .view-head::before {
+  content: 'TEL / TELEMETRY COMMAND / OPERATOR METRICS';
+}
+
+:root[data-materials='wired'] .aero-calendar-chrome .view-head::before,
+:root[data-materials='wired'] .calendar-view .view-head::before {
+  content: 'OPS / OPERATIONS SCHEDULE / MISSION GRID';
+}
+
+:root[data-materials='wired'] .aero-settings-chrome .view-head::before,
+:root[data-materials='wired'] .os-set-page-head::before {
+  content: 'SYS / SERVICE PANEL / MACHINE CONFIGURATION';
+  display: block;
+  color: var(--wired-amber);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+:root[data-materials='wired'] .os-settings,
+:root[data-materials='wired'] .os-set-pane-v2,
+:root[data-materials='wired'] .os-set-card,
+:root[data-materials='wired'] .os-set-nav,
+:root[data-materials='wired'] .os-set-status-chip,
+:root[data-materials='wired'] .os-set-quick-card {
+  border-radius: 0;
+  background: rgba(2, 18, 27, 0.78);
+  border-color: rgba(109, 241, 255, 0.2);
+}
+
+:root[data-materials='wired'] .os-set-card-title,
+:root[data-materials='wired'] .os-set-page-title {
+  color: #e9feff;
+}
+
+.wired-access-card {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 10px;
+  border: 1px dashed rgba(109, 241, 255, 0.24);
+  background: rgba(0, 9, 14, 0.44);
+}
+
+.wired-access-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  color: rgba(216, 251, 255, 0.72);
+  background: rgba(0, 9, 14, 0.72);
+  border: 1px solid rgba(109, 241, 255, 0.18);
+  border-radius: 2px;
+  padding: 10px;
+}
+
+.wired-access-tile strong,
+.wired-access-tile small {
+  display: block;
+}
+
+.wired-access-card.is-armed {
+  border-style: solid;
+  border-color: rgba(255, 177, 59, 0.42);
+}
+
+.wired-access-command {
+  display: grid;
+  gap: 6px;
+}
+
+.wired-access-command div {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.wired-settings-terminal {
+  --special-terminal-accent: var(--accent);
+  --special-terminal-accent-2: var(--accent-2);
+  --special-terminal-panel: color-mix(in srgb, var(--panel) 82%, transparent);
+  --special-terminal-panel-2: color-mix(in srgb, var(--panel-2) 86%, transparent);
+  --special-terminal-border: color-mix(in srgb, var(--accent) 34%, var(--border));
+  --special-terminal-text: var(--text);
+  --special-terminal-muted: var(--muted);
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--special-terminal-border);
+  border-radius: 4px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--special-terminal-accent) 7%, transparent) 1px, transparent 1px),
+    var(--special-terminal-panel);
+  background-size: 16px 16px;
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+}
+
+:root[data-materials='wired'] .wired-settings-terminal {
+  --special-terminal-accent: var(--wired-cyan, #6df1ff);
+  --special-terminal-accent-2: var(--wired-amber, #ffb13b);
+  --special-terminal-panel: rgba(0, 8, 13, 0.68);
+  --special-terminal-panel-2: rgba(0, 5, 8, 0.62);
+  --special-terminal-border: rgba(109, 241, 255, 0.22);
+  --special-terminal-text: rgba(233, 254, 255, 0.92);
+  --special-terminal-muted: rgba(216, 251, 255, 0.62);
+}
+
+.wired-settings-terminal-screen {
+  min-height: 92px;
+  max-height: 132px;
+  overflow: hidden;
+  padding: 8px;
+  color: var(--special-terminal-text);
+  background: var(--special-terminal-panel-2);
+  font-size: 11px;
+  line-height: 1.45;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--special-terminal-accent) 16%, transparent);
+}
+
+.wired-settings-terminal-command {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.wired-settings-terminal-command span {
+  color: var(--special-terminal-accent-2);
+}
+
+.wired-settings-terminal-command input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--special-terminal-accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--special-terminal-panel-2) 76%, transparent);
+  color: var(--special-terminal-text);
+  font: inherit;
+}
+
+.wired-settings-terminal-command button,
+.wired-settings-terminal-actions button {
+  border: 1px solid color-mix(in srgb, var(--special-terminal-accent) 34%, var(--border));
+  border-radius: 3px;
+  color: var(--special-terminal-accent);
+  background: var(--special-terminal-panel-2);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.wired-settings-terminal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wired-feature-grid {
+  --special-terminal-accent: var(--accent);
+  --special-terminal-accent-2: var(--accent-2);
+  --special-terminal-panel: color-mix(in srgb, var(--panel) 82%, transparent);
+  --special-terminal-panel-2: color-mix(in srgb, var(--panel-2) 86%, transparent);
+  --special-terminal-border: color-mix(in srgb, var(--accent) 34%, var(--border));
+  --special-terminal-text: var(--text);
+  --special-terminal-muted: var(--muted);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+:root[data-materials='wired'] .wired-feature-grid {
+  --special-terminal-accent: var(--wired-cyan, #6df1ff);
+  --special-terminal-accent-2: var(--wired-amber, #ffb13b);
+  --special-terminal-panel: rgba(0, 8, 13, 0.68);
+  --special-terminal-panel-2: rgba(0, 5, 8, 0.62);
+  --special-terminal-border: rgba(109, 241, 255, 0.22);
+  --special-terminal-text: rgba(233, 254, 255, 0.92);
+  --special-terminal-muted: rgba(216, 251, 255, 0.62);
+}
+
+.wired-feature-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: start;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--special-terminal-accent) 18%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--special-terminal-panel) 76%, transparent);
+}
+
+.wired-feature-toggle.is-active {
+  border-color: color-mix(in srgb, var(--special-terminal-accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--special-terminal-accent) 10%, var(--special-terminal-panel));
+}
+
+.wired-feature-toggle input {
+  margin-top: 2px;
+}
+
+.wired-feature-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.wired-feature-toggle strong {
+  color: var(--special-terminal-text);
+  font-size: 12px;
+}
+
+.wired-feature-toggle small {
+  color: var(--special-terminal-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.wired-feature-toggle code {
+  color: var(--special-terminal-accent-2);
+  font-size: 10px;
+}
+
+/* Generic empty states: remove playful card feel in wired mode ------------ */
+:root[data-materials='wired'] .empty-emoji,
+:root[data-materials='wired'] .flash-empty-emoji,
+:root[data-materials='wired'] .flash-done-emoji,
+:root[data-materials='wired'] .media-empty-emoji,
+:root[data-materials='wired'] .stats-empty-emoji,
+:root[data-materials='wired'] .cs-emoji {
+  color: var(--wired-cyan);
+  filter: drop-shadow(0 0 10px rgba(109, 241, 255, 0.28));
+}
+
+:root[data-materials='wired'] .empty-emoji::after,
+:root[data-materials='wired'] .flash-empty-emoji::after,
+:root[data-materials='wired'] .media-empty-emoji::after,
+:root[data-materials='wired'] .stats-empty-emoji::after {
+  content: 'NO RECORDS';
+  display: block;
+  margin-top: 6px;
+  color: var(--wired-amber);
+  font-size: 11px;
+}
+
+/* Global constancy: same signal colors on every surface ------------------- */
+:root[data-materials='wired'] ::selection {
+  color: #02070d;
+  background: rgba(109, 241, 255, 0.82);
+}
+
+:root[data-materials='wired'] input[type='checkbox'],
+:root[data-materials='wired'] input[type='radio'],
+:root[data-materials='wired'] input[type='range'],
+:root[data-materials='wired'] progress {
+  accent-color: var(--wired-cyan);
+}
+
+:root[data-materials='wired'] a {
+  color: var(--wired-cyan);
+  text-decoration-color: rgba(109, 241, 255, 0.42);
+}
+
+:root[data-materials='wired'] a:hover {
+  color: #e9feff;
+}
+
+:root[data-materials='wired'] .ui-app-chrome ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+:root[data-materials='wired'] .ui-app-chrome ::-webkit-scrollbar-track {
+  background: rgba(0, 8, 13, 0.92);
+  border-left: 1px solid rgba(109, 241, 255, 0.14);
+}
+
+:root[data-materials='wired'] .ui-app-chrome ::-webkit-scrollbar-thumb {
+  background: rgba(109, 241, 255, 0.42);
+  border: 1px solid rgba(0, 8, 13, 0.92);
+}
+
+:root[data-materials='wired'] .ui-app-chrome ::-webkit-scrollbar-thumb:hover {
+  background: rgba(109, 241, 255, 0.62);
+}
+
+:root[data-materials='wired'] .btn.danger,
+:root[data-materials='wired'] .ui-btn--danger {
+  color: #ffd2d4;
+  background: rgba(126, 0, 12, 0.36);
+  border-color: rgba(223, 39, 50, 0.66);
+}
+
+/* Immersion: NODE-FEED / surveillance browser ----------------------------- */
+:root[data-materials='wired'] .aero-immersion-chrome .ui-app-chrome__body {
+  background: rgba(2, 13, 20, 0.96);
+}
+
+:root[data-materials='wired'] .aero-immersion,
+:root[data-materials='wired'] .immersion-root {
+  color: var(--text);
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.03) 1px, transparent 1px),
+    rgba(2, 13, 20, 0.96);
+  background-size: 20px 20px;
+}
+
+:root[data-materials='wired'] .aero-immersion-toolbar,
+:root[data-materials='wired'] .immersion-toolbar {
+  border-bottom: 1px solid rgba(109, 241, 255, 0.24);
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.07) 0 1px, transparent 1px 18px),
+    rgba(0, 9, 14, 0.92);
+}
+
+:root[data-materials='wired'] .aero-immersion-icon-btn,
+:root[data-materials='wired'] .immersion-toolbar .icon-btn {
+  border-radius: 2px;
+  color: var(--wired-cyan);
+  background: rgba(2, 22, 31, 0.84);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+}
+
+:root[data-materials='wired'] .aero-immersion-icon-btn.active,
+:root[data-materials='wired'] .immersion-toolbar .icon-btn.active {
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.15);
+  border-color: rgba(109, 241, 255, 0.58);
+}
+
+:root[data-materials='wired'] .aero-immersion-url-form,
+:root[data-materials='wired'] .immersion-url-form {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: rgba(0, 8, 13, 0.86);
+  box-shadow: none;
+  color: rgba(216, 251, 255, 0.62);
+}
+
+:root[data-materials='wired'] .aero-immersion-url-form::before,
+:root[data-materials='wired'] .immersion-url-form::before {
+  content: 'NODE PATH';
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+}
+
+:root[data-materials='wired'] .immersion-url-form {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+:root[data-materials='wired'] .aero-immersion-url,
+:root[data-materials='wired'] .immersion-url {
+  color: #e9feff;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .aero-immersion-mode-seg,
+:root[data-materials='wired'] .immersion-mode-seg {
+  border-radius: 0;
+  border-color: rgba(109, 241, 255, 0.24);
+  background: rgba(0, 8, 13, 0.8);
+}
+
+:root[data-materials='wired'] .aero-immersion-mode-btn,
+:root[data-materials='wired'] .immersion-mode-btn {
+  border-radius: 0;
+  color: rgba(216, 251, 255, 0.62);
+}
+
+:root[data-materials='wired'] .aero-immersion-mode-btn:hover,
+:root[data-materials='wired'] .immersion-mode-btn:hover {
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.08);
+}
+
+:root[data-materials='wired'] .aero-immersion-mode-btn.active,
+:root[data-materials='wired'] .immersion-mode-btn.active {
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.15);
+  border-color: rgba(109, 241, 255, 0.58);
+  box-shadow: none;
+}
+
+:root[data-materials='wired'] .aero-immersion-main,
+:root[data-materials='wired'] .immersion-body {
+  background: transparent;
+}
+
+:root[data-materials='wired'] .aero-immersion-stage-head {
+  border-bottom: 1px solid rgba(109, 241, 255, 0.18);
+  background: rgba(0, 9, 14, 0.72);
+}
+
+:root[data-materials='wired'] .aero-immersion-kicker {
+  color: var(--wired-amber);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:root[data-materials='wired'] .aero-immersion-kicker::before {
+  content: 'NODE-FEED / ';
+  color: var(--wired-cyan);
+}
+
+:root[data-materials='wired'] .aero-immersion-surface,
+:root[data-materials='wired'] .immersion-stage {
+  border: 1px solid rgba(109, 241, 255, 0.26);
+  background: #00070b;
+  box-shadow: inset 0 0 28px rgba(109, 241, 255, 0.08);
+}
+
+:root[data-materials='wired'] .aero-immersion-banner,
+:root[data-materials='wired'] .immersion-banner {
+  border-radius: 0;
+  color: var(--wired-amber);
+  border: 1px solid rgba(255, 177, 59, 0.24);
+  background: rgba(255, 177, 59, 0.06);
+}
+
+:root[data-materials='wired'] .aero-immersion-empty,
+:root[data-materials='wired'] .immersion-empty {
+  color: rgba(216, 251, 255, 0.62);
+}
+
+:root[data-materials='wired'] .aero-immersion-empty::before,
+:root[data-materials='wired'] .immersion-empty::before {
+  content: 'SIGNAL LOST / AWAITING NODE PATH';
+  display: block;
+  margin-bottom: 8px;
+  color: var(--wired-amber);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+:root[data-materials='wired'] .aero-immersion-rail,
+:root[data-materials='wired'] .immersion-rail {
+  border-left: 1px solid rgba(109, 241, 255, 0.2);
+  background: rgba(2, 18, 27, 0.78);
+}
+
+:root[data-materials='wired'] .aero-immersion-rail-head,
+:root[data-materials='wired'] .immersion-rail-head {
+  color: var(--wired-amber);
+  border-bottom: 1px solid rgba(109, 241, 255, 0.18);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:root[data-materials='wired'] .aero-immersion-site,
+:root[data-materials='wired'] .immersion-site-card {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.14);
+  background: rgba(0, 9, 14, 0.72);
+}
+
+:root[data-materials='wired'] .aero-immersion-site:hover,
+:root[data-materials='wired'] .immersion-site-card:hover {
+  border-color: rgba(109, 241, 255, 0.42);
+  background: rgba(109, 241, 255, 0.08);
+}
+
+:root[data-materials='wired'] .aero-immersion-site-title,
+:root[data-materials='wired'] .immersion-site-title {
+  color: #e9feff;
+}
+
+:root[data-materials='wired'] .aero-immersion-site-meta,
+:root[data-materials='wired'] .immersion-site-meta {
+  color: rgba(216, 251, 255, 0.62);
+  font-size: 10px;
+}
+
+:root[data-materials='wired'] .aero-immersion-site-bar,
+:root[data-materials='wired'] .immersion-site-bar {
+  height: 3px;
+  border-radius: 0;
+  background: rgba(109, 241, 255, 0.14);
+}
+
+:root[data-materials='wired'] .aero-immersion-site-bar > *,
+:root[data-materials='wired'] .immersion-site-bar > * {
+  background: var(--wired-cyan);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.42);
+}
+
+/* Media: CRT viewport ------------------------------------------------------ */
+:root[data-materials='wired'] .media-player {
+  position: relative;
+}
+
+:root[data-materials='wired'] .media-player::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px);
+  opacity: 0.5;
+  mix-blend-mode: screen;
+}
+
+:root[data-wired-crt='clean'] .media-player::after,
+:root[data-wired-static='reduced'] .media-player::after {
+  opacity: 0.16;
+}
+
+/* Statistics: telemetry command center ------------------------------------ */
+:root[data-materials='wired'] .stats-card {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.06), transparent 40%),
+    rgba(2, 18, 27, 0.82);
+}
+
+:root[data-materials='wired'] .stats-card-val {
+  color: #e9feff;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.34);
+}
+
+:root[data-materials='wired'] .stats-card-lbl {
+  color: var(--wired-amber);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+:root[data-materials='wired'] .stats-section {
+  border-radius: 0;
+  border-color: rgba(109, 241, 255, 0.18);
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.03) 1px, transparent 1px),
+    rgba(2, 18, 27, 0.66);
+  background-size: 20px 20px;
+}
+
+:root[data-materials='wired'] .stats-level-badge {
+  border-radius: 0;
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.14);
+  border: 1px solid rgba(109, 241, 255, 0.42);
+}
+
+/* Calendar: operations mission grid --------------------------------------- */
+:root[data-materials='wired'] .cal-month-grid,
+:root[data-materials='wired'] .cal-week-grid {
+  gap: 2px;
+}
+
+:root[data-materials='wired'] .cal-month-cell,
+:root[data-materials='wired'] .cal-week-col {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.14);
+  background: rgba(0, 9, 14, 0.72);
+}
+
+:root[data-materials='wired'] .cal-month-cell.out {
+  background: rgba(0, 8, 13, 0.42);
+  opacity: 0.55;
+}
+
+:root[data-materials='wired'] .cal-month-cell.today,
+:root[data-materials='wired'] .cal-week-col.today {
+  border-color: rgba(255, 177, 59, 0.56);
+  background:
+    linear-gradient(180deg, rgba(255, 177, 59, 0.1), transparent 46%),
+    rgba(0, 9, 14, 0.88);
+  box-shadow: 0 0 14px rgba(255, 177, 59, 0.18) inset;
+}
+
+:root[data-materials='wired'] .cal-month-cell.today .cal-month-daynum::after {
+  content: ' / ACTIVE';
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+:root[data-materials='wired'] .cal-month-dow {
+  color: var(--wired-amber);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+:root[data-materials='wired'] .cal-chip {
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+
+/* §5.4 / §5.5 — MEM + SIM: sealed packets and decrypt reveals -------------- */
+:root[data-materials='wired'] .flash-card {
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-materials='wired'] .flash-card::before {
+  content: 'ENCRYPTED PACKET / MEM-SYNC';
+  display: block;
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  margin-bottom: 8px;
+}
+
+:root[data-materials='wired'] .flash-card::after,
+:root[data-materials='wired'] .anki-card::after {
+  content: '3F 2A 91 C4 00 6D 1F D8 FB FF 02 07 0D E9 FE FF 6D F1 FF B1 3B DF 27 32 3F 2A 91 C4 00 6D 1F D8';
+  position: absolute;
+  inset: auto 6px 4px 6px;
+  color: rgba(109, 241, 255, 0.1);
+  font-size: 8px;
+  letter-spacing: 0.24em;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+:root[data-materials='wired'] .anki-card {
+  position: relative;
+  overflow: hidden;
+}
+
+:root[data-materials='wired'] .flash-card.is-decrypt .flash-answer {
+  animation: wm-decrypt-noise 0.28s steps(6) both;
+}
+
+:root[data-materials='wired'] .flash-card.is-resync {
+  animation: wm-resync-shake 0.24s steps(2);
+}
+
+:root[data-materials='wired'] .status-banner.ok::before { content: 'LINK STABLE / '; }
+:root[data-materials='wired'] .status-banner.warn::before { content: 'LINK DEGRADED / '; }
+:root[data-materials='wired'] .status-banner.bad::before { content: 'LINK LOST / '; }
+
+:root[data-materials='wired'] .flash-progress-bar,
+:root[data-materials='wired'] .flash-progress-bar > * {
+  border-radius: 0;
+}
+
+:root[data-materials='wired'] .flash-progress-bar > * {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 6px, rgba(0, 8, 13, 0.6) 6px 8px),
+    linear-gradient(90deg, var(--wired-cyan) 0 82%, var(--wired-amber) 82% 100%);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.3);
+}
+
+:root[data-materials='wired'] .flash-strip-card {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.22);
+  background: rgba(0, 9, 14, 0.78);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .flash-done {
+  position: relative;
+}
+
+:root[data-materials='wired'] .flash-done::before {
+  content: 'MEMORY MAP UPDATED';
+  display: block;
+  margin-bottom: 8px;
+  color: var(--wired-amber);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  animation: wm-phosphor-settle 0.4s steps(3) both;
+}
+
+/* §5.8 — TEL: traces draw themselves --------------------------------------- */
+:root[data-materials='wired'] .stats-bar-track {
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(109, 241, 255, 0.08) 0 1px, transparent 1px 7px),
+    rgba(0, 9, 14, 0.7);
+  border: 1px solid rgba(109, 241, 255, 0.14);
+}
+
+:root[data-materials='wired'] .stats-bar-fill {
+  border-radius: 0;
+  background: rgba(109, 241, 255, 0.42);
+  border-top: 2px solid var(--wired-cyan);
+  box-shadow: 0 0 10px rgba(109, 241, 255, 0.3);
+  transform-origin: bottom;
+  animation: wm-bar-grow 0.5s steps(8) both;
+}
+
+:root[data-materials='wired'] .stats-bar-col:nth-child(2) .stats-bar-fill { animation-delay: 40ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(3) .stats-bar-fill { animation-delay: 80ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(4) .stats-bar-fill { animation-delay: 120ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(5) .stats-bar-fill { animation-delay: 160ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(6) .stats-bar-fill { animation-delay: 200ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(7) .stats-bar-fill { animation-delay: 240ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(8) .stats-bar-fill { animation-delay: 280ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(9) .stats-bar-fill { animation-delay: 320ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(10) .stats-bar-fill { animation-delay: 360ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(11) .stats-bar-fill { animation-delay: 400ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(12) .stats-bar-fill { animation-delay: 440ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(13) .stats-bar-fill { animation-delay: 480ms; }
+:root[data-materials='wired'] .stats-bar-col:nth-child(14) .stats-bar-fill { animation-delay: 520ms; }
+
+:root[data-materials='wired'] .stats-section {
+  animation: wm-scan-reveal 0.24s steps(6) both;
+}
+
+:root[data-materials='wired'] .stats-cards .stats-card:first-child .stats-card-val {
+  animation: wm-phosphor-settle 0.4s steps(3) both;
+}
+
+/* §5.2 — AUD-DAT: hardware transport + oscilloscope ------------------------ */
+:root[data-materials='wired'] .music-controls .btn {
+  border-radius: 0;
+  min-width: 34px;
+  text-shadow: var(--wired-glow);
+}
+
+:root[data-materials='wired'] .music-controls .btn.primary,
+:root[data-materials='wired'] .music-controls .btn.active {
+  color: #1a1102;
+  background: var(--wired-amber);
+  border-color: rgba(255, 177, 59, 0.8);
+  text-shadow: none;
+}
+
+:root[data-materials='wired'] .music-seek,
+:root[data-materials='wired'] .music-volume {
+  height: 10px;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.16) 0 1px, transparent 1px 10px),
+    rgba(0, 8, 13, 0.86);
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+:root[data-materials='wired'] .music-seek::-webkit-slider-thumb,
+:root[data-materials='wired'] .music-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 7px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--wired-cyan);
+  border: 1px solid rgba(0, 8, 13, 0.9);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.5);
+  cursor: pointer;
+}
+
+:root[data-materials='wired'] .music-line.active {
+  color: #e9feff;
+  text-shadow: 0 0 12px rgba(109, 241, 255, 0.55);
+}
+
+:root[data-materials='wired'] .music-line.past {
+  opacity: 0.4;
+}
+
+.wired-osc {
+  display: block;
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: rgba(0, 7, 11, 0.92);
+  box-shadow: inset 0 0 12px rgba(109, 241, 255, 0.08);
+}
+
+.music-osc {
+  margin: 6px 0 2px;
+}
+
+/* §5.13 — NODE-FEED: CRT bezel + tuning ------------------------------------ */
+:root[data-materials='wired'] .immersion-stage {
+  position: relative;
+}
+
+:root[data-materials='wired'] .immersion-stage::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 0 0 / 14px 1px no-repeat,
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 0 0 / 1px 14px no-repeat,
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 100% 0 / 14px 1px no-repeat,
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 100% 0 / 1px 14px no-repeat,
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 0 100% / 14px 1px no-repeat,
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 0 100% / 1px 14px no-repeat,
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 100% 100% / 14px 1px no-repeat,
+    linear-gradient(rgba(109, 241, 255, 0.6), rgba(109, 241, 255, 0.6)) 100% 100% / 1px 14px no-repeat;
+}
+
+:root[data-materials='wired'] .immersion-stage.is-tuning::after {
+  content: 'TUNING…';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wired-amber);
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.04) 0 2px, transparent 2px 5px),
+    rgba(0, 7, 11, 0.82);
+  pointer-events: none;
+}
+
+:root[data-materials='wired'] .immersion-stage.is-settle {
+  animation: wm-phosphor-settle 0.32s steps(3) both;
+}
+
+/* §5.1 — SIG-VID: CRT monitor + tape shelf --------------------------------- */
+:root[data-materials='wired'] .media-stage {
+  position: relative;
+  border: 8px solid rgba(1, 12, 18, 0.96);
+  outline: 1px solid rgba(109, 241, 255, 0.3);
+  box-shadow: inset 0 0 34px rgba(0, 0, 0, 0.66), inset 0 0 18px rgba(109, 241, 255, 0.07);
+}
+
+:root[data-materials='wired'] .media-stage.is-acquiring::after {
+  content: 'SIGNAL ACQUISITION';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wired-amber);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.05) 0 2px, transparent 2px 5px),
+    rgba(0, 7, 11, 0.72);
+  pointer-events: none;
+}
+
+:root[data-materials='wired'] .media-subbar {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .media-subbar::before {
+  content: 'TC ';
+  color: var(--wired-amber);
+}
+
+:root[data-materials='wired'] .media-card img,
+:root[data-materials='wired'] .media-card .media-thumb {
+  filter: saturate(0.4) sepia(0.2) hue-rotate(150deg);
+}
+
+:root[data-materials='wired'] .media-lib-folders {
+  counter-reset: wired-tape;
+}
+
+:root[data-materials='wired'] .media-lib-folders > *::before {
+  counter-increment: wired-tape;
+  content: counter(wired-tape, decimal-leading-zero) ' ';
+  color: rgba(109, 241, 255, 0.55);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+:root[data-materials='wired'] .media-gen-bar-fill {
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 6px, rgba(0, 8, 13, 0.6) 6px 8px),
+    var(--wired-cyan);
+}
+
+/* §5.3 — LEX: database records --------------------------------------------- */
+:root[data-materials='wired'] .dict-results {
+  counter-reset: wired-lex;
+}
+
+:root[data-materials='wired'] .dict-results article {
+  position: relative;
+  padding-left: 52px;
+  animation: wm-scan-reveal 0.16s steps(4) both;
+}
+
+:root[data-materials='wired'] .dict-results article::before {
+  counter-increment: wired-lex;
+  content: 'LEX-' counter(wired-lex, decimal-leading-zero);
+  position: absolute;
+  left: 8px;
+  top: 10px;
+  color: rgba(109, 241, 255, 0.5);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .dict-results article:nth-child(2) { animation-delay: 40ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(3) { animation-delay: 80ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(4) { animation-delay: 120ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(5) { animation-delay: 160ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(6) { animation-delay: 200ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(7) { animation-delay: 240ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(8) { animation-delay: 280ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(9) { animation-delay: 320ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(10) { animation-delay: 360ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(11) { animation-delay: 400ms; }
+:root[data-materials='wired'] .dict-results article:nth-child(12) { animation-delay: 440ms; }
+
+:root[data-materials='wired'] .dict-hint::after {
+  content: ' ▌';
+  color: var(--wired-cyan);
+  animation: wm-cursor-blink 1.2s steps(1) infinite;
+}
+
+/* §5.6 — SYN: diagnostic registers ----------------------------------------- */
+:root[data-materials='wired'] .gram-view {
+  counter-reset: wired-syn;
+}
+
+:root[data-materials='wired'] .gram-item {
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .gram-item::before {
+  counter-increment: wired-syn;
+  content: 'SYN-' counter(wired-syn, decimal-leading-zero) ' ';
+  color: rgba(109, 241, 255, 0.45);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+:root[data-materials='wired'] .gram-badge {
+  border-radius: 0;
+  color: var(--wired-cyan);
+  background: rgba(109, 241, 255, 0.1);
+  border: 1px solid rgba(109, 241, 255, 0.4);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .gram-badge.lv-4,
+:root[data-materials='wired'] .gram-badge.lv-5 {
+  color: var(--wired-amber);
+  background: rgba(255, 177, 59, 0.1);
+  border-color: rgba(255, 177, 59, 0.44);
+}
+
+:root[data-materials='wired'] .gram-detail > *,
+:root[data-materials='wired'] .gram-card > * {
+  border-bottom: 1px solid rgba(109, 241, 255, 0.08);
+}
+
+:root[data-materials='wired'] .gram-detail > section:nth-child(1) { animation: wm-scan-reveal 0.18s steps(4) both; }
+:root[data-materials='wired'] .gram-detail > section:nth-child(2) { animation: wm-scan-reveal 0.18s steps(4) 90ms both; }
+:root[data-materials='wired'] .gram-detail > section:nth-child(3) { animation: wm-scan-reveal 0.18s steps(4) 180ms both; }
+
+:root[data-materials='wired'] .gram-ex-jp {
+  position: relative;
+  display: block;
+  padding: 6px 8px;
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  border-left: 2px solid var(--wired-cyan);
+  background: rgba(0, 9, 14, 0.6);
+}
+
+/* §5.7 — TRN: channel decks ------------------------------------------------ */
+:root[data-materials='wired'] .tr-pane:nth-child(1) .tr-label::before {
+  content: 'CH-A SOURCE / ';
+  color: var(--wired-amber);
+}
+
+:root[data-materials='wired'] .tr-pane:nth-child(2) .tr-label::before {
+  content: 'CH-B DECODED / ';
+  color: var(--wired-amber);
+}
+
+:root[data-materials='wired'] .tr-swap {
+  border-radius: 0;
+  transition: transform 0.2s steps(2);
+}
+
+:root[data-materials='wired'] .tr-swap:active {
+  transform: rotate(180deg);
+}
+
+:root[data-materials='wired'] .tr-output {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background: rgba(0, 8, 13, 0.8);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .tr-output > .muted::after {
+  content: ' ▌';
+  color: var(--wired-cyan);
+  animation: wm-cursor-blink 1.2s steps(1) infinite;
+}
+
+:root[data-materials='wired'] .tr-status::before {
+  content: 'DECODING ▮▮▮▮▯▯ ';
+  color: var(--wired-amber);
+  letter-spacing: 0.14em;
+  font-size: 10px;
+}
+
+/* §5.9 — OPS: chip ticks ---------------------------------------------------- */
+:root[data-materials='wired'] .cal-chip::before {
+  content: '▸ ';
+  color: var(--wired-amber);
+}
+
+/* §5.10 — ARCH: disk bays + restricted covers ------------------------------ */
+:root[data-materials='wired'] .lib-folders {
+  counter-reset: wired-bay;
+}
+
+:root[data-materials='wired'] .lib-folder-chip {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.26);
+  background: rgba(0, 9, 14, 0.78);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .lib-folder-chip::before {
+  counter-increment: wired-bay;
+  content: counter(wired-bay, decimal-leading-zero) ' ';
+  color: rgba(109, 241, 255, 0.5);
+  font-size: 9px;
+}
+
+:root[data-materials='wired'] .lib-folder-chip.active {
+  border-color: rgba(255, 177, 59, 0.6);
+}
+
+:root[data-materials='wired'] .lib-folder-chip.active::after {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-left: 6px;
+  vertical-align: 2px;
+  background: var(--wired-amber);
+  box-shadow: 0 0 6px rgba(255, 177, 59, 0.6);
+}
+
+:root[data-materials='wired'] .library .card {
+  position: relative;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+:root[data-materials='wired'] .library .card-cover-thumb {
+  filter: saturate(0.35) sepia(0.16) hue-rotate(150deg) brightness(0.9);
+}
+
+:root[data-materials='wired'] .library .card::after {
+  content: 'RESTRICTED';
+  position: absolute;
+  top: 10px;
+  right: -26px;
+  transform: rotate(38deg);
+  padding: 1px 28px;
+  color: #1a1102;
+  background: rgba(255, 177, 59, 0.82);
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+
+:root[data-materials='wired'] .card-progress,
+:root[data-materials='wired'] .card-progress > * {
+  border-radius: 0;
+}
+
+:root[data-materials='wired'] .card-progress > * {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 5px, rgba(0, 8, 13, 0.55) 5px 7px),
+    var(--wired-cyan);
+}
+
+:root[data-materials='wired'] .kind-badge {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* §5.11 — DOC: recovered-document index + reader margins ------------------- */
+:root[data-materials='wired'] .jiten-row-cover {
+  position: relative;
+}
+
+:root[data-materials='wired'] .jiten-row-cover::after {
+  content: 'SCAN';
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  padding: 0 3px;
+  color: var(--wired-cyan);
+  background: rgba(0, 8, 13, 0.85);
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .nov-diff {
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .jiten-inspector {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.03) 1px, transparent 1px) 0 0 / 100% 26px,
+    rgba(2, 18, 27, 0.82);
+}
+
+:root[data-materials='wired'] .jiten-tags > * {
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+
+/* Reader chrome only — never the page itself (it has its own theme system). */
+:root[data-materials='wired'] .reader-bar,
+:root[data-materials='wired'] .reader-footer {
+  color: var(--wired-cyan);
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.06) 0 1px, transparent 1px 18px),
+    rgba(0, 9, 14, 0.94);
+  border-color: rgba(109, 241, 255, 0.24);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .reader-stage {
+  outline: 1px solid rgba(109, 241, 255, 0.26);
+}
+
+:root[data-materials='wired'] .reader-seek {
+  height: 8px;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.14) 0 1px, transparent 1px 12px),
+    rgba(0, 8, 13, 0.86);
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+:root[data-materials='wired'] .reader-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 6px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--wired-cyan);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.5);
+  cursor: pointer;
+}
+
+/* §5.12 — LINK: relay nodes + wireframe map -------------------------------- */
+:root[data-materials='wired'] .res-host {
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .res-host::before {
+  content: 'NODE://';
+  color: rgba(109, 241, 255, 0.55);
+}
+
+:root[data-materials='wired'] .res-card {
+  position: relative;
+}
+
+:root[data-materials='wired'] .res-card::after {
+  content: 'LINK OK';
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  color: rgba(255, 177, 59, 0.6);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .res-card:hover {
+  border-color: rgba(109, 241, 255, 0.5);
+  box-shadow: 0 0 14px rgba(109, 241, 255, 0.14);
+}
+
+:root[data-materials='wired'] .res-cost {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+:root[data-materials='wired'] .heatmap-svg-wrap {
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.04) 1px, transparent 1px),
+    rgba(0, 7, 11, 0.9);
+  background-size: 22px 22px;
+}
+
+:root[data-materials='wired'] .heatmap-svg path {
+  stroke: rgba(109, 241, 255, 0.4);
+  stroke-width: 0.4;
+}
+
+/* §5.14 — SYS: service categories with port numbers ------------------------ */
+:root[data-materials='wired'] .os-set-nav {
+  counter-reset: wired-port;
+}
+
+:root[data-materials='wired'] .os-set-nav-item::before {
+  counter-increment: wired-port;
+  content: 'P-' counter(wired-port, decimal-leading-zero) ' ';
+  color: rgba(109, 241, 255, 0.5);
+  font-size: 9px;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .os-set-adv-badge {
+  border-radius: 0;
+  color: var(--wired-amber);
+  border: 1px solid rgba(255, 177, 59, 0.5);
+  background: rgba(255, 177, 59, 0.08);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+/* DIP switches: rectangular track, square thumb, engraved states. */
+:root[data-materials='wired'] .ui-toggle__track {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.34);
+  background: rgba(0, 8, 13, 0.88);
+}
+
+:root[data-materials='wired'] .ui-toggle__thumb {
+  border-radius: 0;
+  background: var(--wired-cyan);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.4);
+}
+
+/* §5.15 — FIELD NOTE: stamped row + punched-tape margin -------------------- */
+:root[data-materials='wired'] .fwin-note .fwin-body-note {
+  position: relative;
+  padding-left: 16px;
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-body-note::before {
+  content: 'FLD ▸ MONITOR TAPE';
+  display: block;
+  padding: 2px 0 4px;
+  color: rgba(255, 241, 183, 0.66);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-body-note::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  bottom: 4px;
+  width: 7px;
+  background: repeating-radial-gradient(circle at 3.5px 6px, rgba(255, 241, 183, 0.4) 0 1.6px, transparent 1.7px 12px);
+  background-size: 7px 12px;
+  pointer-events: none;
+}
+
+/* §5.16 — EXPANSION BAY: module rack --------------------------------------- */
+:root[data-materials='wired'] .widget-gallery {
+  counter-reset: wired-rack;
+}
+
+:root[data-materials='wired'] .widget-card {
+  position: relative;
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background: rgba(2, 18, 27, 0.82);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .widget-card::after {
+  counter-increment: wired-rack;
+  content: 'PORT-' counter(wired-rack, decimal-leading-zero);
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  color: rgba(109, 241, 255, 0.45);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+}
+
+:root[data-materials='wired'] .widget-tab {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* Sticky note: field note / monitor tape ----------------------------------- */
+:root[data-materials='wired'] .fwin-note {
+  border: 1px solid rgba(255, 177, 59, 0.56);
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 177, 59, 0.05) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, rgba(255, 177, 59, 0.2), rgba(255, 177, 59, 0.1)),
+    rgba(24, 16, 2, 0.92);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.46), 0 0 18px rgba(255, 177, 59, 0.14);
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-bar,
+:root[data-materials='wired'] .fwin-note .fwin-drag-strip {
+  background: rgba(255, 177, 59, 0.16);
+  border-bottom: 1px solid rgba(255, 177, 59, 0.34);
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-title {
+  color: #fff1b7 !important;
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-body-note,
+:root[data-materials='wired'] .fwin-note .desk-note-text {
+  color: #fff1b7;
+  background: transparent;
+  font-family: var(--font-mono);
+}
+
+/* ---------------------------------------------------------------------------
+   Squared geometry — WIRED ARCHIVE
+   ---------------------------------------------------------------------------
+   A 1998 linguistic-analysis terminal is stamped metal and phosphor: panels
+   meet at right angles, and a rounded corner reads as 2010s web software the
+   moment it appears. Views authored after the theme (GrammarX's `gram-x-*`,
+   the newer toggles) inherit the base stylesheet's 6–10px radii, so they sat
+   inside the terminal looking like a different application.
+
+   This squares app interiors only. The window frame, taskbar and shell chrome
+   keep whatever `wired-shell.css` gives them, and true circles (lamps, dots,
+   the eye's iris, radar contacts) are exempt — those are instrument hardware,
+   not panels, and flattening them would break the fiction rather than serve it.
+   --------------------------------------------------------------------------- */
+:root[data-materials='wired'] .fwin-body *:not(svg):not(svg *) {
+  border-radius: 0;
+}
+
+/* Instrument hardware stays round: lamps, dots, dials and avatars are physical
+   parts, not panels, and flattening them breaks the fiction rather than serving
+   it. Listed explicitly so the blanket rule above can stay simple — enumerating
+   panel suffixes instead always misses the next view someone adds. */
+:root[data-materials='wired'] .fwin-body :where(
+  [class*='-dot'],
+  [class*='-lamp'],
+  [class*='-avatar'],
+  [class*='-swatch'],
+  [class*='-knob'],
+  [class*='-bullet']
+) {
+  border-radius: 50%;
+}
+
+/* ===========================================================================
+   SYN — Syntax Diagnostic Unit (GrammarX)
+   ===========================================================================
+   GrammarX was built after the theme and had no WIRED rules at all, so it
+   rendered as default web UI inside a 1998 terminal. Spec §5.6: grammar points
+   are diagnostic register entries, familiarity is clearance, example sentences
+   are captured trace samples.
+   =========================================================================== */
+
+/* The view stamp was a static inline ::before, so a long code ("SYN / SYNTAX
+   DIAGNOSTICS / PARSE UNIT") wrapped to three lines and collided with the
+   header text beside it. It is a header slug — it gets its own line. */
+:root[data-materials='wired'] .view-head::before {
+  display: block;
+  width: 100%;
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+
+/* --- Channel rail: mode selection ---------------------------------------- */
+:root[data-materials='wired'] .gram-mode-toggle {
+  gap: 0;
+  padding: 0;
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: rgba(0, 8, 13, 0.6);
+}
+:root[data-materials='wired'] .gram-mode-btn {
+  padding: 7px 13px;
+  border-right: 1px solid rgba(109, 241, 255, 0.16);
+  color: rgba(216, 251, 255, 0.6);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  /* Labels like "Guides & hacks" were wrapping over three lines and forcing
+     the rail to 54px tall. A channel selector is a single row of stops. */
+  white-space: nowrap;
+}
+:root[data-materials='wired'] .gram-mode-btn:last-child {
+  border-right: none;
+}
+:root[data-materials='wired'] .gram-mode-btn.active {
+  color: #02070d;
+  background: #6df1ff;
+  text-shadow: none;
+}
+
+/* --- Register: one row per diagnostic ------------------------------------ */
+:root[data-materials='wired'] .gram-x-list {
+  counter-reset: syn;
+}
+:root[data-materials='wired'] .gram-x-row {
+  position: relative;
+  counter-increment: syn;
+  padding-left: 58px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.1);
+  border-left: 2px solid transparent;
+}
+/* Code gutter — the register index, monotonic down the list. */
+:root[data-materials='wired'] .gram-x-row::before {
+  content: 'SYN-' counter(syn, decimal-leading-zero);
+  position: absolute;
+  left: 8px;
+  top: 10px;
+  color: rgba(109, 241, 255, 0.42);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+:root[data-materials='wired'] .gram-x-row:hover {
+  background: rgba(109, 241, 255, 0.05);
+}
+:root[data-materials='wired'] .gram-x-row.active,
+:root[data-materials='wired'] .gram-x-row[aria-selected='true'] {
+  border-left-color: #ffb13b;
+  background: rgba(255, 177, 59, 0.08);
+}
+:root[data-materials='wired'] .gram-x-row.active::before {
+  color: #ffb13b;
+}
+:root[data-materials='wired'] .gram-x-title {
+  color: #e9feff;
+  font-family: var(--font-mono);
+}
+:root[data-materials='wired'] .gram-x-meaning,
+:root[data-materials='wired'] .gram-gloss {
+  color: rgba(216, 251, 255, 0.52);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* --- Clearance chips ------------------------------------------------------
+   Level rides the cyan→amber scale. Never red: red is the emergency colour and
+   a JLPT level is not an emergency. */
+:root[data-materials='wired'] .gram-badge,
+:root[data-materials='wired'] .gram-x-band,
+:root[data-materials='wired'] .gram-x-detail-band {
+  padding: 1px 6px;
+  border: 1px solid rgba(109, 241, 255, 0.45);
+  color: #6df1ff;
+  background: rgba(109, 241, 255, 0.09);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+:root[data-materials='wired'] .gram-x-band-label {
+  color: rgba(255, 241, 183, 0.72);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Familiarity grades: unlearned reads cold, mastered reads warm. */
+:root[data-materials='wired'] .wk-grade-btn {
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  color: rgba(216, 251, 255, 0.62);
+  background: rgba(0, 8, 13, 0.5);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+:root[data-materials='wired'] .wk-grade-btn.wk-g-0.active { border-color: rgba(109, 241, 255, 0.8); color: #6df1ff; background: rgba(109, 241, 255, 0.12); }
+:root[data-materials='wired'] .wk-grade-btn.wk-g-1.active { border-color: rgba(150, 240, 220, 0.8); color: #96f0dc; background: rgba(150, 240, 220, 0.12); }
+:root[data-materials='wired'] .wk-grade-btn.wk-g-2.active { border-color: rgba(214, 224, 150, 0.8); color: #d6e096; background: rgba(214, 224, 150, 0.12); }
+:root[data-materials='wired'] .wk-grade-btn.wk-g-3.active { border-color: rgba(255, 177, 59, 0.85); color: #ffb13b; background: rgba(255, 177, 59, 0.14); }
+
+/* --- Technical report: the detail pane ----------------------------------- */
+:root[data-materials='wired'] .gram-x-detail,
+:root[data-materials='wired'] .gram-card {
+  border: 1px solid rgba(109, 241, 255, 0.22);
+  background: rgba(0, 8, 13, 0.55);
+}
+:root[data-materials='wired'] .gram-card-head,
+:root[data-materials='wired'] .gram-block > strong {
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.18);
+  color: rgba(255, 241, 183, 0.78);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+:root[data-materials='wired'] .gram-structure {
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: rgba(109, 241, 255, 0.05);
+  color: #e9feff;
+  font-family: var(--font-mono);
+}
+
+/* Example sentences are captured traces: boxed, corner-ticked, with a source
+   marker in the gutter. */
+:root[data-materials='wired'] .gram-ex-jp {
+  position: relative;
+  padding: 7px 9px 7px 20px;
+  border: 1px solid rgba(109, 241, 255, 0.18);
+  background: rgba(0, 12, 18, 0.6);
+  color: #e9feff;
+  font-family: var(--font-mono);
+}
+:root[data-materials='wired'] .gram-ex-jp::before {
+  content: '▸';
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  color: rgba(255, 177, 59, 0.7);
+  font-size: 9px;
+}
+/* Corner ticks — the frame of a captured sample. */
+:root[data-materials='wired'] .gram-ex-jp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #6df1ff 0 6px, transparent 6px) 0 0 / 100% 1px no-repeat,
+    linear-gradient(90deg, #6df1ff 0 6px, transparent 6px) 100% 100% / 100% 1px no-repeat;
+  opacity: 0.55;
+  pointer-events: none;
+}
+:root[data-materials='wired'] .gram-ex-en,
+:root[data-materials='wired'] .gram-ex-reading {
+  color: rgba(216, 251, 255, 0.5);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* --- Controls ------------------------------------------------------------- */
+:root[data-materials='wired'] .gram-search,
+:root[data-materials='wired'] .gram-x-preset-name,
+:root[data-materials='wired'] .gram-x-preset-select {
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  color: #d8fbff;
+  background: rgba(0, 8, 13, 0.7);
+  font-family: var(--font-mono);
+}
+:root[data-materials='wired'] .gram-x-count {
+  color: rgba(255, 241, 183, 0.66);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}

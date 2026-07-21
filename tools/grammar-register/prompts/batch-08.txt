@@ -1,0 +1,192 @@
+You are labelling Japanese grammar patterns by REGISTER — the speech level a
+pattern belongs to. Batch 8 of 14.
+
+## The four values
+
+neutral   - works at any speech level. THE DEFAULT AND MOST COMMON ANSWER.
+casual    - only natural in informal speech between equals or intimates
+            (contractions, blunt sentence-final particles, slang endings).
+business  - honorific / humble / formal-polite. Would appear in a business
+            email, an announcement, or speech to a customer or superior.
+literary  - written or classical. Would appear in an essay, a legal notice, or
+            fiction, but sounds archaic or stiff spoken aloud.
+
+## Rules — read these before answering
+
+- **Most patterns are neutral, and neutral is a real answer, not a fallback.**
+  Japanese politeness is carried by the sentence-final predicate, not by the
+  grammar pattern. 〜ながら is identical in 食べながら見た and 食べながら見ました,
+  so it is neutral.
+  If you find yourself labelling more than about a fifth of a batch as
+  non-neutral, you are over-assigning.
+- Do NOT infer register from the English meaning text. A gloss reading "a less
+  formal way to say X" describes the pattern's *meaning*; it does not make the
+  pattern casual. Judge from the Japanese form itself.
+- Politeness is not register. A pattern shown in its 〜ます form is still
+  neutral unless the pattern *itself* is honorific or humble.
+- If you are unsure, answer neutral and append "?" to flag it for review.
+  A flagged guess is useful; a confident wrong answer is not.
+- Every input line must produce exactly one output line. Do not skip, merge,
+  or reorder.
+
+## Patterns (id, then pattern, then structure, then meaning)
+
+n3m-g-8bc57a	よかろう	よかろう	it's okay to have, it's fine even ...
+n3m-g-11a4db	てでも	てでも	no matter what
+n3m-g-861360	(の) なら～しろ	(の) なら～しろ	If..., do something...
+n3m-g-978a0b	となると	となると	when it comes to; in such a case; if that happens
+n3m-g-ddfc0c	ちゃんとする	ちゃんとする	Serious, tidy, complete
+n3m-g-c4ff8d	たろう	たろう	probably is ~
+n3m-g-7ccd68	... だけ ...	... だけ ...	as much as
+n3m-g-ec3559	…とすれば	…とすれば	in the case of~; assuming~; if A then B (conditional) ...
+n3m-g-1364d0	... ことだ	... ことだ	should
+n3m-g-4cef3d	...ぬ	...ぬ	Not (Negative)
+n3m-g-791482	ことによると / ばあいによると	ことによると / ばあいによると	perhaps, ...
+n3m-g-36c37f	なんでもない	なんでもない	of no concern, nothing
+n3m-g-1b7afd	とても ... ない	とても ... ない	cannot possibly be; hardly ~
+n3m-g-32fcb6	なくては	なくては	If not... then no...
+n3m-t-ch-s-l-ng-f79569	... いか + từ chỉ số lượng	... いか + từ chỉ số lượng	How many ... under the leadership, under the authority of ...
+n3m-g-62d435	ひとつ	ひとつ	A little
+n3m-g-527141	あるいは～あるいは～	あるいは～あるいは～	or, either
+n3m-g-78d726	結局	結局	after all; eventually; in the end ~
+n3m-g-4122b5	みたい	みたい	like; similar to; resembling ~
+n3m-g-9d4157	～ばよかった/～たらよかった/～ばよかったのに/～たらよかったのに	～ばよかった/～たらよかった/～ばよかったのに/～たらよかったのに	If only
+n3m-g-1c97d0	一体	一体	…the heck; …in the world; …on earth
+n3m-g-2bbe20	べき	べき	should do; must do ~
+n3m-g-f9cf59	上げる	上げる	to finish doing ~
+n3m-g-d116da	は別として	は別として	aside from; apart from; except for; whether or not
+n3m-g-072380	もしも～なら/ もしも～たら/ もしも～ても	もしも～なら/ もしも～たら/ もしも～ても	if; in the case; supposing ~/If... no matter what
+n3m-g-d3a00b	きり	きり	only; just; since; after ~
+n3m-g-810c13	み	み	~ness
+n3m-g-302e58	だけで(は)なく	だけで(は)なく	not only… but also ~
+n3m-g-a9512a	込む	込む	to be crowded
+n3m-g-fbb839	なかなか	なかなか	very; quite; pretty; rather; just not ~
+n3m-g-09bc21	て(は)はじめて	て(は)はじめて	not until; only after (first time)
+n3m-g-40834a	か何か	か何か	or something
+n3m-g-f4b5c8	通す	通す	to do until the end; to continually do; through ~
+n3m-g-5aeb9b	少しも～ない/ちっとも～ない	少しも～ない/ちっとも～ない	(not) at all; (not) in the least ~.
+n3m-g-7e522d	すでに	すでに	something has already been done/taken place; is already the case
+n3m-g-6a2f94	もし～としても/もし～としたって	もし～としても/もし～としたって	Assuming; Even if ~
+n3m-g-fa738d	わざわざ	わざわざ	to go to the trouble of; to go out of one's way to ~
+n3m-g-29c0ff	合う	合う	do something together
+n3m-g-fbd510	めったに～ない	めったに～ない	hardly; rarely; seldom
+n3m-g-6a8329	たとたん(に)	たとたん(に)	as soon as; just as ~
+n3m-g-ef716e	わざと	わざと	on purpose; intentionally ~
+n3m-g-08d29d	ばかりでなく	ばかりでなく	not only.. but also; as well as ~
+n3m-g-08a27d	しかない	しかない	have no choice but ~
+n3m-g-f287b4	かな(あ)	かな(あ)	I wonder; should I?
+n3m-g-8453c7	たとえ～ても	たとえ～ても	even if… is the case
+n3m-g-5c5344	なぜなら(ば)/なぜかというと/どうしてかというと/なぜかといえば	なぜなら(ば)/なぜかというと/どうしてかというと/なぜかといえば	because; the reason is; if you want to know why
+n3m-g-5c14ca	まさか	まさか	there's no way; that's impossible; you must be joking
+n3m-g-439fda	てほしい	てほしい	I want you to; need you to ~
+n3m-g-f03f6f	ふと	ふと	suddenly; accidentally; unexpectedly; unintentionally ~
+n3m-g-c899bc	例えば	例えば	for example; for instance ~
+n3m-g-759882	は～で有名	は～で有名	famous for ~
+n3m-g-b37039	ないことはない/ないこともない	ないことはない/ないこともない	can do; is not impossible to ~
+n3m-g-bef514	に代わって	に代わって	instead of; replacing; on behalf of ~
+n3m-g-2cd197	にとって	にとって	to, for, concerning, as far as … is concerned
+n3m-g-790b45	わりには	わりには	for, despite, although, unexpectedly
+n3m-g-0ad51f	まま	まま	as it is; current state; without changing
+n3m-g-1c1f2b	その結果	その結果	as a result of; after ~
+n3m-g-8b7dc8	がる	がる	to show signs of; to appear; to feel, to think ~
+n3m-g-be16b0	せいぜい	せいぜい	at the most; at best; to the utmost
+n3m-g-5486c5	必ずしも～とは限らない	必ずしも～とは限らない	Not necessarily; not always
+n3m-g-a0b172	て済む	て済む	sufficient by; no problem to; resolve by ~
+n3m-g-1ffc0c	ますように	ますように	making a wish
+n3m-g-83a9bc	というより/というか	というより/というか	rather than ~
+n3m-g-8ff0f0	代わりに	代わりに	instead of; as a substitute for​; in exchange for; in return for
+n3m-g-ba800a	切る/切れる/切れない	切る/切れる/切れない	to do something completely to the end/unable to do; too much to finish/complete
+n3m-g-7cd647	いくら～ても	いくら～ても	no matter how ~
+n3m-g-9b1cb8	というと/といえば/といったら	というと/といえば/といったら	speaking of; when you talk of; when you say ~
+n3m-g-55006c	といっても	といっても	although I say; although one might say ~
+n3m-g-d3ab6c	より(も)むしろ	より(も)むしろ	rather; instead; better ~
+n3m-g-84cb61	に関して	に関して	about; regarding; related to ~
+n3m-g-6e9e33	つもりだった	つもりだった	I thought I~; I believe I~; was planning to~; was intending to ~
+n3m-g-fd4c45	くらい～はない	くらい～はない	Not to the extent of…
+n3m-g-6c7e8c	別に～ない	別に～ない	not really, not particularly
+n3m-g-bce815	決して～ない	決して～ない	never; by no means ~
+n3m-g-8a031c	確かに	確かに	surely, certainly ~
+n3m-g-3acec8	ということ/というの	ということ/というの	convert phrase into noun
+n3m-g-45f12f	はずだ/はずがない	はずだ/はずがない	it must be; it should be (expectation)/cannot be (impossible)
+n3m-g-f356c5	によって	によって	by means of; due to; owing to; because of ~
+n3m-g-3f9c2f	させてください/させてもらえますか/させてもらえませんか	させてください/させてもらえますか/させてもらえませんか	please let me do
+n3m-g-2c97ed	ようと思う/ようと思っている	ようと思う/ようと思っている	thinking of doing; planning to ~
+n3m-g-ac7d86	に比べて	に比べて	compared to; in comparison to ~
+n3m-g-cbfbe4	に対して	に対して	towards; against; regarding; in contrast with ~​
+n3m-g-01d7aa	的	的	about (change noun into na-adjective or adverb)
+n3m-g-0878a3	にしても/にしろ/にせよ	にしても/にしろ/にせよ	even if; regardless; whether… or ~
+n3m-g-6faaea	ことだ	ことだ	should do~ (used for suggestions or giving advice)
+n3m-g-2cc862	ば～ほど	ば～ほど	the more… the more ~
+n3m-g-690edd	うちに	うちに	While...
+n3m-g-825ba9	ことにする/ことにしている	ことにする/ことにしている	to decide on/have a habit
+n3m-g-c5d868	一度に	一度に	all at once
+n3m-g-afa512	としたら/とすれば	としたら/とすれば	in the case of~; assuming~; if A then B
+n3m-g-c9ebc6	ということだ	ということだ	I heard; it means that; in other words ~
+n3m-g-5f855c	もしかすると/もしかしたら～かもしれない	もしかすると/もしかしたら～かもしれない	perhaps; maybe; perchance; by any chance ~
+n3m-g-8da92c	あまりに(も)～と / あんまりに(も)～と	あまりに(も)～と / あんまりに(も)～と	too much; so much… that; excessively ~
+n3m-v-555e58	V-ば	V-ば	You should...
+n3m-g-b75189	…も…だが	…も…だが	...how to...that way
+n3m-g-d4f91d	てやってもらえないか	てやってもらえないか	Could you...help me, please?
+n3m-g-acee7b	... もの	... もの	thing...
+n3m-g-85b277	...も	...も	...Still no, not at all
+n3m-g-af0eb9	(の) なら～で	(の) なら～で	No matter.. (It's okay)
+n3m-g-3d29ba	ては	ては	whenever; if; when~; repetitive action
+n3m-g-1c17ff	～ぐらい	～ぐらい	approximately; about; around; to the extent ~
+n3m-g-4fe524	～には～の～がある	～には～の～がある	has its own～
+n3m-g-b24d7f	～つい	～つい	accidentally; unintentionally; by mistake
+n3m-g-da3a11	～になれる	～になれる	to be used to, become
+n3m-g-1fcde9	～わけない	～わけない	there is no way that; it is impossible to ~
+n3m-g-e8adb4	～わけでもない	～わけでもない	it doesn’t mean that; it is not the case that; I don’t mean that; it is not true that ~
+n3m-g-4cc658	ておられる	ておられる	( Honorifics)
+n3m-g-5310cd	よく(も)	よく(も)	How the hell is it possible, that ...?
+n3m-g-af11c3	～さえ…ば	～さえ…ば	if only; as long as ~
+n3m-g-2908f2	ごらん	ごらん	(please) try to; (please) look
+n3m-g-0d3ace	どんなに～ても	どんなに～ても	no matter how (much)
+n3m-g-91e05c	といいなあ/たらいいなあ/ばいいなあ	といいなあ/たらいいなあ/ばいいなあ	it would be nice if; should; I hope ~
+n3m-g-63630f	たび(に)	たび(に)	whenever; every time ~
+n3m-g-00e1ab	ぶりに	ぶりに	for the first time in (period of time)
+n3m-g-eeac9c	に慣れる	に慣れる	to be used to something
+n3m-g-743000	ごとに	ごとに	each; every; at intervals of ~
+n3m-g-a61f45	こと	こと	Verb nominalizer
+n3m-g-9adc60	ずに	ずに	without doing ~
+n3m-g-78fea4	～ろと/～なと	～ろと/～なと	Being reminded is to.../Being reminded is not to...
+n3m-g-eb1430	ば～のに/たら～のに	ば～のに/たら～のに	would have; should have; if only ~
+n3m-g-fbca95	どうしても	どうしても	no matter what; at any cost; after all ~
+n3m-g-1bba08	もし～たなら	もし～たなら	if; in the case; supposing ~
+n3m-g-6d3280	全く～ない	全く～ない	not at all ~
+n3m-g-8bb346	ものだ	ものだ	Supposed to/ Should/ That's the way it is
+n3m-g-bbdb08	しばらく	しばらく	for a moment; for a while; for the time being
+n3m-g-88590b	てくれと	てくれと	to do a favor; do something for someone
+n3m-g-0d54dd	について	について	concerning; regarding; about; on ~
+n3m-g-667e7d	さえ/でさえ	さえ/でさえ	even; so much as; not even
+n3m-g-2535aa	最中に	最中に	while; during; in the middle of ~
+n3m-g-e24995	せいで	せいで	because of; due to; as a result of ~
+n3m-g-4062b4	によれば/によると	によれば/によると	according to ~
+n3m-g-237628	ことになる/ことになっている	ことになる/ことになっている	It has been decided that..; it turns out that..
+n3m-g-a52e95	ように言う/頼む/注意する/伝える	ように言う/頼む/注意する/伝える	to convey; to report; to transmit; to communicate; to tell; to impart; to propagate; to teach.
+n3m-g-de56a2	にすれば	にすれば	from one's perspective; from the point of view of ~
+n3m-g-4e4cfe	... ば	... ば	If..., then let's
+n3m-g-e7d0de	…ば…はずだ	…ば…はずだ	If ... then perhaps ...
+n3m-g-cf4389	... はず	... はず	it must be; it should be (expectation)
+n3m-g-f2462b	いまさらながら	いまさらながら	Still ... now
+n3m-g-65f3dc	いまごろになって	いまごろになって	Only now ...
+n3m-g-50e692	けっか	けっか	as a result of; after ~
+n3m-g-8fd75f	どうも	どうも	Confused, bewildered
+n3m-g-a5c64e	なんとも～ようがない	なんとも～ようがない	There's no way to do ..., don't know what to do...
+n3m-g-b1a3eb	なんとも～ない	なんとも～ない	can't ... like that
+n3m-g-bf71cb	なにもかも	なにもかも	anything and everything, just about everything
+n3m-g-2fc7b5	なんとはなしに	なんとはなしに	I don't know why, aimless
+n3m-g-41955d	なにかにつけて	なにかにつけて	to take every opportunity
+n3m-g-06f758	どうせ (のこと) だから	どうせ (のこと) だから	Because eventually have to ...
+n3m-g-628f07	…ほどの…ではない	…ほどの…ではない	It's not worth; no need to ~, not too serious
+n3m-g-7f1426	…というほどではない	…というほどではない	the extent of something is not as much as you would call ～
+n3m-g-9b78d2	なんということもない	なんということもない	Nothing worth mentioning
+
+## Output format
+
+Return ONLY lines of `id<TAB>register`, one per input line, no header, no
+commentary, no code fence. Example:
+
+n3m-g-1a2b3c	neutral
+n1m-g-0f01e6	literary
+n2m-g-b0bf1e	casual?

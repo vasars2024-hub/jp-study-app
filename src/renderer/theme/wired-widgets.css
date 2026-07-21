@@ -1,0 +1,380 @@
+/**
+ * WIRED ARCHIVE — per-widget instrument treatments (WIRED_BESPOKE_SPEC §6).
+ * Every widget names its instrument at a glance: shared frame ships in
+ * wired-shell.css; this file gives each interior its own identity using the
+ * existing wgt-* hooks. Idle animations are slow (≥6s) and low-opacity, keyed
+ * off wm-* keyframes from wired-motion.css. Reduced-motion + idle gates at the
+ * end of the file.
+ */
+
+/* ---- Mount: cartridge slots into the rack (§6, all widgets) -------------- */
+:root[data-materials='wired'] .widget-frame.widget-anim-mounting {
+  animation: wm-scan-reveal 0.3s steps(6) both, wm-phosphor-settle 0.2s steps(3) 0.34s both;
+}
+
+:root[data-materials='wired'] .widget-frame.widget-anim-mounting .widget-title {
+  animation: wm-relay-blink 0.24s steps(1) 2 0.3s;
+}
+
+/* ---- Shared interior grammar --------------------------------------------- */
+:root[data-materials='wired'] .wgt {
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .wgt-progress,
+:root[data-materials='wired'] .wgt-progress-fill {
+  border-radius: 0;
+}
+
+:root[data-materials='wired'] .wgt-progress {
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  background: rgba(0, 8, 13, 0.8);
+}
+
+:root[data-materials='wired'] .wgt-progress-fill {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 5px, rgba(0, 8, 13, 0.55) 5px 7px),
+    var(--wired-cyan);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.28);
+}
+
+:root[data-materials='wired'] .wgt-btn,
+:root[data-materials='wired'] .wgt-btn-icon {
+  border-radius: 0;
+  color: var(--wired-cyan);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: rgba(2, 22, 31, 0.84);
+}
+
+:root[data-materials='wired'] .wgt-btn-icon:active {
+  transform: translateY(1px);
+}
+
+/* ---- Timekeeping instruments --------------------------------------------- */
+/* Terminal Timestamp */
+:root[data-materials='wired'] .wgt-clock-time {
+  color: #e9feff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(109, 241, 255, 0.5);
+}
+
+:root[data-materials='wired'] .wgt-clock-time::after {
+  content: ' ▮';
+  color: var(--wired-cyan);
+  animation: wm-cursor-blink 2s steps(1) infinite;
+}
+
+:root[data-materials='wired'] .wgt-clock-date::before {
+  content: 'TZ-LOCAL / ';
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
+/* Radar Clock */
+:root[data-materials='wired'] .wgt-analog-face {
+  border-radius: 50%;
+  border: 1px solid rgba(109, 241, 255, 0.4);
+  background:
+    radial-gradient(circle, transparent 0 32%, rgba(109, 241, 255, 0.07) 32.5% 33%, transparent 33.5% 62%, rgba(109, 241, 255, 0.07) 62.5% 63%, transparent 63.5%),
+    conic-gradient(rgba(109, 241, 255, 0.14) 0deg, transparent 40deg, transparent 360deg),
+    rgba(0, 7, 11, 0.94);
+  animation: wm-radar-clock 6s steps(48) infinite;
+}
+
+@keyframes wm-radar-clock {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 0; }
+}
+
+:root[data-materials='wired'] .wgt-analog-tick {
+  background: rgba(109, 241, 255, 0.5);
+}
+
+:root[data-materials='wired'] .wgt-analog-hour,
+:root[data-materials='wired'] .wgt-analog-min {
+  background: var(--wired-cyan);
+  box-shadow: 0 0 6px rgba(109, 241, 255, 0.5);
+}
+
+/* The one sanctioned red outside danger states: the alarm hand. */
+:root[data-materials='wired'] .wgt-analog-sec {
+  background: var(--wired-red, #df2732);
+}
+
+/* Mini Ops Board */
+:root[data-materials='wired'] .wgt-cal-grid {
+  gap: 1px;
+}
+
+:root[data-materials='wired'] .wgt-cal-day {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.1);
+}
+
+:root[data-materials='wired'] .wgt-cal-day.today {
+  color: var(--wired-amber);
+  border-color: rgba(255, 177, 59, 0.55);
+  background: rgba(255, 177, 59, 0.08);
+}
+
+:root[data-materials='wired'] .wgt-cal-dow {
+  color: var(--wired-amber);
+  letter-spacing: 0.1em;
+}
+
+:root[data-materials='wired'] .wgt-cal-dot {
+  border-radius: 0;
+  background: var(--wired-cyan);
+  box-shadow: 0 0 5px rgba(109, 241, 255, 0.5);
+}
+
+/* Cycle Reactor (pomodoro) */
+:root[data-materials='wired'] .wgt-pomo-time {
+  color: #e9feff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(109, 241, 255, 0.45);
+}
+
+:root[data-materials='wired'] .wgt-pomo-mode::before {
+  content: 'FOCUS CYCLE / ';
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
+/* Telemetry Timer (stopwatch) */
+:root[data-materials='wired'] .wgt-stopwatch {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Orbital Comms Clock (world clock) */
+:root[data-materials='wired'] .wgt-world-label::before {
+  content: 'STN ';
+  color: rgba(109, 241, 255, 0.5);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+:root[data-materials='wired'] .wgt-world-time {
+  font-variant-numeric: tabular-nums;
+  color: #e9feff;
+}
+
+/* ---- Study instruments ---------------------------------------------------- */
+/* Relay Checklist (daily goals) */
+:root[data-materials='wired'] .wgt-goals input[type='checkbox'] {
+  width: 12px;
+  height: 12px;
+}
+
+:root[data-materials='wired'] .wgt-goal-count {
+  color: var(--wired-amber);
+}
+
+/* Maintenance Log (habit tracker) */
+:root[data-materials='wired'] .wgt-habit-day {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.16);
+}
+
+:root[data-materials='wired'] .wgt-habit-day.done {
+  background: rgba(109, 241, 255, 0.32);
+  box-shadow: inset 0 0 6px rgba(109, 241, 255, 0.5);
+}
+
+/* Arming Timer (countdown) */
+:root[data-materials='wired'] .wgt-countdown {
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-materials='wired'] .wgt-countdown .wgt-stat-value::before {
+  content: 'T-';
+  color: var(--wired-amber);
+}
+
+/* Dispatch Queue (todo) */
+:root[data-materials='wired'] .wgt-todo-list .wgt-row::before {
+  content: 'PRI-B ';
+  color: rgba(109, 241, 255, 0.45);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+
+:root[data-materials='wired'] .wgt-todo-list .wgt-row.done {
+  text-decoration: line-through;
+  text-decoration-color: rgba(109, 241, 255, 0.6);
+  opacity: 0.5;
+}
+
+/* Signal Continuity (streak) */
+:root[data-materials='wired'] .wgt-stat-value {
+  color: #e9feff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(109, 241, 255, 0.4);
+}
+
+:root[data-materials='wired'] .wgt-stat-label {
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+:root[data-materials='wired'] .wgt-spark-bar {
+  border-radius: 0;
+  background: var(--wired-cyan);
+  box-shadow: 0 0 6px rgba(109, 241, 255, 0.3);
+}
+
+/* Lexicon Database (vocab) */
+:root[data-materials='wired'] .wgt-vocab-n {
+  color: #e9feff;
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-materials='wired'] .wgt-vocab-lbl {
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Clearance Ladder (level progress) */
+:root[data-materials='wired'] .wgt-level-row {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.14);
+}
+
+:root[data-materials='wired'] .wgt-level-row.current,
+:root[data-materials='wired'] .wgt-level-row.active {
+  border-color: rgba(255, 177, 59, 0.55);
+  background: rgba(255, 177, 59, 0.06);
+}
+
+/* Intercepted Term (word of the day) */
+:root[data-materials='wired'] .wgt-wotd {
+  position: relative;
+}
+
+:root[data-materials='wired'] .wgt-wotd::before {
+  content: 'INTERCEPTED TERM';
+  display: block;
+  margin-bottom: 4px;
+  color: var(--wired-amber);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+}
+
+:root[data-materials='wired'] .wgt-wotd-word {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid rgba(109, 241, 255, 0.3);
+  background: rgba(0, 9, 14, 0.7);
+  animation: wm-decrypt-noise 0.4s steps(6) both;
+}
+
+/* Phosphor Matrix (learning heatmap) */
+:root[data-materials='wired'] .wgt-heat-cell {
+  border-radius: 0;
+}
+
+:root[data-materials='wired'] .wgt-heatmap-grid .wgt-heat-cell:nth-child(23n + 7) {
+  animation: wm-relay-blink 9s steps(1) infinite;
+}
+
+/* ---- Utility instruments -------------------------------------------------- */
+/* Mini Audio Deck */
+.wgt-player-osc {
+  width: 100%;
+  margin: 2px 0 4px;
+}
+
+:root[data-materials='wired'] .wgt-player-times {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Engineering Pad (calculator) */
+:root[data-materials='wired'] .wgt-calc-display {
+  border-radius: 0;
+  color: var(--wired-cyan);
+  background: rgba(0, 7, 11, 0.95);
+  border: 1px solid rgba(109, 241, 255, 0.3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.4);
+}
+
+:root[data-materials='wired'] .wgt-calc-key {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background: rgba(2, 22, 31, 0.86);
+  color: var(--wired-cyan);
+}
+
+:root[data-materials='wired'] .wgt-calc-key:active {
+  transform: translateY(1px);
+}
+
+/* Query Log (recent lookups) */
+:root[data-materials='wired'] .wgt-recent-list > *:first-child {
+  animation: wm-scan-reveal 0.16s steps(4) both;
+}
+
+/* Memory Buffer (clipboard) */
+:root[data-materials='wired'] .wgt-clip {
+  counter-reset: wired-reg;
+}
+
+:root[data-materials='wired'] .wgt-clip-line::before {
+  counter-increment: wired-reg;
+  content: 'R' counter(wired-reg) ' ';
+  color: rgba(109, 241, 255, 0.5);
+  font-size: 9px;
+}
+
+/* Processor Telemetry / Core Bank / Power Cell / Node Link */
+:root[data-materials='wired'] .wgt-sys-bar {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  background:
+    repeating-linear-gradient(0deg, rgba(109, 241, 255, 0.08) 0 1px, transparent 1px 4px),
+    rgba(0, 8, 13, 0.8);
+}
+
+:root[data-materials='wired'] .wgt-sys-bar > * {
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4px, rgba(0, 8, 13, 0.5) 4px 6px),
+    var(--wired-cyan);
+}
+
+:root[data-materials='wired'] .wgt-sys-meta {
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-materials='wired'] .wgt-sys-dot {
+  border-radius: 0;
+  animation: wm-relay-blink 4s steps(1) infinite;
+}
+
+/* ---- Reduced motion + idle gates ----------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='wired'] .widget-frame.widget-anim-mounting,
+  :root[data-materials='wired'] .widget-frame.widget-anim-mounting .widget-title,
+  :root[data-materials='wired'] .wgt-clock-time::after,
+  :root[data-materials='wired'] .wgt-analog-face,
+  :root[data-materials='wired'] .wgt-wotd-word,
+  :root[data-materials='wired'] .wgt-heatmap-grid .wgt-heat-cell:nth-child(23n + 7),
+  :root[data-materials='wired'] .wgt-recent-list > *:first-child,
+  :root[data-materials='wired'] .wgt-sys-dot {
+    animation: none;
+  }
+}
+
+:root[data-wired-idle='off'] .wgt-clock-time::after,
+:root[data-wired-idle='off'] .wgt-analog-face,
+:root[data-wired-idle='off'] .wgt-heatmap-grid .wgt-heat-cell:nth-child(23n + 7),
+:root[data-wired-idle='off'] .wgt-sys-dot {
+  animation: none;
+}

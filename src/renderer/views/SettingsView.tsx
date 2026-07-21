@@ -1,6 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { confirmDialog } from '../components/ui';
-import { PROFILE_GROUPS, type ProfileId } from '../../shared/profiles';
 import { KNOWN_LANGS } from '../../shared/langs';
 import type { YomitanDictInfo } from '../../shared/types';
 import {
@@ -13,248 +12,40 @@ import {
   ZOOM_MIN,
   ZOOM_STEP,
 } from '../appZoom';
-import {
-  createProfile,
-  DEFAULT_PROFILE_ID,
-  deleteProfile,
-  getActiveProfile,
-  getActiveProfileId,
-  getProfiles,
-  isSeedProfile,
-  onProfileChanged,
-  switchProfile,
-} from '../profileState';
+import { ProfileSwitcher } from '../components/ProfileSwitcher';
 import ShortcutSettings from '../components/ShortcutSettings';
 import { loadClipboardSettings, saveClipboardSettings } from '../clipboardHistory';
-
-function CreateProfileModal({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: (msg: { kind: 'ok' | 'err'; text: string }) => void;
-}) {
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const res = await createProfile(name);
-    setBusy(false);
-    if (res.ok) {
-      onCreated({ kind: 'ok', text: 'Profile created.' });
-      onClose();
-      return;
-    }
-    onCreated({ kind: 'err', text: res.error ?? 'Could not create the profile.' });
-  }
-
-  return (
-    <div className="nov-modal-backdrop" onClick={onClose}>
-      <div className="set-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="nov-modal-x" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-        <div className="set-modal-body">
-          <h3 className="set-modal-title">Create New Profile</h3>
-          <p className="set-row-desc muted">Enter a name for the new study profile.</p>
-          <form onSubmit={submit}>
-            <div className="field-row">
-              <label htmlFor="profile-name">Profile name</label>
-              <input
-                id="profile-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. JLPT N3 Focus"
-                autoFocus
-              />
-            </div>
-            <div className="set-profile-actions">
-              <button type="button" className="btn" onClick={onClose} disabled={busy}>
-                Cancel
-              </button>
-              <button type="submit" className="btn primary" disabled={busy || !name.trim()}>
-                {busy ? 'Creating…' : 'Create'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
+import { sendTelemetryPingIfNeeded } from '../telemetryPing';
+import { useT } from '../i18n';
 
 /** Study-profile picker and controls — shared by Settings and Anki views. */
 export function ProfileSettingsSection() {
-  const [profiles, setProfiles] = useState(getProfiles);
-  const [activeId, setActiveId] = useState<ProfileId>(getActiveProfileId);
-  const [switching, setSwitching] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
-
-  const active = profiles.find((p) => p.id === activeId) ?? getActiveProfile();
-  const isDefault = activeId === DEFAULT_PROFILE_ID;
-  const isSeed = isSeedProfile(activeId);
-
-  useEffect(
-    () =>
-      onProfileChanged((snap) => {
-        setProfiles(snap.profiles);
-        setActiveId(snap.activeProfileId);
-      }),
-    [],
-  );
-
-  async function onSelect(id: ProfileId) {
-    if (id === activeId || switching) return;
-    setSwitching(true);
-    setMsg(null);
-    const res = await switchProfile(id);
-    setSwitching(false);
-    if (!res.ok) {
-      setMsg({ kind: 'err', text: res.error ?? 'Could not switch profile.' });
-    }
-  }
-
-  async function onDelete() {
-    if (isDefault || deleting) return;
-    const question = isSeed
-      ? `Reset "${active.label}" to its default configuration?`
-      : `Delete the profile "${active.label}"? This can't be undone.`;
-    const ok = await confirmDialog({
-      title: isSeed ? 'Reset profile' : 'Delete profile',
-      message: question,
-      confirmLabel: isSeed ? 'Reset' : 'Delete',
-      danger: true,
-    });
-    if (!ok) return;
-    setDeleting(true);
-    setMsg(null);
-    const res = await deleteProfile(activeId);
-    setDeleting(false);
-    if (res.ok) {
-      setMsg({ kind: 'ok', text: isSeed ? 'Profile reset to defaults.' : 'Profile deleted.' });
-    } else {
-      setMsg({ kind: 'err', text: res.error ?? 'Could not remove the profile.' });
-    }
-  }
-
-  return (
-    <section className="set-section">
-      <h2>Profiles</h2>
-
-      <div className="set-row">
-        <div className="set-row-text">
-          <div className="set-row-title">Active profile</div>
-          <div className="set-row-desc muted">
-            {active.description ??
-              'Controls card direction, Anki deck binding, and dictionary pipeline for mining.'}
-          </div>
-        </div>
-        <span className="set-profile-badge" aria-live="polite">
-          <span className="status-dot ok" />
-          {active.label}
-        </span>
-      </div>
-
-      <div className="set-row set-profile-picker">
-        <div className="set-row-text">
-          <div className="set-row-title">Switch profile</div>
-        </div>
-        <select
-          className="set-select"
-          value={activeId}
-          disabled={switching}
-          onChange={(e) => void onSelect(e.target.value as ProfileId)}
-          aria-label="Study profile"
-        >
-          {PROFILE_GROUPS.map((group) => {
-            const items = group.ids
-              .map((id) => profiles.find((p) => p.id === id))
-              .filter((p): p is NonNullable<typeof p> => Boolean(p));
-            if (items.length === 0) return null;
-            return (
-              <optgroup key={group.label} label={group.label}>
-                {items.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                    {p.description
-                      ? ` — ${p.description.slice(0, 48)}${p.description.length > 48 ? '…' : ''}`
-                      : ''}
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })}
-          {profiles.some((p) => !PROFILE_GROUPS.some((g) => g.ids.includes(p.id))) && (
-            <optgroup label="Custom">
-              {profiles
-                .filter((p) => !PROFILE_GROUPS.some((g) => g.ids.includes(p.id)))
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                    {p.description
-                      ? ` — ${p.description.slice(0, 48)}${p.description.length > 48 ? '…' : ''}`
-                      : ''}
-                  </option>
-                ))}
-            </optgroup>
-          )}
-        </select>
-      </div>
-
-      <div className="set-profile-actions">
-        <button className="btn" onClick={() => setShowCreate(true)}>
-          Create New Profile
-        </button>
-        <button
-          className="btn"
-          onClick={() => void onDelete()}
-          disabled={isDefault || deleting}
-          title={
-            isDefault
-              ? 'The default profile cannot be deleted'
-              : isSeed
-                ? 'Reset this built-in profile to its defaults'
-                : 'Delete this profile'
-          }
-        >
-          {deleting
-            ? isSeed
-              ? 'Resetting…'
-              : 'Deleting…'
-            : isSeed
-              ? 'Reset to defaults'
-              : 'Delete Profile'}
-        </button>
-      </div>
-
-      {msg && <div className={`form-msg ${msg.kind}`}>{msg.text}</div>}
-
-      {showCreate && (
-        <CreateProfileModal onClose={() => setShowCreate(false)} onCreated={setMsg} />
-      )}
-    </section>
-  );
+  return <ProfileSwitcher showHeading />;
 }
 
-function dictKindLabel(d: YomitanDictInfo): string {
+function dictKindLabel(d: YomitanDictInfo, t: (key: string) => string): string {
   const parts: string[] = [];
-  if (d.hasTerms) parts.push('terms');
-  if (d.hasPitch) parts.push('pitch');
-  if (d.hasFreq) parts.push('frequency');
-  return parts.length ? parts.join(' + ') : 'metadata';
+  if (d.hasTerms) parts.push(t('settings.study.dict.kind.terms'));
+  if (d.hasPitch) parts.push(t('settings.study.dict.kind.pitch'));
+  if (d.hasFreq) parts.push(t('settings.study.dict.kind.frequency'));
+  return parts.length
+    ? parts.join(t('settings.study.dict.kindJoin'))
+    : t('settings.study.dict.kind.metadata');
 }
 
 /** Import / remove offline Yomitan dictionaries for the pop-up and mining. */
 export function DictionarySettingsSection() {
+  const { t } = useT();
   const [dicts, setDicts] = useState<YomitanDictInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
-  const [exOffline, setExOffline] = useState<{ installed: boolean; sentenceCount: number; updatedAt: number } | null>(null);
+  const [exOffline, setExOffline] = useState<{
+    installed: boolean;
+    sentenceCount: number;
+    updatedAt: number;
+  } | null>(null);
   const [exImporting, setExImporting] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
@@ -283,10 +74,15 @@ export function DictionarySettingsSection() {
     setImporting(false);
     if (res.error === 'cancelled') return;
     if (res.ok) {
-      setMsg({ kind: 'ok', text: `Imported “${res.info?.title ?? 'dictionary'}”.` });
+      setMsg({
+        kind: 'ok',
+        text: t('settings.study.dict.imported', {
+          title: res.info?.title ?? t('settings.study.dict.fallbackTitle'),
+        }),
+      });
       await refresh();
     } else {
-      setMsg({ kind: 'err', text: res.error ?? 'Import failed.' });
+      setMsg({ kind: 'err', text: res.error ?? t('settings.study.dict.importFailed') });
     }
   }
 
@@ -299,19 +95,19 @@ export function DictionarySettingsSection() {
     if (res.ok) {
       setMsg({
         kind: 'ok',
-        text: `Indexed ${res.added.toLocaleString()} Tatoeba sentence${res.added === 1 ? '' : 's'}.`,
+        text: t('settings.study.dict.examples.indexed', { count: res.added }),
       });
       await refresh();
     } else {
-      setMsg({ kind: 'err', text: res.error ?? 'Import failed.' });
+      setMsg({ kind: 'err', text: res.error ?? t('settings.study.dict.importFailed') });
     }
   }
 
   async function onRemove(id: string, title: string) {
     const ok = await confirmDialog({
-      title: 'Remove dictionary',
-      message: `Remove “${title}” from offline dictionaries?`,
-      confirmLabel: 'Remove',
+      title: t('settings.study.dict.removeTitle'),
+      message: t('settings.study.dict.removeMsg', { title }),
+      confirmLabel: t('common.remove'),
       danger: true,
     });
     if (!ok) return;
@@ -320,10 +116,10 @@ export function DictionarySettingsSection() {
     const res = await window.api.dictRemoveYomitan(id);
     setRemoving(null);
     if (res.ok) {
-      setMsg({ kind: 'ok', text: 'Dictionary removed.' });
+      setMsg({ kind: 'ok', text: t('settings.study.dict.removed') });
       await refresh();
     } else {
-      setMsg({ kind: 'err', text: res.error ?? 'Could not remove the dictionary.' });
+      setMsg({ kind: 'err', text: res.error ?? t('settings.study.dict.removeFailed') });
     }
   }
 
@@ -331,7 +127,7 @@ export function DictionarySettingsSection() {
     setMsg(null);
     const res = await window.api.dictSetYomitanEnabled(id, enabled);
     if (res.ok) await refresh();
-    else setMsg({ kind: 'err', text: res.error ?? 'Could not update the dictionary.' });
+    else setMsg({ kind: 'err', text: res.error ?? t('settings.study.dict.updateFailed') });
   }
 
   async function onMove(id: string, dir: number) {
@@ -339,44 +135,39 @@ export function DictionarySettingsSection() {
     const res = await window.api.dictMoveYomitan(id, dir);
     if (res.ok) await refresh();
     else if (res.error !== 'Already at the edge.') {
-      setMsg({ kind: 'err', text: res.error ?? 'Could not reorder the dictionary.' });
+      setMsg({ kind: 'err', text: res.error ?? t('settings.study.dict.reorderFailed') });
     }
   }
 
-  async function onSetLang(id: string, lang: string) {
+  async function onSetLang(id: string, glossLang: string) {
     setMsg(null);
-    const res = await window.api.dictSetYomitanLang(id, lang);
+    const res = await window.api.dictSetYomitanLang(id, glossLang);
     if (res.ok) await refresh();
-    else setMsg({ kind: 'err', text: res.error ?? 'Could not set the dictionary language.' });
+    else setMsg({ kind: 'err', text: res.error ?? t('settings.study.dict.langFailed') });
   }
 
   return (
     <section className="set-section">
-      <h2>Dictionaries</h2>
+      <h2>{t('search.dictionary')}</h2>
       <p className="set-row-desc muted">
-        Offline Yomitan dictionaries power the reader pop-up and fill{' '}
-        <code>{'{pitch}'}</code> / <code>{'{frequency}'}</code> when mining. Kanjium pitch
-        accents are bundled automatically on first launch (requires internet once). Import a term
-        dictionary for richer offline glossaries; import a frequency list for rank badges. The{' '}
-        <b>top</b> dictionary wins when several define the same word — use ↑/↓ to reorder, or the
-        checkbox to switch one off.
+        {t('settings.study.dict.intro')}
       </p>
 
       <div className="set-profile-actions">
         <button className="btn primary" onClick={() => void onImport()} disabled={importing}>
-          {importing ? 'Importing…' : 'Import Yomitan dictionary (.zip)'}
+          {importing ? t('settings.study.dict.importing') : t('settings.study.dict.import')}
         </button>
       </div>
 
-      {loading && <div className="form-msg">Loading dictionaries…</div>}
+      {loading && <div className="form-msg">{t('settings.study.dict.loading')}</div>}
       {!loading && dicts.length === 0 && (
-        <div className="form-msg">No dictionaries loaded yet. Bundled pitch seeds on first boot.</div>
+        <div className="form-msg">{t('settings.study.dict.empty')}</div>
       )}
       {!loading && dicts.length > 0 && (
         <ul className="dict-manage-list">
           {dicts.map((d, i) => (
             <li className={`dict-manage-row ${d.enabled === false ? 'off' : ''}`} key={d.id}>
-              <label className="dict-manage-toggle" title="Use this dictionary">
+              <label className="dict-manage-toggle" title={t('settings.study.dict.useTitle')}>
                 <input
                   type="checkbox"
                   checked={d.enabled !== false}
@@ -386,13 +177,17 @@ export function DictionarySettingsSection() {
               <div className="dict-manage-info">
                 <div className="set-row-title">
                   {d.title}
-                  {d.bundled && <span className="dict-badge bundled">bundled</span>}
+                  {d.bundled && (
+                    <span className="dict-badge bundled">{t('settings.study.dict.bundled')}</span>
+                  )}
                 </div>
                 <div className="set-row-desc muted">
-                  {dictKindLabel(d)}
-                  {d.revision ? ` · rev ${d.revision}` : ''}
+                  {dictKindLabel(d, t)}
+                  {d.revision ? t('settings.study.dict.rev', { rev: d.revision }) : ''}
                   {d.hasTerms && !d.glossLangOverride && d.glossLangs?.length
-                    ? ` · language: ${d.glossLangs.join(', ')} (detected)`
+                    ? t('settings.study.dict.langDetected', {
+                        langs: d.glossLangs.join(', '),
+                      })
                     : ''}
                 </div>
               </div>
@@ -400,12 +195,16 @@ export function DictionarySettingsSection() {
                 {d.hasTerms && (
                   <select
                     className="dict-lang-select"
-                    title="Definition language of this dictionary — auto-detected, override if wrong"
+                    title={t('settings.study.dict.langTitle')}
                     value={d.glossLangOverride ?? ''}
                     onChange={(e) => void onSetLang(d.id, e.target.value)}
                   >
                     <option value="">
-                      Auto{d.glossLangs?.length ? ` (${d.glossLangs.join(', ')})` : ''}
+                      {d.glossLangs?.length
+                        ? t('settings.study.dict.langAutoWith', {
+                            langs: d.glossLangs.join(', '),
+                          })
+                        : t('settings.study.dict.langAuto')}
                     </option>
                     {KNOWN_LANGS.map((l) => (
                       <option key={l.code} value={l.code}>
@@ -416,19 +215,19 @@ export function DictionarySettingsSection() {
                 )}
                 <button
                   className="btn small"
-                  title="Higher priority"
+                  title={t('settings.study.dict.higherPriority')}
                   disabled={i === 0}
                   onClick={() => void onMove(d.id, -1)}
                 >
-                  ↑
+                  â†‘
                 </button>
                 <button
                   className="btn small"
-                  title="Lower priority"
+                  title={t('settings.study.dict.lowerPriority')}
                   disabled={i === dicts.length - 1}
                   onClick={() => void onMove(d.id, 1)}
                 >
-                  ↓
+                  â†“
                 </button>
                 {!d.bundled && (
                   <button
@@ -436,7 +235,9 @@ export function DictionarySettingsSection() {
                     disabled={removing === d.id}
                     onClick={() => void onRemove(d.id, d.title)}
                   >
-                    {removing === d.id ? 'Removing…' : 'Remove'}
+                    {removing === d.id
+                      ? t('settings.study.dict.removing')
+                      : t('common.remove')}
                   </button>
                 )}
               </div>
@@ -445,25 +246,25 @@ export function DictionarySettingsSection() {
         </ul>
       )}
 
-      <h3 className="set-subhead">Offline example sentences</h3>
+      <h3 className="set-subhead">{t('settings.study.dict.examples.title')}</h3>
       <p className="set-row-desc muted">
-        Tatoeba examples work online by default. Import the Japanese sentences CSV from{' '}
+        {t('settings.study.dict.examples.intro')}{' '}
         <a href="https://tatoeba.org/en/downloads" target="_blank" rel="noreferrer">
           tatoeba.org/downloads
-        </a>{' '}
-        for offline lookup; the app also caches examples from successful online searches. Optional:
-        re-use the same sentences file plus a links CSV to attach English glosses during import.
+        </a>
       </p>
       <div className="set-profile-actions">
         <button className="btn" onClick={() => void onImportExamples()} disabled={exImporting}>
-          {exImporting ? 'Importing…' : 'Import Tatoeba sentences (CSV)'}
+          {exImporting
+            ? t('settings.study.dict.importing')
+            : t('settings.study.dict.examples.import')}
         </button>
       </div>
       {!loading && exOffline && (
         <div className="form-msg">
           {exOffline.sentenceCount > 0
-            ? `${exOffline.sentenceCount.toLocaleString()} sentences in offline index.`
-            : 'No offline examples yet — online Tatoeba still works when connected.'}
+            ? t('settings.study.dict.examples.count', { count: exOffline.sentenceCount })
+            : t('settings.study.dict.examples.empty')}
         </div>
       )}
 
@@ -473,19 +274,17 @@ export function DictionarySettingsSection() {
 }
 
 function ClipboardSettingsSection() {
+  const { t } = useT();
   const [settings, setSettings] = useState(loadClipboardSettings);
   return (
     <section className="set-section">
-      <h2>Clipboard History</h2>
-      <p className="set-row-desc muted">
-        Open it any time with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>V</kbd>, the command palette, or the
-        clipboard icon in the taskbar.
-      </p>
+      <h2>{t('settings.clipboard.title')}</h2>
+      <p className="set-row-desc muted">{t('settings.clipboard.intro')}</p>
 
       <div className="set-row">
         <div className="set-row-text">
-          <div className="set-row-title">Maximum history size</div>
-          <div className="set-row-desc muted">Oldest unpinned entries are dropped once this limit is reached.</div>
+          <div className="set-row-title">{t('settings.clipboard.maxSize')}</div>
+          <div className="set-row-desc muted">{t('settings.clipboard.maxSize.desc')}</div>
         </div>
         <input
           type="number"
@@ -499,8 +298,8 @@ function ClipboardSettingsSection() {
 
       <div className="set-row">
         <div className="set-row-text">
-          <div className="set-row-title">Remove consecutive duplicates</div>
-          <div className="set-row-desc muted">Copying the same text twice in a row won't add a second entry.</div>
+          <div className="set-row-title">{t('settings.clipboard.dedupe')}</div>
+          <div className="set-row-desc muted">{t('settings.clipboard.dedupe.desc')}</div>
         </div>
         <input
           type="checkbox"
@@ -511,8 +310,8 @@ function ClipboardSettingsSection() {
 
       <div className="set-row">
         <div className="set-row-text">
-          <div className="set-row-title">Clear on application exit</div>
-          <div className="set-row-desc muted">Unpinned history is wiped when the app closes; pinned entries are kept.</div>
+          <div className="set-row-title">{t('settings.clipboard.clearOnExit')}</div>
+          <div className="set-row-desc muted">{t('settings.clipboard.clearOnExit.desc')}</div>
         </div>
         <input
           type="checkbox"
@@ -523,8 +322,8 @@ function ClipboardSettingsSection() {
 
       <div className="set-row">
         <div className="set-row-text">
-          <div className="set-row-title">Clipboard monitoring</div>
-          <div className="set-row-desc muted">Automatically record text copied anywhere on your system, not just in the app.</div>
+          <div className="set-row-title">{t('settings.clipboard.monitoring')}</div>
+          <div className="set-row-desc muted">{t('settings.clipboard.monitoring.desc')}</div>
         </div>
         <input
           type="checkbox"
@@ -536,7 +335,44 @@ function ClipboardSettingsSection() {
   );
 }
 
+function PrivacySettingsSection() {
+  const { t } = useT();
+  const [consent, setConsent] = useState<'yes' | 'no' | null>(() => {
+    const v = localStorage.getItem(TELEMETRY_CONSENT_KEY);
+    return v === 'yes' || v === 'no' ? v : null;
+  });
+
+  const share = consent === 'yes';
+
+  const onToggle = (next: boolean) => {
+    const value = next ? 'yes' : 'no';
+    try {
+      localStorage.setItem(TELEMETRY_CONSENT_KEY, value);
+      if (next) void sendTelemetryPingIfNeeded();
+    } catch {
+      /* storage unavailable */
+    }
+    setConsent(value);
+  };
+
+  return (
+    <section className="set-section">
+      <h2>{t('settings.privacy.title')}</h2>
+      <p className="set-row-desc muted">{t('settings.privacy.intro')}</p>
+
+      <div className="set-row">
+        <div className="set-row-text">
+          <div className="set-row-title">{t('settings.privacy.heatmap')}</div>
+          <div className="set-row-desc muted">{t('settings.privacy.heatmap.desc')}</div>
+        </div>
+        <input type="checkbox" checked={share} onChange={(e) => onToggle(e.target.checked)} />
+      </div>
+    </section>
+  );
+}
+
 export default function SettingsView() {
+  const { t } = useT();
   const [zoom, setZoomState] = useState<number>(getZoom());
 
   useEffect(() => onZoomChanged(setZoomState), []);
@@ -549,8 +385,8 @@ export default function SettingsView() {
     <div className="settings-view">
       <div className="view-head">
         <div>
-          <h1>Settings</h1>
-          <p className="muted">Make the app comfortable to read and use.</p>
+          <h1>{t('settings.appTitle')}</h1>
+          <p className="muted">{t('settings.legacy.intro')}</p>
         </div>
       </div>
 
@@ -562,32 +398,31 @@ export default function SettingsView() {
 
       <ClipboardSettingsSection />
 
+      <PrivacySettingsSection />
+
       <section className="set-section">
-        <h2>Accessibility</h2>
+        <h2>{t('settings.a11y.title')}</h2>
 
         <div className="set-row">
           <div className="set-row-text">
-            <div className="set-row-title">App zoom</div>
-            <div className="set-row-desc muted">
-              Scales the whole app — text, buttons, and every screen. Use this if the interface
-              feels too small or too large.
-            </div>
+            <div className="set-row-title">{t('settings.a11y.zoom.title')}</div>
+            <div className="set-row-desc muted">{t('settings.a11y.zoom.desc')}</div>
           </div>
           <div className="zoom-control">
             <button
               className="zoom-btn"
               onClick={() => bumpZoom(-ZOOM_STEP)}
               disabled={atMin}
-              aria-label="Decrease app zoom"
+              aria-label={t('settings.a11y.zoom.decrease')}
             >
-              −
+              âˆ’
             </button>
             <span className="zoom-val">{pct}%</span>
             <button
               className="zoom-btn"
               onClick={() => bumpZoom(ZOOM_STEP)}
               disabled={atMax}
-              aria-label="Increase app zoom"
+              aria-label={t('settings.a11y.zoom.increase')}
             >
               +
             </button>
@@ -596,7 +431,7 @@ export default function SettingsView() {
               onClick={() => setZoom(ZOOM_DEFAULT)}
               disabled={pct === Math.round(ZOOM_DEFAULT * 100)}
             >
-              Reset
+              {t('common.reset')}
             </button>
           </div>
         </div>
@@ -609,18 +444,13 @@ export default function SettingsView() {
           step={ZOOM_STEP}
           value={zoom}
           onChange={(e) => setZoom(Number(e.target.value))}
-          aria-label="App zoom"
+          aria-label={t('settings.a11y.zoom.aria')}
         />
       </section>
 
       <section className="set-section">
-        <h2>Reader</h2>
-        <p className="set-row-desc muted">
-          While reading a book, change the <strong>text size</strong> (now up to 400%) by holding{' '}
-          <kbd>Ctrl</kbd> and scrolling, or pressing <kbd>Ctrl</kbd> <kbd>+</kbd> /{' '}
-          <kbd>Ctrl</kbd> <kbd>−</kbd>. Theme, font, and furigana live in the reader’s own settings
-          panel. The app zoom above applies on top of this, everywhere in the app.
-        </p>
+        <h2>{t('settings.readerTip.title')}</h2>
+        <p className="set-row-desc muted">{t('settings.readerTip.body')}</p>
       </section>
     </div>
   );

@@ -9,8 +9,11 @@ import {
 } from '../levelScale';
 
 describe('levelScale slots', () => {
-  it('JA has 5 JLPT slots at tiers 2..6, ZH has 6 HSK slots at tiers 1..6', () => {
-    expect(JA_SLOTS.map((s) => s.tier)).toEqual([2, 3, 4, 5, 6]);
+  // N0 is the user's own post-N1 deck: there is no official exam above N1, so
+  // tier 7 has no canonical list and the slot is optional.
+  it('JA has JLPT slots at tiers 2..6 plus the optional N0 at 7, ZH has 6 HSK slots at tiers 1..6', () => {
+    expect(JA_SLOTS.map((s) => s.tier)).toEqual([2, 3, 4, 5, 6, 7]);
+    expect(JA_SLOTS.at(-1)).toMatchObject({ id: 'jlpt-n0', short: 'N0', tier: 7 });
     expect(ZH_SLOTS.map((s) => s.tier)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(slotsForLang('ja')).toBe(JA_SLOTS);
     expect(slotsForLang('zh')).toBe(ZH_SLOTS);
@@ -65,6 +68,23 @@ describe('deriveUserLevel', () => {
     const r = deriveUserLevel('ja', {
       coverageBySlot: { 'jlpt-n1': 0.9 },
       advancedCoverage: 0.8,
+    });
+    expect(r.level).toBe(7);
+  });
+
+  it('reaches Advanced (7) by clearing an N0 deck directly', () => {
+    const r = deriveUserLevel('ja', { coverageBySlot: { 'jlpt-n1': 0.9, 'jlpt-n0': 0.85 } });
+    expect(r.level).toBe(7);
+    expect(r.advanced).toBe(true);
+    expect(r.reached).toContain('jlpt-n0');
+  });
+
+  // Regression: N0 is the last JA slot, so gating Advanced on "the last slot"
+  // made tier 7 unreachable for everyone without an N0 deck.
+  it('still reaches Advanced by known-word count with no N0 deck supplied', () => {
+    const r = deriveUserLevel('ja', {
+      coverageBySlot: { 'jlpt-n1': 0.9 },
+      totalKnown: ADVANCED_KNOWN_WORDS,
     });
     expect(r.level).toBe(7);
   });

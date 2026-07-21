@@ -32,7 +32,9 @@ const FILTERS_ENTRY = path.join(
 const DEFAULT_OUT = path.join(__dirname, '..', 'grammar-audit.json');
 
 const JLPT = ['N5', 'N4', 'N3', 'N2', 'N1'];
-const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7', 'HSK8', 'HSK9', 'HSK10'];
+// HSK7-9 is one combined band upstream; this list used to split it into three,
+// which reported two levels the standard does not publish as permanently empty.
+const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7-9', 'HSK10'];
 
 function loadCorpus(entry = ENTRY) {
   const { outputFiles } = esbuild.buildSync({
@@ -286,16 +288,29 @@ function audit(corpus, filters) {
 
   /*
    * Records that would actually answer a register query under verifiedTagsOnly.
-   * Keyed on registerSource, not the weakest-link tagSource — a record can have
-   * a register derived from its own morphology and categories that are guesses.
+   *
+   * This calls the app's own predicate rather than restating it. The inline
+   * copy that used to live here would have kept reporting the old numbers
+   * after `trusted()` changed — an audit that can silently disagree with the
+   * code it audits is worse than no audit.
    */
   const trustworthyRegister = points.filter(
-    (p) =>
-      p.provenance &&
-      (p.provenance.registerSource === 'authored' || p.provenance.registerSource === 'derived') &&
-      p.register !== 'neutral',
+    (p) => p.provenance && corpus.hasTrustworthyRegister(p) && p.register !== 'neutral',
   );
   const answerableRegister = tally(trustworthyRegister, (p) => p.register);
+
+  /*
+   * Register coverage as three states, which is the distinction the tables
+   * exist to make: known and marked, known and deliberately unmarked, and
+   * never examined. Collapsing the last two into one 'neutral' count is what
+   * made the old report read as though the corpus had been fully checked.
+   */
+  const registerKnown = points.filter((p) => p.provenance && corpus.hasTrustworthyRegister(p));
+  const registerCoverage = {
+    carriesRegister: trustworthyRegister.length,
+    knownNeutral: registerKnown.length - trustworthyRegister.length,
+    unchecked: points.length - registerKnown.length,
+  };
 
   const heuristic = {
     functions: tagProvenance.heuristic || 0,
@@ -357,6 +372,8 @@ function audit(corpus, filters) {
       byLang: registerByLang,
       /** Records a register filter can honestly return. */
       answerable: answerableRegister,
+      /** known-and-marked vs known-and-unmarked vs never-examined. */
+      coverage: registerCoverage,
     },
     provenance: {
       tagSource: sortedTally(tagProvenance),
@@ -510,6 +527,15 @@ function printSummary(r, prev) {
     console.log('  a register filter can honestly return:');
     if (ans.length === 0) console.log('    (nothing — no record has a trustworthy register)');
     for (const [reg, n] of ans) console.log(`    ${reg.padEnd(10)} ${n}`);
+  }
+  if (r.register.coverage) {
+    const c = r.register.coverage;
+    console.log('  coverage:');
+    console.log(`    carries a register  ${String(c.carriesRegister).padStart(5)}  ${pct(c.carriesRegister, r.totals.all)}`);
+    console.log(`    checked, no register${String(c.knownNeutral).padStart(5)}  ${pct(c.knownNeutral, r.totals.all)}`);
+    console.log(`    never examined      ${String(c.unchecked).padStart(5)}  ${pct(c.unchecked, r.totals.all)}`);
+    console.log('    !! "never examined" records read as neutral in the UI but');
+    console.log('       nothing has confirmed that. Only the first two rows are claims.');
   }
 
   if (r.provenance) {

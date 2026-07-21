@@ -54,9 +54,29 @@ export interface ExtractReadableResult {
   ok: boolean;
   title?: string;
   content?: string;
+  /** Plain text of the article (no markup) — used for comprehensibility scoring. */
+  text?: string;
   url?: string;
   meta?: ExtractReadableMeta;
   error?: string;
+}
+
+/** Strip tags + decode the handful of entities that matter for scoring text. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?>(?=)/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /** Strip cache-bust / reload query params before fetching. */
@@ -212,6 +232,7 @@ export function extractReadableFromHtml(html: string, pageUrl: string): ExtractR
           ok: true,
           title: fallback.title || pageUrl,
           content: fallback.content,
+          text: htmlToText(fallback.content),
           url: pageUrl,
           meta: {},
         };
@@ -224,6 +245,7 @@ export function extractReadableFromHtml(html: string, pageUrl: string): ExtractR
     ok: true,
     title: (art.title || pageUrl).trim(),
     content: art.content,
+    text: (art.textContent ?? htmlToText(art.content)).trim(),
     url: pageUrl,
     meta: {
       byline: art.byline,

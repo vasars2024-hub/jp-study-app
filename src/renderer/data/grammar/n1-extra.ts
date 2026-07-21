@@ -5,6 +5,9 @@ import type { GrammarPoint } from './types';
 export const N1_EXTRA: GrammarPoint[] = [
   {
     id: 'n1x-tomiete',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['speculation'],
     categories: ['judgment.conjecture', 'evidence.source'],
     level: 'N1',
     title: '〜とみえて / 〜とみえる',
@@ -18,6 +21,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toareba',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['condition'],
     categories: ['condition.general'],
     level: 'N1',
     title: '〜とあれば',
@@ -31,6 +37,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-katagata',
+    register: 'business',
+    provenance: { registerSource: 'classified' },
+    functions: ['purpose-goal'],
     categories: ['purpose.goal', 'time.simultaneous'],
     level: 'N1',
     title: '〜かたがた',
@@ -44,6 +53,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tomonaku',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['vague'],
     categories: ['state.description', 'emphasis.negation'],
     level: 'N1',
     title: '〜ともなく / 〜ともなしに',
@@ -57,6 +69,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-gurumi',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['companion'],
     categories: ['quantity.amount', 'space.range'],
     level: 'N1',
     title: '〜ぐるみ',
@@ -70,6 +85,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nami',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['emphasize-on-level'],
     categories: ['comparison.compare', 'comparison.similarity'],
     level: 'N1',
     title: '〜並み',
@@ -83,6 +101,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tokitara',
+    register: 'casual',
+    provenance: { registerSource: 'classified' },
+    functions: ['condition'],
     categories: ['discourse.topic', 'emotion.feeling'],
     level: 'N1',
     title: '〜ときたら',
@@ -96,6 +117,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-kotonashini',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
+    functions: ['condition-contrary'],
     categories: ['emphasis.negation', 'method.means'],
     level: 'N1',
     title: '〜ことなしに',
@@ -109,6 +133,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-houdai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['extremes'],
     categories: ['degree.extent', 'state.description'],
     level: 'N1',
     title: '〜放題',
@@ -122,6 +149,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-madademonai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['extreme-example'],
     categories: ['obligation.necessity', 'emphasis.negation'],
     level: 'N1',
     title: '〜までもない / 〜までもなく',
@@ -135,6 +165,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nitaru',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
+    functions: ['value'],
     categories: ['judgment.evaluation'],
     level: 'N1',
     title: '〜に足る / 〜に足りない',
@@ -148,6 +181,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-meku',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
+    functions: ['similarity-degree'],
     categories: ['state.change', 'comparison.similarity'],
     level: 'N1',
     title: '〜めく',
@@ -161,6 +197,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tatokorode',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['extreme-example'],
     categories: ['contrast.concession', 'condition.hypothetical'],
     level: 'N1',
     title: '〜たところで',
@@ -174,6 +213,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-buru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['similarity-degree'],
     categories: ['comparison.similarity', 'state.description'],
     level: 'N1',
     title: '〜ぶる',
@@ -187,6 +229,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-wokagirini',
+    register: 'business',
+    provenance: { registerSource: 'classified' },
+    functions: ['limit'],
     categories: ['time.point', 'degree.limit'],
     level: 'N1',
     title: '〜を限りに',
@@ -200,6 +245,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-atteno',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['limit'],
     categories: ['cause.reason', 'condition.requirement'],
     level: 'N1',
     title: '〜あっての',
@@ -213,6 +261,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tekaratoiumono',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['time-sequence'],
     categories: ['time.duration', 'state.change'],
     level: 'N1',
     title: '〜てからというもの',
@@ -226,6 +277,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nagarani',
+    functions: ['simultaneous'],
     categories: ['state.description', 'time.simultaneous'],
     level: 'N1',
     title: '〜ながらに（して）',
@@ -239,6 +291,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-narini',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['perspective-way'],
     categories: ['method.means', 'degree.extent'],
     level: 'N1',
     title: '〜なりに / 〜なりの',
@@ -252,6 +307,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-wokawakirini',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['limit'],
     categories: ['time.point', 'examples.instance'],
     level: 'N1',
     title: '〜を皮切りに（して）',
@@ -265,6 +323,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-ikanniyorazu',
+    functions: ['invariant'],
     categories: ['contrast.concession', 'condition.general'],
     level: 'N1',
     title: '〜いかんによらず / 〜いかんを問わず',
@@ -278,6 +337,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nikakawaru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['relationships-follow'],
     categories: ['cause.result', 'state.description'],
     level: 'N1',
     title: '〜にかかわる',
@@ -291,6 +353,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-naidewasumanai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['obligation.necessity'],
     level: 'N1',
     title: '〜ないではすまない / 〜ずにはすまない',
@@ -304,6 +369,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-naidewaokanai',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['judgment.certainty', 'cause.result'],
     level: 'N1',
     title: '〜ないではおかない / 〜ずにはおかない',
@@ -317,6 +385,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-woyoginakusareru',
+    functions: ['forced'],
     categories: ['obligation.necessity', 'voice.passive'],
     level: 'N1',
     title: '〜を余儀なくされる',
@@ -330,6 +399,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-niataisuru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['value'],
     categories: ['judgment.evaluation'],
     level: 'N1',
     title: '〜に値する / 〜に値しない',
@@ -343,6 +415,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-gasaigo',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['cause-time-relationship'],
     categories: ['condition.general', 'cause.result'],
     level: 'N1',
     title: '〜が最後 / 〜たら最後',
@@ -356,6 +431,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-tarasoremadeda',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['condition'],
     categories: ['condition.hypothetical', 'cause.result'],
     level: 'N1',
     title: '〜たらそれまでだ',
@@ -369,6 +447,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-wonukinishite',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['result'],
     categories: ['contrast.exception', 'emphasis.negation'],
     level: 'N1',
     title: '〜を抜きにして（は）',
@@ -382,6 +463,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-karaaru',
+    functions: ['amount'],
     categories: ['quantity.amount', 'emphasis.emphasize'],
     level: 'N1',
     title: '〜からある / 〜からする / 〜からの',
@@ -395,6 +477,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-nishite',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['limit'],
     categories: ['time.point', 'emphasis.emphasize'],
     level: 'N1',
     title: '〜にして',
@@ -408,6 +493,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toiutokoroda',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['story-topic'],
     categories: ['degree.approximation', 'degree.limit'],
     level: 'N1',
     title: '〜というところだ / 〜といったところだ',
@@ -421,6 +509,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toittaranai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['degree.extreme', 'emotion.exclamation'],
     level: 'N1',
     title: '〜といったらない / 〜といったらありはしない',
@@ -434,6 +525,7 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-noitari',
+    functions: ['queue-listing'],
     categories: ['degree.extreme', 'emotion.feeling'],
     level: 'N1',
     title: '〜の至り',
@@ -447,6 +539,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-kotokonouenai',
+    register: 'literary',
+    provenance: { registerSource: 'classified' },
+    functions: ['extremes'],
     categories: ['degree.extreme'],
     level: 'N1',
     title: '〜ことこの上ない',
@@ -460,6 +555,9 @@ export const N1_EXTRA: GrammarPoint[] = [
   },
   {
     id: 'n1x-toshitatokorode',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['perspective-way'],
     categories: ['contrast.concession', 'method.perspective'],
     level: 'N1',
     title: '〜としたところで / 〜にしたところで',

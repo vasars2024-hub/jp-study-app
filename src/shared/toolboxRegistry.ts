@@ -644,6 +644,29 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     migrationNotes: 'Shares the canvas conversion approach with image-converter; extract a shared helper if a third consumer appears.',
   },
   {
+    id: 'workspace-launcher',
+    label: 'Workspace Launcher',
+    category: 'automation',
+    status: 'ready',
+    capabilities: ['automation', 'file-system'],
+    permissions: ['file-read', 'window-control'],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: true,
+    supportsGlobalShortcut: false,
+    supportsAutomation: true,
+    acceptsExternalInput: true,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation: 'Built-in Blanc workspace groups: named sets of targets launched in order through the existing desktop:launch IPC.',
+    externalAdapter: {
+      strategy: 'built-in',
+      notes: 'Reuses desktop:pickShortcut and desktop:launch — no new main-process surface. Window placement/sizing on launch needs a window-control adapter later.',
+    },
+    migrationNotes: 'Targets are added via the native picker (or typed http(s) URLs) so the desktop:launch caller invariant holds; keep that if this moves to normal OS.',
+  },
+  {
     id: 'notification-center',
     label: 'Task Center',
     category: 'system',
@@ -843,7 +866,6 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     ['window-layouts', 'Window Layouts', 'desktop', ['automation', 'utility'], ['window-control']],
     ['hotkey-manager', 'Hotkey Manager', 'system', ['hotkey', 'automation'], ['global-shortcut']],
     ['audio-recorder', 'Audio Recorder', 'media', ['recording', 'media', 'background-task'], ['audio-capture', 'microphone', 'file-write']],
-    ['workspace-launcher', 'Workspace Launcher', 'automation', ['automation', 'file-system'], ['file-read', 'window-control']],
     ['download-organizer', 'Download Organizer', 'files', ['file-system', 'automation', 'background-task'], ['file-read', 'file-write']],
     ['clipboard-ocr', 'Clipboard OCR', 'capture', ['clipboard', 'ocr', 'japanese-analysis', 'background-task'], ['clipboard-read', 'clipboard-write']],
     ['file-watcher', 'File Watcher', 'automation', ['file-system', 'automation', 'background-task'], ['file-read', 'file-write']],
@@ -882,7 +904,11 @@ function plannedModules(
       strategy: 'github-preferred',
       notes: 'Prefer a mature OSS library or CLI adapter when package changes are allowed and the fit is better than hand-rolling.',
     },
-    migrationNotes: 'Build as shared service plus thin Blanc/normal OS launch surfaces so it can migrate without a rewrite.',
+    // Deliberately does NOT claim "needs a native adapter" — that blanket wording
+    // was wrong for most planned modules and misled a session on 2026-07-20 (the
+    // OCR stack is already installed; see BLANC_REFINEMENT_PLAN.md for the
+    // per-module blocker tiering). Check the real blocker before quoting this.
+    migrationNotes: 'Build as shared service plus thin Blanc/normal OS launch surfaces so it can migrate without a rewrite. Blocker is per-module — see BLANC_REFINEMENT_PLAN.md, do not assume a native adapter is required.',
   }));
 }
 

@@ -1,5 +1,8 @@
 // A tiny local store of words the user saved from the dictionary, used by the
 // Flashcards view. Persisted to localStorage (renderer-only, no main process).
+// Phase 8: per study language (`jp-saved-words-ja` / `-zh`).
+
+import { getStudyLang, onStudyLangChanged, type StudyLang } from './studyEnvironment';
 
 export interface SavedWord {
   /** The kanji/expression form — also the unique key. */
@@ -9,11 +12,32 @@ export interface SavedWord {
   addedAt: number;
 }
 
-const KEY = 'jp-saved-words';
+export const LEGACY_SAVED_KEY = 'jp-saved-words';
+
+export function savedWordsKey(lang: StudyLang = getStudyLang()): string {
+  return `${LEGACY_SAVED_KEY}-${lang}`;
+}
+
+let migrated = false;
+
+function migrateLegacyOnce(): void {
+  if (migrated) return;
+  migrated = true;
+  try {
+    const jaKey = savedWordsKey('ja');
+    if (localStorage.getItem(jaKey)) return;
+    const legacy = localStorage.getItem(LEGACY_SAVED_KEY);
+    if (!legacy) return;
+    localStorage.setItem(jaKey, legacy);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function loadSaved(): SavedWord[] {
+  migrateLegacyOnce();
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(savedWordsKey());
     const list = raw ? (JSON.parse(raw) as SavedWord[]) : [];
     return Array.isArray(list) ? list : [];
   } catch {
@@ -23,11 +47,10 @@ export function loadSaved(): SavedWord[] {
 
 function persist(list: SavedWord[]): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list));
+    localStorage.setItem(savedWordsKey(), JSON.stringify(list));
   } catch {
     /* storage full/unavailable — nothing we can do */
   }
-  // Let other open views (Flashcards, Dictionary) react to the change.
   window.dispatchEvent(new CustomEvent('saved-words-changed'));
 }
 
@@ -54,8 +77,10 @@ export function onSavedChanged(cb: () => void): () => void {
   const handler = (): void => cb();
   window.addEventListener('saved-words-changed', handler);
   window.addEventListener('storage', handler);
+  const unsubLang = onStudyLangChanged(handler);
   return () => {
     window.removeEventListener('saved-words-changed', handler);
     window.removeEventListener('storage', handler);
+    unsubLang();
   };
 }

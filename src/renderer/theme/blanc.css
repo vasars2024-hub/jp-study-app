@@ -1,25 +1,63 @@
+/* Per-stream panel styles. Split out so the two parallel Blanc work streams
+   never append to this shared file at the same time — see
+   BLANC_REFINEMENT_PLAN.md, "Parallel split". */
+@import './blanc-media.css';
+@import './blanc-library.css';
+/* Last: re-skins reused Study OS classes into Blanc's sharp, flat language.
+   Must import after the per-stream files so its resets win ties. */
+@import './blanc-native.css';
+
 .blanc-root,
 .blanc-root * {
   box-sizing: border-box;
 }
 
 .blanc-root {
-  --blanc-bg: #07090c;
-  --blanc-rail: #11151a;
-  --blanc-panel: #151a20;
-  --blanc-panel-soft: #0f1318;
-  --blanc-panel-raised: #1c2229;
-  --blanc-border: #2a333d;
-  --blanc-border-strong: #6f8294;
-  --blanc-text: #f4f7fa;
-  --blanc-muted: #a2adb8;
-  --blanc-faint: #73808c;
-  --blanc-active: #22303b;
-  --blanc-accent: #88a4bd;
-  --blanc-accent-strong: #bed4e8;
-  --blanc-danger: #ffb7b7;
-  --blanc-success: #a8d8be;
-  --blanc-shadow: 0 14px 38px rgba(0, 0, 0, 0.36);
+  /* --- Neutral macOS palette --------------------------------------------
+     Restrained greys, no blue/purple undertone. Surfaces separate through
+     background contrast and spacing, not heavy outlines — borders are hairline
+     white-alpha so they nearly disappear. */
+  --blanc-bg: #1c1c1e;
+  --blanc-rail: #1c1c1e;
+  --blanc-panel: #262628;
+  --blanc-panel-soft: #202022;
+  --blanc-panel-raised: #2c2c2e;
+  --blanc-border: rgba(255, 255, 255, 0.07);
+  --blanc-border-strong: rgba(255, 255, 255, 0.14);
+  --blanc-text: #f5f5f7;
+  --blanc-muted: #98989f;
+  --blanc-faint: #6a6a70;
+  --blanc-hover: rgba(255, 255, 255, 0.05);
+  --blanc-active: rgba(255, 255, 255, 0.09);
+  /* Accent is a near-white neutral: emphasis comes from contrast/weight, not
+     colour. A colour only appears on genuine interaction states. */
+  --blanc-accent: #e6e6ea;
+  --blanc-accent-strong: #ffffff;
+  --blanc-tint: rgba(255, 255, 255, 0.10);
+  --blanc-tint-soft: rgba(255, 255, 255, 0.05);
+  --blanc-danger: #ff8f8f;
+  --blanc-success: #7ecb9a;
+
+  /* Geometry — rounded everywhere, larger radius on containers. */
+  --blanc-radius-sm: 8px;
+  --blanc-radius-md: 10px;
+  --blanc-radius-lg: 14px;
+  --blanc-radius-pill: 999px;
+
+  /* Spacing scale — generous by default; screens should breathe. */
+  --blanc-s1: 4px;
+  --blanc-s2: 8px;
+  --blanc-s3: 12px;
+  --blanc-s4: 16px;
+  --blanc-s5: 22px;
+  --blanc-s6: 30px;
+
+  /* Motion — subtle, ease-out, 150–250ms. */
+  --blanc-dur: 180ms;
+  --blanc-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --blanc-shadow: 0 12px 40px rgba(0, 0, 0, 0.44);
+  --blanc-shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.28);
   display: flex;
   width: 100vw;
   height: 100vh;
@@ -27,23 +65,56 @@
   background: var(--blanc-bg);
   color: var(--blanc-text);
   color-scheme: dark;
-  font-family: "Segoe UI", Arial, sans-serif;
-  font-size: 13px;
-  letter-spacing: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
 }
 
 .blanc-root.is-dark {
-  --blanc-bg: #030405;
-  --blanc-rail: #0b0e12;
-  --blanc-panel: #11161b;
-  --blanc-panel-soft: #090c10;
-  --blanc-panel-raised: #171d23;
-  --blanc-border: #242c35;
-  --blanc-border-strong: #8da2b4;
+  --blanc-bg: #161618;
+  --blanc-rail: #161618;
+  --blanc-panel: #212123;
+  --blanc-panel-soft: #1b1b1d;
+  --blanc-panel-raised: #29292b;
+  --blanc-border: rgba(255, 255, 255, 0.06);
+  --blanc-border-strong: rgba(255, 255, 255, 0.13);
   --blanc-text: #ffffff;
-  --blanc-muted: #aeb8c2;
-  --blanc-active: #1e2b35;
+  --blanc-muted: #9a9aa0;
+  --blanc-active: rgba(255, 255, 255, 0.10);
   color-scheme: dark;
+}
+
+/* --- Study OS accent neutralization ---------------------------------------
+   Blanc boots the shared Study OS base stylesheet (styles.css), whose accent is
+   a deep red (--accent: #ff2e4d). That red is Study OS's language, not Blanc's —
+   Blanc is a calm blue-grey. Every reused Study OS surface inside Blanc (the
+   EPUB miner, CSV editor, flashcards, readers, inputs, scrollbars, focus rings)
+   inherits that red and reads as pink/magenta.
+
+   Re-map the shared accent/red tokens to Blanc's palette here. This catches the
+   ~440 `var(--accent)` usages at once. The tokens that Study OS PRE-COMPOSES
+   from --accent (focus ring, scrollbar thumb, accent-weak/soft/strong) must be
+   re-declared explicitly too: their `var(--accent)` was already substituted to
+   #ff2e4d at :root, so overriding --accent alone never reaches them. Hardcoded
+   `rgba(255,46,77,…)` literals — which no token can reach — are neutralized in
+   the `.blanc-embedded-view` block near the end of this file. */
+.blanc-root {
+  --accent: var(--blanc-accent);
+  --accent-2: var(--blanc-accent-strong);
+  --red: var(--blanc-danger);
+  --red-deep: #c98f9a;
+  --focus-ring-color: color-mix(in srgb, var(--blanc-accent) 70%, transparent);
+  --accent-weak: color-mix(in srgb, var(--blanc-accent) 16%, transparent);
+  --accent-soft: color-mix(in srgb, var(--blanc-accent) 40%, transparent);
+  --accent-strong: color-mix(in srgb, var(--blanc-accent) 82%, var(--blanc-text));
+  --scrollbar-thumb: color-mix(in srgb, var(--blanc-accent) 38%, var(--blanc-faint));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--blanc-accent) 60%, var(--blanc-muted));
+  --scrollbar-thumb-active: var(--blanc-accent);
+  --status-info: var(--blanc-accent);
+  --status-error: var(--blanc-danger);
 }
 
 .blanc-taskbar {
@@ -658,6 +729,41 @@
   line-height: 1.35;
 }
 
+/* Music panel: the song list and lyrics both need a bounded, independently
+   scrolling box — VirtualList measures its own scroller, so it must have a
+   real height rather than growing the whole panel. */
+.blanc-music-list {
+  height: 260px;
+  border: 1px solid var(--blanc-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.blanc-music-lyrics {
+  height: 220px;
+  overflow: hidden;
+}
+
+.blanc-music-lyrics .music-lyrics {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Read-only result block (translation output). Matches the textarea it sits
+   beside so source and result read as a pair. */
+.blanc-output {
+  min-height: 96px;
+  padding: 6px 7px;
+  border: 1px solid var(--blanc-border);
+  border-radius: 6px;
+  background: #070a0e;
+  color: var(--blanc-text);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+}
+
 .blanc-status-row,
 .blanc-row-actions {
   display: flex;
@@ -914,18 +1020,11 @@
   accent-color: var(--blanc-text);
 }
 
-.blanc-clipboard-host {
-  padding: 10px;
-}
-
-.blanc-clipboard-host .wgt {
-  width: min(420px, 100%);
-  min-height: 220px;
-  border: 1px solid var(--blanc-border);
-  border-radius: 4px;
-  background: var(--blanc-panel);
-  color: var(--blanc-text);
-}
+/*
+ * `.blanc-clipboard-host` used to re-skin Study OS's ClipboardWidget so it did
+ * not look alien inside Blanc. The clipboard tool is a Blanc-native panel now
+ * (BlancStudyPanels.tsx), so the host and its overrides are gone.
+ */
 
 .blanc-warning {
   margin: 0 0 10px;
@@ -1486,107 +1585,596 @@
   color: var(--blanc-text) !important;
 }
 
+/* Reused Study OS tools (EPUB miner, CSV editor, deck actions, flashcards)
+   hardcode the deep-red accent as `rgba(255,46,77,α)` instead of `var(--accent)`,
+   so the token remap above cannot reach them. Re-tint those literals to Blanc's
+   blue-grey here, grouped by the property each rule sets. Tints use `color-mix`
+   off --blanc-accent so they track the palette. `.blanc-embedded-view` adds a
+   class of specificity, so these win over the bare component selectors without
+   !important — except the sticky CSV header, which needs an opaque fill. */
+.blanc-embedded-view {
+  --blanc-tool-tint: color-mix(in srgb, var(--blanc-accent) 15%, transparent);
+  --blanc-tool-tint-strong: color-mix(in srgb, var(--blanc-accent) 24%, transparent);
+  --blanc-tool-edge: color-mix(in srgb, var(--blanc-accent) 50%, transparent);
+}
+
+.blanc-embedded-view :is(
+  .epub-mining-step-header.is-ready .epub-mining-step-badge,
+  .mining-actions .btn.primary:not(:disabled),
+  .mining-step-hint-ready,
+  .mining-key-status-error,
+  .csv-editor-grid tr.selected td,
+  .csv-editor-col-head.col-selected,
+  .csv-editor-vis-btn:hover,
+  .csv-editor-cell-match,
+  .csv-editor-context-menu button:hover,
+  .btn.active,
+  .epub-simple-filter-tab.active,
+  .deck-action-item.primary,
+  .flash-review-strip-card.active
+) {
+  background: var(--blanc-tool-tint);
+}
+
+.blanc-embedded-view :is(.csv-editor-highlight, .mining-actions .btn.primary:not(:disabled)) {
+  background: var(--blanc-tool-tint-strong);
+}
+
+.blanc-embedded-view .csv-editor-map-row th {
+  background: linear-gradient(var(--blanc-tool-tint), var(--blanc-tool-tint)), var(--blanc-panel);
+}
+
+.blanc-embedded-view :is(
+  .epub-mining-step-header.is-ready .epub-mining-step-badge,
+  .mining-step-hint-ready,
+  .mining-step-hint-ready .mining-step-badge,
+  .mining-key-status-error,
+  .csv-editor-flashcard-side.front,
+  .btn.active,
+  .epub-simple-filter-tab.active,
+  .deck-action-item.primary,
+  .flash-review-strip-card:hover,
+  .flash-review-strip-card.active
+) {
+  border-color: var(--blanc-tool-edge);
+}
+
+.blanc-embedded-view :is(
+  .btn.primary:hover:not(:disabled),
+  .mining-actions .btn.primary:not(:disabled),
+  .mining-candidate.active,
+  .csv-editor-cell-match,
+  .flash-review-strip-card.active
+) {
+  box-shadow: 0 0 0 1px var(--blanc-tool-edge);
+}
+
 html.blanc-mode-enabled body {
-  background: #07090c;
+  background: #1c1c1e;
 }
 
 html.blanc-mode-enabled.blanc-mode-dark body {
-  background: #030405;
+  background: #161618;
 }
 
+/* ============================================================================
+   macOS polish layer
+   A cohesive pass over the Blanc chrome — neutral surfaces, generous spacing,
+   near-invisible hairline borders, rounded geometry, soft hovers, subtle
+   motion, and a clear type hierarchy. Rules are `.blanc-root`-scoped so they
+   win over the base type selectors (`.blanc-root button`, `.blanc-root input`),
+   and sit BEFORE the small-window @media block so that block still overrides
+   here at narrow widths.
+   ============================================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  .blanc-root :is(button, a, input, select, textarea, .blanc-nav-btn,
+    .blanc-tool-launch, .blanc-tool-tabs button, .blanc-table tr,
+    .blanc-file-link, .blanc-icon-btn, .blanc-segmented button) {
+    transition: background-color var(--blanc-dur) var(--blanc-ease),
+      border-color var(--blanc-dur) var(--blanc-ease),
+      color var(--blanc-dur) var(--blanc-ease),
+      box-shadow var(--blanc-dur) var(--blanc-ease),
+      transform var(--blanc-dur) var(--blanc-ease);
+  }
+}
+
+/* --- Sidebar: weightless, centered-ish, rounded active pill -------------- */
+.blanc-root .blanc-taskbar {
+  width: 172px;
+  flex-basis: 172px;
+  gap: 2px;
+  padding: var(--blanc-s3) var(--blanc-s2);
+  border-right: 0;
+  background: var(--blanc-rail);
+}
+.blanc-root .blanc-brand {
+  min-height: 34px;
+  padding: var(--blanc-s2) var(--blanc-s3);
+  margin-bottom: var(--blanc-s3);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.blanc-root .blanc-brand-mark {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 5px;
+  background: linear-gradient(155deg, #ffffff, #b7b7c0);
+}
+.blanc-root .blanc-nav {
+  gap: 2px;
+}
+.blanc-root .blanc-nav-btn {
+  min-height: 36px;
+  gap: var(--blanc-s3);
+  padding: 7px var(--blanc-s3);
+  border: 0;
+  border-radius: var(--blanc-radius-sm);
+  background: transparent;
+  color: var(--blanc-muted);
+  font-weight: 500;
+}
+.blanc-root .blanc-nav-btn:hover:not(.active) {
+  background: var(--blanc-hover);
+  color: var(--blanc-text);
+}
+.blanc-root .blanc-nav-btn.active {
+  border: 0;
+  background: var(--blanc-active);
+  color: var(--blanc-text);
+  font-weight: 600;
+}
+.blanc-root .blanc-exit {
+  border: 0;
+  border-radius: var(--blanc-radius-sm);
+  background: transparent;
+  color: var(--blanc-muted);
+  padding: 7px var(--blanc-s3);
+}
+.blanc-root .blanc-exit:hover {
+  background: var(--blanc-hover);
+  color: var(--blanc-text);
+}
+
+/* --- Top bar: airy, one hairline underneath ----------------------------- */
+.blanc-root .blanc-top {
+  min-height: 52px;
+  gap: var(--blanc-s4);
+  padding: var(--blanc-s2) var(--blanc-s4);
+  border-bottom: 1px solid var(--blanc-border);
+  background: var(--blanc-bg);
+}
+.blanc-root .blanc-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.blanc-root .blanc-top .focus-music-now {
+  border-radius: var(--blanc-radius-sm);
+  background: var(--blanc-panel-soft);
+}
+.blanc-root .blanc-clock {
+  color: var(--blanc-faint);
+  font-weight: 500;
+}
+
+/* --- Buttons: tactile, soft, borderless-until-hover ---------------------- */
+.blanc-root button {
+  min-height: 32px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--blanc-radius-sm);
+  background: var(--blanc-tint-soft);
+  color: var(--blanc-text);
+  font-weight: 500;
+}
+.blanc-root button:hover:not(:disabled),
+.blanc-root .blanc-link-btn:hover {
+  border-color: transparent;
+  background: var(--blanc-tint);
+}
+.blanc-root .blanc-icon-btn {
+  min-width: 34px;
+  min-height: 34px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--blanc-muted);
+}
+.blanc-root .blanc-icon-btn:hover:not(:disabled) {
+  background: var(--blanc-hover);
+  color: var(--blanc-text);
+}
+.blanc-root .blanc-icon-btn.active {
+  border-color: transparent;
+  background: var(--blanc-active);
+  color: var(--blanc-text);
+}
+.blanc-root .blanc-primary-action {
+  min-height: 38px;
+  border: 0;
+  border-radius: var(--blanc-radius-sm);
+  background: #f5f5f7 !important;
+  color: #16161a !important;
+  font-weight: 600;
+  box-shadow: var(--blanc-shadow-soft);
+}
+.blanc-root .blanc-primary-action:hover:not(:disabled) {
+  background: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+/* --- Inputs: taller, rounded, Spotlight-like search --------------------- */
+.blanc-root input,
+.blanc-root select,
+.blanc-root textarea {
+  min-height: 34px;
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-sm);
+  background: var(--blanc-panel-soft) !important;
+  color: var(--blanc-text);
+}
+.blanc-root input::placeholder,
+.blanc-root textarea::placeholder {
+  color: var(--blanc-faint);
+}
+.blanc-root input:focus-visible,
+.blanc-root select:focus-visible,
+.blanc-root textarea:focus-visible {
+  outline: none;
+  border-color: var(--blanc-border-strong);
+  box-shadow: 0 0 0 3px var(--blanc-tint-soft);
+}
+.blanc-root input,
+.blanc-root select {
+  padding: 6px 11px;
+}
+.blanc-root .blanc-tool-search {
+  min-height: 40px;
+  padding: 0 var(--blanc-s3);
+  border-radius: var(--blanc-radius-md);
+  background: var(--blanc-panel-soft);
+}
+.blanc-root .blanc-tool-search input {
+  background: transparent !important;
+  border: 0;
+}
+
+/* --- Workbench & tool launcher: borderless columns ---------------------- */
+.blanc-root .blanc-toolbox-header {
+  padding: var(--blanc-s3) var(--blanc-s4);
+  border-bottom: 1px solid var(--blanc-border);
+  background: var(--blanc-bg);
+}
+.blanc-root .blanc-tool-launcher {
+  padding: var(--blanc-s3);
+  border-right: 1px solid var(--blanc-border);
+  background: var(--blanc-bg);
+}
+.blanc-root .blanc-tool-launch {
+  min-height: 44px;
+  gap: var(--blanc-s3);
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--blanc-radius-sm);
+  background: transparent;
+}
+.blanc-root .blanc-tool-launch:hover {
+  background: var(--blanc-hover);
+}
+.blanc-root .blanc-tool-launch.active,
+.blanc-root .blanc-tool-strip button.active,
+.blanc-root .blanc-tool-recent button.active {
+  border-color: transparent;
+  background: var(--blanc-active);
+  color: var(--blanc-text);
+}
+.blanc-root .blanc-tool-section {
+  gap: var(--blanc-s1);
+  margin-bottom: var(--blanc-s5);
+}
+.blanc-root .blanc-tool-recent > span,
+.blanc-root .blanc-tool-section h3 {
+  padding: 0 4px var(--blanc-s1);
+  color: var(--blanc-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+/* --- Tool workspace & tabs ---------------------------------------------- */
+.blanc-root .blanc-tool-workspace {
+  gap: var(--blanc-s4);
+  padding: var(--blanc-s5);
+}
+.blanc-root .blanc-active-tool-head {
+  padding-bottom: var(--blanc-s3);
+}
+.blanc-root .blanc-active-tool-head h2 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.blanc-root .blanc-tool-kicker {
+  color: var(--blanc-faint);
+  font-weight: 600;
+}
+.blanc-root .blanc-tool-tabs {
+  gap: 6px;
+  padding-bottom: var(--blanc-s2);
+  border-bottom: 1px solid var(--blanc-border);
+}
+.blanc-root .blanc-tool-tabs button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--blanc-radius-pill);
+  background: transparent;
+  color: var(--blanc-muted);
+}
+.blanc-root .blanc-tool-tabs button:hover {
+  background: var(--blanc-hover);
+  color: var(--blanc-text);
+}
+.blanc-root .blanc-tool-tabs button.active {
+  border: 0;
+  background: var(--blanc-active);
+  color: var(--blanc-text);
+}
+
+/* --- Content & panels: floating cards, comfortable padding -------------- */
+.blanc-root .blanc-content {
+  padding: var(--blanc-s5);
+}
+.blanc-root .blanc-panel {
+  gap: var(--blanc-s4);
+}
+.blanc-root .blanc-embedded-view {
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-lg);
+  background: var(--blanc-panel);
+  box-shadow: var(--blanc-shadow-soft);
+}
+.blanc-root fieldset {
+  padding: var(--blanc-s4);
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-lg);
+  background: var(--blanc-panel);
+}
+.blanc-root legend {
+  padding: 0 var(--blanc-s2);
+  color: var(--blanc-muted);
+  font-weight: 600;
+}
+
+/* --- Cards / rows / chips: rounded, spaced, hairline -------------------- */
+.blanc-root .blanc-tool-management-row,
+.blanc-root .blanc-shortcut-row,
+.blanc-root .blanc-meter,
+.blanc-root .blanc-status-row span,
+.blanc-root .blanc-status,
+.blanc-root .blanc-file-link,
+.blanc-root .blanc-output,
+.blanc-root .blanc-result-box,
+.blanc-root .blanc-timer-display,
+.blanc-root .blanc-warning,
+.blanc-root .blanc-image-preview,
+.blanc-root .blanc-table-wrap,
+.blanc-root .blanc-table-scroll,
+.blanc-root .blanc-music-list {
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-md);
+  background: var(--blanc-panel);
+}
+.blanc-root .blanc-tool-management-row,
+.blanc-root .blanc-shortcut-row {
+  padding: var(--blanc-s3) var(--blanc-s4);
+}
+.blanc-root .blanc-tool-management,
+.blanc-root .blanc-shortcut-list {
+  gap: var(--blanc-s2);
+}
+.blanc-root .blanc-status,
+.blanc-root .blanc-status-row span {
+  padding: 4px 10px;
+  border-radius: var(--blanc-radius-pill);
+  font-size: 12px;
+}
+.blanc-root .blanc-file-link {
+  padding: 5px 12px;
+  border-radius: var(--blanc-radius-sm);
+}
+
+/* --- Tables become airy lists, not spreadsheets ------------------------- */
+.blanc-root .blanc-table th,
+.blanc-root .blanc-table td,
+.blanc-root .blanc-coverage-table th,
+.blanc-root .blanc-coverage-table td {
+  padding: 10px 14px;
+  border-right: 0;
+  border-bottom: 1px solid var(--blanc-border);
+}
+.blanc-root .blanc-table th,
+.blanc-root .blanc-coverage-table th {
+  background: transparent;
+  color: var(--blanc-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.blanc-root .blanc-table tbody tr:hover td,
+.blanc-root .blanc-table tr:hover td {
+  background: var(--blanc-hover);
+}
+.blanc-root .blanc-table tr.active-row td {
+  background: var(--blanc-active);
+}
+
+/* --- Focus / timer cards float ------------------------------------------ */
+.blanc-root .blanc-focus-workspace {
+  gap: var(--blanc-s4);
+  padding: var(--blanc-s5);
+}
+.blanc-root .blanc-focus-main,
+.blanc-root .blanc-focus-side section {
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-lg);
+  background: var(--blanc-panel);
+  box-shadow: var(--blanc-shadow-soft);
+}
+.blanc-root .blanc-segmented {
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-pill);
+  background: var(--blanc-panel-soft);
+}
+.blanc-root .blanc-segmented button.active,
+.blanc-root .blanc-preset-grid button.active {
+  border-color: transparent;
+  border-radius: var(--blanc-radius-pill);
+  background: var(--blanc-active);
+  color: var(--blanc-text);
+}
+
+/* --- Thin, rounded, self-effacing scrollbars ---------------------------- */
+.blanc-root *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.blanc-root *::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--blanc-radius-pill);
+  background: rgba(255, 255, 255, 0.16);
+  background-clip: content-box;
+}
+.blanc-root *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+  background-clip: content-box;
+}
+.blanc-root *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --- Ultrawide: expand whitespace, don't stretch controls --------------- */
+@media (min-width: 1500px) {
+  .blanc-root .blanc-tool-workspace,
+  .blanc-root .blanc-focus-workspace {
+    padding: var(--blanc-s6);
+  }
+  .blanc-root .blanc-settings-panel,
+  .blanc-root .blanc-tool-detail {
+    max-width: 1080px;
+  }
+}
+
+/* Narrow window: collapse the sidebar and launcher to icon rails, stack the top
+   bar, and drop multi-column grids to one column. Every selector is
+   `.blanc-root`-prefixed so it matches the polish layer's specificity above and
+   wins by source order — without the prefix the (0,2,0) polish rules would
+   outrank a bare (0,1,0) media rule and the sidebar would never collapse. */
 @media (max-width: 780px) {
-  .blanc-taskbar {
-    width: 64px;
-    flex-basis: 64px;
+  .blanc-root .blanc-taskbar {
+    width: 60px;
+    flex-basis: 60px;
+    padding: var(--blanc-s3) var(--blanc-s2);
   }
 
-  .blanc-brand span:last-child,
-  .blanc-nav-btn span,
-  .blanc-exit {
+  .blanc-root .blanc-brand span:last-child,
+  .blanc-root .blanc-nav-btn span,
+  .blanc-root .blanc-exit {
     display: none;
   }
 
-  .blanc-brand {
+  .blanc-root .blanc-brand {
     justify-content: center;
   }
 
-  .blanc-nav-btn {
+  .blanc-root .blanc-nav-btn {
     justify-content: center;
-    padding: 6px;
+    padding: 8px;
   }
 
-  .blanc-top {
+  .blanc-root .blanc-top {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .blanc-top > .focus-music-bar {
+  .blanc-root .blanc-top > .focus-music-bar {
     width: 100%;
     max-width: none;
     flex-basis: auto;
   }
 
-  .blanc-top-tools {
+  .blanc-root .blanc-top-tools {
     justify-content: flex-start;
   }
 
-  .blanc-top .focus-music-vol {
+  .blanc-root .blanc-top .focus-music-vol {
     display: none;
   }
 
-  .blanc-active-tool-head h2 {
-    font-size: 15px;
+  .blanc-root .blanc-active-tool-head h2 {
+    font-size: 18px;
   }
 
-  .blanc-active-tool-head p,
-  .blanc-tool-kicker {
+  .blanc-root .blanc-active-tool-head p,
+  .blanc-root .blanc-tool-kicker {
     display: none;
   }
 
-  .blanc-workbench {
-    grid-template-columns: 64px minmax(0, 1fr);
+  .blanc-root .blanc-workbench {
+    grid-template-columns: 60px minmax(0, 1fr);
   }
 
-  .blanc-tool-launcher {
+  .blanc-root .blanc-tool-launcher {
+    padding: var(--blanc-s2);
+  }
+
+  .blanc-root .blanc-tool-recent,
+  .blanc-root .blanc-tool-section h3,
+  .blanc-root .blanc-tool-launch strong,
+  .blanc-root .blanc-tool-launch small,
+  .blanc-root .blanc-tool-launch kbd {
+    display: none;
+  }
+
+  .blanc-root .blanc-tool-launch {
+    min-height: 40px;
+    grid-template-columns: 1fr;
+    justify-items: center;
     padding: 8px;
   }
 
-  .blanc-tool-recent,
-  .blanc-tool-section h3,
-  .blanc-tool-launch strong,
-  .blanc-tool-launch small,
-  .blanc-tool-launch kbd {
-    display: none;
+  .blanc-root .blanc-tool-workspace {
+    padding: var(--blanc-s3);
   }
 
-  .blanc-tool-launch {
-    min-height: 34px;
-    grid-template-columns: 1fr;
-    justify-items: center;
-    padding: 7px;
+  .blanc-root .blanc-content {
+    padding: var(--blanc-s3);
   }
 
-  .blanc-active-tool-head {
+  .blanc-root .blanc-active-tool-head {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .blanc-focus-workspace {
+  .blanc-root .blanc-focus-workspace {
     grid-template-columns: 1fr;
   }
 
-  .blanc-folder-row,
-  .blanc-form-grid,
-  .blanc-music-layout,
-  .blanc-stats-grid {
+  .blanc-root .blanc-folder-row,
+  .blanc-root .blanc-form-grid,
+  .blanc-root .blanc-music-layout,
+  .blanc-root .blanc-stats-grid,
+  .blanc-root .blanc-command-row {
     grid-template-columns: 1fr;
   }
 
-  .blanc-metric-row {
+  .blanc-root .blanc-metric-row {
     grid-template-columns: minmax(80px, 1fr) minmax(80px, 1fr);
   }
 
-  .mono-board {
+  .blanc-root .mono-board {
     width: min(72vw, 320px);
   }
 }

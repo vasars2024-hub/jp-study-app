@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 2,
+  "id": "noctis.scene.era1.ancestral_basin",
+  "era": "era1",
+  "canvas": { "width": 1920, "height": 1200 },
+  "cropSafe": { "left": 0.15, "top": 0.08, "right": 0.85, "bottom": 0.88 },
+  "focusBounds": { "left": 0.25, "top": 0.25, "right": 0.75, "bottom": 0.8 },
+  "layers": [
+    { "id": "sky", "role": "sky", "order": 10, "assetId": "noctis.environment.era1.ancestral_basin.sky.v01.base", "fallbackId": "fallback.css.night_gradient", "required": true, "depthBand": "far" },
+    { "id": "far_ridge", "role": "far", "order": 20, "assetId": "noctis.environment.era1.ancestral_basin.far_ridge.v01.base", "fallbackId": "fallback.svg.far_ridge", "required": true, "depthBand": "far" },
+    { "id": "terrain", "role": "terrain", "order": 30, "assetId": "noctis.environment.era1.ancestral_basin.terrain.v01.base", "fallbackId": "fallback.svg.terrain", "required": true, "depthBand": "middle" },
+    { "id": "liquid", "role": "ecology", "order": 40, "assetId": "noctis.environment.era1.ancestral_basin.liquid_channel.v01.base", "fallbackId": "fallback.svg.liquid_channel", "required": true, "depthBand": "middle" },
+    { "id": "canopy", "role": "ecology", "order": 50, "assetId": "noctis.environment.era1.ancestral_basin.canopy_cluster.v01.base", "fallbackId": "fallback.svg.canopy", "required": true, "depthBand": "middle" },
+    { "id": "root_paths", "role": "ecology", "order": 60, "assetId": "noctis.environment.era1.ancestral_basin.root_path.v01.base", "fallbackId": "fallback.svg.root_paths", "required": true, "depthBand": "ground" },
+    { "id": "shelters", "role": "civic", "order": 70, "assetId": "noctis.environment.era1.ancestral_basin.shelter.v01.base", "fallbackId": "fallback.svg.shelters", "required": true, "depthBand": "ground" },
+    { "id": "hearth", "role": "civic", "order": 80, "assetId": "noctis.environment.era1.ancestral_basin.spore_hearth.v01.base", "fallbackId": "fallback.svg.spore_hearth", "required": true, "depthBand": "ground" },
+    { "id": "props", "role": "props", "order": 90, "assetId": "noctis.environment.era1.ancestral_basin.bridge.v01.base", "fallbackId": "fallback.svg.bridge", "required": false, "depthBand": "ground" },
+    { "id": "citizens", "role": "characters", "order": 100, "assetId": "noctis.character.era1.noctae.body_a.southwest_idle.base", "fallbackId": "fallback.svg.noctae_silhouette", "required": true, "depthBand": "citizen" },
+    { "id": "foreground", "role": "foreground", "order": 110, "assetId": "noctis.environment.era1.ancestral_basin.foreground_frame.v01.occlusion", "fallbackId": "fallback.svg.foreground", "required": true, "depthBand": "near" },
+    { "id": "hearth_light", "role": "light", "order": 120, "assetId": "noctis.environment.era1.ancestral_basin.spore_hearth.v01.emissive", "fallbackId": "fallback.svg.hearth_emissive", "required": true, "depthBand": "light" },
+    { "id": "current_light", "role": "light", "order": 130, "assetId": "noctis.motion.era1.ancestral_basin.current_strip.v01.motion", "fallbackId": "fallback.svg.current_dash", "required": true, "depthBand": "light" },
+    { "id": "fog", "role": "atmosphere", "order": 140, "assetId": "noctis.environment.era1.ancestral_basin.fog_band.v01.atmosphere", "fallbackId": "fallback.css.fog_band", "required": false, "depthBand": "atmosphere" },
+    { "id": "particles", "role": "atmosphere", "order": 150, "assetId": "noctis.particle.era1.common.mote_a.v01.base", "fallbackId": "fallback.canvas.soft_disc", "required": true, "depthBand": "atmosphere" }
+  ],
+  "routeAnchors": [
+    { "id": "hearth", "point": { "x": 0.5, "y": 0.66 } },
+    { "id": "west_shelter", "point": { "x": 0.27, "y": 0.72 } },
+    { "id": "east_shelter", "point": { "x": 0.72, "y": 0.71 } },
+    { "id": "liquid_west", "point": { "x": 0.12, "y": 0.81 } },
+    { "id": "liquid_east", "point": { "x": 0.87, "y": 0.79 } },
+    { "id": "archive_future", "point": { "x": 0.63, "y": 0.58 } }
+  ],
+  "depthBands": [
+    { "id": "far", "min": 0.02, "max": 0.3 },
+    { "id": "middle", "min": 0.3, "max": 0.55 },
+    { "id": "ground", "min": 0.55, "max": 0.78 },
+    { "id": "citizen", "min": 0.58, "max": 0.86 },
+    { "id": "near", "min": 0.78, "max": 1 },
+    { "id": "light", "min": 0.2, "max": 0.96 },
+    { "id": "atmosphere", "min": 0.05, "max": 0.98 }
+  ],
+  "seededVariants": [
+    { "family": "far_ridge", "assetIds": ["noctis.environment.era1.ancestral_basin.far_ridge.v01.base", "noctis.environment.era1.ancestral_basin.far_ridge.v02.base", "noctis.environment.era1.ancestral_basin.far_ridge.v03.base"] },
+    { "family": "canopy_cluster", "assetIds": ["noctis.environment.era1.ancestral_basin.canopy_cluster.v01.base", "noctis.environment.era1.ancestral_basin.canopy_cluster.v02.base", "noctis.environment.era1.ancestral_basin.canopy_cluster.v03.base"] },
+    { "family": "foreground_frame", "assetIds": ["noctis.environment.era1.ancestral_basin.foreground_frame.v01.occlusion", "noctis.environment.era1.ancestral_basin.foreground_frame.v02.occlusion"] },
+    { "family": "shelter", "assetIds": ["noctis.environment.era1.ancestral_basin.shelter.v01.base", "noctis.environment.era1.ancestral_basin.shelter.v02.base", "noctis.environment.era1.ancestral_basin.shelter.v03.base"] }
+  ],
+  "world": {
+    "coordinateSpace": { "width": 3600, "height": 2400 },
+    "originRegionId": "origin_basin",
+    "expansionMode": "monotone_connected_regions",
+    "eraBounds": [
+      { "era": "SPORE_HEARTH", "bounds": { "x": 1200, "y": 920, "width": 1200, "height": 860 } },
+      { "era": "CRYSTAL_INSCRIPTION", "bounds": { "x": 260, "y": 740, "width": 3080, "height": 1040 } },
+      { "era": "PHONONIC_SUBTERRANEAN", "bounds": { "x": 260, "y": 740, "width": 3080, "height": 1600 } },
+      { "era": "OPTOGENETIC_CIRCUIT", "bounds": { "x": 80, "y": 360, "width": 3280, "height": 1980 } },
+      { "era": "COSMIC_STELLAR", "bounds": { "x": 80, "y": 40, "width": 3280, "height": 2300 } }
+    ],
+    "lods": [
+      { "id": "detail", "minWorldUnitsPerViewport": 0, "maxWorldUnitsPerViewport": 760 },
+      { "id": "district", "minWorldUnitsPerViewport": 520, "maxWorldUnitsPerViewport": 1800 },
+      { "id": "overview", "minWorldUnitsPerViewport": 1400, "maxWorldUnitsPerViewport": 5000 }
+    ],
+    "regions": [
+      { "id": "origin_basin", "label": "Ancestral Basin", "introducedEra": "SPORE_HEARTH", "stratum": "surface", "bounds": { "x": 1200, "y": 920, "width": 1200, "height": 860 }, "connectionIds": ["west_terraces", "east_channels", "deep_works", "stellar_chasm"], "overviewLodId": "overview", "districtLodId": "district", "detailLodId": "detail" },
+      { "id": "west_terraces", "label": "Inscription Terraces", "introducedEra": "CRYSTAL_INSCRIPTION", "stratum": "surface", "bounds": { "x": 260, "y": 760, "width": 1120, "height": 980 }, "connectionIds": ["origin_basin", "deep_works", "network_reaches"], "overviewLodId": "overview", "districtLodId": "district", "detailLodId": "detail" },
+      { "id": "east_channels", "label": "Aqueduct Reaches", "introducedEra": "CRYSTAL_INSCRIPTION", "stratum": "surface", "bounds": { "x": 2220, "y": 740, "width": 1120, "height": 1020 }, "connectionIds": ["origin_basin", "deep_works", "network_reaches"], "overviewLodId": "overview", "districtLodId": "district", "detailLodId": "detail" },
+      { "id": "deep_works", "label": "Phononic Deep Works", "introducedEra": "PHONONIC_SUBTERRANEAN", "stratum": "deep", "bounds": { "x": 720, "y": 1580, "width": 2180, "height": 760 }, "connectionIds": ["origin_basin", "west_terraces", "east_channels", "network_reaches"], "overviewLodId": "overview", "districtLodId": "district", "detailLodId": "detail" },
+      { "id": "network_reaches", "label": "Living Network Reaches", "introducedEra": "OPTOGENETIC_CIRCUIT", "stratum": "root", "bounds": { "x": 80, "y": 360, "width": 3280, "height": 1920 }, "connectionIds": ["west_terraces", "east_channels", "deep_works", "stellar_chasm"], "overviewLodId": "overview", "districtLodId": "district", "detailLodId": "detail" },
+      { "id": "stellar_chasm", "label": "Stellar Chasm", "introducedEra": "COSMIC_STELLAR", "stratum": "stellar", "bounds": { "x": 1040, "y": 40, "width": 1520, "height": 1080 }, "connectionIds": ["origin_basin", "network_reaches"], "overviewLodId": "overview", "districtLodId": "district", "detailLodId": "detail" }
+    ],
+    "focusTargets": [
+      { "id": "ancestral_hearth", "label": "Ancestral spore-hearth", "regionId": "origin_basin", "stratum": "surface", "point": { "x": 1800, "y": 1420 }, "detailBounds": { "x": 1490, "y": 1225, "width": 620, "height": 390 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "ordinary_shelters", "label": "Ordinary shelter cluster", "regionId": "origin_basin", "stratum": "surface", "point": { "x": 2100, "y": 1430 }, "detailBounds": { "x": 1820, "y": 1245, "width": 560, "height": 370 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "noctae_gathering", "label": "Noctae gathering", "regionId": "origin_basin", "stratum": "surface", "point": { "x": 1880, "y": 1510 }, "detailBounds": { "x": 1555, "y": 1305, "width": 650, "height": 410 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "first_current", "label": "First current", "regionId": "origin_basin", "stratum": "surface", "point": { "x": 1640, "y": 1600 }, "detailBounds": { "x": 1260, "y": 1365, "width": 760, "height": 470 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "fungal_canopy", "label": "Fungal canopy cluster", "regionId": "origin_basin", "stratum": "surface", "point": { "x": 2190, "y": 1360 }, "detailBounds": { "x": 1865, "y": 1155, "width": 650, "height": 410 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "basin_ridges", "label": "Close basin ridges", "regionId": "origin_basin", "stratum": "surface", "point": { "x": 1510, "y": 1110 }, "detailBounds": { "x": 1200, "y": 920, "width": 760, "height": 470 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "living_root_paths", "label": "Living root paths", "regionId": "origin_basin", "stratum": "surface", "point": { "x": 1800, "y": 1530 }, "detailBounds": { "x": 1450, "y": 1310, "width": 700, "height": 440 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "root_mouth", "label": "Unmapped root mouth", "regionId": "origin_basin", "stratum": "root", "point": { "x": 2040, "y": 1640 }, "detailBounds": { "x": 1730, "y": 1445, "width": 620, "height": 390 }, "introducedEra": "SPORE_HEARTH" },
+      { "id": "west_archive", "label": "Terrace archive", "regionId": "west_terraces", "stratum": "surface", "point": { "x": 760, "y": 1230 }, "detailBounds": { "x": 400, "y": 1005, "width": 720, "height": 450 }, "introducedEra": "CRYSTAL_INSCRIPTION" },
+      { "id": "east_aqueduct", "label": "Aqueduct exchange", "regionId": "east_channels", "stratum": "surface", "point": { "x": 2820, "y": 1280 }, "detailBounds": { "x": 2430, "y": 1035, "width": 780, "height": 490 }, "introducedEra": "CRYSTAL_INSCRIPTION" },
+      { "id": "pressure_exchange", "label": "Pressure exchange", "regionId": "deep_works", "stratum": "deep", "point": { "x": 1800, "y": 2070 }, "detailBounds": { "x": 1370, "y": 1800, "width": 860, "height": 540 }, "introducedEra": "PHONONIC_SUBTERRANEAN" },
+      { "id": "living_matrix", "label": "Living matrix", "regionId": "network_reaches", "stratum": "root", "point": { "x": 3060, "y": 650 }, "detailBounds": { "x": 2650, "y": 390, "width": 820, "height": 520 }, "introducedEra": "OPTOGENETIC_CIRCUIT" },
+      { "id": "rift_observatory", "label": "Rift observatory", "regionId": "stellar_chasm", "stratum": "stellar", "point": { "x": 1800, "y": 520 }, "detailBounds": { "x": 1390, "y": 260, "width": 820, "height": 520 }, "introducedEra": "COSMIC_STELLAR" },
+      { "id": "orbital_garden", "label": "Anchored orbital garden", "regionId": "stellar_chasm", "stratum": "stellar", "point": { "x": 2200, "y": 250 }, "detailBounds": { "x": 1860, "y": 35, "width": 680, "height": 430 }, "introducedEra": "COSMIC_STELLAR" }
+    ]
+  }
+}

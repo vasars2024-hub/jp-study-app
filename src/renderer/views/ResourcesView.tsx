@@ -1,4 +1,8 @@
-import { useMemo, useState } from 'react';
+// Resources catalogue. The state and section renderers live in
+// components/resources/ResourcesContent.tsx so Blanc can compose the same
+// catalogue into Blanc chrome (BLANC_REFINEMENT_PLAN.md Pillar 0); this file
+// keeps only the two Study OS shells — Aero (menu bar + status bar + three-pane
+// workbench) and standard.
 import Icon from '../components/Icons';
 import {
   AppChrome,
@@ -9,54 +13,56 @@ import {
   type MenuBarMenu,
   useAeroMaterials,
 } from '../components/ui';
-import { RESOURCES, type Resource, type ResourceCategory } from '../data/resources';
+import WorldHeatMap from '../components/resources/WorldHeatMap';
+import {
+  ResourceBundleDetail,
+  ResourceBundles,
+  ResourceGroups,
+  ResourceMyTools,
+  ResourceNewSection,
+  hostOf,
+  openLink,
+  useResources,
+} from '../components/resources/ResourcesContent';
 import { useT } from '../i18n';
-
-type Filter = 'All' | string;
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
-
-function openLink(url: string): void {
-  // Opens in the system browser via the safe main-process bridge.
-  void window.api.openExternal(url);
-}
-
-function matchesResource(r: Resource, q: string): boolean {
-  return `${r.name} ${r.description}`.toLowerCase().includes(q);
-}
 
 export default function ResourcesView() {
   const { t } = useT();
   const aero = useAeroMaterials();
-  const [filter, setFilter] = useState<Filter>('All');
-  const [query, setQuery] = useState('');
+  const state = useResources();
+  const {
+    filter,
+    setFilter,
+    query,
+    setQuery,
+    refreshState,
+    doRefresh,
+    selectedBundle,
+    closeBundle,
+    allCategories,
+    groups,
+    total,
+    allTotal,
+    activeCategory,
+    bundles,
+    showLanding,
+  } = state;
 
-  const groups: ResourceCategory[] = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return RESOURCES
-      .filter((cat) => filter === 'All' || cat.id === filter)
-      .map((cat) => ({
-        ...cat,
-        items: q ? cat.items.filter((r) => matchesResource(r, q)) : cat.items,
-      }))
-      .filter((cat) => cat.items.length > 0);
-  }, [filter, query]);
-
-  const total = groups.reduce((n, g) => n + g.items.length, 0);
-  const allTotal = RESOURCES.reduce((n, g) => n + g.items.length, 0);
-  const activeCategory = filter === 'All' ? null : RESOURCES.find((cat) => cat.id === filter) ?? null;
+  const refreshLabel =
+    refreshState === 'refreshing'
+      ? t('resources.refreshing')
+      : refreshState === 'offline'
+        ? t('resources.offline')
+        : refreshState === 'updated'
+          ? t('resources.updated', { when: '' }).replace('{when}', '').trim() || 'Updated'
+          : '';
 
   const menus: MenuBarMenu[] = [
     {
       id: 'file',
       label: 'File',
       items: [
+        { id: 'refresh', label: 'Refresh catalogue', onSelect: () => void doRefresh() },
         { id: 'clear-search', label: 'Clear search', disabled: !query, onSelect: () => setQuery('') },
         { id: 'all', label: 'Show all resources', onSelect: () => setFilter('All') },
       ],
@@ -66,7 +72,7 @@ export default function ResourcesView() {
       label: 'View',
       items: [
         { id: 'all-view', label: 'All categories', onSelect: () => setFilter('All') },
-        ...RESOURCES.map((cat) => ({
+        ...allCategories.map((cat) => ({
           id: `cat-${cat.id}`,
           label: cat.title,
           onSelect: () => setFilter(cat.id),
@@ -74,6 +80,8 @@ export default function ResourcesView() {
       ],
     },
   ];
+
+  // -------------------------------- Aero shell --------------------------------
 
   if (aero) {
     return (
@@ -83,28 +91,34 @@ export default function ResourcesView() {
           <>
             <StatusBarField>{total} visible</StatusBarField>
             <StatusBarField>{allTotal} indexed</StatusBarField>
+            <StatusBarField>{bundles.length} bundles</StatusBarField>
             <StatusBarSpacer />
-            <StatusBarField>{activeCategory?.title ?? 'All categories'}</StatusBarField>
+            <StatusBarField>
+              {selectedBundle ? selectedBundle.gem : activeCategory?.title ?? 'All categories'}
+            </StatusBarField>
           </>
         }
         className="aero-resources-chrome"
       >
         <div className="aero-resources">
           <Toolbar className="aero-resources-toolbar" aria-label="Resource catalogue commands">
-            <button className={`aero-resource-filter ${filter === 'All' ? 'active' : ''}`} onClick={() => setFilter('All')}>
+            <button className={`aero-resource-filter ${filter === 'All' ? 'active' : ''}`} onClick={() => { setFilter('All'); closeBundle(); }}>
               All
             </button>
-            {RESOURCES.map((cat) => (
+            {allCategories.map((cat) => (
               <button
                 key={cat.id}
                 className={`aero-resource-filter ${filter === cat.id ? 'active' : ''}`}
-                onClick={() => setFilter(cat.id)}
+                onClick={() => { setFilter(cat.id); closeBundle(); }}
                 title={cat.title}
               >
                 {cat.title}
               </button>
             ))}
             <ToolbarSpacer />
+            <button className="aero-resource-filter" onClick={() => void doRefresh()} disabled={refreshState === 'refreshing'} title="Refresh catalogue">
+              <Icon name="refresh" size={12} /> {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}
+            </button>
             <input
               className="aero-resource-search"
               type="text"
@@ -114,76 +128,96 @@ export default function ResourcesView() {
             />
           </Toolbar>
 
-          <div className="aero-resources-workbench">
-            <aside className="aero-resources-tree" aria-label="Resource categories">
-              <button className={`aero-resources-node ${filter === 'All' ? 'active' : ''}`} onClick={() => setFilter('All')}>
-                <span>All resources</span>
-                <b>{allTotal}</b>
-              </button>
-              {RESOURCES.map((cat) => (
-                <button
-                  key={cat.id}
-                  className={`aero-resources-node ${filter === cat.id ? 'active' : ''}`}
-                  onClick={() => setFilter(cat.id)}
-                >
-                  <span>{cat.title}</span>
-                  <b>{cat.items.length}</b>
+          {selectedBundle ? (
+            <div className="aero-resources-workbench single">
+              <ResourceBundleDetail state={state} />
+            </div>
+          ) : (
+            <div className="aero-resources-workbench">
+              <aside className="aero-resources-tree" aria-label="Resource categories">
+                <button className={`aero-resources-node ${filter === 'All' ? 'active' : ''}`} onClick={() => setFilter('All')}>
+                  <span>All resources</span>
+                  <b>{allTotal}</b>
                 </button>
-              ))}
-            </aside>
+                {allCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    className={`aero-resources-node ${filter === cat.id ? 'active' : ''}`}
+                    onClick={() => setFilter(cat.id)}
+                  >
+                    <span>{cat.title}</span>
+                    <b>{cat.items.length}</b>
+                  </button>
+                ))}
+              </aside>
 
-            <main className="aero-resources-list">
-              {groups.length === 0 ? (
-                <div className="aero-resources-empty">No resources match the current search.</div>
-              ) : (
-                groups.map((cat) => (
-                  <section className="aero-resource-group" key={cat.id}>
-                    <div className="aero-resource-group-head">
-                      <span>{cat.title}</span>
-                      <small>{cat.blurb}</small>
-                    </div>
-                    <div className="aero-resource-table" role="table" aria-label={cat.title}>
-                      <div className="aero-resource-row aero-resource-row-head" role="row">
-                        <span>Name</span>
-                        <span>Cost</span>
-                        <span>Host</span>
-                        <span>Description</span>
+              <main className="aero-resources-list">
+                {showLanding ? <WorldHeatMap /> : null}
+                {showLanding ? <ResourceBundles state={state} /> : null}
+                {showLanding ? <ResourceMyTools state={state} /> : null}
+                {showLanding ? <ResourceNewSection state={state} /> : null}
+                {groups.length === 0 ? (
+                  <div className="aero-resources-empty">No resources match the current search.</div>
+                ) : (
+                  groups.map((cat) => (
+                    <section className="aero-resource-group" key={cat.id}>
+                      <div className="aero-resource-group-head">
+                        <span>{cat.title}</span>
+                        <small>{cat.blurb}</small>
                       </div>
-                      {cat.items.map((r) => (
-                        <button key={r.url} className="aero-resource-row" role="row" onClick={() => openLink(r.url)}>
-                          <span className="aero-resource-name">{r.name}</span>
-                          <span className={`aero-resource-cost cost-${r.cost.toLowerCase()}`}>{r.cost}</span>
-                          <span>{hostOf(r.url)}</span>
-                          <span>{r.description}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ))
-              )}
-            </main>
+                      <div className="aero-resource-table" role="table" aria-label={cat.title}>
+                        <div className="aero-resource-row aero-resource-row-head" role="row">
+                          <span>Name</span>
+                          <span>Cost</span>
+                          <span>Host</span>
+                          <span>Description</span>
+                        </div>
+                        {cat.items.map((r) => (
+                          <button key={r.url} className="aero-resource-row" role="row" onClick={() => openLink(r.url)}>
+                            <span className="aero-resource-name">{r.name}</span>
+                            <span className={`aero-resource-cost cost-${r.cost.toLowerCase()}`}>{r.cost}</span>
+                            <span>{hostOf(r.url)}</span>
+                            <span>{r.description}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                )}
+              </main>
 
-            <aside className="aero-resources-inspector" aria-label="Resource details">
-              <h2>{activeCategory?.title ?? 'Study directory'}</h2>
-              <p>{activeCategory?.blurb ?? 'A compact catalogue of Japanese study links grouped by purpose.'}</p>
-              <dl>
-                <div>
-                  <dt>Visible</dt>
-                  <dd>{total}</dd>
-                </div>
-                <div>
-                  <dt>Categories</dt>
-                  <dd>{RESOURCES.length}</dd>
-                </div>
-                <div>
-                  <dt>Mode</dt>
-                  <dd>{query ? 'Filtered' : 'Browsing'}</dd>
-                </div>
-              </dl>
-            </aside>
-          </div>
+              <aside className="aero-resources-inspector" aria-label="Resource details">
+                <h2>{activeCategory?.title ?? 'Study directory'}</h2>
+                <p>{activeCategory?.blurb ?? 'A living catalogue of Japanese study links, bundles, and tools.'}</p>
+                <dl>
+                  <div>
+                    <dt>Visible</dt>
+                    <dd>{total}</dd>
+                  </div>
+                  <div>
+                    <dt>Bundles</dt>
+                    <dd>{bundles.length}</dd>
+                  </div>
+                  <div>
+                    <dt>Mode</dt>
+                    <dd>{query ? 'Filtered' : 'Browsing'}</dd>
+                  </div>
+                </dl>
+              </aside>
+            </div>
+          )}
         </div>
       </AppChrome>
+    );
+  }
+
+  // ------------------------------ Standard shell ------------------------------
+
+  if (selectedBundle) {
+    return (
+      <div className="res-view">
+        <ResourceBundleDetail state={state} />
+      </div>
     );
   }
 
@@ -201,7 +235,7 @@ export default function ResourcesView() {
           >
             {t('resources.filter.all')}
           </button>
-          {RESOURCES.map((cat) => (
+          {allCategories.map((cat) => (
             <button
               key={cat.id}
               className={`gram-level-btn ${filter === cat.id ? 'active' : ''}`}
@@ -212,47 +246,36 @@ export default function ResourcesView() {
             </button>
           ))}
         </div>
-        <input
-          className="gram-search"
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t('resources.search.placeholder')}
-        />
+        <div className="res-controls-right">
+          <button
+            className="gram-level-btn res-refresh"
+            onClick={() => void doRefresh()}
+            disabled={refreshState === 'refreshing'}
+            title="Fetch the latest catalogue"
+          >
+            <Icon name="refresh" size={12} />
+            {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}
+          </button>
+          <input
+            className="gram-search"
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('resources.search.placeholder')}
+          />
+        </div>
       </div>
+
+      {refreshLabel ? <div className="res-refresh-hint muted">{refreshLabel}</div> : null}
+
+      {showLanding ? <WorldHeatMap /> : null}
+      {showLanding ? <ResourceBundles state={state} /> : null}
+      {showLanding ? <ResourceMyTools state={state} /> : null}
+      {showLanding ? <ResourceNewSection state={state} /> : null}
 
       <div className="gram-count muted">{t('resources.count', { count: total })}</div>
 
-      {groups.length === 0 ? (
-        <div className="res-empty muted">{t('resources.noMatches')}</div>
-      ) : (
-        groups.map((cat) => (
-          <section className="res-group" key={cat.id}>
-            <div className="res-group-head">
-              <h2>{cat.title}</h2>
-              <p className="muted">{cat.blurb}</p>
-            </div>
-
-            <div className="res-grid">
-              {cat.items.map((r) => (
-                <button key={r.url} className="res-card" onClick={() => openLink(r.url)}>
-                  <span className="res-card-top">
-                    <span className="res-name">{r.name}</span>
-                    <span className={`res-cost cost-${r.cost.toLowerCase()}`}>{r.cost}</span>
-                  </span>
-                  <span className="res-desc">{r.description}</span>
-                  <span className="res-host">
-                    {hostOf(r.url)}
-                    <span className="res-open" aria-hidden="true">
-                      <Icon name="external" size={11} />
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ))
-      )}
+      <ResourceGroups state={state} />
     </div>
   );
 }

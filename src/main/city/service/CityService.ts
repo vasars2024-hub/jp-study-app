@@ -1,121 +1,121 @@
-/**
- * CityService — main-process state owner for the Noctis Civilization Module.
- *
- * The single source of truth and single writer of civilization data
- * (ARCHITECTURE.md Section 3). It owns native file I/O, the wall clock, and
- * IPC publication, and delegates every simulation fact to the pure engine
- * boundary — CityService reads clocks and files; the engine never does.
- *
- * All three lifecycle flows of ARCHITECTURE.md Section 6 live here:
- * initialization (load-or-create, one elapsed-time evaluation), in-session
- * ingestion (recordSession), and write-through teardown.
- */
+import {
+  CivilizationState,
+  EngineEventFlag,
+  InterpretedLearningInput,
+  advanceCivilizationTime,
+  createInitialState,
+  evaluateCivilization,
+} from '../engine';
+import { CITY_WIRE_VERSION, CityStateMessage } from '../ipc/channels';
+import { CityStorage } from './persistence';
 
-import { evaluate } from '../engine';
-import { createInitialState } from '../engine/state';
-import { CivilizationState, EngineEventFlag, InterpretedLearningInput } from '../engine/types';
-import { CityStateMessage } from '../ipc/channels';
-import { loadEnvelope, saveState } from './persistence';
-
-/** How the wall clock and a fresh seed reach the service, injectable for tests. */
 export interface CityClock {
-  now(): number; // epoch milliseconds
-  seed(): number; // committed once at first-ever creation
+  now(): number;
+  seed(): number;
 }
 
-const systemClock: CityClock = {
-  now: () => Date.now(),
-  seed: () => (Date.now() ^ (Math.floor(Math.random() * 0xffffffff))) >>> 0,
-};
-
 const MS_PER_MINUTE = 60000;
+const IDEMPOTENCY_HISTORY_LIMIT = 512;
 
 export class CityService {
   private state: CivilizationState;
   private lastFlags: EngineEventFlag[] = [];
   private savedAt: number;
+  private appliedSessionIds: string[];
+  private readonly appliedSessionSet: Set<string>;
   private readonly clock: CityClock;
+  private readonly storage: CityStorage;
   private readonly broadcast: (message: CityStateMessage) => void;
+  private mutationQueue: Promise<void> = Promise.resolve();
 
   private constructor(
     state: CivilizationState,
     savedAt: number,
+    appliedSessionIds: string[],
     clock: CityClock,
+    storage: CityStorage,
     broadcast: (message: CityStateMessage) => void,
   ) {
     this.state = state;
     this.savedAt = savedAt;
+    this.appliedSessionIds = appliedSessionIds.slice(-IDEMPOTENCY_HISTORY_LIMIT);
+    this.appliedSessionSet = new Set(this.appliedSessionIds);
     this.clock = clock;
+    this.storage = storage;
     this.broadcast = broadcast;
   }
 
-  /**
-   * Initialization (ARCHITECTURE.md Section 6, flow 1). Loads the local save
-   * or generates the initial state, then evaluates the elapsed real-world
-   * delta since the last save exactly once — the offline decay checkpoint —
-   * and persists atomically with a fresh timestamp.
-   */
   static init(
     broadcast: (message: CityStateMessage) => void,
-    clock: CityClock = systemClock,
+    clock: CityClock,
+    storage: CityStorage,
   ): CityService {
-    const now = clock.now();
-    const loaded = loadEnvelope();
-
-    let state: CivilizationState;
-    let elapsedMinutes: number;
-    if (loaded) {
-      state = loaded.state;
-      elapsedMinutes = Math.max(0, (now - loaded.savedAt) / MS_PER_MINUTE);
-    } else {
-      state = createInitialState(clock.seed());
-      elapsedMinutes = 0;
-    }
-
-    const service = new CityService(state, now, clock, broadcast);
-    // The launch checkpoint: pure elapsed-time evaluation, no learning input.
-    const { state: next, flags } = evaluate(state, null, elapsedMinutes);
-    service.state = next;
-    service.lastFlags = flags;
-    service.commit(now);
+    const now = Math.max(0, clock.now());
+    const loaded = storage.load().envelope;
+    const state = loaded ? loaded.state : createInitialState(clock.seed());
+    const elapsedMinutes = loaded ? Math.max(0, (now - loaded.savedAt) / MS_PER_MINUTE) : 0;
+    const checkpoint = advanceCivilizationTime(state, elapsedMinutes);
+    const service = new CityService(
+      checkpoint.state,
+      now,
+      loaded ? loaded.appliedSessionIds : [],
+      clock,
+      storage,
+      broadcast,
+    );
+    service.lastFlags = checkpoint.flags;
+    service.storage.save(service.state, now, service.appliedSessionIds);
     return service;
   }
 
-  /** The current snapshot with the flags from its most recent evaluation. */
   getState(): CityStateMessage {
-    return { state: this.state, flags: this.lastFlags };
+    return {
+      schemaVersion: CITY_WIRE_VERSION,
+      state: JSON.parse(JSON.stringify(this.state)) as CivilizationState,
+      flags: this.lastFlags.slice(),
+    };
   }
 
-  /**
-   * In-session ingestion (ARCHITECTURE.md Section 6, flow 2). Evaluates an
-   * interpreted learning input against the current snapshot, including the
-   * elapsed time since the last commit, persists atomically, and broadcasts
-   * the unified result to all windows.
-   */
-  recordSession(input: InterpretedLearningInput): CityStateMessage {
-    const now = this.clock.now();
-    const elapsedMinutes = Math.max(0, (now - this.savedAt) / MS_PER_MINUTE);
-    const { state: next, flags } = evaluate(this.state, input, elapsedMinutes);
-    this.state = next;
-    this.lastFlags = flags;
-    this.commit(now);
-    const message = this.getState();
-    this.broadcast(message);
-    return message;
+  /** Serialized write-through ingestion; a failed save never commits memory or broadcasts. */
+  recordSession(idempotencyKey: string, input: InterpretedLearningInput): Promise<CityStateMessage> {
+    let resolveResult: (message: CityStateMessage) => void;
+    let rejectResult: (error: unknown) => void;
+    const result = new Promise<CityStateMessage>((resolve, reject) => {
+      resolveResult = resolve;
+      rejectResult = reject;
+    });
+
+    this.mutationQueue = this.mutationQueue.then(() => {
+      if (this.appliedSessionSet.has(idempotencyKey)) {
+        resolveResult(this.getState());
+        return;
+      }
+      try {
+        const now = Math.max(this.savedAt, this.clock.now());
+        const elapsedMinutes = Math.max(0, (now - this.savedAt) / MS_PER_MINUTE);
+        const evaluated = evaluateCivilization(this.state, input, elapsedMinutes);
+        const ids = this.appliedSessionIds.concat(idempotencyKey).slice(-IDEMPOTENCY_HISTORY_LIMIT);
+        this.storage.save(evaluated.state, now, ids);
+        this.state = evaluated.state;
+        this.lastFlags = evaluated.flags;
+        this.savedAt = now;
+        this.appliedSessionIds = ids;
+        this.appliedSessionSet.clear();
+        ids.forEach((id) => this.appliedSessionSet.add(id));
+        const message = this.getState();
+        this.broadcast(message);
+        resolveResult(message);
+      } catch (error) {
+        rejectResult(error);
+      }
+    }, () => undefined);
+    return result;
   }
 
-  /**
-   * Optional teardown stamp (ARCHITECTURE.md Section 6, flow 4). Persistence
-   * is already write-through, so this only narrows the offline-delta window
-   * on a clean quit; it never mutates simulation state.
-   */
+  /** Clean-quit timestamp stamp; it never evaluates or mutates civilization state. */
   stampOnQuit(): void {
-    this.commit(this.clock.now());
-  }
-
-  /** Atomic write-through with a fresh timestamp (the service owns the clock). */
-  private commit(now: number): void {
+    const now = Math.max(this.savedAt, this.clock.now());
+    this.storage.save(this.state, now, this.appliedSessionIds);
     this.savedAt = now;
-    saveState(this.state, now);
   }
 }

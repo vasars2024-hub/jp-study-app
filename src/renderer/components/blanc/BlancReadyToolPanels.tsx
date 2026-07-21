@@ -889,6 +889,60 @@ export function BlancModelsPanel() {
   );
 }
 
+const WORKSPACE_LAUNCHER_KEY = 'jp-study.blanc.toolbox.workspaces.v1';
+
+/** One launchable target inside a workspace. */
+interface WorkspaceTarget {
+  id: string;
+  /** Absolute path from the native picker, or an http(s) URL. */
+  target: string;
+  label: string;
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  targets: WorkspaceTarget[];
+}
+
+function readWorkspaces(): Workspace[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WORKSPACE_LAUNCHER_KEY) ?? '[]') as unknown;
+    if (!Array.isArray(parsed)) return [];
+    // Rebuild from known keys only — stale shapes must not survive a reload.
+    return parsed.flatMap((raw): Workspace[] => {
+      if (!raw || typeof raw !== 'object') return [];
+      const row = raw as Record<string, unknown>;
+      if (typeof row.id !== 'string' || typeof row.name !== 'string') return [];
+      const targets = Array.isArray(row.targets) ? row.targets : [];
+      return [{
+        id: row.id,
+        name: row.name,
+        targets: targets.flatMap((rawTarget): WorkspaceTarget[] => {
+          if (!rawTarget || typeof rawTarget !== 'object') return [];
+          const entry = rawTarget as Record<string, unknown>;
+          if (typeof entry.id !== 'string' || typeof entry.target !== 'string' || !entry.target) return [];
+          return [{ id: entry.id, target: entry.target, label: typeof entry.label === 'string' ? entry.label : entry.target }];
+        }),
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeWorkspaces(value: Workspace[]): void {
+  try {
+    window.localStorage.setItem(WORKSPACE_LAUNCHER_KEY, JSON.stringify(value));
+  } catch {
+    /* ignore */
+  }
+}
+
+function isLaunchableUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
 type BatchImageFormat = 'image/png' | 'image/jpeg' | 'image/webp';
 
 const BATCH_FORMAT_EXT: Record<BatchImageFormat, string> = {
@@ -1090,6 +1144,207 @@ export function BatchConverterPanel() {
               </tbody>
             </table>
           </div>
+        </fieldset>
+      )}
+    </div>
+  );
+}
+
+export function WorkspaceLauncherPanel() {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => readWorkspaces());
+  const [selectedId, setSelectedId] = useState('');
+  const [newName, setNewName] = useState('');
+  const [urlDraft, setUrlDraft] = useState('');
+  const [status, setStatus] = useState('');
+  const [launching, setLaunching] = useState(false);
+
+  const selected = workspaces.find((workspace) => workspace.id === selectedId) ?? workspaces[0] ?? null;
+
+  const commit = useCallback((next: Workspace[]): void => {
+    setWorkspaces(next);
+    writeWorkspaces(next);
+  }, []);
+
+  const updateSelected = useCallback((patch: (workspace: Workspace) => Workspace): void => {
+    if (!selected) return;
+    commit(workspaces.map((workspace) => (workspace.id === selected.id ? patch(workspace) : workspace)));
+  }, [commit, selected, workspaces]);
+
+  const addWorkspace = (): void => {
+    const name = newName.trim();
+    if (!name) return;
+    const workspace: Workspace = { id: `ws-${Date.now()}`, name, targets: [] };
+    commit([...workspaces, workspace]);
+    setSelectedId(workspace.id);
+    setNewName('');
+    setStatus(`Created "${name}".`);
+  };
+
+  const removeWorkspace = (): void => {
+    if (!selected) return;
+    commit(workspaces.filter((workspace) => workspace.id !== selected.id));
+    setSelectedId('');
+    setStatus(`Removed "${selected.name}".`);
+  };
+
+  const addPickedTarget = async (): Promise<void> => {
+    if (!selected) return;
+    const picked = await window.api.pickShortcut();
+    if (!picked) return;
+    updateSelected((workspace) => ({
+      ...workspace,
+      targets: [...workspace.targets, { id: `t-${Date.now()}`, target: picked.target, label: picked.name || picked.target }],
+    }));
+    setStatus(`Added ${picked.name || picked.target}.`);
+  };
+
+  const addUrlTarget = (): void => {
+    if (!selected) return;
+    const url = urlDraft.trim();
+    if (!isLaunchableUrl(url)) {
+      setStatus('Enter a full http:// or https:// address.');
+      return;
+    }
+    updateSelected((workspace) => ({
+      ...workspace,
+      targets: [...workspace.targets, { id: `t-${Date.now()}`, target: url, label: url }],
+    }));
+    setUrlDraft('');
+    setStatus('Added link.');
+  };
+
+  const removeTarget = (targetId: string): void => {
+    updateSelected((workspace) => ({ ...workspace, targets: workspace.targets.filter((entry) => entry.id !== targetId) }));
+  };
+
+  const moveTarget = (index: number, delta: number): void => {
+    updateSelected((workspace) => {
+      const next = [...workspace.targets];
+      const swap = index + delta;
+      if (swap < 0 || swap >= next.length) return workspace;
+      [next[index], next[swap]] = [next[swap], next[index]];
+      return { ...workspace, targets: next };
+    });
+  };
+
+  const launchOne = async (entry: WorkspaceTarget): Promise<string> => {
+    const error = await window.api.launchTarget(entry.target);
+    return error ? `${entry.label}: ${error}` : '';
+  };
+
+  const launchAll = async (): Promise<void> => {
+    if (!selected?.targets.length) return;
+    setLaunching(true);
+    setStatus(`Launching ${selected.targets.length} targets...`);
+    const failures: string[] = [];
+    for (const entry of selected.targets) {
+      const failure = await launchOne(entry);
+      if (failure) failures.push(failure);
+    }
+    setLaunching(false);
+    const opened = selected.targets.length - failures.length;
+    setStatus(failures.length
+      ? `Opened ${opened} of ${selected.targets.length}. Failed — ${failures.join('; ')}`
+      : `Opened all ${opened} targets.`);
+  };
+
+  return (
+    <div className="blanc-tool-detail">
+      <fieldset>
+        <legend>Workspaces</legend>
+        <p className="blanc-note">
+          Group the apps, files, and links you always open together, then start them in one click. Targets are added through the
+          Windows picker or as full http(s) links.
+        </p>
+        <div className="blanc-row-actions">
+          <input
+            type="text"
+            value={newName}
+            placeholder="New workspace name"
+            onChange={(event) => setNewName(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') addWorkspace(); }}
+          />
+          <button type="button" disabled={!newName.trim()} onClick={addWorkspace}>Create</button>
+        </div>
+        {workspaces.length > 0 && (
+          <div className="blanc-form-grid">
+            <label>
+              Workspace
+              <select value={selected?.id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
+                {workspaces.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {workspace.name} ({workspace.targets.length})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        {status && <p className="blanc-note">{status}</p>}
+      </fieldset>
+
+      {selected ? (
+        <fieldset>
+          <legend>{selected.name}</legend>
+          <div className="blanc-row-actions">
+            <button type="button" disabled={launching || !selected.targets.length} onClick={() => void launchAll()}>
+              {launching ? 'Launching...' : `Launch all (${selected.targets.length})`}
+            </button>
+            <button type="button" disabled={launching} onClick={() => void addPickedTarget()}>Add app or file</button>
+            <button type="button" disabled={launching} onClick={removeWorkspace}>Delete workspace</button>
+          </div>
+          <div className="blanc-row-actions">
+            <input
+              type="text"
+              value={urlDraft}
+              placeholder="https://example.com"
+              onChange={(event) => setUrlDraft(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Enter') addUrlTarget(); }}
+            />
+            <button type="button" disabled={!urlDraft.trim()} onClick={addUrlTarget}>Add link</button>
+          </div>
+          {selected.targets.length ? (
+            <div className="blanc-table-wrap">
+              <table className="blanc-table">
+                <thead>
+                  <tr>
+                    <th>Target</th>
+                    <th>Path</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {selected.targets.map((entry, index) => (
+                    <tr key={entry.id}>
+                      <td>{entry.label}</td>
+                      <td className="blanc-note">{entry.target}</td>
+                      <td>
+                        <div className="blanc-row-actions">
+                          <button type="button" disabled={index === 0} onClick={() => moveTarget(index, -1)}>Up</button>
+                          <button type="button" disabled={index === selected.targets.length - 1} onClick={() => moveTarget(index, 1)}>Down</button>
+                          <button
+                            type="button"
+                            disabled={launching}
+                            onClick={() => { void launchOne(entry).then((failure) => setStatus(failure || `Opened ${entry.label}.`)); }}
+                          >
+                            Open
+                          </button>
+                          <button type="button" onClick={() => removeTarget(entry.id)}>Remove</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="blanc-note">No targets yet. Add an app, file, or link above.</p>
+          )}
+        </fieldset>
+      ) : (
+        <fieldset>
+          <legend>No workspaces</legend>
+          <p className="blanc-note">Create a workspace to start grouping targets.</p>
         </fieldset>
       )}
     </div>

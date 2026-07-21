@@ -1,18 +1,25 @@
 /**
  * Minimal surface for the transparent OS companion host window (?companionHost=1).
  * Maps Study OS desk-space positions onto the host viewport.
- * Span=all: stable-hash each companion onto a display work area.
+ * Span=all: continuous virtual-desktop mapping snapped to the nearest work area
+ * so climb edges track each monitor's physical edges (mixed-DPI safe DIPs).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { defFor, type CompanionInstance } from './companionCatalog';
 import { resolvePrimaryRoutineId } from './buddyRoutines';
 import ShimejiSprite from './ShimejiSprite';
+import {
+  companionCssTransform,
+  mapDeskToDisplayWorkArea,
+  pickDisplayForVirtualPoint,
+} from './shimejiPhysics';
 
 interface HostState {
   companions: CompanionInstance[];
   enabled: boolean;
   deskW?: number;
   deskH?: number;
+  activeness?: number;
 }
 
 interface Viewport {
@@ -26,22 +33,19 @@ interface DisplayInfo {
   bounds: { x: number; y: number; width: number; height: number };
   workArea: { x: number; y: number; width: number; height: number };
   primary: boolean;
+  scaleFactor: number;
 }
 
 const SIZE = 52;
 const SHIMEJI_SIZE = 96;
+const WIRED_SHIMEJI_SIZE = 100;
 
 function companionSize(c: Pick<CompanionInstance, 'typeId'>): number {
-  return c.typeId === 'miko-shimeji' ? SHIMEJI_SIZE : SIZE;
-}
-
-function hashId(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+  return defFor(c.typeId).spritePack
+    ? c.typeId === 'wired-navi'
+      ? WIRED_SHIMEJI_SIZE
+      : SHIMEJI_SIZE
+    : SIZE;
 }
 
 function mapToHost(
@@ -67,14 +71,14 @@ function mapToHost(
     };
   }
 
-  // All displays: pick a stable display per companion id, map into its work area
-  // relative to the virtual-desktop origin (host window origin).
-  const d = displays[hashId(c.id) % displays.length];
-  const wa = d.workArea;
-  return {
-    left: wa.x - vp.bounds.x + nx * wa.width,
-    top: wa.y - vp.bounds.y + ny * wa.height,
-  };
+  // Continuous map onto the host union, then snap into the work area that
+  // contains (or is nearest to) that virtual point — avoids dead gaps and
+  // keeps wall/ceiling pets on real monitor edges.
+  const virtX = vp.bounds.x + nx * vp.bounds.width;
+  const virtY = vp.bounds.y + ny * vp.bounds.height;
+  const idx = pickDisplayForVirtualPoint(virtX, virtY, displays);
+  const d = displays[idx] ?? displays[0];
+  return mapDeskToDisplayWorkArea(nx, ny, d.workArea, vp.bounds);
 }
 
 export default function CompanionHostView() {
@@ -83,6 +87,8 @@ export default function CompanionHostView() {
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
   const overRef = useRef(false);
+  const hitTestRaf = useRef(0);
+  const lastMouse = useRef<{ x: number; y: number } | null>(null);
 
   const refreshGeometry = useCallback(() => {
     void window.api
@@ -124,12 +130,19 @@ export default function CompanionHostView() {
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const over = Boolean(el?.closest?.('.os-companion'));
-      if (over !== overRef.current) {
-        overRef.current = over;
-        window.api.companionHostSetClickThrough(!over);
-      }
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+      if (hitTestRaf.current) return;
+      hitTestRaf.current = window.requestAnimationFrame(() => {
+        hitTestRaf.current = 0;
+        const point = lastMouse.current;
+        if (!point) return;
+        const el = document.elementFromPoint(point.x, point.y);
+        const over = Boolean(el?.closest?.('.os-companion'));
+        if (over !== overRef.current) {
+          overRef.current = over;
+          window.api.companionHostSetClickThrough(!over);
+        }
+      });
     };
     const onVis = () => {
       if (!document.hidden) {
@@ -146,6 +159,10 @@ export default function CompanionHostView() {
       window.removeEventListener('mousemove', onMove);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('resize', onResize);
+      if (hitTestRaf.current) {
+        window.cancelAnimationFrame(hitTestRaf.current);
+        hitTestRaf.current = 0;
+      }
       window.api.companionHostSetClickThrough(true);
     };
   }, [refreshGeometry]);
@@ -155,7 +172,12 @@ export default function CompanionHostView() {
   const visible = state.companions.filter((c) => !c.hiddenUntil || c.hiddenUntil <= Date.now());
 
   return (
-    <div className="os-companion-host-root">
+    <div
+      className="os-companion-host-root"
+      style={{
+        ['--companion-bob-dur' as string]: `${2.8 * (1.55 - Math.min(1, Math.max(0, state.activeness ?? 0.4)) * 0.75)}s`,
+      }}
+    >
       {visible.map((c) => {
         const def = defFor(c.typeId);
         const pos = mapToHost(c, deskW, deskH, vp, displays);
@@ -169,7 +191,10 @@ export default function CompanionHostView() {
               top: pos.top,
               width: size,
               height: size,
-              transform: `scaleX(${c.facing})`,
+              transform: companionCssTransform(
+                { x: 0, y: 0, facing: c.facing, edge: c.edge },
+                { includeTranslate: false },
+              ),
               ['--c-body' as string]: def.color,
               ['--c-accent' as string]: def.accent,
             }}
@@ -186,8 +211,13 @@ export default function CompanionHostView() {
               setMenuId((id) => (id === c.id ? null : c.id));
             }}
           >
-            {def.sprite === 'miko-shimeji' ? (
-              <ShimejiSprite motion={c.motion} mood={c.mood} />
+            {def.spritePack ? (
+              <ShimejiSprite
+                motion={c.motion}
+                mood={c.mood}
+                pack={def.spritePack}
+                activeness={state.activeness ?? 0.4}
+              />
             ) : (
               <div className="os-companion-body">
                 <span className="os-companion-eye" />
@@ -195,15 +225,14 @@ export default function CompanionHostView() {
                 <span className={`os-companion-mouth mood-${c.mood}`} />
               </div>
             )}
-            {c.mood === 'celebrate' && <span className="os-companion-spark" />}
+            {c.speechBubble && <div className="os-companion-bubble">{c.speechBubble}</div>}
             {menuId === c.id && (
               <div
                 className="os-companion-menu"
-                style={{ transform: 'translateX(-50%) scaleX(1)' }}
                 onClick={(e) => e.stopPropagation()}
+                onContextMenu={(e) => e.preventDefault()}
               >
                 <div className="os-companion-menu-title">{def.label}</div>
-                <div className="os-companion-menu-status muted">{c.status ?? def.blurb}</div>
                 <button
                   type="button"
                   className="btn small"
@@ -214,17 +243,7 @@ export default function CompanionHostView() {
                     setMenuId(null);
                   }}
                 >
-                  Run primary
-                </button>
-                <button
-                  type="button"
-                  className="btn small"
-                  onClick={() => {
-                    void window.api.companionHostFocusMain();
-                    setMenuId(null);
-                  }}
-                >
-                  Open Study OS
+                  Run routine
                 </button>
                 <button type="button" className="btn small" onClick={() => setMenuId(null)}>
                   Close
@@ -234,11 +253,6 @@ export default function CompanionHostView() {
           </div>
         );
       })}
-      {!visible.length && (
-        <div className="os-companion-host-empty muted">
-          Enable companions in Study OS · Desktop settings
-        </div>
-      )}
     </div>
   );
 }

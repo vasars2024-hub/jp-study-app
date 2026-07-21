@@ -48,6 +48,7 @@ import {
 } from '../../shared/deckImport';
 import { promptDialog, AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from './ui';
 import { importDeckFromEntries } from '../flashcardDeck';
+import { useT } from '../i18n';
 import { getActiveProfile } from '../profileState';
 import { parseCsvTextAsync } from '../csvParseAsync';
 import { clampToViewport, toLayoutPoint } from '../zoomCoords';
@@ -101,12 +102,14 @@ function menuPosition(e: React.MouseEvent): { x: number; y: number } {
 }
 
 export default function CsvEditorPanel({ onDeckImported }: Props) {
+  const { t } = useT();
   const initial = useMemo(() => loadStoredEditor() ?? defaultEditorSnapshot(), []);
   const [history, setHistory] = useState<CsvEditorHistory>(() => createHistory(initial));
   const [mapping, setMapping] = useState<DeckColumnMapping>(() =>
     guessColumnMapping(initial.table.headers),
   );
   const [status, setStatus] = useState('');
+  const [statusOk, setStatusOk] = useState(false);
   const [saving, setSaving] = useState(false);
   const [persistState, setPersistState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
@@ -185,21 +188,29 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   const topPad = windowStart * ROW_HEIGHT;
   const bottomPad = Math.max(0, (totalRows - windowEnd) * ROW_HEIGHT);
 
-  const commit = useCallback((next: CsvEditorSnapshot, msg?: string) => {
-    setHistory((h) => pushHistory(h, next));
-    if (msg) setStatus(msg);
+  const setStatusMsg = useCallback((msg: string, ok = false) => {
+    setStatus(msg);
+    setStatusOk(ok);
   }, []);
 
+  const commit = useCallback(
+    (next: CsvEditorSnapshot, msg?: string, ok = false) => {
+      setHistory((h) => pushHistory(h, next));
+      if (msg) setStatusMsg(msg, ok);
+    },
+    [setStatusMsg],
+  );
+
   const updateSnap = useCallback(
-    (patch: Partial<CsvEditorSnapshot>, msg?: string) => {
-      commit({ ...history.present, ...patch }, msg);
+    (patch: Partial<CsvEditorSnapshot>, msg?: string, ok = false) => {
+      commit({ ...history.present, ...patch }, msg, ok);
     },
     [commit, history.present],
   );
 
   const updateTable = useCallback(
-    (nextTable: CsvTable, msg?: string) => {
-      updateSnap({ table: nextTable }, msg);
+    (nextTable: CsvTable, msg?: string, ok = false) => {
+      updateSnap({ table: nextTable }, msg, ok);
     },
     [updateSnap],
   );
@@ -345,23 +356,23 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
       title: nextTitle,
       hiddenColumns: mode === 'overwrite' ? [] : [...hiddenColumns],
     };
-    commit(nextSnap, `Loaded ${merged.rows.length} rows.`);
+    commit(nextSnap, t('csv.status.loadedRows', { count: merged.rows.length }), true);
     setMapping(guessColumnMapping(merged.headers));
     if (mode === 'overwrite') setHiddenColumns(new Set());
     setBaseline(nextSnap);
     const count = syncToDeck(merged, guessColumnMapping(merged.headers), nextTitle);
-    if (count) setStatus(`Imported ${count} cards into flashcards.`);
+    if (count) setStatusMsg(t('csv.status.importedCards', { count }), true);
   }
 
   async function loadText(raw: string, deckTitle?: string): Promise<void> {
     if (!raw.trim()) return;
-    setStatus('Parsing…');
+    setStatusMsg(t('csv.status.parsing'));
     // Parse in a Web Worker so a large file never freezes the grid.
     const parsed = await parseCsvTextAsync(raw, {
       delimiter: table.delimiter,
       hasHeader: table.hasHeader,
     });
-    setStatus('');
+    setStatusMsg('');
     if (table.rows.length && raw.trim()) {
       setPendingImport({ table: parsed, title: deckTitle });
       return;
@@ -385,29 +396,34 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     const next = { ...mapping, [col]: field };
     setMapping(next);
     const count = syncToDeck(table, next, title);
-    if (count) setStatus(`Re-imported ${count} cards with new column mapping.`);
+    if (count) setStatusMsg(t('csv.status.reimported', { count }), true);
   }
 
   function manualImport(): void {
     const count = syncToDeck(table, mapping, title);
-    setStatus(count ? `Imported ${count} cards.` : 'Nothing to import — map a column to Expression / Word.');
+    setStatusMsg(
+      count ? t('csv.status.importedCount', { count }) : t('csv.status.nothingToImport'),
+      count > 0,
+    );
     setBaseline(snap);
   }
 
   async function downloadCsv(): Promise<void> {
     setSaving(true);
-    setStatus('');
+    setStatusMsg('');
     try {
       const csv = serializeCsvTable(table);
       const safe = (title.trim() || 'deck').replace(/[^\w -]+/g, '').trim() || 'deck';
       const ext = table.delimiter === '\t' ? 'tsv' : 'csv';
       const res = await window.api.miningSaveEpubDeckFile(csv, safe, ext);
       if (res.ok && res.path) {
-        setStatus(`Saved file → ${res.path}`);
+        setStatusMsg(t('csv.status.savedFile', { path: res.path }), true);
         setBaseline(snap);
-      } else if (res.error !== 'cancelled') setStatus(res.error ?? 'Could not save CSV.');
+      } else if (res.error !== 'cancelled') {
+        setStatusMsg(res.error ?? t('csv.status.saveFailed'));
+      }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatusMsg(error instanceof Error ? error.message : String(error));
     } finally {
       setSaving(false);
     }
@@ -471,10 +487,14 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   async function handleSplitColumn(): Promise<void> {
     const col = selectedCols.size === 1 ? [...selectedCols][0] : null;
     if (col === null || col === undefined) {
-      setStatus('Select exactly one column to split.');
+      setStatusMsg(t('csv.status.selectOneToSplit'));
       return;
     }
-    const delim = await promptDialog({ title: 'Split column', message: 'Split delimiter (e.g. : or ;)', defaultValue: ':' });
+    const delim = await promptDialog({
+      title: t('csv.prompt.splitTitle'),
+      message: t('csv.prompt.splitMsg'),
+      defaultValue: ':',
+    });
     if (delim === null) return;
     updateTable(splitColumn(table, col, delim));
     setMapping((m) => remapMappingOnSplit(m, col));
@@ -482,13 +502,21 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
 
   async function handleMergeColumns(): Promise<void> {
     if (selectedCols.size < 2) {
-      setStatus('Select two or more columns to merge.');
+      setStatusMsg(t('csv.status.selectTwoToMerge'));
       return;
     }
-    const sep = await promptDialog({ title: 'Merge columns', message: 'Merge separator', defaultValue: ' ' });
+    const sep = await promptDialog({
+      title: t('csv.prompt.mergeTitle'),
+      message: t('csv.prompt.mergeSep'),
+      defaultValue: ' ',
+    });
     if (sep === null) return;
     const cols = [...selectedCols].sort((a, b) => a - b);
-    const header = (await promptDialog({ title: 'Merge columns', message: 'Merged column header (optional)' })) ?? undefined;
+    const header =
+      (await promptDialog({
+        title: t('csv.prompt.mergeTitle'),
+        message: t('csv.prompt.mergeHeader'),
+      })) ?? undefined;
     const next = mergeColumns(table, cols, sep, header);
     updateTable(next);
     setMapping((prev) => refreshMapping(next.headers, prev));
@@ -499,19 +527,33 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
     const col = selectedCols.size === 1 ? [...selectedCols][0] : 0;
     const before = table.rows.length;
     const next = deduplicateRows(table, col);
-    updateTable(next, `Removed ${before - next.rows.length} duplicate row(s).`);
+    updateTable(next, t('csv.status.removedDupes', { count: before - next.rows.length }), true);
   }
 
   async function handleTagColumn(): Promise<void> {
-    const header = (await promptDialog({ title: 'Tag column', message: 'Tag column header', defaultValue: 'Tag' })) ?? 'Tag';
+    const header =
+      (await promptDialog({
+        title: t('csv.prompt.tagTitle'),
+        message: t('csv.prompt.tagHeader'),
+        defaultValue: 'Tag',
+      })) ?? 'Tag';
     const value =
-      (await promptDialog({ title: 'Tag column', message: 'Tag value for all rows', defaultValue: 'Vocabulary Set 1' })) ?? '';
+      (await promptDialog({
+        title: t('csv.prompt.tagTitle'),
+        message: t('csv.prompt.tagValue'),
+        defaultValue: 'Vocabulary Set 1',
+      })) ?? '';
     updateTable(addTagColumn(table, header, value));
     setMapping((prev) => refreshMapping(table.headers, prev));
   }
 
   async function handleAutoNumber(): Promise<void> {
-    const header = (await promptDialog({ title: 'Auto-number', message: 'ID column header', defaultValue: 'ID' })) ?? 'ID';
+    const header =
+      (await promptDialog({
+        title: t('csv.prompt.autoTitle'),
+        message: t('csv.prompt.autoHeader'),
+        defaultValue: 'ID',
+      })) ?? 'ID';
     updateTable(addAutoNumberColumn(table, header));
     setMapping((m) => remapMappingOnInsert(m, 0));
   }
@@ -545,76 +587,110 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
   const csvMenus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('csv.menu.file'),
       items: [
-        { id: 'open', label: 'Open file…', onSelect: () => fileRef.current?.click() },
-        { id: 'download', label: table.delimiter === '\t' ? 'Download TSV' : 'Download CSV', disabled: saving, onSelect: () => void downloadCsv() },
+        { id: 'open', label: t('csv.menu.open'), onSelect: () => fileRef.current?.click() },
+        {
+          id: 'download',
+          label: table.delimiter === '\t' ? t('csv.downloadTsv') : t('csv.downloadCsv'),
+          disabled: saving,
+          onSelect: () => void downloadCsv(),
+        },
         { separator: true, label: '' },
-        { id: 'import', label: 'Import to flashcards', onSelect: manualImport },
+        { id: 'import', label: t('csv.importFlashcards'), onSelect: manualImport },
       ],
     },
     {
       id: 'edit',
-      label: 'Edit',
+      label: t('csv.menu.edit'),
       items: [
-        { id: 'undo', label: 'Undo', disabled: !canUndo(history), onSelect: () => setHistory((h) => undoHistory(h) ?? h) },
-        { id: 'redo', label: 'Redo', disabled: !canRedo(history), onSelect: () => setHistory((h) => redoHistory(h) ?? h) },
+        {
+          id: 'undo',
+          label: t('csv.undo'),
+          disabled: !canUndo(history),
+          onSelect: () => setHistory((h) => undoHistory(h) ?? h),
+        },
+        {
+          id: 'redo',
+          label: t('csv.redo'),
+          disabled: !canRedo(history),
+          onSelect: () => setHistory((h) => redoHistory(h) ?? h),
+        },
         { separator: true, label: '' },
-        { id: 'find', label: 'Find and replace…', onSelect: () => setShowFindReplace(true) },
+        { id: 'find', label: t('csv.menu.find'), onSelect: () => setShowFindReplace(true) },
       ],
     },
     {
       id: 'data',
-      label: 'Data',
+      label: t('csv.menu.data'),
       items: [
-        { id: 'split', label: 'Split column…', disabled: selectedCols.size !== 1, onSelect: () => void handleSplitColumn() },
-        { id: 'merge', label: 'Merge columns…', disabled: selectedCols.size < 2, onSelect: () => void handleMergeColumns() },
-        { id: 'dedup', label: 'Remove duplicate rows', onSelect: handleDeduplicate },
+        {
+          id: 'split',
+          label: t('csv.menu.split'),
+          disabled: selectedCols.size !== 1,
+          onSelect: () => void handleSplitColumn(),
+        },
+        {
+          id: 'merge',
+          label: t('csv.menu.merge'),
+          disabled: selectedCols.size < 2,
+          onSelect: () => void handleMergeColumns(),
+        },
+        { id: 'dedup', label: t('csv.menu.dedup'), onSelect: handleDeduplicate },
         { separator: true, label: '' },
-        { id: 'tag', label: 'Add tag column…', onSelect: () => void handleTagColumn() },
-        { id: 'autonum', label: 'Add auto-number column…', onSelect: () => void handleAutoNumber() },
+        { id: 'tag', label: t('csv.menu.tag'), onSelect: () => void handleTagColumn() },
+        { id: 'autonum', label: t('csv.menu.autonum'), onSelect: () => void handleAutoNumber() },
       ],
     },
     {
       id: 'view',
-      label: 'View',
-      items: [{ id: 'preview', label: showPreview ? 'Hide card preview' : 'Show card preview', onSelect: () => setShowPreview((v) => !v) }],
+      label: t('csv.menu.view'),
+      items: [
+        {
+          id: 'preview',
+          label: showPreview ? t('csv.menu.hidePreview') : t('csv.menu.showPreview'),
+          onSelect: () => setShowPreview((v) => !v),
+        },
+      ],
     },
   ];
 
   const csvStatus = (
     <>
-      <StatusBarField>{table.rows.length} rows</StatusBarField>
-      <StatusBarField>{table.headers.length} cols</StatusBarField>
-      {selectedCols.size > 0 && <StatusBarField>{selectedCols.size} selected</StatusBarField>}
+      <StatusBarField>{t('csv.status.rows', { count: table.rows.length })}</StatusBarField>
+      <StatusBarField>{t('csv.status.cols', { count: table.headers.length })}</StatusBarField>
+      {selectedCols.size > 0 && (
+        <StatusBarField>{t('clipboard.selectedCount', { count: selectedCols.size })}</StatusBarField>
+      )}
       <StatusBarSpacer />
-      {dirty && <StatusBarField live>Unsaved changes</StatusBarField>}
+      {dirty && <StatusBarField live>{t('csv.status.unsaved')}</StatusBarField>}
     </>
   );
 
   return (
     <AppChrome menus={csvMenus} status={csvStatus} className="aero-csv-chrome">
     <section className="anki-card csv-editor">
-      <p className="muted csv-editor-lead">
-        Spreadsheet editor for CSV / TSV decks. Paste or open a file, edit with power tools, then import to flashcards.
-      </p>
+      <p className="muted csv-editor-lead">{t('csv.lead')}</p>
 
       <div className="csv-editor-toolbar">
         <label className="csv-editor-field compact">
-          <span>Deck name{dirty ? ' *' : ''}</span>
+          <span>
+            {t('csv.deckName')}
+            {dirty ? ' *' : ''}
+          </span>
           <input
             type="text"
             value={title}
             onChange={(e) => updateSnap({ title: e.target.value })}
-            placeholder="deck"
+            placeholder={t('csv.deckNamePlaceholder')}
           />
         </label>
         <label className="csv-editor-field compact">
-          <span>Delimiter</span>
+          <span>{t('csv.delimiter')}</span>
           <select value={table.delimiter} onChange={(e) => changeDelimiter(e.target.value as CsvDelimiter)}>
-            <option value=",">Comma</option>
-            <option value="\t">Tab</option>
-            <option value=";">Semicolon</option>
+            <option value=",">{t('csv.delimiter.comma')}</option>
+            <option value="\t">{t('csv.delimiter.tab')}</option>
+            <option value=";">{t('csv.delimiter.semicolon')}</option>
           </select>
         </label>
         <label className="csv-editor-check">
@@ -623,16 +699,28 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
             checked={table.hasHeader}
             onChange={(e) => updateTable({ ...table, hasHeader: e.target.checked })}
           />
-          Header row
+          {t('csv.headerRow')}
         </label>
-        <button type="button" className="btn" disabled={!canUndo(history)} onClick={() => setHistory((h) => undoHistory(h) ?? h)} title="Undo (Ctrl+Z)">
-          Undo
+        <button
+          type="button"
+          className="btn"
+          disabled={!canUndo(history)}
+          onClick={() => setHistory((h) => undoHistory(h) ?? h)}
+          title={t('csv.undoTitle')}
+        >
+          {t('csv.undo')}
         </button>
-        <button type="button" className="btn" disabled={!canRedo(history)} onClick={() => setHistory((h) => redoHistory(h) ?? h)} title="Redo (Ctrl+Y)">
-          Redo
+        <button
+          type="button"
+          className="btn"
+          disabled={!canRedo(history)}
+          onClick={() => setHistory((h) => redoHistory(h) ?? h)}
+          title={t('csv.redoTitle')}
+        >
+          {t('csv.redo')}
         </button>
         <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
-          Open file
+          {t('csv.openFile')}
         </button>
         <input
           ref={fileRef}
@@ -646,45 +734,57 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
           }}
         />
         <button type="button" className="btn primary" onClick={manualImport}>
-          Import to flashcards
+          {t('csv.importFlashcards')}
         </button>
         <button type="button" className="btn" disabled={saving} onClick={() => void downloadCsv()}>
           <Icon name="download" size={16} />
-          {saving ? 'Saving…' : table.delimiter === '\t' ? 'Download TSV' : 'Download CSV'}
+          {saving
+            ? t('csv.saving')
+            : table.delimiter === '\t'
+              ? t('csv.downloadTsv')
+              : t('csv.downloadCsv')}
         </button>
-        <button type="button" className={`btn${showPreview ? ' active' : ''}`} onClick={() => setShowPreview((v) => !v)}>
-          Preview
+        <button
+          type="button"
+          className={`btn${showPreview ? ' active' : ''}`}
+          onClick={() => setShowPreview((v) => !v)}
+        >
+          {t('csv.preview')}
         </button>
       </div>
 
       <div className="csv-editor-search-row">
         <label className="csv-editor-field compact csv-editor-search-field">
-          <span>Search</span>
+          <span>{t('csv.search')}</span>
           <input
             type="search"
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
-            placeholder="Filter rows across all columns…"
+            placeholder={t('csv.searchPlaceholder')}
           />
         </label>
         <label className="csv-editor-check">
           <input type="checkbox" checked={useRegex} onChange={(e) => setUseRegex(e.target.checked)} />
-          Regex
+          {t('csv.regex')}
         </label>
         <button type="button" className="btn small" onClick={() => setShowFindReplace(true)}>
-          Find / replace
+          {t('csv.findReplace')}
         </button>
-        <button type="button" className="btn small" onClick={() => updateTable(trimWhitespace(table), 'Trimmed whitespace.')}>
-          Trim spaces
+        <button
+          type="button"
+          className="btn small"
+          onClick={() => updateTable(trimWhitespace(table), t('csv.status.trimmed'), true)}
+        >
+          {t('csv.trimSpaces')}
         </button>
         <button type="button" className="btn small" onClick={handleDeduplicate}>
-          Deduplicate
+          {t('csv.deduplicate')}
         </button>
         <button type="button" className="btn small" onClick={handleTagColumn}>
-          Add tag column
+          {t('csv.addTagColumn')}
         </button>
         <button type="button" className="btn small" onClick={handleAutoNumber}>
-          Auto-number
+          {t('csv.autoNumber')}
         </button>
       </div>
 
@@ -692,23 +792,23 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
         <textarea
           ref={pasteRef}
           className="csv-editor-paste"
-          placeholder="Paste CSV / TSV here and click Load"
+          placeholder={t('csv.pastePlaceholder')}
           rows={2}
           spellCheck={false}
           lang={getActiveProfile().targetLang}
         />
         <button type="button" className="btn" onClick={handlePasteArea}>
-          Load paste
+          {t('csv.loadPaste')}
         </button>
       </div>
 
       <div className="csv-editor-col-tools">
-        <span className="muted csv-editor-col-tools-label">Columns:</span>
+        <span className="muted csv-editor-col-tools-label">{t('csv.columns')}</span>
         <button type="button" className="btn small" onClick={handleSplitColumn}>
-          Split
+          {t('csv.split')}
         </button>
         <button type="button" className="btn small" onClick={handleMergeColumns}>
-          Merge
+          {t('csv.merge')}
         </button>
         <button
           type="button"
@@ -719,7 +819,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
             setMapping((m) => remapMappingOnInsert(m, next.headers.length - 1));
           }}
         >
-          + Column
+          {t('csv.addColumn')}
         </button>
         <button
           type="button"
@@ -731,18 +831,21 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
             setMapping((m) => remapMappingOnDelete(m, idx));
           }}
         >
-          Delete column
+          {t('csv.deleteColumn')}
         </button>
       </div>
 
       <p className="muted csv-editor-stats">
-        {filteredRowIndices.length} / {stats.rows} row{stats.rows === 1 ? '' : 's'} shown · {stats.columns} column
-        {stats.columns === 1 ? '' : 's'} · deck id {deckBookId(title)}
-        {dirty && ' · unsaved changes'}
+        {t('csv.stats.rowsShown', { shown: filteredRowIndices.length, count: stats.rows })}
+        {' · '}
+        {t('csv.stats.cols', { count: stats.columns })}
+        {' · '}
+        {t('csv.stats.deckId', { id: deckBookId(title) })}
+        {dirty && t('csv.unsavedSuffix')}
         {persistState !== 'idle' && (
           <span className={`csv-editor-autosave ${persistState}`}>
             <span className="csv-editor-autosave-dot" aria-hidden />
-            {persistState === 'saving' ? 'Saving…' : 'Saved'}
+            {persistState === 'saving' ? t('csv.autosave.saving') : t('csv.autosave.saved')}
           </span>
         )}
       </p>
@@ -764,11 +867,11 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
                     <select
                       value={mapping[col] ?? 'skip'}
                       onChange={(e) => updateMapping(col, e.target.value as DeckFieldKey)}
-                      aria-label={`Map ${table.headers[col]}`}
+                      aria-label={t('csv.mapAria', { header: table.headers[col] })}
                     >
                       {DECK_FIELD_OPTIONS.map((opt) => (
                         <option key={opt.id} value={opt.id}>
-                          {opt.label}
+                          {t(`csv.field.${opt.id}`)}
                         </option>
                       ))}
                     </select>
@@ -784,8 +887,8 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
                       onChange={(e) =>
                         setColumnFilters((prev) => ({ ...prev, [col]: e.target.value }))
                       }
-                      placeholder="Filter…"
-                      aria-label={`Filter ${table.headers[col]}`}
+                      placeholder={t('csv.filterPlaceholder')}
+                      aria-label={t('csv.filterAria', { header: table.headers[col] })}
                     />
                   </th>
                 ))}
@@ -803,7 +906,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
                     onContextMenu={(e) => openContextMenu(e, null, col)}
                   >
                     <div className="csv-editor-col-head-inner">
-                      <span className="csv-editor-drag-handle" title="Drag to reorder" aria-hidden>
+                      <span className="csv-editor-drag-handle" title={t('csv.dragReorder')} aria-hidden>
                         ::
                       </span>
                       <input
@@ -815,13 +918,13 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
                       <button
                         type="button"
                         className="csv-editor-vis-btn"
-                        title={hiddenColumns.has(col) ? 'Show column' : 'Hide column'}
+                        title={hiddenColumns.has(col) ? t('csv.showColumn') : t('csv.hideColumn')}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleColumnVisibility(col);
                         }}
                       >
-                        {hiddenColumns.has(col) ? 'Show' : 'Hide'}
+                        {hiddenColumns.has(col) ? t('csv.show') : t('csv.hide')}
                       </button>
                     </div>
                   </th>
@@ -874,10 +977,10 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
 
       {hiddenColumns.size > 0 && (
         <div className="csv-editor-hidden-cols">
-          <span className="muted">Hidden columns:</span>
+          <span className="muted">{t('csv.hiddenColumns')}</span>
           {[...hiddenColumns].sort((a, b) => a - b).map((col) => (
             <button key={col} type="button" className="btn small subtle" onClick={() => toggleColumnVisibility(col)}>
-              {table.headers[col] || `Column ${col + 1}`}
+              {table.headers[col] || t('csv.columnN', { n: col + 1 })}
             </button>
           ))}
         </div>
@@ -885,7 +988,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
 
       <div className="csv-editor-row-actions">
         <button type="button" className="btn small" onClick={() => updateTable(insertRow(table, table.rows.length))}>
-          + Row
+          {t('csv.addRow')}
         </button>
         <button
           type="button"
@@ -897,7 +1000,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
             setSelectedRow(null);
           }}
         >
-          Delete row
+          {t('csv.deleteRow')}
         </button>
         <button
           type="button"
@@ -906,15 +1009,15 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
             const empty = emptyTable(4, 8);
             commit({ table: empty, title, hiddenColumns: [] });
             setHiddenColumns(new Set());
-            setStatus('');
+            setStatusMsg('');
           }}
         >
-          Clear grid
+          {t('csv.clearGrid')}
         </button>
       </div>
 
       {status && (
-        <p className={`csv-editor-status${status.includes('Imported') || status.startsWith('Saved') ? ' ok' : ''}`}>
+        <p className={`csv-editor-status${statusOk ? ' ok' : ''}`}>
           {status}
         </p>
       )}
@@ -945,13 +1048,13 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
           role="menu"
         >
           <button type="button" role="menuitem" onClick={() => handleCaseChange('upper')}>
-            UPPERCASE
+            {t('csv.ctx.upper')}
           </button>
           <button type="button" role="menuitem" onClick={() => handleCaseChange('lower')}>
-            lowercase
+            {t('csv.ctx.lower')}
           </button>
           <button type="button" role="menuitem" onClick={() => handleCaseChange('title')}>
-            Title Case
+            {t('csv.ctx.title')}
           </button>
           {contextMenu.colIndex !== null && (
             <button
@@ -963,7 +1066,7 @@ export default function CsvEditorPanel({ onDeckImported }: Props) {
                 setContextMenu(null);
               }}
             >
-              Split column…
+              {t('csv.ctx.split')}
             </button>
           )}
         </div>

@@ -22,10 +22,14 @@ import Icon, { type IconName } from './Icons';
 import DesktopSettings, { type WallChoice } from './DesktopSettings';
 import NotificationCenter from './shell/NotificationCenter';
 import NotificationBell from './shell/NotificationBell';
+import WiredGlobe from './shell/WiredGlobe';
+import { getNotifications, notify, onNotificationsChanged } from '../notificationStore';
 import QuickSettings from './shell/QuickSettings';
 import AeroBootOverlay from './shell/AeroBootOverlay';
+import WiredArchiveBootOverlay from './shell/WiredArchiveBootOverlay';
+import WiredBreachOverlay from './shell/WiredBreachOverlay';
 import DesktopLayerHost from './shell/DesktopLayerHost';
-import { ContextMenu, confirmDialog, alertDialog } from './ui';
+import { ContextMenu, confirmDialog, alertDialog, useAppMaterialSet } from './ui';
 import {
   commitLayout,
   getActiveDesktopIndex,
@@ -44,14 +48,22 @@ import {
 } from '../desktopPrefs';
 import { requestSecretLifecycleRestart, requestSecretLifecycleSleep } from '../secretLifecycle';
 import { exitSecretAero } from '../theme/SecretAeroTrigger';
-import { EnvironmentStack, WALL_PRESETS, loadEnvironment, saveEnvironment } from '../environment';
+import {
+  requestWiredArchiveRestart,
+  requestWiredArchiveShutdown,
+  requestWiredArchiveSleep,
+} from '../wiredArchiveLifecycle';
+import { EnvironmentStack, WALL_PRESETS, loadEnvironment, onEnvironmentChanged } from '../environment';
 import BuddyToast from '../environment/BuddyToast';
+import AeroFindingOverlay from './shell/AeroFindingOverlay';
+import WiredFindingOverlay from './shell/WiredFindingOverlay';
 import { startCompanionOsBridge, stopCompanionOsBridge } from '../environment/companionOsBridge';
 import { startAchievementWatcher } from '../environment/achievements';
 import { startNoctisLightBridge } from '../environment/noctisLightBridge';
 import { loadPersonalization, onPersonalizationChanged } from '../osPersonalization';
 import { syncPillarboxWallImage } from '../pillarboxSettings';
 import { getZoomFactor } from '../appZoom';
+import { perfSetInteracting } from '../perf/perfHub';
 import {
   addUserWallpaper,
   loadUserWallpapers,
@@ -62,9 +74,9 @@ import {
 import { useT } from '../i18n';
 
 type WinSection =
-  | 'library' | 'novels' | 'dictionary' | 'grammar' | 'translate'
-  | 'player' | 'music' | 'anki' | 'flashcards' | 'stats' | 'resources' | 'settings' | 'note'
-  | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar';
+  | 'library' | 'novels' | 'dictionary' | 'grammar' | 'notebook' | 'translate'
+  | 'player' | 'video' | 'music' | 'anki' | 'flashcards' | 'stats' | 'resources' | 'settings' | 'note'
+  | 'games' | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar' | 'reading' | 'youtube';
 
 interface Win {
   id: string;
@@ -72,8 +84,17 @@ interface Win {
   x: number; y: number; w: number; h: number; z: number;
   min?: boolean;
   max?: boolean;
+  /** Always-on-top: rendered in a z band above every unpinned window. */
+  pin?: boolean;
   rect?: { x: number; y: number; w: number; h: number };
 }
+
+/**
+ * Pinned windows render at PIN_Z_BASE + z. Ordinary z counts up from 1 per
+ * focus, so a band this high can never be reached by normal stacking, and
+ * pinned windows still order among themselves by their own focus history.
+ */
+const PIN_Z_BASE = 1_000_000;
 
 interface DeskIcon {
   id: string;
@@ -96,15 +117,20 @@ interface NoteData {
 // translation serves both surfaces rather than drifting into two catalogs.
 const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'player', labelKey: 'palette.section.player', glyph: 'player' },
+  { id: 'video', labelKey: 'palette.section.video', glyph: 'video' },
+  { id: 'youtube', labelKey: 'palette.section.youtube', glyph: 'player' },
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
   { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
   { id: 'library', labelKey: 'palette.section.library', glyph: 'library' },
   { id: 'novels', labelKey: 'palette.section.novels', glyph: 'novels' },
+  { id: 'reading', labelKey: 'palette.section.reading', glyph: 'search' },
   { id: 'translate', labelKey: 'palette.section.translate', glyph: 'translate' },
   { id: 'grammar', labelKey: 'palette.section.grammar', glyph: 'grammar' },
+  { id: 'notebook', labelKey: 'palette.section.notebook', glyph: 'note' },
   { id: 'anki', labelKey: 'palette.section.anki', glyph: 'anki' },
   { id: 'flashcards', labelKey: 'palette.section.flashcards', glyph: 'flashcards' },
+  { id: 'games', labelKey: 'palette.section.games', glyph: 'dice' },
   { id: 'stats', labelKey: 'palette.section.stats', glyph: 'stats' },
   { id: 'calendar', labelKey: 'palette.section.calendar', glyph: 'calendar' },
   { id: 'resources', labelKey: 'palette.section.resources', glyph: 'resources' },
@@ -112,24 +138,73 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
 ];
 
-const START_PRIMARY_SECTIONS: WinSection[] = ['immersion', 'dictionary', 'grammar', 'flashcards', 'anki', 'player'];
+const START_PRIMARY_SECTIONS: WinSection[] = [
+  'immersion',
+  'library',
+  'dictionary',
+  'grammar',
+  'flashcards',
+  'anki',
+  'video',
+  'youtube',
+  'player',
+];
 const START_HINTS: Partial<Record<WinSection, string>> = {
-  player: 'Japanese subtitle desk',
+  player: 'Media library',
+  video: 'Subtitle learning player',
+  youtube: 'Immersion playlists',
   music: 'Listening room',
   dictionary: 'Lookup and pitch',
+  grammar: 'Reference, Practice, guides',
+  notebook: 'Unified study history',
   immersion: 'Live reader browser',
-  library: 'Local files',
+  library: 'Local files & Reader Inbox',
   novels: 'Reading shelf',
+  reading: 'Level-matched web reading',
   translate: 'Sentence tools',
-  grammar: 'JLPT patterns',
   anki: 'Card export',
   flashcards: 'Review queues',
+  games: 'Fast recall drills',
   stats: 'Progress charts',
   calendar: 'Study schedule',
   resources: 'Reference hub',
   settings: 'Control panel',
   city: 'Night desktop',
 };
+
+const WIRED_MODULES: Partial<Record<WinSection, { code: string; name: string; hint: string; ready: string }>> = {
+  player: { code: 'SIG-LIB', name: 'Signal Library', hint: 'Local media catalog', ready: 'LIB READY' },
+  video: { code: 'SIG-VID', name: 'Signal Archive', hint: 'Recovered field recordings', ready: 'SIGNAL READY' },
+  youtube: { code: 'YT-DIP', name: 'Playlist Tracker', hint: 'Immersion playlist sync', ready: 'LIST READY' },
+  music: { code: 'AUD-DAT', name: 'Audio Deck', hint: 'DAT catalog / ear calibration', ready: 'DECK LINKED' },
+  dictionary: { code: 'LEX', name: 'Lexeme Analyzer', hint: 'Corpus index / probe terminal', ready: 'INDEX READY' },
+  immersion: { code: 'FEED', name: 'Immersion Feed', hint: 'Remote node monitor', ready: 'FEED DEGRADED' },
+  library: { code: 'ARCH', name: 'Archive Bay', hint: 'Mounted local files', ready: 'BAY MOUNTED' },
+  novels: { code: 'DOC', name: 'Classified Text', hint: 'Recovered documents', ready: 'TEXT VIEWER READY' },
+  reading: { code: 'FIND', name: 'Reading Locator', hint: 'Comprehension-matched web texts', ready: 'LOCATOR READY' },
+  translate: { code: 'TRN', name: 'Signal Translator', hint: 'Transmission decoder', ready: 'CHANNEL READY' },
+  grammar: { code: 'SYN', name: 'Syntax Diagnostics', hint: 'Parse and dependency unit', ready: 'ANALYZER READY' },
+  anki: { code: 'MEM', name: 'Memory Sync', hint: 'SRS implant bridge', ready: 'SYNC LINKED' },
+  flashcards: { code: 'SIM', name: 'Training Simulator', hint: 'Retention drill protocol', ready: 'SIM READY' },
+  stats: { code: 'TEL', name: 'Telemetry', hint: 'Operator performance matrix', ready: 'METRICS LIVE' },
+  calendar: { code: 'OPS', name: 'Schedule', hint: 'Operations planning grid', ready: 'OPS READY' },
+  resources: { code: 'LINK', name: 'Uplink Directory', hint: 'External relay nodes', ready: 'NODES LISTED' },
+  settings: { code: 'SYS', name: 'Service Panel', hint: 'Machine configuration', ready: 'SERVICE MODE' },
+  games: { code: 'DRILL', name: 'Training Lab', hint: 'Fast recall exercise bay', ready: 'DRILL READY' },
+  city: { code: 'NOCTIS', name: 'Observation Node', hint: 'Civilization mirror', ready: 'MIRROR WAITING' },
+  musicwidget: { code: 'AUD-MINI', name: 'Mini Audio Deck', hint: 'Compact transport module', ready: 'AUDIO READY' },
+  visualizer: { code: 'OSC', name: 'Visualizer Scope', hint: 'Waveform monitor', ready: 'SCOPE READY' },
+  note: { code: 'NOTE', name: 'Field Note', hint: 'Monitor tape annotation', ready: 'NOTE OPEN' },
+};
+
+function wiredModule(section: WinSection): { code: string; name: string; hint: string; ready: string } {
+  return WIRED_MODULES[section] ?? { code: section.toUpperCase(), name: section, hint: 'Module route', ready: 'READY' };
+}
+
+function wiredModuleLabel(section: WinSection): string {
+  const meta = wiredModule(section);
+  return `${meta.code} / ${meta.name}`;
+}
 
 const WALLPAPERS = WALL_PRESETS;
 
@@ -146,6 +221,12 @@ const WIN_SNAP = 26;
 const START_APP_DND = 'text/x-study-os-app';
 
 type AppMeta = { id: WinSection; labelKey: string; glyph: IconName };
+
+type WinAnimPhase = 'opening' | 'closing' | 'minimizing';
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 function zoomFactor(): number {
   return getZoomFactor();
@@ -280,6 +361,7 @@ function winFromSnapshot(win: WindowSnapshot): Win {
     z: win.z,
     min: !win.visible,
     max: win.maximized,
+    pin: win.pinned,
     rect: win.restoreRect,
   };
 }
@@ -295,6 +377,7 @@ function winToSnapshot(win: Win): WindowSnapshot {
     z: win.z,
     visible: !win.min,
     maximized: !!win.max,
+    pinned: !!win.pin,
     restoreRect: win.rect,
   };
 }
@@ -421,7 +504,10 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   // enough — every call site below reads it fresh at render time, unlike the
   // CommandPalette/SettingsSearch memos that needed `lang` as an explicit dep.
   const { t } = useT();
+  const material = useAppMaterialSet();
+  const wired = material === 'wired';
   const deskRef = useRef<HTMLDivElement>(null);
+  const taskbarRef = useRef<HTMLDivElement>(null);
   const hydrating = useRef(true);
   const winsRef = useRef<Win[]>([]);
   const notesRef = useRef<Record<string, NoteData>>({});
@@ -444,6 +530,11 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   };
   const [activeDesktop, setActiveDesktop] = useState<DesktopIndex>(getActiveDesktopIndex());
   const [wins, setWins] = useState<Win[]>([]);
+  // Window lifecycle phases (WIRED_BESPOKE_SPEC §2). Theme-neutral and purely
+  // additive: only wired gets a non-zero phase duration, so aero/base keep
+  // their instant open/close/minimize behavior.
+  const [winAnim, setWinAnim] = useState<Record<string, WinAnimPhase>>({});
+  const winAnimTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [icons, setIcons] = useState<DeskIcon[]>([]);
   const [notes, setNotes] = useState<Record<string, NoteData>>({});
   const [widgets, setWidgets] = useState<WidgetSnapshot[]>([]);
@@ -461,6 +552,26 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   const [wallDim, setWallDim] = useState(() => loadPersonalization().wallpaperDim);
   /** Living-layer wallpaper rotation is painting the desk background. */
   const [wallFromEnv, setWallFromEnv] = useState(false);
+  /** Session pin: shell wallpaper wins without permanently clearing living rotation. */
+  const [pinShellWall, setPinShellWall] = useState(false);
+
+  useEffect(() => {
+    // Clear the session shell-wall pin when living wallpaper is (re)enabled in Settings.
+    let prev = (() => {
+      try {
+        const e = loadEnvironment();
+        return { enabled: e.enabled, rotation: e.rotationEnabled };
+      } catch {
+        return { enabled: false, rotation: false };
+      }
+    })();
+    return onEnvironmentChanged((env) => {
+      if ((!prev.enabled && env.enabled) || (!prev.rotation && env.rotationEnabled)) {
+        setPinShellWall(false);
+      }
+      prev = { enabled: env.enabled, rotation: env.rotationEnabled };
+    });
+  }, []);
   const [userWalls, setUserWalls] = useState<UserWallpaper[]>(() => loadUserWallpapers());
   const [userWallThumbs, setUserWallThumbs] = useState<Record<string, string>>({});
   const [viz, setViz] = useState<VizSettings>(loadVizSettings);
@@ -724,9 +835,52 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     setWins((ws) => ws.map((w) => (w.id === id ? { ...w, z: ++zTop.current, min: false } : w)));
   const patch = (id: string, p: Partial<Win>) =>
     setWins((ws) => ws.map((w) => (w.id === id ? { ...w, ...p } : w)));
+
+  // §2 lifecycle helpers: stamp a phase class on the window, then run the real
+  // mutation after the phase duration. Duration 0 (non-wired) mutates inline.
+  const beginWinAnim = (id: string, phase: WinAnimPhase, ms: number, onDone?: () => void) => {
+    const timer = winAnimTimers.current.get(id);
+    if (timer) clearTimeout(timer);
+    setWinAnim((m) => ({ ...m, [id]: phase }));
+    winAnimTimers.current.set(
+      id,
+      setTimeout(() => {
+        winAnimTimers.current.delete(id);
+        setWinAnim((m) => {
+          const next = { ...m };
+          delete next[id];
+          return next;
+        });
+        onDone?.();
+      }, ms),
+    );
+  };
+  const winPhaseMs = (openPhase: boolean): number =>
+    !wired ? 0 : prefersReducedMotion() ? 80 : openPhase ? 620 : 360;
+  useEffect(
+    () => () => {
+      winAnimTimers.current.forEach((timer) => clearTimeout(timer));
+      winAnimTimers.current.clear();
+    },
+    [],
+  );
+
   const close = (id: string) => {
+    const delay = winPhaseMs(false);
+    if (delay > 0) {
+      if (winAnim[id] === 'closing') return;
+      window.dispatchEvent(new CustomEvent('shell:windowClose'));
+      beginWinAnim(id, 'closing', delay, () => removeWin(id, { silent: true }));
+      return;
+    }
+    removeWin(id);
+  };
+  const removeWin = (id: string, opts?: { silent?: boolean }) => {
     const closing = winsRef.current.find((w) => w.id === id);
-    window.dispatchEvent(new CustomEvent('shell:windowClose'));
+    if (!opts?.silent) window.dispatchEvent(new CustomEvent('shell:windowClose'));
+    if (wired && closing && closing.section !== 'note') {
+      notify({ message: `MODULE ${wiredModule(closing.section).code} UNMOUNTED`, source: 'SHELL', silent: true });
+    }
     setWins((ws) => ws.filter((w) => w.id !== id));
     if (id.startsWith('note-')) {
       setNotes((n) => {
@@ -752,6 +906,13 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     }
   };
   const minimize = (id: string) => {
+    const delay = winPhaseMs(false);
+    if (delay > 0) {
+      if (winAnim[id] === 'minimizing') return;
+      window.dispatchEvent(new CustomEvent('shell:windowMinimize'));
+      beginWinAnim(id, 'minimizing', delay, () => patch(id, { min: true }));
+      return;
+    }
     window.dispatchEvent(new CustomEvent('shell:windowMinimize'));
     patch(id, { min: true });
   };
@@ -798,6 +959,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     setNotes((prev) => ({ ...prev, [id]: { text: '', color: NOTE_COLORS[count % NOTE_COLORS.length] } }));
     const n = winsRef.current.length % 5;
     setWins((ws) => [...ws, { id, section: 'note', x: 260 + n * 30, y: 60 + n * 28, w: 260, h: 220, z: ++zTop.current }]);
+    const openMs = winPhaseMs(true);
+    if (openMs > 0) beginWinAnim(id, 'opening', openMs);
     setStartOpen(false);
   };
 
@@ -811,15 +974,22 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       void window.api.popOut(section);
       return;
     }
+    // New window (not a re-focus): run the §2 "module powers on" phase.
+    if (!winsRef.current.some((w) => w.section === section)) {
+      const openMs = winPhaseMs(true);
+      if (openMs > 0) beginWinAnim(section, 'opening', openMs);
+      // §4 bulletin: passive log-only entry, never toasts or blinks the lamp.
+      if (wired) notify({ message: `MODULE ${wiredModule(section).code} MOUNTED`, source: 'SHELL', silent: true });
+    }
     setWins((ws) => {
       const existing = ws.find((w) => w.section === section);
       if (existing) return ws.map((w) => (w.id === existing.id ? { ...w, z: ++zTop.current, min: false } : w));
       const { w: dw, h: dh } = deskSize();
       const n = ws.length % 6;
       const wantW =
-        section === 'visualizer' ? 380 : section === 'musicwidget' ? 430 : section === 'music' ? 980 : section === 'settings' ? 960 : section === 'city' ? 960 : 820;
+        section === 'visualizer' ? 380 : section === 'musicwidget' ? 430 : section === 'music' ? 980 : section === 'youtube' ? 980 : section === 'settings' ? 960 : section === 'city' ? 960 : section === 'games' ? 980 : 820;
       const wantH =
-        section === 'visualizer' ? 200 : section === 'musicwidget' ? 190 : section === 'music' ? 640 : section === 'settings' ? 680 : section === 'city' ? 640 : 580;
+        section === 'visualizer' ? 200 : section === 'musicwidget' ? 190 : section === 'music' ? 640 : section === 'youtube' ? 640 : section === 'settings' ? 680 : section === 'city' ? 640 : section === 'games' ? 660 : 580;
       return [
         ...ws,
         {
@@ -869,7 +1039,11 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   // effect binds once.
   const addWidgetRef = useRef(addWidget);
   addWidgetRef.current = addWidget;
-  const switchDesktopRef = useRef<(target: DesktopIndex) => Promise<void>>(async () => {});
+  // close captures wired/winAnim (lifecycle phases), so the bind-once handlers
+  // below must go through a ref to stay fresh.
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  const switchDesktopRef = useRef<(target: DesktopIndex) => Promise<void>>(() => Promise.resolve());
 
   useEffect(() => {
     const onWidgets = () => setGalleryOpen((o) => !o);
@@ -878,7 +1052,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       const ws = winsRef.current.filter((w) => !w.min);
       if (!ws.length) return;
       const top = ws.reduce((a, b) => (b.z > a.z ? b : a));
-      close(top.id);
+      closeRef.current(top.id);
     };
     const onCycle = (e: Event) => {
       const dir = ((e as CustomEvent<number>).detail ?? 1) >= 0 ? 1 : -1;
@@ -921,6 +1095,138 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         patch(prev.id, { max: true, min: false });
       }
     };
+    // Window-management shortcuts (Settings → Shortcuts → Window). One event
+    // with an action tag; geometry maths all run against the live desk size so
+    // snapping stays correct after a resize or a taskbar height change.
+    const onWindowAction = (e: Event) => {
+      const action = (e as CustomEvent<string>).detail;
+      const all = winsRef.current;
+      const open = all.filter((w) => !w.min);
+      const topWin = open.length ? open.reduce((a, b) => (b.z > a.z ? b : a)) : null;
+      const { w: dw, h: dh } = deskSize();
+
+      // Remember pre-snap geometry once, so restore returns to the real size
+      // rather than to whatever half-screen the last snap left behind.
+      const withRestore = (w: Win): Partial<Win> =>
+        w.rect ? {} : { rect: { x: w.x, y: w.y, w: w.w, h: w.h } };
+
+      switch (action) {
+        case 'maximize': {
+          if (!topWin) return;
+          if (topWin.max) {
+            const r = topWin.rect;
+            patch(topWin.id, r ? { max: false, ...r, rect: undefined } : { max: false });
+          } else {
+            patch(topWin.id, { max: true, min: false, ...withRestore(topWin) });
+          }
+          return;
+        }
+        case 'minimize':
+          if (topWin) patch(topWin.id, { min: true });
+          return;
+        case 'snapLeft':
+        case 'snapRight': {
+          if (!topWin) return;
+          const left = action === 'snapLeft';
+          // Half → quarter → half. Repeating the same shortcut narrows the
+          // window instead of doing nothing, which is what Windows 11 does.
+          const half = Math.round(dw / 2);
+          const quarter = Math.round(dw / 4);
+          const atHalf = Math.abs(topWin.w - half) < 8 && Math.abs(topWin.h - dh) < 8;
+          const width = atHalf ? quarter : half;
+          patch(topWin.id, {
+            max: false,
+            min: false,
+            x: left ? 0 : dw - width,
+            y: 0,
+            w: width,
+            h: dh,
+            ...withRestore(topWin),
+          });
+          return;
+        }
+        case 'center': {
+          if (!topWin) return;
+          const w = Math.min(topWin.rect?.w ?? topWin.w, Math.round(dw * 0.72));
+          const h = Math.min(topWin.rect?.h ?? topWin.h, Math.round(dh * 0.82));
+          patch(topWin.id, {
+            max: false,
+            min: false,
+            w,
+            h,
+            x: Math.round((dw - w) / 2),
+            y: Math.round((dh - h) / 2),
+            rect: undefined,
+          });
+          return;
+        }
+        case 'tileAll': {
+          if (!open.length) return;
+          const cols = Math.ceil(Math.sqrt(open.length));
+          const rows = Math.ceil(open.length / cols);
+          const cw = Math.floor(dw / cols);
+          const ch = Math.floor(dh / rows);
+          const ordered = [...open].sort((a, b) => a.z - b.z);
+          setWins((ws) =>
+            ws.map((w) => {
+              const i = ordered.findIndex((o) => o.id === w.id);
+              if (i < 0) return w;
+              return {
+                ...w,
+                max: false,
+                x: (i % cols) * cw,
+                y: Math.floor(i / cols) * ch,
+                w: cw,
+                h: ch,
+                rect: undefined,
+              };
+            }),
+          );
+          return;
+        }
+        case 'cascade': {
+          if (!open.length) return;
+          const step = 34;
+          const cw = Math.round(dw * 0.62);
+          const ch = Math.round(dh * 0.68);
+          const ordered = [...open].sort((a, b) => a.z - b.z);
+          setWins((ws) =>
+            ws.map((w) => {
+              const i = ordered.findIndex((o) => o.id === w.id);
+              if (i < 0) return w;
+              return {
+                ...w,
+                max: false,
+                // Wrap before running off the bottom-right of the desk.
+                x: Math.min((i * step) % Math.max(1, dw - cw), dw - cw),
+                y: Math.min((i * step) % Math.max(1, dh - ch), dh - ch),
+                w: cw,
+                h: ch,
+                rect: undefined,
+              };
+            }),
+          );
+          return;
+        }
+        case 'showDesktop':
+          setWins((ws) => ws.map((w) => ({ ...w, min: true })));
+          return;
+        case 'restoreAll':
+          setWins((ws) => ws.map((w) => ({ ...w, min: false })));
+          return;
+        case 'pinTop': {
+          if (!topWin) return;
+          patch(topWin.id, { pin: !topWin.pin });
+          return;
+        }
+        case 'closeAll':
+          all.forEach((w) => closeRef.current(w.id));
+          return;
+        default:
+          return;
+      }
+    };
+    window.addEventListener('os:window', onWindowAction);
     window.addEventListener('os:widgets', onWidgets);
     window.addEventListener('os:add-widget', onAddWidget);
     window.addEventListener('os:close-window', onCloseWin);
@@ -928,6 +1234,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     window.addEventListener('os:switch-desktop', onSwitchDesktop);
     window.addEventListener('os:cycle-app-fullscreen', onCycleAppFullscreen);
     return () => {
+      window.removeEventListener('os:window', onWindowAction);
       window.removeEventListener('os:widgets', onWidgets);
       window.removeEventListener('os:add-widget', onAddWidget);
       window.removeEventListener('os:close-window', onCloseWin);
@@ -992,13 +1299,10 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
 
   /** User-chosen walls must not stay hidden under living-layer rotation. */
   const releaseEnvWallpaper = () => {
+    // Session-only pin — do NOT persist rotationEnabled:false or living wallpaper
+    // prefs are wiped across restarts / look "lost" after picking a static wall.
+    setPinShellWall(true);
     setWallFromEnv(false);
-    try {
-      const env = loadEnvironment();
-      if (env.rotationEnabled) saveEnvironment({ rotationEnabled: false });
-    } catch {
-      /* ignore */
-    }
   };
 
   const setPreset = (id: string) => {
@@ -1246,7 +1550,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     const grid = deskPrefs.snapGrid;
     // Compositor-only transform during gesture; snap live so the grid feels solid.
     el.style.willChange = 'transform';
-    document.documentElement.classList.add('os-interacting');
+    perfSetInteracting(true);
     const move = (ev: PointerEvent) => {
       const local = clientToDeskLocal(desk, ev.clientX, ev.clientY);
       const rawX = local.x - grabX;
@@ -1266,7 +1570,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       if (raf != null) cancelAnimationFrame(raf);
-      document.documentElement.classList.remove('os-interacting');
+      perfSetInteracting(false);
       el.style.transform = '';
       el.style.willChange = '';
       if (moved) {
@@ -1303,6 +1607,25 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   })();
 
   const topZ = wins.length ? Math.max(...wins.map((w) => w.z)) : 0;
+
+  // §2 app switch: when the focused window changes under wired, send one
+  // wm-rail-pulse across the taskbar (one-shot animation retriggered by
+  // stamping data-pulse) and let shellSounds route the cue.
+  const focusedWinId = wins.find((w) => w.z === topZ && !w.min)?.id ?? null;
+  const lastFocusedRef = useRef<string | null>(focusedWinId);
+  useEffect(() => {
+    if (focusedWinId === lastFocusedRef.current) return;
+    lastFocusedRef.current = focusedWinId;
+    if (!wired || !focusedWinId || hydrating.current) return;
+    const bar = taskbarRef.current;
+    if (bar && !prefersReducedMotion()) {
+      bar.removeAttribute('data-pulse');
+      void bar.offsetWidth;
+      bar.setAttribute('data-pulse', '');
+    }
+    window.dispatchEvent(new CustomEvent('shell:appSwitch'));
+  }, [focusedWinId, wired]);
+
   const visibleWidgets = widgets.filter((w) => !w.hidden);
   const hiddenWidgets = widgets.filter((w) => w.hidden);
   const topWidgetZ = visibleWidgets.length ? Math.max(...visibleWidgets.map((w) => w.z)) : 0;
@@ -1313,6 +1636,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
 
   const renderAeroStartApp = (app: AppMeta, tone: 'program' | 'place') => {
     const pinned = isAppPinned(app.id);
+    const wiredMeta = wired ? wiredModule(app.id) : null;
     return (
       <div
         key={app.id}
@@ -1331,8 +1655,10 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
             <Icon name={app.glyph} size={tone === 'program' ? 22 : 18} />
           </span>
           <span className="os-start-aero-copy">
-            <span className="os-start-aero-name">{app.label}</span>
-            <span className="os-start-aero-hint">{START_HINTS[app.id] ?? 'Study app'}</span>
+            <span className="os-start-aero-name">{wiredMeta ? wiredMeta.code : t(app.labelKey)}</span>
+            <span className="os-start-aero-hint">
+              {wiredMeta ? `${wiredMeta.name} / ${wiredMeta.hint}` : START_HINTS[app.id] ?? 'Study app'}
+            </span>
           </span>
         </button>
         <button
@@ -1350,6 +1676,15 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
 
   const switchDesktop = async (target: DesktopIndex) => {
     if (target === activeDesktop) return;
+    // §3 workspace switch: routing pulse across the machine rail.
+    if (wired && !prefersReducedMotion()) {
+      const bar = taskbarRef.current;
+      if (bar) {
+        bar.removeAttribute('data-pulse');
+        void bar.offsetWidth;
+        bar.setAttribute('data-pulse', '');
+      }
+    }
     hydrating.current = true;
     // Cancel any pending debounced commit — we flush the current layout
     // explicitly right here before switching.
@@ -1373,24 +1708,36 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
 
   const sleepSecretOs = () => {
     setStartOpen(false);
-    requestSecretLifecycleSleep();
+    if (wired) requestWiredArchiveSleep();
+    else requestSecretLifecycleSleep();
   };
 
   const restartSecretOs = async () => {
     const ok = await confirmDialog({
-      title: 'Restart Secret OS',
-      message: 'Restart the Secret OS desktop sequence? Open apps and desktop layout stay in place.',
+      title: wired ? 'Restart WIRED ARCHIVE' : 'Restart Secret OS',
+      message: wired
+        ? 'Restart the WIRED ARCHIVE boot sequence? Open modules and desktop layout stay in place.'
+        : 'Restart the Secret OS desktop sequence? Open apps and desktop layout stay in place.',
       confirmLabel: 'Restart',
     });
     if (!ok) return;
     setStartOpen(false);
-    requestSecretLifecycleRestart();
+    if (wired) requestWiredArchiveRestart();
+    else requestSecretLifecycleRestart();
   };
 
   const shutdownSecretOs = async () => {
+    // WIRED confirms in-fiction: the breach overlay IS the prompt, and it
+    // offers three destinations rather than a yes/no. A generic dialog in front
+    // of it would ask the same question twice and break the moment.
+    if (wired) {
+      setStartOpen(false);
+      requestWiredArchiveShutdown();
+      return;
+    }
     const ok = await confirmDialog({
       title: 'Shut down Secret OS',
-      message: 'Return to the previous Study OS theme and restore the pre-Aero desktop atmosphere?',
+      message: 'Return to the previous GrammarX theme and restore the pre-Aero desktop atmosphere?',
       confirmLabel: 'Shut down',
     });
     if (!ok) return;
@@ -1401,7 +1748,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   return (
     <div
       ref={deskRef}
-      className={`os-desktop ${animated ? 'wall-animated' : ''}${wallFromEnv ? ' wall-from-env' : ''}${startAppDragging ? ' start-app-drop' : ''}`}
+      className={`os-desktop ${animated ? 'wall-animated' : ''}${wallFromEnv ? ' wall-from-env' : ''}${startAppDragging ? ' start-app-drop' : ''}${wired ? ' os-desktop-wired' : ''}`}
       style={deskStyle}
       onDragOver={(e) => {
         if (!isStartAppDrag(e.dataTransfer) && !startAppDragging) return;
@@ -1442,7 +1789,16 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         <video className="os-wall-video" src={wallVideo} autoPlay loop muted playsInline />
       )}
 
-      <EnvironmentStack onRotationActive={(active) => setWallFromEnv(active)} />
+      <EnvironmentStack
+        suppressWallpaper={pinShellWall}
+        onRotationActive={(active) => {
+          if (pinShellWall) {
+            setWallFromEnv(false);
+            return;
+          }
+          setWallFromEnv(active);
+        }}
+      />
       <BuddyToast />
       <NotificationCenter />
 
@@ -1451,6 +1807,17 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       )}
 
       {wallDim > 0 && <div className="os-wall-dim" />}
+      {wired && (
+        <div className="wired-wall-atmosphere" aria-hidden="true">
+          <span className="wired-wall-kana">語 彙 文 法 記 憶 読 解 聴 解</span>
+          <span className="wired-wall-node node-a">NODE: STUDY-LOCAL</span>
+          <span className="wired-wall-node node-b">ARCHIVE / LINGUA</span>
+          <span className="wired-wall-node node-c">LINK STATUS: LISTENING</span>
+        </div>
+      )}
+
+      <WiredFindingOverlay />
+      <AeroFindingOverlay />
 
       {icons.map((ic) => (
         <div
@@ -1473,7 +1840,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
               <Icon name={ic.glyph ?? 'app'} size={iconMetrics(deskPrefs).glyph} />
             )}
           </div>
-          <span className="os-desk-icon-label">{ic.name}</span>
+          <span className="os-desk-icon-label">{wired && ic.section ? wiredModule(ic.section).code : ic.name}</span>
           <button
             className="os-desk-icon-x"
             title={t('desktop.removeFromDesktop')}
@@ -1492,6 +1859,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         <FloatingWindow
           key={w.id}
           win={w}
+          animPhase={winAnim[w.id] ?? null}
           focused={w.z === topZ && !w.min}
           hidden={!!w.min}
           deskRef={deskRef}
@@ -1591,7 +1959,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
               e.stopPropagation();
             }}
           >
-            <div className="os-start-title">Study OS</div>
+            <div className="os-start-title">GrammarX</div>
             <div className="os-start-hint">
               {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
             </div>
@@ -1697,7 +2065,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 onClick={async () => {
                   const ok = await confirmDialog({
                     title: 'Restart shell',
-                    message: 'Restart the Study OS shell? Unsaved text in fields may be lost.',
+                    message: 'Restart the GrammarX shell? Unsaved text in fields may be lost.',
                     confirmLabel: 'Restart',
                   });
                   if (ok) window.location.reload();
@@ -1727,9 +2095,13 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 <Icon name="logo" size={24} />
               </span>
               <div className="os-start-aero-id">
-                <div className="os-start-aero-title">Secret Study OS</div>
+                <div className="os-start-aero-title">{wired ? 'WIRED ARCHIVE' : 'Secret GrammarX'}</div>
                 <div className="os-start-aero-sub">
-                  {startAppDragging ? 'Drop on the desktop to place the app' : 'Personal study desktop'}
+                  {wired
+                    ? startAppDragging
+                      ? 'PATCH MODULE INTO LOCAL DESKTOP'
+                      : 'LAYER-09 / ROUTER INDEX'
+                    : startAppDragging ? 'Drop on the desktop to place the app' : 'Personal study desktop'}
                 </div>
               </div>
               <button
@@ -1748,7 +2120,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
 
             <div className="os-start-aero-columns">
               <section className="os-start-aero-main" aria-label="Study programs">
-                <div className="os-start-aero-label">Study programs</div>
+                <div className="os-start-aero-label">{wired ? 'NODE INDEX' : 'Study programs'}</div>
                 <div className="os-start-aero-programs">
                   {startPrimaryApps.map((app) => renderAeroStartApp(app, 'program'))}
                 </div>
@@ -1760,17 +2132,17 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                     window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
                   }}
                 >
-                  <span>All programs</span>
+                  <span>{wired ? 'LOCATE MODULE' : 'All programs'}</span>
                   <Icon name="chevron" size={14} />
                 </button>
               </section>
 
               <aside className="os-start-aero-side" aria-label="Places and tools">
-                <div className="os-start-aero-label">Places</div>
+                <div className="os-start-aero-label">{wired ? 'CHANNELS' : 'Places'}</div>
                 <div className="os-start-aero-places">
                   {startPlaceApps.map((app) => renderAeroStartApp(app, 'place'))}
                 </div>
-                <div className="os-start-aero-label">Tools</div>
+                <div className="os-start-aero-label">{wired ? 'SERVICE PORTS' : 'Tools'}</div>
                 <div className="os-start-aero-tools">
                   <button
                     type="button"
@@ -1778,15 +2150,15 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                     onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
                   >
                     <Icon name="widgets" size={17} />
-                    <span>Widgets</span>
+                    <span>{wired ? 'Module rack' : 'Widgets'}</span>
                   </button>
                   <button type="button" className="os-start-aero-tool" onClick={openNote}>
                     <Icon name="note" size={17} />
-                    <span>Sticky note</span>
+                    <span>{wired ? 'Field note' : 'Sticky note'}</span>
                   </button>
                   <button type="button" className="os-start-aero-tool" onClick={() => void addShortcut()}>
                     <Icon name="plus" size={17} />
-                    <span>Add app...</span>
+                    <span>{wired ? 'Mount module...' : 'Add app...'}</span>
                   </button>
                   <button
                     type="button"
@@ -1797,7 +2169,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                     }}
                   >
                     <Icon name="wrench" size={17} />
-                    <span>Quick settings</span>
+                    <span>{wired ? 'Relay panel' : 'Quick settings'}</span>
                   </button>
                 </div>
               </aside>
@@ -1806,7 +2178,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
             <div className="os-start-aero-footer">
               <button type="button" className="os-start-aero-footer-btn" onClick={() => open('settings')}>
                 <Icon name="settings" size={16} />
-                <span>Control panel</span>
+                <span>{wired ? 'SYS / Service Panel' : 'Control panel'}</span>
               </button>
               <div className="os-start-aero-power-cluster" aria-label="Secret OS power">
                 <button
@@ -1842,31 +2214,32 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         </>
       )}
 
-      <div className="os-taskbar">
+      <div className="os-taskbar" ref={taskbarRef}>
         <button
           className={`os-start-btn ${startOpen ? 'active' : ''}`}
-          title={t('desktop.start')}
+          title={wired ? 'NODE ROUTER' : t('desktop.start')}
           onClick={() => setStartOpen((o) => !o)}
         >
           <Icon name="logo" size={22} />
-          <span>{t('desktop.start')}</span>
+          <span>{wired ? 'NODE' : t('desktop.start')}</span>
         </button>
         <div className="os-desktop-switches">
           <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} onClick={() => void switchDesktop(0)}>
-            {t('desktop.desktopN', { n: 1 })}
+            {wired ? 'LOCAL NODE' : t('desktop.desktopN', { n: 1 })}
           </button>
           <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} onClick={() => void switchDesktop(1)}>
-            {t('desktop.desktopN', { n: 2 })}
+            {wired ? 'REMOTE FEED' : t('desktop.desktopN', { n: 2 })}
           </button>
         </div>
         <div className="os-task-wins">
           {wins.map((w) => {
             const app = APPS.find((a) => a.id === w.section);
             const label =
-              w.section === 'note' ? t('desktop.noteLabel')
-                : w.section === 'visualizer' ? t('settings.nav.visualizer')
-                  : w.section === 'musicwidget' ? ''
-                    : app ? t(app.labelKey) : w.section;
+              wired ? wiredModule(w.section).code
+                : w.section === 'note' ? t('desktop.noteLabel')
+                  : w.section === 'visualizer' ? t('settings.nav.visualizer')
+                    : w.section === 'musicwidget' ? ''
+                      : app ? t(app.labelKey) : w.section;
             const glyph: IconName =
               w.section === 'note' ? 'note'
                 : w.section === 'visualizer' || w.section === 'musicwidget' ? 'music'
@@ -1874,8 +2247,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
             return (
               <button
                 key={w.id}
-                className={`os-task-win app-${w.section} ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''}`}
-                title={label}
+                className={`os-task-win app-${w.section} ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''} ${winAnim[w.id] ? `anim-${winAnim[w.id]}` : ''}`}
+                title={wired ? wiredModuleLabel(w.section) : label}
                 onClick={() => taskClick(w)}
               >
                 <Icon name={glyph} size={18} />
@@ -1926,6 +2299,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
             </svg>
           </button>
           <NotificationBell />
+          {wired && <WiredTrayLamps />}
+          {wired && <WiredGlobe />}
           <TaskbarClock
             showSeconds={!!deskPrefs.clockSeconds}
             hour12={!deskPrefs.clock24h}
@@ -1937,6 +2312,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       <QuickSettings />
       <NotificationCenter />
       <AeroBootOverlay />
+      <WiredArchiveBootOverlay />
+      <WiredBreachOverlay />
       <ContextMenu
         open={!!ctxPos}
         x={ctxPos?.x ?? 0}
@@ -1953,6 +2330,24 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         ]}
       />
     </div>
+  );
+}
+
+/**
+ * WIRED tray lamp cluster (§3): cyan = link up (always lit), amber = pending
+ * dispatches (blinks while unread), red = an unread error is present.
+ */
+function WiredTrayLamps() {
+  const [, setTick] = useState(0);
+  useEffect(() => onNotificationsChanged(() => setTick((n) => n + 1)), []);
+  const unread = getNotifications().filter((n) => !n.read);
+  const hasError = unread.some((n) => n.kind === 'error');
+  return (
+    <span className="wired-tray-lamps" aria-hidden="true">
+      <i className="wired-lamp wired-lamp-link on" />
+      <i className={`wired-lamp wired-lamp-pending${unread.length > 0 ? ' on blink' : ''}`} />
+      <i className={`wired-lamp wired-lamp-error${hasError ? ' on' : ''}`} />
+    </span>
   );
 }
 
@@ -1994,10 +2389,11 @@ function TaskbarClock({
 type ResizeMode = 'corner' | 'right' | 'bottom';
 
 const FloatingWindow = memo(function FloatingWindow({
-  win, focused, hidden, deskRef, noteColor,
+  win, animPhase, focused, hidden, deskRef, noteColor,
   onFocus, onClose, onMinimize, onMaximize, onPopOut, onPatch, children,
 }: {
   win: Win;
+  animPhase: WinAnimPhase | null;
   focused: boolean;
   hidden: boolean;
   deskRef: React.RefObject<HTMLDivElement>;
@@ -2011,6 +2407,8 @@ const FloatingWindow = memo(function FloatingWindow({
   children: ReactNode;
 }) {
   const { t } = useT();
+  const material = useAppMaterialSet();
+  const wired = material === 'wired';
   const app = APPS.find((a) => a.id === win.section);
   const isNote = win.section === 'note';
   const isVisualizer = win.section === 'visualizer';
@@ -2019,13 +2417,15 @@ const FloatingWindow = memo(function FloatingWindow({
   // Real apps (incl. Noctis, music widget) can detach into their own OS window;
   // desktop-only trinkets (notes, the viz widget) cannot.
   const canPopOut = !isNote && !isVisualizer;
-  const title = isNote
-    ? t('desktop.stickyNote')
-    : isVisualizer || isMusicWidget || isNoctis
-      ? ''
-      : app
-        ? t(app.labelKey)
-        : win.section;
+  const title = wired
+    ? wiredModuleLabel(win.section)
+    : isNote
+      ? t('desktop.stickyNote')
+      : isVisualizer || isMusicWidget || isNoctis
+        ? ''
+        : app
+          ? t(app.labelKey)
+          : win.section;
   const glyph: IconName = isNote ? 'note' : isVisualizer || isMusicWidget ? 'music' : app?.glyph ?? 'app';
 
   // The window element, so a drag/resize can move it directly (no per-frame
@@ -2053,7 +2453,7 @@ const FloatingWindow = memo(function FloatingWindow({
     // trigger layout of the window's whole subtree per event, while a
     // translate() only moves the already-painted layer on the compositor.
     if (winRef.current) winRef.current.style.willChange = 'transform';
-    document.documentElement.classList.add('os-interacting');
+    perfSetInteracting(true);
     const move = (ev: PointerEvent) => {
       curX = Math.min(Math.max(ox + (ev.clientX - sx) / z, -win.w + 90), dw - 60);
       curY = Math.min(Math.max(oy + (ev.clientY - sy) / z, 0), dh - 36);
@@ -2071,7 +2471,7 @@ const FloatingWindow = memo(function FloatingWindow({
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       if (raf != null) cancelAnimationFrame(raf);
-      document.documentElement.classList.remove('os-interacting');
+      perfSetInteracting(false);
       const node = winRef.current;
       if (node) {
         // Swap the visual transform for real coordinates in one go, so there
@@ -2146,8 +2546,8 @@ const FloatingWindow = memo(function FloatingWindow({
   return (
     <section
       ref={winRef}
-      className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isNoctis ? 'fwin-frameless' : ''} ${win.max ? 'fwin-max' : ''}`}
-      style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.z, display: hidden ? 'none' : undefined }}
+      className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isNoctis ? 'fwin-frameless' : ''} ${win.max ? 'fwin-max' : ''} ${animPhase ? `fwin-anim-${animPhase}` : ''}`}
+      style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.pin ? PIN_Z_BASE + win.z : win.z, display: hidden ? 'none' : undefined }}
       onPointerDown={onFocus}
     >
       {!isNoctis && (
@@ -2159,7 +2559,7 @@ const FloatingWindow = memo(function FloatingWindow({
         >
           <span className="fwin-title" style={isNote ? { color: '#3a3320' } : undefined}>
             <Icon name={glyph} size={15} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            {title}
+            <span className="fwin-title-text">{title}</span>
           </span>
           <span className="fwin-btns">
             {canPopOut && (
@@ -2214,6 +2614,12 @@ const FloatingWindow = memo(function FloatingWindow({
       >
         {children}
       </div>
+      {wired && !isNoctis && (
+        <div className="fwin-wired-status">
+          <span>{wiredModule(win.section).ready}</span>
+          <span>WIN-ID {win.id.toUpperCase()}</span>
+        </div>
+      )}
       {!win.max && (
         <>
           <div className="fwin-edge-r" onPointerDown={resizeStart('right')} />

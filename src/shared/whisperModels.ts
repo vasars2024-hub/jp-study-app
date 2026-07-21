@@ -1,0 +1,63 @@
+/**
+ * Whisper model tiers for Transformers.js (Phase 5b).
+ * Runtime downloads ONNX weights via HF; the Phase 6 ggml registry entries
+ * remain for a future whisper.cpp path and are not used by the worker yet.
+ */
+
+export type WhisperModelTier =
+  | 'whisper-base'
+  | 'whisper-small'
+  | 'kotoba-whisper'
+  | 'whisper-large-v3-turbo';
+
+export interface WhisperModelSpec {
+  id: WhisperModelTier;
+  /** Hugging Face model id for @huggingface/transformers */
+  hfId: string;
+  /** Approx download size for UI copy (bytes). */
+  sizeBytes: number;
+  langs: Array<'ja' | 'zh' | 'any'>;
+  /** Prefer this tier when study language matches. */
+  preferFor?: Array<'ja' | 'zh'>;
+}
+
+export const WHISPER_MODEL_SPECS: WhisperModelSpec[] = [
+  {
+    id: 'whisper-base',
+    hfId: 'Xenova/whisper-base',
+    sizeBytes: 75_000_000,
+    langs: ['any'],
+  },
+  {
+    id: 'whisper-small',
+    hfId: 'Xenova/whisper-small',
+    sizeBytes: 250_000_000,
+    langs: ['any'],
+  },
+  {
+    id: 'kotoba-whisper',
+    hfId: 'onnx-community/kotoba-whisper-v2.0',
+    sizeBytes: 320_000_000,
+    langs: ['ja'],
+    preferFor: ['ja'],
+  },
+  {
+    id: 'whisper-large-v3-turbo',
+    hfId: 'onnx-community/whisper-large-v3-turbo',
+    sizeBytes: 1_600_000_000,
+    langs: ['any'],
+  },
+];
+
+export function whisperSpec(id: WhisperModelTier): WhisperModelSpec {
+  return WHISPER_MODEL_SPECS.find((s) => s.id === id) ?? WHISPER_MODEL_SPECS[0];
+}
+
+export function defaultWhisperTier(lang: 'ja' | 'zh'): WhisperModelTier {
+  if (lang === 'ja') return 'kotoba-whisper';
+  return 'whisper-small';
+}
+
+export function isWhisperModelTier(v: unknown): v is WhisperModelTier {
+  return WHISPER_MODEL_SPECS.some((s) => s.id === v);
+}

@@ -12,6 +12,8 @@ export default defineConfig({
       'src/main/city/engine/tests/**/*.test.ts',
       // Phase 3: node-safe pure-logic tests for the living-environment layer.
       'src/renderer/environment/**/*.test.ts',
+      // Renderer modules whose only browser dependency (localStorage) is stubbed via vi.stubGlobal.
+      'src/renderer/__tests__/**/*.test.ts',
     ],
     environment: 'node',
     testTimeout: 20000,

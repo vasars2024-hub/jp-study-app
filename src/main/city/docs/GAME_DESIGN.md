@@ -416,6 +416,23 @@ Eras advance on **learning maturity, not clock time**. Breadth, consistency, dep
 - The camera observes; the user never gains a body, a cursor-army, or a build menu.
 - Light stays precious. Even Era V pools its brilliance against deep dark.
 
+### Navigable Scale And Civilizational Space
+
+Noctis is a navigable civilization, not a fixed aquarium. The application window is a camera onto a world whose authored bounds expand as secured civilizational history makes new regions permanently legible. The user may observe, pan, zoom, select, and follow routes; none of those camera actions commands a citizen, places a structure, or mutates simulation state.
+
+The camera has semantic scales rather than one infinitely enlarged painting:
+
+1. **Glance** frames one calm lived-in locality during study.
+2. **District** permits manual pan and zoom across connected civic and ecological regions.
+3. **Detail** resolves one structure, route, organism, citizen, instrument, or record with committed-state explanation.
+4. **Strata** exposes authored cross-sections: canopy, civic ground, root mat, vault, and deep-fluid infrastructure.
+5. **Stellar** follows the Era V rift upward from the ancestral depths to observatories and anchored orbital plates.
+6. **Whole Civilization** alone fits every currently revealed region into one rectangular overview. That rectangle is a camera framing device, never the physical edge or canonical shape of the world.
+
+World growth adds connected authored regions; it never stretches one background image. Era I begins deliberately cramped: a close origin chamber, short routes, one small hearth, nearby shelters, and darkness pressing around one or two surveyed exits. Era II reveals horizontal terraces and aqueduct-linked chambers. Era III descends into stacked canyon infrastructure. Era IV connects distant regions into a broad network. Era V opens the vertical stellar chasm and lets the observer travel upward into the orbital layer while older depths remain explorable below. Interplanetary free flight is outside the current canon; the stellar layer is an inhabited vertical continuation of the same civilization.
+
+**Night Drift** is an optional auto-explorer. When deliberately started, it follows a deterministic route through currently revealed places, slowly interpolates the camera between semantic scales, and displays quiet observation cards grounded only in committed state. It pauses when the window is hidden, the user interacts, study becomes primary, or reduced-motion rules require static transitions. It never fabricates discoveries, acts as a tutorial, or becomes an attention-seeking reward reel.
+
 ---
 
 ## SECTION 8 — HIDDEN SIMULATION PHILOSOPHY

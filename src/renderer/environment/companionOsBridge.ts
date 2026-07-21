@@ -9,8 +9,10 @@ import { loadDesktopPrefs, onDesktopPrefsChanged } from '../desktopPrefs';
 let unsubEnv: (() => void) | null = null;
 let unsubDesk: (() => void) | null = null;
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
+let directPushTimer: ReturnType<typeof setTimeout> | null = null;
 let lastEnabled: boolean | null = null;
 let lastSpan: 'primary' | 'all' | null = null;
+let pendingCompanions: CompanionInstance[] | null = null;
 
 function deskMetrics(): { deskW: number; deskH: number } {
   // Prefer live desktop element; fall back to viewport under taskbar.
@@ -27,9 +29,9 @@ function deskMetrics(): { deskW: number; deskH: number } {
   };
 }
 
-function push(companions: CompanionInstance[], enabled: boolean): void {
+function push(companions: CompanionInstance[], enabled: boolean, activeness: number): void {
   const { deskW, deskH } = deskMetrics();
-  window.api.companionHostPushState({ companions, enabled, deskW, deskH });
+  window.api.companionHostPushState({ companions, enabled, deskW, deskH, activeness });
 }
 
 function apply(env = loadEnvironment()): void {
@@ -47,7 +49,7 @@ function apply(env = loadEnvironment()): void {
     const list = (env.companions ?? []).filter(
       (c) => !env.companionTypes?.length || env.companionTypes.includes(c.typeId),
     );
-    push(list, true);
+    push(list, true, env.companionActiveness ?? 0.4);
   }
 }
 
@@ -90,6 +92,11 @@ export function stopCompanionOsBridge(): void {
     clearTimeout(pushTimer);
     pushTimer = null;
   }
+  if (directPushTimer) {
+    clearTimeout(directPushTimer);
+    directPushTimer = null;
+  }
+  pendingCompanions = null;
   if (lastEnabled) {
     void window.api.companionHostSetEnabled(false);
     lastEnabled = false;
@@ -101,6 +108,13 @@ export function stopCompanionOsBridge(): void {
 export function pushCompanionOsState(companions: CompanionInstance[]): void {
   const env = loadEnvironment();
   if (env.enabled && env.companionsEnabled && env.companionsOnOsDesktop) {
-    push(companions, true);
+    pendingCompanions = companions;
+    if (directPushTimer) return;
+    directPushTimer = setTimeout(() => {
+      directPushTimer = null;
+      const next = pendingCompanions;
+      pendingCompanions = null;
+      if (next) push(next, true, loadEnvironment().companionActiveness ?? 0.4);
+    }, 250);
   }
 }

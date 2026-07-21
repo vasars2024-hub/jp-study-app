@@ -109,7 +109,8 @@ function sanitizeWallpaper(value: unknown): WallpaperSnapshot {
   };
 }
 
-function sanitizeWindow(value: unknown): WindowSnapshot | null {
+/** Exported for tests — every field here must round-trip, see desktop.test.ts. */
+export function sanitizeWindow(value: unknown): WindowSnapshot | null {
   if (!isObject(value)) return null;
   if (typeof value.id !== 'string' || typeof value.section !== 'string') return null;
   const num = (k: string): number => (typeof value[k] === 'number' ? value[k] : 0);
@@ -127,6 +128,7 @@ function sanitizeWindow(value: unknown): WindowSnapshot | null {
     z: num('z'),
     visible: value.min === true ? false : value.visible !== false,
     maximized: value.max === true || value.maximized === true,
+    pinned: value.pin === true || value.pinned === true,
     restoreRect: restoreRect
       ? {
           x: typeof restoreRect.x === 'number' ? restoreRect.x : 0,

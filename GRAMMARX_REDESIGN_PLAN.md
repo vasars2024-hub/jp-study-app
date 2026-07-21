@@ -555,6 +555,55 @@ and dedupe strategy. Import must land as a reproducible adapter retaining
       logic is unit-tested against the real corpus and the build is clean, but
       the screen itself has not been exercised; that needs `npm start`.
 
+- [x] **Register classification pass — the 2,060 points morphology couldn't
+      decide, applied.** `tools/grammar-register/` (extract → make-prompts →
+      14 batches → ingest → apply, documented in its own README) asks a model
+      to label register on every point `normalize.ts`'s morphology rules can't
+      resolve, writing `registerSource: 'classified'` so the label stays
+      attributable and — by design — untrusted by `trusted()`/the "verified
+      tags only" filter. All 14 batch replies validated clean (2060/2060
+      accepted, 0 unlabelled) and landed well under the pipeline's own 35%
+      non-neutral sanity check (18.2%: neutral 1685, literary 194, casual 126,
+      business 55).
+
+      **`apply.cjs` (the step that writes the `.ts` data files) had two real
+      bugs, both found and fixed before landing:**
+      1. *Not idempotent.* It always blindly inserted a fresh
+         `register:`/`provenance:` pair instead of checking for one already
+         there, so records touched across more than one run (this pass had
+         been partially re-run before) ended up with 2–3 duplicate
+         `provenance:` keys in the same object literal — harmless at runtime
+         (JS keeps the last duplicate and every copy was byte-identical) but
+         a growing mess that would have kept compounding on every future
+         re-run. Rewritten to operate per-record: strip any existing
+         `register:`/`provenance:` lines for that id, merge forward any other
+         field already living in `provenance` (e.g. the HSK import's
+         `categorySource: 'imported'`), and write exactly one pair. Verified
+         idempotent — a second `--dry` run now reports 0 changes, 2060
+         "already correct".
+      2. *Silently skipped the four `*-mazii.ts` files.* Those four are CRLF
+         while every other data file is LF; the new per-record regex required
+         exact `\n` adjacency around the braces and matched zero records in a
+         CRLF file, so the first fixed version would have dropped 1,687 of
+         the 2,060 assignments with no error. Fixed by normalizing to LF for
+         matching and restoring each file's original line-ending style on
+         write (no unrelated CRLF↔LF diff noise). A third gap — the very last
+         record in each array has no trailing comma before `];` — was also
+         missing 4 ids (one per mazii file) until the closing-brace match was
+         made comma-optional.
+
+      Applied: 2060 points across 13 files (`n1-mazii.ts` 304, `n3-mazii.ts`
+      590, `n4-mazii.ts` 370, `n2-mazii.ts` 423, and the rest split across
+      `n1–n5.ts`, `n1-extra/n2-extra.ts`, `hsk.ts`, `hsk-extra.ts`). Verified:
+      898/898 vitest, `vite build` clean, eslint clean on `apply.cjs` (the two
+      remaining `no-var-requires` errors are the same pre-existing pattern on
+      every `.cjs` tool script in this repo, confirmed by checking
+      `grammar-audit.cjs`/`extract.cjs`/`ingest.cjs`, not something this pass
+      introduced). The corpus-level "coverage" audit numbers (carries a
+      register / checked-no-register / never-examined) do not move from this
+      pass by design — those track `trusted()` register sources only, and
+      `classified` is deliberately excluded from that trust tier.
+
 ### Phase 2 — Grammar Explorer redesign
 
 - [x] Collapse the Aero and classic explorers into one themed component —
@@ -716,10 +765,137 @@ band, but there is no "sort by how well I know it" option in `GrammarSort`.
 `appendNotebookEvent` has only 4 call sites, so manga-reader OCR under
 `<item>/_ocr/` never reaches the Notebook at all.
 
-- [ ] Human-readable source grouping
-- [ ] Emit the three missing streams
-- [ ] Overview / Library / Words / Translations / Highlights / Captures views
-- [ ] Artifact lineage
+- [x] Human-readable source grouping
+- [x] Emit the three missing streams
+- [x] Overview / Library / Words / Translations / Highlights / Captures views
+- [x] Artifact lineage
+
+**Shipped 2026-07-20 (M1 + M2).** `aggregateNotebook` now takes an optional
+`NotebookSources` ({ library, plan }) instead of fetching nothing; it stays
+synchronous, and `loadNotebookSources()` / `aggregateNotebookAsync()` wrap the
+two IPC calls. Highlights group as `Highlights/<library title>`, degrading to
+`Unknown book (3f8a1c92)` — never the full UUID — when the book has been
+removed. 11 new tests, 837 total, `vite build` clean, i18n clean at 3,657 keys.
+
+All three "missing" streams turned out to have real backing stores; none needed
+to be dropped:
+
+| Stream | Source | Granularity |
+|---|---|---|
+| `ocr` | `LibraryItem.ocrMeta` | one entry per **volume**, not per page — `_ocr/` page files are the truth, `ocrMeta` is the summary the library already keeps in sync |
+| `extension` | deck cards with `source: 'extension'`, plus `inboxMeta` articles | per card / per article |
+| `plan` | `JitenStore.plan` via `jitenGetStore()` | per plan entry |
+
+**A correction worth recording.** The first pass of this work concluded `plan`
+had *no* backing store and proposed dropping it, after grepping for
+`planToRead` / `toRead` / `wantToRead` / `readingList` and finding only the i18n
+string. The store exists — it is `JitenStore.plan`, written by `ensurePlanned()`
+in `NovelsView.tsx`, and it is named `acquisitionStatus`/`jiten` throughout. The
+grep searched for the concept's *obvious* names and read their absence as the
+feature's absence. This is §7.1's failure mode in yet another form: a result
+whose meaning was set by the query behind it. `plan` was also missing from
+`STREAM_KEYS` in `NotebookView.tsx`, so its count chip had never rendered —
+which is why the empty stream was easy to believe.
+
+**Groundwork this lays for artifact lineage.** `JitenPlanEntry` already persists
+`importedLibraryItemId` (plan → library item) and `minedAt` (→ mined cards), and
+deck cards already carry `bookId`/`bookTitle`/`source`. Both are now passed
+through to entry `meta`. The lineage chain is already on disk and needs reading,
+not a new store — so the last checkbox is cheaper than it looks.
+
+**Shipped 2026-07-20 (M3).** Six tabs over the previously flat timeline, in
+`notebook/views.ts` so the mapping is testable apart from the component. The
+stream→view map is a **partition**: every stream belongs to exactly one named
+view, and `overview` owns none (it shows all). `notebookViews.test.ts` holds
+that property — an unassigned stream fails the suite instead of quietly
+vanishing from every tab while still inflating the Overview count, and a
+double-assigned one fails instead of making the tabs stop summing to the
+notebook.
+
+| View | Streams |
+|---|---|
+| Overview | all |
+| Library | `plan`, `ocr` |
+| Words | `saved-words`, `lookups`, `flashcards`, `anki`, `mining`, `known` |
+| Translations | `translations` |
+| Highlights | `highlights` |
+| Captures | `extension`, `audio`, `clipboard` |
+
+Two hazards handled while wiring it: the folder sidebar recomputes against the
+active view (a whole-notebook count in a scoped sidebar promises rows the view
+will not show — §7.1's defect again), and switching views clears the stream and
+folder chips, since a filter stranded on a stream the new view lacks reads as an
+empty notebook rather than a stale filter. 843 tests / 88 files (+17 across the
+two new files), `vite build` clean, i18n clean at 3,663 keys (+6 view labels ×
+4 locales).
+
+**Shipped 2026-07-20 (M4).** `notebook/lineage.ts` renders the chain
+
+```
+plan → library → ocr → highlights → cards → anki
+```
+
+under each entry that has one. Every stage is read from a relationship the app
+*already persists* — `JitenPlanEntry.importedLibraryItemId`, `Annotation.bookId`,
+`DeckFlashcard.bookId`/`ankiExported`, `LibraryItem.ocrMeta` — so no new store
+was added and nothing is inferred.
+
+Three deliberate refusals, each with a test:
+
+- **Stages that never happened are omitted, not shown as zero.** A `Cards 0`
+  node is the §7.1 defect in miniature: a number that reads as a census and is
+  actually an absence.
+- **An unresolvable book yields `[]`, never a partial chain.** A plausible-looking
+  lineage is worse than none.
+- **Single-node chains are suppressed.** "Library: 君の名は。" under a row about
+  that same book restates the row; it is not lineage.
+
+The index is built once per refresh rather than per row — resolving inline would
+re-scan the whole deck for each of up to 400 rendered entries. 855 tests / 89
+files (+12), `vite build` clean, i18n clean at 3,670 keys.
+
+### Phase 4 live verification (2026-07-20)
+
+Driven in the running Electron app on the real profile (3,245 entries).
+
+**Confirmed working.** Six tabs render and switch. The 13-chip Overview grid
+fits one row at 1920px with no collision — the §7.1 layout failure did *not*
+recur. Highlight folders show real titles (`Highlights/ハサミ男 (殊能将之) …`),
+not UUIDs. `Plan to read 3` and `OCR 1` prove the two IPC-backed streams reach
+the screen. The lineage strip renders and resolves:
+`Library One Punch-Man : The Koi Pond | C… → OCR 18`. Chips sum to 3,245,
+matching `All (3245)` — the counts reconcile.
+
+**One defect found, and it was mine.** The sidebar read `Extension (4)` while
+the Extension chip read `1`, with the three-card difference labelled
+`Flashcards`. Cause: the stream was classified on `source === 'extension'` but
+`origin` on `source === 'extension' || folder === 'Extension'` — one predicate
+asked two ways. `source` postdates the extension bridge, so cards captured
+before it carry only the folder, and those three were simultaneously
+`origin: 'extension'` and `stream: 'flashcards'`. Now a single `fromExtension`
+binding feeds both. Two regression tests, both confirmed to fail against the
+old code: the legacy folder-only card, and the invariant behind it — a card with
+`origin: 'extension'` may never sit in the plain `flashcards` stream.
+
+857 tests / 89 files, `vite build` clean, i18n clean at 3,670 keys.
+
+**This is the fifth consecutive milestone in this project where driving the UI
+found something the suite did not.** §7 recorded it, §7.1 recorded it, and it
+held again here — with the added sting that the defect was an inconsistency
+*within a single function I had just written*, invisible to tests that only ever
+asked about one card shape at a time. The invariant test is the durable fix; the
+symptom test alone would not have generalised.
+
+Two observations that are **data, not defects**: some library titles carry
+scraper noise (`… (z-library.sk, 1lib.sk, z-lib.sk)`) and wrap to two lines in
+the sidebar, and the deck holds exact duplicate cards (two `んだが` 13 seconds
+apart). Neither originates in the Notebook.
+
+The new tab styles use the same `var(--border)` / `var(--accent)` / `color-mix`
+tokens as the sibling `.gx-notebook-*` rules, so they follow either skin. Note
+that `aero-notebook-chrome` has no CSS anywhere in the repo — the Notebook has
+never been Aero-transformed (Frutiger Aero Phase 4 M1–M14 are still pending),
+so the class is inert in both skins today.
 
 ### Phase 5 — full GrammarX rename
 

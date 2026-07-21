@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '../components/Icons';
 import {
   AppChrome,
@@ -9,125 +8,79 @@ import {
   type MenuBarMenu,
   useAeroMaterials,
 } from '../components/ui';
-import { translateTo, onModelProgress, type TransLang } from '../translator';
-
-type State = 'idle' | 'loading' | 'translating' | 'done' | 'error';
-
-// Shared with the Dictionary's 日本語/中文 toggle, so the app has one study language.
-const LANG_KEY = 'jp-study-dict-lang';
-const SOURCE_KEY = 'jp-study-translate-source';
-const TARGET_KEY = 'jp-study-translate-target';
-
-const LANG_LABELS: Record<TransLang, string> = {
-  ja: '日本語',
-  zh: '中文',
-  en: 'English',
-  ru: 'Русский',
-};
-
-const LANG_ORDER: TransLang[] = ['ja', 'zh', 'en', 'ru'];
-
-const PLACEHOLDERS: Record<TransLang, string> = {
-  ja: '日本語を貼り付け / 入力してください…',
-  zh: '粘贴或输入中文…',
-  en: 'Paste or type English…',
-  ru: 'Вставьте или введите русский текст…',
-};
+import type { TransLang } from '../translator';
+import SentenceAnalysisPanel from '../components/SentenceAnalysisPanel';
+import {
+  LANG_LABELS,
+  LANG_ORDER,
+  PLACEHOLDERS,
+  TranslateHistoryList,
+  useTranslate,
+} from '../components/translate/TranslateContent';
+import { useT } from '../i18n';
 
 export default function TranslateView() {
   const aero = useAeroMaterials();
-  const [source, setSource] = useState<TransLang>(() => {
-    const saved = localStorage.getItem(SOURCE_KEY) as TransLang | null;
-    return saved ?? ((localStorage.getItem(LANG_KEY) as TransLang) || 'ja');
-  });
-  const [target, setTarget] = useState<TransLang>(
-    () => (localStorage.getItem(TARGET_KEY) as TransLang) || 'en',
-  );
-  const [input, setInput] = useState('');
-  const [output, setOutput] = useState('');
-  const [state, setState] = useState<State>('idle');
-  const [msg, setMsg] = useState('');
-  const [error, setError] = useState('');
-  const startedRef = useRef(false);
-
-  useEffect(() => () => onModelProgress(null), []);
-
-  function pickSource(l: TransLang) {
-    const next = l === target ? source : l; // don't let source == target
-    setSource(next);
-    localStorage.setItem(SOURCE_KEY, next);
-    // Keep the Dictionary's study-language toggle in sync for ja/zh.
-    if (next === 'ja' || next === 'zh') localStorage.setItem(LANG_KEY, next);
-  }
-
-  function pickTarget(l: TransLang) {
-    const next = l === source ? target : l;
-    setTarget(next);
-    localStorage.setItem(TARGET_KEY, next);
-  }
-
-  function swap() {
-    setSource(target);
-    setTarget(source);
-    localStorage.setItem(SOURCE_KEY, target);
-    localStorage.setItem(TARGET_KEY, source);
-    if (target === 'ja' || target === 'zh') localStorage.setItem(LANG_KEY, target);
-    setInput(output);
-    setOutput(input);
-  }
-
-  const run = useCallback(async () => {
-    const text = input.trim();
-    if (!text) return;
-    setError('');
-    setOutput('');
-    setState('loading');
-    setMsg('Loading the translation model…');
-    startedRef.current = false;
-
-    onModelProgress((p) => {
-      if (p.status === 'progress' && typeof p.progress === 'number') {
-        const f = typeof p.file === 'string' ? p.file.split('/').pop() : 'model';
-        setMsg(`Loading model: ${f} — ${Math.round(p.progress)}%`);
-      }
-    });
-
-    try {
-      const result = await translateTo(text, source, target, (prog) => {
-        startedRef.current = true;
-        setState('translating');
-        setMsg(`Translating… ${Math.round(prog * 100)}%`);
-      });
-      setOutput(result);
-      setState('done');
-      setMsg('');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setState('error');
-    } finally {
-      onModelProgress(null);
-    }
-  }, [input, source, target]);
-
-  const busy = state === 'loading' || state === 'translating';
+  const { t } = useT();
+  const state = useTranslate();
+  const { tab, source, target, input, output, msg, error, busy, run, swap } = state;
 
   const menus: MenuBarMenu[] = [
     {
       id: 'file',
-      label: 'File',
+      label: t('translate.menu.file'),
       items: [
-        { id: 'clear', label: 'Clear text', disabled: !input && !output, onSelect: () => { setInput(''); setOutput(''); setError(''); setMsg(''); setState('idle'); } },
+        {
+          id: 'clear',
+          label: t('translate.menu.clear'),
+          disabled: !input && !output,
+          onSelect: state.clear,
+        },
       ],
     },
     {
       id: 'tools',
-      label: 'Tools',
+      label: t('translate.menu.tools'),
       items: [
-        { id: 'swap', label: 'Swap languages', onSelect: swap },
-        { id: 'translate', label: 'Translate', disabled: busy || !input.trim(), onSelect: () => void run() },
+        { id: 'swap', label: t('translate.menu.swap'), onSelect: swap },
+        {
+          id: 'translate',
+          label: t('translate.menu.translate'),
+          disabled: busy || !input.trim(),
+          onSelect: () => void run(),
+        },
       ],
     },
   ];
+
+  const tabBar = (
+    <div className="gram-mode-toggle tr-tabs">
+      <button
+        type="button"
+        className={`gram-mode-btn ${tab === 'translate' ? 'active' : ''}`}
+        onClick={() => state.setTab('translate')}
+      >
+        {t('translate.tab.translate')}
+      </button>
+      <button
+        type="button"
+        className={`gram-mode-btn ${tab === 'history' ? 'active' : ''}`}
+        onClick={() => state.setTab('history')}
+      >
+        {t('translate.tab.history')}
+      </button>
+    </div>
+  );
+
+  const openNotebook = (): void => {
+    window.dispatchEvent(new CustomEvent('os:open', { detail: 'notebook' }));
+  };
+
+  const historyPanel = (
+    <div className="tr-history">
+      <TranslateHistoryList state={state} onOpenNotebook={openNotebook} />
+    </div>
+  );
 
   if (aero) {
     return (
@@ -135,158 +88,212 @@ export default function TranslateView() {
         menus={menus}
         status={
           <>
-            <StatusBarField>{LANG_LABELS[source]} to {LANG_LABELS[target]}</StatusBarField>
+            <StatusBarField>
+              {LANG_LABELS[source]} to {LANG_LABELS[target]}
+            </StatusBarField>
             <StatusBarField>{input.length} source chars</StatusBarField>
             <StatusBarSpacer />
-            <StatusBarField live>{busy ? msg || 'Working' : state === 'done' ? 'Complete' : state === 'error' ? 'Error' : 'Ready'}</StatusBarField>
+            <StatusBarField live>
+              {busy
+                ? msg || 'Working'
+                : state.state === 'done'
+                  ? 'Complete'
+                  : state.state === 'error'
+                    ? 'Error'
+                    : 'Ready'}
+            </StatusBarField>
           </>
         }
         className="aero-translate-chrome"
       >
         <div className="aero-translate">
-          <Toolbar className="aero-translate-toolbar" aria-label="Translation commands">
-            <label>
-              From
-              <select value={source} onChange={(e) => pickSource(e.target.value as TransLang)}>
-                {LANG_ORDER.filter((l) => l !== target).map((l) => (
-                  <option key={l} value={l}>{LANG_LABELS[l]}</option>
-                ))}
-              </select>
-            </label>
-            <button className="aero-translate-swap" onClick={swap} aria-label="Swap languages" title="Swap languages">
-              <Icon name="globe" size={13} />
-            </button>
-            <label>
-              To
-              <select value={target} onChange={(e) => pickTarget(e.target.value as TransLang)}>
-                {LANG_ORDER.filter((l) => l !== source).map((l) => (
-                  <option key={l} value={l}>{LANG_LABELS[l]}</option>
-                ))}
-              </select>
-            </label>
-            <ToolbarSpacer />
-            <button className="aero-translate-run" onClick={() => void run()} disabled={busy || !input.trim()}>
-              {busy ? 'Working...' : 'Translate'}
-            </button>
-          </Toolbar>
+          {tabBar}
+          {tab === 'history' ? (
+            historyPanel
+          ) : (
+            <>
+              <Toolbar className="aero-translate-toolbar" aria-label="Translation commands">
+                <label>
+                  From
+                  <select value={source} onChange={(e) => state.pickSource(e.target.value as TransLang)}>
+                    {LANG_ORDER.filter((l) => l !== target).map((l) => (
+                      <option key={l} value={l}>
+                        {LANG_LABELS[l]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="aero-translate-swap" onClick={swap} aria-label="Swap languages" title="Swap languages">
+                  <Icon name="globe" size={13} />
+                </button>
+                <label>
+                  To
+                  <select value={target} onChange={(e) => state.pickTarget(e.target.value as TransLang)}>
+                    {LANG_ORDER.filter((l) => l !== source).map((l) => (
+                      <option key={l} value={l}>
+                        {LANG_LABELS[l]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <ToolbarSpacer />
+                <button className="aero-translate-run" onClick={() => void run()} disabled={busy || !input.trim()}>
+                  {busy ? 'Working...' : 'Translate'}
+                </button>
+              </Toolbar>
 
-          <div className="aero-translate-workbench">
-            <section className="aero-translate-pane">
-              <header>{LANG_LABELS[source]} source</header>
-              <textarea
-                className="aero-translate-textarea"
-                lang={source}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
-                }}
-                placeholder={PLACEHOLDERS[source]}
-              />
-            </section>
+              <div className="aero-translate-workbench">
+                <section className="aero-translate-pane">
+                  <header>{LANG_LABELS[source]} source</header>
+                  <textarea
+                    className="aero-translate-textarea"
+                    lang={source}
+                    value={input}
+                    onChange={(e) => state.setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
+                    }}
+                    placeholder={PLACEHOLDERS[source]}
+                  />
+                </section>
 
-            <section className="aero-translate-pane">
-              <header>{LANG_LABELS[target]} output</header>
-              <div className="aero-translate-output" lang={target}>
-                {output || <span className="muted">Translation appears here.</span>}
+                <section className="aero-translate-pane">
+                  <header>{LANG_LABELS[target]} output</header>
+                  <div className="aero-translate-output" lang={target}>
+                    {output || <span className="muted">Translation appears here.</span>}
+                  </div>
+                </section>
               </div>
-            </section>
-          </div>
 
-          {(busy || error) && (
-            <div className="aero-translate-status">
-              {busy && <><span className="media-gen-dot" /><span>{msg}</span></>}
-              {error && <span className="aero-translate-error">{error}</span>}
-            </div>
+              {(busy || error) && (
+                <div className="aero-translate-status">
+                  {busy && (
+                    <>
+                      <span className="media-gen-dot" />
+                      <span>{msg}</span>
+                    </>
+                  )}
+                  {error && <span className="aero-translate-error">{error}</span>}
+                </div>
+              )}
+            </>
           )}
         </div>
       </AppChrome>
     );
   }
 
+  const classicStatus = (
+    <>
+      <StatusBarField>TRN / CHANNEL READY</StatusBarField>
+      <StatusBarField>
+        {LANG_LABELS[source]} → {LANG_LABELS[target]}
+      </StatusBarField>
+      <StatusBarSpacer />
+      <StatusBarField live>
+        {busy
+          ? msg || 'DECODING'
+          : state.state === 'done'
+            ? 'DECODE COMPLETE'
+            : state.state === 'error'
+              ? 'CHANNEL FAULT'
+              : 'STANDBY'}
+      </StatusBarField>
+    </>
+  );
+
   return (
-    <div className="tr-view">
-      <div className="view-head">
-        <p className="muted">
-          Offline translation via Qwen3, running on your GPU/CPU. Uses the Qwen3-1.7B model from
-          your Downloads folder — no internet needed.
-        </p>
-        <div className="tr-dir">
-          <div className="dict-lang-toggle">
-            {LANG_ORDER.filter((l) => l !== target).map((l) => (
-              <button
-                key={l}
-                className={`gram-level-btn ${source === l ? 'active' : ''}`}
-                onClick={() => pickSource(l)}
-              >
-                {LANG_LABELS[l]}
+    <AppChrome menus={menus} status={classicStatus} className="tr-chrome">
+      <div className="tr-view">
+        <div className="view-head">
+          <p className="muted">{t('translate.intro')}</p>
+          {tabBar}
+          {tab === 'translate' && (
+            <div className="tr-dir">
+              <div className="dict-lang-toggle">
+                {LANG_ORDER.filter((l) => l !== target).map((l) => (
+                  <button
+                    key={l}
+                    className={`gram-level-btn ${source === l ? 'active' : ''}`}
+                    onClick={() => state.pickSource(l)}
+                  >
+                    {LANG_LABELS[l]}
+                  </button>
+                ))}
+              </div>
+              <button className="tr-swap" onClick={swap} aria-label="Swap languages" title="Swap">
+                <Icon name="globe" size={14} />
               </button>
-            ))}
-          </div>
-          <button className="tr-swap" onClick={swap} aria-label="Swap languages" title="Swap">
-            <Icon name="globe" size={14} />
-          </button>
-          <div className="dict-lang-toggle">
-            {LANG_ORDER.filter((l) => l !== source).map((l) => (
-              <button
-                key={l}
-                className={`gram-level-btn ${target === l ? 'active' : ''}`}
-                onClick={() => pickTarget(l)}
-              >
-                {LANG_LABELS[l]}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="tr-panes">
-        <div className="tr-pane">
-          <label className="tr-label">{LANG_LABELS[source]}</label>
-          <textarea
-            className="tr-textarea"
-            lang={source}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) run();
-            }}
-            placeholder={`${PLACEHOLDERS[source]}  (Ctrl+Enter to translate)`}
-          />
-        </div>
-        <div className="tr-pane">
-          <label className="tr-label">{LANG_LABELS[target]}</label>
-          <div className="tr-output" lang={target}>
-            {output || <span className="muted">Translation appears here.</span>}
-          </div>
-        </div>
-      </div>
-
-      <div className="tr-actions">
-        <button className="btn primary" onClick={run} disabled={busy || !input.trim()}>
-          {busy ? (
-            'Working…'
-          ) : (
-            <>
-              <Icon name="globe" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-              Translate
-            </>
+              <div className="dict-lang-toggle">
+                {LANG_ORDER.filter((l) => l !== source).map((l) => (
+                  <button
+                    key={l}
+                    className={`gram-level-btn ${target === l ? 'active' : ''}`}
+                    onClick={() => state.pickTarget(l)}
+                  >
+                    {LANG_LABELS[l]}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
-        </button>
-        {busy && (
-          <div className="tr-status">
-            <span className="media-gen-dot" />
-            <span className="muted">{msg}</span>
-          </div>
-        )}
-        {error && <div className="media-error tr-error">{error}</div>}
-      </div>
+        </div>
 
-      <p className="muted tr-note">
-        Powered by Qwen3-1.7B — translates any direction between Japanese, Chinese, English, and
-        Russian. Pair with Dictionary for word-level detail. The first run loads the model
-        (~10–30s), then it is fast.
-      </p>
-    </div>
+        {tab === 'history' ? (
+          historyPanel
+        ) : (
+          <>
+            <div className="tr-panes">
+              <div className="tr-pane">
+                <label className="tr-label">{LANG_LABELS[source]}</label>
+                <textarea
+                  className="tr-textarea"
+                  lang={source}
+                  value={input}
+                  onChange={(e) => state.setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
+                  }}
+                  placeholder={`${PLACEHOLDERS[source]}  (Ctrl+Enter)`}
+                />
+              </div>
+              <div className="tr-pane">
+                <label className="tr-label">{LANG_LABELS[target]}</label>
+                <div className="tr-output" lang={target}>
+                  {output || <span className="muted">{t('translate.outputPlaceholder')}</span>}
+                </div>
+              </div>
+            </div>
+
+            <div className="tr-actions">
+              <button className="btn primary" onClick={() => void run()} disabled={busy || !input.trim()}>
+                {busy ? (
+                  t('translate.working')
+                ) : (
+                  <>
+                    <Icon name="globe" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+                    {t('translate.menu.translate')}
+                  </>
+                )}
+              </button>
+              {busy && (
+                <div className="tr-status">
+                  <span className="media-gen-dot" />
+                  <span className="muted">{msg}</span>
+                </div>
+              )}
+              {error && <div className="media-error tr-error">{error}</div>}
+            </div>
+
+            <SentenceAnalysisPanel
+              sourceText={state.translatedInput}
+              translatedText={output}
+              source={source}
+              target={target}
+            />
+          </>
+        )}
+      </div>
+    </AppChrome>
   );
 }

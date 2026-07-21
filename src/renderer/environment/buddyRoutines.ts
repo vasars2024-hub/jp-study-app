@@ -1,13 +1,28 @@
 /**
  * Programmable buddy routines — allowlisted action chains for companions.
  * No eval / shell / network. Nested routines depth-capped.
+ * Speak steps use local Animalese beeps (no TTS).
  */
 import type { CompanionMood, CompanionTypeId } from './companionCatalog';
 import type { EnvironmentSettings } from './types';
 import { loadEnvironment, saveEnvironment } from './environmentStore';
 import { runCommand } from '../keyboardShortcuts';
 import { next as musicNext, prev as musicPrev, toggle as musicToggle } from '../playerBus';
-import { speak, ttsAvailable } from '../tts';
+import { speakBeepLine, voiceForType } from './beepSpeech';
+import { defFor } from './companionCatalog';
+import {
+  sanitizeTrigger,
+  timeScheduleFromRoutines,
+  type BuddyTrigger,
+} from './buddyTriggers';
+
+export type { BuddyTrigger, BuddyTriggerKind, BuddyTimeScheduleEntry } from './buddyTriggers';
+export {
+  hourInTriggerWindow,
+  routinesMatchingTrigger,
+  sanitizeTrigger,
+  timeScheduleFromRoutines,
+} from './buddyTriggers';
 
 export const BUDDY_TOAST_EVENT = 'buddy:toast';
 export const BUDDY_RUN_EVENT = 'buddy:run';
@@ -39,13 +54,17 @@ export interface BuddyRoutine {
   forType?: CompanionTypeId | '*';
   steps: BuddyStep[];
   builtin?: boolean;
+  /** When set, the routine can fire from a trigger (still testable manually). */
+  trigger?: BuddyTrigger;
 }
 
 export interface BuddyRunContext {
   companionId: string;
   typeId: CompanionTypeId;
   /** Update companion fields in live list + optionally persist. */
-  patchCompanion: (patch: { mood?: CompanionMood; status?: string }) => void;
+  patchCompanion: (patch: { mood?: CompanionMood; status?: string; speechBubble?: string | null }) => void;
+  /** Optional beep-speech override (CompanionLayer provides this). */
+  speak?: (text: string) => void;
 }
 
 const STEP_TYPES = new Set([
@@ -174,8 +193,45 @@ export function getDefaultBuddyRoutines(): BuddyRoutine[] {
       builtin: true,
       steps: [
         { type: 'setMood', mood: 'celebrate', status: 'Secret OS discovered' },
+        { type: 'speak', text: 'Secret strength!' },
         { type: 'wait', ms: 1400 },
         { type: 'setMood', mood: 'curious', status: 'Climbing the frame' },
+      ],
+    },
+    {
+      id: 'br-time-morning',
+      name: 'Morning greeting',
+      forType: 'timekeeper',
+      builtin: true,
+      trigger: { kind: 'timeOfDay', startHour: 5, endHour: 11 },
+      steps: [
+        { type: 'setMood', mood: 'curious', status: 'Good morning' },
+        { type: 'speak', text: 'Good morning.' },
+        { type: 'notify', title: 'Timekeeper', body: 'Day watch begins' },
+      ],
+    },
+    {
+      id: 'br-critter-music',
+      name: 'Music jam',
+      forType: 'critter',
+      builtin: true,
+      trigger: { kind: 'musicPlaying' },
+      steps: [
+        { type: 'setMood', mood: 'celebrate', status: 'Feeling the music' },
+        { type: 'speak', text: 'Dance paws!' },
+        { type: 'wait', ms: 900 },
+        { type: 'setMood', mood: 'curious', status: 'Exploring' },
+      ],
+    },
+    {
+      id: 'br-buddy-idle',
+      name: 'Idle stretch',
+      forType: 'study-buddy',
+      builtin: true,
+      trigger: { kind: 'idle', afterMs: 90_000 },
+      steps: [
+        { type: 'setMood', mood: 'curious', status: 'Still here' },
+        { type: 'speak', text: 'Ready when you are.' },
       ],
     },
   ];
@@ -296,7 +352,8 @@ export function sanitizeRoutine(raw: unknown): BuddyRoutine | null {
     r.forType === 'critter' ||
     r.forType === 'timekeeper' ||
     r.forType === 'noctis' ||
-    r.forType === 'miko-shimeji'
+    r.forType === 'miko-shimeji' ||
+    r.forType === 'wired-navi'
       ? r.forType
       : undefined;
   return {
@@ -305,7 +362,18 @@ export function sanitizeRoutine(raw: unknown): BuddyRoutine | null {
     forType,
     steps,
     builtin: r.builtin === true,
+    trigger: sanitizeTrigger(r.trigger),
   };
+}
+
+/** Push time-of-day triggers to the single main-process scheduler. */
+export function syncBuddyTimeSchedule(routines: BuddyRoutine[]): void {
+  const entries = timeScheduleFromRoutines(routines);
+  try {
+    window.api?.buddySchedulerSync?.(entries);
+  } catch {
+    /* preload may be absent in tests */
+  }
 }
 
 /** Merge user routines with missing builtins (by id). */
@@ -402,7 +470,12 @@ async function runStep(step: BuddyStep, ctx: BuddyRunContext, depth: number): Pr
       ctx.patchCompanion({ mood: step.mood, status: step.status });
       return;
     case 'speak':
-      if (ttsAvailable()) speak(step.text, 'ja');
+      if (ctx.speak) {
+        ctx.speak(step.text);
+      } else {
+        const profile = defFor(ctx.typeId).voice ?? voiceForType(ctx.typeId);
+        await speakBeepLine(ctx.companionId, step.text, profile);
+      }
       return;
     case 'wait':
       await new Promise((r) => setTimeout(r, step.ms));

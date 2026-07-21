@@ -1,16 +1,16 @@
 {
   "name": "jp-study-app",
   "productName": "jp-study-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "My Electron application description",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
     "start": "electron-forge start",
-    "package": "node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge package",
-    "make": "node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge make",
+    "package": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge package",
+    "make": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge make",
     "package:win": "node tools/package-app.cjs",
-    "postinstall": "node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs",
+    "postinstall": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run"
@@ -57,6 +57,7 @@
     "kuromoji": "^0.1.2",
     "linkedom": "^0.18.12",
     "node-llama-cpp": "^3.19.0",
+    "onnxruntime-node": "^1.27.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

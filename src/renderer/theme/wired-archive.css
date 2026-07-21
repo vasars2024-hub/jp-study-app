@@ -1,0 +1,379 @@
+:root[data-theme='wired-archive'] {
+  color-scheme: dark;
+  --bg: #02070d;
+  --panel: #06121a;
+  --panel-2: #0a1d27;
+  --sidebar: #020910;
+  --text: #d8fbff;
+  --muted: #77a8b2;
+  --border: rgba(109, 241, 255, 0.24);
+  --accent: #6df1ff;
+  --accent-2: #b9fbff;
+  --red: #df2732;
+  --red-deep: #6f0710;
+  --control-bg: rgba(0, 15, 22, 0.86);
+  --control-border: rgba(109, 241, 255, 0.34);
+  --grid-line: rgba(109, 241, 255, 0.14);
+  --chrome: #030d14;
+  --chrome-elevated: #071823;
+  --font-body: 'JetBrains Mono', 'IBM Plex Mono', Consolas, 'Yu Gothic UI', Meiryo, ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', Consolas, 'Yu Gothic UI', Meiryo, ui-monospace, monospace;
+  --wired-black: #02070d;
+  --wired-blue: #061d2b;
+  --wired-cyan: #6df1ff;
+  --wired-cyan-dim: rgba(109, 241, 255, 0.42);
+  --wired-teal: #57d6c9;
+  --wired-amber: #ffb13b;
+  --wired-red: #df2732;
+  --wired-steel: #385765;
+  --wired-glass: rgba(3, 19, 27, 0.86);
+  --wired-glass-strong: rgba(6, 28, 39, 0.94);
+  --wired-line: rgba(109, 241, 255, 0.26);
+  --wired-glow: 0 0 12px rgba(109, 241, 255, 0.34);
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --taskbar-h: 52px;
+}
+
+:root[data-materials='wired'] {
+  background: var(--wired-black);
+}
+
+:root[data-materials='wired'] body,
+:root[data-materials='wired'] button,
+:root[data-materials='wired'] input,
+:root[data-materials='wired'] textarea,
+:root[data-materials='wired'] select {
+  letter-spacing: 0;
+}
+
+:root[data-materials='wired'] .desktop-root,
+:root[data-materials='wired'] .os-viewport-stage {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(37, 112, 126, 0.18), transparent 44%),
+    linear-gradient(180deg, #03080f, #000409);
+}
+
+/* Boot overlay ------------------------------------------------------------ */
+.wired-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--wired-cyan);
+  background: #00050a;
+  font-family: var(--font-mono);
+}
+
+.wired-boot-grid,
+.wired-boot-noise,
+.wired-boot-vignette,
+.lockscreen-wired-map,
+.lockscreen-wired-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wired-boot-grid {
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.12), transparent 54%);
+  background-size: 28px 28px, 28px 28px, cover;
+  animation: wired-grid-drift 8s steps(24) infinite;
+}
+
+.wired-boot-noise,
+.lockscreen-wired-noise {
+  opacity: 0.14;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.12) 0 1px, transparent 1px 5px);
+  mix-blend-mode: screen;
+  animation: wired-static 180ms steps(2) infinite;
+}
+
+:root[data-wired-crt='clean'] .wired-boot-noise,
+:root[data-wired-crt='clean'] .lockscreen-wired-noise,
+:root[data-wired-static='reduced'] .wired-boot-noise,
+:root[data-wired-static='reduced'] .lockscreen-wired-noise {
+  opacity: 0.045;
+  animation-duration: 900ms;
+}
+
+:root[data-wired-crt='heavy'] .wired-boot-noise,
+:root[data-wired-crt='heavy'] .lockscreen-wired-noise {
+  opacity: 0.24;
+}
+
+.wired-boot-vignette {
+  background:
+    radial-gradient(ellipse at center, transparent 48%, rgba(0, 0, 0, 0.78) 100%),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.035), transparent 18%, transparent 82%, rgba(0, 180, 255, 0.04));
+}
+
+.wired-boot-panel {
+  position: relative;
+  width: min(880px, calc(100vw - 48px));
+  min-height: 560px;
+  border: 1px solid rgba(109, 241, 255, 0.42);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent 32%),
+    rgba(0, 11, 17, 0.9);
+  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.12) inset, 0 0 52px rgba(29, 186, 207, 0.22);
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.42);
+}
+
+.wired-boot-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 18px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.28);
+  color: #d8fbff;
+  font-size: 12px;
+}
+
+.wired-boot-map {
+  height: 220px;
+  margin: 18px;
+  border: 1px solid rgba(109, 241, 255, 0.18);
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.06) 1px, transparent 1px),
+    rgba(2, 14, 22, 0.78);
+  background-size: 22px 22px;
+}
+
+.wired-boot-map svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: rgba(109, 241, 255, 0.72);
+  stroke-width: 1.5;
+}
+
+.wired-boot-map text {
+  fill: rgba(216, 251, 255, 0.72);
+  stroke: none;
+  font-size: 11px;
+}
+
+.wired-boot-route {
+  stroke-dasharray: 9 9;
+  animation: wired-route 1.2s linear infinite;
+}
+
+.wired-boot-route.route-b {
+  stroke: rgba(255, 177, 59, 0.56);
+  animation-duration: 1.7s;
+}
+
+.wired-boot-console {
+  margin: 18px;
+  padding: 14px;
+  min-height: 190px;
+  border: 1px solid rgba(109, 241, 255, 0.22);
+  background: rgba(0, 8, 13, 0.72);
+}
+
+.wired-boot-kicker {
+  color: var(--wired-amber);
+  margin-bottom: 10px;
+}
+
+.wired-boot-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wired-boot-lines li {
+  opacity: 0;
+  transform: translateY(2px);
+  animation: wired-line-in 220ms steps(2) forwards;
+  animation-delay: calc(var(--wired-line-index) * 95ms);
+}
+
+.wired-boot-lines li::before {
+  content: '> ';
+  color: var(--wired-amber);
+}
+
+.wired-boot-warning {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  color: #ffd2d4;
+  background: rgba(126, 0, 12, 0.36);
+  border: 1px solid rgba(223, 39, 50, 0.7);
+  box-shadow: 0 0 26px rgba(223, 39, 50, 0.36) inset;
+  font-size: 22px;
+}
+
+.wired-boot-sleep {
+  display: grid;
+  gap: 8px;
+}
+
+.wired-boot-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px 18px;
+  font-size: 12px;
+}
+
+.wired-boot-controls button,
+.lockscreen-wired-command button {
+  color: var(--wired-cyan);
+  background: rgba(4, 24, 34, 0.9);
+  border: 1px solid rgba(109, 241, 255, 0.42);
+  border-radius: 2px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+}
+
+.wired-boot-controls button:disabled {
+  opacity: 0.45;
+}
+
+/* Lockscreen -------------------------------------------------------------- */
+.lockscreen-wired {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--wired-cyan);
+  background: #00050a;
+  font-family: var(--font-mono);
+}
+
+.lockscreen-wired-map {
+  opacity: 0.62;
+  background:
+    radial-gradient(circle at 50% 44%, transparent 0 88px, rgba(109, 241, 255, 0.18) 89px 90px, transparent 91px),
+    radial-gradient(circle at 50% 44%, transparent 0 178px, rgba(109, 241, 255, 0.12) 179px 180px, transparent 181px),
+    linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.06) 1px, transparent 1px);
+  background-size: auto, auto, 30px 30px, 30px 30px;
+}
+
+.lockscreen-wired-panel {
+  position: relative;
+  width: min(620px, calc(100vw - 38px));
+  border: 1px solid rgba(109, 241, 255, 0.38);
+  background: rgba(0, 13, 20, 0.9);
+  box-shadow: var(--wired-glow), 0 0 0 1px rgba(109, 241, 255, 0.12) inset;
+}
+
+.lockscreen-wired-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.24);
+  font-size: 12px;
+}
+
+.lockscreen-wired-clock {
+  display: grid;
+  gap: 4px;
+  padding: 26px 28px 14px;
+}
+
+.lockscreen-wired-clock time {
+  font-size: 44px;
+  color: #e9feff;
+}
+
+.lockscreen-wired-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0 28px 20px;
+}
+
+.lockscreen-wired-grid span {
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  padding: 8px;
+  color: rgba(216, 251, 255, 0.66);
+  background: rgba(109, 241, 255, 0.035);
+}
+
+.lockscreen-wired-form {
+  padding: 0 28px 28px;
+}
+
+.lockscreen-wired-form label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--wired-amber);
+}
+
+.lockscreen-wired-command {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.lockscreen-wired-command input {
+  min-width: 0;
+  color: #e9feff;
+  background: rgba(0, 6, 10, 0.9);
+  border: 1px solid rgba(109, 241, 255, 0.34);
+  border-radius: 0;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+}
+
+.lockscreen-wired-status {
+  color: rgba(216, 251, 255, 0.72);
+  min-height: 20px;
+}
+
+.lockscreen-wired.is-error .lockscreen-wired-status {
+  color: #ffd2d4;
+}
+
+.lockscreen-wired.is-error .lockscreen-wired-panel {
+  border-color: rgba(223, 39, 50, 0.72);
+  box-shadow: 0 0 32px rgba(223, 39, 50, 0.28);
+}
+
+@keyframes wired-grid-drift {
+  to { background-position: 0 28px, 28px 0, center; }
+}
+
+@keyframes wired-static {
+  to { transform: translateY(2px); }
+}
+
+@keyframes wired-route {
+  to { stroke-dashoffset: -36; }
+}
+
+@keyframes wired-line-in {
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wired-boot-grid,
+  .wired-boot-noise,
+  .lockscreen-wired-noise,
+  .wired-boot-route,
+  .wired-boot-lines li {
+    animation: none !important;
+  }
+  .wired-boot-lines li {
+    opacity: 1;
+    transform: none;
+  }
+}

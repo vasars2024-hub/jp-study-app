@@ -3,6 +3,7 @@ import Icon from '../../Icons';
 import SettingsCard from '../SettingsCard';
 import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
+import { useT } from '../../../i18n';
 import {
   clearSettingsDomain,
   exportAllData,
@@ -54,14 +55,17 @@ function Meter({ label, pct, detail }: { label: string; pct: number; detail: str
   );
 }
 
-function tierLabel(tier: DomainInventoryItem['tier']): string {
-  if (tier === 'host') return 'Host';
-  if (tier === 'durable') return 'Durable';
-  if (tier === 'mixed') return 'Mixed';
-  return 'Local';
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+function tierLabel(tier: DomainInventoryItem['tier'], t: TFn): string {
+  if (tier === 'host') return t('settings.memory.tier.host');
+  if (tier === 'durable') return t('settings.memory.tier.durable');
+  if (tier === 'mixed') return t('settings.memory.tier.mixed');
+  return t('settings.memory.tier.local');
 }
 
 export default function MemoryPage() {
+  const { t } = useT();
   const { focusSettingId } = useSettings();
   const [domains, setDomains] = useState<DomainInventoryItem[]>([]);
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
@@ -78,7 +82,7 @@ export default function MemoryPage() {
       setDomains(await listSettingsDomains());
     } catch (error) {
       setDomains([]);
-      setLoadError(error instanceof Error ? error.message : 'Could not read settings inventory.');
+      setLoadError(error instanceof Error ? error.message : t('settings.memory.inventoryFail'));
     }
     try {
       const est = await navigator.storage.estimate();
@@ -142,7 +146,7 @@ export default function MemoryPage() {
       URL.revokeObjectURL(url);
       const n = backup.domains?.length ?? 0;
       setStatus(
-        `Backup downloaded (format ${backup.format}) — ${n} settings domain(s), including particles, companions, wallpaper, display, and host configs.`,
+        t('settings.memory.backupDownloaded', { format: String(backup.format), count: n }),
       );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -160,7 +164,7 @@ export default function MemoryPage() {
         setStatus(error);
         return;
       }
-      setStatus('Backup restored (all settings + host configs) — reloading…');
+      setStatus(t('settings.memory.backupRestored'));
       setTimeout(() => window.location.reload(), 500);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -171,13 +175,11 @@ export default function MemoryPage() {
 
   async function handleClearDomain(d: DomainInventoryItem): Promise<void> {
     if (!d.clearable) return;
-    const msg =
-      d.clearConfirm ??
-      `Clear “${d.label}”? This only removes that settings domain.`;
+    const msg = d.clearConfirm ?? t('settings.memory.clearDomainMsg', { label: d.label });
     const ok = await confirmDialog({
-      title: 'Clear settings domain',
+      title: t('settings.memory.clearDomainTitle'),
       message: msg,
-      confirmLabel: 'Clear',
+      confirmLabel: t('settings.memory.clear'),
       danger: true,
     });
     if (!ok) return;
@@ -185,7 +187,7 @@ export default function MemoryPage() {
     setStatus('');
     try {
       const err = await clearSettingsDomain(d.id);
-      setStatus(err ?? `Cleared: ${d.label}`);
+      setStatus(err ?? t('settings.memory.clearedLabel', { label: d.label }));
       await refreshStorage();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -196,10 +198,9 @@ export default function MemoryPage() {
 
   async function handleFactoryReset(): Promise<void> {
     const ok = await confirmDialog({
-      title: 'Factory reset',
-      message:
-        'Factory reset: deletes local settings, decks, drafts, caches, and resets mining config, then restarts. Export a backup first. Continue?',
-      confirmLabel: 'Factory reset',
+      title: t('settings.memory.factoryTitle'),
+      message: t('settings.memory.factoryMessage'),
+      confirmLabel: t('settings.memory.factoryButton'),
       danger: true,
     });
     if (!ok) return;
@@ -235,12 +236,21 @@ export default function MemoryPage() {
 
   const env = domains.find((d) => d.id === 'environment');
 
+  const quickActions = [
+    { id: 'environment', labelKey: 'settings.memory.quick.environment' },
+    { id: 'flashcards', labelKey: 'settings.memory.quick.flashcards' },
+    { id: 'clipboard', labelKey: 'settings.memory.quick.clipboard' },
+    { id: 'lyrics-cache', labelKey: 'settings.memory.quick.lyrics' },
+    { id: 'lookups', labelKey: 'settings.memory.quick.lookups' },
+    { id: 'mining', labelKey: 'settings.memory.quick.mining' },
+  ] as const;
+
   return (
     <>
       <SettingsCard
         id="system-memory"
-        title="System memory"
-        description="Live RAM usage on this PC."
+        title={t('search.systemMemory')}
+        description={t('search.systemMemory.desc')}
         highlight={focusSettingId === 'system-memory'}
         trailing={
           <button
@@ -252,52 +262,66 @@ export default function MemoryPage() {
               void refreshStorage();
             }}
           >
-            Refresh
+            {t('settings.memory.refresh')}
           </button>
         }
       >
         {sys ? (
           <>
             <Meter
-              label="RAM"
+              label={t('settings.memory.ram')}
               pct={ramPct}
-              detail={`${formatBytes(ramUsed)} used of ${formatBytes(sys.totalmem)} · ${ramPct.toFixed(0)}%`}
+              detail={t('settings.memory.usedOf', {
+                used: formatBytes(ramUsed),
+                total: formatBytes(sys.totalmem),
+                pct: String(Math.round(ramPct)),
+              })}
             />
             <div className="memory-sys-meta muted">
-              <span>CPU load {Math.round(sys.cpuLoad * 100)}%</span>
+              <span>
+                {t('settings.memory.cpuLoad', { pct: String(Math.round(sys.cpuLoad * 100)) })}
+              </span>
               <span aria-hidden>·</span>
-              <span>Uptime {formatUptime(sys.uptime)}</span>
+              <span>{t('settings.memory.uptime', { uptime: formatUptime(sys.uptime) })}</span>
               <span aria-hidden>·</span>
               <span>{sys.platform}</span>
             </div>
           </>
         ) : (
-          <p className="muted os-set-hint">System metrics unavailable.</p>
+          <p className="muted os-set-hint">{t('settings.memory.sysUnavailable')}</p>
         )}
       </SettingsCard>
 
       <SettingsCard
         id="storage-usage"
-        title="App storage"
-        description="Browser quota plus catalogued settings size."
+        title={t('search.storageUsage')}
+        description={t('search.storageUsage.desc')}
         highlight={focusSettingId === 'storage-usage' || focusSettingId === 'memory'}
       >
         {usage ? (
           <Meter
-            label="Quota"
+            label={t('settings.memory.quota')}
             pct={usagePct}
-            detail={`${formatBytes(usage.used)} used of ${formatBytes(usage.quota)} · ${usagePct.toFixed(1)}%`}
+            detail={t('settings.memory.usedOf', {
+              used: formatBytes(usage.used),
+              total: formatBytes(usage.quota),
+              pct: usagePct.toFixed(1),
+            })}
           />
         ) : (
-          <p className="muted os-set-hint">Storage estimate unavailable.</p>
+          <p className="muted os-set-hint">{t('settings.memory.storageUnavailable')}</p>
         )}
         <p className="muted os-set-hint" style={{ marginTop: 8 }}>
-          Settings catalog ≈ {formatBytes(totalBytes)} across {present.length} active domain
-          {present.length === 1 ? '' : 's'} (particles, companions, wallpaper, display, study, host…).
+          {t(
+            present.length === 1
+              ? 'settings.memory.catalogSummaryOne'
+              : 'settings.memory.catalogSummary',
+            { bytes: formatBytes(totalBytes), count: present.length },
+          )}
         </p>
         {env && (
           <p className="memory-env-summary" style={{ marginTop: 8 }}>
-            <strong>Living layer</strong>
+            <strong>{t('settings.memory.livingLayer')}</strong>
             <span className="muted"> — {env.detail}</span>
           </p>
         )}
@@ -306,29 +330,29 @@ export default function MemoryPage() {
 
       <SettingsCard
         id="storage-inventory"
-        title="Settings inventory"
-        description="Every settings domain: living layer, appearance, desktop, study, media, and host configs."
+        title={t('settings.memory.inventoryTitle')}
+        description={t('settings.memory.inventoryDesc')}
         highlight={focusSettingId === 'storage-inventory'}
       >
         <div className="memory-filter-row">
           <input
             type="search"
             className="os-set-search-input"
-            placeholder="Filter domains…"
+            placeholder={t('settings.memory.filterPlaceholder')}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            aria-label="Filter settings domains"
+            aria-label={t('settings.memory.filterAria')}
           />
         </div>
         <div className="memory-inventory-wrap">
           <table className="memory-inventory">
             <thead>
               <tr>
-                <th>Settings</th>
-                <th>Category</th>
-                <th>Where</th>
-                <th>Size</th>
-                <th>Detail</th>
+                <th>{t('settings.memory.col.settings')}</th>
+                <th>{t('settings.memory.col.category')}</th>
+                <th>{t('settings.memory.col.where')}</th>
+                <th>{t('settings.memory.col.size')}</th>
+                <th>{t('settings.memory.col.detail')}</th>
                 <th />
               </tr>
             </thead>
@@ -336,7 +360,9 @@ export default function MemoryPage() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} className="muted">
-                    {loadError ? 'Inventory failed to load.' : 'No matching domains.'}
+                    {loadError
+                      ? t('settings.memory.inventoryFailed')
+                      : t('settings.memory.noMatches')}
                   </td>
                 </tr>
               )}
@@ -346,7 +372,7 @@ export default function MemoryPage() {
                     <strong className="memory-domain-label">{d.label}</strong>
                   </td>
                   <td className="muted">{d.category}</td>
-                  <td className="muted">{tierLabel(d.tier)}</td>
+                  <td className="muted">{tierLabel(d.tier, t)}</td>
                   <td>{d.bytes > 0 ? formatBytes(d.bytes) : '—'}</td>
                   <td className="memory-detail muted">{d.detail}</td>
                   <td>
@@ -357,7 +383,7 @@ export default function MemoryPage() {
                         disabled={busy || !(d.present || d.bytes > 0)}
                         onClick={() => void handleClearDomain(d)}
                       >
-                        Clear
+                        {t('settings.memory.clear')}
                       </button>
                     ) : (
                       <span className="muted">—</span>
@@ -369,26 +395,21 @@ export default function MemoryPage() {
           </table>
         </div>
         <p className="muted os-set-hint" style={{ marginTop: 8 }}>
-          Living layer includes particles (density / intensity / size), companions, buddy routines,
-          wallpaper playlists, and lighting — export captures them all.
+          {t('settings.memory.inventoryHint')}
         </p>
       </SettingsCard>
 
       <SettingsCard
         id="backup"
-        title="Backup & restore"
-        description="Export or import every local setting plus host configs (mining, AI, desktop layout, profiles)."
+        title={t('search.backup')}
+        description={t('search.backup.desc')}
         highlight={focusSettingId === 'backup'}
       >
-        <p className="muted os-set-hint">
-          Full backup (format 2): localStorage, IndexedDB, mining presets, AI config, desktop layout,
-          and study profiles. Wallpaper image files on disk are not embedded — only layout references
-          and living-layer playlists.
-        </p>
+        <p className="muted os-set-hint">{t('settings.memory.backupHint')}</p>
         <div className="memory-actions">
           <button type="button" className="btn" disabled={busy} onClick={() => void handleExport()}>
             <Icon name="download" size={14} style={{ marginRight: 5, verticalAlign: '-2px' }} />
-            Export all settings
+            {t('settings.memory.exportAll')}
           </button>
           <button
             type="button"
@@ -396,7 +417,7 @@ export default function MemoryPage() {
             disabled={busy}
             onClick={() => importRef.current?.click()}
           >
-            Import backup…
+            {t('settings.memory.importBackup')}
           </button>
           <input
             ref={importRef}
@@ -414,46 +435,40 @@ export default function MemoryPage() {
 
       <SettingsCard
         id="clear-data"
-        title="Quick clear"
-        description="Common wipe actions. Full domain list is above."
+        title={t('settings.memory.quickTitle')}
+        description={t('settings.memory.quickDesc')}
         highlight={focusSettingId === 'clear-data'}
       >
         <div className="memory-actions">
-          {(
-            [
-              ['environment', 'Reset living layer'],
-              ['flashcards', 'Clear flashcards'],
-              ['clipboard', 'Clear clipboard'],
-              ['lyrics-cache', 'Clear lyrics cache'],
-              ['lookups', 'Clear lookups'],
-              ['mining', 'Reset mining presets'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className="btn small"
-              disabled={busy}
-              onClick={() => {
-                const d = domains.find((x) => x.id === id);
-                if (d) void handleClearDomain(d);
-                else
-                  void run(async () => {
-                    const err = await clearSettingsDomain(id);
-                    if (err) throw new Error(err);
-                  }, `Cleared ${label}`);
-              }}
-            >
-              {label}
-            </button>
-          ))}
+          {quickActions.map(({ id, labelKey }) => {
+            const label = t(labelKey);
+            return (
+              <button
+                key={id}
+                type="button"
+                className="btn small"
+                disabled={busy}
+                onClick={() => {
+                  const d = domains.find((x) => x.id === id);
+                  if (d) void handleClearDomain(d);
+                  else
+                    void run(async () => {
+                      const err = await clearSettingsDomain(id);
+                      if (err) throw new Error(err);
+                    }, t('settings.memory.cleared', { label }));
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </SettingsCard>
 
       <SettingsCard
         id="factory-reset"
-        title="Factory reset"
-        description="Wipe local app data and restart. Export a backup first."
+        title={t('search.factoryReset')}
+        description={t('search.factoryReset.desc')}
         highlight={focusSettingId === 'factory-reset'}
       >
         <button
@@ -462,7 +477,7 @@ export default function MemoryPage() {
           disabled={busy}
           onClick={() => void handleFactoryReset()}
         >
-          Factory reset
+          {t('settings.memory.factoryButton')}
         </button>
       </SettingsCard>
 

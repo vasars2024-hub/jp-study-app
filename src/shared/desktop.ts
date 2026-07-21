@@ -10,11 +10,14 @@ export type DesktopWinSection =
   | 'novels'
   | 'dictionary'
   | 'grammar'
+  | 'notebook'
   | 'translate'
   | 'player'
+  | 'video'
   | 'music'
   | 'anki'
   | 'flashcards'
+  | 'games'
   | 'stats'
   | 'resources'
   | 'settings'
@@ -23,7 +26,9 @@ export type DesktopWinSection =
   | 'musicwidget'
   | 'city'
   | 'immersion'
-  | 'calendar';
+  | 'calendar'
+  | 'reading'
+  | 'youtube';
 
 export interface WindowSnapshot {
   id: string;
@@ -35,6 +40,8 @@ export interface WindowSnapshot {
   z: number;
   visible: boolean;
   maximized: boolean;
+  /** Always-on-top. Optional so pre-existing saved layouts still parse. */
+  pinned?: boolean;
   restoreRect?: { x: number; y: number; w: number; h: number };
 }
 

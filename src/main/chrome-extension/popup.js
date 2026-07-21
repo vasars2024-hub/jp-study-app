@@ -1,0 +1,313 @@
+/* global chrome */
+/* Task-oriented toolbar popup: what can I do on this page right now? */
+
+const chipEl = document.getElementById('status-chip');
+const detailEl = document.getElementById('status-detail');
+const stApp = document.getElementById('st-app');
+const stPair = document.getElementById('st-pair');
+const stAnki = document.getElementById('st-anki');
+const stPending = document.getElementById('st-pending');
+const pageTitleEl = document.getElementById('page-title');
+const pageMetaEl = document.getElementById('page-meta');
+const pageCardEl = document.getElementById('page-card');
+const actionsEl = document.getElementById('actions');
+const recentWrap = document.getElementById('recent-wrap');
+const recentEl = document.getElementById('recent');
+const pendingBar = document.getElementById('pending-bar');
+const pendingText = document.getElementById('pending-text');
+const feedbackEl = document.getElementById('feedback');
+
+let detect = null;
+
+function send(msg) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(msg, (res) => {
+      if (chrome.runtime.lastError) {
+        resolve({ ok: false, error: chrome.runtime.lastError.message });
+        return;
+      }
+      resolve(res || { ok: false, error: 'No response' });
+    });
+  });
+}
+
+function feedback(text, cls) {
+  feedbackEl.textContent = text || '';
+  feedbackEl.className = cls || '';
+}
+
+/* ------------------------------ status header ------------------------------ */
+
+async function refreshStatus() {
+  const st = await send({ type: 'status-summary' });
+  const pending = st?.pending || 0;
+
+  if (st?.app && st?.paired !== false) {
+    chipEl.textContent = pending > 0 ? `Connected · ${pending} queued` : 'Connected';
+    chipEl.className = 'status-chip' + (pending > 0 ? ' warn' : ' ok');
+  } else if (st?.app) {
+    chipEl.textContent = 'Pairing needed';
+    chipEl.className = 'status-chip warn';
+  } else {
+    chipEl.textContent = 'App not running';
+    chipEl.className = 'status-chip err';
+  }
+
+  stApp.textContent = st?.app ? 'Running' : 'Not running';
+  stApp.className = 'v ' + (st?.app ? 'ok' : 'err');
+  stPair.textContent = !st?.app ? '—' : st?.paired === false ? 'Token needed' : 'OK';
+  stPair.className = 'v ' + (!st?.app ? '' : st?.paired === false ? 'warn' : 'ok');
+  stAnki.textContent = st?.profileName
+    ? st.deckName
+      ? `${st.profileName} → ${st.deckName}`
+      : st.profileName
+    : '—';
+  stAnki.className = 'v';
+  stPending.textContent = String(pending);
+  stPending.className = 'v ' + (pending > 0 ? 'warn' : '');
+
+  pendingBar.hidden = pending === 0;
+  if (pending > 0) {
+    pendingText.textContent = `${pending} item${pending === 1 ? '' : 's'} waiting to sync`;
+  }
+}
+
+chipEl.addEventListener('click', () => {
+  const open = detailEl.hidden;
+  detailEl.hidden = !open;
+  chipEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+
+document.getElementById('fix-connection').addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+});
+
+/* ------------------------------- page section ------------------------------ */
+
+async function refreshPage() {
+  detect = await send({ type: 'detect' });
+  if (!detect?.ok || !detect.scriptable) {
+    pageCardEl.classList.add('empty');
+    pageTitleEl.textContent = 'This page is browser-restricted';
+    pageMetaEl.innerHTML = '';
+    if (detect?.ok && !detect.scriptable) {
+      pageMetaEl.innerHTML = '<span>Lookup and capture are unavailable on internal browser pages.</span>';
+    }
+    renderActions();
+    return;
+  }
+  pageTitleEl.textContent = detect.title || detect.url || 'Current page';
+  pageTitleEl.title = detect.url || '';
+
+  const pills = [`<span class="pill">${escapeHtml(detect.categoryLabel || 'Webpage')}</span>`];
+
+  // Difficulty + known coverage come from the content script's page scan.
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      const badge = await chrome.tabs.sendMessage(tab.id, { type: 'jp-get-level-badge' });
+      if (badge?.badge && badge.badge !== '—' && badge.badge !== 'X') {
+        pills.push(
+          `<span class="pill" title="Vocabulary-band estimate, not an official rating">Difficulty ${escapeHtml(badge.badge)}${badge.offline ? ' (cached)' : ''}</span>`,
+        );
+      }
+      if (typeof badge?.comprehensibility === 'number') {
+        pills.push(`<span class="pill">Known words ${badge.comprehensibility}%</span>`);
+      }
+      if (badge?.empty) {
+        pageCardEl.classList.add('empty');
+        pageTitleEl.textContent = 'No Japanese text detected on this page';
+        pageMetaEl.innerHTML =
+          '<span>Hover lookup activates when you hold the lookup key over Japanese text.</span>';
+        renderActions();
+        return;
+      }
+    }
+  } catch {
+    /* content script not present (e.g. page just opened) — fine */
+  }
+  pageCardEl.classList.remove('empty');
+  pageMetaEl.innerHTML = pills.join('');
+  renderActions();
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* -------------------------------- actions ---------------------------------- */
+
+function renderActions() {
+  const kind = detect?.kind || 'article';
+  const category = detect?.category || 'other';
+  const scriptable = !!detect?.scriptable;
+  let items;
+  if (!scriptable) {
+    items = [{ id: 'open-app', label: 'Open GrammarX', primary: true }];
+  } else if (kind === 'youtube-video' || kind === 'youtube-playlist') {
+    items = [
+      { id: 'capture-page', label: kind === 'youtube-playlist' ? 'Save playlist' : 'Save video', primary: true },
+      { id: 'download', label: 'Download video' },
+      { id: 'lookup', label: 'Look up selection' },
+      { id: 'save-selection', label: 'Save selection' },
+    ];
+  } else if (category === 'manga') {
+    items = [
+      { id: 'ocr', label: 'OCR capture', primary: true },
+      { id: 'scan-strip', label: 'Import manga pages' },
+      { id: 'lookup', label: 'Look up selection' },
+      { id: 'capture-page', label: 'Save page' },
+    ];
+  } else {
+    items = [
+      { id: 'lookup', label: 'Look up selection', primary: true },
+      { id: 'save-selection', label: 'Save selection' },
+      { id: 'capture-page', label: 'Save page' },
+      { id: 'ocr', label: 'OCR capture' },
+    ];
+  }
+  actionsEl.innerHTML = items
+    .map(
+      (a) =>
+        `<button type="button" data-action="${a.id}"${a.primary ? ' class="primary"' : ''}>${escapeHtml(a.label)}</button>`,
+    )
+    .join('');
+}
+
+actionsEl.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  btn.disabled = true;
+  try {
+    if (action === 'lookup') {
+      const res = await send({ type: 'run-command', command: 'lookup.selection' });
+      if (res?.ok) window.close();
+      else feedback(res?.error || 'Could not open the lookup popup', 'err');
+    } else if (action === 'save-selection') {
+      feedback('Saving selection…', 'pending');
+      const res = await send({ type: 'save-selection', mode: 'auto' });
+      feedback(formatSave(res), res?.ok || res?.queued ? 'ok' : 'err');
+    } else if (action === 'capture-page') {
+      feedback('Saving page…', 'pending');
+      const res = await send({ type: 'capture' });
+      feedback(formatCapture(res), res?.ok || res?.queued ? 'ok' : 'err');
+    } else if (action === 'download') {
+      feedback('Queueing download…', 'pending');
+      const res = await send({ type: 'run-command', command: 'media.download' });
+      feedback(res?.ok ? 'Download queued in GrammarX.' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
+    } else if (action === 'ocr') {
+      const res = await send({ type: 'run-command', command: 'capture.ocr' });
+      if (res?.ok) window.close();
+      else feedback(res?.error || 'Could not start OCR selection', 'err');
+    } else if (action === 'scan-strip') {
+      feedback('Scanning manga pages… this scrolls the page', 'pending');
+      const res = await send({ type: 'scan-strip' });
+      feedback(
+        res?.ok
+          ? `Imported ${res.pageCount ?? res.imageCount ?? '?'} pages into GrammarX Manga.`
+          : res?.error || 'Import failed',
+        res?.ok ? 'ok' : 'err',
+      );
+    } else if (action === 'open-app') {
+      const res = await send({ type: 'ui-open', target: 'inbox' });
+      if (!res?.ok) feedback(res?.error || 'GrammarX is not running', 'err');
+      else window.close();
+    }
+  } finally {
+    btn.disabled = false;
+    void refreshStatus();
+    void refreshRecent();
+  }
+});
+
+function formatSave(res) {
+  if (!res) return 'Save failed';
+  if (!res.ok && !res.queued) return res.error || 'Save failed';
+  if (res.queued) return 'Queued — will sync when GrammarX is open.';
+  if (res.anki?.ok) return 'Card created in Anki · saved in GrammarX.';
+  return 'Saved to GrammarX.';
+}
+
+function formatCapture(res) {
+  if (!res) return 'Could not save this page';
+  if (!res.ok && !res.queued) return res.error || 'Could not save this page';
+  if (res.queued) return 'Page queued — will sync when GrammarX is open.';
+  if (res.action === 'playlist') return 'Playlist saved to GrammarX.';
+  if (res.action === 'video') return res.duplicate ? 'Video is already in GrammarX.' : 'Video saved to GrammarX.';
+  return 'Page saved to your GrammarX inbox.';
+}
+
+/* --------------------------------- recent ---------------------------------- */
+
+const RECENT_LABELS = {
+  word: 'Word saved',
+  sentence: 'Sentence saved',
+  card: 'Card created',
+  page: 'Page saved',
+  download: 'Download queued',
+  ocr: 'OCR captured',
+  manga: 'Manga imported',
+};
+
+async function refreshRecent() {
+  const res = await send({ type: 'recent-activity' });
+  const items = res?.ok && Array.isArray(res.items) ? res.items.slice(0, 3) : [];
+  recentWrap.hidden = !items.length;
+  recentEl.innerHTML = items
+    .map(
+      (it) => `
+      <div class="recent-item">
+        <span class="term" lang="ja" title="${escapeHtml(it.label || '')}">${escapeHtml(it.label || '')}</span>
+        <span class="what${it.queued ? ' queued' : ''}">${escapeHtml(
+          it.queued ? 'Queued' : RECENT_LABELS[it.kind] || 'Saved',
+        )}</span>
+      </div>`,
+    )
+    .join('');
+}
+
+/* -------------------------------- footer nav ------------------------------- */
+
+document.getElementById('nav-tabs').addEventListener('click', async () => {
+  const res = await send({ type: 'open-tab-picker' });
+  if (res?.ok) window.close();
+  else feedback(res?.error || 'Could not open the reading list', 'err');
+});
+
+document.getElementById('nav-app').addEventListener('click', async () => {
+  const res = await send({ type: 'ui-open', target: 'inbox' });
+  if (res?.ok) window.close();
+  else feedback(res?.error || 'GrammarX is not running — start the desktop app.', 'err');
+});
+
+document.getElementById('nav-settings').addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+});
+
+document.getElementById('retry-queue').addEventListener('click', async () => {
+  feedback('Retrying queued items…', 'pending');
+  const res = await send({ type: 'flush' });
+  if (res?.flushed) {
+    feedback(
+      `Sent ${res.flushed} queued item${res.flushed === 1 ? '' : 's'}${res.left ? ` — ${res.left} still pending` : ''}.`,
+      res.left ? 'err' : 'ok',
+    );
+  } else {
+    feedback(
+      res?.left ? `App still unreachable — ${res.left} item(s) queued.` : 'Nothing to retry.',
+      res?.left ? 'err' : 'ok',
+    );
+  }
+  void refreshStatus();
+});
+
+/* ---------------------------------- init ----------------------------------- */
+
+void (async () => {
+  await Promise.all([refreshStatus(), refreshPage(), refreshRecent()]);
+})();

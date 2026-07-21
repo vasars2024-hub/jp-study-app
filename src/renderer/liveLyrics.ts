@@ -6,11 +6,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MediaItem } from '../shared/types';
 import { parseSubtitles, type Cue } from './subtitles';
+import { markWiredDiscovered } from './wiredDiscovery';
 import {
   cachedLyrics,
   clearLyrics,
   fetchLyrics,
   guessSongMeta,
+  hasFreshNoLyrics,
   markNoLyrics,
   saveLyrics,
   type LyricsResult,
@@ -60,7 +62,7 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
       setLyrics(toLyricsState(cached));
       return;
     }
-    if (!force && localStorage.getItem(`jp-lyrics-${item.id}`)) {
+    if (!force && hasFreshNoLyrics(item.id)) {
       // Cached "nothing found" — don't hammer the API on every play.
       setLyrics({ kind: 'missing' });
       return;
@@ -70,6 +72,7 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
       const res = await fetchLyrics(guessSongMeta(item, useAlbumInSearch), durationSec);
       if (res) {
         saveLyrics(item.id, res);
+        markWiredDiscovered();
         setLyrics(toLyricsState(res));
       } else {
         markNoLyrics(item.id);
@@ -90,7 +93,7 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
     lyricsForRef.current = null;
     setActiveIndex(-1);
     void load(current, duration, true);
-  }, [useAlbumInSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useAlbumInSearch]);
 
   // Load lyrics when the current song (and its duration) becomes known.
   useEffect(() => {
@@ -125,6 +128,7 @@ export function useLiveLyrics(current: MediaItem | null, duration: number, time:
       if (!current) return;
       const res: LyricsResult = { lrc: text, source: 'file' };
       saveLyrics(current.id, res);
+      markWiredDiscovered();
       setLyrics(toLyricsState(res));
     },
     [current],

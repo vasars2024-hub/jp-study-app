@@ -1,24 +1,31 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import DictionaryResults, { type DictLang } from '../components/DictionaryResults';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '../studyEnvironment';
 
-export const DICT_LANG_KEY = 'jp-study-dict-lang';
+/** @deprecated Prefer STUDY_LANG_KEY / getStudyLang — kept for external imports. */
+export const DICT_LANG_KEY = STUDY_LANG_KEY;
 
 export default function DictionaryView() {
-  const [lang, setLang] = useState<DictLang>(
-    () => (localStorage.getItem(DICT_LANG_KEY) as DictLang) || 'ja',
-  );
+  const [lang, setLang] = useState<DictLang>(() => getStudyLang());
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
 
+  useEffect(() => onStudyLangChanged(setLang), []);
+
   function submit(e: FormEvent) {
     e.preventDefault();
-    setQuery(input.trim());
+    const q = input.trim();
+    setQuery(q);
+    // §5.3 LEX: db-blip on a fired search (cue exists only in the wired pack).
+    if (q && document.documentElement.getAttribute('data-materials') === 'wired') {
+      window.dispatchEvent(new CustomEvent('wired:db-blip'));
+    }
   }
 
   function pickLang(l: DictLang) {
+    setStudyLang(l);
     setLang(l);
-    localStorage.setItem(DICT_LANG_KEY, l);
   }
 
   const isZh = lang === 'zh';

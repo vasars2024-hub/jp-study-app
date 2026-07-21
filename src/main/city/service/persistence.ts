@@ -1,69 +1,70 @@
-/**
- * Noctis persistence — atomic save/load envelope.
- *
- * Main-process only (ARCHITECTURE.md Section 3 persistence boundary). The
- * Simulation Engine Core never writes files; this module, under CityService
- * ownership, is the sole writer of civilization state, targeting
- * userData/noctis-state.json via the ProfileStore house pattern (atomic
- * temporary-write-then-rename, invariant P-1 in src/main/profiles.ts).
- *
- * Loaded files are untrusted input (ARCHITECTURE.md Section 6, boot sequence):
- * a missing, unparseable, or Trope-Guard-failing file yields null so the
- * caller runs the initial-state factory rather than trusting a corrupt save.
- */
-
-import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { CivilizationState, NoctisStateEnvelope } from '../engine/types';
-import { createEnvelope, NOCTIS_SCHEMA_VERSION } from '../engine/state';
+import { NOCTIS_SCHEMA_VERSION } from '../engine/constants';
 import { validateState } from '../engine/constraints';
+import { CivilizationState, NoctisStateEnvelope } from '../engine/types';
+import { createEnvelope } from '../engine/state';
 
-function storePath(): string {
-  return path.join(app.getPath('userData'), 'noctis-state.json');
+export type CityLoadSource = 'primary' | 'backup' | 'missing' | 'corrupt';
+
+export interface CityLoadResult {
+  envelope: NoctisStateEnvelope | null;
+  source: CityLoadSource;
 }
 
-/**
- * Reads and validates the persisted envelope. Returns null on any failure
- * (missing file, parse error, wrong schema version, or a state that fails the
- * Trope Guard / invariants) so the boot sequence regenerates instead.
- */
-export function loadEnvelope(): NoctisStateEnvelope | null {
-  let raw: string;
-  try {
-    raw = fs.readFileSync(storePath(), 'utf-8');
-  } catch {
-    return null; // no save yet — first run
-  }
+export interface CityStorage {
+  load(): CityLoadResult;
+  save(state: CivilizationState, savedAt: number, appliedSessionIds: string[]): void;
+}
 
+function parseEnvelope(raw: string): NoctisStateEnvelope | null {
   try {
-    const parsed = JSON.parse(raw) as Partial<NoctisStateEnvelope>;
-    if (!parsed || parsed.schemaVersion !== NOCTIS_SCHEMA_VERSION) return null;
-    if (typeof parsed.savedAt !== 'number' || !parsed.state) return null;
-    // Untrusted input: validate against the invariants and Trope Guard.
-    validateState(parsed.state as CivilizationState);
-    return {
-      schemaVersion: NOCTIS_SCHEMA_VERSION,
-      savedAt: parsed.savedAt,
-      state: parsed.state as CivilizationState,
-    };
-  } catch (err) {
-    console.error('[noctis] state load failed, regenerating:', err);
+    const value = JSON.parse(raw) as Partial<NoctisStateEnvelope>;
+    if (!value || value.schemaVersion !== NOCTIS_SCHEMA_VERSION) return null;
+    if (!Number.isFinite(value.savedAt) || (value.savedAt as number) < 0 || !value.state) return null;
+    if (!Array.isArray(value.appliedSessionIds)
+      || value.appliedSessionIds.some((id) => typeof id !== 'string' || id.length === 0 || id.length > 128)) return null;
+    validateState(value.state as CivilizationState);
+    return createEnvelope(value.state as CivilizationState, value.savedAt as number, value.appliedSessionIds);
+  } catch {
     return null;
   }
 }
 
-/**
- * Persists a state snapshot atomically with a caller-supplied timestamp
- * (the service owns the wall clock; the engine never reads one). Write-through:
- * the temporary file is renamed only after a complete write, so a partial
- * write can never tear the save.
- */
-export function saveState(state: CivilizationState, savedAt: number): void {
-  const envelope = createEnvelope(state, savedAt);
-  const file = storePath();
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(envelope, null, 2), 'utf-8');
-  fs.renameSync(tmp, file);
+function readEnvelope(file: string): NoctisStateEnvelope | null {
+  try {
+    return parseEnvelope(fs.readFileSync(file, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+/** Main-only filesystem adapter. CityService itself remains Electron-free and injectable. */
+export function createFileCityStorage(userDataPath: string): CityStorage {
+  const file = path.join(userDataPath, 'noctis-state.json');
+  const backup = `${file}.bak`;
+  const temporary = `${file}.tmp`;
+
+  return {
+    load(): CityLoadResult {
+      const primaryExists = fs.existsSync(file);
+      const primary = readEnvelope(file);
+      if (primary) return { envelope: primary, source: 'primary' };
+      const recovered = readEnvelope(backup);
+      if (recovered) return { envelope: recovered, source: 'backup' };
+      return { envelope: null, source: primaryExists || fs.existsSync(backup) ? 'corrupt' : 'missing' };
+    },
+
+    save(state: CivilizationState, savedAt: number, appliedSessionIds: string[]): void {
+      validateState(state);
+      fs.mkdirSync(userDataPath, { recursive: true });
+      const envelope = createEnvelope(state, savedAt, appliedSessionIds);
+      fs.writeFileSync(temporary, JSON.stringify(envelope, null, 2), 'utf-8');
+
+      // Preserve only a validated primary; a corrupt primary must not replace a good backup.
+      if (readEnvelope(file)) fs.copyFileSync(file, backup);
+      fs.renameSync(temporary, file);
+    },
+  };
 }

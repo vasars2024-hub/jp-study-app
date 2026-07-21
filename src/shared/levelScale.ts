@@ -19,6 +19,7 @@ export type LevelSlotId =
   | 'jlpt-n3'
   | 'jlpt-n2'
   | 'jlpt-n1'
+  | 'jlpt-n0'
   | 'hsk-1'
   | 'hsk-2'
   | 'hsk-3'
@@ -58,6 +59,10 @@ export const JA_SLOTS: readonly LevelSlot[] = [
   { id: 'jlpt-n3', tier: 4, short: 'N3', label: 'JLPT N3' },
   { id: 'jlpt-n2', tier: 5, short: 'N2', label: 'JLPT N2' },
   { id: 'jlpt-n1', tier: 6, short: 'N1', label: 'JLPT N1' },
+  // Tier 7 has no canonical list (there is no official post-N1 exam), so "N0"
+  // is the user's own advanced deck. Supplying one proves tier 7 directly
+  // instead of leaning on the ADVANCED_KNOWN_WORDS count heuristic below.
+  { id: 'jlpt-n0', tier: 7, short: 'N0', label: 'JLPT N0 (post-N1)' },
 ];
 
 export const ZH_SLOTS: readonly LevelSlot[] = [
@@ -141,12 +146,20 @@ export function deriveUserLevel(lang: StudyLang, input: DeriveLevelInput): Deriv
     }
   }
 
-  const topSlot = slots[slots.length - 1];
-  const topCleared = reached.includes(topSlot.id);
+  // A tier-7 slot (JLPT N0) is an OPTIONAL direct proof of Advanced, so it must
+  // not become the gate for it: taking the last slot blindly made N0 the gate,
+  // and since almost nobody supplies an N0 deck, tier 7 became unreachable by
+  // the known-word route that has always backed it. The gate stays the top
+  // graded slot (N1 / HSK 6); clearing an N0 list proves Advanced on its own.
+  const gradedSlots = slots.filter((s) => s.tier < 7);
+  const topSlot = gradedSlots[gradedSlots.length - 1];
+  const topCleared = !!topSlot && reached.includes(topSlot.id);
+  const advancedSlotCleared = slots.some((s) => s.tier === 7 && reached.includes(s.id));
   const advanced =
-    topCleared &&
-    ((input.advancedCoverage != null && input.advancedCoverage >= threshold) ||
-      (input.totalKnown ?? 0) >= ADVANCED_KNOWN_WORDS);
+    advancedSlotCleared ||
+    (topCleared &&
+      ((input.advancedCoverage != null && input.advancedCoverage >= threshold) ||
+        (input.totalKnown ?? 0) >= ADVANCED_KNOWN_WORDS));
   if (advanced) level = 7;
 
   return { level, reached, advanced };

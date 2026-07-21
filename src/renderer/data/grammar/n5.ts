@@ -3,6 +3,9 @@ import type { GrammarPoint } from './types';
 export const N5: GrammarPoint[] = [
   {
     id: 'n5-desu',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['definition'],
     categories: ['explanation.definition', 'discourse.topic'],
     level: 'N5',
     title: '〜は〜です',
@@ -17,6 +20,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-dewa-arimasen',
+    functions: ['negative'],
     categories: ['explanation.definition', 'emphasis.negation'],
     level: 'N5',
     title: '〜ではありません',
@@ -31,6 +35,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-deshita',
+    functions: ['past-state'],
     categories: ['explanation.definition', 'time.point'],
     level: 'N5',
     title: '〜でした',
@@ -45,6 +50,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-wa-topic',
+    functions: ['story-topic'],
     categories: ['discourse.topic'],
     level: 'N5',
     title: '〜は (topic particle)',
@@ -59,6 +65,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ga-subject',
+    functions: ['heard'],
     categories: ['discourse.topic'],
     level: 'N5',
     title: '〜が (subject particle)',
@@ -73,6 +80,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-o-object',
+    functions: ['act'],
     categories: ['voice.form'],
     level: 'N5',
     title: '〜を (object particle)',
@@ -87,6 +95,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ni-time',
+    functions: ['time'],
     categories: ['time.point', 'space.direction', 'space.location'],
     level: 'N5',
     title: '〜に (time / destination)',
@@ -101,6 +110,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-de-place',
+    functions: ['place'],
     categories: ['space.location', 'method.means'],
     level: 'N5',
     title: '〜で (place of action / means)',
@@ -115,6 +125,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-e-direction',
+    functions: ['direction'],
     categories: ['space.direction'],
     level: 'N5',
     title: '〜へ (direction)',
@@ -129,6 +140,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-to-and',
+    functions: ['companion'],
     categories: ['examples.listing', 'space.relation'],
     level: 'N5',
     title: '〜と (and / with)',
@@ -143,6 +155,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ya',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['denote-by-example'],
     categories: ['examples.listing', 'examples.instance'],
     level: 'N5',
     title: '〜や〜（など）',
@@ -156,6 +171,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-no-possessive',
+    functions: ['attach'],
     categories: ['space.relation'],
     level: 'N5',
     title: '〜の (possessive / modifier)',
@@ -170,6 +186,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mo',
+    functions: ['add'],
     categories: ['emphasis.emphasize', 'examples.listing'],
     level: 'N5',
     title: '〜も (also / too)',
@@ -184,6 +201,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-kara-made',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['point-of-departure-receipt'],
     categories: ['space.range', 'time.duration'],
     level: 'N5',
     title: '〜から〜まで',
@@ -198,6 +218,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ka-question',
+    functions: ['asked'],
     categories: ['request.ask'],
     level: 'N5',
     title: '〜か (question marker)',
@@ -212,6 +233,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ne-yo',
+    functions: ['confirm'],
     categories: ['emphasis.emphasize'],
     level: 'N5',
     title: '〜ね / 〜よ',
@@ -226,6 +248,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-masu',
+    functions: ['negative'],
     categories: ['register.honorific', 'voice.form'],
     level: 'N5',
     title: '〜ます / 〜ません',
@@ -240,6 +263,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mashita',
+    functions: ['negative'],
     categories: ['time.point', 'voice.form'],
     level: 'N5',
     title: '〜ました / 〜ませんでした',
@@ -253,6 +277,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-arimasu-imasu',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['status'],
     categories: ['state.description', 'space.location'],
     level: 'N5',
     title: 'あります / います',
@@ -267,6 +294,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-i-adjective',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['adjective'],
     categories: ['state.description', 'voice.form'],
     level: 'N5',
     title: 'い-adjectives',
@@ -281,6 +311,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-na-adjective',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['adjective'],
     categories: ['state.description', 'voice.form'],
     level: 'N5',
     title: 'な-adjectives',
@@ -295,6 +328,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-adverbial',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['adjective'],
     categories: ['voice.form', 'state.description'],
     level: 'N5',
     title: 'Adjective → adverb (〜く / 〜に)',
@@ -309,6 +345,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-suki',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['desire'],
     categories: ['emotion.feeling', 'judgment.evaluation'],
     level: 'N5',
     title: '〜が好き / 上手 / 下手',
@@ -323,6 +362,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-hoshii',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['desire'],
     categories: ['volition.desire'],
     level: 'N5',
     title: '〜がほしい',
@@ -336,6 +378,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-tai',
+    functions: ['desire'],
     categories: ['volition.desire'],
     level: 'N5',
     title: '〜たい',
@@ -350,6 +393,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mashou',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['invite-suggest'],
     categories: ['request.invite', 'volition.will'],
     level: 'N5',
     title: '〜ましょう / 〜ましょうか',
@@ -364,6 +410,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-masenka',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['invite-suggest'],
     categories: ['request.invite'],
     level: 'N5',
     title: '〜ませんか',
@@ -377,6 +426,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-form',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['time-sequence'],
     categories: ['time.sequence', 'discourse.connection', 'voice.form'],
     level: 'N5',
     title: 'て-form (connecting)',
@@ -390,6 +442,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-kudasai',
+    functions: ['request'],
     categories: ['request.ask'],
     level: 'N5',
     title: '〜てください',
@@ -403,6 +456,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-naide-kudasai',
+    functions: ['request'],
     categories: ['request.ask', 'emphasis.negation'],
     level: 'N5',
     title: '〜ないでください',
@@ -415,6 +469,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-iru',
+    functions: ['process'],
     categories: ['state.ongoing', 'state.description'],
     level: 'N5',
     title: '〜ている',
@@ -429,6 +484,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-temo-ii',
+    functions: ['allow'],
     categories: ['possibility.permission'],
     level: 'N5',
     title: '〜てもいいです',
@@ -441,6 +497,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-tewa-ikemasen',
+    functions: ['negative'],
     categories: ['obligation.prohibition'],
     level: 'N5',
     title: '〜てはいけません',
@@ -454,6 +511,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-te-kara',
+    functions: ['time-sequence'],
     categories: ['time.sequence'],
     level: 'N5',
     title: '〜てから',
@@ -467,6 +525,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mae-ni',
+    functions: ['time-sequence'],
     categories: ['time.sequence'],
     level: 'N5',
     title: '〜前に',
@@ -481,6 +540,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ato-de',
+    functions: ['time-sequence'],
     categories: ['time.sequence'],
     level: 'N5',
     title: '〜あとで',
@@ -494,6 +554,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-nagara',
+    functions: ['simultaneous'],
     categories: ['time.simultaneous'],
     level: 'N5',
     title: '〜ながら',
@@ -507,6 +568,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-tari-tari',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['queue-listing'],
     categories: ['examples.listing', 'examples.instance'],
     level: 'N5',
     title: '〜たり〜たりする',
@@ -520,6 +584,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-naru',
+    functions: ['status'],
     categories: ['state.change'],
     level: 'N5',
     title: '〜くなる / 〜になる',
@@ -533,6 +598,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-mada-mou',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['continuity'],
     categories: ['time.point', 'state.ongoing'],
     level: 'N5',
     title: 'まだ / もう',
@@ -547,6 +615,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-deshou',
+    functions: ['speculation'],
     categories: ['judgment.conjecture'],
     level: 'N5',
     title: '〜でしょう',
@@ -560,6 +629,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-kara-because',
+    functions: ['cause-reason'],
     categories: ['cause.reason'],
     level: 'N5',
     title: '〜から (because)',
@@ -573,6 +643,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ga-but',
+    functions: ['contrast'],
     categories: ['contrast.opposition'],
     level: 'N5',
     title: '〜が / 〜けど (but)',
@@ -586,6 +657,7 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-toki',
+    functions: ['time-situation'],
     categories: ['time.point'],
     level: 'N5',
     title: '〜とき',
@@ -600,6 +672,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-hou-ga',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['compare'],
     categories: ['comparison.compare'],
     level: 'N5',
     title: '〜より〜のほうが',
@@ -613,6 +688,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-ichiban',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['highest-level'],
     categories: ['comparison.compare', 'degree.extreme'],
     level: 'N5',
     title: '〜で一番',
@@ -626,6 +704,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-counter',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['amount'],
     categories: ['quantity.amount'],
     level: 'N5',
     title: 'Counters (〜つ・〜人・〜枚…)',
@@ -640,6 +721,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-n-desu',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['explain'],
     categories: ['explanation.explain'],
     level: 'N5',
     title: '〜んです / のです',
@@ -654,6 +738,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-question-words',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['how-to-say-the-first'],
     categories: ['request.ask'],
     level: 'N5',
     title: 'Question words (なに・だれ・どこ…)',
@@ -668,6 +755,9 @@ export const N5: GrammarPoint[] = [
   },
   {
     id: 'n5-koso-ado',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['describe'],
     categories: ['space.relation', 'space.location'],
     level: 'N5',
     title: 'これ・それ・あれ / この・その・あの',

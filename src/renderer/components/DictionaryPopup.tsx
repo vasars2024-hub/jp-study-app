@@ -6,6 +6,7 @@ import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../tts';
 import { recordLookup } from '../lookupHistory';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { getZoomFactor } from '../appZoom';
+import { getStudyLang } from '../studyEnvironment';
 import Icon from './Icons';
 
 interface Props {
@@ -43,7 +44,7 @@ export default function DictionaryPopup({ query, x, y, context, onClose }: Props
       : { left, top: Math.min(ly + 12, vh - 120), width: POPUP_W, maxHeight };
   }, [x, y]);
 
-  const lang = (localStorage.getItem('jp-study-dict-lang') as DictLang) || 'ja';
+  const lang = getStudyLang() as DictLang;
 
   // Resolve the word to its dictionary form for knowledge grading (JP only).
   const [lemma, setLemma] = useState('');

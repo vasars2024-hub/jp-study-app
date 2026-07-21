@@ -12,7 +12,7 @@ import { N3_MAZII } from '../data/grammar/n3-mazii';
 import { N4_MAZII } from '../data/grammar/n4-mazii';
 
 const JLPT = ['N5', 'N4', 'N3', 'N2', 'N1'];
-const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7', 'HSK8', 'HSK9', 'HSK10'];
+const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7-9', 'HSK10'];
 
 describe('GrammarX corpus', () => {
   it('includes Mazii N1–N4 and HSK bands', () => {
@@ -88,9 +88,9 @@ describe('GrammarX corpus', () => {
 
     it('attributes official bands to their real framework', () => {
       expect(frameworkForLevel('HSK1')).toBe('hsk3.0');
-      expect(frameworkForLevel('HSK9')).toBe('hsk3.0');
+      expect(frameworkForLevel('HSK7-9')).toBe('hsk3.0');
       expect(frameworkForLevel('N5')).toBe('jlpt');
-      expect(isUnofficialLevel('HSK9')).toBe(false);
+      expect(isUnofficialLevel('HSK7-9')).toBe(false);
     });
   });
 

@@ -35,16 +35,16 @@ Canon (Tiers 1-4 + meta)        WHAT the module is and means — absolute source
         |
 ARCHITECTURE.md (Tier 5)        HOW any system must be shaped — structural law (this file)
         |
-SIMULATION_SYSTEMS.md (Tier 6)  Cross-domain simulation specification (reserved stub)
+SIMULATION_SYSTEMS.md (Tier 6)  Cross-domain simulation specification (authored and reconciled)
         |
 Domain system blueprints        WHAT each subsystem computes — formulas, coefficients,
-(Tier 7: CITIZEN_SYSTEM.md,      thresholds, subsystem decomposition (reserved stubs,
+(Tier 7: CITIZEN_SYSTEM.md,      thresholds, subsystem decomposition (authored domain
  ECOLOGY_SYSTEM.md,              written later, each value carrying a canon citation)
  CULTURE_SYSTEM.md,
  TECHNOLOGY_SYSTEM.md,
  MEMORY_SYSTEM.md)
         |
-Production pipeline docs        Visual and asset authoring specifications (reserved stubs;
+Production pipeline docs        Visual and asset authoring specifications (Tier 8;
 (Tier 8: VISUAL_PIPELINE.md,    must not define simulation rules)
  ASSET_PIPELINE.md, peers)
         |
@@ -93,15 +93,17 @@ src/
 |  |                              decomposition: UNBOUND at this tier.
 |  |  |- tests/                   Vitest suites (environment: node) and schema fixtures only.
 |  |                              Deterministic simulation verification; no live persistence.
-|  |- rendering/                  UI/RENDERER LAYER   Civilization visual representation (future).
+|  |- rendering/                  UI/RENDERER LAYER   Civilization visual representation.
+|  |  |- world/                   Stable world topology, region bounds, semantic focus graph.
 |  |  |- diorama/                 Layer composition and viewport staging.
+|  |  |- camera/                  Renderer-local pan, zoom, focus, whole-fit, and Night Drift.
 |  |  |- particles/               Spore, glow, and atmospheric particle systems.
 |  |  |- lighting/                Bio-light pools, masks, and illumination staging.
-|  |- ui/                         UI/RENDERER LAYER   Study OS workspace interface (future).
+|  |- ui/                         UI/RENDERER LAYER   Study OS workspace interface.
 |  |  |- panels/                  Civilization inspection and status panels.
 |  |  |- dashboard/               Summary dashboards and overview layouts.
 |  |  |- widgets/                 Compact embedded workspace widgets.
-|  |- docs/                       Tiers 1-5 canon, Tier 6-8 reserved stubs, archive/
+|  |- docs/                       Tiers 1-8 authority documents and archive/
 |- renderer/
    |- cityState.ts     (future)   UI/RENDERER LAYER   Read-only mirrored snapshot provider,
    |                              following the profileState.ts house pattern.
@@ -127,6 +129,12 @@ The renderer layer serves the diorama relationship mandated by `VISION.md` (Visu
 | `ui/` (`panels/`, `dashboard/`, `widgets/`) | Study OS interface — Fluent-style workspace, readable panels, user interaction | The living civilization window or simulation staging |
 
 The civilization window is not the same thing as the application UI.
+
+**Spatial presentation boundary (mandatory).** The simulation does not store pixels or camera state. The pure presentation projection derives a stable revealed-region graph from the civilization seed plus monotone committed facts such as era history, secured ecology, and permanent Memory. Each projected region has a stable id, world-space bounds, stratum, introduction era, connection ids, and semantic focus targets. Renewable state may change light, motion, activity, and detail emphasis inside a revealed region; it may never remove or relocate secured geography.
+
+Camera position, zoom, selected focus, active stratum, and Night Drift timing are renderer-local state. They never cross the city IPC mutation channel and never enter `noctis-state.json`. Whole Civilization computes a padded fit from the union of currently revealed bounds. District and Detail clamp to those bounds. Unrevealed space is non-interactive. Night Drift is a deterministic read-only traversal of the projected focus graph, pauses on user or lifecycle interruption, and may display only presentation copy derived from committed snapshot fields.
+
+The standard 1920 × 1200 art canvas is a region plate and LOD source, not the global coordinate system. Region layers share local registration, then compose through a world transform. This separation permits horizontal chambers, deep strata, and the Era V stellar ascent without invalidating the ancestral origin.
 
 **Persistence boundary (explicit).** Live civilization state targets the Electron `userData` directory — `userData/noctis-state.json` via `app.getPath('userData')` — written exclusively through `service/persistence.ts` under `CityService` ownership, matching the established `profiles.json` convention (SERVICES_PATCH.md, ownership rules). The Simulation Engine Core never writes files. In-repo `engine/tests/` holds Vitest schema fixtures only; an installed application must never write civilization state inside its own bundle.
 
@@ -285,6 +293,6 @@ Every implementation proposal — human or AI — must answer yes to all of the 
 
 ## Closing Validation Statement
 
-Every future technical concept for the Noctis Civilization Module must pass, in order: the Tier 1 test of `VISION.md`, the Tier 2 test of `ART_DIRECTION.md`, the Tier 3 test of `NOCTIS_ECOLOGICAL_ENGINE.md`, the experience tests of `GAME_DESIGN.md`, the structural laws of this document, and — when authored — the domain specifications of Tier 6-7 and the production pipeline constraints of Tier 8. Anything that fails is not adjusted at the edges; it is rejected and reshaped from the constraint up.
+Every future technical concept for the Noctis Civilization Module must pass, in order: the Tier 1 test of `VISION.md`, the Tier 2 test of `ART_DIRECTION.md`, the Tier 3 test of `NOCTIS_ECOLOGICAL_ENGINE.md`, the experience tests of `GAME_DESIGN.md`, the structural laws of this document, the shared physics of Tier 6, the domain specifications of Tier 7, and the production pipeline constraints of Tier 8. Anything that fails is not adjusted at the edges; it is rejected and reshaped from the constraint up.
 
 The engine is pure. The service is the sole owner. The renderer only mirrors. The night runs on the user's mind — and the code that carries it must be as lawful as the world it sustains.

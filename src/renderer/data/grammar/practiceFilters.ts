@@ -21,7 +21,22 @@ import {
   type NormalizedGrammarPoint,
 } from './normalize';
 import { resolveCategories } from './taxonomy';
+import { LEGACY_HSK_LEVELS } from './types';
 import type { GrammarLang, GrammarLevel, GrammarRegister } from './types';
+
+/**
+ * Map saved level ids onto the bands that still exist.
+ *
+ * HSK7/8/9 were merged into the single HSK7-9 band the standard publishes. A
+ * saved filter naming one of them would otherwise match nothing and read as
+ * "this level is empty" rather than "this level was renamed" — silent, and
+ * indistinguishable from a corpus bug from the user's side.
+ */
+function migrateLevels(levels: unknown): GrammarLevel[] {
+  if (!Array.isArray(levels)) return [];
+  const mapped = levels.map((l) => LEGACY_HSK_LEVELS[l as string] ?? (l as GrammarLevel));
+  return [...new Set(mapped)];
+}
 
 /**
  * A point as the filter reads it. Familiarity is learner state applied over the
@@ -41,6 +56,12 @@ export interface PracticeFilters {
   categories: string[];
   /** Canonical ids to subtract from the result, applied after inclusion. */
   excludeCategories: string[];
+  /**
+   * Mazii function ids — the finer second level beneath a category. Narrows
+   * within the selected categories rather than replacing them, so picking
+   * "Condition" then "Condition (requirement)" reads as one drill-down.
+   */
+  functions: string[];
   registers: GrammarRegister[];
   /**
    * Hide records whose tags came from gloss-regex inference. Default true:
@@ -65,6 +86,7 @@ export const DEFAULT_PRACTICE_FILTERS: PracticeFilters = {
   levels: [],
   categories: [],
   excludeCategories: [],
+  functions: [],
   registers: [],
   verifiedTagsOnly: true,
   studyReadyOnly: false,
@@ -95,7 +117,7 @@ export function migrateLegacyFilters(legacy: LegacyPracticeFilters): PracticeFil
   return {
     ...DEFAULT_PRACTICE_FILTERS,
     lang: legacy.lang ?? 'all',
-    levels: Array.isArray(legacy.levels) ? legacy.levels : [],
+    levels: migrateLevels(legacy.levels),
     categories: resolveCategories(Array.isArray(legacy.functions) ? legacy.functions : []),
     registers,
     query: typeof legacy.query === 'string' ? legacy.query : '',
@@ -112,7 +134,7 @@ function coerce(parsed: Partial<PracticeFilters>): PracticeFilters {
   return {
     ...DEFAULT_PRACTICE_FILTERS,
     ...parsed,
-    levels: Array.isArray(parsed.levels) ? parsed.levels : [],
+    levels: migrateLevels(parsed.levels),
     categories: Array.isArray(parsed.categories) ? parsed.categories : [],
     excludeCategories: Array.isArray(parsed.excludeCategories) ? parsed.excludeCategories : [],
     registers: Array.isArray(parsed.registers) ? parsed.registers : [],
@@ -219,6 +241,11 @@ export function matchesFilters(point: FilterablePoint, filters: PracticeFilters)
     if (filters.excludeCategories.some((c) => point.categories.includes(c))) return false;
   }
 
+  // Narrows within the categories above rather than acting as its own axis.
+  if (filters.functions.length) {
+    if (!filters.functions.some((f) => point.functions.includes(f))) return false;
+  }
+
   if (filters.registers.length) {
     if (!filters.registers.includes(point.register)) return false;
     /*
@@ -250,10 +277,8 @@ const LEVEL_ORDER: Record<string, number> = {
   HSK4: 3,
   HSK5: 4,
   HSK6: 5,
-  HSK7: 6,
-  HSK8: 7,
-  HSK9: 8,
-  HSK10: 9,
+  'HSK7-9': 6,
+  HSK10: 7,
 };
 
 function completenessScore(p: NormalizedGrammarPoint): number {
@@ -332,11 +357,34 @@ export function categoryCounts(
   points: readonly NormalizedGrammarPoint[],
   filters: PracticeFilters,
 ): Record<string, number> {
-  const base: PracticeFilters = { ...filters, categories: [], excludeCategories: [] };
+  const base: PracticeFilters = {
+    ...filters,
+    categories: [],
+    excludeCategories: [],
+    functions: [],
+  };
   const out: Record<string, number> = {};
   for (const p of points) {
     if (!matchesFilters(p, base)) continue;
     for (const c of p.categories) out[c] = (out[c] || 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * Per-function result counts, measured against every other active filter but
+ * not against the function selection itself — so a sub-item's number is what
+ * ticking it yields, matching how `categoryCounts` behaves one level up.
+ */
+export function functionCounts(
+  points: readonly NormalizedGrammarPoint[],
+  filters: PracticeFilters,
+): Record<string, number> {
+  const base: PracticeFilters = { ...filters, functions: [] };
+  const out: Record<string, number> = {};
+  for (const p of points) {
+    if (!matchesFilters(p, base)) continue;
+    for (const f of p.functions) out[f] = (out[f] || 0) + 1;
   }
   return out;
 }

@@ -10,6 +10,8 @@ import {
   resolveTraditionalTemplates,
 } from '../../shared/mining';
 import type { MiningCandidate, TraditionalMiningConfig, ValueSource } from '../../shared/mining';
+import { useT } from '../i18n';
+import type { TVars } from '../../shared/i18n/core';
 
 type Props = {
   candidates: MiningCandidate[];
@@ -23,34 +25,35 @@ type VarStatus = {
   source: ValueSource;
 };
 
-const SOURCE_LABELS: Record<ValueSource, string> = {
-  mined: 'mined from book',
-  dict: 'dictionary',
-  qwen: 'Qwen fail-switch',
-  api: 'API translation',
-  missing: 'missing',
+const SOURCE_KEYS: Record<ValueSource, string> = {
+  mined: 'epub.test.source.mined',
+  dict: 'epub.test.source.dict',
+  qwen: 'epub.test.source.qwen',
+  api: 'epub.test.source.api',
+  missing: 'epub.test.source.missing',
 };
 
-function missingVarHint(token: string): string {
+function missingVarHint(token: string, t: (key: string, vars?: TVars) => string): string {
   if (token.startsWith('reading:') && !token.endsWith(':ja')) {
-    return 'not supported — readings exist only for Japanese';
+    return t('epub.test.hint.readingLang');
   }
   if (
     token.startsWith('translation') ||
     token.startsWith('sentence-translation') ||
     (token.includes(':') && !token.endsWith(':ja') && !token.startsWith('meaning:ja'))
   ) {
-    return 'empty — download deck to run Qwen fail-switch, or use Preview card below';
+    return t('epub.test.hint.needDownload');
   }
   if (token.startsWith('meaning')) {
-    return 'empty — Re-analyze to fetch dictionary glosses';
+    return t('epub.test.hint.needReanalyze');
   }
-  return 'empty — re-analyze or enable translations';
+  return t('epub.test.hint.empty');
 }
 
 const ENRICH_TIMEOUT_MS = 120_000;
 
 export default function EpubTestCard({ candidates, config, onCandidateUpdated }: Props) {
+  const { t, lang } = useT();
   const [selectedKey, setSelectedKey] = useState('');
   const [rendering, setRendering] = useState(false);
   const [enrichError, setEnrichError] = useState('');
@@ -147,18 +150,13 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
       const gen = ++enrichGenRef.current;
       setRendering(true);
       setEnrichError('');
-      setProgressMessage('Starting enrichment…');
+      setProgressMessage(t('epub.test.starting'));
       try {
         const enriched = await Promise.race([
           window.api.miningEnrichCandidate(baseCandidate, config),
           new Promise<never>((_, reject) => {
             setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    'Enrichment timed out. Qwen3 may still be loading — wait a moment and click Render test card again.',
-                  ),
-                ),
+              () => reject(new Error(t('epub.test.timeout'))),
               ENRICH_TIMEOUT_MS,
             );
           }),
@@ -177,7 +175,7 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
         }
       }
     },
-    [baseCandidate, config, onCandidateUpdated, selectedKey],
+    [baseCandidate, config, onCandidateUpdated, selectedKey, t, lang],
   );
 
   useEffect(() => {
@@ -196,12 +194,10 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
 
   return (
     <div className="epub-test-card">
-      <p className="muted collapse-lead">
-        Preview one card with exact template rendering before bulk download.
-      </p>
+      <p className="muted collapse-lead">{t('epub.test.lead')}</p>
       <div className="mining-form-grid mining-form-grid-wide">
         <label>
-          Test term
+          {t('epub.test.term')}
           <select value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)}>
             {pickerOptions.map((c) => {
               const key = candidateLookupKey(c.expression, c.reading);
@@ -224,7 +220,7 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
               void renderTestCard();
             }}
           >
-            {rendering ? 'Enriching…' : 'Render test card'}
+            {rendering ? t('epub.test.enriching') : t('epub.test.render')}
           </button>
         </div>
       </div>
@@ -235,11 +231,11 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
 
       <div className="epub-test-card-panels">
         <div className="epub-test-card-panel">
-          <span className="download-deck-label">Front</span>
+          <span className="download-deck-label">{t('epub.test.front')}</span>
           <pre className="epub-test-card-output">{renderedFront || (rendering ? '…' : '—')}</pre>
         </div>
         <div className="epub-test-card-panel">
-          <span className="download-deck-label">Back</span>
+          <span className="download-deck-label">{t('epub.test.back')}</span>
           <pre className="epub-test-card-output">{rendering ? '…' : renderedBack || '—'}</pre>
         </div>
       </div>
@@ -254,7 +250,9 @@ export default function EpubTestCard({ candidates, config, onCandidateUpdated }:
                 {v.filled ? 'OK' : '--'}
               </span>
               <code>{`{${v.token}}`}</code>
-              <span className="muted">{v.filled ? SOURCE_LABELS[v.source] : missingVarHint(v.token)}</span>
+              <span className="muted">
+                {v.filled ? t(SOURCE_KEYS[v.source]) : missingVarHint(v.token, t)}
+              </span>
             </li>
           ))}
         </ul>

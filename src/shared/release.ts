@@ -8,6 +8,15 @@ export interface AppReleaseInfo {
   summary: string;
   body: string;
   url: string;
+  /** True when the GitHub app tag is newer than the running desktop build. */
+  appUpdate: boolean;
+  /**
+   * Chrome extension version advertised in the release notes, when newer than
+   * the unpacked folder currently on disk. Absent when unchanged / unparsed.
+   */
+  extensionUpdate?: { version: string };
+  /** Manifest version currently written to the load-unpacked folder. */
+  installedExtensionVersion?: string;
 }
 
 export function normalizeVersion(tag: string): string {
@@ -39,4 +48,22 @@ export function parseReleaseHighlights(body: string, maxBullets = 4): string {
   if (bullets.length) return bullets.join(' · ');
   const para = body.split(/\r?\n/).find((l) => l.trim() && !l.startsWith('#'));
   return para?.trim().slice(0, 220) || 'A new version is available.';
+}
+
+/**
+ * Pull a Chrome-extension semver out of release notes when authors advertise it
+ * separately from the desktop tag (e.g. `extension: 3.2.0`).
+ */
+export function parseExtensionVersionFromBody(body: string): string | null {
+  const text = String(body || '');
+  const patterns = [
+    /(?:^|\n)\s*(?:chrome\s+)?extension(?:\s+version)?\s*[:=]\s*v?(\d+\.\d+(?:\.\d+)?)/i,
+    /(?:^|\n)\s*reader\s+companion\s*[:=]?\s*v?(\d+\.\d+(?:\.\d+)?)/i,
+    /(?:^|\n)\s*[-*]\s+(?:chrome\s+)?extension\s+v?(\d+\.\d+(?:\.\d+)?)/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m?.[1]) return normalizeVersion(m[1]);
+  }
+  return null;
 }

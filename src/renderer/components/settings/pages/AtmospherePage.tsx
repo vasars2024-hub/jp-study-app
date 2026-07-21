@@ -60,8 +60,8 @@ export default function AtmospherePage() {
 
       <SettingsCard
         id="environment-preset"
-        title="Environment"
-        description="Cohesive places that set particles, weather, lighting, and ambience together in one click."
+        title={t('settings.atmosphere.environment.title')}
+        description={t('settings.atmosphere.environment.desc')}
         highlight={focusSettingId === 'environment-preset'}
       >
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
@@ -72,6 +72,12 @@ export default function AtmospherePage() {
               className={seg(env.environmentPresetId === p.id)}
               title={p.description}
               onClick={() => {
+                // Clicking the active preset clears it — otherwise these chips
+                // are one-way and there is no way back to an unthemed desk.
+                if (env.environmentPresetId === p.id) {
+                  patchEnv({ environmentPresetId: undefined });
+                  return;
+                }
                 patchEnv({ ...presetPatch(p.id), enabled: true });
                 emitCompanionEvent('environment', p.label);
               }}
@@ -201,7 +207,9 @@ export default function AtmospherePage() {
                   const next: ParticlePresetId[] = on
                     ? env.particlePresets.filter((id) => id !== p.id)
                     : [...env.particlePresets, p.id];
-                  patchEnv({ particlePresets: next.length ? next : [p.id] });
+                  // An empty list is a valid state: no presets = no particles.
+                  // Re-adding p.id here made the last chip impossible to clear.
+                  patchEnv({ particlePresets: next });
                 }}
               >
                 {p.label}
@@ -261,19 +269,19 @@ export default function AtmospherePage() {
 
       <SettingsCard
         id="weather"
-        title="Weather"
-        description="Atmospheric fog, clouds, and precipitation over the desktop. Auto follows the wallpaper."
+        title={t('settings.atmosphere.weather.title')}
+        description={t('settings.atmosphere.weather.desc')}
         highlight={focusSettingId === 'weather'}
       >
         <div className="os-viz-row" style={{ flexWrap: 'wrap' }}>
-          <span className="os-viz-label muted">Mode</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.mode')}</span>
           {([
-            ['off', 'Off'],
-            ['auto', 'Auto'],
-            ['clouds', 'Clouds'],
-            ['fog', 'Fog'],
-            ['rain', 'Rain'],
-            ['snow', 'Snow'],
+            ['off', t('common.off')],
+            ['auto', t('settings.atmosphere.weather.auto')],
+            ['clouds', t('settings.atmosphere.weather.clouds')],
+            ['fog', t('settings.atmosphere.weather.fog')],
+            ['rain', t('settings.atmosphere.weather.rain')],
+            ['snow', t('settings.atmosphere.weather.snow')],
           ] as [WeatherMode, string][]).map(([id, label]) => (
             <button
               key={id}
@@ -287,7 +295,7 @@ export default function AtmospherePage() {
           ))}
         </div>
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Intensity</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.intensity')}</span>
           <input
             type="range"
             min={0}
@@ -303,8 +311,8 @@ export default function AtmospherePage() {
 
       <SettingsCard
         id="ambient-audio"
-        title="Ambient audio"
-        description="Looping soundscapes matched to the environment."
+        title={t('settings.atmosphere.ambientAudio.title')}
+        description={t('settings.atmosphere.ambientAudio.desc')}
         highlight={focusSettingId === 'ambient-audio'}
         trailing={
           <label className="os-toggle os-toggle-compact">
@@ -313,14 +321,14 @@ export default function AtmospherePage() {
               checked={env.ambientAudio?.enabled ?? false}
               disabled={!env.enabled}
               onChange={(e) => patchEnv({ ambientAudio: { enabled: e.target.checked, volume: env.ambientAudio?.volume ?? 0.5 } })}
-              aria-label="Enable ambient audio"
+              aria-label={t('settings.atmosphere.enableAmbientAudio')}
             />
-            <span>{env.ambientAudio?.enabled ? 'On' : 'Off'}</span>
+            <span>{env.ambientAudio?.enabled ? t('common.on') : t('common.off')}</span>
           </label>
         }
       >
         <div className="os-viz-row">
-          <span className="os-viz-label muted">Volume</span>
+          <span className="os-viz-label muted">{t('settings.atmosphere.volume')}</span>
           <input
             type="range"
             min={0}
@@ -332,7 +340,7 @@ export default function AtmospherePage() {
           />
           <span className="muted">{Math.round((env.ambientAudio?.volume ?? 0.5) * 100)}%</span>
         </div>
-        <p className="muted os-set-hint">Ships silent — add a sound pack to hear environment ambience.</p>
+        <p className="muted os-set-hint">{t('settings.atmosphere.ambientAudio.hint')}</p>
       </SettingsCard>
 
       <SettingsCard

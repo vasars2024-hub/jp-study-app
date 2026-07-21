@@ -27,7 +27,34 @@ Bare left-click is **not** allowed as a global shortcut (would hijack the UI). C
 
 ## Categories
 
-Navigation, Reader, Manga, Dictionary, Flashcards, Immersion, Utility, Music, Custom
+Rendered in this order (`CATEGORY_ORDER` in `ShortcutSettings.tsx`), grouped by
+purpose — moving around the OS, then arranging it, then the study surfaces, then
+media, then tools and user macros:
+
+Navigation, Window, Reader, Manga, Dictionary, Flashcards, Immersion, Music,
+Video, Toolbox, Utility, Custom
+
+Window defaults avoid the `Meta` (Win) key on purpose: Windows reserves
+`Win+Arrow` for its own snap layouts and `Win+D` for show-desktop, and the OS
+consumes those before Electron sees the keydown. `Ctrl+Alt+*` is the safe band.
+
+## App-wide dictionary lookup
+
+`GlobalDictionaryOverlay` (mounted next to `ToastHost` in every `App.tsx` shell)
+opens the dictionary popup on text **anywhere** in the Study OS, not just in the
+six reader views. Gesture is configured in Settings → Shortcuts → App-wide lookup
+(`globalLookupSettings.ts`); default is `Shift`+click.
+
+- Modifier gestures (`Shift`/`Ctrl`/`Alt` + click) are intercepted in the capture
+  phase and `preventDefault`ed, so they never activate the control underneath and
+  work inside the readers too.
+- `Plain click` mode stays passive instead: it skips interactive controls and any
+  surface marked `data-dict-owner` (the six readers, which run their own lookup).
+- Any view can open the popup without importing the module by dispatching
+  `window.dispatchEvent(new CustomEvent('dict:lookup', { detail: { query } }))`.
+- `Escape` closes the popup. It is handled locally rather than as a catalog
+  command, because the shortcut model is one-command-per-chord and `Escape` is
+  already `flashcards.end`; the overlay only intercepts it while a popup is open.
 
 View-scoped commands only fire while that view is mounted (handlers registered on open).
 

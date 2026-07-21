@@ -2,6 +2,7 @@
 // Shared verbatim by main and renderer. No Electron imports allowed here.
 
 import type { CardContent, FieldRole, ProfileId } from './profiles';
+import type { MineCardKind, MineCategory, MineLanguage, MineSource } from './profileRules';
 
 /** Byte-exact UI copy required on connection failure. Single source of truth. */
 export const ANKI_UNREACHABLE_MSG =
@@ -34,8 +35,25 @@ export interface AnkiLinkStatus {
 // ----- Mining (profile-aware note creation) --------------------------------
 
 export interface MineNoteRequest {
-  /** Defaults to the active profile. */
+  /**
+   * Hard override: when set, the note goes to this exact profile and mining
+   * rules are NOT consulted. Leave unset and pass `route` to let the Mining
+   * Rules (Settings → Study → Mining rules) pick the profile.
+   */
   profileId?: ProfileId;
+  /**
+   * Mining-rule routing context. When present and `profileId` is unset,
+   * `mineNote` resolves the target profile through the user's mining rules
+   * (falling back to the active profile). Omit for flows that should always
+   * use the active profile (e.g. the manual "Add card" screen).
+   */
+  route?: {
+    source?: MineSource;
+    cardKind?: MineCardKind;
+    /** Omit to auto-detect from term/sentence (CJK/Cyrillic heuristic). */
+    language?: MineLanguage;
+    category?: MineCategory;
+  };
   term: string;
   reading?: string;
   /** English gloss (P1 back, P2 front). */
@@ -82,6 +100,13 @@ export interface MineNoteRequest {
   prebuiltCard?: { front: string; back: string };
   /** Fetch native-speaker audio into the {audio} variable (Phase D). */
   fetchAudio?: boolean;
+  /**
+   * Optional pre-recorded audio (base64, no data: prefix) to attach as
+   * `[sound:…]` via AnkiConnect storeMediaFile. Used by extension audio mining.
+   */
+  audioBase64?: string;
+  /** Filename for storeMediaFile (e.g. jp-ext-audio-….webm). */
+  audioFilename?: string;
   /** Named frequency ranks for tokens like {frequency:BCCWJ}. */
   frequencies?: Record<string, string | number>;
   extraTags?: string[];
@@ -92,6 +117,14 @@ export interface MineNoteResult {
   noteId?: number;
   /** 'duplicate' | ANKI_UNREACHABLE_MSG | verbatim AnkiConnect API error. */
   error?: string;
+  /** Profile the note was actually written to (after mining-rule resolution). */
+  profileId?: ProfileId;
+  /** Human label of that profile, for "card went to X" UI. */
+  profileName?: string;
+  /** Label of the mining rule that matched, if routing chose a rule. */
+  matchedRuleLabel?: string;
+  /** True when no rule matched and the active/default profile was used. */
+  usedDefault?: boolean;
 }
 
 // ----- Note-type integration ------------------------------------------------

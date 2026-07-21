@@ -3,6 +3,7 @@ doc_id: noctis.technology_system
 tier: 7
 authority: domain_specification
 role: technology_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -167,7 +168,7 @@ The technology domain owns the following symbolic coefficient families. Each is 
 | `λ_practice` | Decay of unmaintained or superseded active practice | Acts only on the renewable practice layer; **never** triggered by user absence; heritage untouched | `SIMULATION_SYSTEMS.md` Sections 10, 16, Law 8 |
 | `α_adopt` | Adoption-breadth advance per compatible condition | Monotone in compatibility and reception; `A_adopt` bounded; never reaches forced universality | `SIMULATION_SYSTEMS.md` Section 16 |
 | `Θ_redisc` | Rediscovery reactivation threshold | Crossable only when a heritage record exists and preconditions realign; deterministic | `SIMULATION_SYSTEMS.md` Sections 10, 21 |
-| `w_era` | Technology's contribution weight to era readiness | A contribution signal only; the gate `Θ_era` is owned by `ERA_PROGRESSION.md` | `SIMULATION_SYSTEMS.md` Section 15 |
+| `x_technology` | Technology's secured-maturity contribution to era readiness | A bounded `[0,1]` reading only; its weight and the gate `Θ_era` are owned by `ERA_PROGRESSION.md` | `SIMULATION_SYSTEMS.md` Section 15 |
 
 No coefficient may ever be user-visible as a number to optimize, and no technological advance may ever require a user decision (`GAME_DESIGN.md` Section 11, Principle 2; `SIMULATION_SYSTEMS.md` Law 10).
 
@@ -318,7 +319,7 @@ Technology produces consequences the whole simulation can read, but it **resolve
 - to **Culture** — symbols, prestige, anxiety, aspiration, taboo *candidates*; Culture decides meaning and legitimacy (Section 15).
 - to **Economy** — production capability and resource-demand pressure; Economy decides allocation and sufficiency, with no price and no market (Section 15).
 - to **Memory** — inventions, disasters, ruins, lost techniques, and monument-of-invention *candidates*; Memory decides persistence and distortion (Section 15).
-- to **Era Progression** — a technological-maturity contribution signal (`w_era`); Era Progression decides gating (Section 17).
+- to **Era Progression** — a technological secured-maturity contribution (`x_technology`); Era Progression assigns `w_technology` and decides gating (Section 17).
 - to **metabolism** — infrastructure efficiency (`η_era`), returned across time steps, never as primary energy (`SIMULATION_SYSTEMS.md` Section 13).
 
 This clean ownership is what lets technology be consequential without becoming a second simulation of ecology, society, or economy. It names the pressure; the world answers it.
@@ -345,7 +346,7 @@ Citizens differ — in skill, access, trust, familiarity, dependence, exposure t
 
 ## SECTION 15 — CULTURE, ECONOMY, AND MEMORY INTERFACES
 
-These three domains are unwritten (placeholders) or reserved; this document defines **one-directional deferred contracts** to them and authors none of their internals (`SIMULATION_SYSTEMS.md` Sections 17, 20, 21).
+These three domains are completed peers; this document defines **one-directional ownership contracts** to them and authors none of their internals (`SIMULATION_SYSTEMS.md` Sections 17, 20, 21).
 
 **Culture interface.** Technology emits, as candidates, the symbols, rituals, anxieties, aspirations, aesthetics, prestige markers, taboos, generational identities, and philosophical questions a technology can provoke. It reads back an abstract **cultural-reception vector** — legitimacy, trust, prestige, openness, resistance, taboo, compatibility, preservation strength — which conditions adoption (Section 10). Culture owns interpretation and legitimacy; technology never decides what a device *means* (`CULTURE_SYSTEM.md`).
 
@@ -376,7 +377,7 @@ These influence technology through the possibility field, never as a purchase:
 
 ## SECTION 17 — ERA BEHAVIOUR
 
-The five canonical eras (`SIMULATION_SYSTEMS.md` Section 15; `GAME_DESIGN.md` Section 7) are not rungs on a technology ladder; each is a **changed relationship between the civilization and knowledge**, and each defines a **capability envelope** — the outer bound of what is *possible* — not a package of guaranteed, universally-installed technologies. This domain owns the *realization* of each envelope and the infrastructure-efficiency curve `η_era`; era **gating** is owned by `ERA_PROGRESSION.md`, to which this domain emits only a technological-maturity contribution (`w_era`). Era advancement is **not** invention: crossing into an era widens what can precipitate; it does not hand the civilization the era's signature devices for free.
+The five canonical eras (`SIMULATION_SYSTEMS.md` Section 15; `GAME_DESIGN.md` Section 7) are not rungs on a technology ladder; each is a **changed relationship between the civilization and knowledge**, and each defines a **capability envelope** — the outer bound of what is *possible* — not a package of guaranteed, universally-installed technologies. This domain owns the *realization* of each envelope and the infrastructure-efficiency curve `η_era`; era **gating** is owned by `ERA_PROGRESSION.md`, to which this domain emits only the technological secured-maturity contribution `x_technology`. Era advancement is **not** invention: crossing into an era widens what can precipitate; it does not hand the civilization the era's signature devices for free.
 
 - **`SPORE_HEARTH`** — knowledge is embodied, oral, local, inseparable from survival, living in hands, rituals, routes, elders, and communal repetition. Envelope: tactile knot-record, near-range semaphore and touch, echolocation survey, communal cold-hearth cultivation.
 - **`CRYSTAL_INSCRIPTION`** — knowledge becomes organized and externalized: scriptoria, crystal archives, routed light, apprenticeship, the first standards. Envelope: fiber-scroll and lattice memory, aqueduct-routed signal, luciferin synthesis, resonant storage.
@@ -567,12 +568,12 @@ Any future technology feature — a domain, a technique class, a transition, an 
 
 Bound by future documents, under the contracts this file provides:
 
-- **`ERA_PROGRESSION.md`** — the era-transition gating formula and thresholds `Θ_era`; how this domain's `w_era` contribution combines with ecology, citizen, culture, and memory contributions.
+- **`ERA_PROGRESSION.md`** — the era-transition gating formula, `w_technology`, and thresholds `Θ_era`; how this domain's `x_technology` contribution combines with ecology, citizen, culture, memory, and economy contributions.
 - **`LEARNING_INTEGRATION.md`** — the exact interpreted-profile dimensions and their derivation from raw study; the subject taxonomy.
 - **`CULTURE_SYSTEM.md`** — the internal model of the cultural-reception vector this domain reads; legitimacy, prestige, and taboo resolution.
 - **`ECONOMY_SYSTEM.md`** — how production-capability and demand-pressure signals become allocation and sufficiency, with no market.
 - **`MEMORY_SYSTEM.md`** — how technique heritage, ruins, and lost-technique records persist, distort, and surface; the generation of invention monuments and rediscoverable schemas.
-- **Implementation phase** — all coefficient values (`Θ_precip`, `η_era`, `μ_maint`, `λ_practice`, `α_adopt`, `Θ_redisc`, `w_era`), each carrying a canon citation, under the calibration constraints of `SIMULATION_SYSTEMS.md` and this file; and the exact seed and selection encoding for `select`.
+- **Implementation phase** — all coefficient values (`Θ_precip`, `η_era`, `μ_maint`, `λ_practice`, `α_adopt`, `Θ_redisc`) and the exact derivation of `x_technology`, each carrying a canon citation, under the calibration constraints of `SIMULATION_SYSTEMS.md` and this file; and the exact seed and selection encoding for `select`. `w_technology` remains owned by `ERA_PROGRESSION.md`.
 
 None of these is resolved here with an arbitrary assumption; each is a clean deferred contract.
 

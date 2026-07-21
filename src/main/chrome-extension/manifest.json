@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "GrammarX — Reader Companion",
+  "version": "3.2.0",
+  "description": "Read Japanese in the browser: hover lookup with grammar and sentence analysis, save words and sentences to GrammarX, create Anki cards, OCR, and page capture.",
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus", "alarms", "tabs"],
+  "host_permissions": ["http://127.0.0.1:18765/*", "<all_urls>"],
+  "action": {
+    "default_title": "GrammarX",
+    "default_popup": "popup.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["shared.js", "settings.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "save-page": {
+      "suggested_key": { "default": "Alt+Shift+R" },
+      "description": "Save page to GrammarX"
+    },
+    "dictionary-popup": {
+      "suggested_key": { "default": "Alt+Shift+D" },
+      "description": "Look up selection / word under cursor"
+    },
+    "mine-selection": {
+      "suggested_key": { "default": "Alt+Shift+M" },
+      "description": "Save selection (word or sentence)"
+    },
+    "action-wheel": {
+      "suggested_key": { "default": "Alt+Shift+W" },
+      "description": "Open the action wheel"
+    },
+    "bulk-tabs": {
+      "description": "Open the reading list (assign a shortcut in the browser if desired)"
+    }
+  }
+}

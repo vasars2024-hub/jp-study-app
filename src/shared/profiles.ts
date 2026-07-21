@@ -124,8 +124,8 @@ export interface StudyProfile {
   label: string;
   /** Shown in Settings — explains what this profile is for. */
   description?: string;
-  /** Lemma space tracked by the knowledge store. 'ja' for all seeds. */
-  targetLang: 'ja';
+  /** Lemma space tracked by the knowledge store. */
+  targetLang: 'ja' | 'zh';
   card: CardBlueprint;
   anki: AnkiBinding;
   deckParams: DeckParams;

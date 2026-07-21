@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GrammarX — Extension settings</title>
+    <style>
+      :root {
+        --bg: #13151b;
+        --panel: #1b1e26;
+        --panel-2: #21252f;
+        --border: rgba(255, 255, 255, 0.08);
+        --text: #e8eaef;
+        --muted: #98a0af;
+        --accent: #9c2b3d;
+        --accent-soft: rgba(156, 43, 61, 0.16);
+        --ok: #4cc584;
+        --warn: #d8a01d;
+        --err: #e05555;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 14px/1.55 "Segoe UI", system-ui, sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        min-height: 100vh;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        max-width: 980px;
+        margin: 0 auto;
+        gap: 28px;
+        padding: 28px 20px 64px;
+      }
+      @media (max-width: 760px) {
+        .layout { grid-template-columns: 1fr; }
+        nav.side { position: static !important; display: flex; flex-wrap: wrap; gap: 4px; }
+        nav.side button { flex: 0 0 auto; }
+      }
+      nav.side {
+        position: sticky;
+        top: 28px;
+        align-self: start;
+        display: grid;
+        gap: 2px;
+      }
+      nav.side .brand {
+        font-size: 16px;
+        font-weight: 650;
+        margin-bottom: 10px;
+        padding-left: 10px;
+      }
+      #search {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+      }
+      nav.side button {
+        text-align: left;
+        background: none;
+        border: 0;
+        border-radius: 8px;
+        color: var(--muted);
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+      nav.side button:hover { background: var(--panel); color: var(--text); }
+      nav.side button.active {
+        background: var(--accent-soft);
+        color: var(--text);
+        font-weight: 600;
+      }
+      nav.side button[hidden] { display: none; }
+      main { min-width: 0; }
+      section.pane { display: none; }
+      section.pane.active { display: block; }
+      section.pane > h1 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
+      section.pane > .lead { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+      .group {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin-bottom: 14px;
+      }
+      .group h3 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+      .field { margin: 12px 0; }
+      .field:first-child { margin-top: 0; }
+      .field > label.name { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+      .field .desc { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+      input[type="text"], input[type="password"], input[type="number"], select, textarea {
+        width: 100%;
+        max-width: 340px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+      }
+      textarea { min-height: 64px; resize: vertical; max-width: 480px; }
+      input[type="range"] { max-width: 240px; vertical-align: middle; }
+      .range-val { display: inline-block; min-width: 56px; color: var(--muted); font-size: 12px; margin-left: 8px; }
+      .check { display: flex; align-items: flex-start; gap: 9px; margin: 9px 0; font-size: 13px; }
+      .check input { margin-top: 3px; }
+      .check .sub { display: block; font-size: 12px; color: var(--muted); }
+      .radio-group { display: grid; gap: 8px; margin-top: 6px; }
+      .radio-card {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        cursor: pointer;
+        background: var(--panel-2);
+        max-width: 480px;
+      }
+      .radio-card input { margin-top: 3px; }
+      .radio-card.selected { border-color: rgba(156, 43, 61, 0.55); background: var(--accent-soft); }
+      .radio-card b { font-size: 13px; }
+      .radio-card .sub { font-size: 12px; color: var(--muted); }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+      button.btn {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 13px;
+        cursor: pointer;
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+      }
+      button.btn:hover { background: #2a2f3a; }
+      button.btn.primary {
+        background: var(--accent);
+        border-color: transparent;
+        font-weight: 600;
+      }
+      button.btn.danger { color: var(--err); border-color: rgba(224, 85, 85, 0.4); }
+      .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+      kbd {
+        font: 12px ui-monospace, Consolas, monospace;
+        background: var(--panel-2);
+        padding: 2px 7px;
+        border-radius: 5px;
+        border: 1px solid var(--border);
+      }
+      /* Wheel editor */
+      .wheel-editor { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+      .wheel-positions { display: grid; gap: 8px; min-width: 280px; }
+      .wheel-pos { display: grid; grid-template-columns: 92px 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+      #wheel-preview {
+        position: relative;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 50% 40%, #262b36, #1b1e26 70%);
+        border: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      #wheel-preview .pv-slice {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        font-size: 11px;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 3px 9px;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+      #wheel-preview .pv-center {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 11px;
+        color: var(--muted);
+        border: 1px dashed var(--border);
+        border-radius: 999px;
+        padding: 5px 11px;
+      }
+      /* Shortcuts table */
+      table.shortcuts { width: 100%; border-collapse: collapse; font-size: 13px; }
+      table.shortcuts td { padding: 7px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      table.shortcuts td:last-child { text-align: right; white-space: nowrap; }
+      table.shortcuts .cmd-desc { color: var(--muted); font-size: 12px; }
+      #status {
+        position: fixed;
+        bottom: 18px;
+        right: 22px;
+        padding: 8px 14px;
+        border-radius: 9px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        font-size: 13px;
+        color: var(--muted);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+      }
+      #status.show { opacity: 1; }
+      #status.ok { color: var(--ok); }
+      #status.err { color: var(--err); }
+      .conn-state { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
+      .conn-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+      .conn-state.ok { color: var(--ok); } .conn-state.ok::before { background: var(--ok); }
+      .conn-state.err { color: var(--err); } .conn-state.err::before { background: var(--err); }
+      .search-empty { color: var(--muted); font-size: 13px; padding: 8px 10px; display: none; }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="side" id="nav">
+        <div class="brand">GrammarX</div>
+        <input id="search" type="search" placeholder="Search settings…" aria-label="Search settings" />
+        <div class="search-empty" id="search-empty">No settings match.</div>
+        <button data-pane="lookup" data-keywords="hover shift key delay scan dictionary popup activation hold editable click">Hover lookup</button>
+        <button data-pane="popup" data-keywords="reader popup width font compact pin size appearance">Reader popup</button>
+        <button data-pane="saving" data-keywords="save mine card anki flashcard destination preview folder library confirm">Saving &amp; cards</button>
+        <button data-pane="wheel" data-keywords="wheel radial slot actions gesture positions">Radial wheel</button>
+        <button data-pane="panel" data-keywords="panel fab badge level comprehensibility corner theme highlight tint hide site">Page panel</button>
+        <button data-pane="media" data-keywords="youtube yt video download audio playlist media subtitle">Video &amp; media</button>
+        <button data-pane="connection" data-keywords="connection pairing token port bridge app anki mapping rules clipboard history flashcards test pull">Connection</button>
+        <button data-pane="shortcuts" data-keywords="shortcut keyboard keys binding commands chrome">Shortcuts</button>
+        <button data-pane="advanced" data-keywords="advanced export import reset immersion notes legacy mine terminology data">Advanced</button>
+      </nav>
+
+      <main>
+        <!-- Hover lookup -->
+        <section class="pane" id="pane-lookup">
+          <h1>Hover lookup</h1>
+          <p class="lead">Hold a key and point at Japanese text to open the reader popup.</p>
+          <div class="group">
+            <label class="check"><input type="checkbox" id="hover-enabled" />
+              <span>Enable hover lookup<span class="sub">Hold the activation key and move the cursor over a word.</span></span></label>
+            <div class="field">
+              <label class="name" for="hover-key">Activation key</label>
+              <p class="desc">Held while hovering; also used with click and select lookups.</p>
+              <select id="hover-key">
+                <option value="shift">Shift</option>
+                <option value="alt">Alt</option>
+                <option value="ctrl">Ctrl</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="name" for="hover-delay">Hover delay</label>
+              <p class="desc">How long the cursor rests on a word before the popup opens.</p>
+              <input type="range" id="hover-delay" min="0" max="600" step="20" />
+              <span class="range-val" id="hover-delay-val"></span>
+            </div>
+            <div class="field">
+              <label class="name" for="scan-length">Scan length</label>
+              <p class="desc">Maximum characters considered for a match. Longer catches long compounds; shorter is faster.</p>
+              <input type="range" id="scan-length" min="4" max="24" step="1" />
+              <span class="range-val" id="scan-length-val"></span>
+            </div>
+            <label class="check"><input type="checkbox" id="close-on-release" />
+              <span>Close the popup when the key is released<span class="sub">Off: the popup stays until you click elsewhere or press Esc. Pinned popups always stay.</span></span></label>
+            <label class="check"><input type="checkbox" id="click-lookup" />
+              <span>Key + click / key + select also look up<span class="sub">Plain clicks always pass through to the page.</span></span></label>
+            <label class="check"><input type="checkbox" id="lookup-editable" />
+              <span>Allow lookup inside text fields<span class="sub">Off by default so typing is never interrupted.</span></span></label>
+          </div>
+        </section>
+
+        <!-- Reader popup -->
+        <section class="pane" id="pane-popup">
+          <h1>Reader popup</h1>
+          <p class="lead">The in-page dictionary with Meaning, Grammar, Sentence, Kanji, and Examples tabs.</p>
+          <div class="group">
+            <div class="field">
+              <label class="name" for="popup-width">Width</label>
+              <input type="range" id="popup-width" min="280" max="560" step="10" />
+              <span class="range-val" id="popup-width-val"></span>
+            </div>
+            <div class="field">
+              <label class="name" for="popup-font">Font size</label>
+              <input type="range" id="popup-font" min="12" max="18" step="1" />
+              <span class="range-val" id="popup-font-val"></span>
+            </div>
+            <label class="check"><input type="checkbox" id="popup-compact" />
+              <span>Compact mode<span class="sub">Fewer definitions per entry — lighter for long reading sessions.</span></span></label>
+            <label class="check"><input type="checkbox" id="popup-pin-click" />
+              <span>Pin the popup on key + click<span class="sub">Pinned popups can be dragged by their header and stay open while you read.</span></span></label>
+            <p class="hint">Inside the popup: <kbd>←</kbd><kbd>→</kbd> switch tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Esc</kbd> close.</p>
+          </div>
+        </section>
+
+        <!-- Saving & cards -->
+        <section class="pane" id="pane-saving">
+          <h1>Saving &amp; cards</h1>
+          <p class="lead">Where saved words, sentences, and flashcards go. (Previously called “mining”.)</p>
+          <div class="group">
+            <div class="field">
+              <label class="name">When I save a word or sentence</label>
+              <div class="radio-group" id="dest-group">
+                <label class="radio-card"><input type="radio" name="dest" value="both" />
+                  <span><b>GrammarX + Anki card</b><span class="sub">Creates an Anki card when Anki is running; a copy is always kept in your GrammarX library.</span></span></label>
+                <label class="radio-card"><input type="radio" name="dest" value="app" />
+                  <span><b>GrammarX only</b><span class="sub">Saves to your GrammarX library. “Create card” still sends to Anki explicitly.</span></span></label>
+              </div>
+            </div>
+            <label class="check"><input type="checkbox" id="confirm-card" />
+              <span>Preview before creating a card<span class="sub">Shows the text, card type, and destination before sending. Card fields are filled by GrammarX from its dictionaries and your Anki field mapping.</span></span></label>
+            <div class="field">
+              <label class="name" for="folder-label">Library folder label</label>
+              <p class="desc">Saves from the extension appear under this folder in GrammarX flashcards.</p>
+              <input id="folder-label" type="text" maxlength="40" />
+            </div>
+            <p class="hint">Deck, note type, and field mapping live in the GrammarX app — see <b>Connection</b> for direct links.</p>
+          </div>
+        </section>
+
+        <!-- Radial wheel -->
+        <section class="pane" id="pane-wheel">
+          <h1>Radial wheel</h1>
+          <p class="lead">A quick action ring opened with <kbd>Alt+Shift+W</kbd>. One command per position; the center always cancels.</p>
+          <div class="group">
+            <label class="check"><input type="checkbox" id="wheel-enabled" />
+              <span>Enable the radial wheel<span class="sub">When disabled, the shortcut opens a compact action list instead.</span></span></label>
+            <div class="wheel-editor">
+              <div class="wheel-positions" id="wheel-positions"></div>
+              <div id="wheel-preview" aria-hidden="true"></div>
+            </div>
+            <p class="hint">Each command can be assigned once — picking a command that is already placed swaps the two positions. Commands that don't apply to the current page (like Download video outside YouTube) appear disabled on the wheel. Keyboard: <kbd>1</kbd>–<kbd>6</kbd> run a position, arrows move the highlight, <kbd>Esc</kbd> cancels.</p>
+          </div>
+        </section>
+
+        <!-- Page panel -->
+        <section class="pane" id="pane-panel">
+          <h1>Page panel</h1>
+          <p class="lead">The small corner panel with the difficulty estimate and page tools.</p>
+          <div class="group">
+            <label class="check"><input type="checkbox" id="fab-visible" /><span>Show the page panel</span></label>
+            <label class="check"><input type="checkbox" id="fab-collapsed" /><span>Start collapsed</span></label>
+            <div class="field">
+              <label class="name" for="fab-corner">Position</label>
+              <select id="fab-corner">
+                <option value="bottom-right">Bottom right</option>
+                <option value="bottom-right-mid">Bottom right (higher)</option>
+                <option value="top-right">Top right</option>
+              </select>
+            </div>
+            <h3 style="margin-top:16px">Badges &amp; buttons</h3>
+            <label class="check"><input type="checkbox" id="fab-level" /><span>Difficulty estimate</span></label>
+            <label class="check"><input type="checkbox" id="fab-comp" /><span>Known-word percentage</span></label>
+            <label class="check"><input type="checkbox" id="fab-theme" /><span>Reading theme button</span></label>
+            <label class="check"><input type="checkbox" id="fab-hl" /><span>Highlight mode button</span></label>
+            <label class="check"><input type="checkbox" id="fab-learn" /><span>Known-word tint button</span></label>
+            <label class="check"><input type="checkbox" id="fab-ocr" /><span>OCR button</span></label>
+            <div class="row">
+              <button type="button" class="btn" id="fab-clear-hidden">Show panel on all sites again</button>
+            </div>
+            <p class="hint">“Hide here” on the panel suppresses it per-site; this clears that list.</p>
+          </div>
+        </section>
+
+        <!-- Video & media -->
+        <section class="pane" id="pane-media">
+          <h1>Video &amp; media</h1>
+          <p class="lead">What “Save page” does on YouTube, and media options.</p>
+          <div class="group">
+            <div class="field">
+              <label class="name" for="yt-mode">Saving a YouTube page</label>
+              <select id="yt-mode">
+                <option value="download">Download the media into GrammarX</option>
+                <option value="metadata">Save metadata only (track the video/playlist)</option>
+              </select>
+            </div>
+            <label class="check"><input type="checkbox" id="yt-audio" />
+              <span>Audio only when downloading<span class="sub">Smaller files — useful for listening practice.</span></span></label>
+            <p class="hint">“Download video” is always available explicitly on YouTube pages from the popup, wheel, and More menu.</p>
+          </div>
+        </section>
+
+        <!-- Connection -->
+        <section class="pane" id="pane-connection">
+          <h1>Connection</h1>
+          <p class="lead">Pairing with the GrammarX desktop app. Everything else — Anki mapping, mining rules, clipboard history — lives in the app itself.</p>
+          <div class="group">
+            <h3>Pairing <span class="conn-state" id="conn-state" style="margin-left:10px">unknown</span></h3>
+            <div class="field">
+              <label class="name" for="token">Pairing token</label>
+              <p class="desc">Copy it from GrammarX → Settings → Study → Chrome extension, or pull it automatically while the app is open.</p>
+              <input id="token" type="password" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label class="name" for="port">Bridge port</label>
+              <input id="port" type="number" value="18765" min="1" max="65535" />
+            </div>
+            <div class="row">
+              <button type="button" class="btn primary" id="save-pair">Save pairing</button>
+              <button type="button" class="btn" id="test">Test connection</button>
+              <button type="button" class="btn" id="pull-app">Pull token from app</button>
+            </div>
+          </div>
+          <div class="group">
+            <h3>Open in the GrammarX app</h3>
+            <div class="row">
+              <button type="button" class="btn" data-open="anki">Anki &amp; field mapping</button>
+              <button type="button" class="btn" data-open="profile-rules">Saving rules (profiles)</button>
+              <button type="button" class="btn" data-open="clipboard">Clipboard history</button>
+              <button type="button" class="btn" data-open="flashcards">Flashcards</button>
+              <button type="button" class="btn" data-open="inbox">Inbox</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Shortcuts -->
+        <section class="pane" id="pane-shortcuts">
+          <h1>Shortcuts</h1>
+          <p class="lead">Browser-level shortcuts are managed by Chrome; in-page keys work whenever the reader popup or wheel is open.</p>
+          <div class="group">
+            <h3>Browser shortcuts</h3>
+            <table class="shortcuts" id="shortcut-table"></table>
+            <div class="row">
+              <button type="button" class="btn" id="open-shortcuts">Change in Chrome shortcut settings</button>
+            </div>
+          </div>
+          <div class="group">
+            <h3>In-page keys</h3>
+            <p class="hint" style="margin-top:0">
+              Reader popup: <kbd>←</kbd><kbd>→</kbd> tabs · <kbd>S</kbd> save word · <kbd>Shift+S</kbd> save sentence · <kbd>C</kbd> create card · <kbd>P</kbd> pin · <kbd>A</kbd> audio · <kbd>Backspace</kbd> back · <kbd>Esc</kbd> close.<br />
+              Wheel: <kbd>1</kbd>–<kbd>6</kbd> run · arrows highlight · <kbd>Enter</kbd> run · <kbd>Esc</kbd> cancel.<br />
+              OCR selection: drag a box · <kbd>Esc</kbd> cancel.
+            </p>
+          </div>
+        </section>
+
+        <!-- Advanced -->
+        <section class="pane" id="pane-advanced">
+          <h1>Advanced</h1>
+          <p class="lead">Data, migration, and everything that doesn't need to be on by default.</p>
+          <div class="group">
+            <label class="check"><input type="checkbox" id="log-immersion" />
+              <span>Log reading time to GrammarX<span class="sub">Counts active time on pages with Japanese text toward your immersion statistics.</span></span></label>
+            <div class="field">
+              <label class="name" for="notes">Notes</label>
+              <textarea id="notes" placeholder="Optional notes for yourself"></textarea>
+            </div>
+          </div>
+          <div class="group">
+            <h3>Settings data</h3>
+            <div class="row">
+              <button type="button" class="btn" id="export-settings">Export settings</button>
+              <button type="button" class="btn" id="import-settings">Import settings</button>
+              <input type="file" id="import-file" accept="application/json" hidden />
+              <button type="button" class="btn danger" id="reset-settings">Reset to defaults</button>
+            </div>
+            <p class="hint">Reset keeps your pairing token and port. Settings from older versions (including “Prefer Anki for mines” and the old wheel slots) are migrated automatically — “mine” is simply called “save” now.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div id="status" role="status"></div>
+    <script src="shared.js"></script>
+    <script src="settings.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

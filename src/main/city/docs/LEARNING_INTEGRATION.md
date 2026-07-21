@@ -3,6 +3,7 @@ doc_id: noctis.learning_integration
 tier: 7
 authority: domain_specification
 role: learning_integration_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -120,7 +121,7 @@ A lightweight event bus already carrying `kind: 'streak' | 'achievement'` notice
 
 ### The Existing Bridge, And Its Honest Limits
 
-`noctisLightBridge.ts` already forwards a coarse `noctis:pulse { kind: 'study'|'flashcard'|'streak'|'achievement', note?, at }` as a DOM event, and its own comment is explicit: it is an "intentional under-coupling" that does *not* call `city:` IPC, does not mutate simulation state, and does not drive simulation, economy, or map systems. The real inbound channel this document's output is destined for — `city:recordSession` in `src/main/city/ipc/channels.ts` — is, at this writing, a documented **TODO stub**, not a working channel. This document specifies the *contract* that channel must eventually carry; it does not claim the wiring already exists, and it modifies no application code.
+The repository contains an earlier renderer collector, state mirror, `city:recordSession` IPC path, and a separate coarse `noctisLightBridge.ts`. They were implemented before the completed Tier 6/7 reconciliation and are therefore **provisional, not authoritative**. The final integration must retain one path only: raw local activity is accumulated in the renderer, interpreted into `I`, and only the irreversible interpreted payload crosses `city:recordSession`. The coarse pulse bridge may provide presentation-only ambience, but it may never become a second simulation writer or bypass the interpretation membrane. Implementation status does not change this contract.
 
 ### What Does Not Exist Today
 
@@ -315,7 +316,7 @@ Hard rules; a proposed learning-integration mechanic that violates any is invali
 
 ## SECTION 14 — DEFERRED QUESTIONS
 
-Bound by future work, under the contract this file provides: the exact wire encoding of `I` on the `city:recordSession` channel, still a stub (`ARCHITECTURE.md` Section 4); the exact normalization coefficients for each profile dimension, each carrying a canon citation, bound under `SIMULATION_SYSTEMS.md`'s calibration constraints; the classification entries for any future tracked activity beyond Japanese reading (Section 7); a genuine difficulty/failure telemetry source, should the app ever add one (Section 6); and any UI surfacing of the interpreted profile itself (`ART_DIRECTION.md`, Tier 8 — today the Statistics view surfaces only raw telemetry, which remains correct and unrelated to this document's simulation-facing output). Each is a clean deferred contract, resolved with no arbitrary assumption here.
+Bound by implementation under the contract this file provides: the versioned wire encoding of `I` on `city:recordSession` (`ARCHITECTURE.md` Section 4); reliable accumulation and retry semantics so shutdown or a renderer crash cannot silently lose a partial window; the exact normalization coefficients for each profile dimension, each carrying a canon citation; the classification entries for future tracked activity beyond Japanese reading (Section 7); a genuine difficulty/failure telemetry source, should the app add one (Section 6); and any UI surfacing of the interpreted profile itself (`ART_DIRECTION.md`, Tier 8 — the Statistics view may continue to surface raw user-facing telemetry while Noctis consumes only the interpreted projection). Each is a clean implementation contract, resolved with no arbitrary assumption here.
 
 ---
 

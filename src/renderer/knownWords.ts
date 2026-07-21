@@ -3,6 +3,11 @@
 // Levels: 0 = new/unknown (not stored), 1 = learning, 2 = familiar, 3 = known.
 // Entries remember whether they were set manually — the Anki auto-sync never
 // overwrites a manual choice.
+//
+// Phase 8: storage is per study language (`jp-word-knowledge-ja` / `-zh`) so
+// switching environments never mixes JA and ZH lemmas.
+
+import { getStudyLang, onStudyLangChanged, type StudyLang } from './studyEnvironment';
 
 export const WK_LEVELS = ['New', 'Learning', 'Familiar', 'Known'] as const;
 export type WkLevel = 0 | 1 | 2 | 3;
@@ -13,15 +18,39 @@ interface Entry {
   m?: 1;
 }
 
-const KEY = 'jp-word-knowledge';
+export const LEGACY_KNOWLEDGE_KEY = 'jp-word-knowledge';
+
+export function knowledgeKey(lang: StudyLang = getStudyLang()): string {
+  return `${LEGACY_KNOWLEDGE_KEY}-${lang}`;
+}
+
 const EVENT = 'word-knowledge-changed';
 
+let cacheLang: StudyLang | null = null;
 let cache: Record<string, Entry> | null = null;
+let migrated = false;
+
+function migrateLegacyOnce(): void {
+  if (migrated) return;
+  migrated = true;
+  try {
+    const jaKey = knowledgeKey('ja');
+    if (localStorage.getItem(jaKey)) return;
+    const legacy = localStorage.getItem(LEGACY_KNOWLEDGE_KEY);
+    if (!legacy) return;
+    localStorage.setItem(jaKey, legacy);
+  } catch {
+    /* ignore */
+  }
+}
 
 function db(): Record<string, Entry> {
-  if (!cache) {
+  migrateLegacyOnce();
+  const lang = getStudyLang();
+  if (!cache || cacheLang !== lang) {
+    cacheLang = lang;
     try {
-      cache = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, Entry>;
+      cache = JSON.parse(localStorage.getItem(knowledgeKey(lang)) ?? '{}') as Record<string, Entry>;
     } catch {
       cache = {};
     }
@@ -31,7 +60,7 @@ function db(): Record<string, Entry> {
 
 function persist(): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(db()));
+    localStorage.setItem(knowledgeKey(), JSON.stringify(db()));
   } catch {
     /* storage unavailable */
   }
@@ -41,13 +70,22 @@ function emit(words: string[]): void {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: words }));
 }
 
-// The native 'storage' event fires in *other* windows (e.g. a popped-out
-// Dictionary or Reader) whenever this key changes here — but only if their
-// in-memory `cache` gets thrown out first, otherwise they'd keep serving the
-// stale copy forever. Registered at module load, so it always runs before any
-// component's own onKnowledgeChanged listener (added later, in an effect).
+function isKnowledgeStorageKey(key: string | null): boolean {
+  if (key === null) return true;
+  if (key === LEGACY_KNOWLEDGE_KEY) return true;
+  return key === knowledgeKey('ja') || key === knowledgeKey('zh');
+}
+
 window.addEventListener('storage', (e) => {
-  if (e.key === null || e.key === KEY) cache = null;
+  if (isKnowledgeStorageKey(e.key)) {
+    cache = null;
+    cacheLang = null;
+  }
+});
+
+onStudyLangChanged(() => {
+  cache = null;
+  cacheLang = null;
 });
 
 export function getLevel(word: string): WkLevel {
@@ -98,20 +136,28 @@ export function knowledgeCounts(): Record<WkLevel, number> {
   return out;
 }
 
+/** Snapshot of lemma → level for Notebook / export (excludes level 0). */
+export function listKnownEntries(): Array<{ word: string; level: WkLevel }> {
+  return Object.entries(db())
+    .filter(([, e]) => e.l > 0)
+    .map(([word, e]) => ({ word, level: e.l }));
+}
+
 /** Subscribe to knowledge changes, including from other windows (returns unsubscribe). */
 export function onKnowledgeChanged(cb: (words: string[]) => void): () => void {
   const h = (e: Event): void => cb((e as CustomEvent<string[]>).detail ?? []);
-  // Cross-window change: we don't know which words, so pass none — every
-  // caller today just re-derives its view from the store, not from this list.
   const storageHandler = (e: Event): void => {
     const se = e as StorageEvent;
-    if (se.key !== null && se.key !== KEY) return;
+    if (!isKnowledgeStorageKey(se.key)) return;
     cb([]);
   };
+  const langHandler = (): void => cb([]);
   window.addEventListener(EVENT, h);
   window.addEventListener('storage', storageHandler);
+  const unsubLang = onStudyLangChanged(langHandler);
   return () => {
     window.removeEventListener(EVENT, h);
     window.removeEventListener('storage', storageHandler);
+    unsubLang();
   };
 }

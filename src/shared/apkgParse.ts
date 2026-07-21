@@ -123,6 +123,19 @@ export function stripFieldHtml(raw: string): string {
  * still lemmatizes and dedupes by lemma afterward). Returns the unique
  * expressions in first-seen order plus the count of notes seen.
  */
+/**
+ * A modern .apkg carries a decoy `collection.anki2` holding one note telling
+ * old Anki clients to upgrade. If that ever gets read instead of the real
+ * collection, the import "succeeds" with a single nonsense word — so detect the
+ * shape (a lone note that talks about upgrading) and fail loudly instead.
+ */
+const UPGRADE_STUB_RE = /(update|upgrade|newer version|new version).{0,40}(anki|version)|anki.{0,40}(update|upgrade)/i;
+
+export function looksLikeUpgradeStub(expressions: string[], noteCount: number): boolean {
+  if (noteCount > 2) return false;
+  return expressions.some((e) => UPGRADE_STUB_RE.test(e));
+}
+
 export function extractExpressions(
   notes: Array<{ mid: string; flds: string }>,
   models: AnkiModels,

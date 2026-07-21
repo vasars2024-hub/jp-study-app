@@ -13,7 +13,8 @@ export type AssetKind =
   | 'tessdata'
   | 'examples'
   | 'accent'
-  | 'sentences';
+  | 'sentences'
+  | 'llm';
 
 /** Language an asset belongs to, or 'any' for language-neutral assets. */
 export type AssetLang = 'ja' | 'zh' | 'any';
@@ -200,16 +201,20 @@ export interface VerifyOutcome {
 /**
  * Decide whether a finished download is good.
  *
- * With a pinned hash this is a real integrity check. Without one, all we can
- * honestly assert is "the server sent us the number of bytes the catalog
- * promised" — which catches truncation and captive-portal HTML, and nothing
- * else. We still compute the hash so it can be stored: a later integrity check
- * can then detect on-disk corruption even for a size-verified asset.
+ * With a pinned hash this is a real integrity check. Without one, catalog
+ * `sizeBytes` is only an estimate used for the Storage UI and disk pre-flight
+ * — GitHub `latest` release zips and HuggingFace remuxes drift constantly, so
+ * rejecting on a tight size match discarded otherwise-good installs. We still
+ * compute the hash so it can be stored for later integrity checks.
  *
- * Size tolerance exists because published sizes drift by a few bytes on
- * re-uploads; a mismatch beyond it means we did not get the file we asked for.
+ * Truncation guard: empty payloads and tiny bodies (captive-portal HTML) when
+ * the catalog expects a large artifact are still rejected.
  */
 export const SIZE_TOLERANCE = 0.02;
+/** Absolute floor — below this, a "large" download is almost certainly an HTML error page. */
+export const SIZE_TRUNCATION_ABS = 8_192;
+/** Catalog sizes above this must clear SIZE_TRUNCATION_ABS or we treat them as truncated. */
+export const SIZE_LARGE_BYTES = 100_000;
 
 export function verifyAsset(
   spec: AssetSpec,
@@ -225,18 +230,22 @@ export function verifyAsset(
       reason: ok ? undefined : { key: 'assetError.checksumMismatch' },
     };
   }
-  const drift = Math.abs(actualBytes - spec.sizeBytes) / spec.sizeBytes;
-  const ok = drift <= SIZE_TOLERANCE;
+  // Unpinned: accept any non-empty real payload. Catalog sizes for floating
+  // URLs (GitHub latest, Tatoeba exports) swing by tens of MB across releases;
+  // a ratio check would discard good installs. Only reject empty / HTML-sized
+  // bodies when we were expecting something large.
+  const truncated =
+    actualBytes <= 0 || (spec.sizeBytes >= SIZE_LARGE_BYTES && actualBytes < SIZE_TRUNCATION_ABS);
   return {
-    ok,
+    ok: !truncated,
     mode: 'size',
     actualSha256,
-    reason: ok
-      ? undefined
-      : {
+    reason: truncated
+      ? {
           key: 'assetError.sizeMismatch',
           vars: { expected: formatBytes(spec.sizeBytes), actual: formatBytes(actualBytes) },
-        },
+        }
+      : undefined,
   };
 }
 
@@ -320,11 +329,50 @@ export const ASSET_CATALOG: AssetSpec[] = [
     description: 'Reads whole speech bubbles in one pass. Replaces Tesseract for manga.',
     kind: 'ocr',
     lang: 'ja',
-    url: 'https://huggingface.co/TrixiaBelleza/manga-ocr-onnx/resolve/main/manga-ocr.zip',
-    sizeBytes: 471_859_200,
-    version: '1',
+    // TrixiaBelleza/manga-ocr-onnx returned 401 (gated/removed). Public ONNX
+    // export from mayocream — encoder is the bulk of the ~440 MB package.
+    url: 'https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/encoder_model.onnx',
+    sizeBytes: 343_454_249,
+    version: '2',
     installDir: 'manga-ocr',
-    archive: 'zip',
+    file: 'encoder_model.onnx',
+    requires: ['manga-ocr-decoder', 'manga-ocr-vocab'],
+  },
+  {
+    id: 'manga-ocr-decoder',
+    name: 'Manga OCR (decoder)',
+    description: 'Decoder graph for Manga OCR. Downloaded automatically with Manga OCR.',
+    kind: 'ocr',
+    lang: 'ja',
+    url: 'https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/decoder_model.onnx',
+    sizeBytes: 117_480_262,
+    version: '2',
+    installDir: 'manga-ocr-decoder',
+    file: 'decoder_model.onnx',
+  },
+  {
+    id: 'manga-ocr-vocab',
+    name: 'Manga OCR (vocab)',
+    description: 'Tokenizer vocabulary for Manga OCR. Downloaded automatically with Manga OCR.',
+    kind: 'ocr',
+    lang: 'ja',
+    url: 'https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/vocab.txt',
+    sizeBytes: 30_216,
+    version: '2',
+    installDir: 'manga-ocr-vocab',
+    file: 'vocab.txt',
+  },
+  {
+    id: 'mirror-writing-evaluator',
+    name: 'Mirror Writing evaluator',
+    description: 'Small local LLM artifact reserved for offline Japanese writing evaluation.',
+    kind: 'llm',
+    lang: 'ja',
+    url: 'https://huggingface.co/onnx-community/Tiny-LLM-ONNX/resolve/main/onnx/model_q4.onnx',
+    sizeBytes: 28_912_263,
+    version: '1',
+    installDir: 'mirror-writing-evaluator',
+    file: 'model_q4.onnx',
   },
   {
     id: 'comic-text-detector',
@@ -332,9 +380,11 @@ export const ASSET_CATALOG: AssetSpec[] = [
     description: 'Finds the speech bubbles that Manga OCR then reads.',
     kind: 'ocr',
     lang: 'any',
-    url: 'https://huggingface.co/dreMaz/AnimeInstanceSegmentation/resolve/main/comictextdetector.pt.onnx',
-    sizeBytes: 91_226_112,
-    version: '1',
+    // dreMaz/AnimeInstanceSegmentation never hosted this file (404). Official
+    // ONNX lives on the manga-image-translator release that first shipped it.
+    url: 'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.2.1/comictextdetector.pt.onnx',
+    sizeBytes: 94_669_756,
+    version: '2',
     installDir: 'comic-text-detector',
     file: 'comictextdetector.onnx',
   },
@@ -345,10 +395,107 @@ export const ASSET_CATALOG: AssetSpec[] = [
     kind: 'tessdata',
     lang: 'ja',
     url: 'https://github.com/tesseract-ocr/tessdata_fast/raw/main/jpn.traineddata',
-    sizeBytes: 2_248_704,
-    version: '1',
+    sizeBytes: 2_471_260,
+    version: '2',
     installDir: 'tessdata-jpn',
     file: 'jpn.traineddata',
+  },
+  // PP-OCR pack for the browser extension. manga-ocr reads manga bubbles well
+  // but hallucinates confident nonsense on printed web text (news headlines,
+  // video thumbnails), so pages that are not manga go through these instead.
+  //
+  // Detection is language-agnostic and shared; only the small recognition head
+  // and its charset change per language, so a second language costs ~10 MB
+  // rather than a second full engine. There is deliberately no angle
+  // classifier: browser screenshots never contain upside-down text, and
+  // vertical Japanese is handled by rotating tall boxes, which is geometry
+  // rather than a model.
+  {
+    id: 'paddle-ocr-det',
+    name: 'Web OCR (text detector)',
+    description: 'Finds every line of text in a screenshot. Shared by all OCR languages.',
+    kind: 'ocr',
+    lang: 'any',
+    url: 'https://huggingface.co/deepghs/paddleocr/resolve/main/det/ch_PP-OCRv4_det/model.onnx',
+    sizeBytes: 4_745_517,
+    version: '1',
+    installDir: 'paddle-ocr-det',
+    file: 'model.onnx',
+  },
+  {
+    id: 'paddle-ocr-ja',
+    name: 'Web OCR — Japanese',
+    description: 'Reads Japanese text on web pages and images, horizontal or vertical.',
+    kind: 'ocr',
+    lang: 'ja',
+    url: 'https://huggingface.co/deepghs/paddleocr/resolve/main/rec/japan_PP-OCRv3_rec/model.onnx',
+    sizeBytes: 10_085_330,
+    version: '1',
+    installDir: 'paddle-ocr-ja',
+    file: 'model.onnx',
+    requires: ['paddle-ocr-det', 'paddle-ocr-ja-keys'],
+  },
+  {
+    id: 'paddle-ocr-ja-keys',
+    name: 'Web OCR — Japanese (charset)',
+    description: 'Character set for Japanese web OCR. Downloaded automatically with it.',
+    kind: 'ocr',
+    lang: 'ja',
+    url: 'https://huggingface.co/deepghs/paddleocr/resolve/main/rec/japan_PP-OCRv3_rec/dict.txt',
+    sizeBytes: 17_332,
+    version: '1',
+    installDir: 'paddle-ocr-ja-keys',
+    file: 'keys.txt',
+  },
+  {
+    id: 'paddle-ocr-zh',
+    name: 'Web OCR — Chinese',
+    description: 'Reads Chinese text on web pages and images.',
+    kind: 'ocr',
+    lang: 'zh',
+    url: 'https://huggingface.co/deepghs/paddleocr/resolve/main/rec/ch_PP-OCRv4_rec/model.onnx',
+    sizeBytes: 10_826_336,
+    version: '1',
+    installDir: 'paddle-ocr-zh',
+    file: 'model.onnx',
+    requires: ['paddle-ocr-det', 'paddle-ocr-zh-keys'],
+  },
+  {
+    id: 'paddle-ocr-zh-keys',
+    name: 'Web OCR — Chinese (charset)',
+    description: 'Character set for Chinese web OCR. Downloaded automatically with it.',
+    kind: 'ocr',
+    lang: 'zh',
+    url: 'https://huggingface.co/deepghs/paddleocr/resolve/main/rec/ch_PP-OCRv4_rec/dict.txt',
+    sizeBytes: 26_249,
+    version: '1',
+    installDir: 'paddle-ocr-zh-keys',
+    file: 'keys.txt',
+  },
+  {
+    id: 'paddle-ocr-ru',
+    name: 'Web OCR — Russian',
+    description: 'Reads Russian and other Cyrillic text on web pages and images.',
+    kind: 'ocr',
+    lang: 'any',
+    url: 'https://huggingface.co/deepghs/paddleocr/resolve/main/rec/cyrillic_PP-OCRv3_rec/model.onnx',
+    sizeBytes: 8_983_966,
+    version: '1',
+    installDir: 'paddle-ocr-ru',
+    file: 'model.onnx',
+    requires: ['paddle-ocr-det', 'paddle-ocr-ru-keys'],
+  },
+  {
+    id: 'paddle-ocr-ru-keys',
+    name: 'Web OCR — Russian (charset)',
+    description: 'Character set for Russian web OCR. Downloaded automatically with it.',
+    kind: 'ocr',
+    lang: 'any',
+    url: 'https://huggingface.co/deepghs/paddleocr/resolve/main/rec/cyrillic_PP-OCRv3_rec/dict.txt',
+    sizeBytes: 410,
+    version: '1',
+    installDir: 'paddle-ocr-ru-keys',
+    file: 'keys.txt',
   },
   {
     id: 'cc-cedict',
@@ -357,8 +504,8 @@ export const ASSET_CATALOG: AssetSpec[] = [
     kind: 'dictionary',
     lang: 'zh',
     url: 'https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.zip',
-    sizeBytes: 4_194_304,
-    version: '1',
+    sizeBytes: 3_965_257,
+    version: '2',
     installDir: 'cc-cedict',
     archive: 'zip',
   },
@@ -369,8 +516,8 @@ export const ASSET_CATALOG: AssetSpec[] = [
     kind: 'dictionary',
     lang: 'ja',
     url: 'https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english.zip',
-    sizeBytes: 62_914_560,
-    version: '1',
+    sizeBytes: 15_487_771,
+    version: '2',
     installDir: 'jmdict-yomitan',
     archive: 'zip',
   },
@@ -380,9 +527,11 @@ export const ASSET_CATALOG: AssetSpec[] = [
     description: 'Pitch-accent contours for the pronunciation checker. Not part of JMdict.',
     kind: 'accent',
     lang: 'ja',
-    url: 'https://github.com/yomidevs/yomitan-import/releases/latest/download/kanjium_pitch_accents.zip',
-    sizeBytes: 10_485_760,
-    version: '1',
+    // yomitan-import latest no longer attaches this zip (404). Yomitan still
+    // ships it on the dictionaries branch.
+    url: 'https://github.com/yomidevs/yomitan/raw/dictionaries/kanjium_pitch_accents.zip',
+    sizeBytes: 1_072_708,
+    version: '2',
     installDir: 'kanjium-accent',
     archive: 'zip',
   },
@@ -393,8 +542,8 @@ export const ASSET_CATALOG: AssetSpec[] = [
     kind: 'examples',
     lang: 'ja',
     url: 'https://downloads.tatoeba.org/exports/per_language/jpn/jpn_sentences.tsv.bz2',
-    sizeBytes: 20_971_520,
-    version: '1',
+    sizeBytes: 3_415_765,
+    version: '2',
     installDir: 'tatoeba-ja',
     file: 'jpn_sentences.tsv.bz2',
   },
@@ -409,7 +558,22 @@ export function assetsForLang(assets: AssetSpec[], lang: 'ja' | 'zh'): AssetSpec
   return assets.filter((a) => a.lang === lang || a.lang === 'any');
 }
 
-/** Total download size of a set of ids — drives the "Set up Chinese (2 downloads, 210 MB)" card. */
+/**
+ * Starter setup set for the study-language environment card.
+ * Excludes `lang: 'any'` whispers (downloaded on demand via Transformers.js).
+ * JA: empty — Yomitan JMdict auto-provisions. ZH: CC-CEDICT.
+ */
+export function starterAssetIds(lang: 'ja' | 'zh'): string[] {
+  if (lang === 'zh') return ['cc-cedict'];
+  return [];
+}
+
+export function starterAssetsForLang(assets: AssetSpec[], lang: 'ja' | 'zh'): AssetSpec[] {
+  const ids = new Set(starterAssetIds(lang));
+  return assets.filter((a) => ids.has(a.id));
+}
+
+/** Total download size of a set of ids — drives the "Set up Chinese (N downloads, X MB)" card. */
 export function totalSize(assets: AssetSpec[], ids: string[]): number {
   return ids.reduce((sum, id) => sum + (findAsset(assets, id)?.sizeBytes ?? 0), 0);
 }

@@ -7,6 +7,16 @@ import { pipeline, env } from '@huggingface/transformers';
 
 env.allowLocalModels = false;
 
+// Serve the onnxruntime-web engine (the .wasm/.mjs runtime) from the app's own
+// bundle instead of a CDN. Without this, Transformers.js fetches the engine from
+// jsdelivr — which needs the network in dev and is blocked outright by the
+// packaged app's CSP, surfacing as "Failed to fetch" before any model even
+// downloads. The files in public/ort are byte-identical to the ort version this
+// Transformers.js bundles, so the jsep (WebGPU) and wasm (CPU) backends match.
+// `/ort/` resolves to http://127.0.0.1:5173/ort/ in dev and app://bundle/ort/
+// when packaged (public/ is served at the origin root in both).
+env.backends.onnx.wasm.wasmPaths = new URL('/ort/', self.location.href).href;
+
 const post = (m: unknown): void => (self as unknown as { postMessage: (m: unknown) => void }).postMessage(m);
 
 const SAMPLE_RATE = 16000;
@@ -60,14 +70,30 @@ async function load(model: string, prefer: 'auto' | 'cpu'): Promise<any> {
 }
 
 self.onmessage = async (e: MessageEvent): Promise<void> => {
-  const { audio, model, prefer, lang } = e.data as {
-    audio: Float32Array;
+  const { audio, model, prefer, lang, mode } = e.data as {
+    audio?: Float32Array;
     model: string;
     prefer?: 'auto' | 'cpu';
     lang?: 'ja' | 'zh';
+    mode?: 'prefetch';
   };
+
+  // Prefetch: load (and therefore download + cache) the model without any audio.
+  // Used by the Settings "Transcription models" section so a user can download
+  // ahead of time and see it reflected in the player's model dropdown.
+  if (mode === 'prefetch') {
+    try {
+      await load(model, prefer ?? 'auto');
+      post({ type: 'ready', device });
+    } catch (err) {
+      post({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
   const whisperLang = lang === 'zh' ? 'chinese' : 'japanese';
   try {
+    if (!audio) throw new Error('no audio provided');
     const t = await load(model, prefer ?? 'auto');
     post({ type: 'status', status: 'transcribing', device });
 

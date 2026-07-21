@@ -4,8 +4,7 @@
 // civilization state; this module only ever reads snapshots and relays the
 // one inbound channel (already-interpreted sessions) over IPC.
 
-import type { InterpretedLearningInput } from '../main/city/engine/types';
-import type { CityStateMessage } from '../main/city/ipc/channels';
+import type { CitySessionPacket, CityStateMessage } from '../main/city/ipc/channels';
 
 export const CITY_EVENT = 'city-changed';
 
@@ -13,6 +12,7 @@ let snapshot: CityStateMessage | null = null;
 let initPromise: Promise<void> | null = null;
 
 function applySnapshot(next: CityStateMessage): void {
+  if (snapshot && next.state.revision < snapshot.state.revision) return;
   snapshot = next;
   window.dispatchEvent(new CustomEvent<CityStateMessage>(CITY_EVENT, { detail: next }));
 }
@@ -34,10 +34,8 @@ export function onCityChanged(cb: (message: CityStateMessage) => void): () => vo
  * citySession.ts before this call, so no raw telemetry, book title, or word
  * ever reaches IPC (LEARNING_INTEGRATION.md Section 9).
  */
-export async function recordCitySession(
-  input: InterpretedLearningInput,
-): Promise<CityStateMessage> {
-  const res = await window.api.cityRecordSession(input);
+export async function recordCitySession(packet: CitySessionPacket): Promise<CityStateMessage> {
+  const res = await window.api.cityRecordSession(packet);
   applySnapshot(res);
   return res;
 }
@@ -48,8 +46,17 @@ export function initCityState(): Promise<void> {
     initPromise = (async () => {
       // Subscribed before the handshake so a push racing it is never missed.
       window.api.onCityChanged((message) => applySnapshot(message));
-      const got = await window.api.cityGetState();
-      applySnapshot(got);
+      let delay = 1000;
+      for (;;) {
+        try {
+          const got = await window.api.cityGetState();
+          applySnapshot(got);
+          return;
+        } catch {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+          delay = Math.min(10000, delay * 2);
+        }
+      }
     })();
   }
   return initPromise;

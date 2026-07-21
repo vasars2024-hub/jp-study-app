@@ -17,7 +17,11 @@ import {
   INDENT_MAX,
   clampMargin,
   MARGIN_MAX,
+  clampContentWidth,
+  CONTENT_WIDTH_MIN,
+  CONTENT_WIDTH_MAX,
 } from '../readerSettings';
+import { useT } from '../i18n';
 
 interface Props {
   settings: ReaderSettings;
@@ -25,26 +29,6 @@ interface Props {
   /** When true, render as a full-width block (Settings app) not a floating popover. */
   embedded?: boolean;
 }
-
-const FLOW_OPTIONS: { id: ReaderFlow; label: string }[] = [
-  { id: 'paginated', label: 'Pages' },
-  { id: 'scrolled', label: 'Scroll' },
-];
-
-const WRITING_OPTIONS: { id: ReaderWritingMode; label: string }[] = [
-  { id: 'auto', label: 'Auto' },
-  { id: 'horizontal', label: '横 Rows' },
-  { id: 'vertical', label: '縦 Tategaki' },
-];
-
-const THEME_OPTIONS: { id: ReaderTheme; label: string }[] = [
-  { id: 'light', label: 'Light' },
-  { id: 'cream', label: 'Cream' },
-  { id: 'sepia', label: 'Sepia' },
-  { id: 'gray', label: 'Gray' },
-  { id: 'dark', label: 'Dark' },
-  { id: 'black', label: 'Black' },
-];
 
 type BoolKey =
   | 'justify'
@@ -55,18 +39,37 @@ type BoolKey =
   | 'hideFurigana'
   | 'wordHighlight'
   | 'hyperlinksEnabled';
-const TOGGLES: { key: BoolKey; label: string }[] = [
-  { key: 'justify', label: 'Justify text' },
-  { key: 'kerning', label: 'Font kerning' },
-  { key: 'vpal', label: 'Punctuation spacing' },
-  { key: 'prettyWrap', label: 'Pretty wrap' },
-  { key: 'prioritizeStyles', label: 'Prioritize my styles' },
-  { key: 'hideFurigana', label: 'Hide furigana' },
-  { key: 'wordHighlight', label: 'Vocabulary colors (New / Learning / Known)' },
-  {
-    key: 'hyperlinksEnabled',
-    label: 'Hyperlinks (Wikipedia → import as EPUB)',
-  },
+
+const FLOW_OPTIONS: { id: ReaderFlow; labelKey: string }[] = [
+  { id: 'paginated', labelKey: 'settings.reader.flow.pages' },
+  { id: 'scrolled', labelKey: 'settings.reader.flow.scroll' },
+];
+
+const WRITING_OPTIONS: { id: ReaderWritingMode; labelKey: string }[] = [
+  { id: 'auto', labelKey: 'settings.reader.write.auto' },
+  { id: 'horizontal', labelKey: 'settings.reader.write.horizontal' },
+  { id: 'vertical', labelKey: 'settings.reader.write.vertical' },
+];
+
+const THEME_OPTIONS: { id: ReaderTheme; labelKey: string }[] = [
+  { id: 'light', labelKey: 'settings.reader.theme.light' },
+  { id: 'cream', labelKey: 'settings.reader.theme.cream' },
+  { id: 'sepia', labelKey: 'settings.reader.theme.sepia' },
+  { id: 'gray', labelKey: 'settings.reader.theme.gray' },
+  { id: 'dark', labelKey: 'settings.reader.theme.dark' },
+  { id: 'black', labelKey: 'settings.reader.theme.black' },
+  { id: 'wired', labelKey: 'settings.reader.theme.wired' },
+];
+
+const TOGGLES: { key: BoolKey; labelKey: string }[] = [
+  { key: 'justify', labelKey: 'settings.reader.toggle.justify' },
+  { key: 'kerning', labelKey: 'settings.reader.toggle.kerning' },
+  { key: 'vpal', labelKey: 'settings.reader.toggle.vpal' },
+  { key: 'prettyWrap', labelKey: 'settings.reader.toggle.prettyWrap' },
+  { key: 'prioritizeStyles', labelKey: 'settings.reader.toggle.prioritizeStyles' },
+  { key: 'hideFurigana', labelKey: 'settings.reader.toggle.hideFurigana' },
+  { key: 'wordHighlight', labelKey: 'settings.reader.toggle.wordHighlight' },
+  { key: 'hyperlinksEnabled', labelKey: 'settings.reader.toggle.hyperlinks' },
 ];
 
 function Stepper(props: {
@@ -94,6 +97,7 @@ function Stepper(props: {
 }
 
 export default function ReaderSettingsPanel({ settings, onChange, embedded = false }: Props) {
+  const { t } = useT();
   // Backfill defaults so a settings object saved before a field existed (or a
   // stale one) can never blank the panel with an undefined read.
   const s: ReaderSettings = { ...DEFAULT_SETTINGS, ...settings };
@@ -105,7 +109,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
       onClick={(e) => e.stopPropagation()}
     >
       <Stepper
-        label="Text size"
+        label={t('settings.reader.textSize')}
         value={`${s.fontSize}%`}
         onDec={() => set({ fontSize: clampFontSize(s.fontSize - 10) })}
         onInc={() => set({ fontSize: clampFontSize(s.fontSize + 10) })}
@@ -114,7 +118,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
       />
 
       <div className="sp-row sp-col">
-        <span className="sp-label">Reading mode</span>
+        <span className="sp-label">{t('settings.reader.readingMode')}</span>
         <div className="sp-seg">
           {FLOW_OPTIONS.map((f) => (
             <button
@@ -122,14 +126,14 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
               className={`sp-seg-btn ${s.flow === f.id ? 'active' : ''}`}
               onClick={() => set({ flow: f.id })}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="sp-row sp-col">
-        <span className="sp-label">Direction</span>
+        <span className="sp-label">{t('settings.reader.direction')}</span>
         <div className="sp-seg">
           {WRITING_OPTIONS.map((w) => (
             <button
@@ -138,53 +142,53 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
               onClick={() => set({ writingMode: w.id })}
               lang="ja"
             >
-              {w.label}
+              {t(w.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="sp-row sp-col">
-        <span className="sp-label">Theme</span>
+        <span className="sp-label">{t('settings.reader.theme')}</span>
         <div className="sp-seg sp-seg-wrap">
-          {THEME_OPTIONS.map((t) => (
+          {THEME_OPTIONS.map((opt) => (
             <button
-              key={t.id}
-              className={`sp-seg-btn ${s.theme === t.id ? 'active' : ''}`}
-              onClick={() => set({ theme: t.id })}
+              key={opt.id}
+              className={`sp-seg-btn ${s.theme === opt.id ? 'active' : ''}`}
+              onClick={() => set({ theme: opt.id })}
             >
-              {t.label}
+              {t(opt.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="sp-row">
-        <span className="sp-label">Font</span>
+        <span className="sp-label">{t('settings.reader.font')}</span>
         <select value={s.font} onChange={(e) => set({ font: e.target.value as ReaderFont })}>
-          <option value="default">Publisher default</option>
-          <option value="serif">Serif (Mincho)</option>
-          <option value="sans">Sans (Gothic)</option>
-          <option value="rounded">Rounded</option>
+          <option value="default">{t('settings.reader.font.default')}</option>
+          <option value="serif">{t('settings.reader.font.serif')}</option>
+          <option value="sans">{t('settings.reader.font.sans')}</option>
+          <option value="rounded">{t('settings.reader.font.rounded')}</option>
         </select>
       </div>
 
       <div className="sp-row">
-        <span className="sp-label">Font weight</span>
+        <span className="sp-label">{t('settings.reader.fontWeight')}</span>
         <select
           value={s.fontWeight}
           onChange={(e) => set({ fontWeight: Number(e.target.value) })}
         >
-          <option value={0}>Default</option>
-          <option value={300}>Light</option>
-          <option value={400}>Normal</option>
-          <option value={500}>Medium</option>
-          <option value={700}>Bold</option>
+          <option value={0}>{t('settings.reader.weight.default')}</option>
+          <option value={300}>{t('settings.reader.weight.light')}</option>
+          <option value={400}>{t('settings.reader.weight.normal')}</option>
+          <option value={500}>{t('settings.reader.weight.medium')}</option>
+          <option value={700}>{t('settings.reader.weight.bold')}</option>
         </select>
       </div>
 
       <Stepper
-        label="Line height"
+        label={t('settings.reader.lineHeight')}
         value={s.lineHeight.toFixed(2)}
         onDec={() => set({ lineHeight: clampLineHeight(s.lineHeight - 0.05) })}
         onInc={() => set({ lineHeight: clampLineHeight(s.lineHeight + 0.05) })}
@@ -193,7 +197,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
       />
 
       <Stepper
-        label="Paragraph indent"
+        label={t('settings.reader.indent')}
         value={`${s.paragraphIndent}em`}
         onDec={() => set({ paragraphIndent: clampIndent(s.paragraphIndent - 0.5) })}
         onInc={() => set({ paragraphIndent: clampIndent(s.paragraphIndent + 0.5) })}
@@ -202,7 +206,7 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
       />
 
       <Stepper
-        label="Side margin"
+        label={t('settings.reader.margin')}
         value={`${s.sideMargin}%`}
         onDec={() => set({ sideMargin: clampMargin(s.sideMargin - 2) })}
         onInc={() => set({ sideMargin: clampMargin(s.sideMargin + 2) })}
@@ -210,20 +214,29 @@ export default function ReaderSettingsPanel({ settings, onChange, embedded = fal
         incDisabled={s.sideMargin >= MARGIN_MAX}
       />
 
+      <Stepper
+        label={t('settings.reader.contentWidth')}
+        value={`${s.contentWidth}rem`}
+        onDec={() => set({ contentWidth: clampContentWidth(s.contentWidth - 4) })}
+        onInc={() => set({ contentWidth: clampContentWidth(s.contentWidth + 4) })}
+        decDisabled={s.contentWidth <= CONTENT_WIDTH_MIN}
+        incDisabled={s.contentWidth >= CONTENT_WIDTH_MAX}
+      />
+
       <div className="sp-toggles">
-        {TOGGLES.map((t) => (
-          <label key={t.key} className="sp-toggle">
+        {TOGGLES.map((opt) => (
+          <label key={opt.key} className="sp-toggle">
             <input
               type="checkbox"
-              checked={!!s[t.key]}
-              onChange={(e) => set({ [t.key]: e.target.checked })}
+              checked={!!s[opt.key]}
+              onChange={(e) => set({ [opt.key]: e.target.checked })}
             />
-            <span>{t.label}</span>
+            <span>{t(opt.labelKey)}</span>
           </label>
         ))}
       </div>
 
-      <p className="sp-hint">Hold Ctrl and scroll to resize. Settings save automatically.</p>
+      <p className="sp-hint">{t('settings.reader.hint')}</p>
     </div>
   );
 }

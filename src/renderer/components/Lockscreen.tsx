@@ -1,5 +1,6 @@
 /**
- * Lockscreen — compact PIN widget (default) or Windows XP welcome screen (Aero).
+ * Lockscreen — full-screen Win11-style gate (GrammarX), compact widget (floating),
+ * or Windows XP welcome screen (Secret Aero).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -9,6 +10,7 @@ import {
   type LockscreenSettings,
 } from '../lockscreenSettings';
 import { AERO_THEME_ID } from '../theme/frutiger-aero';
+import { WIRED_ARCHIVE_THEME_ID } from '../theme/wired-archive';
 import { loadThemeId } from '../theme';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'] as const;
@@ -21,6 +23,14 @@ function isAeroLockscreen(): boolean {
   );
 }
 
+function isWiredLockscreen(): boolean {
+  if (typeof document === 'undefined') return false;
+  return (
+    document.documentElement.getAttribute('data-materials') === 'wired' ||
+    loadThemeId() === WIRED_ARCHIVE_THEME_ID
+  );
+}
+
 export default function Lockscreen({
   onUnlocked,
   widgetMode = false,
@@ -29,11 +39,14 @@ export default function Lockscreen({
   widgetMode?: boolean;
 }) {
   const xpMode = !widgetMode && isAeroLockscreen();
+  const wiredMode = !widgetMode && isWiredLockscreen();
   const [cfg] = useState<LockscreenSettings>(() => loadLockscreen());
   const [digits, setDigits] = useState('');
   const [password, setPassword] = useState('');
   const [shake, setShake] = useState(false);
   const [error, setError] = useState(false);
+  // Wired lockscreen: amber flash per failure; red is reserved for 3+ failures.
+  const [failCount, setFailCount] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
   const [clock, setClock] = useState(() => new Date());
   const widgetRef = useRef<HTMLDivElement>(null);
@@ -45,8 +58,8 @@ export default function Lockscreen({
   }, []);
 
   useEffect(() => {
-    if (xpMode) passwordRef.current?.focus();
-  }, [xpMode]);
+    if (xpMode || wiredMode) passwordRef.current?.focus();
+  }, [xpMode, wiredMode]);
 
   useEffect(() => {
     if (!widgetMode) return;
@@ -84,6 +97,8 @@ export default function Lockscreen({
   }, [widgetMode]);
 
   const fail = useCallback(() => {
+    setFailCount((c) => c + 1);
+    if (isWiredLockscreen()) window.dispatchEvent(new CustomEvent('wired:sync-fail'));
     setError(true);
     setShake(true);
     window.setTimeout(() => {
@@ -103,9 +118,7 @@ export default function Lockscreen({
       }
       setUnlocking(true);
       markLockscreenUnlocked();
-      const reduce =
-        typeof document !== 'undefined' && document.documentElement.classList.contains('reduce-motion');
-      window.setTimeout(() => onUnlocked(), reduce ? 80 : 560);
+      onUnlocked();
     },
     [fail, onUnlocked],
   );
@@ -130,22 +143,24 @@ export default function Lockscreen({
   );
 
   useEffect(() => {
-    if (xpMode) return;
+    if (xpMode || wiredMode) return;
     const onKey = (e: KeyboardEvent) => {
       if (unlocking) return;
       if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
+        e.stopPropagation();
         press('del');
         return;
       }
       if (/^\d$/.test(e.key)) {
         e.preventDefault();
+        e.stopPropagation();
         press(e.key as (typeof KEYS)[number]);
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [press, unlocking, xpMode]);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [press, unlocking, xpMode, wiredMode]);
 
   const submitPassword = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -155,6 +170,62 @@ export default function Lockscreen({
 
   const time = clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const date = clock.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+
+  if (wiredMode) {
+    return (
+      <div
+        className={`lockscreen lockscreen-wired${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}${error ? ' is-error' : ''}${error && failCount >= 3 ? ' is-error-hard' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="WIRED ARCHIVE access clearance"
+      >
+        <div className="lockscreen-wired-map" aria-hidden="true" />
+        <div className="lockscreen-wired-noise" aria-hidden="true" />
+        <section className="lockscreen-wired-panel">
+          <header className="lockscreen-wired-head">
+            <span>TERMINAL ID: WIRED ARCHIVE</span>
+            <span>NODE STATUS: PASSIVE</span>
+          </header>
+          <div className="lockscreen-wired-clock">
+            <time>{time}</time>
+            <span>{date}</span>
+          </div>
+          <div className="lockscreen-wired-grid" aria-hidden="true">
+            {['LEX', 'MEM', 'FEED', 'OPS', 'LINK', 'SYS'].map((node) => (
+              <span key={node}>{node}</span>
+            ))}
+          </div>
+          <form className="lockscreen-wired-form" onSubmit={submitPassword}>
+            <label htmlFor="wired-access-code">INPUT ACCESS CODE</label>
+            <div className="lockscreen-wired-command">
+              <span aria-hidden="true">&gt;</span>
+              <input
+                id="wired-access-code"
+                ref={passwordRef}
+                type="password"
+                value={password}
+                maxLength={4}
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={unlocking}
+                aria-label="Access code"
+                onChange={(e) => {
+                  setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  setError(false);
+                }}
+              />
+              <button type="submit" disabled={unlocking}>
+                AUTH
+              </button>
+            </div>
+            <p className="lockscreen-wired-status">
+              {error ? 'ACCESS DENIED / TEMPORARY CLEARANCE REJECTED' : 'CLEARANCE: STUDY OPERATOR / ARCHIVE SEALED'}
+            </p>
+          </form>
+        </section>
+      </div>
+    );
+  }
 
   if (xpMode) {
     return (
@@ -216,41 +287,115 @@ export default function Lockscreen({
     );
   }
 
+  if (widgetMode) {
+    return (
+      <div
+        className={`lockscreen lock-tint-${cfg.tint} is-widget${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Enter passcode"
+      >
+        <div ref={widgetRef} className="lockscreen-widget">
+          <header className="lockscreen-bar">
+            <span className="lockscreen-brand">
+              <span className="lockscreen-brand-mark" aria-hidden />
+              Lock
+            </span>
+            <span className="lockscreen-clock-inline">{time}</span>
+          </header>
+          <div className="lockscreen-date muted">{date}</div>
+          <p className={`lockscreen-prompt${error ? ' is-error' : ''}`}>
+            {error ? 'Wrong passcode' : 'Enter passcode'}
+          </p>
+          <div className="lockscreen-dots" aria-hidden>
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} className={`lockscreen-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
+            ))}
+          </div>
+          <div className="lockscreen-pad">
+            {KEYS.map((key, i) => {
+              if (key === '') {
+                return <span key={`empty-${i}`} className="lockscreen-key is-spacer" aria-hidden />;
+              }
+              if (key === 'del') {
+                return (
+                  <button
+                    key="del"
+                    type="button"
+                    className="lockscreen-key is-action"
+                    title="Delete"
+                    disabled={unlocking}
+                    onClick={() => press('del')}
+                  >
+                    Del
+                  </button>
+                );
+              }
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className="lockscreen-key"
+                  disabled={unlocking}
+                  onClick={() => press(key)}
+                >
+                  {key}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`lockscreen lock-tint-${cfg.tint}${widgetMode ? ' is-widget' : ''}${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}`}
+      className={`lockscreen lockscreen-win11 lock-tint-${cfg.tint}${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Enter passcode"
+      aria-label="Sign in to GrammarX"
     >
-      <div ref={widgetRef} className="lockscreen-widget">
-        <header className="lockscreen-bar">
-          <span className="lockscreen-brand">
-            <span className="lockscreen-brand-mark" aria-hidden />
-            Lock
-          </span>
-          <span className="lockscreen-clock-inline">{time}</span>
-        </header>
-        <div className="lockscreen-date muted">{date}</div>
-        <p className={`lockscreen-prompt${error ? ' is-error' : ''}`}>
-          {error ? 'Wrong passcode' : 'Enter passcode'}
+      <div className="lockscreen-win11-bg" aria-hidden="true">
+        <div className="lockscreen-win11-bg-clouds" />
+        <div className="lockscreen-win11-bg-vignette" />
+      </div>
+      <div className="lockscreen-win11-clock" aria-hidden="true">
+        <time className="lockscreen-win11-time">{time}</time>
+        <span className="lockscreen-win11-date">{date}</span>
+      </div>
+      <div className="lockscreen-win11-panel">
+        <div className="lockscreen-win11-avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="8.5" r="3.6" stroke="currentColor" strokeWidth="1.6" />
+            <path
+              d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+        <div className="lockscreen-win11-name">User</div>
+        <p className={`lockscreen-win11-prompt${error ? ' is-error' : ''}`}>
+          {error ? 'Incorrect passcode. Try again.' : 'Enter your passcode'}
         </p>
-        <div className="lockscreen-dots" aria-hidden>
+        <div className="lockscreen-win11-dots" aria-hidden>
           {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={`lockscreen-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
+            <span key={i} className={`lockscreen-win11-dot${i < digits.length ? ' is-filled' : ''}${error ? ' is-error' : ''}`} />
           ))}
         </div>
-        <div className="lockscreen-pad">
+        <div className="lockscreen-win11-pad">
           {KEYS.map((key, i) => {
             if (key === '') {
-              return <span key={`empty-${i}`} className="lockscreen-key is-spacer" aria-hidden />;
+              return <span key={`empty-${i}`} className="lockscreen-win11-key is-spacer" aria-hidden />;
             }
             if (key === 'del') {
               return (
                 <button
                   key="del"
                   type="button"
-                  className="lockscreen-key is-action"
+                  className="lockscreen-win11-key is-action"
                   title="Delete"
                   disabled={unlocking}
                   onClick={() => press('del')}
@@ -263,7 +408,7 @@ export default function Lockscreen({
               <button
                 key={key}
                 type="button"
-                className="lockscreen-key"
+                className="lockscreen-win11-key"
                 disabled={unlocking}
                 onClick={() => press(key)}
               >

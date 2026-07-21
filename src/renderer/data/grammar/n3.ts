@@ -3,6 +3,9 @@ import type { GrammarPoint } from './types';
 export const N3: GrammarPoint[] = [
   {
     id: 'n3-tokoro',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['relationships-in-time'],
     categories: ['time.point', 'time.immediate', 'state.ongoing'],
     level: 'N3',
     title: '〜ところだ',
@@ -17,6 +20,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-bakari',
+    functions: ['limit'],
     categories: ['time.immediate', 'degree.limit'],
     level: 'N3',
     title: '〜たばかり / 〜ばかり',
@@ -31,6 +35,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-you-to-suru',
+    functions: ['action-effort'],
     categories: ['state.effort', 'time.immediate'],
     level: 'N3',
     title: '〜ようとする',
@@ -44,6 +49,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ba-hodo',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['proportional'],
     categories: ['comparison.proportion', 'condition.general'],
     level: 'N3',
     title: '〜ば〜ほど',
@@ -57,6 +65,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-mama',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['invariant'],
     categories: ['state.description', 'state.ongoing'],
     level: 'N3',
     title: '〜まま',
@@ -71,6 +82,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-uchi-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['short-time'],
     categories: ['time.duration', 'time.simultaneous'],
     level: 'N3',
     title: '〜うちに',
@@ -85,6 +99,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-aida-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['period'],
     categories: ['time.duration', 'time.simultaneous'],
     level: 'N3',
     title: '〜間に',
@@ -98,6 +115,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tabi-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['frequency'],
     categories: ['time.repetition', 'quantity.frequency'],
     level: 'N3',
     title: '〜たびに',
@@ -110,6 +130,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-sae-ba',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['condition-requirement'],
     categories: ['condition.requirement', 'degree.minimal'],
     level: 'N3',
     title: '〜さえ〜ば',
@@ -123,6 +146,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-about-ni-tsuite',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['story-topic'],
     categories: ['method.perspective'],
     level: 'N3',
     title: '〜について',
@@ -135,6 +161,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ni-taishite',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['contrast'],
     categories: ['space.direction', 'contrast.opposition'],
     level: 'N3',
     title: '〜に対して',
@@ -148,6 +177,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ni-yotte',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['standard'],
     categories: ['method.means', 'cause.reason', 'voice.passive'],
     level: 'N3',
     title: '〜によって',
@@ -161,6 +193,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ni-totte',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['perspective-way'],
     categories: ['method.perspective'],
     level: 'N3',
     title: '〜にとって',
@@ -174,6 +209,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-toshite',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['as'],
     categories: ['method.perspective'],
     level: 'N3',
     title: '〜として',
@@ -186,6 +224,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-okage-sei',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['cause-reason'],
     categories: ['cause.reason', 'cause.result'],
     level: 'N3',
     title: '〜おかげで / 〜せいで',
@@ -200,6 +241,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tame-ni',
+    functions: ['purpose-goal'],
     categories: ['purpose.goal', 'cause.reason'],
     level: 'N3',
     title: '〜ために',
@@ -213,6 +255,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-temo',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['concessions'],
     categories: ['contrast.concession', 'condition.general'],
     level: 'N3',
     title: '疑問詞 + 〜ても',
@@ -226,6 +271,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-wake-da',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['conclude'],
     categories: ['explanation.conclusion', 'explanation.explain'],
     level: 'N3',
     title: '〜わけだ',
@@ -239,6 +287,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-wake-ga-nai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['judgment.certainty', 'emphasis.negation'],
     level: 'N3',
     title: '〜わけがない',
@@ -252,6 +303,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-to-iu-koto-da',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['heard'],
     categories: ['evidence.hearsay', 'explanation.conclusion'],
     level: 'N3',
     title: '〜ということだ',
@@ -265,6 +319,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-bakari-de-naku',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['limit'],
     categories: ['examples.listing', 'emphasis.emphasize'],
     level: 'N3',
     title: '〜ばかりでなく / 〜だけでなく',
@@ -277,6 +334,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-baai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['case'],
     categories: ['condition.general'],
     level: 'N3',
     title: '〜場合は',
@@ -289,6 +349,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-saichu-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['period'],
     categories: ['time.duration', 'state.ongoing'],
     level: 'N3',
     title: '〜最中に',
@@ -302,6 +365,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-toori-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['perspective-way'],
     categories: ['comparison.similarity', 'method.means'],
     level: 'N3',
     title: '〜とおりに',
@@ -314,6 +380,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-marude-you',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['similarity-degree'],
     categories: ['comparison.similarity'],
     level: 'N3',
     title: 'まるで〜ようだ',
@@ -326,6 +395,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-koto-wa-nai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['obligation.necessity', 'emphasis.negation'],
     level: 'N3',
     title: '〜ことはない',
@@ -338,6 +410,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-zu-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['method.means', 'emphasis.negation'],
     level: 'N3',
     title: '〜ずに / 〜ないで',
@@ -351,6 +426,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-dasu',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['process'],
     categories: ['state.change', 'time.immediate'],
     level: 'N3',
     title: '〜出す',
@@ -363,6 +441,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-hajimeru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['finish'],
     categories: ['time.point', 'state.change'],
     level: 'N3',
     title: '〜始める / 〜終わる',
@@ -377,6 +458,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tsuzukeru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['continuity'],
     categories: ['time.duration', 'state.ongoing'],
     level: 'N3',
     title: '〜続ける',
@@ -389,6 +473,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-kiru',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['time.completion', 'degree.extent'],
     level: 'N3',
     title: '〜きる / 〜きれない',
@@ -403,6 +490,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-gachi',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['trend'],
     categories: ['quantity.frequency', 'judgment.evaluation'],
     level: 'N3',
     title: '〜がち',
@@ -415,6 +505,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-gimi',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['trend'],
     categories: ['degree.minimal', 'state.description'],
     level: 'N3',
     title: '〜気味',
@@ -427,6 +520,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ppoi',
+    register: 'casual',
+    provenance: { registerSource: 'classified' },
+    functions: ['trend'],
     categories: ['comparison.similarity', 'state.description'],
     level: 'N3',
     title: '〜っぽい',
@@ -440,6 +536,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-muke-muki',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['purpose-goal'],
     categories: ['purpose.goal', 'method.perspective'],
     level: 'N3',
     title: '〜向け / 〜向き',
@@ -453,6 +552,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ue-de',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['assumptions'],
     categories: ['time.sequence', 'method.means'],
     level: 'N3',
     title: '〜上で',
@@ -466,6 +568,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ippou-da',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['trend'],
     categories: ['state.change', 'degree.extent'],
     level: 'N3',
     title: '〜一方だ',
@@ -478,6 +583,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-kawari-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['selective'],
     categories: ['contrast.exception', 'method.means'],
     level: 'N3',
     title: '〜代わりに',
@@ -490,6 +598,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-tsuide-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['simultaneous'],
     categories: ['time.simultaneous', 'method.means'],
     level: 'N3',
     title: '〜ついでに',
@@ -502,6 +613,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-to-tomo-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['companion'],
     categories: ['time.simultaneous', 'comparison.proportion'],
     level: 'N3',
     title: '〜とともに',
@@ -514,6 +628,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-shidai',
+    register: 'business',
+    provenance: { registerSource: 'classified' },
+    functions: ['immediately-after'],
     categories: ['time.immediate'],
     level: 'N3',
     title: '〜次第',
@@ -527,6 +644,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-ba-yokatta',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['regret'],
     categories: ['emotion.regret', 'condition.counterfactual'],
     level: 'N3',
     title: '〜ばよかった',
@@ -539,6 +659,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-hodo',
+    functions: ['level'],
     categories: ['degree.extent'],
     level: 'N3',
     title: '〜ほど',
@@ -552,6 +673,7 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-kurai',
+    functions: ['level'],
     categories: ['degree.approximation', 'degree.extent'],
     level: 'N3',
     title: '〜くらい / 〜ぐらい',
@@ -565,6 +687,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-mitai-ni',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['similarity-degree'],
     categories: ['comparison.similarity'],
     level: 'N3',
     title: '〜みたいに / 〜みたいな',
@@ -577,6 +702,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-koso',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['emphasize'],
     categories: ['emphasis.emphasize'],
     level: 'N3',
     title: '〜こそ',
@@ -589,6 +717,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-you-ga-nai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['negative'],
     categories: ['possibility.ability', 'emphasis.negation'],
     level: 'N3',
     title: '〜ようがない',
@@ -601,6 +732,9 @@ export const N3: GrammarPoint[] = [
   },
   {
     id: 'n3-temo-kamawanai',
+    register: 'neutral',
+    provenance: { registerSource: 'classified' },
+    functions: ['allow'],
     categories: ['possibility.permission', 'contrast.concession'],
     level: 'N3',
     title: '〜てもかまわない',

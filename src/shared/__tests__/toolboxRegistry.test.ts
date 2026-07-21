@@ -33,6 +33,7 @@ describe('toolbox registry', () => {
     expect(blancIds).toContain('kanji-inspector');
     expect(blancIds).toContain('youtube-library');
     expect(blancIds).toContain('batch-converter');
+    expect(blancIds).toContain('workspace-launcher');
   });
 
   it('retired unknown-word-detector into difficulty-analyzer', () => {

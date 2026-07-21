@@ -7,6 +7,7 @@ import {
   type WallpaperPlaylist,
 } from './types';
 import { mergeBuddyRoutines } from './buddyRoutines';
+import { writeLocalStorageJson } from '../localStorageWrite';
 
 const KEY = 'jp-os-environment-v1';
 const EVENT = 'jp-os-environment-changed';
@@ -88,7 +89,12 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
 
   const companionTypes = Array.isArray(partial.companionTypes)
     ? (partial.companionTypes.filter((t) =>
-        t === 'study-buddy' || t === 'critter' || t === 'timekeeper' || t === 'noctis' || t === 'miko-shimeji',
+        t === 'study-buddy' ||
+        t === 'critter' ||
+        t === 'timekeeper' ||
+        t === 'noctis' ||
+        t === 'miko-shimeji' ||
+        t === 'wired-navi',
       ) as EnvironmentSettings['companionTypes'])
     : DEFAULT_ENVIRONMENT.companionTypes;
 
@@ -116,7 +122,9 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
         : DEFAULT_ENVIRONMENT.particleSize,
     ),
     snowAccumulation: partial.snowAccumulation !== false,
-    particlePresets: particlePresets.length ? particlePresets : [...DEFAULT_ENVIRONMENT.particlePresets],
+    // An explicitly empty array means "every preset turned off" and must round-trip.
+    // Only a missing/invalid field falls back to the defaults (handled above).
+    particlePresets,
     matchParticleSuggestions: partial.matchParticleSuggestions !== false,
     companionTypes: companionTypes.length ? companionTypes : [...DEFAULT_ENVIRONMENT.companionTypes],
     companionReactivity:
@@ -125,6 +133,11 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
       partial.companionReactivity === 'normal'
         ? partial.companionReactivity
         : DEFAULT_ENVIRONMENT.companionReactivity,
+    companionActiveness: clamp01(
+      typeof partial.companionActiveness === 'number'
+        ? partial.companionActiveness
+        : DEFAULT_ENVIRONMENT.companionActiveness,
+    ),
     companionCelebrate: partial.companionCelebrate !== false,
     companionPauseWhenStudying: partial.companionPauseWhenStudying === true,
     companions,
@@ -175,11 +188,7 @@ export function loadEnvironment(): EnvironmentSettings {
 export function saveEnvironment(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
   const prev = loadEnvironment();
   const next = normalize({ ...prev, ...partial });
-  try {
-    localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* ignore */
-  }
+  writeLocalStorageJson(KEY, next);
   window.dispatchEvent(new CustomEvent<EnvironmentSettings>(EVENT, { detail: next }));
   return next;
 }

@@ -11,8 +11,10 @@ import {
   setLockscreenPin,
   type LockscreenSettings,
 } from '../../../lockscreenSettings';
+import { useT } from '../../../i18n';
 
 export default function LockscreenPage() {
+  const { t } = useT();
   const { focusSettingId, seg } = useSettings();
   const [cfg, setCfg] = useState<LockscreenSettings>(() => loadLockscreen());
   const [pinDraft, setPinDraft] = useState('');
@@ -20,52 +22,56 @@ export default function LockscreenPage() {
   const [msg, setMsg] = useState('');
   const [hasPin, setHasPin] = useState(() => hasLockscreenPin());
 
-  useEffect(() => onLockscreenChanged((s) => {
-    setCfg(s);
-    setHasPin(!!s.pinHash);
-  }), []);
+  useEffect(
+    () =>
+      onLockscreenChanged((s) => {
+        setCfg(s);
+        setHasPin(!!s.pinHash);
+      }),
+    [],
+  );
 
-  const flash = (t: string) => {
-    setMsg(t);
+  const flash = (text: string) => {
+    setMsg(text);
     window.setTimeout(() => setMsg(''), 2400);
   };
 
   const savePin = () => {
     if (!/^\d{4}$/.test(pinDraft)) {
-      flash('Enter a 4-digit passcode.');
+      flash(t('settings.lock.msg.needFour'));
       return;
     }
     if (pinDraft !== pinConfirm) {
-      flash('Passcodes do not match.');
+      flash(t('settings.lock.msg.mismatch'));
       return;
     }
     const next = setLockscreenPin(pinDraft);
     if (!next) {
-      flash('Could not save passcode.');
+      flash(t('settings.lock.msg.saveFail'));
       return;
     }
     setPinDraft('');
     setPinConfirm('');
     setHasPin(true);
-    flash('Passcode saved.');
+    flash(t('settings.lock.msg.saved'));
   };
 
   const toggleEnabled = (on: boolean) => {
     if (on && !hasLockscreenPin()) {
-      flash('Set a 4-digit passcode before enabling.');
+      flash(t('settings.lock.msg.needBeforeEnable'));
       return;
     }
     setCfg(saveLockscreen({ enabled: on }));
     if (on) clearLockscreenSession();
-    flash(on ? 'Lockscreen enabled — required on next launch.' : 'Lockscreen disabled.');
+    flash(on ? t('settings.lock.msg.enabled') : t('settings.lock.msg.disabled'));
   };
 
   return (
     <>
       <SettingsCard
         id="lockscreen-enable"
-        title="Lockscreen"
-        description="Optional border-style PIN gate when Study OS launches. Unlock reveals the desktop or Mini View based on your other settings."
+        title={t('search.lockscreen')}
+        description={t('search.lockscreen.desc')}
         highlight={focusSettingId === 'lockscreen-enable'}
       >
         <label className="os-check-row">
@@ -75,29 +81,31 @@ export default function LockscreenPage() {
             disabled={!hasPin}
             onChange={(e) => toggleEnabled(e.target.checked)}
           />
-          <span>Require passcode on launch</span>
+          <span>{t('settings.lock.requireOnLaunch')}</span>
         </label>
         {!hasPin && (
           <p className="muted" style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.45 }}>
-            Set a passcode below before you can turn this on.
+            {t('settings.lock.needPinFirst')}
           </p>
         )}
         {cfg.enabled && (
           <p className="muted" style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.45 }}>
-            After unlock this session, the lockscreen stays clear until you restart the app.
+            {t('settings.lock.sessionHint')}
           </p>
         )}
       </SettingsCard>
 
       <SettingsCard
         id="lockscreen-pin"
-        title="Passcode"
-        description="Four digits, iOS-style keypad on the lockscreen. Stored locally on this PC only."
+        title={t('search.lockscreenPin')}
+        description={t('search.lockscreenPin.desc')}
         highlight={focusSettingId === 'lockscreen-pin'}
       >
         <div className="os-viz-row" style={{ flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-            <span className="muted" style={{ fontSize: 11 }}>New passcode</span>
+            <span className="muted" style={{ fontSize: 11 }}>
+              {t('settings.lock.newPasscode')}
+            </span>
             <input
               type="password"
               inputMode="numeric"
@@ -110,7 +118,9 @@ export default function LockscreenPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-            <span className="muted" style={{ fontSize: 11 }}>Confirm</span>
+            <span className="muted" style={{ fontSize: 11 }}>
+              {t('settings.lock.confirm')}
+            </span>
             <input
               type="password"
               inputMode="numeric"
@@ -123,7 +133,7 @@ export default function LockscreenPage() {
             />
           </label>
           <button type="button" className="btn small primary" onClick={savePin}>
-            {hasPin ? 'Update passcode' : 'Save passcode'}
+            {hasPin ? t('settings.lock.update') : t('settings.lock.save')}
           </button>
           {hasPin && (
             <button
@@ -134,10 +144,10 @@ export default function LockscreenPage() {
                 setHasPin(false);
                 setPinDraft('');
                 setPinConfirm('');
-                flash('Passcode cleared. Lockscreen turned off.');
+                flash(t('settings.lock.msg.cleared'));
               }}
             >
-              Clear passcode
+              {t('settings.lock.clear')}
             </button>
           )}
         </div>
@@ -150,26 +160,26 @@ export default function LockscreenPage() {
 
       <SettingsCard
         id="lockscreen-tint"
-        title="Lockscreen look"
-        description="Soft tint behind the PIN panel."
+        title={t('search.lockscreenTint')}
+        description={t('search.lockscreenTint.desc')}
         highlight={focusSettingId === 'lockscreen-tint'}
       >
         <div className="os-viz-row">
           {(
             [
-              ['neutral', 'Neutral'],
-              ['ember', 'Ember'],
-              ['slate', 'Slate'],
-              ['moss', 'Moss'],
+              ['neutral', 'settings.lock.tint.neutral'],
+              ['ember', 'settings.lock.tint.ember'],
+              ['slate', 'settings.lock.tint.slate'],
+              ['moss', 'settings.lock.tint.moss'],
             ] as const
-          ).map(([id, label]) => (
+          ).map(([id, labelKey]) => (
             <button
               key={id}
               type="button"
               className={seg(cfg.tint === id)}
               onClick={() => setCfg(saveLockscreen({ tint: id }))}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>

@@ -18,8 +18,10 @@ import { WIDGETS } from '../widgets/registry';
 import { loadSaved } from '../savedWords';
 import { loadDeck } from '../flashcardDeck';
 import { useT } from '../i18n';
+import { commandCategory, commandLabel } from '../commandI18n';
+import { fuzzyScore as fuzzy } from '../fuzzySearch';
 
-type PaletteMode = 'commands' | 'search';
+type PaletteMode = 'commands' | 'search' | 'toolbox';
 
 interface Item {
   key: string;
@@ -40,14 +42,19 @@ type UngroupedItem = Omit<Item, 'group'>;
  * render/merge time so a language switch relabels without reloading data. */
 const SECTIONS: { id: string; labelKey: string; glyph: IconName }[] = [
   { id: 'player', labelKey: 'palette.section.player', glyph: 'player' },
+  { id: 'video', labelKey: 'palette.section.video', glyph: 'video' },
+  { id: 'youtube', labelKey: 'palette.section.youtube', glyph: 'player' },
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
   { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
   { id: 'library', labelKey: 'palette.section.library', glyph: 'library' },
   { id: 'novels', labelKey: 'palette.section.novels', glyph: 'novels' },
+  { id: 'reading', labelKey: 'palette.section.reading', glyph: 'search' },
   { id: 'translate', labelKey: 'palette.section.translate', glyph: 'translate' },
   { id: 'grammar', labelKey: 'palette.section.grammar', glyph: 'grammar' },
+  { id: 'notebook', labelKey: 'palette.section.notebook', glyph: 'note' },
   { id: 'anki', labelKey: 'palette.section.anki', glyph: 'anki' },
   { id: 'flashcards', labelKey: 'palette.section.flashcards', glyph: 'flashcards' },
+  { id: 'games', labelKey: 'palette.section.games', glyph: 'dice' },
   { id: 'stats', labelKey: 'palette.section.stats', glyph: 'stats' },
   { id: 'calendar', labelKey: 'palette.section.calendar', glyph: 'calendar' },
   { id: 'resources', labelKey: 'palette.section.resources', glyph: 'resources' },
@@ -55,24 +62,6 @@ const SECTIONS: { id: string; labelKey: string; glyph: IconName }[] = [
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
   { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
 ];
-
-/** Subsequence fuzzy score; higher is better, null = no match. */
-function fuzzy(needle: string, hay: string): number | null {
-  if (!needle) return 0;
-  const n = needle.toLowerCase();
-  const h = hay.toLowerCase();
-  const direct = h.indexOf(n);
-  if (direct >= 0) return 100 - direct - (h.length - n.length) * 0.1;
-  let hi = 0;
-  let score = 50;
-  for (let ni = 0; ni < n.length; ni++) {
-    const found = h.indexOf(n[ni], hi);
-    if (found < 0) return null;
-    score -= (found - hi) * 0.5;
-    hi = found + 1;
-  }
-  return score - (h.length - n.length) * 0.1;
-}
 
 function openSection(id: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: id }));
@@ -95,7 +84,8 @@ export default function CommandPalette() {
   // Open/close via the shortcut manager's events.
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const m = ((e as CustomEvent<string>).detail === 'search' ? 'search' : 'commands') as PaletteMode;
+      const detail = (e as CustomEvent<string>).detail;
+      const m = (detail === 'search' || detail === 'toolbox' ? detail : 'commands') as PaletteMode;
       setMode(m);
       setQuery('');
       setSel(0);
@@ -140,41 +130,41 @@ export default function CommandPalette() {
     if (!open) return [];
     const out: Item[] = [];
 
-    // Command labels/categories come from keyboardShortcuts.ts (the Phase 4
-    // command manager) and widget titles from widgets/registry.ts — both are
-    // separate large data modules not yet on t(), so their text stays English
-    // here even once this file is fully localized; only the palette's own
-    // chrome (group names, "Open app", etc.) is translated below.
+    // Command labels resolve via commands.{id} keys; categories via commands.category.*.
     for (const c of COMMAND_CATALOG) {
+      if (mode === 'toolbox' && c.category !== 'Toolbox') continue;
+      const category = commandCategory(c.category, t);
       out.push({
         key: `cmd-${c.id}`,
-        label: c.label,
-        sub: commandIsLive(c.id) ? c.category : t('palette.needsView', { category: c.category }),
+        label: commandLabel(c.id, c.label, t),
+        sub: commandIsLive(c.id) ? category : t('palette.needsView', { category }),
         group: t('palette.group.commands'),
         glyph: 'command',
         keys: formatKeysDisplay(effectiveKeys(c.id)) || undefined,
         run: () => void runCommand(c.id),
       });
     }
-    for (const s of SECTIONS) {
-      out.push({
-        key: `sec-${s.id}`,
-        label: t(s.labelKey),
-        sub: t('palette.openApp'),
-        group: t('palette.group.pages'),
-        glyph: s.glyph,
-        run: () => openSection(s.id),
-      });
-    }
-    for (const w of WIDGETS) {
-      out.push({
-        key: `wgt-${w.type}`,
-        label: w.title,
-        sub: t('palette.addWidget', { category: w.category }),
-        group: t('palette.group.widgets'),
-        glyph: 'app',
-        run: () => window.dispatchEvent(new CustomEvent('os:add-widget', { detail: w.type })),
-      });
+    if (mode !== 'toolbox') {
+      for (const s of SECTIONS) {
+        out.push({
+          key: `sec-${s.id}`,
+          label: t(s.labelKey),
+          sub: t('palette.openApp'),
+          group: t('palette.group.pages'),
+          glyph: s.glyph,
+          run: () => openSection(s.id),
+        });
+      }
+      for (const w of WIDGETS) {
+        out.push({
+          key: `wgt-${w.type}`,
+          label: t(w.titleKey),
+          sub: t('palette.addWidget', { category: t(`widgets.category.${w.category}`) }),
+          group: t('palette.group.widgets'),
+          glyph: 'app',
+          run: () => window.dispatchEvent(new CustomEvent('os:add-widget', { detail: w.type })),
+        });
+      }
     }
     if (mode === 'search') {
       for (const w of loadSaved().slice(0, 400)) {
@@ -264,7 +254,7 @@ export default function CommandPalette() {
           <input
             ref={inputRef}
             className="palette-input"
-            placeholder={mode === 'search' ? t('palette.searchPlaceholder') : t('palette.commandPlaceholder')}
+            placeholder={mode === 'search' ? t('palette.searchPlaceholder') : mode === 'toolbox' ? 'Search Toolbox commands' : t('palette.commandPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}

@@ -16,6 +16,8 @@ import { N1 } from './n1';
 import { N1_EXTRA } from './n1-extra';
 import { N1_MAZII } from './n1-mazii';
 import { HSK } from './hsk';
+import { HSK_EXTRA } from './hsk-extra';
+import { HSK_IMPORT } from './hsk-import';
 import { TATOEBA_EXAMPLES } from './tatoebaExamples';
 
 export * from './types';
@@ -27,6 +29,8 @@ export {
   normalizeGrammarList,
   deriveRegister,
   hasTrustworthyTags,
+  hasTrustworthyRegister,
+  hasTrustworthyCategories,
   isStudyReady,
 } from './normalize';
 export type { NormalizedGrammarPoint, ModuleProvenance } from './normalize';
@@ -84,6 +88,38 @@ const HSK_SEED: ModuleProvenance = {
   verification: 'partial',
 };
 
+/*
+ * The expansion is `verified` where the seed is `partial`, and the distinction
+ * is real rather than optimistic: seed records carry legacy `functions` ids that
+ * are resolved to categories through LEGACY_ALIASES, so their tags are one
+ * inference step removed from anything a human wrote. Expansion records carry
+ * canonical `categories` written against the taxonomy directly, with examples
+ * authored alongside them — nothing in them was guessed from a gloss.
+ */
+const HSK_AUTHORED: ModuleProvenance = {
+  source: 'authored:hsk-extra',
+  tagSource: 'authored',
+  verification: 'verified',
+};
+
+/*
+ * The supplied HSK list (tools/hsk-import/source.tsv). Weakest provenance in
+ * the corpus, and correctly so: it is a chat model's output rather than a
+ * published syllabus, about a quarter of the original rows were vocabulary
+ * rather than grammar, and several carried a wrong gloss or wrong pinyin.
+ *
+ * The records also have no examples, so `verificationFor` lowers each one to
+ * 'missing' regardless of this ceiling — they answer level and category
+ * queries but never reach "Ready to study". That is the accurate reading of a
+ * pattern with a gloss and nothing else, and it is the same bar every other
+ * example-less record in the corpus is held to.
+ */
+const HSK_IMPORTED: ModuleProvenance = {
+  source: 'imported:hsk-list',
+  tagSource: 'imported',
+  verification: 'imported-unreviewed',
+};
+
 /** All grammar points (JA JLPT + ZH HSK), normalized with provenance. */
 export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(N5, CORE),
@@ -98,6 +134,8 @@ export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(N1_EXTRA, CORE),
   ...normalizeGrammarList(withImportedExamples(N1_MAZII), mazii('n1')),
   ...normalizeGrammarList(HSK, HSK_SEED),
+  ...normalizeGrammarList(HSK_EXTRA, HSK_AUTHORED),
+  ...normalizeGrammarList(HSK_IMPORT, HSK_IMPORTED),
 ];
 
 /** Raw per-module lists, for the corpus audit's provenance accounting. */
@@ -114,6 +152,8 @@ export const GRAMMAR_MODULES: Record<string, GrammarPoint[]> = {
   'n1-extra': N1_EXTRA,
   'n1-mazii': N1_MAZII,
   hsk: HSK,
+  'hsk-extra': HSK_EXTRA,
+  'hsk-import': HSK_IMPORT,
 };
 
 function countLevel(level: GrammarLevel): number {
@@ -139,9 +179,7 @@ export const HSK_COUNTS: Record<HskLevel, number> = {
   HSK4: countLevel('HSK4'),
   HSK5: countLevel('HSK5'),
   HSK6: countLevel('HSK6'),
-  HSK7: countLevel('HSK7'),
-  HSK8: countLevel('HSK8'),
-  HSK9: countLevel('HSK9'),
+  'HSK7-9': countLevel('HSK7-9'),
   HSK10: countLevel('HSK10'),
 };
 

@@ -15,7 +15,12 @@ import zlib from 'node:zlib';
 import { createRequire } from 'node:module';
 import AdmZip from 'adm-zip';
 import type { Database, SqlJsStatic } from 'sql.js';
-import { extractExpressions, parseModels, type ApkgImportResult } from '../../shared/apkgParse';
+import {
+  extractExpressions,
+  looksLikeUpgradeStub,
+  parseModels,
+  type ApkgImportResult,
+} from '../../shared/apkgParse';
 import { mt } from '../i18n';
 
 function focusedWindow(): BrowserWindow | undefined {
@@ -60,15 +65,19 @@ function getSql(): Promise<SqlJsStatic> {
 const COMPRESSED_HELP =
   'This deck uses Anki’s newer compressed format. In Anki, open File → Export, choose "Anki Deck Package (*.apkg)", CHECK "Support older Anki versions", export, and import that file instead.';
 
-/** Return the raw SQLite bytes for the collection, decompressing zstd if needed. */
+/**
+ * Return the raw SQLite bytes for the collection, decompressing zstd if needed.
+ *
+ * Order matters, and getting it wrong is silent. A modern Anki export contains
+ * BOTH the real collection (`collection.anki21b`, zstd) and a decoy
+ * `collection.anki2` — a valid SQLite file holding a single note that says
+ * "please upgrade Anki", there so old clients show a message instead of
+ * crashing. Reading the decoy first "succeeds" and imports exactly one word,
+ * which is what "1 cards → 1 words" was. Always try newest → oldest.
+ */
 function readCollectionBytes(zip: AdmZip): Uint8Array {
   const get = (name: string): Buffer | null => zip.getEntry(name)?.getData() ?? null;
 
-  // Prefer an uncompressed collection (legacy-compatible export).
-  const plain = get('collection.anki21') ?? get('collection.anki2');
-  if (plain) return plain;
-
-  // Newer exports ship a zstd-compressed collection.anki21b.
   const compressed = get('collection.anki21b');
   if (compressed) {
     // node:zlib gained zstd support in newer Node; Electron's bundled Node may
@@ -82,6 +91,9 @@ function readCollectionBytes(zip: AdmZip): Uint8Array {
       throw new Error(COMPRESSED_HELP);
     }
   }
+
+  const plain = get('collection.anki21') ?? get('collection.anki2');
+  if (plain) return plain;
 
   throw new Error('That file is not an Anki deck (no collection database inside).');
 }
@@ -97,6 +109,9 @@ function readNotes(db: Database): ApkgImportResult {
   const notes = rows.map((r) => ({ mid: String(r[0]), flds: String(r[1] ?? '') }));
 
   const { expressions, noteCount } = extractExpressions(notes, models);
+  // Belt and braces: if we somehow read the legacy decoy, say so rather than
+  // importing its single "upgrade Anki" note as vocabulary.
+  if (looksLikeUpgradeStub(expressions, noteCount)) throw new Error(COMPRESSED_HELP);
   return { ok: true, expressions, noteCount };
 }
 

@@ -3,6 +3,7 @@ doc_id: noctis.era_progression
 tier: 7
 authority: domain_specification
 role: era_progression_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -47,7 +48,7 @@ ECONOMY_SYSTEM.md              Tier 7 — Economy Domain Blueprint
 ERA_PROGRESSION.md             Tier 7 — Era Progression Domain Blueprint (this file)
 ```
 
-This document specializes the **Era Progression Contract** of `SIMULATION_SYSTEMS.md` Section 15; it binds the *conditions* of a protocol Tier 6 has already fixed. It also honors the boundary `SIMULATION_SYSTEMS.md` Section 16 draws against equating an era with an invention, and it is the document the non-post-scarcity clause of `ECONOMY_SYSTEM.md` Section 18 (echoed in Section 19 and the Economy Contract of `SIMULATION_SYSTEMS.md` Section 20) defers to for gating. It consumes the era-facing contributions each peer domain has already promised: `TECHNOLOGY_SYSTEM.md` Sections 16–17 (`w_era`), `ECONOMY_SYSTEM.md` Section 18, `CULTURE_SYSTEM.md` Section 31, `MEMORY_SYSTEM.md` Section 29, and the ecological-succession and population-institutional-maturity signals of `ECOLOGY_SYSTEM.md` Section 5 and `CITIZEN_SYSTEM.md` Section 3. It may specialize the physics; it may never override it.
+This document specializes the **Era Progression Contract** of `SIMULATION_SYSTEMS.md` Section 15; it binds the *conditions* of a protocol Tier 6 has already fixed. It also honors the boundary `SIMULATION_SYSTEMS.md` Section 16 draws against equating an era with an invention, and it is the document the non-post-scarcity clause of `ECONOMY_SYSTEM.md` Section 18 (echoed in Section 19 and the Economy Contract of `SIMULATION_SYSTEMS.md` Section 20) defers to for gating. It consumes the era-facing contributions each peer domain exposes: `x_technology`, `x_ecology`, `x_citizen`, `x_culture`, `x_memory`, and `x_economy`. It may specialize the physics; it may never override it.
 
 ### The Corrective This Document Exists To Pay Off
 
@@ -67,7 +68,7 @@ No numeric anchors appear in this document beyond the three the canon itself loc
 
 ### Notation
 
-Mathematics is written in plain text, matching `SIMULATION_SYSTEMS.md`. The era designation is one of five canonical symbols (Section 6). The six per-domain contributions are written `x_technology`, `x_ecology`, `x_citizen`, `x_culture`, `x_memory`, `x_economy`, each a bounded reading in `[0, 1]`. Their weights are `w_era` (Technology's, canon-named in `TECHNOLOGY_SYSTEM.md`), `w_ecology`, `w_citizen`, `w_culture`, `w_memory`, and `w_economy`, summing to 1. Per-era floors are `φ_d(era)`; the combined era readiness is `R_era`; the four thresholds are `Θ_era(next)`. Research readiness `R` (`SIMULATION_SYSTEMS.md` Section 2) and learning maturity `L_mat` (breadth, consistency, depth, difficulty, reflection — `VISION.md`) are upstream signals, defined where used. Seeded deterministic selection is `select(seed, S, context)`, a pure function of committed state, never randomness (`SIMULATION_SYSTEMS.md` Section 11). Named constants carry their constraints here and their values at implementation.
+Mathematics is written in plain text, matching `SIMULATION_SYSTEMS.md`. The era designation is one of five canonical symbols (Section 6). The six per-domain contributions are written `x_technology`, `x_ecology`, `x_citizen`, `x_culture`, `x_memory`, `x_economy`, each a bounded reading in `[0, 1]`. Their weights are `w_technology`, `w_ecology`, `w_citizen`, `w_culture`, `w_memory`, and `w_economy`, summing to 1. Per-era floors are `φ_d(era)`; the combined era readiness is `R_era`; the four thresholds are `Θ_era(next)`. Research readiness `R` (`SIMULATION_SYSTEMS.md` Section 2) and learning maturity `L_mat` (breadth, consistency, depth, difficulty, reflection — `VISION.md`) are upstream signals, defined where used. Seeded deterministic selection is `select(seed, S, context)`, a pure function of committed state, never randomness (`SIMULATION_SYSTEMS.md` Section 11). Named constants carry their constraints here and their values at implementation.
 
 ---
 
@@ -94,7 +95,7 @@ The deepest law, inherited whole from `SIMULATION_SYSTEMS.md` Sections 8, 9, and
 Era Progression refuses to blur its terms. Each is distinguished, with its owner named:
 
 - **Contribution** — a bounded `[0, 1]` reading of how far one domain's relationship to knowledge has matured, exposed by that domain and consumed here (`x_technology`, `x_ecology`, `x_citizen`, `x_culture`, `x_memory`, `x_economy`). Each domain owns its own derivation; this document owns only their combination (Section 7).
-- **Weight** — how heavily a domain's contribution counts toward combined readiness (`w_era` and the five sibling weights). A shaping constant, never a user control.
+- **Weight** — how heavily a domain's contribution counts toward combined readiness (`w_technology` and the five sibling weights). A shaping constant, never a user control.
 - **Floor** — the minimum contribution a domain must independently reach before an era may be entered at all, regardless of how strong the others are (`φ_d`). The structural guarantee that no single domain silently defines the era (Section 7).
 - **Combined readiness** — the single bounded value `R_era` produced by combining the six contributions under the weights (Section 7). Not a hidden score the user pursues; an internal, monotone reading of civilizational maturity.
 - **Threshold** — the readiness level `Θ_era(next)` at which the next era becomes reachable (Section 6). Four of them, one per boundary.
@@ -115,7 +116,7 @@ Specializing `SIMULATION_SYSTEMS.md` Section 14, which assigns this domain its c
 
 **Era Progression owns:** the combination of the six domain contributions into one readiness value; the weights, floors, and thresholds that shape that combination; the gate condition that decides an era boundary; the monotone, non-regressing advance of the era designation; the interaction of a `BENTHIC_BLOOM` breakthrough with the gate; the one-era-per-evaluation pacing rule; the emission of the transition as a committed-state change; and the handoff of the crossed boundary to Memory as a legacy anchor and to every domain as a widened capability envelope.
 
-**Era Progression does not own:** any domain's internal mechanics or the internal derivation of its own contribution — Technology owns `w_era`'s derivation and the invention lifecycle (`TECHNOLOGY_SYSTEM.md`), Ecology owns succession (`ECOLOGY_SYSTEM.md` Section 5), Citizen owns adaptation and role maturity (`CITIZEN_SYSTEM.md`), Culture owns its maturity-of-relationship projection (`CULTURE_SYSTEM.md`), Memory owns historical-accumulation depth (`MEMORY_SYSTEM.md`), Economy owns coordination maturity (`ECONOMY_SYSTEM.md` Section 18); the raw interpretation of study (`LEARNING_INTEGRATION.md`); the *exact numeric values* of any weight, floor, or threshold (calibration, Section 20); the historical record of a transition once produced (Memory keeps it); and every visual and staging appearance of a turning era (`ART_DIRECTION.md`, Tier 8). This document decides *when*; it does not author the *what* or paint the *how*.
+**Era Progression does not own:** any domain's internal mechanics or the internal derivation of its own contribution — Technology owns `x_technology` and the invention lifecycle (`TECHNOLOGY_SYSTEM.md`), Ecology owns `x_ecology` and succession (`ECOLOGY_SYSTEM.md` Section 5), Citizen owns `x_citizen` and institutional maturity (`CITIZEN_SYSTEM.md`), Culture owns `x_culture` (`CULTURE_SYSTEM.md`), Memory owns `x_memory` (`MEMORY_SYSTEM.md`), Economy owns `x_economy` (`ECONOMY_SYSTEM.md` Section 18); the raw interpretation of study (`LEARNING_INTEGRATION.md`); the *exact numeric values* of any weight, floor, or threshold (calibration, Section 20); the historical record of a transition once produced (Memory keeps it); and every visual and staging appearance of a turning era (`ART_DIRECTION.md`, Tier 8). This document decides *when*; it does not author the *what* or paint the *how*.
 
 The one boundary that most defines this domain: it **consumes what its peers already declare they emit, and re-derives none of their internals** (`SIMULATION_SYSTEMS.md` Section 13, cross-domain reads from prior committed state only). Every other domain has already written a line disclaiming ownership of the era gate and pointing here. This document takes them at their word and reaches into none of their machinery.
 
@@ -159,7 +160,7 @@ This domain adds *vocabulary*, never a hidden loop. It runs no ticking readiness
 
 | Symbol family | Governs | Binding constraint | Canon source |
 |---|---|---|---|
-| `w_era` | Technology's contribution weight | Canon-named in `TECHNOLOGY_SYSTEM.md`; a contribution weight only, the gate is owned here | `SIMULATION_SYSTEMS.md` Section 15; `TECHNOLOGY_SYSTEM.md` Section 16 |
+| `w_technology` | Technology's contribution weight | Positive; assigned here independently of Technology's `x_technology` derivation | `SIMULATION_SYSTEMS.md` Section 15; `TECHNOLOGY_SYSTEM.md` Section 16 |
 | `w_ecology, w_citizen, w_culture, w_memory, w_economy` | The five sibling contribution weights | All positive; the six weights sum to 1; none may be zero (no domain excluded) | `SIMULATION_SYSTEMS.md` Section 15 |
 | `φ_d(era)` | Per-domain minimum floor to enter an era | In `[0,1]`; non-decreasing across the four boundaries; every domain has a positive floor | Section 7; `SIMULATION_SYSTEMS.md` Section 15 |
 | `Θ_era(next)` | Combined-readiness threshold per boundary | Four values; strictly increasing across the boundaries (Section 6); monotone gate only | `SIMULATION_SYSTEMS.md` Section 15; `GAME_DESIGN.md` Section 7 |
@@ -223,7 +224,7 @@ Combined readiness is built from six bounded contributions, one per domain, each
 
 | Contribution | Domain reads | Grounded in |
 |---|---|---|
-| `x_technology` | technological-maturity signal `w_era` and research readiness `R` | `TECHNOLOGY_SYSTEM.md` Sections 16–17 |
+| `x_technology` | secured technological maturity, with research readiness `R` as one principal input | `TECHNOLOGY_SYSTEM.md` Sections 16–17 |
 | `x_ecology` | succession stage `θ_stage(n)`, crystal four-stage maturity, mycelial network depth `X_myc` | `ECOLOGY_SYSTEM.md` Sections 5, 8 |
 | `x_citizen` | adaptation level, role differentiation, and skill-transmission depth — *never population count alone* | `CITIZEN_SYSTEM.md` Section 3 |
 | `x_culture` | a derived projection of maturity-of-relationship-to-knowledge — transmission fidelity, institutional legitimacy, resolved cultural tension | `CULTURE_SYSTEM.md` Sections 16, 31; `SIMULATION_SYSTEMS.md` Section 17 |
@@ -237,14 +238,14 @@ Each domain owns the *internal derivation* of its contribution; this document ow
 Combined readiness is the **weighted geometric mean** of the six contributions:
 
 ```
-R_era = ( x_technology ^ w_era )
+R_era = ( x_technology ^ w_technology )
       · ( x_ecology    ^ w_ecology )
       · ( x_citizen    ^ w_citizen )
       · ( x_culture    ^ w_culture )
       · ( x_memory     ^ w_memory )
       · ( x_economy    ^ w_economy )
 
-with   w_era + w_ecology + w_citizen + w_culture + w_memory + w_economy = 1,
+with   w_technology + w_ecology + w_citizen + w_culture + w_memory + w_economy = 1,
        every weight strictly positive.
 ```
 
@@ -319,9 +320,9 @@ On a crossing the domain performs two handoffs and no more:
 
 Each interface reads a contribution the peer already declares it emits (or, for Ecology and Citizen, a maturity signal the peer already documents). Every read is from prior committed state, across evaluations (`SIMULATION_SYSTEMS.md` Section 13); this document re-derives no internal.
 
-### Technology — `w_era`
+### Technology — `x_technology`
 
-`TECHNOLOGY_SYSTEM.md` names its contribution as a coefficient outright (Section 16, coefficient table): "`w_era` — Technology's contribution weight to era readiness. A contribution signal only; the gate `Θ_era` is owned by `ERA_PROGRESSION.md`." Section 17 confirms: "era **gating** is owned by `ERA_PROGRESSION.md`, to which this domain emits only a technological-maturity contribution (`w_era`)," and "Era advancement is **not** invention." And its deferred-questions section (Section 30) hands this document the combination problem explicitly: "the era-transition gating formula and thresholds `Θ_era`; how this domain's `w_era` contribution combines with ecology, citizen, culture, and memory contributions." This document answers exactly that (Section 7). `x_technology` reads Technology's emitted maturity signal, with research readiness `R` as a principal input and the `BENTHIC_BLOOM` hinge (Section 9). `w_era` in this document's formula *is* the weight `TECHNOLOGY_SYSTEM.md` named.
+`TECHNOLOGY_SYSTEM.md` owns `x_technology`, its secured-maturity reading, with research readiness `R` as a principal input and the `BENTHIC_BLOOM` hinge (Section 9). This document owns `w_technology`, the positive weight applied to that reading, and the gate that combines it with the five peers. Keeping the reading and its weight distinct prevents a domain from grading its own influence on the gate. Era advancement remains **not** invention.
 
 ### Economy — Section 18
 
@@ -333,15 +334,15 @@ Each interface reads a contribution the peer already declares it emits (or, for 
 
 ### Memory — Contributor And Recorder-Of-Record
 
-Memory's relationship is dual, and subtly different from the other five. First, as a **contributor**, `x_memory` reads a *historical-accumulation depth* — the breadth and depth of secured record and the continuity of institutional memory (`MEMORY_SYSTEM.md` Section 5, `historicalProvenance` and heritage anchors) — less a forward-looking readiness than a measure of how much history the civilization has securely accumulated. Second, as the **recorder-of-record**, Memory is the domain that *records* the transition after this document decides it: "Memory records era transitions as foundational legacy anchors and inflects its media and institutions by era; it emits no gating signal beyond the historical record of the transition, and era gating is owned entirely by `ERA_PROGRESSION.md`" (`MEMORY_SYSTEM.md` Section 29). This document produces the crossing; Memory keeps it forever (Section 9). Both roles are held distinctly: Memory's accumulation feeds the gate, and Memory's archive preserves the gate's result.
+Memory's relationship is dual, and subtly different from the other five. First, as a **contributor**, `x_memory` reads a *historical-accumulation depth* — the breadth and depth of secured record and the continuity of institutional memory (`MEMORY_SYSTEM.md` Sections 5, 27, `historicalProvenance` and heritage anchors) — less a forward-looking readiness than a measure of how much history the civilization has securely accumulated. Second, as the **recorder-of-record**, Memory records the transition after this document decides it as a foundational legacy anchor. This document produces the crossing; Memory keeps it forever (Section 9). Both roles are held distinctly: Memory's accumulation feeds the gate, and Memory's archive preserves the gate's result.
 
 ### Ecology — Succession-Derived
 
-`ECOLOGY_SYSTEM.md` has not yet written an explicit "era progression contract" section or a named contribution coefficient; it predates the convention. This document invents no obligation for it. Instead, `x_ecology` is grounded in `SIMULATION_SYSTEMS.md` Section 15's own phrase, "ecological succession (Ecology)," and read from what `ECOLOGY_SYSTEM.md` already defines as legitimate ecological maturity: the five-stage succession model `θ_stage(n)` (Section 5, a monotone stage function that never regresses), the four-stage crystal-network maturity, and mycelial network depth `X_myc`. The contribution is a *reading of Ecology's existing committed state*, never a new demand placed on the ecology domain. Because succession is explicitly distinct from the era machine (`ECOLOGY_SYSTEM.md` Section 5 — "neither defines the other"), this document reads succession as *one contribution among six*, never as an era gate in itself.
+`ECOLOGY_SYSTEM.md` Section 12 exposes `x_ecology`, grounded in the five-stage succession model `θ_stage(n)`, the four-stage crystal-network maturity, secured mycelial depth `X_myc`, habitat interdependence, and circulation reach. Because succession is explicitly distinct from the era machine (`ECOLOGY_SYSTEM.md` Section 5 — "neither defines the other"), this document reads ecological maturity as *one contribution among six*, never as an era gate in itself.
 
 ### Citizen — Population-Institutional Maturity
 
-`CITIZEN_SYSTEM.md` likewise predates the coefficient convention and names no era coefficient. `x_citizen` is grounded in `SIMULATION_SYSTEMS.md` Section 15's phrase, "population and institutional maturity (Citizen)," and read from `CITIZEN_SYSTEM.md`'s own documented concepts: adaptation level (`CitizenState.adaptationLevel`, which projects era and local development), role differentiation, and skill-transmission depth (`CITIZEN_SYSTEM.md` Section 3, citizens who "teach ... preserve, and lose knowledge"). It is emphatically **never population count `P` alone** — population size is not permitted to proxy civilizational maturity on its own (`SIMULATION_SYSTEMS.md` Section 10, Section 19; `CITIZEN_SYSTEM.md` Section 3, "a number on a panel ... says nothing about what they *are*"). A large but undifferentiated citizenry reads low; a mature one, rich in transmitted skill and adapted expression, reads high. As with Ecology, the contribution reads existing committed state and imposes no new obligation.
+`CITIZEN_SYSTEM.md` Section 3 exposes `x_citizen`, derived from adaptation breadth, role differentiation, institutional participation, and skill-transmission depth. It is emphatically **never population count `P` alone** — population size is not permitted to proxy civilizational maturity on its own (`SIMULATION_SYSTEMS.md` Sections 10, 19; `CITIZEN_SYSTEM.md` Section 3). A large but undifferentiated citizenry reads low; a mature one, rich in transmitted skill and adapted expression, reads high.
 
 ### Learning Integration — Upstream, Never A Seventh Term
 
@@ -432,7 +433,7 @@ Each resolves to a lawful state, never an exception.
 
 ## SECTION 17 — INPUTS AND OUTPUTS
 
-**Era Progression receives** (across committed evaluations, all from prior committed state): the technological-maturity contribution `w_era` and research readiness `R` (`TECHNOLOGY_SYSTEM.md`); the economic-readiness contribution (`ECONOMY_SYSTEM.md` Section 18); the cultural maturity-of-relationship projection (`CULTURE_SYSTEM.md` Sections 16, 31); the historical-accumulation-depth reading (`MEMORY_SYSTEM.md` Sections 5, 29); the ecological-succession maturity signals — succession stage, crystal maturity, mycelial depth (`ECOLOGY_SYSTEM.md` Section 5); the population-institutional-maturity signals — adaptation, role differentiation, skill transmission (`CITIZEN_SYSTEM.md` Section 3); the completion/breakthrough marker that drives `R` and `BENTHIC_BLOOM` (`SIMULATION_SYSTEMS.md` Sections 3, 12); and the current committed era designation (`SIMULATION_SYSTEMS.md` Section 2). It never receives raw learning telemetry (`LEARNING_INTEGRATION.md`).
+**Era Progression receives** (across committed evaluations, all from prior committed state): `x_technology` and research readiness `R` (`TECHNOLOGY_SYSTEM.md`); `x_economy` (`ECONOMY_SYSTEM.md` Section 18); `x_culture` (`CULTURE_SYSTEM.md` Sections 16, 31); `x_memory` (`MEMORY_SYSTEM.md` Sections 5, 29); `x_ecology` (`ECOLOGY_SYSTEM.md` Sections 5, 12); `x_citizen` (`CITIZEN_SYSTEM.md` Section 3); the completion/breakthrough marker that drives `R` and `BENTHIC_BLOOM` (`SIMULATION_SYSTEMS.md` Sections 3, 12); and the current committed era designation (`SIMULATION_SYSTEMS.md` Section 2). It never receives raw learning telemetry (`LEARNING_INTEGRATION.md`).
 
 **Era Progression produces** exactly two interpretable outputs, and no generic modifier: the **advanced era designation** (a monotone committed-state change, at most one boundary per evaluation), written into the canonical era-and-progression state it specializes; and, on a crossing, the **transition record handed to Memory** as a foundational legacy anchor. Downstream, the crossed designation becomes a **widened capability envelope** that Technology, Economy, Culture, Ecology, and Citizen read for their own path-dependent development (Section 8), and a **staging obligation** that rendering interprets (Section 14). It emits no readiness number to any consumer, no user-facing meter, and no new engine event flag.
 
@@ -478,11 +479,11 @@ Any future era-progression feature must pass every rule, *after* clearing the ti
 
 Bound by future documents or implementation, under the contracts this file provides; none resolved here with an arbitrary assumption:
 
-- **The exact weight values** — `w_era`, `w_ecology`, `w_citizen`, `w_culture`, `w_memory`, `w_economy` — summing to 1, each carrying a canon citation, bound at implementation under the calibration constraints of `SIMULATION_SYSTEMS.md` and this file.
+- **The exact weight values** — `w_technology`, `w_ecology`, `w_citizen`, `w_culture`, `w_memory`, `w_economy` — summing to 1, each carrying a canon citation, bound at implementation under the calibration constraints of `SIMULATION_SYSTEMS.md` and this file.
 - **The exact threshold values** — the four `Θ_era(next)`, strictly increasing (Section 6), calibrated so the first boundary is reachable within a genuine study practice and the last demands maturity across all six domains, honoring the three canonical anchors.
 - **The exact per-domain floor values** — `φ_d(era)`, non-decreasing across the four boundaries, each domain positive at every boundary.
 - **Each domain's internal contribution formula** — the derivation of its own `[0,1]` reading stays owned by that domain (`TECHNOLOGY_SYSTEM.md`, `ECOLOGY_SYSTEM.md`, `CITIZEN_SYSTEM.md`, `CULTURE_SYSTEM.md`, `MEMORY_SYSTEM.md`, `ECONOMY_SYSTEM.md`).
-- **Whether Ecology and Citizen adopt named era coefficients** symmetrical to Technology's `w_era`. This document's formula works with the maturity signals they currently expose (Section 10); a future compatibility pass may add explicit named contribution coefficients to `ECOLOGY_SYSTEM.md` and `CITIZEN_SYSTEM.md` for symmetry, but this document requires none.
+- **The exact implementation formulas for all six domain contributions.** Each domain exposes a named `x_domain` projection; this document consumes those readings and never re-derives them.
 - **The precise commit-step placement** of the era check within the evaluation lifecycle of `SIMULATION_SYSTEMS.md` Section 6, and the implementation-level state schema for the era-and-progression family (`ARCHITECTURE.md`, Tier 8).
 - **The staging vocabulary** of an overnight metamorphosis (`ART_DIRECTION.md`, Tier 8).
 

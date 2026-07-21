@@ -4,6 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { confirmDialog, promptDialog } from './ui';
+import { useT } from '../i18n';
+import { commandCategory, commandLabel } from '../commandI18n';
 import {
   addCustomCommand,
   addShortcutProfile,
@@ -28,25 +30,47 @@ import {
   type CustomAction,
 } from '../keyboardShortcuts';
 
+// Ordered by purpose, roughly by how often a shortcut in that group gets used:
+// moving around the OS first, then arranging it, then the study surfaces
+// (reading → looking up → drilling), then media, then tools and user macros.
 const CATEGORY_ORDER: CommandCategory[] = [
   'Navigation',
+  'Window',
   'Reader',
   'Manga',
   'Dictionary',
   'Flashcards',
   'Immersion',
-  'Utility',
   'Music',
+  'Video',
+  'Toolbox',
+  'Utility',
   'Custom',
 ];
 
-function labelFor(id: string, rows: BindingRow[]): string {
-  return rows.find((r) => r.id === id)?.label ?? id;
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+function labelFor(id: string, rows: BindingRow[], t: TFn): string {
+  const r = rows.find((row) => row.id === id);
+  if (!r) return id;
+  if (r.custom) return r.label;
+  return commandLabel(r.id, r.label, t);
+}
+
+function appSectionLabel(id: string, fallback: string, t: TFn): string {
+  const key = `palette.section.${id}`;
+  const out = t(key);
+  return out === key ? fallback : out;
+}
+
+function displayLabel(r: BindingRow, t: TFn): string {
+  return r.custom ? r.label : commandLabel(r.id, r.label, t);
 }
 
 type CaptureMode = 'replace' | 'add';
 
 export default function ShortcutSettings({ embedded = false }: { embedded?: boolean } = {}) {
+  const { t, lang } = useT();
   const [rows, setRows] = useState<BindingRow[]>(() => getBindings());
   const [profiles, setProfiles] = useState(() => listShortcutProfiles());
   const [query, setQuery] = useState('');
@@ -97,12 +121,13 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       setCapturing(null);
       setHoldHint('');
       const pretty = formatKeysDisplay(chord);
+      const conflictNames = conflicts.map((c) => labelFor(c, getBindings(), t)).join(', ');
       setMsg(
         conflicts.length
-          ? `Bound to ${pretty} — also used by: ${conflicts.map((c) => labelFor(c, getBindings())).join(', ')}`
+          ? `${t('settings.shortcuts.setTo', { chord: pretty })} — ${t('settings.shortcuts.alsoBound', { names: conflictNames })}`
           : modeRef.current === 'add'
-            ? `Added alternative ${pretty}.`
-            : `Bound to ${pretty}.`,
+            ? t('settings.shortcuts.addedChord', { chord: pretty })
+            : t('settings.shortcuts.setTo', { chord: pretty }),
       );
     };
 
@@ -112,7 +137,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       if (e.altKey) mods.push('Alt');
       if (e.shiftKey) mods.push('Shift');
       if (e.metaKey) mods.push('Meta');
-      setHoldHint(mods.length ? `${mods.join('+')}+…` : 'Press a key or mouse button…');
+      setHoldHint(mods.length ? `${mods.join('+')}+…` : t('settings.shortcuts.holdHint'));
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -129,7 +154,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
         setBinding(id, '');
         setCapturing(null);
         setHoldHint('');
-        setMsg('Shortcut removed.');
+        setMsg(t('settings.shortcuts.removed'));
         return;
       }
       if (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta') {
@@ -152,7 +177,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       e.stopPropagation();
       const chord = chordFromMouseEvent(e);
       if (!chord) {
-        if (e.button === 0) setHoldHint('Left click needs Ctrl/Alt/Shift (or use another button)');
+        if (e.button === 0) setHoldHint(t('settings.shortcuts.leftClickNeedsMod'));
         return;
       }
       finish(chord);
@@ -170,33 +195,41 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       window.removeEventListener('auxclick', onMouse, true);
       window.removeEventListener('contextmenu', onMouse, true);
     };
-  }, [capturing]);
+  }, [capturing, lang]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter(
-      (r) =>
-        r.label.toLowerCase().includes(q) ||
+    return rows.filter((r) => {
+      const label = displayLabel(r, t);
+      const cat = commandCategory(r.category, t);
+      return (
+        label.toLowerCase().includes(q) ||
         r.keys.toLowerCase().includes(q) ||
         r.id.toLowerCase().includes(q) ||
+        cat.toLowerCase().includes(q) ||
         r.category.toLowerCase().includes(q) ||
-        (r.note?.toLowerCase().includes(q) ?? false),
-    );
-  }, [rows, query]);
+        (r.note?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }, [rows, query, lang]);
 
   const doExport = async () => {
     try {
       await navigator.clipboard.writeText(exportShortcuts());
-      setMsg('Shortcut profiles copied to the clipboard as JSON.');
+      setMsg(t('settings.shortcuts.exported'));
     } catch {
-      setMsg('Could not access the clipboard.');
+      setMsg(t('settings.shortcuts.clipboardFail'));
     }
   };
 
   const doImport = () => {
     const res = importShortcuts(importText);
-    setMsg(res.ok ? 'Shortcuts imported.' : `Import failed: ${res.error}`);
+    setMsg(
+      res.ok
+        ? t('settings.shortcuts.imported')
+        : t('settings.shortcuts.importFail', { error: res.error ?? '' }),
+    );
     if (res.ok) {
       setImportOpen(false);
       setImportText('');
@@ -205,8 +238,8 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
 
   const addProfile = async () => {
     const name = await promptDialog({
-      title: 'New shortcut profile',
-      message: 'Name for the new shortcut profile (copies the current one):',
+      title: t('settings.shortcuts.newProfileTitle'),
+      message: t('settings.shortcuts.newProfileMsg'),
     });
     if (name) addShortcutProfile(name);
   };
@@ -215,20 +248,21 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
     setManualId(null);
     setCaptureMode(mode);
     setCapturing(capturing === id && captureMode === mode ? null : id);
-    setHoldHint('Press keys or a mouse button…');
+    setHoldHint(t('settings.shortcuts.holdHintDots'));
   };
 
   const applyManual = (id: string) => {
     const conflicts = setBinding(id, manualText.trim(), 'replace');
     setManualId(null);
     setManualText('');
-    const pretty = formatKeysDisplay(manualText.trim()) || '(empty)';
+    const pretty = formatKeysDisplay(manualText.trim()) || t('settings.shortcuts.unbound');
+    const conflictNames = conflicts.map((c) => labelFor(c, getBindings(), t)).join(', ');
     setMsg(
       conflicts.length
-        ? `Bound to ${pretty} — also used by: ${conflicts.map((c) => labelFor(c, getBindings())).join(', ')}`
+        ? `${t('settings.shortcuts.setTo', { chord: pretty })} — ${t('settings.shortcuts.alsoBound', { names: conflictNames })}`
         : manualText.trim()
-          ? `Bound to ${pretty}.`
-          : 'Shortcut removed.',
+          ? t('settings.shortcuts.setTo', { chord: pretty })
+          : t('settings.shortcuts.removed'),
     );
   };
 
@@ -238,7 +272,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       action = { type: 'openApp', appId: customAppId };
     } else if (customActionType === 'runCommands') {
       if (customStack.length < 2) {
-        setMsg('Stack needs at least two commands.');
+        setMsg(t('settings.shortcuts.stackNeedTwo'));
         return;
       }
       action = { type: 'runCommands', commandIds: [...customStack] };
@@ -254,7 +288,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       setMsg(res.error);
       return;
     }
-    setMsg(`Custom shortcut “${customLabel.trim()}” added.`);
+    setMsg(t('settings.shortcuts.customAdded', { label: customLabel.trim() }));
     setCustomLabel('');
     setCustomKeys('');
     setCustomStack([]);
@@ -266,18 +300,13 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
 
   return (
     <section className={`set-section${embedded ? ' sc-embedded' : ''}`}>
-      {!embedded && <h2>Shortcuts</h2>}
-      <p className="set-row-desc muted">
-        Click a key combo to rebind — multi-key chords (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+…), mouse
-        buttons (<kbd>MouseRight</kbd>, <kbd>MouseMiddle</kbd>, side buttons), and alternatives
-        (e.g. <kbd>Space</kbd> · <kbd>Enter</kbd>). <kbd>Backspace</kbd> unbinds, <kbd>Esc</kbd>{' '}
-        cancels. Changes apply immediately.
-      </p>
+      {!embedded && <h2>{t('settings.shortcuts.title')}</h2>}
+      <p className="set-row-desc muted">{t('settings.shortcuts.intro')}</p>
 
       <div className="sc-toolbar">
         <input
           className="sc-search"
-          placeholder="Search shortcuts…"
+          placeholder={t('settings.shortcuts.searchPlaceholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -285,8 +314,8 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
           className="set-select"
           value={profiles.active}
           onChange={(e) => switchShortcutProfile(e.target.value)}
-          aria-label="Shortcut profile"
-          title="Shortcut profile"
+          aria-label={t('settings.shortcuts.profileAria')}
+          title={t('settings.shortcuts.profileAria')}
         >
           {profiles.names.map((n) => (
             <option key={n} value={n}>
@@ -295,64 +324,64 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
           ))}
         </select>
         <button type="button" className="btn small" onClick={addProfile}>
-          New profile
+          {t('settings.shortcuts.newProfile')}
         </button>
         {profiles.active !== 'Default' && (
           <button type="button" className="btn small" onClick={() => deleteShortcutProfile(profiles.active)}>
-            Delete profile
+            {t('settings.shortcuts.deleteProfile')}
           </button>
         )}
         <button type="button" className="btn small" onClick={() => setCustomOpen((o) => !o)}>
-          {customOpen ? 'Cancel custom' : 'Add custom'}
+          {customOpen ? t('settings.shortcuts.cancelCustom') : t('settings.shortcuts.addCustom')}
         </button>
         <button type="button" className="btn small" onClick={() => void doExport()}>
-          Export
+          {t('settings.shortcuts.export')}
         </button>
         <button type="button" className="btn small" onClick={() => setImportOpen((o) => !o)}>
-          Import
+          {t('settings.shortcuts.import')}
         </button>
         <button
           type="button"
           className="btn small"
           onClick={async () => {
             const ok = await confirmDialog({
-              title: 'Reset shortcuts',
-              message: 'Reset every shortcut in this profile to its default?',
-              confirmLabel: 'Reset',
+              title: t('settings.shortcuts.resetTitle'),
+              message: t('settings.shortcuts.resetMessage'),
+              confirmLabel: t('settings.shortcuts.reset'),
               danger: true,
             });
             if (ok) {
               resetAllBindings();
-              setMsg('All shortcuts reset.');
+              setMsg(t('settings.shortcuts.resetDone'));
             }
           }}
         >
-          Reset all
+          {t('settings.shortcuts.resetAll')}
         </button>
       </div>
 
       {customOpen && (
         <div className="sc-custom">
-          <div className="sc-custom-title">New custom shortcut</div>
+          <div className="sc-custom-title">{t('settings.shortcuts.customTitle')}</div>
           <div className="sc-custom-grid">
             <label className="sc-field">
-              <span className="muted">Name</span>
+              <span className="muted">{t('settings.shortcuts.field.name')}</span>
               <input
                 value={customLabel}
                 onChange={(e) => setCustomLabel(e.target.value)}
-                placeholder="e.g. Open flashcards fast"
+                placeholder={t('settings.shortcuts.field.namePh')}
               />
             </label>
             <label className="sc-field">
-              <span className="muted">Keys (optional — capture after create)</span>
+              <span className="muted">{t('settings.shortcuts.field.keys')}</span>
               <input
                 value={customKeys}
                 onChange={(e) => setCustomKeys(e.target.value)}
-                placeholder="Ctrl+Shift+F or MouseMiddle"
+                placeholder={t('settings.shortcuts.field.keysPh')}
               />
             </label>
             <label className="sc-field">
-              <span className="muted">Action</span>
+              <span className="muted">{t('settings.shortcuts.field.action')}</span>
               <select
                 className="set-select"
                 value={customActionType}
@@ -360,14 +389,14 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                   setCustomActionType(e.target.value as 'openApp' | 'runCommand' | 'runCommands')
                 }
               >
-                <option value="openApp">Open app / section</option>
-                <option value="runCommand">Run existing command</option>
-                <option value="runCommands">Stack commands (A then B…)</option>
+                <option value="openApp">{t('settings.shortcuts.action.openApp')}</option>
+                <option value="runCommand">{t('settings.shortcuts.action.runCommand')}</option>
+                <option value="runCommands">{t('settings.shortcuts.action.runCommands')}</option>
               </select>
             </label>
             {customActionType === 'openApp' ? (
               <label className="sc-field">
-                <span className="muted">App</span>
+                <span className="muted">{t('settings.shortcuts.field.app')}</span>
                 <select
                   className="set-select"
                   value={customAppId}
@@ -375,14 +404,14 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                 >
                   {SHORTCUT_OPEN_APPS.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.label}
+                      {appSectionLabel(a.id, a.label, t)}
                     </option>
                   ))}
                 </select>
               </label>
             ) : customActionType === 'runCommand' ? (
               <label className="sc-field">
-                <span className="muted">Command</span>
+                <span className="muted">{t('settings.shortcuts.field.command')}</span>
                 <select
                   className="set-select"
                   value={customCmdId}
@@ -390,14 +419,14 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                 >
                   {COMMAND_CATALOG.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.category}: {c.label}
+                      {commandCategory(c.category, t)}: {commandLabel(c.id, c.label, t)}
                     </option>
                   ))}
                 </select>
               </label>
             ) : (
               <div className="sc-field sc-stack-field">
-                <span className="muted">Command stack (runs in order)</span>
+                <span className="muted">{t('settings.shortcuts.field.stack')}</span>
                 <div className="sc-stack-add">
                   <select
                     className="set-select"
@@ -406,7 +435,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                   >
                     {COMMAND_CATALOG.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.category}: {c.label}
+                        {commandCategory(c.category, t)}: {commandLabel(c.id, c.label, t)}
                       </option>
                     ))}
                   </select>
@@ -418,11 +447,11 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                       setCustomStack((s) => [...s, stackPick]);
                     }}
                   >
-                    Add
+                    {t('settings.shortcuts.add')}
                   </button>
                 </div>
                 {customStack.length === 0 ? (
-                  <p className="muted sc-stack-empty">Add at least two commands (e.g. open Music + open Dictionary).</p>
+                  <p className="muted sc-stack-empty">{t('settings.shortcuts.stackEmpty')}</p>
                 ) : (
                   <ol className="sc-stack-list">
                     {customStack.map((id, i) => {
@@ -430,15 +459,18 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                       return (
                         <li key={`${id}-${i}`}>
                           <span>
-                            {i + 1}. {c ? `${c.category}: ${c.label}` : id}
+                            {i + 1}.{' '}
+                            {c
+                              ? `${commandCategory(c.category, t)}: ${commandLabel(c.id, c.label, t)}`
+                              : id}
                           </span>
                           <button
                             type="button"
                             className="btn small"
-                            title="Remove"
+                            title={t('settings.shortcuts.remove')}
                             onClick={() => setCustomStack((s) => s.filter((_, j) => j !== i))}
                           >
-                            Remove
+                            {t('settings.shortcuts.remove')}
                           </button>
                         </li>
                       );
@@ -457,7 +489,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
             }
             onClick={createCustom}
           >
-            Create shortcut
+            {t('settings.shortcuts.create')}
           </button>
         </div>
       )}
@@ -465,12 +497,12 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       {importOpen && (
         <div className="sc-import">
           <textarea
-            placeholder="Paste a shortcuts JSON export here…"
+            placeholder={t('settings.shortcuts.importPh')}
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
           />
           <button type="button" className="btn small primary" onClick={doImport} disabled={!importText.trim()}>
-            Apply import
+            {t('settings.shortcuts.applyImport')}
           </button>
         </div>
       )}
@@ -483,15 +515,17 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
         if (!inCat.length) return null;
         return (
           <div key={cat} className="sc-group">
-            <h3 className="sc-group-title">{cat}</h3>
+            <h3 className="sc-group-title">{commandCategory(cat, t)}</h3>
             {inCat.map((r) => (
               <div key={r.id} className={`sc-row ${r.conflictsWith.length ? 'conflict' : ''}`}>
                 <div className="sc-row-text">
-                  <span className="sc-label">{r.label}</span>
+                  <span className="sc-label">{displayLabel(r, t)}</span>
                   {r.note && <span className="sc-note muted">{r.note}</span>}
                   {r.conflictsWith.length > 0 && (
                     <span className="sc-conflict">
-                      Also bound to: {r.conflictsWith.map((c) => labelFor(c, rows)).join(', ')}
+                      {t('settings.shortcuts.alsoBound', {
+                        names: r.conflictsWith.map((c) => labelFor(c, rows, t)).join(', '),
+                      })}
                     </span>
                   )}
                 </div>
@@ -499,62 +533,64 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                   <button
                     type="button"
                     className={`sc-keys ${capturing === r.id && captureMode === 'replace' ? 'capturing' : ''} ${r.keys ? '' : 'unbound'}`}
-                    title="Click, then press the new key combination or mouse button"
+                    title={t('settings.shortcuts.captureTitle')}
                     onClick={() => startCapture(r.id, 'replace')}
                   >
                     {capturing === r.id && captureMode === 'replace'
-                      ? holdHint || 'Press keys…'
-                      : formatKeysDisplay(r.keys) || 'Unbound'}
+                      ? holdHint || t('settings.shortcuts.pressKeys')
+                      : formatKeysDisplay(r.keys) || t('settings.shortcuts.unbound')}
                   </button>
                   <button
                     type="button"
                     className={`btn small ${capturing === r.id && captureMode === 'add' ? 'primary' : ''}`}
-                    title="Add another key or mouse button that also triggers this command"
+                    title={t('settings.shortcuts.addKeyTitle')}
                     onClick={() => startCapture(r.id, 'add')}
                   >
-                    + Key
+                    {t('settings.shortcuts.addKey')}
                   </button>
                   <button
                     type="button"
                     className="btn small"
-                    title="Type a chord manually (Ctrl+Shift+H, Space|Enter, MouseRight…)"
+                    title={t('settings.shortcuts.typeTitle')}
                     onClick={() => {
                       setCapturing(null);
                       setManualId(manualId === r.id ? null : r.id);
                       setManualText(r.keys);
                     }}
                   >
-                    Type
+                    {t('settings.shortcuts.type')}
                   </button>
                   {!r.isDefault && (
                     <button
                       type="button"
                       className="btn small"
-                      title={`Reset to ${formatKeysDisplay(r.defaultKeys) || 'unbound'}`}
+                      title={t('settings.shortcuts.resetTo', {
+                        keys: formatKeysDisplay(r.defaultKeys) || t('settings.shortcuts.unbound'),
+                      })}
                       onClick={() => resetBinding(r.id)}
                     >
-                      Reset
+                      {t('settings.shortcuts.reset')}
                     </button>
                   )}
                   {r.custom && (
                     <button
                       type="button"
                       className="btn small"
-                      title="Delete this custom shortcut"
+                      title={t('settings.shortcuts.deleteTitle')}
                       onClick={async () => {
                         const ok = await confirmDialog({
-                          title: 'Delete shortcut',
-                          message: `Delete custom shortcut “${r.label}”?`,
-                          confirmLabel: 'Delete',
+                          title: t('settings.shortcuts.deleteConfirmTitle'),
+                          message: t('settings.shortcuts.deleteConfirmMsg', { label: r.label }),
+                          confirmLabel: t('settings.shortcuts.delete'),
                           danger: true,
                         });
                         if (ok) {
                           removeCustomCommand(r.id);
-                          setMsg('Custom shortcut deleted.');
+                          setMsg(t('settings.shortcuts.deleted'));
                         }
                       }}
                     >
-                      Delete
+                      {t('settings.shortcuts.delete')}
                     </button>
                   )}
                 </div>
@@ -564,7 +600,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                       className="sc-manual-input"
                       value={manualText}
                       onChange={(e) => setManualText(e.target.value)}
-                      placeholder="Ctrl+Alt+S · or Space|Enter · or Ctrl+MouseRight"
+                      placeholder={t('settings.shortcuts.manualPh')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
@@ -577,10 +613,10 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                       autoFocus
                     />
                     <button type="button" className="btn small primary" onClick={() => applyManual(r.id)}>
-                      Apply
+                      {t('settings.shortcuts.apply')}
                     </button>
                     <button type="button" className="btn small" onClick={() => setManualId(null)}>
-                      Cancel
+                      {t('settings.shortcuts.cancel')}
                     </button>
                   </div>
                 )}

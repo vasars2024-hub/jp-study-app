@@ -3,6 +3,7 @@ doc_id: noctis.economy_system
 tier: 7
 authority: domain_specification
 role: economy_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -299,7 +300,7 @@ Economy sits amid five completed domains; each interface is one-directional in o
 
 ## SECTION 17 — LEARNING INTEGRATION CONTRACT
 
-Economy receives only already-interpreted learning signals, never raw Study OS telemetry (`SIMULATION_SYSTEMS.md` Section 22; `LEARNING_INTEGRATION.md`, placeholder). Learning may expand economic *possibility* through deeper technical competence, improved classification, stronger institutional knowledge, broader interdisciplinary understanding, better planning concepts, improved communication, stronger historical awareness, greater scientific understanding, and increased problem-solving capacity — all of which widen what the civilization can understand and coordinate.
+Economy receives only already-interpreted learning signals, never raw Study OS telemetry (`SIMULATION_SYSTEMS.md` Section 22; `LEARNING_INTEGRATION.md`). Learning may expand economic *possibility* through deeper technical competence, improved classification, stronger institutional knowledge, broader interdisciplinary understanding, better planning concepts, improved communication, stronger historical awareness, greater scientific understanding, and increased problem-solving capacity — all of which widen what the civilization can understand and coordinate.
 
 The hard boundaries: **no school subject maps directly to an economic outcome** (`SIMULATION_SYSTEMS.md` Section 7), and **learning minutes never become money, labor, production points, purchasing power, or any currency** (`SIMULATION_SYSTEMS.md` Law 7; `GAME_DESIGN.md` Section 11, Principle 2). Learning expands what can be understood and coordinated; citizens and institutions determine how that understanding is used. The metabolic energy that learning banks (`SIMULATION_SYSTEMS.md` Section 6) is the one quantitative thing learning supplies the economy — and even that is a budget the economy allocates, never a wallet the user spends.
 
@@ -307,7 +308,7 @@ The hard boundaries: **no school subject maps directly to an economic outcome** 
 
 ## SECTION 18 — ERA PROGRESSION CONTRACT
 
-Economy emits an era-readiness contribution reflecting productive capacity, distribution reach, institutional coordination, maintenance resilience, regional integration, ability to support complex technology, and ability to preserve and transmit specialized labor. It **does not decide era advancement**; `ERA_PROGRESSION.md` owns the final gating model, combining Economy's contribution with those of the other domains (`SIMULATION_SYSTEMS.md` Section 15). **Era transition instantly solves nothing** — not scarcity, inequality, maintenance, access, or distribution. Later eras create *more complex dependencies*, not economic perfection (Section 19).
+Economy emits `x_economy ∈ [0, 1]`, a secured era-readiness contribution reflecting productive capacity, distribution reach, institutional coordination, maintenance resilience, regional integration, ability to support complex technology, and ability to preserve and transmit specialized labor. It records coordination maturity already demonstrated, not current output volume, wealth, or absence-sensitive activity. Economy owns its derivation. It **does not decide era advancement**; `ERA_PROGRESSION.md` owns the contribution's weight, floor, and final combination with the other domains (`SIMULATION_SYSTEMS.md` Section 15). **Era transition instantly solves nothing** — not scarcity, inequality, maintenance, access, or distribution. Later eras create *more complex dependencies*, not economic perfection (Section 19).
 
 ---
 

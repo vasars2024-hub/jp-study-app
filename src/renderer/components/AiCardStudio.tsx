@@ -16,8 +16,8 @@ import {
   AI_PROVIDERS,
   DEFAULT_AI_PROVIDER_ID,
   applyLanguageOptionsToFormat,
+  effectiveLanguagePair,
   formatsForPreset,
-  languageDirectionLabel,
   languageOptionsForProfile,
   normalizeLanguageOptions,
   providerById,
@@ -36,6 +36,7 @@ import { saveAiResultsToDeck } from '../aiDeckSave';
 import { loadSaved, onSavedChanged, type SavedWord } from '../savedWords';
 import { getActiveProfile, getProfiles, onProfileChanged } from '../profileState';
 import type { AnkiStatus } from '../../shared/types';
+import { useT } from '../i18n';
 
 function normalizeAiEngineConfig(raw?: Partial<AiEngineConfig> | null): AiEngineConfig {
   const apiKeysSet = {
@@ -68,7 +69,22 @@ function profileById(id: string): StudyProfile | undefined {
 
 type AiCardStudioProps = { onDeckImported?: () => void };
 
+const LOG_FIELD_KEYS: Array<[string, string]> = [
+  ['preset', 'aiStudio.log.field.preset'],
+  ['format', 'aiStudio.log.field.format'],
+  ['front', 'aiStudio.log.field.front'],
+  ['back', 'aiStudio.log.field.back'],
+  ['reverse', 'aiStudio.log.field.reverse'],
+  ['gloss', 'aiStudio.log.field.gloss'],
+  ['cardCount', 'aiStudio.log.field.cardCount'],
+  ['output', 'aiStudio.log.field.output'],
+  ['source', 'aiStudio.log.field.source'],
+  ['items', 'aiStudio.log.field.items'],
+  ['dictWords', 'aiStudio.log.field.dictWords'],
+];
+
 export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {}) {
+  const { t, lang } = useT();
   const [aiConfig, setAiConfig] = useState<AiEngineConfig>(() => normalizeAiEngineConfig());
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [savingKey, setSavingKey] = useState(false);
@@ -99,7 +115,24 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
   const syncedPresetKey = useRef('');
   const studioSnapRef = useRef('');
   const prevMappingRef = useRef<Record<string, string>>({});
-  const langLabel = (id: AiMiningLanguage) => AI_MINING_LANGUAGES.find((l) => l.id === id)?.label ?? id;
+
+  const langLabel = (id: AiMiningLanguage) => t(`aiStudio.lang.${id}`);
+
+  const directionLabel = (options: AiLanguageOptions) => {
+    const normalized = normalizeLanguageOptions(options);
+    const { front, back } = effectiveLanguagePair(normalized);
+    const extras = normalized.backGlossLangs
+      .filter((entry) => entry !== back)
+      .map((entry) => langLabel(entry));
+    if (extras.length) {
+      return t('aiStudio.direction.withExtras', {
+        front: langLabel(front),
+        back: langLabel(back),
+        extras: extras.join(' + '),
+      });
+    }
+    return t('aiStudio.direction.pair', { front: langLabel(front), back: langLabel(back) });
+  };
 
   useEffect(() => {
     return window.api.onAiGenerateProgress(setGenProgress);
@@ -174,13 +207,16 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         setLogLines((lines) =>
           appendStudioLog(
             lines,
-            'Language direction',
-            `Synced to ${langLabel(profileLangOptions.frontLang)} → ${langLabel(profileLangOptions.backLang)} (from preset profile)`,
+            t('aiStudio.log.field.languageDirection'),
+            t('aiStudio.log.syncedTo', {
+              front: langLabel(profileLangOptions.frontLang),
+              back: langLabel(profileLangOptions.backLang),
+            }),
           ),
         );
       });
     }
-  }, [selectedFormat, profileLangOptions, aiConfig.selectedPresetId, aiConfig.selectedFormatId]);
+  }, [selectedFormat, profileLangOptions, aiConfig.selectedPresetId, aiConfig.selectedFormatId, lang]);
 
   const localizedFormat = useMemo(() => {
     if (!selectedFormat || !selectedPreset) return null;
@@ -217,13 +253,13 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       else if (specFields.length) setFields([...specFields]);
       else {
         setFields([]);
-        setFieldsErr(r.error ?? 'Could not read this note type’s fields.');
+        setFieldsErr(r.error ?? t('aiStudio.mapping.fieldsErr'));
       }
     });
     return () => {
       alive = false;
     };
-  }, [model, ankiStatus?.connected, mappingProfile.id, mappingProfile.anki.noteFields]);
+  }, [model, ankiStatus?.connected, mappingProfile.id, mappingProfile.anki.noteFields, lang]);
 
   useEffect(() => {
     if (!selectedPreset || !selectedFormat) return;
@@ -247,22 +283,9 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     if (snap === studioSnapRef.current) return;
     const prev = JSON.parse(studioSnapRef.current) as Record<string, string | number | boolean>;
     const next = JSON.parse(snap) as Record<string, string | number | boolean>;
-    const fieldLabels: Array<[string, string]> = [
-      ['preset', 'Preset'],
-      ['format', 'Card format'],
-      ['front', 'Front language'],
-      ['back', 'Back language'],
-      ['reverse', 'Reverse'],
-      ['gloss', 'Extra glosses'],
-      ['cardCount', 'Cards per word'],
-      ['output', 'Output'],
-      ['source', 'Source'],
-      ['items', 'Items to generate'],
-      ['dictWords', 'Dictionary words'],
-    ];
     setLogLines((lines) => {
       let out = lines;
-      for (const [key, label] of fieldLabels) {
+      for (const [key, labelKey] of LOG_FIELD_KEYS) {
         if (prev[key] === next[key]) continue;
         const from =
           key === 'front' || key === 'back'
@@ -272,7 +295,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
           key === 'front' || key === 'back'
             ? langLabel(String(next[key]) as AiMiningLanguage)
             : String(next[key] ?? '—');
-        out = appendStudioLog(out, label, `${from} → ${to}`);
+        out = appendStudioLog(out, t(labelKey), t('aiStudio.log.changeArrow', { from, to }));
       }
       return out;
     });
@@ -289,6 +312,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     generationSource,
     wordCount,
     savedWords.length,
+    lang,
   ]);
 
   useEffect(() => {
@@ -305,14 +329,16 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         changed = true;
         out = appendStudioLog(
           out,
-          `Field: ${field}`,
-          oldVal.trim() ? `"${oldVal}" → "${newVal}"` : `set to "${newVal}"`,
+          t('aiStudio.log.field.mapping', { field }),
+          oldVal.trim()
+            ? t('aiStudio.log.mapping.change', { from: oldVal, to: newVal })
+            : t('aiStudio.log.mapping.set', { value: newVal }),
         );
       }
       return out;
     });
     if (changed || !Object.keys(prev).length) prevMappingRef.current = { ...next };
-  }, [mappingPreview.templates, fields]);
+  }, [mappingPreview.templates, fields, lang]);
 
   const cardsPerWord = useMemo(
     () => Math.max(1, Math.min(50, aiConfig.cardCount || 1)),
@@ -328,6 +354,11 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
   const canGenerate =
     currentProviderKeySaved &&
     (generationSource === 'preset' || savedWords.length > 0);
+
+  const currentDirectionLabel = useMemo(
+    () => directionLabel(aiConfig),
+    [lang, aiConfig.frontLang, aiConfig.backLang, aiConfig.reverse, aiConfig.backGlossLangs],
+  );
 
   function deckGenerationRequest() {
     return {
@@ -361,8 +392,8 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     setLogLines((lines) =>
       appendStudioLog(
         lines,
-        'Generate',
-        `Start · ${itemCount} item${itemCount === 1 ? '' : 's'} × ${cardsPerWord} cards/item ≈ ${estimatedCards} cards`,
+        t('aiStudio.log.field.generate'),
+        t('aiStudio.log.generateStart', { count: itemCount, cards: cardsPerWord, total: estimatedCards }),
       ),
     );
     try {
@@ -373,15 +404,28 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       const saved = saveAiResultsToDeck(results, deckTitle);
       if (saved) onDeckImported?.();
       setStatus(
-        `Generated ${cards} cards from ${results.length} ${generationSource === 'preset' ? 'invented items' : 'words'} · ${saved} saved to Flashcards.`,
+        t(
+          generationSource === 'preset' ? 'aiStudio.status.generatedPreset' : 'aiStudio.status.generatedDict',
+          { cards, count: results.length, saved },
+        ),
       );
       setLogLines((lines) =>
-        appendStudioLog(lines, 'Generate', `Done · ${cards} cards from ${results.length} items`),
+        appendStudioLog(
+          lines,
+          t('aiStudio.log.field.generate'),
+          t('aiStudio.log.generateDone', { cards, count: results.length }),
+        ),
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message);
-      setLogLines((lines) => appendStudioLog(lines, 'Generate', `Error · ${message}`));
+      setLogLines((lines) =>
+        appendStudioLog(
+          lines,
+          t('aiStudio.log.field.generate'),
+          t('aiStudio.log.generateError', { message }),
+        ),
+      );
     } finally {
       setAiBusy(false);
     }
@@ -393,8 +437,8 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     if (!blocks.length) return;
     const combined = blocks.length === 1 ? blocks[0] : [blocks[0], ...blocks.slice(1).map((b) => b.split('\n').slice(1).join('\n'))].join('\n');
     const res = await window.api.aiSaveCsv(combined);
-    if (res.ok && res.path) setStatus(`CSV saved to ${res.path}`);
-    else if (res.error !== 'cancelled') setStatus(res.error ?? 'Could not save CSV.');
+    if (res.ok && res.path) setStatus(t('aiStudio.status.csvSaved', { path: res.path }));
+    else if (res.error !== 'cancelled') setStatus(res.error ?? t('aiStudio.status.csvFail'));
   }
 
   async function mineToAnki(): Promise<void> {
@@ -439,7 +483,11 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       }
     }
     if (localEntries.length) addDeckCards(localEntries);
-    setStatus(`Sent ${ok} of ${total} cards to Anki${localEntries.length ? ` · ${localEntries.length} saved locally` : ''}.`);
+    setStatus(
+      localEntries.length
+        ? t('aiStudio.status.sentAnkiLocal', { ok, total, local: localEntries.length })
+        : t('aiStudio.status.sentAnki', { ok, total }),
+    );
   }
 
   function applyAiConfigPatch(patch: Partial<AiEngineConfig>): void {
@@ -450,22 +498,22 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     const draft = (apiKeyDraft || apiKeyInputRef.current?.value || '').trim();
     if (!draft) {
       setKeyStatusKind('error');
-      setKeyStatus(`Paste a ${selectedProvider.label} API key above.`);
+      setKeyStatus(t('aiStudio.status.pasteKey', { provider: selectedProvider.label }));
       return;
     }
     setSavingKey(true);
-    setKeyStatus('Saving…');
+    setKeyStatus(t('aiStudio.status.saving'));
     try {
       const result = await window.api.aiSetApiKey({ provider: selectedProvider.keyBucket, apiKey: draft });
       if (!result.ok) {
         setKeyStatusKind('error');
-        setKeyStatus(result.error ?? 'Could not save key.');
+        setKeyStatus(result.error ?? t('aiStudio.status.couldNotSaveKey'));
         return;
       }
       setAiConfig((prev) => normalizeAiEngineConfig({ ...prev, apiKeysSet: result.apiKeysSet }));
       setApiKeyDraft('');
       setKeyStatusKind('ok');
-      setKeyStatus(`${selectedProvider.label} API key saved.`);
+      setKeyStatus(t('aiStudio.status.keySaved', { provider: selectedProvider.label }));
     } catch (error) {
       setKeyStatusKind('error');
       setKeyStatus(error instanceof Error ? error.message : String(error));
@@ -485,10 +533,10 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     }));
   }
 
-  function toggleBackGlossLang(lang: AiMiningLanguage): void {
-    const next = aiConfig.backGlossLangs.includes(lang)
-      ? aiConfig.backGlossLangs.filter((entry) => entry !== lang)
-      : [...aiConfig.backGlossLangs, lang];
+  function toggleBackGlossLang(langId: AiMiningLanguage): void {
+    const next = aiConfig.backGlossLangs.includes(langId)
+      ? aiConfig.backGlossLangs.filter((entry) => entry !== langId)
+      : [...aiConfig.backGlossLangs, langId];
     void saveLanguageOptions({ backGlossLangs: next });
   }
 
@@ -499,14 +547,18 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       )}
 
       <CollapsibleSection
-        title="Provider & API key"
-        summary={currentProviderKeySaved ? `${selectedProvider.label} key saved` : 'Connect Gemini or DeepSeek'}
+        title={t('aiStudio.section.provider')}
+        summary={
+          currentProviderKeySaved
+            ? t('aiStudio.summary.keySaved', { provider: selectedProvider.label })
+            : t('aiStudio.summary.connect')
+        }
         defaultOpen={!currentProviderKeySaved}
         className="mining-collapse anki-card"
       >
         <div className="mining-form-grid mining-form-grid-wide">
           <label>
-            AI provider
+            {t('aiStudio.label.provider')}
             <select
               value={aiConfig.providerId}
               onChange={(e) => {
@@ -527,19 +579,23 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             </select>
           </label>
           <label className="mining-api-key-field">
-            API key
+            {t('aiStudio.label.apiKey')}
             <input
               ref={apiKeyInputRef}
               type="password"
               value={apiKeyDraft}
               onChange={(e) => setApiKeyDraft(e.target.value)}
-              placeholder={currentProviderKeySaved ? 'Replace saved key…' : `Paste ${selectedProvider.label} key`}
+              placeholder={
+                currentProviderKeySaved
+                  ? t('aiStudio.placeholder.replaceKey')
+                  : t('aiStudio.placeholder.pasteKey', { provider: selectedProvider.label })
+              }
             />
           </label>
         </div>
         <div className="mining-api-key-actions">
           <button className="btn primary" type="button" disabled={savingKey} onClick={() => void saveApiKey()}>
-            {savingKey ? 'Saving…' : 'Save key'}
+            {savingKey ? t('aiStudio.status.saving') : t('aiStudio.btn.saveKey')}
           </button>
         </div>
         {keyStatus && keyStatusKind !== 'idle' && (
@@ -548,45 +604,37 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="How these settings connect"
-        summary="Preset → language → profile → Anki fields"
+        title={t('aiStudio.section.flowGuide')}
+        summary={t('aiStudio.summary.flow')}
         defaultOpen={false}
         className="mining-collapse anki-card ai-studio-flow-guide"
       >
         <ol className="ai-studio-flow-list">
           <li>
-            <b>Preset</b> tells the AI <em>what to analyze</em> (idiom nuance, grammar stack, proper name, etc.)
-            and ships a default card layout.
+            <b>{t('aiStudio.flow.presetTitle')}</b> {t('aiStudio.flow.presetBody')}
           </li>
           <li>
-            <b>Language direction</b> shapes the AI card faces (what language appears on front vs back). It
-            syncs from the preset profile when you change preset — you can still adjust it for extra glosses or
-            production cues.
+            <b>{t('aiStudio.flow.languageTitle')}</b> {t('aiStudio.flow.languageBody')}
           </li>
           <li>
-            <b>Anki profile</b> comes from the preset and controls field mapping. Each preset assigns one profile
-            (e.g. Grammar Deconstruction → Sentence Mining).
+            <b>{t('aiStudio.flow.profileTitle')}</b> {t('aiStudio.flow.profileBody')}
           </li>
           <li>
-            <b>Field mapping</b> routes AI output into Anki note fields. Variable palette tags like{' '}
-            <code>{'{expression:ru}'}</code> pick which translation fills a field — separate from card face
-            language.
+            <b>{t('aiStudio.flow.mappingTitle')}</b> {t('aiStudio.flow.mappingBody')}
           </li>
         </ol>
-        <p className="muted collapse-lead">
-          Panels on the right show the AI card example and the exact prompt sent to the model.
-        </p>
+        <p className="muted collapse-lead">{t('aiStudio.flow.footer')}</p>
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="1 · Preset & output"
-        summary={`${selectedPreset?.label ?? 'What the AI analyzes'} · ${aiConfig.outputFormat.toUpperCase()} · ${cardsPerWord}/word`}
+        title={t('aiStudio.section.preset')}
+        summary={`${selectedPreset?.label ?? t('aiStudio.summary.analyzes')} · ${aiConfig.outputFormat.toUpperCase()} · ${t('aiStudio.summary.perWord', { n: cardsPerWord })}`}
         defaultOpen
         className="mining-collapse anki-card"
       >
         <div className="mining-form-grid mining-form-grid-wide">
           <label>
-            Preset
+            {t('aiStudio.label.preset')}
             <select
               value={aiConfig.selectedPresetId}
               onChange={(e) => {
@@ -599,7 +647,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
                 </option>
               ))}
               {specializedPresets.length > 0 && (
-                <optgroup label="Specialized">
+                <optgroup label={t('aiStudio.optgroup.specialized')}>
                   {specializedPresets.map((preset) => (
                     <option key={preset.id} value={preset.id}>
                       {preset.label}
@@ -610,7 +658,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             </select>
           </label>
           <label>
-            Card format
+            {t('aiStudio.label.cardFormat')}
             <select
               value={aiConfig.selectedFormatId}
               onChange={(e) => {
@@ -633,7 +681,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             </select>
           </label>
           <label>
-            Cards per word
+            {t('aiStudio.label.cardsPerWord')}
             <input
               type="number"
               min={1}
@@ -651,7 +699,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             />
           </label>
           <label>
-            Output
+            {t('aiStudio.label.output')}
             <select
               value={aiConfig.outputFormat}
               onChange={(e) => {
@@ -664,19 +712,20 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
                 setAiConfig((prev) => ({ ...prev, outputFormat }));
               }}
             >
-              <option value="anki">Anki</option>
-              <option value="csv">CSV</option>
+              <option value="anki">{t('aiStudio.output.anki')}</option>
+              <option value="csv">{t('aiStudio.output.csv')}</option>
             </select>
           </label>
         </div>
         {selectedPreset && <p className="muted mining-preset-note">{selectedPreset.description}</p>}
         {selectedFormat && (
           <p className="muted ai-studio-meta">
-            Anki profile: <b>{profileById(selectedFormat.profileId)?.label ?? selectedFormat.profileId}</b>
+            {t('aiStudio.meta.ankiProfile')}{' '}
+            <b>{profileById(selectedFormat.profileId)?.label ?? selectedFormat.profileId}</b>
             {formatTemplateCount < cardsPerWord && (
               <>
-                {' '}· this preset has {formatTemplateCount} template{formatTemplateCount === 1 ? '' : 's'} —
-                higher counts repeat the cycle
+                {' '}
+                · {t('aiStudio.meta.templateNote', { count: formatTemplateCount })}
               </>
             )}
           </p>
@@ -684,38 +733,35 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="2 · Language direction"
-        summary={languageDirectionLabel(aiConfig)}
+        title={t('aiStudio.section.language')}
+        summary={currentDirectionLabel}
         defaultOpen
         className="mining-collapse anki-card"
       >
-        <p className="muted collapse-lead">
-          Shapes AI card front/back text. Changing preset resets direction to match that preset profile. Extra
-          glosses add more languages on the back face only.
-        </p>
+        <p className="muted collapse-lead">{t('aiStudio.language.lead')}</p>
         <div className="mining-form-grid mining-language-grid">
           <label>
-            Front language
+            {t('aiStudio.label.frontLang')}
             <select
               value={aiConfig.frontLang}
               onChange={(e) => void saveLanguageOptions({ frontLang: e.target.value as AiMiningLanguage })}
             >
-              {AI_MINING_LANGUAGES.map((lang) => (
-                <option key={lang.id} value={lang.id}>
-                  {lang.label}
+              {AI_MINING_LANGUAGES.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {langLabel(entry.id)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Back language
+            {t('aiStudio.label.backLang')}
             <select
               value={aiConfig.backLang}
               onChange={(e) => void saveLanguageOptions({ backLang: e.target.value as AiMiningLanguage })}
             >
-              {AI_MINING_LANGUAGES.map((lang) => (
-                <option key={lang.id} value={lang.id}>
-                  {lang.label}
+              {AI_MINING_LANGUAGES.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {langLabel(entry.id)}
                 </option>
               ))}
             </select>
@@ -736,20 +782,20 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
                 })
               }
             >
-              {preset.label}
+              {t(`aiStudio.dirPreset.${preset.id}`)}
             </button>
           ))}
         </div>
         <div className="mining-language-gloss-row">
-          <span className="fm-palette-label">Extra glosses on back</span>
-          {AI_MINING_LANGUAGES.filter((lang) => lang.id !== aiConfig.backLang).map((lang) => (
-            <label key={lang.id} className="mining-gloss-check">
+          <span className="fm-palette-label">{t('aiStudio.label.extraGlosses')}</span>
+          {AI_MINING_LANGUAGES.filter((entry) => entry.id !== aiConfig.backLang).map((entry) => (
+            <label key={entry.id} className="mining-gloss-check">
               <input
                 type="checkbox"
-                checked={aiConfig.backGlossLangs.includes(lang.id)}
-                onChange={() => toggleBackGlossLang(lang.id)}
+                checked={aiConfig.backGlossLangs.includes(entry.id)}
+                onChange={() => toggleBackGlossLang(entry.id)}
               />
-              {lang.label}
+              {langLabel(entry.id)}
             </label>
           ))}
         </div>
@@ -758,17 +804,19 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       <AiStudioConfigLog lines={logLines} onClear={() => setLogLines([])} />
 
       <section className="anki-card ai-studio-mapping-section">
-        <h2 className="mining-pane-title">3 · Anki field mapping</h2>
+        <h2 className="mining-pane-title">{t('aiStudio.section.mapping')}</h2>
         <p className="muted ai-studio-lead">
-          Profile <b>{mappingProfile.label}</b> (from preset) · note type <b>{model || '—'}</b>. These templates
-          route AI output into Anki when you send cards.
+          {t('aiStudio.mapping.lead', {
+            profile: mappingProfile.label,
+            model: model || '—',
+          })}
         </p>
         <div className="fm-split ai-studio-split">
           <div className="fm-split-editor">
-            {fieldsLoading && <div className="muted">Reading note type fields…</div>}
+            {fieldsLoading && <div className="muted">{t('aiStudio.mapping.readingFields')}</div>}
             {fieldsErr && <div className="form-msg err">{fieldsErr}</div>}
             {!fieldsLoading && fields.length === 0 && (
-              <div className="muted">No fields found for this profile’s note type.</div>
+              <div className="muted">{t('aiStudio.mapping.noFields')}</div>
             )}
             {fields.length > 0 && (
               <FieldMappingEditor
@@ -797,33 +845,37 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       </section>
 
       <section className="anki-card download-deck-panel ai-mine-panel">
-        <h2 className="download-deck-title">4 · Generate cards</h2>
+        <h2 className="download-deck-title">{t('aiStudio.section.generate')}</h2>
         <div className="download-deck-info">
           {selectedPreset && localizedFormat ? (
             <>
               <b>{selectedPreset.label}</b> · {localizedFormat.label}
               <br />
-              Profile <code>{mappingProfile.label}</code> · {cardsPerWord} card{cardsPerWord === 1 ? '' : 's'} per
-              word · {aiConfig.outputFormat.toUpperCase()} output · {languageDirectionLabel(aiConfig)}
+              {t('aiStudio.generate.infoDetail', {
+                profile: mappingProfile.label,
+                count: cardsPerWord,
+                output: aiConfig.outputFormat.toUpperCase(),
+                direction: currentDirectionLabel,
+              })}
             </>
           ) : (
-            'Choose a preset and card format above.'
+            t('aiStudio.generate.chooseAbove')
           )}
         </div>
         <div className="mining-form-grid ai-generate-source-grid">
           <label>
-            Source
+            {t('aiStudio.label.source')}
             <select
               value={generationSource}
               onChange={(e) => setGenerationSource(e.target.value as AiDeckGenerationSource)}
             >
-              <option value="preset">From preset (AI invents vocabulary)</option>
-              <option value="dictionary">From dictionary stars</option>
+              <option value="preset">{t('aiStudio.source.preset')}</option>
+              <option value="dictionary">{t('aiStudio.source.dictionary')}</option>
             </select>
           </label>
           {generationSource === 'preset' ? (
             <label>
-              Items to generate
+              {t('aiStudio.label.itemsToGenerate')}
               <input
                 type="number"
                 min={1}
@@ -834,32 +886,31 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             </label>
           ) : (
             <label>
-              Dictionary words
-              <input type="text" readOnly value={`${savedWords.length} starred`} />
+              {t('aiStudio.label.dictionaryWords')}
+              <input type="text" readOnly value={t('aiStudio.starredCount', { count: savedWords.length })} />
             </label>
           )}
         </div>
         <p className="muted collapse-lead">
-          {generationSource === 'preset' ? (
-            <>
-              AI invents <b>{wordCount}</b> vocabulary items. Each item becomes{' '}
-              <b>{cardsPerWord}</b> card{cardsPerWord === 1 ? '' : 's'} → approx{' '}
-              <b>{estimatedCards}</b> total ({wordCount} × {cardsPerWord}).
-            </>
-          ) : (
-            <>
-              <b>{savedWords.length}</b> dictionary word{savedWords.length === 1 ? '' : 's'} ×{' '}
-              <b>{cardsPerWord}</b> cards each → approx <b>{estimatedCards}</b> cards.
-            </>
-          )}
+          {generationSource === 'preset'
+            ? t(cardsPerWord === 1 ? 'aiStudio.estimate.presetOneCard' : 'aiStudio.estimate.preset', {
+                items: wordCount,
+                cards: cardsPerWord,
+                total: estimatedCards,
+              })
+            : t('aiStudio.estimate.dictionary', {
+                count: savedWords.length,
+                cards: cardsPerWord,
+                total: estimatedCards,
+              })}
         </p>
         <AiGenerationProgressPanel progress={genProgress} active={aiBusy} />
         <div className="download-deck-footer ai-mine-footer">
           <span className="download-deck-result">
-            Result: approx <b>{batchResults.length ? minedCardCount : estimatedCards}</b> cards
+            {t('aiStudio.result.approx', { count: batchResults.length ? minedCardCount : estimatedCards })}
             {genProgress?.message && aiBusy && <span className="muted"> · {genProgress.message}</span>}
             {!canGenerate && currentProviderKeySaved && generationSource === 'dictionary' && savedWords.length === 0 && (
-              <span className="muted"> · star words in Dictionary first</span>
+              <span className="muted"> · {t('aiStudio.hint.starFirst')}</span>
             )}
           </span>
           <div className="ai-mine-actions">
@@ -870,7 +921,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               onClick={() => void runGenerate()}
             >
               <Icon name="download" size={16} />
-              {aiBusy ? 'Generating…' : 'Generate cards'}
+              {aiBusy ? t('aiStudio.btn.generating') : t('aiStudio.btn.generate')}
             </button>
             <button
               className="btn"
@@ -878,7 +929,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               disabled={!minedCardCount}
               onClick={() => void mineToAnki()}
             >
-              Send to Anki
+              {t('aiStudio.btn.sendAnki')}
             </button>
             <button
               className="btn"
@@ -888,11 +939,11 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
                 const n = saveAiResultsToDeck(batchResults, `${selectedPreset?.label ?? 'AI'} studio`);
                 if (n) {
                   onDeckImported?.();
-                  setStatus(`Saved ${n} cards to Flashcards.`);
+                  setStatus(t('aiStudio.status.savedFlash', { count: n }));
                 }
               }}
             >
-              Save to flashcards
+              {t('aiStudio.btn.saveFlash')}
             </button>
             <button
               className="btn"
@@ -900,7 +951,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               disabled={!batchResults.length}
               onClick={() => void exportCsv()}
             >
-              Export CSV
+              {t('aiStudio.btn.exportCsv')}
             </button>
           </div>
         </div>
@@ -909,9 +960,9 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       {batchResults.length > 0 && (
         <div className="flash-strip-section anki-card">
           <div className="flash-strip-head">
-            <span className="flash-section-title">Generated cards</span>
+            <span className="flash-section-title">{t('aiStudio.generated.title')}</span>
             <span className="muted">
-              {minedCardCount} cards from {batchResults.length} words
+              {t('aiStudio.generated.summary', { cards: minedCardCount, count: batchResults.length })}
             </span>
           </div>
           <div className="flash-strip" role="list">
@@ -930,12 +981,10 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       )}
 
       {!currentProviderKeySaved && (
-        <p className="muted ai-studio-hint">Save an API key above to enable generation.</p>
+        <p className="muted ai-studio-hint">{t('aiStudio.hint.saveKey')}</p>
       )}
       {currentProviderKeySaved && generationSource === 'dictionary' && savedWords.length === 0 && (
-        <p className="muted ai-studio-hint">
-          Open Dictionary, look up words, and tap the star icon — or switch source to preset generation.
-        </p>
+        <p className="muted ai-studio-hint">{t('aiStudio.hint.starOrPreset')}</p>
       )}
     </div>
   );

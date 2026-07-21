@@ -487,6 +487,31 @@ export function resolveCategories(
 }
 
 /** Categories available for a study language, in declaration order. */
+/**
+ * Category id -> the legacy function ids that map into it.
+ *
+ * The 82 canonical categories are deliberately broad, which leaves the big ones
+ * (negation, condition) holding 150+ points each — accurate, but too coarse to
+ * filter with. Inverting the alias map gives the filter panel a finer second
+ * level to offer underneath each category without changing what a category
+ * *means*.
+ */
+export const FUNCTIONS_BY_CATEGORY: ReadonlyMap<CanonicalCategoryId, GrammarFunctionId[]> =
+  (() => {
+    const out = new Map<CanonicalCategoryId, GrammarFunctionId[]>();
+    for (const [fn, cats] of Object.entries(LEGACY_ALIASES) as [
+      GrammarFunctionId,
+      CanonicalCategoryId[],
+    ][]) {
+      for (const c of cats) {
+        const list = out.get(c);
+        if (list) list.push(fn);
+        else out.set(c, [fn]);
+      }
+    }
+    return out;
+  })();
+
 export function categoriesForLang(lang: GrammarLang): GrammarCategory[] {
   return GRAMMAR_CATEGORIES.filter((c) => c.langs.includes(lang));
 }

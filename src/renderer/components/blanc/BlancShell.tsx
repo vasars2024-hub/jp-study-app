@@ -15,11 +15,6 @@ import {
 } from '../../../shared/toolboxUtilities';
 import type { ToolboxFileSearchResult } from '../../../shared/toolboxFileSearch';
 import { LANG_LABELS, LANG_TAGS, UI_LANGS, type UiLang } from '../../../shared/i18n/core';
-import AnkiView from '../../views/AnkiView';
-import MangaReader from '../../views/MangaReader';
-import NovelReader from '../../views/NovelReader';
-import EpubMiningPanel from '../EpubMiningPanel';
-import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
 import Icon, { type IconName } from '../Icons';
 import FocusMusicBar from '../FocusMusicBar';
 import ClipboardHistoryPanel from '../ClipboardHistoryPanel';
@@ -37,7 +32,7 @@ import {
   type BlancMemorySettings,
   type BlancModeSettings,
 } from '../../blancMode';
-import { getUiLang, setUiLang } from '../../i18n';
+import { getUiLang, setUiLang, useT } from '../../i18n';
 import {
   exportCurrentToolboxSettings,
   importCurrentToolboxSettings,
@@ -78,10 +73,10 @@ import {
   updateDeckCard,
   type DeckFlashcard,
 } from '../../flashcardDeck';
-import { ClipboardWidget } from '../../widgets/system';
 import { ProfileSwitcher } from '../ProfileSwitcher';
 import {
   BatchConverterPanel,
+  WorkspaceLauncherPanel,
   BlancModelsPanel,
   BlancYoutubePanel,
   ContextSearchPanel,
@@ -93,14 +88,71 @@ import {
   SubtitleImporterPanel,
 } from './BlancReadyToolPanels';
 
-const MediaView = lazy(() => import('../../views/MediaView'));
-const FlashcardsView = lazy(() => import('../../views/FlashcardsView'));
-const StatisticsView = lazy(() => import('../../views/StatisticsView'));
-const DictionaryView = lazy(() => import('../../views/DictionaryView'));
-const GrammarView = lazy(() => import('../../views/GrammarView'));
-const ResourcesView = lazy(() => import('../../views/ResourcesView'));
-const CalendarView = lazy(() => import('../../views/CalendarView'));
-const ReadingFinderView = lazy(() => import('../../views/ReadingFinderView'));
+// Pillar 1: these five were static imports, so the Blanc window paid for both
+// readers and both mining panels before it painted. Every heavy view is lazy now.
+const MangaReader = lazy(() => import('../../views/MangaReader'));
+const NovelReader = lazy(() => import('../../views/NovelReader'));
+const EpubMiningPanel = lazy(() => import('../EpubMiningPanel'));
+const EpubMiningSimplePanel = lazy(() => import('../EpubMiningSimplePanel'));
+
+// Owned by the Media & Cards work stream — see BlancMediaPanels.tsx. The shell
+// imports these two names and nothing else from that file, so that stream can
+// rebuild both panels Blanc-native without editing BlancShell.
+const BlancMediaPanel = lazy(() =>
+  import('./BlancMediaPanels').then((m) => ({ default: m.BlancMediaPanel })),
+);
+const BlancFlashcardsPanel = lazy(() =>
+  import('./BlancMediaPanels').then((m) => ({ default: m.BlancFlashcardsPanel })),
+);
+// Pillar 0: Blanc-native panels, not Study OS `*View`s. See BlancStudyPanels.tsx.
+const BlancStatisticsPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancStatisticsPanel })),
+);
+const BlancAnkiPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancAnkiPanel })),
+);
+const BlancNotebookPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancNotebookPanel })),
+);
+const BlancTranslatePanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancTranslatePanel })),
+);
+const BlancMusicPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancMusicPanel })),
+);
+const BlancDictionaryPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancDictionaryPanel })),
+);
+const BlancGrammarPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancGrammarPanel })),
+);
+const BlancClipboardPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancClipboardPanel })),
+);
+const BlancResourcesPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancResourcesPanel })),
+);
+const BlancCalendarPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancCalendarPanel })),
+);
+const BlancReadingFinderPanel = lazy(() =>
+  import('./BlancStudyPanels').then((m) => ({ default: m.BlancReadingFinderPanel })),
+);
+
+// Owned by the Library & Arcade work stream — see BlancLibraryPanels.tsx. All
+// four surfaces are new Blanc-only tool ids registered below.
+const BlancNovelsPanel = lazy(() =>
+  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancNovelsPanel })),
+);
+const BlancGamesPanel = lazy(() =>
+  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancGamesPanel })),
+);
+const BlancImmersionPanel = lazy(() =>
+  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancImmersionPanel })),
+);
+const BlancVisualizerPanel = lazy(() =>
+  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancVisualizerPanel })),
+);
 
 const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
   read: { label: 'Read', icon: 'library' },
@@ -300,6 +352,7 @@ export default function BlancShell({
         </header>
 
         <section className={`blanc-content${book ? ' is-reader' : ''}`}>
+          <Suspense fallback={<div className="blanc-loading">Loading...</div>}>
           {book?.kind === 'manga' ? (
             <MangaReader item={book} onClose={() => setBook(null)} />
           ) : book ? (
@@ -323,6 +376,7 @@ export default function BlancShell({
           ) : (
             <BlancSettingsPanel settings={settings} onPatch={setSettings} />
           )}
+          </Suspense>
         </section>
       </main>
       {workspaceFull && (
@@ -578,13 +632,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
     });
   }, [deck]);
 
-  if (advanced) {
-    return (
-      <div className="blanc-panel blanc-advanced-host">
-        <AnkiView />
-      </div>
-    );
-  }
+  if (advanced) return <BlancAnkiPanel />;
 
   const toggle = (id: string): void => {
     setSelected((prev) => {
@@ -751,54 +799,16 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
   );
 }
 
-function BlancViewHost({
-  children,
-  note,
-}: {
-  children: JSX.Element;
-  note?: string;
-}) {
-  return (
-    <div className="blanc-panel blanc-practical-host">
-      {note && (
-        <fieldset className="blanc-toolbox-note">
-          <legend>Toolbox</legend>
-          <p className="blanc-note">{note}</p>
-        </fieldset>
-      )}
-      <div className="blanc-embedded-view">
-        <Suspense fallback={<div className="blanc-loading">Loading...</div>}>{children}</Suspense>
-      </div>
-    </div>
-  );
-}
 
-function BlancMediaPanel() {
-  return (
-    <BlancViewHost note="Full media mode: audio, video, subtitles, downloads, folder library, lookup, and playback tools in the plain Blanc frame.">
-      <MediaView />
-    </BlancViewHost>
-  );
-}
-
-function BlancFlashcardsPanel() {
-  return (
-    <BlancViewHost note="Flashcards, deck folders, review, imports, EPUB mining, CSV tools, and Anki handoff. AI Studio is hidden in Blanc Mode.">
-      <FlashcardsView hideAiStudio />
-    </BlancViewHost>
-  );
-}
-
-function BlancStatisticsPanel() {
-  return (
-    <BlancViewHost note="Full statistics view, plus the lightweight Blanc timer and clock remain available in Settings and the top strip.">
-      <StatisticsView />
-    </BlancViewHost>
-  );
-}
+/**
+ * Blanc-only tool ids — surfaces Blanc has that the shared toolbox registry
+ * does not model. `coverage` established this pattern; Pillar 2 ports reuse it
+ * rather than adding entries to `TOOLBOX_MODULES`, which Study OS also reads.
+ */
+type BlancOnlyToolId = 'coverage' | 'notebook' | 'translate' | 'music' | 'novels' | 'games' | 'immersion' | 'visualizer';
 
 type BlancToolId =
-  | 'coverage'
+  | BlancOnlyToolId
   | Extract<
   ToolboxModuleId,
   | 'clipboard'
@@ -812,6 +822,7 @@ type BlancToolId =
   | 'hash-checker'
   | 'image-converter'
   | 'batch-converter'
+  | 'workspace-launcher'
   | 'dictionary'
   | 'grammar'
   | 'reading-finder'
@@ -829,6 +840,13 @@ type BlancToolId =
 
 const BLANC_TOOL_IDS: BlancToolId[] = [
   'coverage',
+  'notebook',
+  'translate',
+  'music',
+  'novels',
+  'games',
+  'immersion',
+  'visualizer',
   'clipboard',
   'automation-builder',
   'calculator',
@@ -840,6 +858,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
   'hash-checker',
   'image-converter',
   'batch-converter',
+  'workspace-launcher',
   'dictionary',
   'grammar',
   'reading-finder',
@@ -857,6 +876,13 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
 
 const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   coverage: 'stats',
+  notebook: 'note',
+  translate: 'globe',
+  music: 'music',
+  novels: 'library',
+  games: 'dice',
+  immersion: 'globe',
+  visualizer: 'music',
   clipboard: 'clipboard',
   'automation-builder': 'wrench',
   calculator: 'app',
@@ -868,6 +894,7 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   'hash-checker': 'check',
   'image-converter': 'image',
   'batch-converter': 'image',
+  'workspace-launcher': 'wrench',
   dictionary: 'dictionary',
   grammar: 'grammar',
   'reading-finder': 'search',
@@ -905,6 +932,13 @@ const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['quick', 'productivity', 'syst
 
 const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; description: string; shortcut?: string }> = {
   coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
+  notebook: { category: 'language', description: 'Everything you saved, mined, looked up, and read — one timeline with lineage.' },
+  translate: { category: 'language', description: 'Offline JA/ZH/EN/RU translation with history, re-run, and mine-to-deck.' },
+  music: { category: 'language', description: 'Song library, karaoke lyrics, and click-to-look-up — shares the app-wide player.' },
+  novels: { category: 'language', description: 'Search Jiten and the local catalogue, plan to read, and import or mine EPUBs.' },
+  games: { category: 'language', description: 'The full Game Arena — sentence builder, cloze, match, kana sprint, and more; XP and mistakes sync app-wide.' },
+  immersion: { category: 'language', description: 'The full immersion browser — live guest, Reader Mode, sites rail, and click-to-look-up; feeds reading stats.' },
+  visualizer: { category: 'productivity', description: 'Live music visualizer with style, colour, and sensitivity controls — shared with the desktop wallpaper.' },
   calculator: { category: 'quick', description: 'Offline arithmetic with a compact result display.', shortcut: 'Alt+1' },
   'unit-converter': { category: 'quick', description: 'Static length, weight, temperature, and data conversions.', shortcut: 'Alt+2' },
   'hash-checker': { category: 'quick', description: 'Generate SHA-256 and compare downloaded files.', shortcut: 'Alt+3' },
@@ -917,6 +951,7 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
   'system-monitor': { category: 'system', description: 'CPU, RAM, storage, uptime, and battery at a glance.', shortcut: 'Alt+8' },
   'file-search': { category: 'system', description: 'Capped local filename search with open/copy actions.', shortcut: 'Alt+9' },
   'automation-builder': { category: 'system', description: 'Launch the existing Windows automation builder.' },
+  'workspace-launcher': { category: 'system', description: 'Open a saved group of apps, files, and links in one click.' },
   dictionary: { category: 'language', description: 'Lookup, dictionaries, examples, and study actions.' },
   grammar: { category: 'language', description: 'Deterministic Japanese grammar reference.' },
   'reading-finder': { category: 'language', description: 'Find and import readable Japanese sources.' },
@@ -931,9 +966,21 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
   'youtube-library': { category: 'language', description: 'Compact playlist manager with download and plan-to-watch toggles.' },
 };
 
+/** Labels for the Blanc-only ids, which have no `TOOLBOX_MODULES` entry to read. */
+const BLANC_ONLY_LABELS: Record<BlancOnlyToolId, string> = {
+  coverage: 'Coverage',
+  notebook: 'Notebook',
+  translate: 'Translate',
+  music: 'Music',
+  novels: 'Novels',
+  games: 'Games',
+  immersion: 'Immersion',
+  visualizer: 'Visualizer',
+};
+
 const BLANC_TOOLS: BlancToolEntry[] = BLANC_TOOL_IDS.map((id) => ({
   id,
-  label: id === 'coverage' ? 'Coverage' : getToolboxModule(id)?.label ?? id,
+  label: BLANC_ONLY_LABELS[id as BlancOnlyToolId] ?? getToolboxModule(id)?.label ?? id,
   icon: BLANC_TOOL_ICONS[id],
   category: TOOL_DESCRIPTIONS[id].category,
   description: TOOL_DESCRIPTIONS[id].description,
@@ -975,13 +1022,14 @@ function writeToolList(key: string, value: BlancToolId[]): void {
 
 function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => void): JSX.Element {
   if (tool === 'coverage') return <ToolboxCoveragePanel />;
-  if (tool === 'clipboard') {
-    return (
-      <div className="blanc-clipboard-host">
-        <ClipboardWidget settings={{}} setSettings={() => undefined} size={{ w: 360, h: 240 }} />
-      </div>
-    );
-  }
+  if (tool === 'notebook') return <BlancNotebookPanel />;
+  if (tool === 'translate') return <BlancTranslatePanel />;
+  if (tool === 'music') return <BlancMusicPanel />;
+  if (tool === 'novels') return <BlancNovelsPanel />;
+  if (tool === 'games') return <BlancGamesPanel />;
+  if (tool === 'immersion') return <BlancImmersionPanel />;
+  if (tool === 'visualizer') return <BlancVisualizerPanel />;
+  if (tool === 'clipboard') return <BlancClipboardPanel />;
   if (tool === 'automation-builder') return <AutomationBuilderPanel />;
   if (tool === 'calculator') return <CalculatorPanel />;
   if (tool === 'unit-converter') return <UnitConverterPanel />;
@@ -992,10 +1040,11 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'hash-checker') return <HashCheckerPanel />;
   if (tool === 'image-converter') return <ImageConverterPanel />;
   if (tool === 'batch-converter') return <BatchConverterPanel />;
-  if (tool === 'dictionary') return <DictionaryView />;
-  if (tool === 'grammar') return <GrammarView />;
-  if (tool === 'reading-finder') return <ReadingFinderView onOpenBook={onOpenBook} />;
-  if (tool === 'resources') return <ResourcesView />;
+  if (tool === 'workspace-launcher') return <WorkspaceLauncherPanel />;
+  if (tool === 'dictionary') return <BlancDictionaryPanel />;
+  if (tool === 'grammar') return <BlancGrammarPanel />;
+  if (tool === 'reading-finder') return <BlancReadingFinderPanel onOpenBook={onOpenBook} />;
+  if (tool === 'resources') return <BlancResourcesPanel />;
   if (tool === 'notification-center') return <NotificationCenterPanel />;
   if (tool === 'difficulty-analyzer') return <DifficultyAnalyzerPanel />;
   if (tool === 'immersion-tracker') return <ImmersionTrackerPanel />;
@@ -1004,7 +1053,7 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'context-search') return <ContextSearchPanel />;
   if (tool === 'kanji-inspector') return <KanjiInspectorPanel />;
   if (tool === 'youtube-library') return <BlancYoutubePanel />;
-  return <CalendarView />;
+  return <BlancCalendarPanel />;
 }
 
 function BlancToolsPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => void }) {
@@ -1426,7 +1475,7 @@ function ToolboxCoveragePanel() {
               <tr>
                 <th>Feature</th>
                 <th>Status</th>
-                <th>Category</th>
+                <th>{t('blanc.settings.col.category')}</th>
                 <th>Blanc</th>
                 <th>Normal OS</th>
                 <th>Side</th>
@@ -1619,7 +1668,7 @@ function FocusTimerPanel() {
           <button type="button" onClick={reset} title="Reset timer">Reset</button>
           <button type="button" onClick={recordLap} title="Record current time">Lap</button>
         </div>
-        <p className="blanc-note">Shortcuts: Space start/pause, R reset. Controls remain fully reachable by keyboard focus.</p>
+        <p className="blanc-note">Shortcuts: Ctrl+Shift+Space start/pause, Ctrl+Shift+Backspace reset. Controls remain fully reachable by keyboard focus.</p>
       </section>
 
       <aside className="blanc-focus-side">
@@ -2299,6 +2348,24 @@ function AutomationBuilderPanel() {
   );
 }
 
+/** Toolbox boolean settings. Keys only — labels resolve through t() at render. */
+const TOOLBOX_TOGGLE_KEYS = [
+  'rememberSidebarState',
+  'rememberWindowBounds',
+  'showTooltips',
+  'showToolDescriptions',
+  'showCategoryHeaders',
+  'showFavoritesSection',
+  'showRecentToolsSection',
+  'openToolsInTabs',
+  'showTabIcons',
+  'showHiddenToolsInSearch',
+  'fuzzySearch',
+  'searchCommands',
+  'showCommandShortcutLabels',
+  'showCommandDescriptions',
+] as const;
+
 function BlancSettingsPanel({
   settings,
   onPatch,
@@ -2306,6 +2373,7 @@ function BlancSettingsPanel({
   settings: BlancModeSettings;
   onPatch: (settings: BlancModeSettings) => void;
 }) {
+  const { t } = useT();
   const [pin, setPin] = useState('');
   const [pinMsg, setPinMsg] = useState('');
   const [lockOn, setLockOn] = useState(() => loadLockscreen().enabled);
@@ -2329,7 +2397,7 @@ function BlancSettingsPanel({
 
   const toggleTool = (id: ToolboxModuleId, enabled: boolean): void => {
     if (id === 'calculator' && !enabled) {
-      setSettingsMsg('Calculator stays enabled so the Toolbox cannot become empty.');
+      setSettingsMsg(t('blanc.settings.calculatorLocked'));
       return;
     }
     const next = enabled
@@ -2340,7 +2408,7 @@ function BlancSettingsPanel({
 
   const resetToolboxCategory = (category: ToolboxSettingsCategory): void => {
     setToolboxSettings(resetToolboxSettingsCategory(category));
-    setSettingsMsg(`Reset ${category} settings.`);
+    setSettingsMsg(t('blanc.settings.resetCategoryDone', { category: t(`blanc.settings.category.${category}`) }));
   };
 
   const visibleDefinitions = TOOLBOX_SETTING_DEFINITIONS.filter((definition) => {
@@ -2355,29 +2423,29 @@ function BlancSettingsPanel({
   const savePin = (): void => {
     const next = setLockscreenPin(pin);
     if (!next) {
-      setPinMsg('PIN must be exactly four digits.');
+      setPinMsg(t('blanc.settings.pinFourDigits'));
       return;
     }
     setPin('');
     setPinSet(true);
-    setPinMsg('PIN saved.');
+    setPinMsg(t('blanc.settings.pinSaved'));
   };
 
   const toggleLock = (on: boolean): void => {
     if (on && !hasLockscreenPin()) {
-      setPinMsg('Set a 4 digit PIN first.');
+      setPinMsg(t('blanc.settings.pinFirst'));
       setLockOn(false);
       return;
     }
     const next = saveLockscreen({ enabled: on });
     setLockOn(next.enabled);
-    setPinMsg(next.enabled ? 'Lockscreen enabled.' : 'Lockscreen disabled.');
+    setPinMsg(next.enabled ? t('blanc.settings.lockEnabled') : t('blanc.settings.lockDisabled'));
   };
 
   return (
     <div className="blanc-panel blanc-settings-panel">
       <fieldset>
-        <legend>Interface</legend>
+        <legend>{t('blanc.settings.interface')}</legend>
         <LanguageSelect />
         <label className="blanc-check">
           <input
@@ -2385,7 +2453,7 @@ function BlancSettingsPanel({
             checked={settings.darkMode}
             onChange={(event) => onPatch(setBlancDarkMode(event.target.checked))}
           />
-          <span>Dark mode</span>
+          <span>{t('blanc.settings.darkMode')}</span>
         </label>
         <label className="blanc-check">
           <input
@@ -2393,20 +2461,20 @@ function BlancSettingsPanel({
             checked={settings.advanced}
             onChange={(event) => onPatch(setBlancAdvanced(event.target.checked))}
           />
-          <span>Advanced controls</span>
+          <span>{t('blanc.settings.advanced')}</span>
         </label>
       </fieldset>
 
       <fieldset>
-        <legend>Models</legend>
-        <p className="blanc-note">Download dictionaries, OCR packs, and other local models for Blanc tools.</p>
+        <legend>{t('blanc.settings.models')}</legend>
+        <p className="blanc-note">{t('blanc.settings.modelsDesc')}</p>
         <BlancModelsPanel />
       </fieldset>
 
       <fieldset>
-        <legend>Blanc memory</legend>
+        <legend>{t('blanc.settings.memory')}</legend>
         <p className="blanc-warning">
-          These settings only belong to Blanc Mode. They do not transfer to the main Study OS apps, main Memory & Storage page, desktop layout, widgets, or normal mode preferences.
+          {t('blanc.settings.memoryWarning')}
         </p>
         <label className="blanc-check">
           <input
@@ -2414,7 +2482,7 @@ function BlancSettingsPanel({
             checked={memory.rememberLastTab}
             onChange={(event) => patchMemory({ rememberLastTab: event.target.checked })}
           />
-          <span>Remember last Blanc tab</span>
+          <span>{t('blanc.settings.rememberLastTab')}</span>
         </label>
         <label className="blanc-check">
           <input
@@ -2422,10 +2490,10 @@ function BlancSettingsPanel({
             checked={memory.restoreReaderOnLaunch}
             onChange={(event) => patchMemory({ restoreReaderOnLaunch: event.target.checked })}
           />
-          <span>Keep reader restore preference for Blanc only</span>
+          <span>{t('blanc.settings.restoreReader')}</span>
         </label>
         <label className="blanc-range-row">
-          <span>Review limit</span>
+          <span>{t('blanc.settings.reviewLimit')}</span>
           <input
             type="number"
             min={5}
@@ -2435,32 +2503,32 @@ function BlancSettingsPanel({
           />
         </label>
         <label>
-          Scratchpad
+          {t('blanc.settings.scratchpad')}
           <textarea
             rows={4}
             value={memory.scratchpad}
-            placeholder="Plain notes for this toolbox mode only"
+            placeholder={t('blanc.settings.scratchpadPlaceholder')}
             onChange={(event) => patchMemory({ scratchpad: event.target.value })}
           />
         </label>
         <button type="button" onClick={() => setMemory(resetBlancMemory())}>
-          Reset Blanc memory
+          {t('blanc.settings.resetMemory')}
         </button>
       </fieldset>
 
       <fieldset>
-        <legend>Lockscreen</legend>
+        <legend>{t('blanc.settings.lockscreen')}</legend>
         <div className="blanc-folder-row">
           <input
             type="password"
             inputMode="numeric"
             maxLength={4}
             value={pin}
-            placeholder={pinSet ? 'Change PIN' : '4 digit PIN'}
+            placeholder={pinSet ? t('blanc.settings.changePin') : t('blanc.settings.newPin')}
             onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
           />
           <button type="button" onClick={savePin} disabled={pin.length !== 4}>
-            Save PIN
+            {t('blanc.settings.savePin')}
           </button>
           <button
             type="button"
@@ -2468,36 +2536,36 @@ function BlancSettingsPanel({
               clearLockscreenPin();
               setPinSet(false);
               setLockOn(false);
-              setPinMsg('PIN cleared.');
+              setPinMsg(t('blanc.settings.pinCleared'));
             }}
           >
-            Clear PIN
+            {t('blanc.settings.clearPin')}
           </button>
         </div>
         <label className="blanc-check">
           <input type="checkbox" checked={lockOn} onChange={(event) => toggleLock(event.target.checked)} />
-          <span>Require PIN on launch</span>
+          <span>{t('blanc.settings.requirePin')}</span>
         </label>
         {pinMsg && <p className="blanc-note">{pinMsg}</p>}
       </fieldset>
 
       <fieldset>
-        <legend>Toolbox control center</legend>
+        <legend>{t('blanc.settings.controlCenter')}</legend>
         <div className="blanc-settings-toolbar">
           <input
             value={settingsQuery}
             onChange={(event) => setSettingsQuery(event.target.value)}
-            placeholder="Search Toolbox settings"
-            aria-label="Search Toolbox settings"
+            placeholder={t('blanc.settings.searchSettings')}
+            aria-label={t('blanc.settings.searchSettings')}
           />
           <button
             type="button"
             onClick={async () => {
               await navigator.clipboard.writeText(exportCurrentToolboxSettings());
-              setSettingsMsg('Toolbox settings copied as JSON.');
+              setSettingsMsg(t('blanc.settings.exported'));
             }}
           >
-            Export
+            {t('blanc.settings.export')}
           </button>
           <button
             type="button"
@@ -2506,30 +2574,30 @@ function BlancSettingsPanel({
               if (result.ok) {
                 setToolboxSettings(result.settings);
                 setSettingsImport('');
-                setSettingsMsg('Toolbox settings imported.');
+                setSettingsMsg(t('blanc.settings.imported'));
               } else {
                 setSettingsMsg(result.error);
               }
             }}
             disabled={!settingsImport.trim()}
           >
-            Import
+            {t('blanc.settings.import')}
           </button>
           <button
             type="button"
             onClick={() => {
               setToolboxSettings(resetAllToolboxSettings());
-              setSettingsMsg('All Toolbox settings reset.');
+              setSettingsMsg(t('blanc.settings.resetAllDone'));
             }}
           >
-            Reset all
+            {t('blanc.settings.resetAll')}
           </button>
         </div>
         <textarea
           rows={3}
           value={settingsImport}
           onChange={(event) => setSettingsImport(event.target.value)}
-          placeholder="Paste Toolbox settings JSON here"
+          placeholder={t('blanc.settings.importPlaceholder')}
         />
         {settingsMsg && <p className="blanc-note">{settingsMsg}</p>}
 
@@ -2540,10 +2608,10 @@ function BlancSettingsPanel({
               checked={toolboxSettings.enabled}
               onChange={(event) => patchToolbox({ enabled: event.target.checked })}
             />
-            <span>Enable Toolbox</span>
+            <span>{t('blanc.settings.enableToolbox')}</span>
           </label>
           <label>
-            Default tool
+            {t('blanc.settings.defaultTool')}
             <select
               value={toolboxSettings.defaultTool}
               onChange={(event) => patchToolbox({ defaultTool: event.target.value as ToolboxModuleId })}
@@ -2561,7 +2629,7 @@ function BlancSettingsPanel({
               checked={toolboxSettings.restoreLastTool}
               onChange={(event) => patchToolbox({ restoreLastTool: event.target.checked })}
             />
-            <span>Restore last opened tool</span>
+            <span>{t('blanc.settings.restoreLastTool')}</span>
           </label>
           <label className="blanc-check">
             <input
@@ -2569,33 +2637,33 @@ function BlancSettingsPanel({
               checked={toolboxSettings.restoreTabs}
               onChange={(event) => patchToolbox({ restoreTabs: event.target.checked })}
             />
-            <span>Restore Toolbox tabs</span>
+            <span>{t('blanc.settings.restoreTabs')}</span>
           </label>
           <label>
-            Density
+            {t('blanc.settings.density')}
             <select
               value={toolboxSettings.density}
               onChange={(event) => patchToolbox({ density: event.target.value as ToolboxSettings['density'] })}
             >
-              <option value="compact">Compact</option>
-              <option value="comfortable">Comfortable</option>
-              <option value="spacious">Spacious</option>
+              <option value="compact">{t('blanc.settings.density.compact')}</option>
+              <option value="comfortable">{t('blanc.settings.density.comfortable')}</option>
+              <option value="spacious">{t('blanc.settings.density.spacious')}</option>
             </select>
           </label>
           <label>
-            Launcher style
+            {t('blanc.settings.launcherStyle')}
             <select
               value={toolboxSettings.launcherStyle}
               onChange={(event) => patchToolbox({ launcherStyle: event.target.value as ToolboxSettings['launcherStyle'] })}
             >
-              <option value="list">List</option>
-              <option value="compact-list">Compact list</option>
-              <option value="grid">Grid</option>
-              <option value="categorized-grid">Categorized grid</option>
+              <option value="list">{t('blanc.settings.launcher.list')}</option>
+              <option value="compact-list">{t('blanc.settings.launcher.compactList')}</option>
+              <option value="grid">{t('blanc.settings.launcher.grid')}</option>
+              <option value="categorized-grid">{t('blanc.settings.launcher.categorizedGrid')}</option>
             </select>
           </label>
           <label className="blanc-range-row">
-            <span>Sidebar width</span>
+            <span>{t('blanc.settings.sidebarWidth')}</span>
             <input
               type="number"
               min={160}
@@ -2605,7 +2673,7 @@ function BlancSettingsPanel({
             />
           </label>
           <label className="blanc-range-row">
-            <span>Recent tool limit</span>
+            <span>{t('blanc.settings.recentLimit')}</span>
             <input
               type="number"
               min={0}
@@ -2617,29 +2685,14 @@ function BlancSettingsPanel({
         </div>
 
         <div className="blanc-settings-grid">
-          {[
-            ['rememberSidebarState', 'Remember launcher collapsed state'],
-            ['rememberWindowBounds', 'Remember Toolbox window size'],
-            ['showTooltips', 'Show tooltips'],
-            ['showToolDescriptions', 'Show tool descriptions'],
-            ['showCategoryHeaders', 'Show category headers'],
-            ['showFavoritesSection', 'Show favorites'],
-            ['showRecentToolsSection', 'Show recent tools'],
-            ['openToolsInTabs', 'Open tools in tabs'],
-            ['showTabIcons', 'Show tab icons'],
-            ['showHiddenToolsInSearch', 'Show hidden tools in search'],
-            ['fuzzySearch', 'Fuzzy search matching'],
-            ['searchCommands', 'Search commands'],
-            ['showCommandShortcutLabels', 'Show shortcut labels'],
-            ['showCommandDescriptions', 'Show command descriptions'],
-          ].map(([key, label]) => (
+          {TOOLBOX_TOGGLE_KEYS.map((key) => (
             <label key={key} className="blanc-check">
               <input
                 type="checkbox"
                 checked={Boolean(toolboxSettings[key as keyof ToolboxSettings])}
                 onChange={(event) => patchToolbox({ [key]: event.target.checked } as Partial<ToolboxSettings>)}
               />
-              <span>{label}</span>
+              <span>{t(`blanc.settings.toggle.${key}`)}</span>
             </label>
           ))}
         </div>
@@ -2647,20 +2700,20 @@ function BlancSettingsPanel({
         <div className="blanc-row-actions">
           {(['general', 'layout', 'search', 'keyboard-shortcuts'] as ToolboxSettingsCategory[]).map((category) => (
             <button key={category} type="button" onClick={() => resetToolboxCategory(category)}>
-              Reset {category}
+              {t('blanc.settings.resetCategory', { category: t(`blanc.settings.category.${category}`) })}
             </button>
           ))}
         </div>
 
         <details>
-          <summary>Matching setting definitions ({visibleDefinitions.length})</summary>
+          <summary>{t('blanc.settings.definitions', { count: visibleDefinitions.length })}</summary>
           <div className="blanc-table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Setting</th>
+                  <th>{t('blanc.settings.col.setting')}</th>
                   <th>Category</th>
-                  <th>Description</th>
+                  <th>{t('blanc.settings.col.description')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2678,7 +2731,7 @@ function BlancSettingsPanel({
       </fieldset>
 
       <fieldset>
-        <legend>Tool visibility</legend>
+        <legend>{t('blanc.settings.toolVisibility')}</legend>
         <div className="blanc-tool-management">
           {listBlancToolboxModules().map((module) => (
             <div key={module.id} className="blanc-tool-management-row">
@@ -2692,7 +2745,7 @@ function BlancSettingsPanel({
                   checked={toolboxSettings.enabledTools.includes(module.id)}
                   onChange={(event) => toggleTool(module.id, event.target.checked)}
                 />
-                <span>Enabled</span>
+                <span>{t('blanc.settings.toolEnabled')}</span>
               </label>
               <label className="blanc-check">
                 <input
@@ -2705,7 +2758,7 @@ function BlancSettingsPanel({
                     patchToolbox({ hiddenTools });
                   }}
                 />
-                <span>Hidden</span>
+                <span>{t('blanc.settings.toolHidden')}</span>
               </label>
             </div>
           ))}
@@ -2715,10 +2768,10 @@ function BlancSettingsPanel({
       <ToolboxShortcutSettingsPanel />
 
       <fieldset>
-        <legend>Mode</legend>
-        <p className="blanc-note">Leaving Blanc Mode closes this toolbox window. The full Study OS keeps running.</p>
+        <legend>{t('blanc.settings.mode')}</legend>
+        <p className="blanc-note">{t('blanc.settings.modeNote')}</p>
         <button type="button" onClick={() => void setBlancModeEnabled(false)}>
-          Exit Blanc Mode
+          {t('blanc.settings.exitBlanc')}
         </button>
       </fieldset>
     </div>
@@ -2726,6 +2779,7 @@ function BlancSettingsPanel({
 }
 
 function ToolboxShortcutSettingsPanel() {
+  const { t } = useT();
   const [bindings, setBindings] = useState<BindingRow[]>(() =>
     getBindings().filter((row) => TOOLBOX_SHORTCUT_COMMANDS.some((command) => command.id === row.id)),
   );
@@ -2760,7 +2814,7 @@ function ToolboxShortcutSettingsPanel() {
       if (event.key === 'Backspace' || event.key === 'Delete') {
         setBinding(capturing, '');
         setPendingConflict(null);
-        setShortcutMsg('Shortcut removed.');
+        setShortcutMsg(t('blanc.shortcuts.removed'));
         setCapturing(null);
         return;
       }
@@ -2769,10 +2823,15 @@ function ToolboxShortcutSettingsPanel() {
       const conflicts = setBinding(capturing, chord);
       if (conflicts.length > 0) {
         setPendingConflict({ id: capturing, chord, conflicts });
-        setShortcutMsg(`Assigned ${formatKeysDisplay(chord)}, but it conflicts with ${conflicts.join(', ')}.`);
+        setShortcutMsg(
+          t('blanc.shortcuts.assignedConflict', {
+            keys: formatKeysDisplay(chord),
+            commands: conflicts.join(', '),
+          }),
+        );
       } else {
         setPendingConflict(null);
-        setShortcutMsg(`Assigned ${formatKeysDisplay(chord)}.`);
+        setShortcutMsg(t('blanc.shortcuts.assigned', { keys: formatKeysDisplay(chord) }));
       }
       setCapturing(null);
     };
@@ -2784,7 +2843,7 @@ function ToolboxShortcutSettingsPanel() {
     if (!pendingConflict) return;
     pendingConflict.conflicts.forEach((id) => setBinding(id, ''));
     setBinding(pendingConflict.id, pendingConflict.chord);
-    setShortcutMsg(`Replaced conflicts for ${formatKeysDisplay(pendingConflict.chord)}.`);
+    setShortcutMsg(t('blanc.shortcuts.replaced', { keys: formatKeysDisplay(pendingConflict.chord) }));
     setPendingConflict(null);
     refreshBindings();
   };
@@ -2797,19 +2856,26 @@ function ToolboxShortcutSettingsPanel() {
 
   return (
     <fieldset>
-      <legend>Keyboard shortcuts</legend>
+      <legend>{t('blanc.shortcuts.title')}</legend>
       <p className={validation.ok ? 'blanc-note' : 'blanc-warning'}>
-        Registry: {validation.ok ? 'valid' : 'needs attention'} / {TOOLBOX_SHORTCUT_COMMANDS.length} commands.
+        {t('blanc.shortcuts.registry', {
+          status: validation.ok ? t('blanc.shortcuts.valid') : t('blanc.shortcuts.needsAttention'),
+          count: TOOLBOX_SHORTCUT_COMMANDS.length,
+        })}
       </p>
       {!validation.ok && (
         <ul className="blanc-plain-list">
           {validation.conflicts.map((conflict) => (
             <li key={`${conflict.scope}-${conflict.shortcut}`}>
-              Conflict {conflict.shortcut} in {conflict.scope}: {conflict.commandIds.join(', ')}
+              {t('blanc.shortcuts.conflict', {
+                shortcut: conflict.shortcut,
+                scope: conflict.scope,
+                commands: conflict.commandIds.join(', '),
+              })}
             </li>
           ))}
           {validation.missingReadyFeatureCommands.map((id) => (
-            <li key={id}>Ready feature missing command registration: {id}</li>
+            <li key={id}>{t('blanc.shortcuts.missingReady', { id })}</li>
           ))}
         </ul>
       )}
@@ -2817,11 +2883,11 @@ function ToolboxShortcutSettingsPanel() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search Toolbox commands"
-          aria-label="Search Toolbox commands"
+          placeholder={t('blanc.shortcuts.search')}
+          aria-label={t('blanc.shortcuts.search')}
         />
         <button type="button" onClick={() => bindings.forEach((row) => resetBinding(row.id))}>
-          Restore Toolbox defaults
+          {t('blanc.shortcuts.restoreDefaults')}
         </button>
         <button
           type="button"
@@ -2829,11 +2895,11 @@ function ToolboxShortcutSettingsPanel() {
             await navigator.clipboard.writeText(markdown);
           }}
         >
-          Copy generated docs
+          {t('blanc.shortcuts.copyDocs')}
         </button>
         {pendingConflict && (
           <button type="button" onClick={replacePendingConflicts}>
-            Replace conflicts
+            {t('blanc.shortcuts.replaceConflicts')}
           </button>
         )}
       </div>
@@ -2847,14 +2913,18 @@ function ToolboxShortcutSettingsPanel() {
                 <strong>{row.label}</strong>
                 <span>{row.id} / {meta?.scope ?? 'toolbox'}</span>
                 {row.note && <small>{row.note}</small>}
-                {row.conflictsWith.length > 0 && <small>Conflicts with: {row.conflictsWith.join(', ')}</small>}
+                {row.conflictsWith.length > 0 && (
+                  <small>{t('blanc.shortcuts.conflictsWith', { commands: row.conflictsWith.join(', ') })}</small>
+                )}
               </div>
               <button type="button" onClick={() => setCapturing(row.id)}>
-                {capturing === row.id ? 'Press keys, Esc cancels' : formatKeysDisplay(row.keys) || 'Unbound'}
+                {capturing === row.id
+                  ? t('blanc.shortcuts.press')
+                  : formatKeysDisplay(row.keys) || t('blanc.shortcuts.unbound')}
               </button>
               {!row.isDefault && (
                 <button type="button" onClick={() => resetBinding(row.id)}>
-                  Reset
+                  {t('blanc.shortcuts.reset')}
                 </button>
               )}
             </div>
@@ -2862,7 +2932,7 @@ function ToolboxShortcutSettingsPanel() {
         })}
       </div>
       <details>
-        <summary>Generated shortcut documentation</summary>
+        <summary>{t('blanc.shortcuts.generatedDocs')}</summary>
         <textarea rows={10} readOnly value={markdown} />
       </details>
     </fieldset>

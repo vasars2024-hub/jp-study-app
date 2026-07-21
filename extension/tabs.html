@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GrammarX — Reading list</title>
+    <style>
+      :root {
+        --bg: #14161c;
+        --panel: #1b1e26;
+        --panel2: #21252f;
+        --border: rgba(255, 255, 255, 0.08);
+        --text: #e8eaef;
+        --muted: #98a0af;
+        --accent: #9c2b3d;
+        --ok: #4cc584;
+        --err: #e05555;
+        --hl: rgba(156, 43, 61, 0.22);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-width: 380px;
+        max-width: 520px;
+        font: 13px/1.45 'Segoe UI', system-ui, sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 14px 14px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      header strong { font-size: 14px; letter-spacing: 0.02em; }
+      .chip {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .toolbar label.check {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .spacer { flex: 1; }
+      #tab-list {
+        max-height: min(420px, 60vh);
+        overflow: auto;
+        padding: 6px 8px 10px;
+      }
+      .tab-row {
+        display: grid;
+        grid-template-columns: 18px 18px 1fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 10px;
+        margin: 4px 0;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        border-left: 3px solid rgba(152, 160, 175, 0.35);
+        background: var(--panel);
+        cursor: pointer;
+      }
+      .tab-row.cat-news { border-left-color: #5b9fd4; }
+      .tab-row.cat-novel { border-left-color: #9b7bd4; }
+      .tab-row.cat-manga { border-left-color: #d48a5b; }
+      .tab-row.cat-youtube { border-left-color: #c45a6a; }
+      .tab-row.cat-article { border-left-color: #5bb8a0; }
+      .tab-row:hover { border-color: rgba(156, 43, 61, 0.4); }
+      .tab-row.selected {
+        background: var(--hl);
+        border-color: rgba(156, 43, 61, 0.55);
+      }
+      .tab-row input { margin: 0; accent-color: var(--accent); }
+      .tab-row .fav {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        object-fit: contain;
+        background: rgba(0, 0, 0, 0.25);
+      }
+      .tab-row .fav.placeholder {
+        display: block;
+        background: var(--panel2);
+        border: 1px solid var(--border);
+      }
+      .tab-meta { min-width: 0; }
+      .tab-meta .title {
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tab-meta .url {
+        font-size: 10px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .cat-badge {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        white-space: nowrap;
+        background: var(--panel2);
+      }
+      .cat-badge.cat-news { color: #9ec4e8; border-color: rgba(91, 159, 212, 0.45); }
+      .cat-badge.cat-novel { color: #cbb6f0; border-color: rgba(155, 123, 212, 0.45); }
+      .cat-badge.cat-manga { color: #e8c09a; border-color: rgba(212, 138, 91, 0.45); }
+      .cat-badge.cat-youtube { color: #e8a0a8; border-color: rgba(196, 90, 106, 0.5); }
+      .cat-badge.cat-article { color: #9ed9c8; border-color: rgba(91, 184, 160, 0.4); }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 12px;
+        border-top: 1px solid var(--border);
+      }
+      button {
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 7px 12px;
+        cursor: pointer;
+        font: inherit;
+        color: var(--text);
+        background: var(--panel2);
+      }
+      button:hover { border-color: rgba(156, 43, 61, 0.55); }
+      button.primary {
+        background: rgba(156, 43, 61, 0.2);
+        border-color: rgba(156, 43, 61, 0.5);
+        font-weight: 600;
+      }
+      button.primary:hover { background: rgba(156, 43, 61, 0.32); }
+      button:disabled { opacity: 0.45; cursor: default; }
+      #status {
+        min-height: 1.2em;
+        margin: 0 12px 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      #status.ok { color: var(--ok); }
+      #status.err { color: var(--err); }
+      .empty {
+        padding: 24px 12px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .hint {
+        margin: 8px 12px 10px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Reading list</strong>
+      <span id="count" class="chip">0 selected</span>
+    </header>
+
+    <div class="toolbar">
+      <label class="check"><input id="all-windows" type="checkbox" /> All windows</label>
+      <span class="spacer"></span>
+      <button id="select-all" type="button">Select all</button>
+      <button id="select-none" type="button">None</button>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+
+    <div id="tab-list">
+      <div class="empty">Loading tabs…</div>
+    </div>
+
+    <div class="actions">
+      <button id="capture" class="primary" type="button" disabled>Save pages to GrammarX</button>
+      <button id="download" type="button" disabled>Download videos</button>
+    </div>
+    <p class="hint">
+      Select tabs and save them in one go — articles go to your GrammarX inbox, videos and playlists
+      to YouTube tracking. The colored edge shows the detected source type (News, Novel, Manga,
+      Video, Article). Download only applies to YouTube tabs.
+    </p>
+    <div id="status"></div>
+    <script src="tabs.js"></script>
+  </body>
+</html>

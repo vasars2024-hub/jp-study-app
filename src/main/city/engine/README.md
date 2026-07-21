@@ -1,28 +1,16 @@
-# Noctis engine
+# Noctis Engine
 
-Deterministic simulation boundary for the civilization module.
+This folder is the pure deterministic simulation boundary. It has no Electron, React, DOM, filesystem, clock, timer, IPC, or random dependency.
 
-## Modules
+Public entry points from `index.ts`:
 
-| File | Responsibility |
-|------|----------------|
-| `index.ts` | Public exports and the master `evaluate(S, I, dt)` pass |
-| `types.ts` | Public type surface |
-| `state.ts` | Civilization state shape and initial-state factory |
-| `constants.ts` | Canon-cited calibration coefficients |
-| `constraints.ts` | Trope guard, state invariants, legacy protection |
-| `select.ts` | Seeded deterministic variation (no randomness) |
-| `interpretation.ts` | Telemetry membrane: raw study to interpreted input `I` |
-| `time.ts` | Elapsed-time evaluation D: cushion, decay, dormancy, wake |
-| `metabolism.ts` | Learning evaluation T: transmutation, growth, succession, memory |
-| `era.ts` | Era gate: six-domain readiness, geometric mean with floors |
-| `events.ts` | Transition observation E: the four closed world-event flags |
-| `tests/` | Vitest purity proofs (`environment: 'node'`) |
+- `createInitialState(seed)`
+- `evaluateCivilization(state, interpretedInput, elapsedMinutes?)`
+- `advanceCivilizationTime(state, elapsedMinutes)`
+- `interpretTelemetry(rawCountsOnlyWindow)`
+- `projectCityPresentation(state, flags?)`
+- `validateState(state)`
 
-## Boundary laws
+The engine returns fresh snapshots and the closed four-event flag set. Cross-domain proposals read the same committed prior state; Era resolves from six explicit secured contributions; Memory records committed crossings after the gate.
 
-- Deterministic pure TypeScript
-- No Electron, React, filesystem, timers, or randomness
-- Immutable snapshot transitions only
-
-Canon: `docs/NOCTIS_ECOLOGICAL_ENGINE.md`, `docs/ARCHITECTURE.md`.
+Tests live in `tests/` and run in the Node Vitest environment.

@@ -5,7 +5,7 @@
  * opening marks all read.
  */
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { Notification, Toggle } from '../ui';
+import { Notification, Toggle, useWiredMaterials } from '../ui';
 import {
   clearAll,
   dismiss,
@@ -16,6 +16,7 @@ import {
   setDnd,
   type NotificationKind,
 } from '../../notificationStore';
+import { openExtensionSettings } from '../../extensionBridgeUi';
 import { useT } from '../../i18n';
 
 const TOGGLE_EVENT = 'shell:toggleNotifications';
@@ -36,9 +37,27 @@ function timeAgo(ts: number): string {
 
 export default function NotificationCenter() {
   const { t } = useT();
+  const wired = useWiredMaterials();
   const [open, setOpen] = useState(false);
   const [, force] = useReducer((n: number) => n + 1, 0);
   const panelRef = useRef<HTMLElement>(null);
+  // Wired teletype dismiss (§4): scan-collapse the entry, then archive it.
+  const [closingIds, setClosingIds] = useState<ReadonlySet<number>>(new Set());
+  const dismissEntry = (id: number) => {
+    if (!wired || closingIds.has(id)) {
+      dismiss(id);
+      return;
+    }
+    setClosingIds((prev) => new Set(prev).add(id));
+    window.setTimeout(() => {
+      dismiss(id);
+      setClosingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 200);
+  };
 
   useEffect(() => onNotificationsChanged(force), []);
 
@@ -88,13 +107,49 @@ export default function NotificationCenter() {
         </header>
         <div className="os-flyout-body">
           {items.length === 0 ? (
-            <div className="os-notif-empty type-body">{t('notifications.empty')}</div>
+            <div className="os-notif-empty type-body">{wired ? 'BULLETIN CHANNEL EMPTY / NO DISPATCHES' : t('notifications.empty')}</div>
           ) : (
             items.map((n) => (
-              <Notification key={n.id} title={n.title} kind={uiKind(n.kind)} onClose={() => dismiss(n.id)}>
-                {n.message}
-                <div className="os-notif-time type-status">{timeAgo(n.ts)}</div>
+              <div key={n.id} className={closingIds.has(n.id) ? 'wired-notif-closing' : undefined}>
+              <Notification title={n.title} kind={uiKind(n.kind)} onClose={() => dismissEntry(n.id)}>
+                {wired && (
+                  <div className="wired-notif-meta">
+                    <span>{`TX-${String(n.id % 10000).padStart(4, '0')}`}</span>
+                    <span>{n.source ?? 'NODE'}</span>
+                    <span>{n.priority?.toUpperCase() ?? 'NORMAL'}</span>
+                    <span>
+                      {n.kind === 'error'
+                        ? 'RED'
+                        : n.kind === 'warning'
+                          ? 'AMBER'
+                          : 'BLUE'}
+                    </span>
+                  </div>
+                )}
+                <span>{n.message}</span>
+                <div className="os-notif-time type-status">{wired ? new Date(n.ts).toLocaleTimeString() : timeAgo(n.ts)}</div>
+                {n.actionUrl || n.clientAction === 'extension-settings' ? (
+                  <div className="os-notif-actions" style={{ marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="ui-btn ui-btn--sm ui-focusable"
+                      onClick={() => {
+                        if (n.clientAction === 'extension-settings') {
+                          openExtensionSettings();
+                          setOpen(false);
+                          return;
+                        }
+                        if (n.actionUrl) void window.api.openExternal(n.actionUrl);
+                      }}
+                    >
+                      {n.clientAction === 'extension-settings'
+                        ? t('notifications.openExtensionSettings')
+                        : t('notifications.openLink')}
+                    </button>
+                  </div>
+                ) : null}
               </Notification>
+              </div>
             ))
           )}
         </div>

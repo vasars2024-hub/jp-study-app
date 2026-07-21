@@ -3,6 +3,7 @@ doc_id: noctis.culture_system
 tier: 7
 authority: domain_specification
 role: culture_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -384,13 +385,13 @@ The ownership boundary matches `TECHNOLOGY_SYSTEM.md` Section 15 exactly: Cultur
 
 ## SECTION 25 — ECONOMY INTERFACE
 
-Economy is a reserved domain (`ECONOMY_SYSTEM.md`, placeholder); this document defines only the boundary, inventing none of its internals, and honoring the canon caution that Noctis has no market, currency, or user-facing spending (`SIMULATION_SYSTEMS.md` Section 20). Economy may influence culture through work structure, inequality, ownership, scarcity, consumption, trade, leisure, migration, patronage, commercialization, and access to education and institutions. Culture may influence economy through trust, prestige consumption, work ethics, gift and inheritance customs, notions of acceptable exchange, professional identity, craft preservation, and attitudes toward automation. Culture does **not** own prices, inventories, production allocation, ownership resolution, distribution, or any exchange mechanic; it emits and reads cultural signals and pressures only.
+Economy is a completed peer domain (`ECONOMY_SYSTEM.md`); this document defines only the boundary, inventing none of its internals, and honors the canon caution that Noctis has no market, currency, or user-facing spending (`SIMULATION_SYSTEMS.md` Section 20). Economy may influence culture through work structure, inequality, ownership, scarcity, consumption, trade, leisure, migration, patronage, commercialization, and access to education and institutions. Culture may influence economy through trust, prestige consumption, work ethics, gift and inheritance customs, notions of acceptable exchange, professional identity, craft preservation, and attitudes toward automation. Culture does **not** own prices, inventories, production allocation, ownership resolution, distribution, or any exchange mechanic; it emits and reads cultural signals and pressures only.
 
 ---
 
 ## SECTION 26 — MEMORY INTERFACE
 
-The Culture/Memory boundary is the most delicate in this document, and it is drawn on the legacy/active split (`SIMULATION_SYSTEMS.md` Sections 10, 21; `MEMORY_SYSTEM.md`, placeholder). **Memory owns the record** — historical persistence, recollection, archives, distortion, forgetting, access, monuments, remembered figures, and factual traces. **Culture owns the active meaning** — interpretation, ritual, practice, values, symbols, identity, participation, and current narrative.
+The Culture/Memory boundary is the most delicate in this document, and it is drawn on the legacy/active split (`SIMULATION_SYSTEMS.md` Sections 10, 21; `MEMORY_SYSTEM.md`). **Memory owns the record** — historical persistence, recollection, archives, distortion, forgetting, access, monuments, remembered figures, and factual traces. **Culture owns the active meaning** — interpretation, ritual, practice, values, symbols, identity, participation, and current narrative.
 
 The division is cleanest in examples: Memory records *that* a disaster occurred and preserves the names of the dead; Culture decides whether it was sacrifice, arrogance, tragedy, injustice, or warning, and how the dead are honored. Memory preserves a ritual's description; Culture decides whether it is revived and what it now means. Because meaning is active and record is legacy, the two can diverge — a culture can honor a figure the record shows to be villainous, or forget a figure the record faithfully keeps. Culture never stores the historical record and never overwrites it; it reads Memory and interprets, and its own heritage layer (Section 4) is held *with* Memory State, not duplicated from it.
 
@@ -398,7 +399,7 @@ The division is cleanest in examples: Memory records *that* a disaster occurred 
 
 ## SECTION 27 — LEARNING INTEGRATION CONTRACT
 
-The user's real learning influences cultural *possibility*, never as currency (`SIMULATION_SYSTEMS.md` Section 22; `LEARNING_INTEGRATION.md`, placeholder). Culture receives already-interpreted signals — disciplinary diversity, conceptual depth, exposure to differing perspectives, linguistic development, historical awareness, artistic exposure, philosophical engagement, scientific understanding, retained knowledge, interdisciplinary connection, sustained attention, curiosity, revision strength — and never raw Study OS telemetry.
+The user's real learning influences cultural *possibility*, never as currency (`SIMULATION_SYSTEMS.md` Section 22; `LEARNING_INTEGRATION.md`). Culture receives already-interpreted signals — disciplinary diversity, conceptual depth, exposure to differing perspectives, linguistic development, historical awareness, artistic exposure, philosophical engagement, scientific understanding, retained knowledge, interdisciplinary connection, sustained attention, curiosity, revision strength — and never raw Study OS telemetry.
 
 Culture may use these to *expand what is possible to mean*: conceptual vocabulary, institutional possibility, artistic range, public discourse, historical interpretation, symbolic association, educational tradition, and tolerance for complexity. The hard boundaries: **no single subject unlocks a cultural outcome** (language study does not unlock festivals; history study does not mint tradition points; art study does not make citizens artistic; philosophy study does not select a worldview), and **the same learning signal need not produce the same culture** in two different civilizations, because the signal only widens the field of possibility within which the civilization's own history decides. Study is never spent, and no cultural development is ever purchased with it (`GAME_DESIGN.md` Section 11, Principle 2).
 
@@ -431,6 +432,8 @@ The identity rule binds forever, matching `TECHNOLOGY_SYSTEM.md` Section 21 and 
 ## SECTION 31 — CULTURE ACROSS THE FIVE ERAS
 
 The five canonical eras (`SIMULATION_SYSTEMS.md` Section 15) are capability envelopes and, above all, changing *relationships between the civilization and knowledge* — never fixed cultural unlock lists. Culture is inflected by era; it is not dispensed by it. Gating is deferred to `ERA_PROGRESSION.md`; later eras are never culturally superior or conflict-free.
+
+Culture exposes `x_culture ∈ [0, 1]`, a secured **maturity-of-relationship-to-knowledge** projection for Era Progression. It is derived from transmission fidelity, legitimate institutional continuity, interpretive breadth, and the civilization's demonstrated capacity to hold and work through cultural tension. It is not a culture stock, happiness reading, or measure of cultural superiority. Active practices may fragment, disappear, or revive while the secured maturity of having developed durable means of interpretation and transmission remains. Culture owns this derived projection; Era Progression owns its weight, floor, and combination (`SIMULATION_SYSTEMS.md` Sections 15 and 17).
 
 - **`SPORE_HEARTH`** — culture may be oral-in-signal, embodied, local, kin-centered, ecological, bound to survival, routes, organisms, darkness, and communal light. Early culture is intelligent and meaningful, never primitive.
 - **`CRYSTAL_INSCRIPTION`** — culture may be shaped by settlements, archives, guilds, scholarship, hierarchy, regional identity, inscribed tradition, ceremonial authority, and specialized craft.

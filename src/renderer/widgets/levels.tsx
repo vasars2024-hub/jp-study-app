@@ -8,11 +8,13 @@ import {
   type LevelKind,
   type LevelList,
 } from '../levelLists';
+import { useT } from '../i18n';
 
 // JLPT / HSK / custom vocabulary progress. Lists are user-provided (paste an
 // Anki deck's words); progress = Familiar-or-better coverage from the knowledge
 // store, which the Anki sync keeps up to date.
 export function LevelProgressWidget() {
+  const { t } = useT();
   const [lists, setLists] = useState<LevelList[]>(() => loadLevelLists());
   const [tick, setTick] = useState(0);
   const [adding, setAdding] = useState(false);
@@ -42,10 +44,7 @@ export function LevelProgressWidget() {
   return (
     <div className="wgt wgt-levels" data-tick={tick}>
       {lists.length === 0 && !adding && (
-        <div className="wgt-empty">
-          Add a level list — paste the words from an Anki deck (e.g. an N1 or HSK 3 deck) and your
-          progress fills in as those words become Familiar.
-        </div>
+        <div className="wgt-empty">{t('widgets.levels.emptyHint')}</div>
       )}
 
       <ul className="wgt-level-rows">
@@ -56,7 +55,7 @@ export function LevelProgressWidget() {
               <div className="wgt-level-top">
                 <span className="wgt-level-label">{l.label}</span>
                 <span className="wgt-level-count">{p.learned}/{p.total}</span>
-                <button className="wgt-btn-icon sm" title="Remove list" onClick={() => setLists(removeLevelList(l.id))}>×</button>
+                <button className="wgt-btn-icon sm" title={t('widgets.levels.removeList')} onClick={() => setLists(removeLevelList(l.id))}>×</button>
               </div>
               <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${p.pct}%` }} /></div>
             </li>
@@ -69,29 +68,29 @@ export function LevelProgressWidget() {
           <div className="wgt-row">
             <input
               className="wgt-level-name"
-              placeholder="Label (e.g. N1)"
+              placeholder={t('widgets.levels.labelPlaceholder')}
               value={label}
               onChange={(e) => setLabel(e.target.value)}
             />
             <select value={kind} onChange={(e) => setKind(e.target.value as LevelKind)}>
-              <option value="jlpt">JLPT</option>
-              <option value="hsk">HSK</option>
-              <option value="custom">Custom</option>
+              <option value="jlpt">{t('widgets.levels.kind.jlpt')}</option>
+              <option value="hsk">{t('widgets.levels.kind.hsk')}</option>
+              <option value="custom">{t('widgets.levels.kind.custom')}</option>
             </select>
           </div>
           <textarea
             className="wgt-level-paste"
-            placeholder="Paste words here — one per line (tab/comma columns are fine)…"
+            placeholder={t('widgets.levels.pastePlaceholder')}
             value={paste}
             onChange={(e) => setPaste(e.target.value)}
           />
           <div className="wgt-row">
-            <button className="wgt-btn primary" onClick={save}>Save list</button>
-            <button className="wgt-btn" onClick={() => setAdding(false)}>Cancel</button>
+            <button className="wgt-btn primary" onClick={save}>{t('widgets.levels.saveList')}</button>
+            <button className="wgt-btn" onClick={() => setAdding(false)}>{t('common.cancel')}</button>
           </div>
         </div>
       ) : (
-        <button className="wgt-btn wgt-level-add" onClick={() => setAdding(true)}>+ Add level list</button>
+        <button className="wgt-btn wgt-level-add" onClick={() => setAdding(true)}>{t('widgets.levels.addList')}</button>
       )}
     </div>
   );

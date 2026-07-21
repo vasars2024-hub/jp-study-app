@@ -7,6 +7,7 @@ import {
   rowsToDeckEntries,
 } from '../../shared/deckImport';
 import { importDeckFromEntries } from '../flashcardDeck';
+import { useT } from '../i18n';
 import { getActiveProfile } from '../profileState';
 
 type Props = {
@@ -14,8 +15,10 @@ type Props = {
 };
 
 export default function DeckImportPanel({ onImported }: Props) {
+  const { t } = useT();
   const [title, setTitle] = useState('imported-deck');
   const [status, setStatus] = useState('');
+  const [statusOk, setStatusOk] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function importRaw(text: string, fileName?: string): void {
@@ -24,7 +27,8 @@ export default function DeckImportPanel({ onImported }: Props) {
 
     const trimmed = text.trim();
     if (!trimmed) {
-      setStatus('Nothing to import.');
+      setStatusOk(false);
+      setStatus(t('flash.import.nothing'));
       return;
     }
 
@@ -43,26 +47,39 @@ export default function DeckImportPanel({ onImported }: Props) {
     }
 
     if (count) {
-      setStatus(`Imported ${count} cards as “${deckTitle}” (${deckBookId(deckTitle)}).`);
+      setStatusOk(true);
+      setStatus(
+        t('flash.import.success', {
+          count,
+          title: deckTitle,
+          id: deckBookId(deckTitle),
+        }),
+      );
       onImported?.();
     } else {
-      setStatus('No valid rows found. Use CSV/TSV or one word per line.');
+      setStatusOk(false);
+      setStatus(t('flash.import.noRows'));
     }
   }
 
   return (
     <section className="anki-card deck-import-panel">
       <div className="flash-strip-head">
-        <h2 className="flash-section-title">Import deck</h2>
-        <span className="muted">CSV, TSV, TXT — paste or open a file</span>
+        <h2 className="flash-section-title">{t('flash.import.title')}</h2>
+        <span className="muted">{t('flash.import.hint')}</span>
       </div>
       <div className="deck-import-grid">
         <label>
-          Deck name
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="my-deck" />
+          {t('flash.import.deckName')}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={t('flash.import.deckNamePlaceholder')}
+          />
         </label>
         <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
-          Open file
+          {t('flash.import.openFile')}
         </button>
         <input
           ref={fileRef}
@@ -72,14 +89,14 @@ export default function DeckImportPanel({ onImported }: Props) {
           onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
-            void f.text().then((t) => importRaw(t, f.name));
+            void f.text().then((raw) => importRaw(raw, f.name));
             e.target.value = '';
           }}
         />
       </div>
       <textarea
         className="deck-import-paste"
-        placeholder="Paste vocabulary list, CSV, or TSV here…"
+        placeholder={t('flash.import.pastePlaceholder')}
         rows={5}
         spellCheck={false}
         lang={getActiveProfile().targetLang}
@@ -90,8 +107,8 @@ export default function DeckImportPanel({ onImported }: Props) {
           importRaw(text);
         }}
       />
-      <p className="muted deck-import-hint">Paste auto-imports. Re-importing the same deck name replaces that deck.</p>
-      {status && <p className={`deck-import-status${status.startsWith('Imported') ? ' ok' : ''}`}>{status}</p>}
+      <p className="muted deck-import-hint">{t('flash.import.autoHint')}</p>
+      {status && <p className={`deck-import-status${statusOk ? ' ok' : ''}`}>{status}</p>}
     </section>
   );
 }

@@ -1,0 +1,14 @@
+﻿{
+    "initialHours":  6,
+    "initialMinutes":  0,
+    "initialSeconds":  0,
+    "betweenSeconds":  0,
+    "betweenMilliseconds":  500,
+    "moveDurationMs":  300,
+    "steps":  [
+                  {
+                      "type":  "enter"
+                  }
+              ],
+    "name":  "press-enter-later"
+}

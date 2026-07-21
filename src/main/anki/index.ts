@@ -25,11 +25,13 @@ import {
   type MiningValues,
 } from '../../shared/anki';
 import type { CardContent, ProfileId, StudyProfile } from '../../shared/profiles';
+import { buildRouteContext, resolveProfileMatch } from '../../shared/profileRules';
 import type { AnkiAddRequest, AnkiAddResult, AnkiStatus } from '../../shared/types';
 import { fetchJapaneseAudio } from '../dictionary';
 import { getFrequency, getPitch } from '../dictionary/yomitan';
 import { resolveCustomFrequencyRanks } from '../mining';
 import { getProfileStore } from '../profiles';
+import { loadProfileRules } from '../profileRules';
 import { invoke, isCollectionUnavailable, setAnkiUrlProvider, toUiError } from './client';
 import { escapeForAnki } from './fieldMapper';
 import {
@@ -170,6 +172,16 @@ async function gatherMiningValues(
     values.audio = await fetchJapaneseAudio(term, reading || term, async (filename, data) => {
       await invoke('storeMediaFile', { filename, data });
     });
+  } else if (typeof req.audioBase64 === 'string' && req.audioBase64.trim()) {
+    const filename =
+      (typeof req.audioFilename === 'string' && req.audioFilename.trim()) ||
+      `jp-study-audio-${Date.now()}.webm`;
+    try {
+      await invoke('storeMediaFile', { filename, data: req.audioBase64.trim() });
+      values.audio = `[sound:${filename}]`;
+    } catch {
+      values.audio = '';
+    }
   }
 
   for (const [name, rank] of Object.entries(mergedFrequencies)) {
@@ -233,15 +245,49 @@ async function validateSortField(
 
 // ----- Mining gateway (5.6) ------------------------------------------------------
 
-async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
+export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
   const store = getProfileStore();
-  const profile = req?.profileId ? store.getProfile(req.profileId) : store.getActiveProfile();
+  const active = store.getActiveProfile();
+
+  // Profile resolution order:
+  //   1. explicit req.profileId  -> hard override, rules skipped
+  //   2. req.route (+ no id)      -> Mining Rules pick the profile (else active)
+  //   3. neither                  -> active profile (e.g. manual "Add card")
+  let profile: StudyProfile | undefined;
+  let matchedRuleLabel: string | undefined;
+  let usedDefault: boolean | undefined;
+  if (req?.profileId) {
+    profile = store.getProfile(req.profileId);
+  } else if (req?.route) {
+    const ctx = buildRouteContext(req.route, {
+      text: `${req?.term ?? ''} ${req?.sentence ?? ''}`.trim(),
+      fallbackLanguage: active?.targetLang,
+    });
+    const resolved = resolveProfileMatch(loadProfileRules().rules, ctx, active?.id || '');
+    matchedRuleLabel = resolved.matchedRule?.label;
+    usedDefault = resolved.usedDefault;
+    profile = (resolved.profileId && store.getProfile(resolved.profileId)) || active;
+  } else {
+    profile = active;
+  }
   if (!profile) return { ok: false, error: `Unknown profile: ${String(req?.profileId)}` };
+  // Stamped onto success results so callers can show where the card actually went.
+  const meta = {
+    profileId: profile.id,
+    profileName: profile.label || profile.id,
+    matchedRuleLabel,
+    usedDefault,
+  };
 
     const term = typeof req?.term === 'string' ? req.term.trim() : '';
     if (!term) return { ok: false, error: 'term is required' };
+    // When a mining rule actively matched, the rule's profile owns the whole
+    // destination (its own deck too) — a generic caller deckName must not send a
+    // routed card into the wrong deck. A deckName override still applies when no
+    // rule matched (unchanged behavior for non-routed / default flows).
+    const routedToRule = Boolean(req?.route) && !req?.profileId && usedDefault === false;
     const targetDeck =
-      typeof req?.deckName === 'string' && req.deckName.trim()
+      !routedToRule && typeof req?.deckName === 'string' && req.deckName.trim()
         ? req.deckName.trim()
         : profile.anki.deckName;
 
@@ -283,7 +329,7 @@ async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
             options: { allowDuplicate: false },
           },
         });
-        return { ok: true, noteId };
+        return { ok: true, noteId, ...meta };
       }
 
       const content: Partial<Record<CardContent, string>> = { term };
@@ -348,6 +394,33 @@ async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
         }
       }
 
+      // Attach caller-supplied recording (extension audio mine) to audio roles.
+      if (typeof req.audioBase64 === 'string' && req.audioBase64.trim()) {
+        const filename =
+          (typeof req.audioFilename === 'string' && req.audioFilename.trim()) ||
+          `jp-study-audio-${Date.now()}.webm`;
+        try {
+          await invoke('storeMediaFile', { filename, data: req.audioBase64.trim() });
+          const sound = `[sound:${filename}]`;
+          const audioField =
+            model.fieldMap.sentenceAudio || model.fieldMap.termAudio || model.fieldMap.notes;
+          if (audioField) {
+            fields[audioField] = fields[audioField] ? `${fields[audioField]} ${sound}` : sound;
+          } else {
+            // Fall back: append to the last back-facing field or the second model field.
+            const names = (await invoke('modelFieldNames', { modelName: profile.anki.modelName })) ?? [];
+            const fallback =
+              names.find((n) => /audio|sound|音声/i.test(n)) ||
+              (names.length > 1 ? names[names.length - 1] : names[0]);
+            if (fallback) {
+              fields[fallback] = fields[fallback] ? `${fields[fallback]}<br>${sound}` : sound;
+            }
+          }
+        } catch {
+          /* Anki media upload failed — note still saves without audio */
+        }
+      }
+
       if (!Object.keys(fields).length) {
         return { ok: false, error: model.error ?? `Model "${model.modelName}" has no usable fields.` };
       }
@@ -375,7 +448,7 @@ async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
         options: { allowDuplicate: false },
       },
     });
-    return { ok: true, noteId };
+    return { ok: true, noteId, ...meta };
   } catch (err) {
     // duplicate -> 'duplicate' (A-3), transport -> ANKI_UNREACHABLE_MSG (A-2),
     // api -> verbatim message.

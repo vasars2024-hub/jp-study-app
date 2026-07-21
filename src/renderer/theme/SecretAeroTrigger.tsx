@@ -11,15 +11,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useT } from '../i18n';
 import { DEFAULT_THEME_ID, loadThemeId, setTheme } from './engine';
 import { AERO_THEME_ID } from './frutiger-aero';
 import { requestSecretLifecycleShutdown } from '../secretLifecycle';
 import { soundEngine } from '../audio/soundEngine';
 import { markAeroDiscovered } from '../aeroDiscovery';
-import { applyAeroEnvironment, restoreStudyEnvironmentAfterAero } from '../aeroEnvironment';
+import {
+  applyAeroEnvironment,
+  loadAeroRestoreTheme,
+  rememberAeroRestoreTheme,
+} from '../aeroEnvironment';
 import { armLockscreenOnSecretEntry, AERO_ENTRY_LOCKED_EVENT } from '../lockscreenSettings';
-
-let aeroRestoreThemeId = DEFAULT_THEME_ID;
 
 const SEQUENCE = 'aero';
 const AERO_SHUTDOWN_THEME_DELAY = 820;
@@ -32,17 +35,20 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 export function exitSecretAero(): void {
-  const back = aeroRestoreThemeId !== AERO_THEME_ID ? aeroRestoreThemeId : DEFAULT_THEME_ID;
+  // Living env restore is handled by installAeroEnvironmentBridge() when the
+  // theme leaves Aero — do not call restoreStudyEnvironmentAfterAero here or
+  // the Study backup would be overwritten by a second snapshot.
+  const back = loadAeroRestoreTheme(DEFAULT_THEME_ID);
   requestSecretLifecycleShutdown();
   window.setTimeout(() => {
     setTheme(back);
     soundEngine.stopAll();
-    restoreStudyEnvironmentAfterAero();
     window.dispatchEvent(new CustomEvent(STUDY_OS_REBOOT_EVENT));
   }, AERO_SHUTDOWN_THEME_DELAY);
 }
 
 export default function SecretAeroTrigger() {
+  const { t, lang } = useT();
   const bufRef = useRef<string>('');
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -51,10 +57,10 @@ export default function SecretAeroTrigger() {
     if (current === AERO_THEME_ID) {
       exitSecretAero();
       window.setTimeout(() => {
-        setFlash('Frutiger Aero - off');
+        setFlash(t('aero.trigger.off'));
       }, AERO_SHUTDOWN_THEME_DELAY + 40);
     } else {
-      aeroRestoreThemeId = current !== AERO_THEME_ID ? current : DEFAULT_THEME_ID;
+      rememberAeroRestoreTheme(current !== AERO_THEME_ID ? current : DEFAULT_THEME_ID);
       const firstDiscovery = markAeroDiscovered();
       applyAeroEnvironment(firstDiscovery);
       const needsLock = armLockscreenOnSecretEntry();
@@ -65,9 +71,9 @@ export default function SecretAeroTrigger() {
         window.dispatchEvent(new CustomEvent('shell:softReboot'));
         window.setTimeout(() => setTheme(AERO_THEME_ID), 240);
       }
-      setFlash('Frutiger Aero');
+      setFlash(t('aero.trigger.on'));
     }
-  }, []);
+  }, [t, lang]);
 
   // Typed "aero" Easter egg (ignored while typing in a field).
   useEffect(() => {

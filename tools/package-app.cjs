@@ -29,6 +29,7 @@ function run(label, cmd, args) {
   }
 }
 
+run('Syncing chrome-extension mirror', 'node', [path.join(__dirname, 'sync-extension-mirror.cjs')]);
 run('Patching @electron-forge/plugin-vite', 'node', [path.join(__dirname, 'patch-forge-vite.cjs')]);
 run('Patching @electron/packager unzip', 'node', [path.join(__dirname, 'patch-packager-unzip.cjs')]);
 

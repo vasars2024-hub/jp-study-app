@@ -22,7 +22,7 @@ import {
 import { MiniPlayer } from './music';
 import { Calculator } from './utility';
 import { LevelProgressWidget } from './levels';
-import { WorldClock, DailyGoals, HabitTracker, LearningHeatmap } from './more';
+import { WorldClock, DailyGoals, HabitTracker, LearningHeatmap, LearnerMapWidget } from './more';
 import {
   BatteryWidget,
   ClipboardWidget,
@@ -34,41 +34,42 @@ import {
 
 export const WIDGETS: WidgetDef[] = [
   // ---- Productivity ----
-  { type: 'clock-digital', title: 'Digital Clock', category: 'Productivity', description: 'Current time and date.', defaultSize: { w: 240, h: 140 }, minSize: { w: 160, h: 96 }, component: DigitalClock },
-  { type: 'clock-analog', title: 'Analog Clock', category: 'Productivity', description: 'A classic analog clock face.', defaultSize: { w: 200, h: 200 }, minSize: { w: 120, h: 120 }, component: AnalogClock },
-  { type: 'calendar', title: 'Calendar', category: 'Productivity', description: 'Month view with today highlighted.', defaultSize: { w: 280, h: 260 }, minSize: { w: 220, h: 220 }, component: CalendarWidget },
-  { type: 'pomodoro', title: 'Pomodoro Timer', category: 'Productivity', description: 'Focus / break cycles.', defaultSize: { w: 240, h: 240 }, minSize: { w: 200, h: 220 }, component: Pomodoro },
-  { type: 'stopwatch', title: 'Stopwatch', category: 'Productivity', description: 'Count up with start / stop.', defaultSize: { w: 240, h: 140 }, minSize: { w: 180, h: 120 }, component: Stopwatch },
-  { type: 'world-clock', title: 'World Clock', category: 'Productivity', description: 'Time across multiple zones.', defaultSize: { w: 260, h: 220 }, minSize: { w: 200, h: 160 }, component: WorldClock },
-  { type: 'daily-goals', title: 'Daily Goals', category: 'Productivity', description: 'Track goals with progress.', defaultSize: { w: 280, h: 280 }, minSize: { w: 220, h: 180 }, component: DailyGoals },
-  { type: 'habit-tracker', title: 'Habit Tracker', category: 'Productivity', description: 'A 7-day habit grid.', defaultSize: { w: 300, h: 260 }, minSize: { w: 240, h: 180 }, component: HabitTracker },
-  { type: 'countdown', title: 'Countdown Timer', category: 'Productivity', description: 'Count down from a set duration.', defaultSize: { w: 260, h: 150 }, minSize: { w: 200, h: 130 }, component: Countdown },
-  { type: 'todo', title: 'To-do List', category: 'Productivity', description: 'A quick checklist.', defaultSize: { w: 280, h: 300 }, minSize: { w: 200, h: 180 }, component: TodoList },
+  { type: 'clock-digital', titleKey: 'widgets.title.clock-digital', category: 'Productivity', descKey: 'widgets.desc.clock-digital', defaultSize: { w: 240, h: 140 }, minSize: { w: 160, h: 96 }, component: DigitalClock },
+  { type: 'clock-analog', titleKey: 'widgets.title.clock-analog', category: 'Productivity', descKey: 'widgets.desc.clock-analog', defaultSize: { w: 200, h: 200 }, minSize: { w: 120, h: 120 }, component: AnalogClock },
+  { type: 'calendar', titleKey: 'widgets.title.calendar', category: 'Productivity', descKey: 'widgets.desc.calendar', defaultSize: { w: 280, h: 260 }, minSize: { w: 220, h: 220 }, component: CalendarWidget },
+  { type: 'pomodoro', titleKey: 'widgets.title.pomodoro', category: 'Productivity', descKey: 'widgets.desc.pomodoro', defaultSize: { w: 240, h: 240 }, minSize: { w: 200, h: 220 }, component: Pomodoro },
+  { type: 'stopwatch', titleKey: 'widgets.title.stopwatch', category: 'Productivity', descKey: 'widgets.desc.stopwatch', defaultSize: { w: 240, h: 140 }, minSize: { w: 180, h: 120 }, component: Stopwatch },
+  { type: 'world-clock', titleKey: 'widgets.title.world-clock', category: 'Productivity', descKey: 'widgets.desc.world-clock', defaultSize: { w: 260, h: 220 }, minSize: { w: 200, h: 160 }, component: WorldClock },
+  { type: 'daily-goals', titleKey: 'widgets.title.daily-goals', category: 'Productivity', descKey: 'widgets.desc.daily-goals', defaultSize: { w: 280, h: 280 }, minSize: { w: 220, h: 180 }, component: DailyGoals },
+  { type: 'habit-tracker', titleKey: 'widgets.title.habit-tracker', category: 'Productivity', descKey: 'widgets.desc.habit-tracker', defaultSize: { w: 300, h: 260 }, minSize: { w: 240, h: 180 }, component: HabitTracker },
+  { type: 'countdown', titleKey: 'widgets.title.countdown', category: 'Productivity', descKey: 'widgets.desc.countdown', defaultSize: { w: 260, h: 150 }, minSize: { w: 200, h: 130 }, component: Countdown },
+  { type: 'todo', titleKey: 'widgets.title.todo', category: 'Productivity', descKey: 'widgets.desc.todo', defaultSize: { w: 280, h: 300 }, minSize: { w: 200, h: 180 }, component: TodoList },
 
   // ---- Study ----
-  { type: 'study-streak', title: 'Study Streak', category: 'Study', description: 'Consecutive days studied.', defaultSize: { w: 200, h: 160 }, minSize: { w: 150, h: 130 }, component: StudyStreak },
-  { type: 'today-study-time', title: "Today's Study Time", category: 'Study', description: 'Time and characters read today.', defaultSize: { w: 220, h: 160 }, minSize: { w: 160, h: 130 }, component: TodayStudyTime },
-  { type: 'reading-progress', title: 'Reading Progress', category: 'Study', description: 'Reading time over the last two weeks.', defaultSize: { w: 300, h: 170 }, minSize: { w: 220, h: 140 }, component: ReadingProgress },
-  { type: 'vocab-progress', title: 'Vocabulary Progress', category: 'Study', description: 'Your known / familiar / learning word counts.', defaultSize: { w: 260, h: 200 }, minSize: { w: 200, h: 170 }, component: VocabularyProgress },
-  { type: 'level-progress', title: 'JLPT / HSK Progress', category: 'Study', description: 'Progress against your pasted level word lists.', defaultSize: { w: 300, h: 260 }, minSize: { w: 240, h: 180 }, component: LevelProgressWidget },
-  { type: 'word-of-the-day', title: 'Word of the Day', category: 'Study', description: 'A saved word, rotated daily.', defaultSize: { w: 260, h: 160 }, minSize: { w: 190, h: 130 }, component: WordOfTheDay },
+  { type: 'study-streak', titleKey: 'widgets.title.study-streak', category: 'Study', descKey: 'widgets.desc.study-streak', defaultSize: { w: 200, h: 160 }, minSize: { w: 150, h: 130 }, component: StudyStreak },
+  { type: 'today-study-time', titleKey: 'widgets.title.today-study-time', category: 'Study', descKey: 'widgets.desc.today-study-time', defaultSize: { w: 220, h: 160 }, minSize: { w: 160, h: 130 }, component: TodayStudyTime },
+  { type: 'reading-progress', titleKey: 'widgets.title.reading-progress', category: 'Study', descKey: 'widgets.desc.reading-progress', defaultSize: { w: 300, h: 170 }, minSize: { w: 220, h: 140 }, component: ReadingProgress },
+  { type: 'vocab-progress', titleKey: 'widgets.title.vocab-progress', category: 'Study', descKey: 'widgets.desc.vocab-progress', defaultSize: { w: 260, h: 200 }, minSize: { w: 200, h: 170 }, component: VocabularyProgress },
+  { type: 'level-progress', titleKey: 'widgets.title.level-progress', category: 'Study', descKey: 'widgets.desc.level-progress', defaultSize: { w: 300, h: 260 }, minSize: { w: 240, h: 180 }, component: LevelProgressWidget },
+  { type: 'word-of-the-day', titleKey: 'widgets.title.word-of-the-day', category: 'Study', descKey: 'widgets.desc.word-of-the-day', defaultSize: { w: 260, h: 160 }, minSize: { w: 190, h: 130 }, component: WordOfTheDay },
 
   // ---- Statistics ----
-  { type: 'learning-heatmap', title: 'Learning Heatmap', category: 'Statistics', description: 'Reading activity over the last two weeks.', defaultSize: { w: 300, h: 150 }, minSize: { w: 220, h: 120 }, component: LearningHeatmap },
+  { type: 'learning-heatmap', titleKey: 'widgets.title.learning-heatmap', category: 'Statistics', descKey: 'widgets.desc.learning-heatmap', defaultSize: { w: 300, h: 150 }, minSize: { w: 220, h: 120 }, component: LearningHeatmap },
+  { type: 'learner-map', titleKey: 'widgets.title.learner-map', category: 'Statistics', descKey: 'widgets.desc.learner-map', defaultSize: { w: 420, h: 280 }, minSize: { w: 280, h: 180 }, component: LearnerMapWidget },
 
   // ---- Music ----
-  { type: 'mini-player', title: 'Music Player', category: 'Music', description: 'Playback, volume and queue.', defaultSize: { w: 300, h: 200 }, minSize: { w: 240, h: 180 }, component: MiniPlayer },
+  { type: 'mini-player', titleKey: 'widgets.title.mini-player', category: 'Music', descKey: 'widgets.desc.mini-player', defaultSize: { w: 300, h: 200 }, minSize: { w: 240, h: 180 }, component: MiniPlayer },
 
   // ---- Utility ----
-  { type: 'calculator', title: 'Calculator', category: 'Utility', description: 'A simple calculator.', defaultSize: { w: 240, h: 300 }, minSize: { w: 200, h: 260 }, component: Calculator },
-  { type: 'recent-lookups', title: 'Recent Lookups', category: 'Utility', description: 'Words you looked up recently.', defaultSize: { w: 240, h: 220 }, minSize: { w: 180, h: 140 }, component: RecentLookupsWidget },
-  { type: 'clipboard', title: 'Clipboard', category: 'Utility', description: 'Recent clipboard text (local only).', defaultSize: { w: 260, h: 200 }, minSize: { w: 200, h: 140 }, component: ClipboardWidget },
+  { type: 'calculator', titleKey: 'widgets.title.calculator', category: 'Utility', descKey: 'widgets.desc.calculator', defaultSize: { w: 240, h: 300 }, minSize: { w: 200, h: 260 }, component: Calculator },
+  { type: 'recent-lookups', titleKey: 'widgets.title.recent-lookups', category: 'Utility', descKey: 'widgets.desc.recent-lookups', defaultSize: { w: 240, h: 220 }, minSize: { w: 180, h: 140 }, component: RecentLookupsWidget },
+  { type: 'clipboard', titleKey: 'widgets.title.clipboard', category: 'Utility', descKey: 'widgets.desc.clipboard', defaultSize: { w: 260, h: 200 }, minSize: { w: 200, h: 140 }, component: ClipboardWidget },
 
   // ---- System ----
-  { type: 'cpu-usage', title: 'CPU', category: 'System', description: 'Approximate CPU load.', defaultSize: { w: 220, h: 120 }, minSize: { w: 160, h: 96 }, component: CpuWidget },
-  { type: 'memory-usage', title: 'Memory', category: 'System', description: 'RAM used vs total.', defaultSize: { w: 220, h: 120 }, minSize: { w: 160, h: 96 }, component: MemoryWidget },
-  { type: 'battery', title: 'Battery', category: 'System', description: 'Battery level when available.', defaultSize: { w: 220, h: 120 }, minSize: { w: 160, h: 96 }, component: BatteryWidget },
-  { type: 'network', title: 'Network', category: 'System', description: 'Online / offline status.', defaultSize: { w: 200, h: 100 }, minSize: { w: 140, h: 80 }, component: NetworkWidget },
+  { type: 'cpu-usage', titleKey: 'widgets.title.cpu-usage', category: 'System', descKey: 'widgets.desc.cpu-usage', defaultSize: { w: 220, h: 120 }, minSize: { w: 160, h: 96 }, component: CpuWidget },
+  { type: 'memory-usage', titleKey: 'widgets.title.memory-usage', category: 'System', descKey: 'widgets.desc.memory-usage', defaultSize: { w: 220, h: 120 }, minSize: { w: 160, h: 96 }, component: MemoryWidget },
+  { type: 'battery', titleKey: 'widgets.title.battery', category: 'System', descKey: 'widgets.desc.battery', defaultSize: { w: 220, h: 120 }, minSize: { w: 160, h: 96 }, component: BatteryWidget },
+  { type: 'network', titleKey: 'widgets.title.network', category: 'System', descKey: 'widgets.desc.network', defaultSize: { w: 200, h: 100 }, minSize: { w: 140, h: 80 }, component: NetworkWidget },
 ];
 
 const BY_TYPE = new Map(WIDGETS.map((w) => [w.type, w]));

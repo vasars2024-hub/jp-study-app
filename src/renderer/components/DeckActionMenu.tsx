@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { BookGroup } from '../flashcardDeck';
+import { useT } from '../i18n';
 
 type Props = {
   group: BookGroup;
@@ -8,6 +9,7 @@ type Props = {
   onReview: () => void;
   onSaveCsv: () => void;
   onMoveFolder: (folder: string | null) => void;
+  onRename: () => void;
   onDelete: () => void;
 };
 
@@ -18,8 +20,10 @@ export default function DeckActionMenu({
   onReview,
   onSaveCsv,
   onMoveFolder,
+  onRename,
   onDelete,
 }: Props) {
+  const { t } = useT();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,25 +43,28 @@ export default function DeckActionMenu({
 
   return (
     <div className="deck-action-backdrop" role="presentation">
-      <div className="deck-action-menu anki-card" ref={ref} role="dialog" aria-label="Deck actions">
+      <div className="deck-action-menu anki-card" ref={ref} role="dialog" aria-label={t('flash.aero.actionsAria')}>
         <header className="deck-action-head">
           <h3>{group.bookTitle}</h3>
-          <p className="muted">{group.cards.length} cards</p>
-          <button type="button" className="deck-action-close" onClick={onClose} aria-label="Close">
+          <p className="muted">{t('flash.cardsCount', { count: group.cards.length })}</p>
+          <button type="button" className="deck-action-close" onClick={onClose} aria-label={t('common.close')}>
             ×
           </button>
         </header>
         <div className="deck-action-list">
           <button type="button" className="deck-action-item primary" onClick={onReview}>
-            Start review
+            {t('flash.startReview')}
           </button>
           <button type="button" className="deck-action-item" onClick={onSaveCsv}>
-            Save as CSV
+            {t('flash.aero.saveCsv')}
+          </button>
+          <button type="button" className="deck-action-item" onClick={onRename}>
+            {t('flash.renameBook')}
           </button>
           <div className="deck-action-sub">
-            <span className="muted">Move to folder</span>
+            <span className="muted">{t('flash.aero.moveToFolder')}</span>
             <button type="button" className="deck-action-chip" onClick={() => onMoveFolder(null)}>
-              Unfiled
+              {t('flash.unfiled')}
             </button>
             {folders.map((folder) => (
               <button
@@ -71,7 +78,7 @@ export default function DeckActionMenu({
             ))}
           </div>
           <button type="button" className="deck-action-item danger" onClick={onDelete}>
-            Delete deck
+            {t('flash.deleteDeck')}
           </button>
         </div>
       </div>

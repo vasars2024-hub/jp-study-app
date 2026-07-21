@@ -3,6 +3,7 @@ doc_id: noctis.memory_system
 tier: 7
 authority: domain_specification
 role: memory_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -405,15 +406,15 @@ The distinctive feature of this interface is **unintentional recording**: ecolog
 
 ## SECTION 27 — ECONOMY, LEARNING, GOVERNANCE, AND ERA INTERFACES
 
-Four boundaries to reserved or undefined domains; Memory defines the edge and invents none of their internals.
+Four boundaries to peer or undefined domains; Memory defines the edge and invents none of their internals.
 
-**Economy** (`ECONOMY_SYSTEM.md`, placeholder; no market or currency — `SIMULATION_SYSTEMS.md` Section 20). Economy may affect material support for archives, preservation labor, distribution of copies, access inequality, institution survival, scarcity of preservation materials, and heritage commercialization. Memory emits preservation demand, archival-labor demand, access inequality, heritage-site status, restoration need, provenance value, and institutional dependency *as conditions*; it decides no allocation, ownership, production, exchange, or price.
+**Economy** (`ECONOMY_SYSTEM.md`; no user-facing market or currency — `SIMULATION_SYSTEMS.md` Section 20). Economy may affect material support for archives, preservation labor, distribution of copies, access inequality, institution survival, scarcity of preservation materials, and heritage commercialization. Memory emits preservation demand, archival-labor demand, access inequality, heritage-site status, restoration need, provenance value, and institutional dependency *as conditions*; it decides no allocation, ownership, production, exchange, or price.
 
-**Learning Integration** (`LEARNING_INTEGRATION.md`, placeholder). Memory receives **no raw telemetry** (`SIMULATION_SYSTEMS.md` Section 22), only validated signals: that a major learning milestone occurred, a long project completed, a discipline became historically significant, an interdisciplinary breakthrough drove a domain transition, or a study period produced a protected user-linked legacy anchor. Memory turns these into civilizational traces — a dated archive layer, a named historical period, a monument candidate, an institutional founding record, a remembered age of discovery, an attributed transformation. **Study is never a currency, and not every study session is a major historical event** (`GAME_DESIGN.md` Section 9, Honesty; Section 11, Principle 2).
+**Learning Integration** (`LEARNING_INTEGRATION.md`). Memory receives **no raw telemetry** (`SIMULATION_SYSTEMS.md` Section 22), only validated signals: that a major learning milestone occurred, a long project completed, a discipline became historically significant, an interdisciplinary breakthrough drove a domain transition, or a study period produced a protected user-linked legacy anchor. Memory turns these into civilizational traces — a dated archive layer, a named historical period, a monument candidate, an institutional founding record, a remembered age of discovery, an attributed transformation. **Study is never a currency, and not every study session is a major historical event** (`GAME_DESIGN.md` Section 9, Honesty; Section 11, Principle 2).
 
 **Governance** (undefined; no governance document exists). Memory models the historical *fact* of governance acts — an institution classifying a record, an authority promoting an official history, a censorship campaign, a monument removal, competing official narratives — and owns which records became accessible or inaccessible and the provenance of alterations. `CULTURE_SYSTEM.md` owns the legitimacy; a future governance domain owns policy, law, coercion, and authority.
 
-**Era Progression** (`ERA_PROGRESSION.md`, placeholder). Memory records era transitions as foundational legacy anchors and inflects its media and institutions by era (Section 29); it emits no gating signal beyond the historical record of the transition, and era gating is owned entirely by `ERA_PROGRESSION.md`.
+**Era Progression** (`ERA_PROGRESSION.md`). Memory exposes `x_memory ∈ [0, 1]`, a secured historical-accumulation-depth reading derived from the breadth, provenance quality, accessibility history, and institutional continuity of committed records. This is a maturity contribution, not a gate decision: Era Progression alone owns its weight, floor, and combination. After an era boundary is crossed, Memory records the transition as a foundational legacy anchor and inflects its media and institutions by era (Section 29). The two directions remain distinct: historical accumulation contributes before the gate; Memory becomes recorder-of-record after the gate.
 
 ---
 

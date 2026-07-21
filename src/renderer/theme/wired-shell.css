@@ -1,0 +1,2385 @@
+:root[data-materials='wired'] .os-desktop {
+  background:
+    radial-gradient(circle at 72% 24%, rgba(109, 241, 255, 0.12), transparent 28%),
+    linear-gradient(180deg, #02070d, #00050a) !important;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+:root[data-materials='wired'] .os-wall-image,
+:root[data-materials='wired'] .os-wall-video,
+:root[data-materials='wired'] .os-wall-visualizer {
+  filter: brightness(0.42) saturate(0.62) hue-rotate(150deg);
+  opacity: 0.42;
+}
+
+.wired-wall-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.06) 1px, transparent 1px),
+    radial-gradient(circle at 30% 70%, rgba(109, 241, 255, 0.13), transparent 30%);
+  background-size: 34px 34px, 34px 34px, cover;
+}
+
+.wired-wall-atmosphere::before {
+  content: '';
+  position: absolute;
+  inset: 14% 12%;
+  border: 1px solid rgba(109, 241, 255, 0.1);
+  background:
+    linear-gradient(115deg, transparent 0 32%, rgba(109, 241, 255, 0.12) 33%, transparent 34%),
+    linear-gradient(50deg, transparent 0 58%, rgba(255, 177, 59, 0.08) 59%, transparent 60%);
+  clip-path: polygon(0 16%, 54% 0, 100% 30%, 84% 100%, 18% 88%);
+}
+
+.wired-wall-kana {
+  position: absolute;
+  right: 26px;
+  top: 76px;
+  max-width: 220px;
+  color: rgba(216, 251, 255, 0.16);
+  font-size: 30px;
+  line-height: 1.35;
+  writing-mode: vertical-rl;
+}
+
+.wired-wall-node {
+  position: absolute;
+  color: rgba(109, 241, 255, 0.56);
+  border-left: 2px solid rgba(109, 241, 255, 0.42);
+  padding-left: 8px;
+  font-size: 12px;
+  text-shadow: var(--wired-glow);
+}
+
+.wired-wall-node.node-a { left: 26px; top: 32px; }
+.wired-wall-node.node-b { left: 36%; top: 20%; }
+.wired-wall-node.node-c { right: 34px; bottom: 92px; color: rgba(255, 177, 59, 0.65); }
+
+:root[data-materials='wired'] .os-wall-dim {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+/* Desktop icons ----------------------------------------------------------- */
+:root[data-materials='wired'] .os-desk-icon {
+  color: var(--wired-cyan);
+  text-shadow: var(--wired-glow);
+}
+
+:root[data-materials='wired'] .os-desk-icon-img {
+  border-radius: 2px;
+  border: 1px solid rgba(109, 241, 255, 0.36);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.16), rgba(109, 241, 255, 0.035)),
+    rgba(0, 14, 21, 0.82);
+  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.08) inset, 0 0 18px rgba(109, 241, 255, 0.18);
+}
+
+:root[data-materials='wired'] .os-desk-icon-label {
+  background: rgba(0, 10, 15, 0.78);
+  border: 1px solid rgba(109, 241, 255, 0.16);
+  border-radius: 0;
+  font-size: 11px;
+}
+
+/* Taskbar machine rail ---------------------------------------------------- */
+:root[data-materials='wired'] .os-taskbar {
+  height: var(--taskbar-h);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.12), rgba(0, 0, 0, 0)),
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.08) 0 1px, transparent 1px 18px),
+    #020b12;
+  border-top: 1px solid rgba(109, 241, 255, 0.36);
+  box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.46), 0 0 24px rgba(109, 241, 255, 0.13) inset;
+}
+
+:root[data-materials='wired'] .os-start-btn,
+:root[data-materials='wired'] .os-desktop-switch,
+:root[data-materials='wired'] .os-task-win,
+:root[data-materials='wired'] .os-tray-btn {
+  color: var(--wired-cyan);
+  background: rgba(3, 22, 31, 0.92);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(109, 241, 255, 0.08);
+  font-family: var(--font-mono);
+  text-shadow: var(--wired-glow);
+}
+
+:root[data-materials='wired'] .os-start-btn.active,
+:root[data-materials='wired'] .os-desktop-switch.active,
+:root[data-materials='wired'] .os-task-win.active,
+:root[data-materials='wired'] .os-tray-btn.active {
+  color: #e9feff;
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.22), rgba(109, 241, 255, 0.06)),
+    rgba(4, 32, 43, 0.96);
+  border-color: rgba(109, 241, 255, 0.68);
+  box-shadow: 0 0 16px rgba(109, 241, 255, 0.22), inset 0 0 0 1px rgba(216, 251, 255, 0.12);
+}
+
+:root[data-materials='wired'] .os-task-win.min {
+  opacity: 0.62;
+  background: rgba(3, 12, 18, 0.86);
+}
+
+:root[data-materials='wired'] .os-clock {
+  color: var(--wired-cyan);
+  border: 1px solid rgba(109, 241, 255, 0.26);
+  padding: 4px 8px;
+  background: rgba(0, 9, 14, 0.9);
+  text-shadow: var(--wired-glow);
+}
+
+:root[data-materials='wired'] .os-tray-badge {
+  background: var(--wired-amber);
+  color: #160a00;
+  border-radius: 2px;
+}
+
+/* Router menu ------------------------------------------------------------- */
+:root[data-materials='wired'] .os-start-legacy {
+  display: none;
+}
+
+:root[data-materials='wired'] .os-start-aero-menu {
+  display: flex;
+  flex-direction: column;
+  left: 8px;
+  bottom: calc(var(--taskbar-h, 52px) + 6px);
+  width: 560px;
+  max-width: calc(100% - 16px);
+  height: 642px;
+  max-height: calc(100% - var(--taskbar-h, 52px) - 20px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.42);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.12), transparent 30%),
+    rgba(1, 14, 22, 0.96);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.52), 0 0 32px rgba(109, 241, 255, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+:root[data-materials='wired'] .os-start-aero-head,
+:root[data-materials='wired'] .os-start-aero-footer {
+  flex: 0 0 auto;
+}
+
+:root[data-materials='wired'] .os-start-aero-columns {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  /* The two-column layout lived only under [data-materials='aero'], so WIRED
+     fell back to `display: block` and the panes stacked vertically — 712px of
+     content inside a 509px clipped box, which silently swallowed everything
+     below the fold (Tools, Quick settings, All programs). The children's own
+     `overflow-y: auto` could not help: the overflow was at this parent. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 196px;
+}
+
+:root[data-materials='wired'] .os-start-aero-main,
+:root[data-materials='wired'] .os-start-aero-side {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 8px;
+  background: transparent;
+}
+
+:root[data-materials='wired'] .os-start-aero-side {
+  border-left: 1px solid rgba(109, 241, 255, 0.18);
+}
+
+/* Router index entries: module code above, description below.
+   Layout/chrome for this menu only lived under [data-materials='aero'], so
+   WIRED inherited native <button> fills (the washed grey/white slabs) and
+   fused "ARCH"+"Archive Bay" into one line. Rebuild as a black/cyan terminal
+   index: transparent rows, no UA chrome, two-line records. */
+:root[data-materials='wired'] .os-start-aero-programs,
+:root[data-materials='wired'] .os-start-aero-places,
+:root[data-materials='wired'] .os-start-aero-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+}
+
+:root[data-materials='wired'] .os-start-aero-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  border-radius: 0;
+  background: transparent;
+  border: 1px solid rgba(109, 241, 255, 0.18);
+}
+
+:root[data-materials='wired'] .os-start-aero-row.place {
+  min-height: 36px;
+}
+
+:root[data-materials='wired'] .os-start-aero-row:hover,
+:root[data-materials='wired'] .os-start-aero-row.pinned {
+  background: rgba(109, 241, 255, 0.06);
+  border-color: rgba(109, 241, 255, 0.42);
+}
+
+:root[data-materials='wired'] .os-start-aero-row.drag-source {
+  opacity: 0.56;
+}
+
+:root[data-materials='wired'] .os-start-aero-app {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 5px 28px 5px 6px;
+  text-align: left;
+  color: var(--wired-cyan);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-drag: element;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+:root[data-materials='wired'] .os-start-aero-app:active {
+  cursor: grabbing;
+}
+
+:root[data-materials='wired'] .os-start-aero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+:root[data-materials='wired'] .os-start-aero-name {
+  display: block;
+  overflow: hidden;
+  color: #6df1ff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-materials='wired'] .os-start-aero-hint {
+  display: block;
+  overflow: hidden;
+  color: rgba(216, 251, 255, 0.55);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-materials='wired'] .os-start-aero-head,
+:root[data-materials='wired'] .os-start-aero-footer {
+  border-color: rgba(109, 241, 255, 0.24);
+  background: rgba(0, 8, 13, 0.72);
+}
+
+:root[data-materials='wired'] .os-start-aero-avatar,
+:root[data-materials='wired'] .os-start-aero-search,
+:root[data-materials='wired'] .os-start-aero-footer-btn,
+:root[data-materials='wired'] .os-start-aero-power,
+:root[data-materials='wired'] .os-start-aero-tool,
+:root[data-materials='wired'] .os-start-aero-all {
+  border-radius: 2px;
+  color: var(--wired-cyan);
+  background: rgba(0, 8, 13, 0.92);
+  border: 1px solid rgba(109, 241, 255, 0.26);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+:root[data-materials='wired'] .os-start-aero-title,
+:root[data-materials='wired'] .os-start-aero-name,
+:root[data-materials='wired'] .os-start-aero-label {
+  color: #e9feff;
+  text-shadow: var(--wired-glow);
+}
+
+:root[data-materials='wired'] .os-start-aero-sub,
+:root[data-materials='wired'] .os-start-aero-hint {
+  color: rgba(216, 251, 255, 0.68);
+}
+
+:root[data-materials='wired'] .os-start-aero-ic {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  color: var(--wired-cyan);
+  background: rgba(0, 8, 13, 0.92);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+}
+
+:root[data-materials='wired'] .os-start-aero-row.place .os-start-aero-ic {
+  width: 28px;
+  height: 28px;
+}
+
+:root[data-materials='wired'] .os-start-aero-pin {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  transform: translateY(-50%);
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(109, 241, 255, 0.42);
+  cursor: pointer;
+  opacity: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+:root[data-materials='wired'] .os-start-aero-row:hover .os-start-aero-pin,
+:root[data-materials='wired'] .os-start-aero-pin.on,
+:root[data-materials='wired'] .os-start-aero-pin:focus-visible {
+  opacity: 1;
+}
+
+:root[data-materials='wired'] .os-start-aero-pin:hover,
+:root[data-materials='wired'] .os-start-aero-pin.on {
+  color: var(--wired-cyan);
+  background: rgba(109, 241, 255, 0.1);
+  border-color: rgba(109, 241, 255, 0.42);
+}
+
+@media (max-height: 760px) {
+  :root[data-materials='wired'] .os-start-aero-menu {
+    height: auto;
+    top: 8px;
+  }
+}
+
+/* Floating windows -------------------------------------------------------- */
+:root[data-materials='wired'] .fwin {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.32);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent 26%),
+    rgba(1, 12, 18, 0.94);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(109, 241, 255, 0.08) inset;
+}
+
+:root[data-materials='wired'] .fwin.focused {
+  border-color: rgba(109, 241, 255, 0.7);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58), 0 0 24px rgba(109, 241, 255, 0.18);
+}
+
+:root[data-materials='wired'] .fwin::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px);
+  opacity: 0.5;
+  z-index: 2;
+}
+
+:root[data-wired-crt='clean'] .fwin::before,
+:root[data-wired-static='reduced'] .fwin::before {
+  opacity: 0.18;
+}
+
+:root[data-materials='wired'] .fwin-bar,
+:root[data-materials='wired'] .fwin-drag-strip {
+  min-height: 32px;
+  color: #e9feff;
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.08) 0 1px, transparent 1px 16px),
+    rgba(3, 25, 35, 0.96);
+  border-bottom: 1px solid rgba(109, 241, 255, 0.28);
+}
+
+:root[data-materials='wired'] .fwin-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+:root[data-materials='wired'] .fwin-b {
+  border-radius: 0;
+  color: var(--wired-cyan);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: rgba(0, 10, 15, 0.8);
+}
+
+:root[data-materials='wired'] .fwin-close {
+  color: #ffd2d4;
+  border-color: rgba(223, 39, 50, 0.46);
+}
+
+:root[data-materials='wired'] .fwin-body,
+:root[data-materials='wired'] .fwin-body-flush {
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.035) 1px, transparent 1px),
+    rgba(3, 13, 19, 0.96);
+  background-size: 18px 18px;
+  color: var(--text);
+}
+
+:root[data-materials='wired'] .fwin-wired-status {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 8px;
+  color: rgba(216, 251, 255, 0.78);
+  background: rgba(0, 7, 11, 0.96);
+  border-top: 1px solid rgba(109, 241, 255, 0.22);
+  font-size: 11px;
+}
+
+.fwin-wired-status {
+  display: none;
+}
+
+/* Field notes ------------------------------------------------------------
+   Sticky notes carry an inline pastel colour from the desktop shell. In the
+   Wired that pastel reads as a bug, so the terminal palette overrides it
+   outright (hence !important — it is beating an inline style, not a rule). */
+:root[data-materials='wired'] .fwin-note {
+  border-color: rgba(109, 241, 255, 0.34);
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-bar {
+  background:
+    repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.08) 0 1px, transparent 1px 16px),
+    rgba(3, 25, 35, 0.96) !important;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.28) !important;
+  color: #e9feff;
+}
+
+:root[data-materials='wired'] .fwin-note .fwin-body-note {
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.035) 1px, transparent 1px),
+    rgba(3, 13, 19, 0.96);
+  background-size: 18px 18px;
+}
+
+:root[data-materials='wired'] .fwin-note .desk-note-text {
+  background: transparent !important;
+  color: var(--wired-cyan);
+  font-family: var(--font-mono);
+  caret-color: var(--wired-amber);
+}
+
+:root[data-materials='wired'] .fwin-note .desk-note-text::placeholder {
+  color: rgba(109, 241, 255, 0.4);
+}
+
+/* Bulletin and flyouts ---------------------------------------------------- */
+:root[data-materials='wired'] .os-flyout {
+  border-radius: 0;
+  color: var(--text);
+  background: rgba(1, 13, 20, 0.96);
+  border: 1px solid rgba(109, 241, 255, 0.38);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.55), var(--wired-glow);
+}
+
+:root[data-materials='wired'] .os-flyout-title {
+  color: #e9feff;
+}
+
+:root[data-materials='wired'] .os-flyout--notifications .os-flyout-title::before {
+  content: 'BULLETIN CHANNEL / ';
+  color: var(--wired-amber);
+}
+
+:root[data-materials='wired'] .ui-notification,
+:root[data-materials='wired'] .ui-toast,
+:root[data-materials='wired'] .os-toast {
+  border-radius: 0;
+  background: rgba(2, 21, 30, 0.92);
+  border-color: rgba(109, 241, 255, 0.26);
+  color: var(--text);
+}
+
+:root[data-materials='wired'] .ui-notification--warning {
+  border-color: rgba(255, 177, 59, 0.58);
+}
+
+:root[data-materials='wired'] .ui-notification--error {
+  border-color: rgba(223, 39, 50, 0.66);
+}
+
+:root[data-materials='wired'] .wired-notif-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--wired-amber);
+  font-size: 11px;
+}
+
+:root[data-materials='wired'] .wired-notif-meta span {
+  border: 1px solid rgba(255, 177, 59, 0.24);
+  padding: 1px 5px;
+  background: rgba(255, 177, 59, 0.06);
+}
+
+/* Widgets ---------------------------------------------------------------- */
+:root[data-materials='wired'] .widget-frame,
+:root[data-materials='wired'] .widget-gallery {
+  border-radius: 0;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.09), transparent 34%),
+    rgba(2, 17, 25, 0.94);
+  border: 1px solid rgba(109, 241, 255, 0.3);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.42), 0 0 18px rgba(109, 241, 255, 0.12);
+}
+
+:root[data-materials='wired'] .widget-bar,
+:root[data-materials='wired'] .widget-gallery-head {
+  background: rgba(0, 9, 14, 0.88);
+  border-bottom: 1px solid rgba(109, 241, 255, 0.24);
+}
+
+:root[data-materials='wired'] .widget-title::before {
+  content: 'MODULE / ';
+  color: var(--wired-amber);
+}
+
+:root[data-materials='wired'] .widget-card {
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  background: rgba(2, 18, 27, 0.86);
+}
+
+:root[data-materials='wired'] .widget-card-add::before {
+  content: 'MOUNT ';
+}
+
+:root[data-materials='wired'] .widget-tab,
+:root[data-materials='wired'] .wgt-btn,
+:root[data-materials='wired'] .widget-b {
+  border-radius: 2px;
+  color: var(--wired-cyan);
+  background: rgba(0, 11, 17, 0.86);
+  border-color: rgba(109, 241, 255, 0.26);
+}
+
+:root[data-materials='wired'] .widget-tab.active,
+:root[data-materials='wired'] .wgt-btn.primary {
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.14);
+  border-color: rgba(109, 241, 255, 0.52);
+}
+
+/* Mini mode --------------------------------------------------------------- */
+:root[data-materials='wired'] .mini-shell {
+  --mini-wired-panel: rgba(1, 14, 22, 0.96);
+  --mini-wired-line: rgba(109, 241, 255, 0.32);
+  --mini-wired-line-hot: rgba(109, 241, 255, 0.62);
+  --mini-wired-amber-line: rgba(255, 177, 59, 0.54);
+  --mini-wired-glow: rgba(109, 241, 255, 0.18);
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+}
+
+:root[data-materials='wired'] .mini-frame,
+:root[data-materials='wired'] .mini-panel {
+  overflow: hidden;
+  border-radius: 0;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent 38%),
+    radial-gradient(circle at 72% 18%, rgba(255, 177, 59, 0.08), transparent 32%),
+    var(--mini-wired-panel);
+  border: 1px solid var(--mini-wired-line);
+  box-shadow:
+    0 20px 52px rgba(0, 0, 0, 0.52),
+    0 0 0 1px rgba(109, 241, 255, 0.08) inset,
+    0 0 28px var(--mini-wired-glow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-materials='wired'] .mini-frame {
+  animation: wired-mini-frame-glitch 6.4s steps(1, end) infinite;
+}
+
+:root[data-materials='wired'] .mini-frame::before,
+:root[data-materials='wired'] .mini-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(109, 241, 255, 0.06) 0,
+      rgba(109, 241, 255, 0.06) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    linear-gradient(90deg, transparent, rgba(109, 241, 255, 0.08), transparent);
+  opacity: 0.28;
+  mix-blend-mode: screen;
+}
+
+:root[data-materials='wired'] .mini-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 12%, rgba(109, 241, 255, 0.16) 13%, transparent 17% 54%, rgba(255, 177, 59, 0.13) 56%, transparent 60%),
+    repeating-linear-gradient(to bottom, transparent 0 27px, rgba(109, 241, 255, 0.13) 28px, transparent 30px);
+  opacity: 0.16;
+  transform: translateX(-2px);
+  mix-blend-mode: screen;
+  animation: wired-mini-glitch-sweep 3.8s steps(2, end) infinite;
+}
+
+:root[data-materials='wired'][data-wired-crt='clean'] .mini-frame::before,
+:root[data-materials='wired'][data-wired-crt='clean'] .mini-panel::before,
+:root[data-materials='wired'][data-wired-static='reduced'] .mini-frame::before,
+:root[data-materials='wired'][data-wired-static='reduced'] .mini-panel::before {
+  opacity: 0.12;
+}
+
+:root[data-materials='wired'][data-wired-crt='clean'] .mini-frame::after,
+:root[data-materials='wired'][data-wired-static='reduced'] .mini-frame::after {
+  opacity: 0.07;
+  animation-duration: 7.2s;
+}
+
+:root[data-materials='wired'] .mini-frame > *,
+:root[data-materials='wired'] .mini-panel > * {
+  position: relative;
+  z-index: 2;
+}
+
+:root[data-materials='wired'] .mini-panel {
+  position: absolute;
+  inset: calc(24px * var(--mini-scale, 1)) 4px 4px 4px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(109, 241, 255, 0.56) rgba(0, 8, 13, 0.92);
+  scrollbar-width: thin;
+}
+
+:root[data-materials='wired'] .mini-frame > .mini-panel,
+:root[data-materials='wired'] .mini-frame.is-widget-frame > .mini-panel {
+  position: absolute;
+  inset: calc(24px * var(--mini-scale, 1)) 4px 4px 4px;
+  z-index: 80;
+}
+
+:root[data-materials='wired'] .mini-frame.has-panel-open > .mini-craft,
+:root[data-materials='wired'] .mini-frame.has-panel-open > .mini-footer,
+:root[data-materials='wired'] .mini-frame.has-panel-open > .mini-stage {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+:root[data-materials='wired'] .mini-frame.has-panel-open > .mini-frame-bar {
+  z-index: 90;
+}
+
+:root[data-materials='wired'] .mini-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+:root[data-materials='wired'] .mini-panel::-webkit-scrollbar-track {
+  background: rgba(0, 8, 13, 0.92);
+  border-left: 1px solid rgba(109, 241, 255, 0.14);
+}
+
+:root[data-materials='wired'] .mini-panel::-webkit-scrollbar-thumb {
+  background: rgba(109, 241, 255, 0.48);
+  border: 1px solid rgba(0, 8, 13, 0.92);
+}
+
+:root[data-materials='wired'] .mini-panel-head {
+  flex: 0 0 auto;
+}
+
+:root[data-materials='wired'] .mini-panel-block {
+  flex: 0 0 auto;
+}
+
+:root[data-materials='wired'] .mini-panel .mini-add-quick,
+:root[data-materials='wired'] .mini-panel .mini-app-manage {
+  max-height: none;
+}
+
+:root[data-materials='wired'] .mini-frame-bar,
+:root[data-materials='wired'] .mini-panel-head {
+  min-height: calc(32px * var(--mini-scale, 1));
+  color: #e9feff;
+  background:
+    linear-gradient(90deg, rgba(109, 241, 255, 0.14), transparent 58%),
+    rgba(0, 8, 13, 0.9);
+  border-bottom: 1px solid rgba(109, 241, 255, 0.28);
+}
+
+:root[data-materials='wired'] .mini-frame-brand,
+:root[data-materials='wired'] .mini-panel-head span {
+  color: #e9feff;
+  font-size: calc(10px + 1px * var(--mini-scale, 1));
+  font-weight: 800;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.48);
+}
+
+:root[data-materials='wired'] .mini-brand-mark {
+  border-radius: 0;
+  background: var(--wired-amber);
+  box-shadow: 0 0 10px rgba(255, 177, 59, 0.72);
+}
+
+:root[data-materials='wired'] .mini-clock,
+:root[data-materials='wired'] .mini-size-hint,
+:root[data-materials='wired'] .mini-footer-hint {
+  color: var(--wired-amber);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(255, 177, 59, 0.3);
+}
+
+:root[data-materials='wired'] .mini-craft-grid {
+  width: calc(100% - 4px);
+  max-width: calc(76px * 3 + 14px * 2 * var(--mini-scale, 1));
+}
+
+:root[data-materials='wired'] .mini-slot {
+  min-height: calc(44px * var(--mini-scale, 1));
+  border-radius: 0;
+  color: var(--wired-cyan);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent),
+    rgba(0, 12, 18, 0.74);
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.06) inset;
+}
+
+:root[data-materials='wired'] .mini-slot:hover {
+  background: rgba(6, 35, 46, 0.86);
+  border-color: var(--mini-wired-line-hot);
+  box-shadow: 0 0 16px rgba(109, 241, 255, 0.14), 0 0 0 1px rgba(109, 241, 255, 0.1) inset;
+  transform: translateY(-1px);
+}
+
+:root[data-materials='wired'] .mini-slot.is-active {
+  color: #e9feff;
+  background:
+    linear-gradient(180deg, rgba(255, 177, 59, 0.16), rgba(109, 241, 255, 0.08)),
+    rgba(0, 18, 26, 0.88);
+  border-color: var(--mini-wired-amber-line);
+  box-shadow: 0 0 18px rgba(255, 177, 59, 0.18), 0 0 0 1px rgba(255, 177, 59, 0.08) inset;
+}
+
+:root[data-materials='wired'] .mini-slot.is-empty {
+  background:
+    repeating-linear-gradient(135deg, rgba(109, 241, 255, 0.05) 0 3px, transparent 3px 9px),
+    rgba(0, 8, 13, 0.62);
+  border-style: dashed;
+  opacity: 0.76;
+}
+
+:root[data-materials='wired'] .mini-slot-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(34px + 9px * var(--mini-scale, 1));
+  height: calc(34px + 9px * var(--mini-scale, 1));
+  border-radius: 2px;
+  color: var(--wired-cyan);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.1), rgba(109, 241, 255, 0.02)),
+    rgba(0, 8, 13, 0.72);
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  box-shadow: 0 0 14px rgba(109, 241, 255, 0.12) inset;
+}
+
+:root[data-materials='wired'] .mini-slot.is-active .mini-slot-icon {
+  color: #fff1b7;
+  border-color: rgba(255, 177, 59, 0.56);
+  box-shadow: 0 0 16px rgba(255, 177, 59, 0.18) inset;
+}
+
+:root[data-materials='wired'] .mini-slot svg {
+  stroke-width: 1.75;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+:root[data-materials='wired'] .mini-slot-label {
+  max-width: 100%;
+  overflow: hidden;
+  color: inherit;
+  font-size: calc(10px + 1px * var(--mini-scale, 1));
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 8px rgba(109, 241, 255, 0.35);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+:root[data-materials='wired'] .mini-ico-btn,
+:root[data-materials='wired'] .mini-chip,
+:root[data-materials='wired'] .mini-add-select,
+:root[data-materials='wired'] .mini-size-slider {
+  border-radius: 2px;
+  color: var(--wired-cyan);
+  background: rgba(0, 9, 14, 0.88);
+  border-color: rgba(109, 241, 255, 0.3);
+}
+
+:root[data-materials='wired'] .mini-ico-btn:hover,
+:root[data-materials='wired'] .mini-ico-btn.is-on,
+:root[data-materials='wired'] .mini-chip.is-on,
+:root[data-materials='wired'] .mini-chip:hover {
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.14);
+  border-color: rgba(109, 241, 255, 0.58);
+  box-shadow: 0 0 12px rgba(109, 241, 255, 0.12);
+}
+
+:root[data-materials='wired'] .mini-stage {
+  border-radius: 0;
+  background: rgba(0, 10, 15, 0.9);
+  border: 1px solid rgba(109, 241, 255, 0.26);
+}
+
+:root[data-materials='wired'] .mini-stage-bar,
+:root[data-materials='wired'] .mini-panel-block {
+  border-color: rgba(109, 241, 255, 0.18);
+}
+
+:root[data-materials='wired'] .mini-stage-title,
+:root[data-materials='wired'] .mini-panel-title,
+:root[data-materials='wired'] .mini-app-manage-name {
+  color: var(--wired-amber);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+:root[data-materials='wired'] .mini-toast {
+  border-radius: 0;
+  color: #e9feff;
+  background: rgba(0, 13, 19, 0.94);
+  border: 1px solid rgba(255, 177, 59, 0.5);
+  box-shadow: 0 0 18px rgba(255, 177, 59, 0.18);
+}
+
+:root[data-materials='wired'] .mini-size-grip {
+  border-radius: 0;
+  border-color: transparent rgba(109, 241, 255, 0.56) rgba(109, 241, 255, 0.56) transparent;
+  filter: drop-shadow(0 0 6px rgba(109, 241, 255, 0.42));
+}
+
+@keyframes wired-mini-frame-glitch {
+  0%,
+  88%,
+  100% {
+    filter: none;
+    transform: translate(0, 0);
+  }
+  89% {
+    filter: hue-rotate(8deg) contrast(1.08);
+    transform: translate(0.5px, 0);
+  }
+  90% {
+    filter: hue-rotate(-6deg) contrast(1.04);
+    transform: translate(-0.5px, 0.5px);
+  }
+  91% {
+    filter: none;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes wired-mini-glitch-sweep {
+  0%,
+  72%,
+  100% {
+    opacity: 0.12;
+    clip-path: inset(0 0 0 0);
+    transform: translateX(-2px);
+  }
+  73% {
+    opacity: 0.28;
+    clip-path: inset(18% 0 62% 0);
+    transform: translateX(3px);
+  }
+  74% {
+    opacity: 0.2;
+    clip-path: inset(57% 0 30% 0);
+    transform: translateX(-4px);
+  }
+  75% {
+    opacity: 0.16;
+    clip-path: inset(0 0 0 0);
+    transform: translateX(1px);
+  }
+}
+
+.wired-found-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+  color: #d8fbff;
+  mix-blend-mode: screen;
+}
+.wired-found-overlay *,
+.wired-found-overlay *::before,
+.wired-found-overlay *::after {
+  box-sizing: border-box;
+}
+.wired-found-panel {
+  position: absolute;
+  pointer-events: auto;
+  border: 1px solid rgba(109, 241, 255, 0.26);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent 28%),
+    rgba(1, 12, 20, 0.88);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.34),
+    0 0 18px rgba(109, 241, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.wired-found-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.18);
+  color: var(--wired-amber);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.wired-found-ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 14px;
+  height: 62px;
+  overflow: hidden;
+  border-top: 1px solid rgba(109, 241, 255, 0.12);
+  border-bottom: 1px solid rgba(109, 241, 255, 0.12);
+  background: linear-gradient(90deg, rgba(2, 9, 16, 0.46), rgba(109, 241, 255, 0.08), rgba(2, 9, 16, 0.46));
+}
+.wired-found-ribbon-track {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  width: max-content;
+  height: 100%;
+  padding: 0 26px;
+  animation: wiredRibbon 18s linear infinite;
+}
+.wired-found-ribbon-line {
+  font-size: clamp(18px, 2.6vw, 30px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #6df1ff;
+  text-shadow: 0 0 12px rgba(109, 241, 255, 0.48);
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.wired-found-ribbon-line--mirror {
+  transform: scaleX(-1);
+  color: rgba(233, 254, 255, 0.88);
+}
+.wired-found-terminal {
+  left: 18px;
+  bottom: 78px;
+  width: min(380px, calc(100vw - 36px));
+  border-radius: 0;
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+}
+.wired-found-terminal-body {
+  min-height: 132px;
+  max-height: 176px;
+  overflow: hidden;
+  padding: 8px 10px 10px;
+  color: rgba(109, 241, 255, 0.92);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.wired-found-terminal-line.is-current {
+  color: #fff1b7;
+}
+.wired-found-guide {
+  right: 18px;
+  bottom: 88px;
+  width: min(270px, calc(100vw - 36px));
+  border-radius: 0;
+  pointer-events: auto;
+}
+.wired-found-guide-face {
+  position: relative;
+  width: 120px;
+  height: 118px;
+  margin: 10px auto 0;
+  border-radius: 50% 50% 46% 46%;
+  background:
+    radial-gradient(circle at 45% 34%, rgba(255, 255, 255, 0.88), transparent 10%),
+    radial-gradient(circle at 50% 48%, rgba(189, 244, 255, 0.18), transparent 54%),
+    linear-gradient(180deg, rgba(48, 165, 233, 0.98), rgba(7, 44, 88, 0.98));
+  border: 1px solid rgba(216, 251, 255, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
+}
+.wired-found-guide-hair {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 6px;
+  height: 44px;
+  border-radius: 50% 50% 38% 38%;
+  background: linear-gradient(180deg, rgba(2, 11, 28, 0.72), rgba(10, 24, 48, 0.18));
+}
+.wired-found-guide-eye {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #06192d;
+  box-shadow: 0 0 0 1px rgba(216, 251, 255, 0.22);
+}
+.wired-found-guide-eye::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+}
+.wired-found-guide-mouth {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  width: 18px;
+  height: 8px;
+  transform: translateX(-50%);
+  border-bottom: 2px solid rgba(5, 18, 32, 0.56);
+  border-radius: 0 0 20px 20px;
+}
+.wired-found-guide-copy {
+  padding: 8px 10px 0;
+  text-align: center;
+}
+.wired-found-guide-copy strong {
+  display: block;
+  color: #fff1b7;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.wired-found-guide-copy span {
+  display: block;
+  margin-top: 5px;
+  color: rgba(216, 251, 255, 0.82);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.wired-found-guide-input {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+.wired-found-guide-input span {
+  color: var(--wired-amber);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.wired-found-guide-input input {
+  width: 100%;
+  border-radius: 0;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  background: rgba(1, 8, 13, 0.94);
+  color: #e9feff;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+}
+.wired-found-eye {
+  right: 318px;
+  top: 106px;
+  width: 184px;
+  border-radius: 0;
+}
+.wired-found-eye-core {
+  position: relative;
+  height: 100px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.14), transparent 42%),
+    rgba(0, 9, 14, 0.9);
+}
+.wired-found-eye-core::before {
+  content: '';
+  position: absolute;
+  inset: 22px 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #f6ffff 0 30%, #b8f6ff 31% 44%, #07263e 45% 100%);
+  border: 1px solid rgba(216, 251, 255, 0.48);
+  box-shadow: 0 0 18px rgba(109, 241, 255, 0.18);
+}
+.wired-found-eye-iris {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  margin-left: -16px;
+  margin-top: -16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fff7d2, #49dfff 40%, #0d6eb7 70%, #022547 100%);
+  box-shadow: 0 0 24px rgba(109, 241, 255, 0.4);
+  /* --fx/--fy are written by usePointerParallax on the overlay root, once per
+     animation frame. Reading them here keeps the tracking on the compositor:
+     the old build re-rendered the whole React tree on every mousemove. */
+  transform: translate(calc((var(--fx, 0.5) - 0.5) * 18px), calc((var(--fy, 0.5) - 0.5) * 12px));
+}
+.wired-found-eye-glint {
+  position: absolute;
+  left: 52%;
+  top: 42%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+}
+.wired-found-eye-copy {
+  padding: 8px 10px 10px;
+  color: rgba(216, 251, 255, 0.82);
+  font-size: 11px;
+  text-align: center;
+}
+.wired-found-map {
+  left: 50%;
+  top: 118px;
+  width: min(350px, calc(100vw - 36px));
+  transform: translateX(-50%);
+  border-radius: 0;
+}
+.wired-found-map-canvas {
+  position: relative;
+  height: 190px;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    rgba(0, 9, 14, 0.9);
+  background-size: 28px 28px;
+}
+.wired-found-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: rgba(109, 241, 255, 0.7);
+  fill: none;
+  stroke-width: 0.8;
+}
+.wired-found-map svg circle {
+  fill: rgba(109, 241, 255, 0.9);
+}
+.wired-found-map-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: var(--wired-amber);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.wired-found-map-sweep {
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(115deg, transparent 44%, rgba(109, 241, 255, 0.16) 49%, transparent 54%);
+  animation: wiredMapSweep 5.2s linear infinite;
+}
+.wired-found-radar {
+  right: 18px;
+  top: 126px;
+  width: 170px;
+  border-radius: 0;
+}
+.wired-found-radar-core {
+  position: relative;
+  height: 170px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.14), transparent 54%),
+    rgba(0, 9, 14, 0.94);
+}
+.wired-found-radar-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 86px;
+  height: 86px;
+  margin-left: -43px;
+  margin-top: -43px;
+  border-radius: 50%;
+  border: 1px solid rgba(109, 241, 255, 0.3);
+  animation: wiredRadar 4s linear infinite;
+}
+.wired-found-radar-ring:nth-child(2) {
+  width: 132px;
+  height: 132px;
+  margin-left: -66px;
+  margin-top: -66px;
+  animation-delay: 900ms;
+}
+.wired-found-radar-sweep {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from 0deg, rgba(109, 241, 255, 0.02), rgba(109, 241, 255, 0.26), rgba(109, 241, 255, 0.02));
+  animation: wiredSweep 3.4s linear infinite;
+  clip-path: circle(46% at 50% 50%);
+}
+.wired-found-radar-point {
+  position: absolute;
+  /* Pointer-driven, same CSS-var channel as the iris (see .wired-found-eye-iris). */
+  left: calc(34% + (var(--fx, 0.5) - 0.5) * 16%);
+  top: calc(42% + (var(--fy, 0.5) - 0.5) * 16%);
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #fff1b7;
+  box-shadow: 0 0 14px rgba(255, 241, 183, 0.62);
+}
+.wired-found-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.wired-found-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(109, 241, 255, 0.84);
+  box-shadow: 0 0 10px rgba(109, 241, 255, 0.58);
+  animation: wiredParticleRise linear infinite;
+}
+.wired-found-ticker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  height: 26px;
+  overflow: hidden;
+  border-top: 1px solid rgba(109, 241, 255, 0.2);
+  border-bottom: 1px solid rgba(109, 241, 255, 0.2);
+  background: rgba(0, 6, 10, 0.86);
+}
+.wired-found-ticker-track {
+  display: flex;
+  align-items: center;
+  gap: 42px;
+  width: max-content;
+  height: 100%;
+  padding: 0 16px;
+  color: #d8fbff;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  animation: wiredTicker 16s linear infinite;
+}
+@keyframes wiredRibbon {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes wiredTicker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes wiredParticleRise {
+  from { transform: translate3d(0, 22px, 0) scale(0.4); opacity: 0; }
+  20% { opacity: 1; }
+  to { transform: translate3d(0, -24px, 0) scale(1.1); opacity: 0; }
+}
+@keyframes wiredSweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes wiredRadar {
+  from { transform: scale(0.7); opacity: 0.22; }
+  60% { opacity: 0.78; }
+  to { transform: scale(1.08); opacity: 0; }
+}
+@keyframes wiredMapSweep {
+  from { transform: translateX(-8%) rotate(0deg); }
+  to { transform: translateX(8%) rotate(360deg); }
+}
+
+.wired-found-overlay {
+  opacity: 0.84;
+  filter: saturate(1.08) contrast(1.02);
+}
+.wired-found-panel {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.wired-found-panel-head {
+  display: none;
+}
+.wired-found-matrix {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.62;
+  pointer-events: none;
+}
+.wired-found-matrix-col {
+  position: absolute;
+  top: -6%;
+  bottom: -6%;
+  width: 4.4%;
+  color: rgba(109, 241, 255, 0.42);
+  font-size: clamp(14px, 1.8vw, 24px);
+  line-height: 0.78;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  white-space: pre-wrap;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.18);
+  mix-blend-mode: screen;
+  animation: wiredMatrixFlow 18s linear infinite;
+  user-select: none;
+}
+.wired-found-ribbon {
+  top: 6px;
+  height: 106px;
+  border: 0;
+  background: transparent;
+  opacity: 0.92;
+}
+.wired-found-ribbon-track {
+  gap: 56px;
+  padding: 0 18px;
+  animation-duration: 14s;
+}
+.wired-found-ribbon-line {
+  font-size: clamp(28px, 4.7vw, 74px);
+  letter-spacing: 0.18em;
+  opacity: 0.78;
+}
+.wired-found-ribbon-line--mirror {
+  opacity: 0.48;
+}
+.wired-found-terminal {
+  left: 18px;
+  bottom: 74px;
+  width: min(680px, calc(100vw - 36px));
+  pointer-events: none;
+}
+.wired-found-terminal-body {
+  position: relative;
+  min-height: 108px;
+  max-height: 176px;
+  overflow: hidden;
+  padding: 0;
+  color: rgba(109, 241, 255, 0.78);
+  font-size: clamp(12px, 1.45vw, 20px);
+  line-height: 1.25;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.18);
+}
+.wired-found-terminal-glass {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.04) 1px, transparent 1px);
+  background-size: 14px 14px;
+  opacity: 0.18;
+  mix-blend-mode: screen;
+}
+.wired-found-terminal-line {
+  position: relative;
+  z-index: 1;
+  display: block;
+  padding: 2px 0;
+  animation: wiredTerminalFlicker 1.9s steps(2, end) infinite;
+}
+.wired-found-terminal-line.is-current {
+  color: #fff1b7;
+}
+.wired-found-guide {
+  right: 18px;
+  bottom: 72px;
+  width: min(300px, calc(100vw - 36px));
+  pointer-events: auto;
+}
+.wired-found-guide-face {
+  position: relative;
+  width: 192px;
+  height: 146px;
+  margin: 0 auto 6px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(0, 9, 14, 0.72);
+}
+.wired-found-guide-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.95;
+  filter:
+    grayscale(1)
+    brightness(0.68)
+    contrast(1.75)
+    saturate(1.35)
+    hue-rotate(186deg)
+    drop-shadow(0 0 16px rgba(109, 241, 255, 0.12));
+  image-rendering: auto;
+  transform: scale(1.06);
+}
+.wired-found-guide-glitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 20%, rgba(109, 241, 255, 0.24) 44%, transparent 58%);
+  mix-blend-mode: screen;
+}
+.wired-found-guide-glitch-a {
+  animation: wiredGuideGlitchA 2.9s linear infinite;
+}
+.wired-found-guide-glitch-b {
+  animation: wiredGuideGlitchB 4.2s linear infinite;
+  opacity: 0.7;
+  clip-path: inset(52% 0 0 0);
+}
+.wired-found-guide-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.08) 0,
+    rgba(255, 255, 255, 0.08) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  opacity: 0.28;
+  mix-blend-mode: screen;
+}
+.wired-found-guide-copy {
+  padding: 4px 2px 0;
+  text-align: center;
+}
+.wired-found-guide-copy strong {
+  font-size: 14px;
+  letter-spacing: 0.14em;
+}
+.wired-found-guide-copy span {
+  opacity: 0.9;
+  font-size: 11px;
+}
+.wired-found-guide-input {
+  padding: 8px 2px 0;
+}
+.wired-found-guide-input span {
+  font-size: 9px;
+}
+.wired-found-guide-input input {
+  border: 0;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.34);
+  background: rgba(0, 8, 13, 0.72);
+  box-shadow: inset 0 -1px 0 rgba(109, 241, 255, 0.08);
+}
+.wired-found-eye {
+  right: 314px;
+  top: 112px;
+  width: 182px;
+  pointer-events: none;
+}
+.wired-found-eye-core {
+  position: relative;
+  height: 116px;
+  overflow: hidden;
+  border: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.08), transparent 54%),
+    rgba(0, 9, 14, 0.92);
+}
+.wired-found-eye-core::before {
+  inset: 24px 18px;
+}
+.wired-found-eye-copy {
+  padding-top: 6px;
+  color: rgba(216, 251, 255, 0.68);
+}
+.wired-found-map {
+  left: 50%;
+  top: 114px;
+  width: min(340px, calc(100vw - 36px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.wired-found-map-canvas {
+  height: 188px;
+  border: 0;
+  background:
+    linear-gradient(rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 241, 255, 0.08) 1px, transparent 1px),
+    rgba(0, 9, 14, 0.76);
+  background-size: 28px 28px;
+  opacity: 0.82;
+}
+.wired-found-radar {
+  right: 18px;
+  top: 120px;
+  width: 170px;
+  pointer-events: none;
+}
+.wired-found-radar-core {
+  height: 170px;
+  border: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.14), transparent 54%),
+    rgba(0, 9, 14, 0.9);
+}
+.wired-found-radar-ring {
+  border-color: rgba(109, 241, 255, 0.22);
+}
+.wired-found-particles {
+  opacity: 0.9;
+}
+.wired-found-particle {
+  background: rgba(109, 241, 255, 0.76);
+  box-shadow: 0 0 12px rgba(109, 241, 255, 0.45);
+}
+.wired-found-ticker {
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  height: 32px;
+  border: 0;
+  background: rgba(0, 6, 10, 0.72);
+  opacity: 0.85;
+}
+.wired-found-ticker-track {
+  gap: 54px;
+  animation-duration: 14s;
+}
+.wired-found-ticker-track span {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+}
+.wired-found-ribbon {
+  display: none;
+}
+.wired-found-lyric-stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34%;
+  height: 240px;
+  pointer-events: none;
+  overflow: hidden;
+}
+.wired-found-lyric-line {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  will-change: transform, filter, opacity;
+}
+.wired-found-lyric-line-inner {
+  position: relative;
+  font-size: clamp(42px, 7vw, 100px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(216, 251, 255, 0.68);
+  text-shadow:
+    0 0 14px rgba(109, 241, 255, 0.34),
+    0 0 38px rgba(109, 241, 255, 0.12);
+  opacity: 0.8;
+}
+.wired-found-lyric-line-glow {
+  position: absolute;
+  inset: -28px -72px;
+  background: radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.22), transparent 60%);
+  filter: blur(8px);
+  opacity: 0;
+  transform: scale(0.9);
+  mix-blend-mode: screen;
+}
+.wired-found-lyric-stage.is-impact .wired-found-lyric-line-inner {
+  color: #f6ffff;
+  text-shadow:
+    0 0 22px rgba(109, 241, 255, 0.92),
+    0 0 54px rgba(109, 241, 255, 0.22);
+  opacity: 0.98;
+  filter: drop-shadow(0 0 18px rgba(109, 241, 255, 0.24));
+}
+.wired-found-lyric-stage.is-impact .wired-found-lyric-line-glow {
+  opacity: 1;
+  animation: wiredLyricSplash 0.66s ease-out;
+}
+.wired-found-lyric-stage.is-leaving .wired-found-lyric-line-inner {
+  opacity: 0.58;
+  filter: blur(0.6px);
+}
+.wired-found-matrix-col {
+  color: rgba(109, 241, 255, 0.34);
+  opacity: 0.54;
+  text-shadow: 0 0 8px rgba(109, 241, 255, 0.14);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, black 18%, black 46%, rgba(0, 0, 0, 0) 80%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, black 18%, black 46%, rgba(0, 0, 0, 0) 80%);
+  animation-name: wiredMatrixFlow, wiredMatrixFade;
+  animation-timing-function: linear, ease-out;
+}
+.wired-found-guide {
+  right: 18px;
+  bottom: 18px;
+  width: min(260px, calc(100vw - 36px));
+  opacity: 0.82;
+}
+.wired-found-guide-face {
+  width: 176px;
+  height: 128px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(109, 241, 255, 0.18), 0 0 20px rgba(109, 241, 255, 0.1);
+}
+.wired-found-guide-copy strong {
+  font-size: 12px;
+}
+.wired-found-guide-copy span {
+  color: rgba(216, 251, 255, 0.64);
+}
+.wired-found-terminal {
+  left: 18px;
+  bottom: 72px;
+  width: min(480px, calc(100vw - 36px));
+  opacity: 0.62;
+}
+.wired-found-terminal-body {
+  min-height: 82px;
+  max-height: 122px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.wired-found-guide {
+  right: 18px;
+  bottom: 72px;
+  width: min(238px, calc(100vw - 36px));
+  opacity: 0.74;
+}
+.wired-found-guide-face {
+  width: 154px;
+  height: 112px;
+}
+.wired-found-guide-copy strong {
+  font-size: 11px;
+}
+.wired-found-guide-copy span,
+.wired-found-guide-input {
+  font-size: 10px;
+}
+.wired-found-eye {
+  right: 22px;
+  top: 96px;
+  width: 132px;
+  opacity: 0.48;
+}
+.wired-found-eye-core {
+  height: 78px;
+}
+.wired-found-eye-core::before {
+  inset: 18px 16px;
+}
+.wired-found-eye-copy {
+  font-size: 10px;
+}
+.wired-found-map {
+  left: auto;
+  right: 170px;
+  top: 104px;
+  width: 210px;
+  transform: none;
+  opacity: 0.38;
+}
+.wired-found-map-canvas {
+  height: 118px;
+}
+.wired-found-radar {
+  right: 22px;
+  top: 210px;
+  width: 108px;
+  opacity: 0.42;
+}
+.wired-found-radar-core {
+  height: 108px;
+}
+.wired-found-radar-ring {
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  margin-top: -28px;
+}
+.wired-found-radar-ring:nth-child(2) {
+  width: 88px;
+  height: 88px;
+  margin-left: -44px;
+  margin-top: -44px;
+}
+.wired-found-particles {
+  opacity: 0.36;
+}
+.wired-found-particle {
+  background: rgba(109, 241, 255, 0.42);
+  box-shadow: 0 0 8px rgba(109, 241, 255, 0.24);
+}
+.wired-found-ticker {
+  bottom: 50px;
+  height: 22px;
+  opacity: 0.42;
+}
+.wired-found-ticker-track span {
+  font-size: 9px;
+}
+.wired-found-protocols {
+  position: absolute;
+  left: 18px;
+  top: 86px;
+  z-index: 2;
+  display: grid;
+  gap: 7px;
+  width: min(250px, calc(100vw - 36px));
+  pointer-events: auto;
+}
+.wired-found-protocol {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  min-height: 42px;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 1px solid rgba(109, 241, 255, 0.2);
+  border-radius: 4px;
+  color: rgba(216, 251, 255, 0.74);
+  background:
+    linear-gradient(90deg, rgba(109, 241, 255, 0.09), transparent 62%),
+    rgba(0, 8, 13, 0.42);
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+  text-align: left;
+  box-shadow: 0 0 16px rgba(109, 241, 255, 0.08);
+  cursor: pointer;
+}
+.wired-found-protocol:hover {
+  border-color: rgba(109, 241, 255, 0.42);
+  color: #e9feff;
+}
+.wired-found-protocol span {
+  color: rgba(255, 241, 183, 0.76);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+.wired-found-protocol strong {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.wired-found-protocol-meter i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(109, 241, 255, 0.76);
+  transform-origin: left center;
+}
+
+/* ---------------------------------------------------------------------------
+   Instrument modules — MAGI / Voight-Kampff / capsule / ghost / bounty / summon
+   Each reads real session data (see findingModules.ts); the panels below are
+   the terminal fiction wrapped around those numbers. Palette stays locked to
+   the spec: cyan baseline, amber for attention, no new hues.
+   --------------------------------------------------------------------------- */
+
+/* The protocol tiles are articles now, not buttons — only their controls click. */
+.wired-found-protocols > article.wired-found-protocol {
+  cursor: default;
+  gap: 5px;
+}
+.wired-found-protocol header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wired-found-protocol footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(216, 251, 255, 0.56);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+.wired-found-empty {
+  margin: 0;
+  color: rgba(216, 251, 255, 0.42);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+/* MAGI — three units, dissent shown in amber so a split vote reads at a glance. */
+.wired-found-magi-units {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wired-found-magi-units li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px;
+  border-left: 2px solid rgba(109, 241, 255, 0.5);
+  background: rgba(109, 241, 255, 0.05);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.wired-found-magi-units li.is-dissent {
+  border-left-color: rgba(255, 177, 59, 0.72);
+  background: rgba(255, 177, 59, 0.06);
+}
+.wired-found-magi-units b {
+  color: rgba(216, 251, 255, 0.62);
+  font-weight: 600;
+}
+.wired-found-magi-units i {
+  color: #e9feff;
+  font-style: normal;
+  text-transform: uppercase;
+}
+.wired-found-magi-units li.is-dissent i {
+  color: #fff1b7;
+}
+
+/* Voight-Kampff — a reading test on the user's own vocabulary. */
+.wired-found-vk-word {
+  padding: 4px 0;
+  color: #e9feff;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-shadow: 0 0 18px rgba(109, 241, 255, 0.42);
+}
+.wired-found-vk-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wired-found-vk-choice {
+  width: 100%;
+  padding: 4px 5px;
+  border: 1px solid rgba(109, 241, 255, 0.24);
+  border-radius: 3px;
+  color: rgba(216, 251, 255, 0.86);
+  background: rgba(0, 8, 13, 0.5);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.wired-found-vk-choice:hover:not(:disabled) {
+  border-color: rgba(109, 241, 255, 0.6);
+  color: #e9feff;
+}
+.wired-found-vk-choice:disabled {
+  cursor: default;
+}
+.wired-found-vk-choice.is-correct {
+  border-color: rgba(109, 241, 255, 0.9);
+  color: #e9feff;
+  background: rgba(109, 241, 255, 0.16);
+}
+.wired-found-vk-choice.is-wrong {
+  border-color: rgba(255, 177, 59, 0.8);
+  color: #fff1b7;
+  background: rgba(255, 177, 59, 0.12);
+}
+.wired-found-vk-next {
+  justify-self: end;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 177, 59, 0.5);
+  border-radius: 3px;
+  color: #fff1b7;
+  background: transparent;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+/* Capsule sync — today's minutes against the daily target. */
+.wired-found-capsule-bar {
+  height: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(109, 241, 255, 0.1) 0 3px,
+    transparent 3px 6px
+  );
+}
+.wired-found-capsule-bar i {
+  display: block;
+  height: 100%;
+  background: rgba(109, 241, 255, 0.76);
+  transform-origin: left center;
+}
+.wired-found-capsule[data-band='overdrive'] .wired-found-capsule-bar i {
+  background: rgba(255, 177, 59, 0.86);
+}
+
+/* Ghost line — one intercepted term, meaning withheld until asked for. */
+.wired-found-ghost-term {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #e9feff;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+.wired-found-ghost-term em {
+  color: rgba(255, 241, 183, 0.7);
+  font-size: 10px;
+  font-style: normal;
+}
+.wired-found-ghost-reveal {
+  padding: 3px 6px;
+  border: 1px dashed rgba(109, 241, 255, 0.36);
+  border-radius: 3px;
+  color: rgba(216, 251, 255, 0.86);
+  background: transparent;
+  font-family: inherit;
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.wired-found-ghost-reveal:hover {
+  border-style: solid;
+  color: #e9feff;
+}
+
+/* Bounty board — weakest vocabulary, priced by how unlearned it is. */
+.wired-found-bounty-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Two rows: term + reward on the first, meaning on its own line below. A
+   single three-column row crushed the meaning to one character as soon as the
+   term was long — and deck entries are routinely long (grammar points carry
+   their gloss in the term itself). */
+.wired-found-bounty-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 1px 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(109, 241, 255, 0.12);
+  font-size: 9px;
+}
+.wired-found-bounty-list b {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #e9feff;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wired-found-bounty-list i {
+  grid-column: 2;
+  grid-row: 1;
+}
+.wired-found-bounty-list span {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(216, 251, 255, 0.56);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wired-found-bounty-list i {
+  color: #fff1b7;
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+/* Summon — toggles a real companion onto the desktop. */
+.wired-found-summon-btn {
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 177, 59, 0.46);
+  border-radius: 3px;
+  color: #fff1b7;
+  background: rgba(255, 177, 59, 0.07);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+.wired-found-summon-btn:hover {
+  border-color: rgba(255, 177, 59, 0.8);
+  background: rgba(255, 177, 59, 0.14);
+}
+
+/* The ticker renders its message set twice so the scroll can loop seamlessly. */
+.wired-found-ticker-group {
+  display: flex;
+  align-items: center;
+  gap: 42px;
+}
+
+/* Idle loops are opt-out: `data-wired-idle='off'` is the user's setting, and
+   the OS-level reduced-motion preference overrides everything. Both must stop
+   the ambient layers without hiding the instruments that carry real data. */
+:root[data-wired-idle='off'] .wired-found-matrix,
+:root[data-wired-idle='off'] .wired-found-particles {
+  display: none;
+}
+:root[data-wired-motion='off'] .wired-found-ticker-track,
+:root[data-wired-motion='off'] .wired-found-radar-sweep,
+:root[data-wired-motion='off'] .wired-found-map-sweep {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wired-found-matrix,
+  .wired-found-particles {
+    display: none;
+  }
+
+  .wired-found-ticker-track,
+  .wired-found-radar-sweep,
+  .wired-found-map-sweep,
+  .wired-found-lyric-line,
+  .wired-found-guide-glitch,
+  .wired-found-guide-scan {
+    animation: none;
+  }
+
+  .wired-found-eye-iris,
+  .wired-found-radar-point {
+    transition: none;
+  }
+}
+@keyframes wiredLyricSplash {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+    filter: blur(9px);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.1);
+    filter: blur(1.5px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+    filter: blur(12px);
+  }
+}
+@keyframes wiredMatrixFade {
+  0% {
+    opacity: 0.08;
+  }
+  24% {
+    opacity: 0.52;
+  }
+  58% {
+    opacity: 0.36;
+  }
+  84% {
+    opacity: 0.16;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes wiredMatrixFlow {
+  from { transform: translateY(14%); }
+  to { transform: translateY(-30%); }
+}
+@keyframes wiredTerminalFlicker {
+  0%, 84%, 100% { opacity: 0.92; }
+  85% { opacity: 0.42; transform: translateX(1px); }
+  86% { opacity: 0.88; transform: translateX(-1px); }
+  87% { opacity: 0.72; }
+}
+@keyframes wiredGuideGlitchA {
+  0%, 72%, 100% { clip-path: inset(0 0 0 0); transform: translateX(0); opacity: 0.22; }
+  73% { clip-path: inset(10% 0 64% 0); transform: translateX(3px); opacity: 0.48; }
+  74% { clip-path: inset(52% 0 18% 0); transform: translateX(-4px); opacity: 0.34; }
+  75% { clip-path: inset(0 0 0 0); transform: translateX(0); opacity: 0.22; }
+}
+@keyframes wiredGuideGlitchB {
+  0%, 88%, 100% { clip-path: inset(52% 0 0 0); transform: translateX(0); opacity: 0.16; }
+  89% { clip-path: inset(26% 0 34% 0); transform: translateX(-2px); opacity: 0.34; }
+  90% { clip-path: inset(66% 0 8% 0); transform: translateX(2px); opacity: 0.24; }
+  91% { clip-path: inset(52% 0 0 0); transform: translateX(0); opacity: 0.16; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-materials='wired'] .fwin::before {
+    opacity: 0.12;
+  }
+
+  :root[data-materials='wired'] .mini-frame,
+  :root[data-materials='wired'] .mini-frame::after {
+    animation: none;
+  }
+
+  :root[data-materials='wired'] .mini-slot:hover {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Breach — the exit sequence
+   ---------------------------------------------------------------------------
+   Not a fade-out. The display tears, the archive addresses the operator with
+   their own study history, and asks how they want to proceed. Sits above every
+   window because it is the one moment nothing else may be interacted with.
+
+   Palette stays locked: cyan baseline, amber for the address line, the danger
+   red reserved for the tear itself — a breach is the rare emergency the spec
+   says red exists for.
+   --------------------------------------------------------------------------- */
+.wired-breach {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(ellipse at 50% 45%, rgba(0, 18, 26, 0.86), rgba(0, 4, 7, 0.97));
+  animation: wiredBreachIn 220ms steps(4) both;
+}
+
+/* Rolling horizontal hold — the picture failing to lock. */
+.wired-breach-scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(109, 241, 255, 0.07) 0 1px,
+    transparent 1px 3px
+  );
+  animation: wiredBreachRoll 2.4s linear infinite;
+  pointer-events: none;
+}
+
+/* A band of the frame slipping sideways, dragging a red edge with it. */
+.wired-breach-tear {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 14%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(223, 39, 50, 0.16) 20%,
+    rgba(109, 241, 255, 0.2) 50%,
+    transparent
+  );
+  mix-blend-mode: screen;
+  animation: wiredBreachTear 3.7s steps(9) infinite;
+  pointer-events: none;
+}
+
+.wired-breach-inner {
+  position: relative;
+  width: min(620px, 100%);
+  padding: 26px 30px;
+  border: 1px solid rgba(109, 241, 255, 0.34);
+  background: rgba(0, 8, 13, 0.82);
+  box-shadow: 0 0 60px rgba(109, 241, 255, 0.1);
+  color: #d8fbff;
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+  outline: none;
+}
+
+.wired-breach-kicker {
+  margin: 0 0 10px;
+  color: #df2732;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.wired-breach-title {
+  margin: 0 0 18px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.25;
+  text-shadow: 0 0 22px rgba(109, 241, 255, 0.34);
+}
+
+.wired-breach-facts {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(109, 241, 255, 0.34);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.wired-breach-facts p {
+  margin: 0;
+  color: rgba(216, 251, 255, 0.8);
+}
+
+/* The line where it stops narrating and starts talking to you. */
+.wired-breach-address {
+  color: #fff1b7 !important;
+  letter-spacing: 0.05em;
+}
+
+.wired-breach-question {
+  margin: 0 0 12px;
+  color: #e9feff;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.wired-breach-actions {
+  display: grid;
+  gap: 7px;
+}
+.wired-breach-actions button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 13px;
+  border: 1px solid rgba(109, 241, 255, 0.28);
+  border-radius: 0;
+  background: rgba(109, 241, 255, 0.05);
+  color: #d8fbff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 90ms steps(2), background 90ms steps(2);
+}
+.wired-breach-actions button:hover,
+.wired-breach-actions button:focus-visible {
+  border-color: rgba(109, 241, 255, 0.75);
+  background: rgba(109, 241, 255, 0.12);
+  outline: none;
+}
+.wired-breach-actions button b {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.wired-breach-actions button span {
+  color: rgba(216, 251, 255, 0.54);
+  font-size: 10px;
+}
+/* Staying is the archive's own preference, so it wears the amber. */
+.wired-breach-actions button.is-stay b {
+  color: #fff1b7;
+}
+.wired-breach-actions button.is-stay {
+  border-color: rgba(255, 177, 59, 0.4);
+}
+.wired-breach-actions button.is-stay:hover,
+.wired-breach-actions button.is-stay:focus-visible {
+  border-color: rgba(255, 177, 59, 0.85);
+  background: rgba(255, 177, 59, 0.12);
+}
+
+@keyframes wiredBreachIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes wiredBreachRoll {
+  from { transform: translateY(0); }
+  to { transform: translateY(3px); }
+}
+@keyframes wiredBreachTear {
+  0%, 44% { top: 18%; opacity: 0; transform: translateX(0); }
+  46% { opacity: 1; transform: translateX(-3%); }
+  52% { opacity: 1; transform: translateX(2%); }
+  58% { top: 63%; opacity: 1; transform: translateX(-1%); }
+  62%, 100% { opacity: 0; transform: translateX(0); }
+}
+
+/* The tear and roll are the whole point of the effect, so under reduced motion
+   the sequence still runs — it just arrives already settled, with the prompt
+   shown immediately (the component jumps straight to its final step). */
+@media (prefers-reduced-motion: reduce) {
+  .wired-breach,
+  .wired-breach-scan,
+  .wired-breach-tear {
+    animation: none;
+  }
+  .wired-breach-tear {
+    display: none;
+  }
+}

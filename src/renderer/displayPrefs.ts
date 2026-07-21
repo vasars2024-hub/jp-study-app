@@ -1,7 +1,4 @@
-/**
- * Display & accessibility preferences (zoom lives in appZoom.ts; reduce-motion
- * is still the legacy MOTION_KEY — mirrored here for the Display page).
- */
+import { setWindowChromeMode, type WindowChromeMode, parseWindowChromeMode } from './windowChrome';
 
 export type ContrastId = 'normal' | 'medium' | 'high';
 export type LetterSpacingId = 'tight' | 'normal' | 'loose';
@@ -36,6 +33,8 @@ export interface DisplayPrefs {
   reduceFlashes: boolean;
   /** Stronger outline on focused controls. */
   underlineLinks: boolean;
+  /** Native window chrome: standard OS bar, in-app bar, or fully frameless. */
+  windowChromeMode: WindowChromeMode;
 }
 
 const KEY = 'jp-os-display-prefs-v1';
@@ -59,6 +58,7 @@ const DEFAULTS: DisplayPrefs = {
   colorFilter: 'none',
   reduceFlashes: false,
   underlineLinks: false,
+  windowChromeMode: 'standard',
 };
 
 function clamp(n: number, a: number, b: number): number {
@@ -70,8 +70,8 @@ export function loadDisplayPrefs(): DisplayPrefs {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const p = JSON.parse(raw) as Partial<DisplayPrefs>;
-      return normalize({ ...DEFAULTS, ...p });
+      const p = JSON.parse(raw) as Partial<DisplayPrefs> & { borderless?: boolean };
+      return normalize({ ...DEFAULTS, ...p, windowChromeMode: chromeFromStored(p) });
     }
   } catch {
     /* ignore */
@@ -85,6 +85,12 @@ export function loadDisplayPrefs(): DisplayPrefs {
     /* ignore */
   }
   return { ...DEFAULTS };
+}
+
+function chromeFromStored(p: Partial<DisplayPrefs> & { borderless?: boolean }): WindowChromeMode {
+  if (p.windowChromeMode) return parseWindowChromeMode(p.windowChromeMode);
+  if (p.borderless === true) return 'borderless';
+  return 'standard';
 }
 
 function normalize(s: DisplayPrefs): DisplayPrefs {
@@ -125,6 +131,7 @@ function normalize(s: DisplayPrefs): DisplayPrefs {
     colorFilter,
     reduceFlashes: s.reduceFlashes === true,
     underlineLinks: s.underlineLinks === true,
+    windowChromeMode: parseWindowChromeMode(s.windowChromeMode),
   };
 }
 
@@ -208,13 +215,17 @@ function focusAlpha(id: FocusRingId): string {
 }
 
 export function saveDisplayPrefs(partial: Partial<DisplayPrefs>): DisplayPrefs {
-  const next = normalize({ ...loadDisplayPrefs(), ...partial });
+  const prev = loadDisplayPrefs();
+  const next = normalize({ ...prev, ...partial });
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     /* ignore */
   }
   applyDisplayPrefs(next);
+  if (prev.windowChromeMode !== next.windowChromeMode) {
+    void setWindowChromeMode(next.windowChromeMode);
+  }
   window.dispatchEvent(new CustomEvent<DisplayPrefs>(EVENT, { detail: next }));
   return next;
 }
@@ -230,6 +241,7 @@ export function onDisplayPrefsChanged(cb: (s: DisplayPrefs) => void): () => void
 }
 
 export function resetDisplayPrefs(): DisplayPrefs {
+  const prev = loadDisplayPrefs();
   try {
     localStorage.removeItem(KEY);
   } catch {
@@ -237,6 +249,9 @@ export function resetDisplayPrefs(): DisplayPrefs {
   }
   const next = { ...DEFAULTS };
   applyDisplayPrefs(next);
+  if (prev.windowChromeMode !== next.windowChromeMode) {
+    void setWindowChromeMode(next.windowChromeMode);
+  }
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {

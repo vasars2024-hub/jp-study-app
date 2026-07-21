@@ -1,29 +1,64 @@
-import { app, BrowserWindow, protocol, net, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, protocol, net, shell, ipcMain, dialog, globalShortcut, session, type OpenDialogOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot } from './main/library';
 import { registerDictionaryIpc, initYomitan } from './main/dictionary';
 import { registerMediaIpc } from './main/media';
+import { registerYtPlaylistsIpc } from './main/ytPlaylists';
 import { registerProfileIpc } from './main/profiles';
 import { registerAnkiIpc } from './main/anki';
+import { registerProfileRulesIpc } from './main/profileRules';
 import { registerApkgIpc } from './main/anki/apkgImport';
 import { registerDesktopIpc } from './main/desktop';
 import { registerCityIpc } from './main/city';
 import { registerTranslateIpc } from './main/translate';
+import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
 import { registerMiningIpc } from './main/mining';
 import { registerImmersionIpc } from './main/immersion';
 import { registerSystemMetricsIpc } from './main/systemMetrics';
 import { registerReleaseIpc } from './main/release';
+import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
+import { registerCollectedToolsIpc } from './main/collectedTools';
+import { registerStatsIpc } from './main/stats';
+import { registerJitenIpc } from './main/jiten';
 import { initDownloads, registerDownloadIpc } from './main/downloads';
+import { registerMangaOcrIpc } from './main/mangaOcr';
 import { registerMainI18nIpc } from './main/i18n';
+import { startDebugBridge, stopDebugBridge, recordDebugLog } from './main/debugBridge';
+import {
+  registerExtensionBridgeIpc,
+  startExtensionServer,
+  stopExtensionServer,
+} from './main/extensionServer';
+import {
+  loadWindowChromePrefs,
+  mainWindowOptions,
+  registerWindowChromeIpc,
+} from './main/windowChrome';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
+import type { AutomationBuilderLaunchResult } from './shared/automationBuilder';
+import {
+  sanitizeToolboxFileSearchRequest,
+  type ToolboxFileSearchRequest,
+  type ToolboxFileSearchResponse,
+  type ToolboxFileSearchResult,
+} from './shared/toolboxFileSearch';
 import {
   configureCompanionHost,
   registerCompanionHostIpc,
   closeCompanionHost,
 } from './main/companionHost';
+import { registerBuddySchedulerIpc, stopBuddyScheduler } from './main/buddyScheduler';
+import {
+  configureSystemDictionary,
+  registerSystemDictionaryIpc,
+  startSystemDictionary,
+  stopSystemDictionary,
+} from './main/systemDictionary';
+import { logDiagnostic, errorDetail } from './main/errorLog';
 
 if (started) {
   app.quit();
@@ -42,7 +77,14 @@ process.stderr?.on?.('error', (err) => {
 process.on('uncaughtException', (err) => {
   if (isEpipe(err)) return;
   console.error(err);
+  logDiagnostic('error', 'main', 'uncaughtException', errorDetail(err));
   app.quit();
+});
+// Previously unhandled promise rejections in the main process were silent
+// (Node's default is a console warning at best) — log them so they're
+// diagnosable without a dev console attached (PHASE_6_5_AUDIT.md Phase 8 gap).
+process.on('unhandledRejection', (reason) => {
+  logDiagnostic('error', 'main', 'unhandledRejection', errorDetail(reason));
 });
 
 if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined' && MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -127,6 +169,61 @@ function registerMediaProtocol(): void {
   });
 }
 
+// Content-Security-Policy for the packaged app's own document
+// (app://bundle/index.html and any same-origin app:// sub-resources it loads).
+// Only registered when the app:// protocol itself is registered (production —
+// see the app.whenReady() call site), so this never touches the Vite dev
+// server origin, which needs eval/HMR websockets the CSP below would block.
+// media:/playfile:/localfile: are registered with bypassCSP: true (see
+// registerSchemesAsPrivileged above), so resources referenced from those
+// schemes keep loading regardless of what's listed here — this CSP's real
+// job is blocking a compromised renderer from loading/exfiltrating to an
+// arbitrary https:// host (PHASE_6_5_AUDIT.md §3, chained High finding).
+function registerContentSecurityPolicy(): void {
+  const csp = [
+    "default-src 'self' app: media: playfile: localfile:",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' app: media: playfile: localfile: data: blob:",
+    "media-src 'self' app: media: playfile: localfile: blob:",
+    "font-src 'self' app: data:",
+    // HuggingFace hosts are the one exception to "self only": the on-device
+    // Whisper transcription (Transformers.js) streams its ONNX model weights
+    // from HuggingFace on first use, then caches them for offline reuse. Scoped
+    // to HF's domains — this is deliberately NOT a blanket https: allowance, so
+    // a compromised renderer still can't exfiltrate to an arbitrary host
+    // (PHASE_6_5_AUDIT.md §3). The onnxruntime engine itself is served locally
+    // from app://bundle/ort (see whisperWorker.ts), so it needs no host here.
+    "connect-src 'self' app: media: playfile: localfile: https://huggingface.co https://*.huggingface.co https://*.hf.co",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'none'",
+  ].join('; ');
+
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: ['app://*/*'] },
+    (details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [csp],
+        },
+      });
+    },
+  );
+}
+
+function registerDiagnosticsIpc(): void {
+  ipcMain.handle('diagnostics:logRendererError', (_e, payload: { subsystem?: string; operation?: string; detail?: string }) => {
+    logDiagnostic(
+      'error',
+      typeof payload?.subsystem === 'string' ? payload.subsystem.slice(0, 64) : 'renderer',
+      typeof payload?.operation === 'string' ? payload.operation.slice(0, 128) : 'error',
+      typeof payload?.detail === 'string' ? payload.detail : '',
+    );
+  });
+}
+
 function registerShellIpc(): void {
   ipcMain.handle('shell:openExternal', async (_e, url: unknown): Promise<boolean> => {
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
@@ -135,6 +232,169 @@ function registerShellIpc(): void {
     }
     return false;
   });
+}
+
+function registerAppLifecycleIpc(): void {
+  ipcMain.handle('app:relaunch', (): { ok: boolean } => {
+    app.relaunch();
+    app.exit(0);
+    return { ok: true };
+  });
+}
+
+// Folders the user has actually picked via toolbox:pickSearchFolder this
+// session. toolbox:fileSearch only accepts a root that is one of these (or a
+// subdirectory of one), since the file-search UI has no free-text root input.
+const lastPickedSearchRoots = new Set<string>();
+
+function isAllowedSearchRoot(resolvedRoot: string): boolean {
+  for (const picked of lastPickedSearchRoots) {
+    if (resolvedRoot === picked || resolvedRoot.startsWith(picked + path.sep)) return true;
+  }
+  return false;
+}
+
+function registerToolboxIpc(): void {
+  ipcMain.handle('toolbox:launchAutomationBuilder', (): AutomationBuilderLaunchResult => {
+    const candidates = [
+      path.join(app.getAppPath(), 'automation-builder.ps1'),
+      path.join(process.cwd(), 'automation-builder.ps1'),
+    ];
+    const scriptPath = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!scriptPath) {
+      return { ok: false, error: 'automation-builder.ps1 was not found in the app root.' };
+    }
+
+    try {
+      const child = spawn(
+        'powershell.exe',
+        ['-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+        {
+          cwd: path.dirname(scriptPath),
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: false,
+        },
+      );
+      child.unref();
+      return { ok: true, pid: child.pid, scriptPath };
+    } catch (err) {
+      return {
+        ok: false,
+        scriptPath,
+        error: err instanceof Error ? err.message : 'Failed to launch Automation Builder.',
+      };
+    }
+  });
+
+  ipcMain.handle('toolbox:pickSearchFolder', async (): Promise<string | null> => {
+    const options: OpenDialogOptions = {
+      title: 'Choose a folder to search',
+      properties: ['openDirectory'],
+    };
+    const result =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, options)
+        : await dialog.showOpenDialog(options);
+    if (result.canceled || !result.filePaths[0]) return null;
+    const picked = path.resolve(result.filePaths[0]);
+    // The renderer's FileSearchPanel only ever gets `root` from this picker
+    // result (there's no free-text root input) — remember it so
+    // toolbox:fileSearch can reject a root that didn't come from here
+    // (PHASE_6_5_AUDIT.md §3 Medium finding: a compromised renderer could
+    // otherwise call fileSearch directly with an arbitrary root to
+    // enumerate any folder on disk).
+    lastPickedSearchRoots.add(picked);
+    return picked;
+  });
+
+  ipcMain.handle(
+    'toolbox:fileSearch',
+    async (_event, input: ToolboxFileSearchRequest): Promise<ToolboxFileSearchResponse> => {
+      const request = sanitizeToolboxFileSearchRequest(input);
+      const root = path.resolve(request.root);
+      const needle = request.query.toLowerCase();
+      if (!needle) return { ok: false, error: 'Enter a search term.' };
+      if (!isAllowedSearchRoot(root)) {
+        return {
+          ok: false,
+          root,
+          error: 'Choose a folder with "Browse" before searching.',
+        };
+      }
+
+      try {
+        const stat = await fs.promises.stat(root);
+        if (!stat.isDirectory()) return { ok: false, root, error: 'Search root is not a folder.' };
+      } catch (error) {
+        return {
+          ok: false,
+          root,
+          error: error instanceof Error ? error.message : 'Search root is unavailable.',
+        };
+      }
+
+      const extensionSet = new Set(request.extensions);
+      const results: ToolboxFileSearchResult[] = [];
+      const stack = [root];
+      let scanned = 0;
+      let truncated = false;
+
+      while (stack.length > 0) {
+        if (scanned >= request.maxScanned! || results.length >= request.maxResults!) {
+          truncated = true;
+          break;
+        }
+        const current = stack.pop()!;
+        let entries: fs.Dirent[];
+        try {
+          entries = await fs.promises.readdir(current, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+
+        for (const entry of entries) {
+          if (scanned >= request.maxScanned! || results.length >= request.maxResults!) {
+            truncated = true;
+            break;
+          }
+          if (entry.isSymbolicLink()) continue;
+
+          const fullPath = path.join(current, entry.name);
+          const isDirectory = entry.isDirectory();
+          const ext = isDirectory ? '' : path.extname(entry.name).slice(1).toLowerCase();
+
+          if (isDirectory) {
+            stack.push(fullPath);
+          } else {
+            scanned += 1;
+          }
+
+          if (
+            entry.name.toLowerCase().includes(needle) &&
+            (isDirectory || extensionSet.size === 0 || extensionSet.has(ext))
+          ) {
+            try {
+              const itemStat = await fs.promises.stat(fullPath);
+              results.push({
+                name: entry.name,
+                path: fullPath,
+                ext,
+                size: itemStat.size,
+                modifiedMs: itemStat.mtimeMs,
+                isDirectory,
+              });
+            } catch {
+              /* skip entries that vanish during search */
+            }
+          }
+        }
+      }
+
+      results.sort((a, b) => Number(a.isDirectory) - Number(b.isDirectory) || a.name.localeCompare(b.name));
+      return { ok: true, root, results, scanned, truncated };
+    },
+  );
 }
 
 function isDevServer(): boolean {
@@ -151,6 +411,18 @@ function rendererUrl(query = ''): string {
   return `${base}${base.includes('?') ? '&' : '?'}${query}`;
 }
 
+/**
+ * The Blanc Toolbox window has its own HTML entry so it never boots the Study OS
+ * bundle (BLANC_REFINEMENT_PLAN.md Pillar 1). Keeps `blanc=1` on the query
+ * string: `isBlancWindow()` reads it, and several renderer modules branch on it.
+ */
+function blancUrl(): string {
+  const base = isDevServer()
+    ? `${MAIN_WINDOW_VITE_DEV_SERVER_URL.replace(/\/$/, '')}/blanc.html`
+    : 'app://bundle/blanc.html';
+  return `${base}?blanc=1`;
+}
+
 // Mirror the renderer's console to our terminal (dev only). Registered per
 // window so pop-out windows report errors too.
 function forwardRendererConsole(win: BrowserWindow): void {
@@ -159,7 +431,11 @@ function forwardRendererConsole(win: BrowserWindow): void {
       (a) => a && typeof a === 'object' && 'message' in (a as Record<string, unknown>),
     ) as { message?: string } | undefined;
     const message = details?.message ?? (typeof args[2] === 'string' ? args[2] : '');
-    if (message) console.log(`[renderer] ${message}`);
+    if (message) {
+      console.log(`[renderer] ${message}`);
+      // Tee to the debug bridge so the line survives the process that printed it.
+      recordDebugLog(`renderer:${win.id}`, 'log', message);
+    }
   });
 }
 
@@ -167,9 +443,21 @@ function forwardRendererConsole(win: BrowserWindow): void {
 let mainWindow: BrowserWindow | null = null;
 /** Floating Mini craft widget — frameless, transparent, always-on-top. */
 let miniWidgetWindow: BrowserWindow | null = null;
+/** Compact Blanc Toolbox side window — parallel to the full Study OS. */
+let blancWindow: BrowserWindow | null = null;
 /** Compact PIN lock widget — frameless, transparent, no OS shadow. */
 let lockscreenWindow: BrowserWindow | null = null;
 let lockscreenDismissedViaUnlock = false;
+
+const BLANC_DEFAULT_W = 720;
+const BLANC_DEFAULT_H = 560;
+const BLANC_MIN_W = 380;
+const BLANC_MIN_H = 340;
+// No hard max: Blanc must maximize and go fullscreen to fill any monitor, and
+// stay laid out from a tiny window to an ultrawide. The layout is fully fluid,
+// so the window size is the user's to choose.
+const BLANC_MAX_W = 100000;
+const BLANC_MAX_H = 100000;
 
 const MINI_DEFAULT_W = 360;
 const MINI_DEFAULT_H = 440;
@@ -198,21 +486,52 @@ function attachNavGuards(win: BrowserWindow): void {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
+  // Every window goes through attachNavGuards, so this is one place to catch
+  // renderer crashes/hangs for all six window types (previously unmonitored —
+  // PHASE_6_5_AUDIT.md Phase 8 gap: a renderer crash just left a blank/frozen
+  // window with no log trail).
+  win.webContents.on('render-process-gone', (_e, details) => {
+    logDiagnostic('error', 'renderer', 'render-process-gone', `reason=${details.reason}`);
+  });
+  win.on('unresponsive', () => {
+    logDiagnostic('warn', 'renderer', 'unresponsive', win.getTitle());
+  });
 }
 
-const createWindow = (): void => {
+const createWindow = (restore?: {
+  bounds?: { x: number; y: number; width: number; height: number };
+  maximized?: boolean;
+  visible?: boolean;
+}): void => {
+  const chrome = loadWindowChromePrefs();
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 860,
+    width: restore?.bounds?.width ?? 1280,
+    height: restore?.bounds?.height ?? 860,
+    x: restore?.bounds?.x,
+    y: restore?.bounds?.y,
     minWidth: 940,
     minHeight: 600,
     backgroundColor: '#1b1b21',
     autoHideMenuBar: true,
+    // Deferred show + ready-to-show, matching every other window in this file
+    // (Blanc/Mini/Lockscreen/pop-out) — the main window was the only one that
+    // showed immediately on construction instead of waiting for first paint,
+    // which is the standard Electron cause of a window staying blank on some
+    // GPU/compositor setups (nothing to swap in yet when it's first shown).
+    show: false,
+    ...mainWindowOptions(chrome),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       // Immersion Browser guest pages (<webview>) — isolated from window.api.
       webviewTag: true,
     },
+  });
+
+  if (restore?.maximized) mainWindow.maximize();
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && restore?.visible !== false) {
+      mainWindow.show();
+    }
   });
 
   // Companion host is skipTaskbar; tear it down when the real main window closes
@@ -226,6 +545,7 @@ const createWindow = (): void => {
       lockscreenWindow.close();
     }
     closeCompanionHost();
+    stopBuddyScheduler();
   });
 
   attachNavGuards(mainWindow);
@@ -238,6 +558,204 @@ const createWindow = (): void => {
     mainWindow.loadURL(rendererUrl());
   }
 };
+
+function recreateMainWindow(): void {
+  const old = mainWindow;
+  if (!old || old.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  const restore = {
+    bounds: old.getBounds(),
+    maximized: old.isMaximized(),
+    visible: old.isVisible(),
+  };
+  old.removeAllListeners('closed');
+  old.once('closed', () => {
+    createWindow(restore);
+  });
+  old.close();
+}
+
+/**
+ * Blanc Toolbox runs beside the full Study OS. It is intentionally much smaller
+ * than the main desktop window and never hides or relaunches the main shell.
+ */
+function blancBoundsFile(): string {
+  return path.join(app.getPath('userData'), 'blanc-window.json');
+}
+
+/** Last Blanc window size, saved on close. Applied only when the caller passes
+ *  no explicit size (the renderer omits it when rememberWindowBounds is on). */
+function readSavedBlancSize(): { width: number; height: number } | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(blancBoundsFile(), 'utf8')) as {
+      width?: unknown;
+      height?: unknown;
+    };
+    if (typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
+    return { width: parsed.width, height: parsed.height };
+  } catch {
+    return null;
+  }
+}
+
+function saveBlancSize(win: BrowserWindow): void {
+  try {
+    const { width, height } = win.getBounds();
+    fs.writeFileSync(blancBoundsFile(), JSON.stringify({ width, height }));
+  } catch {
+    /* best effort; the default size is always safe */
+  }
+}
+
+function createBlancWindow(size?: { width?: number; height?: number }): void {
+  const saved = size ? null : readSavedBlancSize();
+  const width = Math.min(
+    BLANC_MAX_W,
+    Math.max(BLANC_MIN_W, Math.round(size?.width ?? saved?.width ?? BLANC_DEFAULT_W)),
+  );
+  const height = Math.min(
+    BLANC_MAX_H,
+    Math.max(BLANC_MIN_H, Math.round(size?.height ?? saved?.height ?? BLANC_DEFAULT_H)),
+  );
+
+  if (blancWindow && !blancWindow.isDestroyed()) {
+    blancWindow.setSize(width, height);
+    if (blancWindow.isMinimized()) blancWindow.restore();
+    blancWindow.show();
+    blancWindow.focus();
+    return;
+  }
+
+  blancWindow = new BrowserWindow({
+    width,
+    height,
+    minWidth: BLANC_MIN_W,
+    minHeight: BLANC_MIN_H,
+    // No maxWidth/maxHeight: the window may fill any monitor. The layout is
+    // fluid, so maximize and fullscreen both stay usable.
+    frame: true,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: true,
+    skipTaskbar: false,
+    title: 'Blanc Toolbox',
+    backgroundColor: '#1c1c1e',
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      // BlancShell never mounts ImmersionView (the only <webview> consumer) — no
+      // guest-page capability needed here.
+      backgroundThrottling: false,
+    },
+  });
+
+  const win = blancWindow;
+  attachNavGuards(win);
+  if (isDevServer()) forwardRendererConsole(win);
+
+  win.once('ready-to-show', () => {
+    if (!win.isDestroyed()) win.show();
+  });
+  win.on('close', () => {
+    if (!win.isDestroyed()) saveBlancSize(win);
+  });
+  win.on('closed', () => {
+    blancWindow = null;
+  });
+
+  void win.loadURL(blancUrl());
+}
+
+function closeBlancWindow(): void {
+  if (blancWindow && !blancWindow.isDestroyed()) {
+    blancWindow.close();
+  }
+  blancWindow = null;
+}
+
+function registerBlancIpc(): void {
+  ipcMain.handle(
+    'blanc:open',
+    (_e, size?: { width?: number; height?: number }): { ok: boolean } => {
+      createBlancWindow(size);
+      return { ok: true };
+    },
+  );
+  ipcMain.handle('blanc:close', (): { ok: boolean } => {
+    closeBlancWindow();
+    return { ok: true };
+  });
+  ipcMain.handle('blanc:isOpen', (): boolean =>
+    Boolean(blancWindow && !blancWindow.isDestroyed()),
+  );
+  ipcMain.handle('blanc:setFullScreen', (event, on: unknown): { ok: boolean } => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win !== blancWindow || win.isDestroyed()) return { ok: false };
+    win.setFullScreen(on === true);
+    return { ok: true };
+  });
+
+  // OS-level global shortcut for `toolbox.open`. The renderer pushes the user's
+  // current binding here on boot and on every rebind, so the registry's
+  // `global: true` claim is real, not in-app-only. Registration can fail when
+  // another application owns the accelerator; the in-app binding still works.
+  let blancGlobalAccelerator: string | null = null;
+  ipcMain.handle('blanc:setGlobalShortcut', (_event, chord: unknown): { ok: boolean; error?: string } => {
+    if (blancGlobalAccelerator) {
+      try {
+        globalShortcut.unregister(blancGlobalAccelerator);
+      } catch {
+        /* already gone */
+      }
+      blancGlobalAccelerator = null;
+    }
+    if (typeof chord !== 'string' || !chord.trim()) return { ok: true };
+    // The chord format is "Ctrl+Alt+B" (alternatives split by "|"); register the
+    // first alternative only. Electron uses "Super" where the app says "Meta".
+    const accelerator = chord.split('|')[0]!.trim().replace(/\bMeta\b/g, 'Super');
+    if (!/^([\w]+\+)+[\w,.;'[\]/\\`=-]+$/.test(accelerator)) {
+      return { ok: false, error: 'This shortcut cannot be registered system-wide.' };
+    }
+    if (!/(Ctrl|Alt|Shift|Super|CmdOrCtrl)\+/i.test(accelerator)) {
+      return { ok: false, error: 'Global shortcuts need at least one modifier key.' };
+    }
+    try {
+      const registered = globalShortcut.register(accelerator, () => createBlancWindow());
+      if (!registered) {
+        return { ok: false, error: `"${accelerator}" is already in use by another application.` };
+      }
+      blancGlobalAccelerator = accelerator;
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Could not register the global shortcut.' };
+    }
+  });
+
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+  });
+
+  // Blanc cannot serve Settings-only extension deep-links; focus the main Study
+  // OS window and forward the original target there (not broadcast to all
+  // windows — that would re-enter Blanc's handler and loop).
+  ipcMain.handle(
+    'extension:focus-main-and-open',
+    (_event, target: unknown): { ok: boolean } => {
+      const t = String(target || '').trim().toLowerCase();
+      if (!t) return { ok: false };
+      if (!mainWindow || mainWindow.isDestroyed()) recreateMainWindow();
+      if (!mainWindow || mainWindow.isDestroyed()) return { ok: false };
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('extension:ui-open', { target: t });
+      return { ok: true };
+    },
+  );
+}
 
 /**
  * True Mini Widget Mode: a small borderless transparent always-on-top window
@@ -283,7 +801,8 @@ function createMiniWidgetWindow(size?: { width?: number; height?: number }): voi
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      webviewTag: true,
+      // MiniShell never mounts ImmersionView (the only <webview> consumer) — no
+      // guest-page capability needed here.
       backgroundThrottling: false,
     },
   });
@@ -417,7 +936,8 @@ function createLockscreenWindow(size?: { width?: number; height?: number }): voi
     center: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      webviewTag: true,
+      // Lockscreen never mounts ImmersionView (the only <webview> consumer) — no
+      // guest-page capability needed here.
       backgroundThrottling: false,
     },
   });
@@ -511,9 +1031,9 @@ function registerLockscreenIpc(): void {
 // Sections that may be detached into their own OS window. Mirrors the real apps
 // in the desktop shell; excludes desktop-only trinkets (note/visualizer).
 const POPOUT_SECTIONS = new Set([
-  'library', 'novels', 'dictionary', 'grammar', 'translate', 'player', 'music',
-  'anki', 'flashcards', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings',
+  'library', 'novels', 'reading', 'dictionary', 'grammar', 'notebook', 'translate', 'player', 'video', 'music',
+  'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
+  'calendar', 'settings', 'youtube',
 ]);
 
 // One real OS window per section, max. Keyed here (not just left to the
@@ -634,29 +1154,45 @@ function registerPlayerSyncIpc(): void {
 // "in sync". Do not reintroduce a blanket clearStorageData() call.
 
 app.whenReady().then(async () => {
+  if (isDevServer()) startDebugBridge();
   ensureLibrary();
   if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'undefined' || !MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     registerAppProtocol();
+    registerContentSecurityPolicy();
   }
   registerMediaProtocol();
   registerLocalFileProtocol();
   registerLibraryIpc();
   registerDictionaryIpc();
+  registerDiagnosticsIpc();
   registerShellIpc();
+  registerAppLifecycleIpc();
+  registerToolboxIpc();
   registerMediaIpc();
+  registerYtPlaylistsIpc();
   registerProfileIpc();
   registerAnkiIpc();
+  registerProfileRulesIpc();
   registerApkgIpc();
   registerDesktopIpc();
   registerCityIpc();
   registerTranslateIpc();
+  registerTranslateAnalysisIpc();
   registerMiningIpc();
   registerImmersionIpc();
   registerSystemMetricsIpc();
   registerReleaseIpc();
+  registerResourcesCatalogIpc();
+  registerCollectedToolsIpc();
+  registerStatsIpc();
+  registerJitenIpc();
   registerDownloadIpc();
+  registerMangaOcrIpc();
   registerMainI18nIpc();
+  registerExtensionBridgeIpc();
+  registerWindowChromeIpc(recreateMainWindow);
   registerPopoutIpc();
+  registerBlancIpc();
   registerMiniWidgetIpc();
   registerLockscreenIpc();
   registerPlayerSyncIpc();
@@ -666,7 +1202,18 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerCompanionHostIpc();
+  registerBuddySchedulerIpc();
+  configureSystemDictionary({
+    rendererUrl,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+  });
+  registerSystemDictionaryIpc();
   createWindow();
+  startExtensionServer();
+  // System-wide popup dictionary: registers its global hotkey + tray if enabled.
+  startSystemDictionary();
   // Provision + load offline dictionaries in the background so the window paints
   // immediately. Consumers that need glosses (mining, the pop-up) await
   // initYomitan() themselves, and a dict:updated event refreshes the UI.
@@ -686,7 +1233,16 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   // Companion host is skipTaskbar; still count as a window — close it so quit proceeds.
   closeCompanionHost();
+  stopBuddyScheduler();
+  stopExtensionServer();
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  stopBuddyScheduler();
+  stopExtensionServer();
+  stopSystemDictionary();
+  stopDebugBridge();
 });

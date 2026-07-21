@@ -5,7 +5,6 @@ import {
   buildExampleByLang,
   extractTranslationRefs,
   hasFieldTemplates,
-  labelExampleLang,
   maxExampleCountNeeded,
   pickExamplesForMining,
   requiredExampleLangs,
@@ -23,6 +22,43 @@ import { getActiveProfile, onProfileChanged } from '../profileState';
 import { translateTo, type TransLang } from '../translator';
 import { firstGlossSegment, glossForLangFromEntries } from '../../shared/mining';
 import { recordDictionaryEntry } from '../clipboardHistory';
+import { useT } from '../i18n';
+
+type TFn = (key: string) => string;
+
+// Maps the stable de-inflection reason identifiers (shared/deinflect.ts) to
+// their localized catalog keys. Unmapped reasons fall back to the raw string.
+const REASON_KEY: Record<string, string> = {
+  polite: 'deinflect.reason.polite',
+  'polite negative': 'deinflect.reason.politeNegative',
+  'polite past': 'deinflect.reason.politePast',
+  'polite past negative': 'deinflect.reason.politePastNegative',
+  'polite volitional': 'deinflect.reason.politeVolitional',
+  negative: 'deinflect.reason.negative',
+  past: 'deinflect.reason.past',
+  '-te': 'deinflect.reason.te',
+  causative: 'deinflect.reason.causative',
+  passive: 'deinflect.reason.passive',
+  'passive/potential': 'deinflect.reason.passivePotential',
+  potential: 'deinflect.reason.potential',
+  volitional: 'deinflect.reason.volitional',
+  imperative: 'deinflect.reason.imperative',
+  'conditional (–ば)': 'deinflect.reason.conditionalBa',
+  'conditional (–たら)': 'deinflect.reason.conditionalTara',
+  '–たり': 'deinflect.reason.tari',
+  '–たい': 'deinflect.reason.tai',
+  '–すぎる': 'deinflect.reason.sugiru',
+  adverbial: 'deinflect.reason.adverbial',
+  'progressive (–ている)': 'deinflect.reason.progressive',
+  'completion (–てしまう)': 'deinflect.reason.shimau',
+  'completion (–ちゃう)': 'deinflect.reason.chau',
+  '–ておく': 'deinflect.reason.teoku',
+};
+
+function reasonLabel(reason: string, t: TFn): string {
+  const key = REASON_KEY[reason];
+  return key ? t(key) : reason;
+}
 
 /** Word-level bases: dictionary gloss first, Qwen only as the fail-switch. */
 const WORD_LEVEL_BASES = new Set(['expression', 'meaning', 'translation']);
@@ -192,6 +228,7 @@ function glossFor(entry: DictEntry): string {
 }
 
 export default function DictionaryResults({ query, variant = 'popup', lang = 'ja', context }: Props) {
+  const { t } = useT();
   const [result, setResult] = useState<DictResult | null>(null);
   const [anki, setAnki] = useState<AnkiStatus | null>(null);
   const [ankiLink, setAnkiLink] = useState<AnkiLinkStatus | null>(null);
@@ -327,15 +364,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         setAddState((p) => ({ ...p, [i]: 'error' }));
         setAddErr((p) => ({
           ...p,
-          [i]: `Could not load examples: ${r.error}`,
+          [i]: t('dict.results.err.loadExamples', { error: r.error }),
         }));
         return;
       } else {
         setAddState((p) => ({ ...p, [i]: 'error' }));
         setAddErr((p) => ({
           ...p,
-          [i]:
-            'No Tatoeba examples for this word. Enable “Expression fallback” in field mapping, or add {expression} to your templates.',
+          [i]: t('dict.results.err.noTatoeba'),
         }));
         return;
       }
@@ -349,7 +385,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       setAddState((p) => ({ ...p, [i]: 'error' }));
       setAddErr((p) => ({
         ...p,
-        [i]: 'Example sentences are required for your field mapping. Click "Example sentences" and select at least one.',
+        [i]: t('dict.results.err.examplesRequired'),
       }));
       return;
     }
@@ -420,9 +456,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         setAddState((p) => ({ ...p, [i]: 'error' }));
         setAddErr((p) => ({
           ...p,
-          [i]:
-            `${missingExLangs.map(labelExampleLang).join(' and ')} example text is empty. ` +
-            'Wait for “Translating examples…” to finish, or enable expression fallback in field mapping.',
+          [i]: t('dict.results.err.waitTranslate'),
         }));
         return;
       }
@@ -528,6 +562,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     // The profile's field mapping (or auto role mapper) decides where each
     // variable lands; we just supply the raw content for this entry.
     const res = await window.api.ankiMineNote({
+      route: { source: 'dictionary', cardKind: 'word' },
       term: entry.word,
       reading: entry.reading && entry.reading !== entry.word ? entry.reading : undefined,
       meaning: glossFor(entry) || undefined,
@@ -547,7 +582,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       setAddState((p) => ({ ...p, [i]: 'dup' }));
     } else {
       setAddState((p) => ({ ...p, [i]: 'error' }));
-      setAddErr((p) => ({ ...p, [i]: res.error ?? 'Could not add the card.' }));
+      setAddErr((p) => ({ ...p, [i]: res.error ?? t('dict.results.err.addFailed') }));
     }
   }
 
@@ -691,20 +726,20 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       case 'added':
         return (
           <>
-            Added
+            {t('dict.results.added')}
             <Icon name="check" size={12} style={{ marginLeft: 4, verticalAlign: '-1px' }} />
           </>
         );
       case 'dup':
-        return 'Already in Anki';
+        return t('dict.results.alreadyInAnki');
       case 'translating':
-        return 'Translating sentence…';
+        return t('dict.results.translating');
       case 'adding':
-        return 'Adding…';
+        return t('dict.results.adding');
       case 'error':
-        return 'Retry adding to Anki';
+        return t('dict.results.retryAdd');
       default:
-        return '+ Add to Anki';
+        return t('dict.results.add');
     }
   }
 
@@ -728,10 +763,24 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
   return (
     <div className={`dict-results ${variant}`}>
-      {query.trim() && !result && <div className="dict-loading">Looking up…</div>}
+      {query.trim() && !result && <div className="dict-loading">{t('dict.results.lookingUp')}</div>}
       {result?.error && <div className="dict-empty">{result.error}</div>}
       {result && !result.error && entries.length === 0 && (
-        <div className="dict-empty">No dictionary match for “{query}”.</div>
+        <div className="dict-empty">{t('dict.results.noMatch', { query })}</div>
+      )}
+
+      {result?.deinflection && (
+        <div className="dict-deinflection">
+          <span className="dict-deinflection-forms" lang="ja">
+            {t('deinflect.matched', {
+              source: result.deinflection.source,
+              term: result.deinflection.term,
+            })}
+          </span>
+          <span className="dict-deinflection-reasons">
+            {result.deinflection.reasons.map((r) => reasonLabel(r, t)).join(' · ')}
+          </span>
+        </div>
       )}
 
       <div className="dict-entries">
@@ -748,23 +797,25 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                     {entry.reading}
                   </span>
                 )}
-                {entry.isCommon && <span className="dict-badge common">common</span>}
+                {entry.isCommon && (
+                  <span className="dict-badge common">{t('dict.results.common')}</span>
+                )}
                 {entry.jlpt[0] && <span className="dict-badge jlpt">{entry.jlpt[0]}</span>}
                 {entry.frequency != null && (
-                  <span className="dict-badge freq" title="Corpus frequency rank">
+                  <span className="dict-badge freq" title={t('dict.results.freqTitle')}>
                     #{entry.frequency}
                   </span>
                 )}
                 <button
                   className="dict-star"
-                  title="Copy to clipboard history"
+                  title={t('dict.results.copyClipboard')}
                   onClick={() => copyDictionaryEntry(entry)}
                 >
                   <Icon name="clipboard" size={14} />
                 </button>
                 <button
                   className={`dict-star ${saved ? 'on' : ''}`}
-                  title={saved ? 'Saved to Flashcards' : 'Save to Flashcards'}
+                  title={saved ? t('dict.results.savedFlashcards') : t('dict.results.saveFlashcards')}
                   onClick={() => toggleSave(entry)}
                 >
                   <Icon name="star" size={14} fill={saved} />
@@ -772,7 +823,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
               </div>
               {entry.pitchHtml && (
                 <div className="dict-pitch" lang="ja">
-                  <span className="dict-pitch-label">Pitch</span>
+                  <span className="dict-pitch-label">{t('dict.results.pitch')}</span>
                   <span
                     className="dict-pitch-pattern"
                     dangerouslySetInnerHTML={{ __html: entry.pitchHtml }}
@@ -817,20 +868,22 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         <div className="dict-examples">
           {exState === 'idle' && (
             <button className="dict-ex-btn" onClick={loadExamples}>
-              Example sentences
+              {t('dict.results.examples')}
             </button>
           )}
-          {exState === 'loading' && <div className="dict-ex-status muted">Searching Tatoeba…</div>}
+          {exState === 'loading' && (
+            <div className="dict-ex-status muted">{t('dict.results.searchingTatoeba')}</div>
+          )}
           {exState === 'error' && <div className="dict-ex-status muted">{exError}</div>}
           {exState === 'done' && examples.length === 0 && (
-            <div className="dict-ex-status muted">No example sentences found.</div>
+            <div className="dict-ex-status muted">{t('dict.results.noExamples')}</div>
           )}
           {exState === 'done' && examples.length > 0 && (
             <>
               <div className="dict-ex-head">
-                <span className="dict-ex-title">Example sentences</span>
+                <span className="dict-ex-title">{t('dict.results.examples')}</span>
                 <label className="dict-ex-show">
-                  Show
+                  {t('dict.results.show')}
                   <input
                     type="number"
                     min={1}
@@ -853,14 +906,9 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                 </div>
               </div>
               {exTransLoading && (
-                <div className="dict-ex-status muted">Translating examples…</div>
+                <div className="dict-ex-status muted">{t('dict.results.translatingExamples')}</div>
               )}
-              <p className="dict-ex-hint muted">
-                <b>Manual:</b> click examples to choose exactly which ones go on the card (all
-                selected are used). <b>Auto:</b> mine without selecting — the first N Tatoeba hits
-                per language from field mapping are used. Reader context stays in{' '}
-                <code>{'{sentence}'}</code>.
-              </p>
+              <p className="dict-ex-hint muted">{t('dict.results.exHint')}</p>
               <ul className="dict-ex-list">
                 {examples.slice(0, displayCount).map((ex, i) => (
                   <li
@@ -915,37 +963,47 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           {variant !== 'popup' &&
             (selectedEx.size > 0 ? (
               <span className="dict-ex-selected muted">
-                {selectedEx.size} selected (manual) — all will be mined
+                {t('dict.results.selectedManual', { count: selectedEx.size })}
               </span>
             ) : (
               <span className="dict-ex-selected muted">
-                Auto examples: up to {counts.ja} ja / {counts.en} en / {counts.ru} ru / {counts.zh} zh
+                {t('dict.results.autoExamples', {
+                  ja: counts.ja,
+                  en: counts.en,
+                  ru: counts.ru,
+                  zh: counts.zh,
+                })}
               </span>
             ))}
           {variant === 'popup' && (
             <div className="dict-anki-tip">
               <div className="dict-anki-tip-row">
-                <span className="muted">Language</span>
+                <span className="muted">{t('dict.results.label.language')}</span>
                 <b>{lang.toUpperCase()}</b>
               </div>
               <div className="dict-anki-tip-row">
-                <span className="muted">Profile</span>
+                <span className="muted">{t('dict.results.label.profile')}</span>
                 <b>{active.label}</b>
               </div>
               <div className="dict-anki-tip-row">
-                <span className="muted">Deck</span>
+                <span className="muted">{t('dict.results.label.deck')}</span>
                 <b>{active.anki.deckName}</b>
               </div>
               <div className="dict-anki-tip-row">
-                <span className="muted">Note type</span>
+                <span className="muted">{t('dict.results.label.noteType')}</span>
                 <b>{active.anki.modelName}</b>
               </div>
               <div className="dict-anki-tip-row">
-                <span className="muted">Examples</span>
+                <span className="muted">{t('dict.results.label.examples')}</span>
                 <b>
                   {selectedEx.size > 0
-                    ? `${selectedEx.size} selected (manual)`
-                    : `up to ${counts.ja} ja / ${counts.en} en / ${counts.ru} ru / ${counts.zh} zh`}
+                    ? t('dict.results.selectedManualShort', { count: selectedEx.size })
+                    : t('dict.results.autoExamplesShort', {
+                        ja: counts.ja,
+                        en: counts.en,
+                        ru: counts.ru,
+                        zh: counts.zh,
+                      })}
                 </b>
               </div>
             </div>

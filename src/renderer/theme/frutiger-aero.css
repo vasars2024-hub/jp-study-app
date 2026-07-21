@@ -28,16 +28,18 @@
   --border: #90afba;
   --grid-line: rgba(18, 49, 67, 0.14);
 
-  /* ---- Accents — sky/aqua primary + warm-sunlight secondary ----
-     (Study OS uses red for --accent/--red; Aero swaps to sky blue, with warm
-     orange kept on --red so danger/caution controls still read as warm.) */
-  --accent: #d7245f;
-  --accent-2: #00a8c8;
+  /* ---- Accents — sky/aqua primary + warm secondary ----
+     Study OS uses red for --accent/--red. Aero puts sky aqua on --accent and
+     keeps warm red on --red/--red-deep for danger/caution controls. */
+  --accent: #00a8c8;
+  --accent-2: #35a86b;
   --red: #c21f45;
   --red-deep: #861a33;
   --aero-aqua: #00b8d0;
   --aero-green: #35a86b;
   --aero-amber: #f4b04c;
+  --focus-ring-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  --status-info: var(--accent);
 
   /* ---- Controls — frosted white ---- */
   --control-bg: rgba(255, 255, 255, 0.84);

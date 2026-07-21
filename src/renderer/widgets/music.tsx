@@ -9,6 +9,9 @@ import {
   type PlayerState,
 } from '../playerBus';
 import Icon from '../components/Icons';
+import { useT } from '../i18n';
+import { useWiredMaterials } from '../components/ui';
+import WiredOscilloscope from '../components/wired/WiredOscilloscope';
 
 function fmt(t: number): string {
   if (!Number.isFinite(t) || t <= 0) return '0:00';
@@ -18,27 +21,30 @@ function fmt(t: number): string {
 
 // ---------- Mini player (queue + playback + volume) ----------
 export function MiniPlayer() {
+  const { t } = useT();
+  const wired = useWiredMaterials();
   const [st, setSt] = useState<PlayerState>(() => getState());
   useEffect(() => subscribe(setSt), []);
   const pct = st.duration > 0 ? (st.time / st.duration) * 100 : 0;
   return (
     <div className="wgt wgt-player">
       <div className="wgt-player-title" title={st.current?.title}>
-        {st.current?.title ?? 'Nothing playing'}
+        {st.current?.title ?? t('widgets.miniPlayer.nothingPlaying')}
       </div>
+      {wired && <WiredOscilloscope className="wgt-player-osc" />}
       <div className="wgt-player-times">
         <span>{fmt(st.time)}</span>
         <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${pct}%` }} /></div>
         <span>{fmt(st.duration)}</span>
       </div>
       <div className="wgt-row wgt-player-ctrls">
-        <button className="wgt-btn-icon" title="Previous" onClick={() => prev()}>
+        <button className="wgt-btn-icon" title={t('widgets.miniPlayer.previous')} onClick={() => prev()}>
           <Icon name="skip-back" size={14} />
         </button>
-        <button className="wgt-btn-icon lg" title={st.playing ? 'Pause' : 'Play'} onClick={() => toggle()}>
+        <button className="wgt-btn-icon lg" title={st.playing ? t('common.pause') : t('widgets.miniPlayer.play')} onClick={() => toggle()}>
           <Icon name={st.playing ? 'pause' : 'player'} size={15} />
         </button>
-        <button className="wgt-btn-icon" title="Next" onClick={() => next()}>
+        <button className="wgt-btn-icon" title={t('widgets.miniPlayer.next')} onClick={() => next()}>
           <Icon name="skip-forward" size={14} />
         </button>
       </div>
@@ -53,7 +59,7 @@ export function MiniPlayer() {
           value={Math.round(st.volume * 100)}
           onChange={(e) => setVolume(Number(e.target.value) / 100)}
         />
-        <span className="wgt-player-queue">{st.queue.length} in queue</span>
+        <span className="wgt-player-queue">{t('widgets.miniPlayer.inQueue', { count: st.queue.length })}</span>
       </div>
     </div>
   );

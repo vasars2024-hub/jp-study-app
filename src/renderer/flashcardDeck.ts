@@ -1,6 +1,13 @@
 // Local deck store for EPUB-mined flashcards with user folders and auto book groups.
 
-export type FlashcardSource = 'dictionary' | 'epub' | 'epub-ai' | 'import' | 'csv';
+export type FlashcardSource =
+  | 'dictionary'
+  | 'epub'
+  | 'epub-ai'
+  | 'import'
+  | 'csv'
+  | 'jiten'
+  | 'extension';
 
 export interface DeckFlashcard {
   id: string;
@@ -14,6 +21,8 @@ export interface DeckFlashcard {
   bookId?: string;
   bookTitle?: string;
   folder?: string;
+  /** Optional recorded audio as a data URL (short clips from extension). */
+  audioDataUrl?: string;
   /** Persisted study state — marked via review "Got it". */
   known?: boolean;
   addedAt: number;
@@ -110,6 +119,11 @@ export function addDeckCards(entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[]): 
     id: newId(),
     addedAt: now + index,
   }));
+  for (const entry of created) {
+    if (entry.folder && !store.folders.includes(entry.folder)) {
+      store.folders = [...store.folders, entry.folder];
+    }
+  }
   store.cards = [...created, ...store.cards];
   writeStore(store);
   return store.cards;
@@ -179,6 +193,24 @@ export function setBookGroupFolder(
       (c.bookId || 'unknown') === bookId && (c.bookTitle || 'Unknown source') === bookTitle;
     if (!matches) return c;
     return { ...c, folder: trimmed || undefined };
+  });
+  writeStore(store);
+  return store.cards;
+}
+
+export function renameBookGroup(
+  bookId: string,
+  oldTitle: string,
+  newTitle: string,
+): DeckFlashcard[] {
+  const store = readStore();
+  const trimmed = newTitle.trim();
+  if (!trimmed) return store.cards;
+  store.cards = store.cards.map((c) => {
+    const matches =
+      (c.bookId || 'unknown') === bookId && (c.bookTitle || 'Unknown source') === oldTitle;
+    if (!matches) return c;
+    return { ...c, bookTitle: trimmed };
   });
   writeStore(store);
   return store.cards;

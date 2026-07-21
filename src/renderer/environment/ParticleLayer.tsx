@@ -60,8 +60,8 @@ function resolvePresets(env: EnvironmentSettings): ParticlePresetId[] {
     }
     return suggestPresetsFromTags(activeTags(env));
   }
-  const list = env.particlePresets ?? [];
-  return list.length ? list : ['fireflies'];
+  // No fallback: an empty selection means the user turned every preset off.
+  return env.particlePresets ?? [];
 }
 
 function secretLifecycleSuspended(): boolean {

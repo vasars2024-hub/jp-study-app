@@ -49,12 +49,18 @@ let baseUrl = '';
 
 /** Set per-test to make the server misbehave in a specific, realistic way. */
 let ignoreRange = false;
+/** Serve a tiny HTML body instead of the model — mimics a captive portal. */
+let serveTinyHtml = false;
 let requests: { range: string | undefined }[] = [];
 
 beforeAll(async () => {
   server = http.createServer((req, res) => {
     requests.push({ range: req.headers.range });
-    const body = req.url?.startsWith('/archive') ? ZIP : PAYLOAD;
+    const body = serveTinyHtml
+      ? Buffer.from('<html>login required</html>')
+      : req.url?.startsWith('/archive')
+        ? ZIP
+        : PAYLOAD;
     const range = ignoreRange ? undefined : req.headers.range;
 
     if (range) {
@@ -83,6 +89,7 @@ afterAll(async () => {
 beforeEach(async () => {
   userDataDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'jp-downloads-'));
   ignoreRange = false;
+  serveTinyHtml = false;
   requests = [];
 });
 
@@ -182,8 +189,9 @@ describe('download → verify → install', () => {
     expect(fs.existsSync(partialPath('test-model'))).toBe(false);
   });
 
-  it('rejects a truncated download when no hash is pinned', async () => {
-    // Server sends 60 KB; the catalog claims 10 MB. Size check must catch it.
+  it('rejects a captive-portal HTML body when no hash is pinned', async () => {
+    // Server sends a tiny login page; the catalog claims 10 MB. Must not install.
+    serveTinyHtml = true;
     await boot(fileSpec({ sizeBytes: 10_000_000 }));
     await startDownload('test-model');
     await settle('test-model');

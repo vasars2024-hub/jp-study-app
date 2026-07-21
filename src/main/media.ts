@@ -5,7 +5,8 @@ import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
-import type { MediaItem, MediaOpen, SubtitlePick } from '../shared/types';
+import type { MediaItem, MediaOpen, SubtitlePick, YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
+import { classifyMediaKind } from '../shared/mediaKind';
 import { mt } from './i18n';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
@@ -79,23 +80,187 @@ function cleanTitle(file: string): string {
   return t || path.basename(file);
 }
 
-function addOrGetItem(absPath: string, touch = true): MediaItem {
+function addOrGetItem(
+  absPath: string,
+  touch = true,
+  extra?: { sourceUrl?: string; youtubeId?: string },
+): MediaItem {
   const db = readDb();
   let item = db.items.find((i) => i.path === absPath);
+  if (!item && extra?.youtubeId) {
+    item = db.items.find((i) => i.youtubeId === extra.youtubeId);
+  }
   if (!item) {
+    const fileName = path.basename(absPath);
     item = {
       id: crypto.randomUUID(),
       title: cleanTitle(absPath),
       path: absPath,
-      fileName: path.basename(absPath),
+      fileName,
       addedAt: Date.now(),
+      kind: classifyMediaKind(fileName),
+      sourceUrl: extra?.sourceUrl,
+      youtubeId: extra?.youtubeId,
     };
     db.items.unshift(item);
+  } else {
+    if (!item.kind) item.kind = classifyMediaKind(item.fileName, item.durationSec);
+    if (extra?.sourceUrl) item.sourceUrl = extra.sourceUrl;
+    if (extra?.youtubeId) item.youtubeId = extra.youtubeId;
+    if (item.path !== absPath && fs.existsSync(absPath)) {
+      item.path = absPath;
+      item.fileName = path.basename(absPath);
+      item.title = cleanTitle(absPath);
+    }
   }
   if (touch) item.lastPlayedAt = Date.now();
   writeDb(db);
   return item;
 }
+
+/** Extract YouTube video id from a watch / youtu.be URL when possible. */
+export function extractYoutubeVideoId(url: string): string | undefined {
+  const raw = (url ?? '').trim();
+  try {
+    const u = new URL(raw);
+    if (u.hostname.includes('youtu.be')) {
+      const id = u.pathname.replace(/^\//, '').split('/')[0];
+      return id || undefined;
+    }
+    const v = u.searchParams.get('v');
+    if (v) return v;
+  } catch {
+    /* ignore */
+  }
+  const m = /(?:v=|youtu\.be\/)([\w-]{6,})/.exec(raw);
+  return m?.[1];
+}
+
+export interface DownloadYoutubeResult {
+  item: MediaItem;
+  url: string;
+  subtitle?: SubtitlePick;
+}
+
+/**
+ * Shared YouTube / remote media download via yt-dlp.
+ * Used by MediaView and the playlist manager.
+ */
+export async function downloadYoutubeUrl(
+  link: string,
+  options: YouTubeDownloadOptions,
+  onProgress?: (ev: { stage: string; percent: number }) => void,
+): Promise<DownloadYoutubeResult | { error: string }> {
+  const trimmed = typeof link === 'string' ? link.trim() : '';
+  if (!isRemoteMediaLink(trimmed)) return { error: 'Please paste a valid video or media link.' };
+  const opts = normalizeYoutubeDownloadOptions(options.audioOnly, options);
+  const bin = await findYtDlp();
+  if (!bin) {
+    return {
+      error: 'yt-dlp was not found on your PATH. Install it (e.g. `pip install -U yt-dlp`) and reopen the app.',
+    };
+  }
+  const outDir = path.join(app.getPath('userData'), 'downloads');
+  fs.mkdirSync(outDir, { recursive: true });
+  const pathFile = path.join(outDir, `.out_${crypto.randomUUID()}.txt`);
+  const format = opts.audioOnly
+    ? ['-f', 'ba[ext=m4a]/ba/b', '-x', '--audio-format', 'm4a']
+    : ['-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b', '--merge-output-format', 'mp4'];
+  const subtitleLangs = opts.audioOnly ? [] : resolveYtDlpSubtitleLangs(opts);
+  const subtitleArgs =
+    subtitleLangs.length > 0
+      ? ['--write-subs', '--sub-langs', subtitleLangs.join(','), '--sub-format', 'vtt/srt/ass/best']
+      : [];
+  const args = [
+    trimmed,
+    ...format,
+    ...subtitleArgs,
+    '--ffmpeg-location',
+    ffmpegPath,
+    '--referer',
+    trimmed,
+    '--no-playlist',
+    '--newline',
+    '--no-part',
+    '-o',
+    path.join(outDir, '%(title).150B [%(id)s].%(ext)s'),
+    '--print-to-file',
+    'after_move:filepath',
+    pathFile,
+  ];
+  return new Promise((resolve) => {
+    const proc = spawn(bin, args);
+    let err = '';
+    const onData = (buf: Buffer): void => {
+      const s = buf.toString();
+      const m = /\[download\]\s+([\d.]+)%/.exec(s);
+      if (m) onProgress?.({ stage: 'downloading', percent: parseFloat(m[1]) });
+      else if (/\[Merger\]|Merging formats/.test(s)) onProgress?.({ stage: 'merging', percent: 100 });
+    };
+    proc.stdout.on('data', onData);
+    proc.stderr.on('data', (d: Buffer) => {
+      err += d.toString();
+      onData(d);
+    });
+    proc.on('error', (e2) => resolve({ error: `Could not run yt-dlp: ${e2.message}` }));
+    proc.on('close', (code) => {
+      let file = '';
+      try {
+        file = (fs.readFileSync(pathFile, 'utf-8').trim().split(/\r?\n/).pop() ?? '').trim();
+      } catch {
+        /* no path file */
+      }
+      try {
+        fs.rmSync(pathFile, { force: true });
+      } catch {
+        /* ignore */
+      }
+      if (code !== 0 || !file || !fs.existsSync(file)) {
+        const lastLine = err.trim().split('\n').pop()?.trim();
+        resolve({ error: `Download failed${lastLine ? `: ${lastLine}` : '.'}` });
+        return;
+      }
+      const youtubeId = extractYoutubeVideoId(trimmed);
+      const item = addOrGetItem(file, true, { sourceUrl: trimmed, youtubeId });
+      broadcastMedia();
+      resolve({
+        item,
+        url: `playfile://${tokenFor(item.path)}`,
+        subtitle: findDownloadedSubtitle(file, primarySubtitleLang(opts)),
+      });
+    });
+  });
+}
+
+/** Run yt-dlp -J --flat-playlist and return parsed JSON (or error). */
+export async function ytDlpJson(args: string[]): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  const bin = await findYtDlp();
+  if (!bin) {
+    return { ok: false, error: 'yt-dlp was not found on your PATH.' };
+  }
+  return new Promise((resolve) => {
+    const proc = spawn(bin, args);
+    let out = '';
+    let err = '';
+    proc.stdout.on('data', (d: Buffer) => (out += d.toString()));
+    proc.stderr.on('data', (d: Buffer) => (err += d.toString()));
+    proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        const last = err.trim().split('\n').pop()?.trim();
+        resolve({ ok: false, error: last || `yt-dlp exited with code ${code}` });
+        return;
+      }
+      try {
+        resolve({ ok: true, data: JSON.parse(out) });
+      } catch {
+        resolve({ ok: false, error: 'Could not parse yt-dlp JSON.' });
+      }
+    });
+  });
+}
+
+export { findYtDlp, ytDlpSubtitleLangs, findDownloadedSubtitle, normalizeYoutubeDownloadOptions };
 
 function broadcastMedia(): void {
   const items = readDb().items;
@@ -183,7 +348,8 @@ function clearAllMedia(): MediaItem[] {
 // ----- ffmpeg helpers -----
 
 /** Decode a file's audio to mono 16 kHz 32-bit-float PCM (what Whisper wants). */
-function extractAudioPcm(file: string): Promise<ArrayBuffer> {
+/** Decode any ffmpeg-readable media file to 16 kHz mono float32 PCM (Whisper input). */
+export function extractAudioPcm(file: string): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const args = ['-i', file, '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le',
       '-hide_banner', '-loglevel', 'error', 'pipe:1'];
@@ -285,6 +451,84 @@ function findYtDlp(): Promise<string | null> {
       resolve(code === 0 && first ? first : null);
     });
   });
+}
+
+const OFFICIAL_SUB_LANGS = new Set(['ja', 'zh', 'en', 'ru']);
+
+function normalizeYoutubeDownloadOptions(audioOnly?: boolean, raw?: YouTubeDownloadOptions): YouTubeDownloadOptions {
+  const subtitleLang =
+    raw?.subtitleLang === 'ja' ||
+    raw?.subtitleLang === 'zh' ||
+    raw?.subtitleLang === 'en' ||
+    raw?.subtitleLang === 'ru'
+      ? raw.subtitleLang
+      : 'none';
+  const subtitleLangs = Array.isArray(raw?.subtitleLangs)
+    ? raw!.subtitleLangs!.filter((l): l is Exclude<YouTubeSubtitleLang, 'none'> => OFFICIAL_SUB_LANGS.has(l))
+    : undefined;
+  return {
+    audioOnly: Boolean(raw?.audioOnly ?? audioOnly),
+    subtitleLang,
+    subtitleLangs: subtitleLangs?.length ? subtitleLangs : undefined,
+  };
+}
+
+function primarySubtitleLang(opts: YouTubeDownloadOptions): YouTubeSubtitleLang | undefined {
+  if (opts.subtitleLangs?.length) return opts.subtitleLangs[0];
+  return opts.subtitleLang;
+}
+
+function ytDlpSubtitleLangs(lang: YouTubeSubtitleLang | undefined): string[] {
+  switch (lang) {
+    case 'ja':
+      return ['ja', 'ja.*'];
+    case 'zh':
+      return ['zh', 'zh.*', 'zh-Hans', 'zh-Hant', 'zh-CN', 'zh-TW', 'zh-HK', 'zh-SG'];
+    case 'en':
+      return ['en', 'en.*'];
+    case 'ru':
+      return ['ru', 'ru.*'];
+    default:
+      return [];
+  }
+}
+
+function resolveYtDlpSubtitleLangs(opts: YouTubeDownloadOptions): string[] {
+  if (opts.subtitleLangs?.length) {
+    const out: string[] = [];
+    for (const lang of opts.subtitleLangs) out.push(...ytDlpSubtitleLangs(lang));
+    return [...new Set(out)];
+  }
+  return ytDlpSubtitleLangs(opts.subtitleLang);
+}
+
+function findDownloadedSubtitle(mediaFile: string, lang: YouTubeSubtitleLang | undefined): SubtitlePick | undefined {
+  const langs = ytDlpSubtitleLangs(lang).map((s) => s.replace(/\.\*$/, '').toLowerCase());
+  if (langs.length === 0) return undefined;
+  const dir = path.dirname(mediaFile);
+  const stem = path.basename(mediaFile, path.extname(mediaFile));
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  const candidates = entries
+    .filter((name) => {
+      const ext = path.extname(name).slice(1).toLowerCase();
+      if (!SUBTITLE_EXT.includes(ext)) return false;
+      if (!name.startsWith(`${stem}.`)) return false;
+      const tag = name.slice(stem.length + 1, -(ext.length + 1)).toLowerCase();
+      return langs.some((prefix) => tag === prefix || tag.startsWith(`${prefix}-`));
+    })
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const picked = candidates[0];
+  if (!picked) return undefined;
+  try {
+    return { name: picked, text: fs.readFileSync(path.join(dir, picked), 'utf-8') };
+  } catch {
+    return undefined;
+  }
 }
 
 // ----- watch folder -----
@@ -397,7 +641,18 @@ export function registerMediaIpc(): void {
     }
   });
 
-  ipcMain.handle('media:list', () => readDb().items);
+  ipcMain.handle('media:list', () => {
+    const db = readDb();
+    let dirty = false;
+    for (const item of db.items) {
+      if (!item.kind) {
+        item.kind = classifyMediaKind(item.fileName, item.durationSec);
+        dirty = true;
+      }
+    }
+    if (dirty) writeDb(db);
+    return db.items;
+  });
 
   ipcMain.handle('media:coverArt', async (_e, id: string): Promise<string | null> => {
     const item = readDb().items.find((i) => i.id === id);
@@ -524,6 +779,16 @@ export function registerMediaIpc(): void {
     }
   });
 
+  ipcMain.handle('media:setSubOffset', (_e, id: string, sec: number) => {
+    const db = readDb();
+    const item = db.items.find((i) => i.id === id);
+    if (item) {
+      item.subOffsetSec = sec;
+      writeDb(db);
+      broadcastMedia();
+    }
+  });
+
   ipcMain.handle('media:extractAudio', async (_e, url: string): Promise<ArrayBuffer> => {
     const file = pathForUrl(url);
     if (!file) throw new Error('Unknown media.');
@@ -539,69 +804,14 @@ export function registerMediaIpc(): void {
     return { item, url: `playfile://${tokenFor(mp4)}` };
   });
 
-  ipcMain.handle('media:youtube', async (e, url: string, audioOnly?: boolean): Promise<MediaOpen | { error: string }> => {
-    const link = typeof url === 'string' ? url.trim() : '';
-    if (!isRemoteMediaLink(link)) return { error: 'Please paste a valid video or media link.' };
-    const bin = await findYtDlp();
-    if (!bin) {
-      return { error: 'yt-dlp was not found on your PATH. Install it (e.g. `pip install -U yt-dlp`) and reopen the app.' };
-    }
-    const outDir = path.join(app.getPath('userData'), 'downloads');
-    fs.mkdirSync(outDir, { recursive: true });
-    const pathFile = path.join(outDir, `.out_${crypto.randomUUID()}.txt`);
+  ipcMain.handle('media:youtube', async (e, url: string, audioOnly?: boolean, rawOptions?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }> => {
+    const options = normalizeYoutubeDownloadOptions(audioOnly, rawOptions);
     const sender = e.sender;
-    // audioOnly (Music app): best audio stream as .m4a, no video download.
-    const format = audioOnly
-      ? ['-f', 'ba[ext=m4a]/ba/b', '-x', '--audio-format', 'm4a']
-      : ['-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b', '--merge-output-format', 'mp4'];
-    const args = [
-      link,
-      ...format,
-      '--ffmpeg-location', ffmpegPath,
-      '--referer', link,
-      '--no-playlist',
-      '--newline',
-      '--no-part',
-      '-o', path.join(outDir, '%(title).150B [%(id)s].%(ext)s'),
-      '--print-to-file', 'after_move:filepath', pathFile,
-    ];
-    return new Promise((resolve) => {
-      const proc = spawn(bin, args);
-      let err = '';
-      const onData = (buf: Buffer): void => {
-        const s = buf.toString();
-        const m = /\[download\]\s+([\d.]+)%/.exec(s);
-        if (m) sender.send('media:youtubeProgress', { stage: 'downloading', percent: parseFloat(m[1]) });
-        else if (/\[Merger\]|Merging formats/.test(s)) sender.send('media:youtubeProgress', { stage: 'merging', percent: 100 });
-      };
-      proc.stdout.on('data', onData);
-      proc.stderr.on('data', (d: Buffer) => {
-        err += d.toString();
-        onData(d);
-      });
-      proc.on('error', (e2) => resolve({ error: `Could not run yt-dlp: ${e2.message}` }));
-      proc.on('close', (code) => {
-        let file = '';
-        try {
-          file = (fs.readFileSync(pathFile, 'utf-8').trim().split(/\r?\n/).pop() ?? '').trim();
-        } catch {
-          /* no path file */
-        }
-        try {
-          fs.rmSync(pathFile, { force: true });
-        } catch {
-          /* ignore */
-        }
-        if (code !== 0 || !file || !fs.existsSync(file)) {
-          const lastLine = err.trim().split('\n').pop()?.trim();
-          resolve({ error: `Download failed${lastLine ? `: ${lastLine}` : '.'}` });
-          return;
-        }
-        const item = addOrGetItem(file);
-        broadcastMedia();
-        resolve({ item, url: `playfile://${tokenFor(item.path)}` });
-      });
+    const result = await downloadYoutubeUrl(typeof url === 'string' ? url.trim() : '', options, (ev) => {
+      sender.send('media:youtubeProgress', ev);
     });
+    if ('error' in result) return result;
+    return { item: result.item, url: result.url, subtitle: result.subtitle };
   });
 
   ipcMain.handle('media:pickSubtitle', async (): Promise<SubtitlePick | null> => {

@@ -15,7 +15,7 @@
 export type PerfTier = 'performance' | 'balanced' | 'atmosphere' | 'battery';
 
 export const PERF_TIERS: PerfTier[] = ['performance', 'balanced', 'atmosphere', 'battery'];
-export const DEFAULT_PERF_TIER: PerfTier = 'balanced';
+export const DEFAULT_PERF_TIER: PerfTier = 'performance';
 
 const KEY = 'jp-os-perf-tier';
 const EVENT = 'jp-perf-changed';

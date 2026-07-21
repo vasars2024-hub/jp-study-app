@@ -10,7 +10,7 @@ export default defineConfig({
       // folder rather than inlined into the main bundle.
       // sql.js ships a .wasm loaded at runtime from its own folder (parsing
       // Anki .apkg SQLite) — keep it external like the others.
-      external: ['adm-zip', 'ffmpeg-static', 'node-llama-cpp', 'linkedom', '@mozilla/readability', '@mozilla/readability/JSDOMParser', 'sql.js'],
+      external: ['adm-zip', 'ffmpeg-static', 'node-llama-cpp', 'onnxruntime-node', 'linkedom', '@mozilla/readability', '@mozilla/readability/JSDOMParser', 'sql.js'],
     },
   },
 });

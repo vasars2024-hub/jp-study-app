@@ -9,16 +9,22 @@
 import { toggleWordHighlight } from './readerSettings';
 import { next as musicNext, prev as musicPrev, toggle as musicToggle, setVolume, getState } from './playerBus';
 import { performUndo, canUndo, peekUndo } from './actionHistory';
+import { bumpZoom, setZoom, ZOOM_DEFAULT, ZOOM_STEP } from './appZoom';
+import { TOOLBOX_SHORTCUT_COMMANDS } from '../shared/toolboxShortcuts';
+import { loadToolboxSettings } from './toolboxSettings';
 
 export type CommandCategory =
   | 'Navigation'
+  | 'Window'
   | 'Reader'
   | 'Manga'
   | 'Dictionary'
   | 'Flashcards'
   | 'Immersion'
   | 'Music'
+  | 'Video'
   | 'Utility'
+  | 'Toolbox'
   | 'Custom';
 
 export interface AppCommand {
@@ -33,6 +39,11 @@ export interface AppCommand {
   defaultKeys: string;
   /** Note shown in the settings UI. */
   note?: string;
+  feature?: string;
+  scope?: string;
+  global?: boolean;
+  worksWhileTyping?: boolean;
+  editable?: boolean;
   /** When true, command was created by the user (not in the built-in catalog). */
   custom?: boolean;
 }
@@ -61,30 +72,6 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'nav.search', label: 'Global search', category: 'Navigation', defaultKeys: 'Ctrl+P' },
   { id: 'nav.settings', label: 'Open settings', category: 'Navigation', defaultKeys: 'Ctrl+,' },
   { id: 'nav.home', label: 'Return home (close reader)', category: 'Navigation', defaultKeys: 'Ctrl+H' },
-  { id: 'nav.closeWindow', label: 'Close window', category: 'Navigation', defaultKeys: 'Ctrl+W' },
-  { id: 'nav.nextWindow', label: 'Next window', category: 'Navigation', defaultKeys: 'Ctrl+Tab' },
-  { id: 'nav.prevWindow', label: 'Previous window', category: 'Navigation', defaultKeys: 'Ctrl+Shift+Tab' },
-  {
-    id: 'nav.nextAppFullscreen',
-    label: 'Next app (full screen)',
-    category: 'Navigation',
-    defaultKeys: 'F11',
-    note: 'Cycles through open apps and switches to full screen.',
-  },
-  {
-    id: 'nav.nextDesktop',
-    label: 'Switch to next desktop',
-    category: 'Navigation',
-    defaultKeys: 'Meta+Ctrl+ArrowRight',
-    note: 'Cycles Desktop 1 → Desktop 2. Saves the current layout before switching.',
-  },
-  {
-    id: 'nav.prevDesktop',
-    label: 'Switch to previous desktop',
-    category: 'Navigation',
-    defaultKeys: 'Meta+Ctrl+ArrowLeft',
-    note: 'Cycles Desktop 2 → Desktop 1. Saves the current layout before switching.',
-  },
   {
     id: 'nav.undo',
     label: 'Undo last action',
@@ -98,12 +85,13 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'settings.focusSearch',
     label: 'Focus settings search',
     category: 'Utility',
-    defaultKeys: 'Ctrl+F',
-    note: 'Works while the Settings window is open.',
+    defaultKeys: 'Ctrl+Alt+S',
+    note: 'Works while the Settings window is open. Ctrl+F is reserved for Toolbox search.',
   },
   { id: 'nav.open.dictionary', label: 'Open Dictionary', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.library', label: 'Open Library', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.novels', label: 'Open Novels', category: 'Navigation', defaultKeys: '' },
+  { id: 'nav.open.reading', label: 'Open Reading Finder', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.flashcards', label: 'Open Flashcards', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.grammar', label: 'Open Grammar', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.translate', label: 'Open Translate', category: 'Navigation', defaultKeys: '' },
@@ -114,7 +102,123 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'nav.open.stats', label: 'Open Statistics', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.calendar', label: 'Open Calendar', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.resources', label: 'Open Resources', category: 'Navigation', defaultKeys: '' },
+  { id: 'nav.open.games', label: 'Open Game Arena', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.city', label: 'Open Noctis', category: 'Navigation', defaultKeys: '' },
+
+  // Window management — the desktop's own windows, not the Electron frame.
+  //
+  // Defaults deliberately avoid the Meta (Win) key: Windows reserves Win+Arrow
+  // for its own snap layouts and Win+D for show-desktop, and the OS wins those
+  // races before Electron ever sees the keydown. Ctrl+Alt+* is the safe band.
+  { id: 'nav.closeWindow', label: 'Close window', category: 'Window', defaultKeys: 'Ctrl+W' },
+  { id: 'nav.nextWindow', label: 'Next window', category: 'Window', defaultKeys: 'Ctrl+Tab' },
+  { id: 'nav.prevWindow', label: 'Previous window', category: 'Window', defaultKeys: 'Ctrl+Shift+Tab' },
+  {
+    id: 'nav.nextAppFullscreen',
+    label: 'Next app (full screen)',
+    category: 'Window',
+    defaultKeys: 'F11',
+    note: 'Cycles through open apps and switches to full screen.',
+  },
+  {
+    id: 'window.maximize',
+    label: 'Maximize / restore window',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+ArrowUp',
+    note: 'Toggles the focused window between maximized and its previous size.',
+  },
+  {
+    id: 'window.minimize',
+    label: 'Minimize window',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+ArrowDown',
+    note: 'Sends the focused window to the taskbar.',
+  },
+  {
+    id: 'window.snapLeft',
+    label: 'Snap window left',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+ArrowLeft',
+    note: 'Fills the left half of the desktop. Press again to take the left quarter.',
+  },
+  {
+    id: 'window.snapRight',
+    label: 'Snap window right',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+ArrowRight',
+    note: 'Fills the right half of the desktop. Press again to take the right quarter.',
+  },
+  {
+    id: 'window.center',
+    label: 'Center window',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+C',
+    note: 'Restores a comfortable reading size and centers the focused window.',
+  },
+  {
+    id: 'window.tileAll',
+    label: 'Tile all windows',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+T',
+    note: 'Lays every open window out in a grid so nothing overlaps.',
+  },
+  {
+    id: 'window.cascade',
+    label: 'Cascade windows',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+K',
+    note: 'Stacks windows in a diagonal fan with every title bar reachable.',
+  },
+  {
+    id: 'window.showDesktop',
+    label: 'Show desktop (minimize all)',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+D',
+  },
+  {
+    id: 'window.restoreAll',
+    label: 'Restore all windows',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+Shift+D',
+    note: 'Brings everything back from the taskbar.',
+  },
+  {
+    id: 'window.pinTop',
+    label: 'Pin window on top',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+O',
+    note: 'Keeps the focused window above the others until unpinned. Survives restart.',
+  },
+  {
+    id: 'window.closeAll',
+    label: 'Close all windows',
+    category: 'Window',
+    defaultKeys: '',
+    note: 'Unbound by default — bind it only if you want a one-key desk wipe.',
+  },
+  {
+    id: 'nav.nextDesktop',
+    label: 'Switch to next desktop',
+    category: 'Window',
+    defaultKeys: 'Meta+Ctrl+ArrowRight',
+    note: 'Cycles Desktop 1 → Desktop 2. Saves the current layout before switching.',
+  },
+  {
+    id: 'nav.prevDesktop',
+    label: 'Switch to previous desktop',
+    category: 'Window',
+    defaultKeys: 'Meta+Ctrl+ArrowLeft',
+    note: 'Cycles Desktop 2 → Desktop 1. Saves the current layout before switching.',
+  },
+  {
+    id: 'window.zoomIn',
+    label: 'Zoom in',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+=',
+    note: 'Scales the whole interface. Plain Ctrl+= is the reader font size, which is scoped to a book.',
+  },
+  { id: 'window.zoomOut', label: 'Zoom out', category: 'Window', defaultKeys: 'Ctrl+Alt+-' },
+  { id: 'window.zoomReset', label: 'Reset zoom to 100%', category: 'Window', defaultKeys: 'Ctrl+Alt+0' },
 
   // Reader (handlers attach while a book is open)
   {
@@ -153,14 +257,14 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'reader.pageNext',
     label: 'Next page / scroll forward',
     category: 'Reader',
-    defaultKeys: 'Space|PageDown|ArrowDown',
-    note: 'Active in novel / EPUB readers. Arrow direction may follow vertical layout.',
+    defaultKeys: 'PageDown',
+    note: 'Active in novel / EPUB readers. Space is reserved for flashcard flip.',
   },
   {
     id: 'reader.pagePrev',
     label: 'Previous page / scroll back',
     category: 'Reader',
-    defaultKeys: 'Shift+Space|PageUp|ArrowUp',
+    defaultKeys: 'PageUp',
     note: 'Active in novel / EPUB readers.',
   },
 
@@ -169,7 +273,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'manga.nextPage',
     label: 'Next manga page',
     category: 'Manga',
-    defaultKeys: 'ArrowRight|ArrowDown|Space',
+    defaultKeys: 'ArrowRight|ArrowDown',
     note: 'Active while the manga reader is open.',
   },
   {
@@ -179,17 +283,56 @@ export const COMMAND_CATALOG: AppCommand[] = [
     defaultKeys: 'ArrowLeft|ArrowUp',
     note: 'Active while the manga reader is open.',
   },
-  { id: 'manga.zoomIn', label: 'Manga zoom in', category: 'Manga', defaultKeys: 'Ctrl+=', note: 'Manga reader only.' },
-  { id: 'manga.zoomOut', label: 'Manga zoom out', category: 'Manga', defaultKeys: 'Ctrl+-', note: 'Manga reader only.' },
-  { id: 'manga.zoomReset', label: 'Manga zoom reset', category: 'Manga', defaultKeys: 'Ctrl+0', note: 'Manga reader only.' },
+  {
+    id: 'manga.zoomIn',
+    label: 'Manga zoom in',
+    category: 'Manga',
+    defaultKeys: '',
+    note: 'Unbound by default — manga also listens to reader font-up (Ctrl+=).',
+  },
+  {
+    id: 'manga.zoomOut',
+    label: 'Manga zoom out',
+    category: 'Manga',
+    defaultKeys: '',
+    note: 'Unbound by default — manga also listens to reader font-down (Ctrl+-).',
+  },
+  {
+    id: 'manga.zoomReset',
+    label: 'Manga zoom reset',
+    category: 'Manga',
+    defaultKeys: '',
+    note: 'Unbound by default — manga also listens to reader zoom-reset (Ctrl+0).',
+  },
 
   // Dictionary
   {
     id: 'dictionary.playPronunciation',
     label: 'Play pronunciation',
     category: 'Dictionary',
-    defaultKeys: 'Ctrl+Shift+P',
-    note: 'Works while a dictionary popup is open.',
+    defaultKeys: 'Ctrl+Alt+P',
+    note: 'Works while a dictionary popup is open. Ctrl+Shift+P opens the Toolbox command palette.',
+  },
+  {
+    id: 'dictionary.lookupSelection',
+    label: 'Look up selected text',
+    category: 'Dictionary',
+    defaultKeys: 'Ctrl+Alt+L',
+    note: 'Works anywhere in the app. Long selections open the sentence translator instead.',
+  },
+  {
+    id: 'dictionary.lookupClipboard',
+    label: 'Look up clipboard text',
+    category: 'Dictionary',
+    defaultKeys: 'Ctrl+Alt+V',
+    note: 'Reads the clipboard and opens the dictionary on it — handy for text copied from other apps.',
+  },
+  {
+    id: 'dictionary.toggleGlobalLookup',
+    label: 'Toggle app-wide click lookup',
+    category: 'Dictionary',
+    defaultKeys: '',
+    note: 'Turns the Shift+click dictionary gesture on or off without opening settings.',
   },
 
   // Flashcards — review session
@@ -204,8 +347,8 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'flashcards.again',
     label: 'Mark again (hard)',
     category: 'Flashcards',
-    defaultKeys: '1|A',
-    note: 'After the card is flipped.',
+    defaultKeys: '1',
+    note: 'After the card is flipped. Bare A is reserved for video subtitle prev.',
   },
   {
     id: 'flashcards.gotIt',
@@ -218,15 +361,15 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'flashcards.prev',
     label: 'Previous card',
     category: 'Flashcards',
-    defaultKeys: 'ArrowLeft',
-    note: 'Active during review.',
+    defaultKeys: ',',
+    note: 'Active during review. Arrows are reserved for the manga reader.',
   },
   {
     id: 'flashcards.next',
     label: 'Next card',
     category: 'Flashcards',
-    defaultKeys: 'ArrowRight',
-    note: 'Active during review.',
+    defaultKeys: '.',
+    note: 'Active during review. Arrows are reserved for the manga reader.',
   },
   {
     id: 'flashcards.end',
@@ -241,22 +384,22 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'immersion.focusUrl',
     label: 'Focus URL bar',
     category: 'Immersion',
-    defaultKeys: 'Ctrl+L',
-    note: 'Immersion view only.',
+    defaultKeys: 'Ctrl+Shift+L',
+    note: 'Immersion view only. Ctrl+L is reserved for Toolbox sidebar focus.',
   },
   {
     id: 'immersion.reload',
     label: 'Reload page',
     category: 'Immersion',
-    defaultKeys: 'Ctrl+R',
-    note: 'Immersion view only.',
+    defaultKeys: 'F5',
+    note: 'Immersion view only. Ctrl+R is reserved for Toolbox recent tools.',
   },
   {
     id: 'immersion.bookmark',
     label: 'Save current site',
     category: 'Immersion',
-    defaultKeys: 'Ctrl+D',
-    note: 'Immersion view only — conflicts with reader dict when both open.',
+    defaultKeys: 'Ctrl+Shift+D',
+    note: 'Immersion view only. Ctrl+D stays on reader dictionary lookup.',
   },
   {
     id: 'immersion.focusMode',
@@ -287,8 +430,8 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'perf.toggleOverlay',
     label: 'Toggle performance HUD',
     category: 'Utility',
-    defaultKeys: 'Ctrl+Shift+F',
-    note: 'FPS / heap / particle budget overlay.',
+    defaultKeys: 'Ctrl+Alt+F',
+    note: 'FPS / heap / particle budget overlay. Ctrl+Shift+F stays on save-to-collection.',
   },
 
   // Music
@@ -303,6 +446,32 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'music.prev', label: 'Previous track', category: 'Music', defaultKeys: 'Ctrl+ArrowLeft' },
   { id: 'music.volumeUp', label: 'Volume up', category: 'Music', defaultKeys: 'Ctrl+ArrowUp' },
   { id: 'music.volumeDown', label: 'Volume down', category: 'Music', defaultKeys: 'Ctrl+ArrowDown' },
+
+  // Video player (Phase 5b)
+  { id: 'nav.open.video', label: 'Open Video player', category: 'Navigation', defaultKeys: '' },
+  { id: 'nav.open.youtube', label: 'Open YouTube', category: 'Navigation', defaultKeys: '' },
+  { id: 'video.replayLine', label: 'Replay subtitle line', category: 'Video', defaultKeys: 'r' },
+  { id: 'video.prevLine', label: 'Previous subtitle line', category: 'Video', defaultKeys: 'a' },
+  { id: 'video.nextLine', label: 'Next subtitle line', category: 'Video', defaultKeys: 'd' },
+  { id: 'video.subEarlier', label: 'Subtitle earlier (−100 ms)', category: 'Video', defaultKeys: '[' },
+  { id: 'video.subLater', label: 'Subtitle later (+100 ms)', category: 'Video', defaultKeys: ']' },
+  { id: 'video.subEarlierLarge', label: 'Subtitle earlier (−500 ms)', category: 'Video', defaultKeys: 'Shift+[' },
+  { id: 'video.subLaterLarge', label: 'Subtitle later (+500 ms)', category: 'Video', defaultKeys: 'Shift+]' },
+  { id: 'video.toggleAutoPause', label: 'Toggle auto-pause', category: 'Video', defaultKeys: 'p' },
+  { id: 'video.toggleLoop', label: 'Toggle line loop', category: 'Video', defaultKeys: 'l' },
+  { id: 'video.toggleFurigana', label: 'Toggle furigana', category: 'Video', defaultKeys: 'f' },
+  ...TOOLBOX_SHORTCUT_COMMANDS.map((command): AppCommand => ({
+    id: command.id,
+    label: command.name,
+    category: 'Toolbox',
+    defaultKeys: command.defaultShortcut,
+    note: `${command.description} Scope: ${command.scope}.`,
+    feature: command.feature,
+    scope: command.scope,
+    global: command.global,
+    worksWhileTyping: command.worksWhileTyping,
+    editable: command.editable,
+  })),
 ];
 
 /** App ids users can bind “Open …” shortcuts to. */
@@ -310,16 +479,20 @@ export const SHORTCUT_OPEN_APPS: { id: string; label: string }[] = [
   { id: 'dictionary', label: 'Dictionary' },
   { id: 'library', label: 'Library' },
   { id: 'novels', label: 'Novels' },
+  { id: 'reading', label: 'Reading Finder' },
   { id: 'flashcards', label: 'Flashcards' },
   { id: 'grammar', label: 'Grammar' },
   { id: 'translate', label: 'Translate' },
   { id: 'music', label: 'Music' },
-  { id: 'player', label: 'Media player' },
+  { id: 'player', label: 'Media library' },
+  { id: 'video', label: 'Video player' },
+  { id: 'youtube', label: 'YouTube' },
   { id: 'immersion', label: 'Immersion' },
   { id: 'anki', label: 'Anki' },
   { id: 'stats', label: 'Statistics' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'resources', label: 'Resources' },
+  { id: 'games', label: 'Game Arena' },
   { id: 'settings', label: 'Settings' },
   { id: 'city', label: 'Noctis' },
 ];
@@ -422,12 +595,46 @@ function persist(): void {
     /* ignore */
   }
   window.dispatchEvent(new CustomEvent(EVENT));
+  syncToolboxGlobalShortcut();
 }
 
 export function onShortcutsChanged(cb: () => void): () => void {
   const h = (): void => cb();
   window.addEventListener(EVENT, h);
   return () => window.removeEventListener(EVENT, h);
+}
+
+// Keep the OS-level global shortcut for `toolbox.open` in sync with the user's
+// current binding (pushed to main on boot and on every rebind). If another
+// application owns the accelerator, main reports it and the in-app binding
+// keeps working — the failure is surfaced once as a quiet toast.
+let lastSyncedToolboxOpenKeys: string | null = null;
+function syncToolboxGlobalShortcut(): void {
+  try {
+    if (!window.api?.blancSetGlobalShortcut) return;
+    // Only the main Study window owns the registration; the Blanc window doing
+    // it too would double-register and could race error toasts.
+    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
+    const keys = getBindings().find((row) => row.id === 'toolbox.open')?.keys ?? '';
+    if (keys === lastSyncedToolboxOpenKeys) return;
+    lastSyncedToolboxOpenKeys = keys;
+    void window.api.blancSetGlobalShortcut(keys).then((result) => {
+      if (result && !result.ok && result.error) {
+        window.dispatchEvent(
+          new CustomEvent('os:toast', {
+            detail: { message: `Toolbox global shortcut: ${result.error}`, kind: 'muted' },
+          }),
+        );
+      }
+    });
+  } catch {
+    /* Non-Electron harness (tests, browser dev harness) — in-app binding only. */
+  }
+}
+
+// Initial registration once the module (and the preload bridge) are up.
+if (typeof window !== 'undefined') {
+  window.setTimeout(() => syncToolboxGlobalShortcut(), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -795,6 +1002,35 @@ function openApp(appId: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: appId }));
 }
 
+function dispatchToolboxCommand(id: string): boolean {
+  const command = TOOLBOX_SHORTCUT_COMMANDS.find((item) => item.id === id);
+  if (!command) return false;
+  if (id === 'toolbox.open') {
+    // Match setBlancModeEnabled: only reuse remembered bounds when enabled.
+    void window.api.blancOpen(
+      loadToolboxSettings().rememberWindowBounds ? undefined : { width: 560, height: 460 },
+    );
+    return true;
+  }
+  if (command.scope === 'active-tool') return false;
+  const inBlanc = Boolean(document.querySelector('.blanc-root'));
+  if (command.scope === 'toolbox' && !inBlanc) return false;
+  if (id === 'toolbox.commandPalette') {
+    window.dispatchEvent(new CustomEvent('palette:open', { detail: 'toolbox' }));
+    return true;
+  }
+  if (id === 'toolbox.openSettings') {
+    window.dispatchEvent(new CustomEvent('blanc:select-tab', { detail: 'settings' }));
+    return true;
+  }
+  if (command.feature !== 'toolbox' && id.startsWith('toolbox.open')) {
+    window.dispatchEvent(new CustomEvent('toolbox:open-tool', { detail: command.feature }));
+    return true;
+  }
+  window.dispatchEvent(new CustomEvent('toolbox:command', { detail: id }));
+  return true;
+}
+
 /** Guard against custom stacks that re-enter themselves. */
 let runDepth = 0;
 const MAX_RUN_DEPTH = 12;
@@ -846,6 +1082,29 @@ function builtinHandler(id: string): Handler | null {
       return () => void window.dispatchEvent(new CustomEvent('os:switch-desktop', { detail: 1 }));
     case 'nav.prevDesktop':
       return () => void window.dispatchEvent(new CustomEvent('os:switch-desktop', { detail: -1 }));
+    // Window geometry — DesktopShell owns the window model, so these are all
+    // one event with an action tag rather than fifteen bespoke events.
+    case 'window.maximize':
+    case 'window.minimize':
+    case 'window.snapLeft':
+    case 'window.snapRight':
+    case 'window.center':
+    case 'window.tileAll':
+    case 'window.cascade':
+    case 'window.showDesktop':
+    case 'window.restoreAll':
+    case 'window.pinTop':
+    case 'window.closeAll':
+      return () =>
+        void window.dispatchEvent(
+          new CustomEvent('os:window', { detail: id.slice('window.'.length) }),
+        );
+    case 'window.zoomIn':
+      return () => void bumpZoom(ZOOM_STEP);
+    case 'window.zoomOut':
+      return () => void bumpZoom(-ZOOM_STEP);
+    case 'window.zoomReset':
+      return () => void setZoom(ZOOM_DEFAULT);
     case 'nav.undo':
       return () => {
         if (!canUndo()) {
@@ -871,6 +1130,8 @@ function builtinHandler(id: string): Handler | null {
       return () => void openApp('library');
     case 'nav.open.novels':
       return () => void openApp('novels');
+    case 'nav.open.reading':
+      return () => void openApp('reading');
     case 'nav.open.flashcards':
       return () => void openApp('flashcards');
     case 'nav.open.grammar':
@@ -881,6 +1142,10 @@ function builtinHandler(id: string): Handler | null {
       return () => void openApp('music');
     case 'nav.open.player':
       return () => void openApp('player');
+    case 'nav.open.video':
+      return () => void openApp('video');
+    case 'nav.open.youtube':
+      return () => void openApp('youtube');
     case 'nav.open.immersion':
       return () => void openApp('immersion');
     case 'nav.open.anki':
@@ -891,6 +1156,8 @@ function builtinHandler(id: string): Handler | null {
       return () => void openApp('calendar');
     case 'nav.open.resources':
       return () => void openApp('resources');
+    case 'nav.open.games':
+      return () => void openApp('games');
     case 'nav.open.city':
       return () => void openApp('city');
     case 'reader.toggleWordHighlight':
@@ -910,6 +1177,10 @@ function builtinHandler(id: string): Handler | null {
     case 'music.volumeDown':
       return () => void setVolume(Math.max(0, getState().volume - 0.05));
     default: {
+      if (id.startsWith('toolbox.') || id.startsWith('focusTimer.') || id.startsWith('quickNotes.') || id.startsWith('clipboard.') || id.startsWith('readingFinder.') || id.startsWith('automation.')) {
+        const command = TOOLBOX_SHORTCUT_COMMANDS.find((item) => item.id === id);
+        if (command) return () => dispatchToolboxCommand(id);
+      }
       const custom = store.customCommands.find((c) => c.id === id);
       if (custom) return (e) => runCustomAction(custom.action, e);
       return null;
@@ -956,7 +1227,16 @@ function isInteractiveMouseTarget(t: EventTarget | null): boolean {
   );
 }
 
+function isLockscreenActive(): boolean {
+  return Boolean(document.querySelector('.lockscreen[role="dialog"]'));
+}
+
 function dispatchChord(chord: string, e: Event, opts?: { fromMouse?: boolean }): boolean {
+  // While the lockscreen is up, plain keys belong to PIN entry — not global shortcuts.
+  if (!opts?.fromMouse && isLockscreenActive()) {
+    const ke = e as KeyboardEvent;
+    if (!ke.ctrlKey && !ke.altKey && !ke.metaKey) return false;
+  }
   // While typing, only keyboard chords that carry Ctrl/Alt/Meta may fire.
   if (!opts?.fromMouse && isTypingTarget()) {
     const ke = e as KeyboardEvent;

@@ -2,15 +2,19 @@
  * Secret OS (Aero) environment — wallpaper and living-layer state scoped to Aero mode.
  * Study OS environment is backed up on entry and restored on exit.
  */
-import { loadEnvironment, saveEnvironment } from './environment/environmentStore';
+import { loadEnvironment, onEnvironmentChanged, saveEnvironment } from './environment/environmentStore';
 import { presetPatch } from './environment/environmentPresets';
 import type { EnvironmentSettings, WallpaperPlaylist } from './environment/types';
+import { writeLocalStorage, writeLocalStorageJson } from './localStorageWrite';
+import { AERO_THEME_ID } from './theme/frutiger-aero';
+import { DEFAULT_THEME_ID, loadThemeId, onThemeChanged } from './theme/engine';
 
 const AERO_ENV_KEY = 'jp-aero-environment-v1';
 const STUDY_ENV_BACKUP_KEY = 'jp-study-environment-backup-v1';
+const AERO_RESTORE_THEME_KEY = 'jp-aero-restore-theme-v1';
 
 export const SECRET_AERO_PLAYLIST_ID = 'secret-aero-default-wallpaper';
-export const SECRET_WALLPAPER_URL = new URL('./assets/secret-os-default-wallpaper.png', import.meta.url).href;
+export const SECRET_WALLPAPER_URL = new URL('./assets/secret-aero-network-wallpaper.jpg', import.meta.url).href;
 
 export function buildSecretAeroWallpaperPlaylist(): WallpaperPlaylist {
   return {
@@ -23,8 +27,8 @@ export function buildSecretAeroWallpaperPlaylist(): WallpaperPlaylist {
         id: 'secret-aero-first-discovery',
         kind: 'image',
         ref: SECRET_WALLPAPER_URL,
-        label: 'Secret OS Wallpaper',
-        tags: ['secret', 'aero', 'day'],
+        label: 'Secret Aero Network',
+        tags: ['secret', 'aero', 'network', 'night'],
         durationSec: 0,
       },
     ],
@@ -68,14 +72,6 @@ function readJson<T>(key: string): T | null {
   }
 }
 
-function writeJson(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* ignore */
-  }
-}
-
 export function hasSavedAeroEnvironment(): boolean {
   return readJson<EnvironmentSettings>(AERO_ENV_KEY) !== null;
 }
@@ -85,15 +81,33 @@ export function loadSavedAeroEnvironment(): EnvironmentSettings | null {
 }
 
 export function saveAeroEnvironmentSnapshot(env: EnvironmentSettings): void {
-  writeJson(AERO_ENV_KEY, env);
+  writeLocalStorageJson(AERO_ENV_KEY, env);
 }
 
 export function backupStudyEnvironment(env: EnvironmentSettings): void {
-  writeJson(STUDY_ENV_BACKUP_KEY, env);
+  writeLocalStorageJson(STUDY_ENV_BACKUP_KEY, env);
 }
 
 export function loadStudyEnvironmentBackup(): EnvironmentSettings | null {
   return readJson<EnvironmentSettings>(STUDY_ENV_BACKUP_KEY);
+}
+
+/** Remember the Study OS theme to restore when leaving Aero (survives restarts). */
+export function rememberAeroRestoreTheme(themeId: string): void {
+  const id = themeId.trim();
+  if (!id || id === AERO_THEME_ID) return;
+  writeLocalStorage(AERO_RESTORE_THEME_KEY, id);
+}
+
+/** Theme to apply when exiting Aero; falls back to Study OS default. */
+export function loadAeroRestoreTheme(fallback: string = DEFAULT_THEME_ID): string {
+  try {
+    const stored = localStorage.getItem(AERO_RESTORE_THEME_KEY);
+    if (stored && stored !== AERO_THEME_ID) return stored;
+  } catch {
+    /* ignore */
+  }
+  return fallback !== AERO_THEME_ID ? fallback : DEFAULT_THEME_ID;
 }
 
 /** Enter Aero: back up Study OS env, apply Aero env (seed wallpaper on first discovery). */
@@ -134,4 +148,31 @@ export function bootAeroEnvironmentIfNeeded(isAeroTheme: boolean): void {
     return;
   }
   applyAeroEnvironment(true);
+}
+
+let aeroEnvBridgeInstalled = false;
+let lastThemeForAeroEnv = DEFAULT_THEME_ID;
+
+/**
+ * Restore Study living-environment whenever the active theme leaves Aero —
+ * Settings / Quick Settings / Wired / secret exit all go through theme change.
+ */
+export function installAeroEnvironmentBridge(): void {
+  if (aeroEnvBridgeInstalled) return;
+  aeroEnvBridgeInstalled = true;
+  lastThemeForAeroEnv = loadThemeId();
+  onThemeChanged((id) => {
+    const prev = lastThemeForAeroEnv;
+    lastThemeForAeroEnv = id;
+    if (prev === AERO_THEME_ID && id !== AERO_THEME_ID) {
+      restoreStudyEnvironmentAfterAero();
+    }
+  });
+  // Keep the Aero snapshot in sync while Secret OS is active so Companions Off
+  // (and other living-layer edits) survive the next Aero entry.
+  onEnvironmentChanged((env) => {
+    if (loadThemeId() === AERO_THEME_ID) {
+      saveAeroEnvironmentSnapshot(env);
+    }
+  });
 }

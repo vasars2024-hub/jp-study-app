@@ -12,6 +12,7 @@ import { playSound, soundEngine } from './audio/soundEngine';
 import type { SoundCategory } from './audio/soundPack';
 import type { NotificationKind } from './notificationStore';
 import { COMPANION_EVENT, type CompanionEventDetail } from './environment/companionEvents';
+import { wiredUiCuesEnabled } from './terminalModeSettings';
 
 let installed = false;
 const lastPlayed = new Map<string, number>();
@@ -69,6 +70,24 @@ export function installShellSounds(): void {
     const ok = (event as CustomEvent<{ ok?: boolean }>).detail?.ok === true;
     playRouted('ui', ok ? 'confirm' : 'cancel', ok ? 0.66 : 0.48, 120);
   });
+  // WIRED ARCHIVE interaction cues (bespoke §8). Dispatchers are wired-gated
+  // in the views; the cue names only exist in the wired pack, so any stray
+  // event under another theme is a safe no-op. The uiCues DIP switch (§9)
+  // silences them without touching ambient or the system cues.
+  const wiredCue = (category: SoundCategory, name: string, volume: number, throttleMs = 90) => () => {
+    if (!wiredUiCuesEnabled()) return;
+    playRouted(category, name, volume, throttleMs);
+  };
+  window.addEventListener('shell:appSwitch', wiredCue('ui', 'route', 0.5));
+  window.addEventListener('wired:route', wiredCue('ui', 'route', 0.5));
+  window.addEventListener('shell:widgetMount', wiredCue('ui', 'dock', 0.55));
+  window.addEventListener('wired:decrypt', wiredCue('ui', 'decrypt', 0.5));
+  window.addEventListener('wired:sync-ok', wiredCue('achievement', 'sync-ok', 0.5));
+  window.addEventListener('wired:sync-fail', wiredCue('ui', 'sync-fail', 0.55));
+  window.addEventListener('wired:db-blip', wiredCue('ui', 'db-blip', 0.45));
+  window.addEventListener('wired:tape-seek', wiredCue('ui', 'tape-seek', 0.45));
+  window.addEventListener('wired:switch-clack', wiredCue('ui', 'switch-clack', 0.5, 80));
+
   window.addEventListener(COMPANION_EVENT, (event) => {
     const kind = (event as CustomEvent<CompanionEventDetail>).detail?.kind;
     if (kind === 'achievement' || kind === 'streak') {

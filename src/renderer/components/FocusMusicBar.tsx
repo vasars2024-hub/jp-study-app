@@ -62,7 +62,7 @@ export default function FocusMusicBar() {
 
   const songs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = library.slice();
+    const list = library.slice();
     list.sort(
       (a, b) => (b.lastPlayedAt ?? b.addedAt) - (a.lastPlayedAt ?? a.addedAt),
     );
@@ -148,6 +148,17 @@ export default function FocusMusicBar() {
       >
         <Icon name="skip-forward" size={14} />
       </button>
+      <button
+        type="button"
+        className={`btn small focus-music-btn focus-music-mix${s.shuffle ? ' active' : ''}`}
+        disabled={(!s.queue.length && !s.current) || busy}
+        onClick={() => player.toggleShuffle()}
+        aria-pressed={s.shuffle}
+        aria-label={s.shuffle ? 'Mix on' : 'Mix off'}
+        title={s.shuffle ? 'Mix on' : 'Mix off'}
+      >
+        <Icon name="shuffle" size={14} />
+      </button>
 
       <button
         type="button"
@@ -184,6 +195,7 @@ export default function FocusMusicBar() {
           onChange={(e) => player.setVolume(Number(e.target.value))}
           aria-label="Volume"
         />
+        <span className="focus-music-vol-value">{Math.round(s.volume * 100)}</span>
       </label>
 
       {pickerOpen && (

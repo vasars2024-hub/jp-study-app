@@ -19,9 +19,16 @@ import {
 } from '../../environment';
 import { loadVizSettings, saveVizSettings, type VizSettings } from '../../visualizerSettings';
 import { loadSettings as loadReaderSettings, saveSettings as saveReaderSettings } from '../../readerSettings';
-import { loadWhisperDevice, setWhisperDevice, type WhisperDevice } from '../../whisperSettings';
+import {
+  loadWhisperDevice,
+  loadWhisperModelTier,
+  setWhisperDevice,
+  setWhisperModelTier,
+  type WhisperDevice,
+  type WhisperModelTier,
+} from '../../whisperSettings';
 import { loadLyricsSettings, onLyricsSettingsChanged, setUseAlbumInSearch } from '../../lyricsSettings';
-import { applyTheme, loadThemeId } from '../../theme';
+import { applyTheme, loadThemeId, onThemeChanged } from '../../theme';
 import { bumpZoom, loadZoom, onZoomChanged, setZoom } from '../../appZoom';
 import { loadCustomCss, onCustomCssChanged } from '../../customCss';
 import { registerCommandHandler } from '../../keyboardShortcuts';
@@ -51,14 +58,17 @@ import CompanionsPage from './pages/CompanionsPage';
 import DesktopLayoutPage from './pages/DesktopLayoutPage';
 import ShortcutsPage from './pages/ShortcutsPage';
 import StudyPage from './pages/StudyPage';
+import ProfileRulesPage from './pages/ProfileRulesPage';
 import ReadingPage from './pages/ReadingPage';
 import TranscriptionPage from './pages/TranscriptionPage';
 import StoragePage from './pages/StoragePage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
+import MotionPage from './pages/MotionPage';
 import MemoryPage from './pages/MemoryPage';
 import MiniModePage from './pages/MiniModePage';
 import LockscreenPage from './pages/LockscreenPage';
+import SpecialPage from './pages/SpecialPage';
 import {
   loadMiniMode,
   onMiniModeChanged,
@@ -94,6 +104,9 @@ export default function SettingsApp(props: SettingsWallProps) {
   const [viz, setViz] = useState<VizSettings>(loadVizSettings);
   const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
   const [whisperDevice, setWhisperDeviceState] = useState<WhisperDevice>(loadWhisperDevice);
+  const [whisperModelTier, setWhisperModelTierState] = useState<WhisperModelTier>(() =>
+    loadWhisperModelTier('ja'),
+  );
   const [lyricsSettings, setLyricsSettings] = useState(loadLyricsSettings);
   const [mini, setMini] = useState<MiniModeSettings>(() => loadMiniMode());
   const [advancedMode, setAdvancedModeState] = useState(() => loadSettingsAdvanced());
@@ -115,6 +128,7 @@ export default function SettingsApp(props: SettingsWallProps) {
   useEffect(() => onPersonalizationChanged(setLook), []);
   useEffect(() => onDesktopPrefsChanged(setDeskPrefs), []);
   useEffect(() => onEnvironmentChanged(setEnv), []);
+  useEffect(() => onThemeChanged(setTheme), []);
   useEffect(() => onCustomCssChanged(setUserCss), []);
   useEffect(() => onMiniModeChanged(setMini), []);
   useEffect(() => onSettingsAdvancedChanged(setAdvancedModeState), []);
@@ -189,6 +203,11 @@ export default function SettingsApp(props: SettingsWallProps) {
         setWhisperDeviceState(d);
         setWhisperDevice(d);
       },
+      whisperModelTier,
+      chooseWhisperModelTier: (tier) => {
+        setWhisperModelTierState(tier);
+        setWhisperModelTier(tier);
+      },
       lyricsSettings,
       setLyricsAlbumSearch: (on) => setLyricsSettings(setUseAlbumInSearch(on)),
       userCss,
@@ -215,6 +234,7 @@ export default function SettingsApp(props: SettingsWallProps) {
       reduce,
       readerSettings,
       whisperDevice,
+      whisperModelTier,
       lyricsSettings,
       userCss,
       cssMsg,
@@ -324,6 +344,13 @@ export default function SettingsApp(props: SettingsWallProps) {
           icon: <Icon name="folder" size={14} />,
           disabled: page === 'memory',
           onSelect: () => navigate('memory'),
+        },
+        {
+          id: 'special',
+          label: 'Special modules',
+          icon: <Icon name="sparkle" size={14} />,
+          disabled: page === 'special',
+          onSelect: () => navigate('special'),
         },
       ],
     },
@@ -436,10 +463,13 @@ export default function SettingsApp(props: SettingsWallProps) {
               {page === 'mini' && <MiniModePage />}
               {page === 'lockscreen' && <LockscreenPage />}
               {page === 'study' && <StudyPage />}
+              {page === 'profile-rules' && <ProfileRulesPage />}
               {page === 'reading' && <ReadingPage />}
               {page === 'transcription' && <TranscriptionPage />}
               {page === 'visualizer' && <VisualizerPage />}
+              {page === 'special' && <SpecialPage />}
               {page === 'display' && <DisplayPage />}
+              {page === 'motion' && <MotionPage />}
               {page === 'storage' && <StoragePage />}
               {page === 'memory' && <MemoryPage />}
             </div>

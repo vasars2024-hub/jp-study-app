@@ -1,0 +1,98 @@
+/*
+ * Blanc panel styles owned by the **Library & Arcade** work stream
+ * (novels / games / immersion / visualizer). See BLANC_REFINEMENT_PLAN.md,
+ * "Parallel split".
+ *
+ * The Media & Cards stream must not edit this file; it has blanc-media.css.
+ * Neither stream appends to blanc.css — that file is shared and frozen.
+ *
+ * Use the existing Blanc tokens (--blanc-bg, --blanc-panel, --blanc-border,
+ * --blanc-text, --blanc-accent, --blanc-danger). Do not hardcode new colours:
+ * Pillar 4 ships a theme editor bound to those tokens.
+ */
+
+/* ── Novels ─────────────────────────────────────────────────────────────── */
+/* The shared `jiten-workbench` grid expects a bounded, flexing parent (Study OS
+ * gives it the AppChrome body). Inside a Blanc panel it needs an explicit height
+ * so the three panes get their own scroll instead of stretching the panel. */
+.blanc-jiten-workbench {
+  height: 560px;
+  max-height: 70vh;
+}
+.blanc-novels .jiten-filters,
+.blanc-novels .jiten-table-wrap,
+.blanc-novels .jiten-inspector {
+  border-color: var(--blanc-border);
+  background: var(--blanc-bg);
+}
+@media (max-width: 900px) {
+  .blanc-jiten-workbench {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: none;
+  }
+  .blanc-novels .jiten-table-wrap {
+    min-height: 320px;
+  }
+}
+
+/* ── Games & Immersion ──────────────────────────────────────────────────── */
+/* Both `.game-arena` and `.immersion-root` are `height: 100%` layouts. The
+ * default `blanc-tool-detail` is an auto-height grid, which collapses a
+ * percentage-height child — so these two wrappers drop the grid, fill the
+ * embedded view, and hand a bounded flex parent to the ported layout. */
+.blanc-tool-detail.blanc-games,
+.blanc-tool-detail.blanc-immersion {
+  display: flex;
+  padding: 0;
+  height: 100%;
+  min-height: 540px;
+}
+.blanc-games > .game-arena,
+.blanc-immersion > .immersion-root {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Visualizer ─────────────────────────────────────────────────────────── */
+.blanc-viz-stage {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border: 1px solid var(--blanc-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--blanc-bg);
+}
+.blanc-viz-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.blanc-viz-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.blanc-viz-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.blanc-viz-control > label {
+  min-width: 84px;
+  opacity: 0.8;
+}
+.blanc-viz-control input[type='range'] {
+  flex: 1;
+  max-width: 240px;
+}

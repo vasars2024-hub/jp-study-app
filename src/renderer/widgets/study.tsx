@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getSummary, formatDuration, formatNumber, READING_RECORDED_EVENT, type StatsSummary } from '../stats';
 import { loadSaved, onSavedChanged, type SavedWord } from '../savedWords';
 import { knowledgeCounts } from '../knownWords';
+import { useT } from '../i18n';
 
 /** Live stats summary — refreshes whenever the reader records activity. */
 function useStatsSummary(): StatsSummary {
@@ -21,37 +22,40 @@ function useStatsSummary(): StatsSummary {
 
 // ---------- Study streak ----------
 export function StudyStreak() {
+  const { t } = useT();
   const s = useStatsSummary();
   return (
     <div className="wgt wgt-stat">
       <div className="wgt-stat-value">{s.streak}</div>
-      <div className="wgt-stat-label">day streak</div>
-      <div className="wgt-stat-sub">{s.daysActive} days studied total</div>
+      <div className="wgt-stat-label">{t('widgets.studyStreak.dayStreak')}</div>
+      <div className="wgt-stat-sub">{t('widgets.studyStreak.daysStudiedTotal', { count: s.daysActive })}</div>
     </div>
   );
 }
 
 // ---------- Today's study time ----------
 export function TodayStudyTime() {
+  const { t } = useT();
   const s = useStatsSummary();
   return (
     <div className="wgt wgt-stat">
       <div className="wgt-stat-value">{formatDuration(s.todaySeconds)}</div>
-      <div className="wgt-stat-label">read today</div>
-      <div className="wgt-stat-sub">{formatNumber(s.todayChars)} characters</div>
+      <div className="wgt-stat-label">{t('widgets.todayStudyTime.readToday')}</div>
+      <div className="wgt-stat-sub">{t('widgets.todayStudyTime.characters', { count: formatNumber(s.todayChars) })}</div>
     </div>
   );
 }
 
 // ---------- Reading progress (14-day sparkline) ----------
 export function ReadingProgress() {
+  const { t } = useT();
   const s = useStatsSummary();
   const max = Math.max(1, ...s.recent.map((d) => d.seconds));
   return (
     <div className="wgt wgt-reading">
       <div className="wgt-reading-top">
         <span className="wgt-stat-value sm">{formatDuration(s.totalSeconds)}</span>
-        <span className="wgt-stat-label">total reading</span>
+        <span className="wgt-stat-label">{t('widgets.readingProgress.totalReading')}</span>
       </div>
       <div className="wgt-spark">
         {s.recent.map((d) => (
@@ -69,6 +73,7 @@ export function ReadingProgress() {
 
 // ---------- Vocabulary progress (knowledge breakdown) ----------
 export function VocabularyProgress() {
+  const { t } = useT();
   const [counts, setCounts] = useState(() => knowledgeCounts());
   useEffect(() => {
     const refresh = () => setCounts(knowledgeCounts());
@@ -83,15 +88,15 @@ export function VocabularyProgress() {
   const total = counts[1] + counts[2] + counts[3];
   const pct = total > 0 ? (learned / total) * 100 : 0;
   const rows: { label: string; n: number; cls: string }[] = [
-    { label: 'Known', n: counts[3], cls: 'k3' },
-    { label: 'Familiar', n: counts[2], cls: 'k2' },
-    { label: 'Learning', n: counts[1], cls: 'k1' },
+    { label: t('widgets.vocabProgress.known'), n: counts[3], cls: 'k3' },
+    { label: t('widgets.vocabProgress.familiar'), n: counts[2], cls: 'k2' },
+    { label: t('widgets.vocabProgress.learning'), n: counts[1], cls: 'k1' },
   ];
   return (
     <div className="wgt wgt-vocab">
       <div className="wgt-reading-top">
         <span className="wgt-stat-value sm">{learned}</span>
-        <span className="wgt-stat-label">familiar+ words</span>
+        <span className="wgt-stat-label">{t('widgets.vocabProgress.familiarPlusWords')}</span>
       </div>
       <div className="wgt-progress"><div className="wgt-progress-fill" style={{ width: `${pct}%` }} /></div>
       <ul className="wgt-vocab-rows">
@@ -109,12 +114,13 @@ export function VocabularyProgress() {
 
 // ---------- Word of the day (from saved dictionary words) ----------
 export function WordOfTheDay() {
+  const { t } = useT();
   const [saved, setSaved] = useState<SavedWord[]>(() => loadSaved());
   useEffect(() => onSavedChanged(() => setSaved(loadSaved())), []);
   if (saved.length === 0) {
     return (
       <div className="wgt wgt-wotd">
-        <div className="wgt-empty">Save words from the dictionary and one will appear here each day.</div>
+        <div className="wgt-empty">{t('widgets.wordOfTheDay.emptyHint')}</div>
       </div>
     );
   }

@@ -3,6 +3,9 @@ import type { WidgetSnapshot } from '../../shared/desktop';
 import { WIDGETS, getWidgetDef } from '../widgets/registry';
 import { WIDGET_CATEGORIES, type WidgetCategory } from '../widgets/types';
 import Icon from './Icons';
+import { useT } from '../i18n';
+import { useWiredMaterials } from './ui';
+import { wiredWidgetDesc, wiredWidgetTitle } from '../widgets/wiredLabels';
 
 // Persist favorites + recently-used across sessions (small UI state → localStorage).
 const GKEY = 'jp-widget-gallery';
@@ -42,9 +45,18 @@ export interface WidgetGalleryProps {
 }
 
 export default function WidgetGallery({ onAdd, onResetLayout, hiddenWidgets, onRestore, onClose }: WidgetGalleryProps) {
+  const { t, lang } = useT();
+  const wired = useWiredMaterials();
   const [prefs, setPrefs] = useState<GalleryPrefs>(loadPrefs);
   const [tab, setTab] = useState<Tab>('All');
   const [query, setQuery] = useState('');
+
+  const tabLabel = (tb: Tab): string => {
+    if (tb === 'All') return t('widgetGallery.tab.all');
+    if (tb === 'Favorites') return t('widgetGallery.tab.favorites');
+    if (tb === 'Recent') return t('widgetGallery.tab.recent');
+    return t(`widgets.category.${tb}`);
+  };
 
   const toggleFav = (type: string) => {
     const favorites = prefs.favorites.includes(type)
@@ -65,68 +77,79 @@ export default function WidgetGallery({ onAdd, onResetLayout, hiddenWidgets, onR
         .filter((w) => order.has(w.type))
         .sort((a, b) => (order.get(a.type) ?? 0) - (order.get(b.type) ?? 0));
     } else if (tab !== 'All') list = list.filter((w) => w.category === tab);
-    if (q) list = list.filter((w) => w.title.toLowerCase().includes(q) || w.description.toLowerCase().includes(q));
+    if (q) {
+      list = list.filter((w) => {
+        const title = wired ? wiredWidgetTitle(w.type, t(w.titleKey)) : t(w.titleKey);
+        const desc = wired ? wiredWidgetDesc(w.type, t(w.descKey)) : t(w.descKey);
+        return title.toLowerCase().includes(q) || desc.toLowerCase().includes(q);
+      });
+    }
     return list;
-  }, [tab, query, prefs]);
+    // `t` is intentionally left out of the deps: its identity is stable, `lang`
+    // is what actually needs to trigger a redo of the filtered/translated list.
+  }, [tab, query, prefs, lang, wired]);
 
   const tabs: Tab[] = ['All', 'Favorites', 'Recent', ...WIDGET_CATEGORIES];
 
   return (
     <>
       <div className="widget-gallery-backdrop" onClick={onClose} />
-      <div className="widget-gallery" role="dialog" aria-label="Widget gallery">
+      <div className="widget-gallery" role="dialog" aria-label={t('widgetGallery.dialogLabel')}>
         <div className="widget-gallery-head">
-          <span className="widget-gallery-title">Widgets</span>
+          <span className="widget-gallery-title">{t('widgetGallery.title')}</span>
           <input
             className="widget-gallery-search"
-            placeholder="Search widgets…"
+            placeholder={t('widgetGallery.searchPlaceholder')}
             value={query}
             autoFocus
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="widget-b" title="Close" onClick={onClose}>×</button>
+          <button className="widget-b" title={t('common.close')} onClick={onClose}>×</button>
         </div>
         <div className="widget-gallery-tabs">
-          {tabs.map((t) => (
-            <button key={t} className={`widget-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</button>
+          {tabs.map((tb) => (
+            <button key={tb} className={`widget-tab ${tab === tb ? 'active' : ''}`} onClick={() => setTab(tb)}>{tabLabel(tb)}</button>
           ))}
         </div>
         <div className="widget-gallery-grid">
-          {visible.length === 0 && <div className="wgt-empty">No widgets match.</div>}
+          {visible.length === 0 && <div className="wgt-empty">{t('widgetGallery.noMatch')}</div>}
           {visible.map((w) => (
             <div key={w.type} className="widget-card">
               <div className="widget-card-head">
-                <span className="widget-card-title">{w.title}</span>
+                <span className="widget-card-title">{wired ? wiredWidgetTitle(w.type, t(w.titleKey)) : t(w.titleKey)}</span>
                 <button
                   className={`widget-fav ${prefs.favorites.includes(w.type) ? 'on' : ''}`}
-                  title={prefs.favorites.includes(w.type) ? 'Unfavorite' : 'Favorite'}
+                  title={prefs.favorites.includes(w.type) ? t('widgetGallery.unfavorite') : t('widgetGallery.favorite')}
                   onClick={() => toggleFav(w.type)}
                 >
                   <Icon name="star" size={14} fill />
                 </button>
               </div>
-              <div className="widget-card-cat">{w.category}</div>
-              <div className="widget-card-desc">{w.description}</div>
-              <button className="wgt-btn primary widget-card-add" onClick={() => onAdd(w.type)}>Add</button>
+              <div className="widget-card-cat">{t(`widgets.category.${w.category}`)}</div>
+              <div className="widget-card-desc">{wired ? wiredWidgetDesc(w.type, t(w.descKey)) : t(w.descKey)}</div>
+              <button className="wgt-btn primary widget-card-add" onClick={() => onAdd(w.type)}>{t('widgetGallery.add')}</button>
             </div>
           ))}
         </div>
 
         {hiddenWidgets.length > 0 && (
           <div className="widget-gallery-hidden">
-            <div className="widget-gallery-subhead">Hidden ({hiddenWidgets.length})</div>
+            <div className="widget-gallery-subhead">{t('widgetGallery.hiddenCount', { count: hiddenWidgets.length })}</div>
             <div className="widget-hidden-list">
-              {hiddenWidgets.map((h) => (
-                <button key={h.id} className="wgt-btn" onClick={() => onRestore(h.id)}>
-                  Restore {getWidgetDef(h.type)?.title ?? h.type}
-                </button>
-              ))}
+              {hiddenWidgets.map((h) => {
+                const def = getWidgetDef(h.type);
+                return (
+                  <button key={h.id} className="wgt-btn" onClick={() => onRestore(h.id)}>
+                    {t('widgetGallery.restore', { title: def ? t(def.titleKey) : h.type })}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
         <div className="widget-gallery-foot">
-          <button className="wgt-btn danger" onClick={onResetLayout}>Reset workspace layout</button>
+          <button className="wgt-btn danger" onClick={onResetLayout}>{t('widgetGallery.resetLayout')}</button>
         </div>
       </div>
     </>

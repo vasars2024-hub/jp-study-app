@@ -1,0 +1,246 @@
+You are classifying Japanese grammar points by their grammatical FUNCTION.
+
+Assign exactly one category to each grammar point below. Batch 4 of 6.
+
+## Rules
+
+- Choose based on what the pattern DOES grammatically, not on surface vocabulary in the English gloss.
+- You must use one of the category IDs listed below, spelled exactly. Do not invent new ones.
+- If a point is not really a grammar function (e.g. a bare vocabulary word, a verb
+  conjugation name like "volitional form", or a structural label like "N1 の N2"),
+  still pick the closest functional category rather than leaving it blank —
+  but append a "?" after the id so it can be flagged for review.
+- Every input line must produce exactly one output line. Do not skip, merge, or reorder.
+
+## Categories (id, then label — description)
+
+surprise	Surprise — astonishment at an unexpected fact
+ratio	Ratio — rate, percentage, proportion of a whole
+compare	Compare — comparing two things (より, ほど)
+criticize	Criticize — blaming or faulting someone
+exclamatory	Exclamatory — emotional exclamation (なんて, とは)
+grounds	Grounds — basis or evidence for a claim (からには, 上は)
+cause-reason	Cause/reason — because, since (から, ので, ため)
+cause-time-relationship	Cause/time relationship — cause tied to a moment in time
+feel	Feel — sensation or impression (気がする)
+affection	Affection — fondness, endearment
+action-status	Action/status — state resulting from an action (てある, ておく)
+finish	Finish — completing or finishing an action (てしまう, 終わる)
+action-effort	Action/effort — trying or making an effort (てみる, ようとする)
+emphasize	Emphasize — general emphasis (こそ, さえ)
+extremes	Extremes — the utmost degree (きわまる, の極み)
+extreme-example	Extreme example — even X, of all things (すら, まで)
+simultaneous	Simultaneous — two things at once (ながら, と同時に)
+process	Process — ongoing progression (つつある)
+proportional	Proportional — the more X the more Y (ば〜ほど, につれて)
+limit	Limit — only, nothing but (だけ, しか, ばかり)
+denote-by-example	Denote by example — citing an example (とか, など, たとえば)
+time	Time — plain point in time (とき)
+invariant	Invariant — unchanging regardless of anything (をとわず)
+perspective-way	Perspective/way — viewpoint or standpoint (にとって, から見ると)
+act	Act — performing an act
+time-situation	Time/situation — circumstance-bound timing (際に, にあたって)
+ability	Ability — can / potential (られる, ことができる)
+unexpected-outcome	What did not match the prediction — contrary to expectation (のに, はずが)
+purpose-goal	Purpose/goal — in order to (ため, ように, には)
+direction	Direction — directional movement (へ, 向かって)
+similarity-degree	Similarity/degree — like, as if (よう, みたい, らしい)
+location-method-cause	Location/method/cause — the particle で and its senses
+time-direction	Time/direction — from/until a time (から, まで)
+companion	Companion — together with (と, とともに)
+point-of-departure-receipt	Point of departure/receipt — origin and end point (から〜まで)
+contrast	Contrast — X but Y (が, けど, 一方)
+range	Range — scope or extent covered (にわたって)
+emphasize-negative	Emphasize negative meaning — strong negation (どころか, まったく〜ない)
+level	Level — degree or standard reached (ほど, くらい)
+invite-suggest	Invite/suggest — inviting or proposing (ましょう, ませんか)
+status	Status — a state of being
+amount	Amount — quantity, including approximate amounts
+frequency	Frequency — how often (たびに, ごとに)
+wish	Wish — wishing or hoping (といい, ように)
+necessary-obligation	Necessary/obligation — must, have to (なければならない, べき)
+definition	Definition — defining what something is (とは)
+desire	Desire — wanting (たい, ほしい)
+speculation	Speculation — guessing, inferring (だろう, かもしれない, らしい)
+confirm	Confirm — seeking confirmation (ね, でしょう)
+judge	Judge — evaluating or judging (べきだ, にすぎない)
+intent	Intent — will or intention (つもり, う/よう)
+plan	Plan — scheduled plan (ことになる, 予定)
+allow	Allow — permission, approval (てもいい)
+benefit	Benefit — giving/receiving a favour (てくれる, てもらう)
+conjugated-from	Conjugated from — a conjugation-derived form
+order	Order — commands (なさい, ろ)
+emphasize-on-level	Emphasize on the level — emphasis about degree
+asked	Asked — reported question
+explain	Explain — explanatory (のだ, わけだ)
+relationships-in-time	Relationships in time — temporal relation between events
+decision	Decision — deciding (ことにする, に決める)
+condition	Condition — general if (ば, たら, と, なら)
+condition-requirement	Condition (requirement) — necessary/sufficient condition (さえ〜ば)
+condition-assumption	Condition (assumption) — supposing that (としたら, とすれば)
+condition-contrary	Condition (contrary to reality) — counterfactual (ば〜のに, たら〜のに)
+achievement	Achievement — reaching or attaining
+time-sequence	Time/sequence — ordering of events (てから, あとで, 前に)
+characteristics	Characteristics — traits of a thing (っぽい, がち)
+comes-next	Comes next — what follows next
+past-state	The past/state — a former state ( te-form + いた)
+regret	Regret — regret or remorse (ばよかった)
+continuity	Continuity — continuing (つづける, ままで)
+heard	Heard — hearsay / information source (そうだ, という)
+case	Case — in the case of (場合)
+negative	Negative — plain negation (ない, ません)
+negative-in-the-past	Negative in the past — past negation
+conclude	Conclude — drawing a conclusion (わけだ, ということだ)
+add	Add — in addition (うえに, ばかりでなく)
+assumptions	Assumptions — premise taken as given (上で, 前提)
+remind	Remind — recalling or reminding
+standard	Standard — a criterion or basis (によって, に基づいて)
+time-space	Time/space — spatial-temporal extent
+place	Place — location (で, において)
+short-time	Short time — a brief interval (うちに, とたん)
+results-state	Results state — resulting condition (ことになっている)
+result	Result — outcome of an action (結果, あげく)
+as	As — in the capacity of (として)
+passive	Passive — passive voice (られる)
+refuse	Refuse — refusal or rejection
+much-less-on-level	Much less on the level — let alone, still less (はもちろん, どころか)
+adjective	Adjective — adjectival form or usage
+means-methods	Means/methods — by means of (によって, で)
+queue-listing	Queue/listing — listing items (たり, し)
+how-to-say-the-first	How to say the first — first of all (まず)
+reverent-humble	Reverent/humble — keigo, honorific or humble
+relationships-follow	Relationships follow — consequential relation between parties
+story-topic	Story topic — introducing or shifting topic (といえば, ば)
+selective	Selective — choosing between options (か, または)
+speak	Speak — manner of speaking
+ban	Ban — prohibition (てはいけない, な)
+repeat-habits	Repeat/habits — habitual action (ものだ, ことがある)
+request-permission	Request permission — asking to be allowed (てもいいですか)
+request	Request — asking someone to do something (てください, てほしい)
+vague	Vague — hedging or vagueness (とか, なんか)
+concessions	Concessions — even if, although (ても, のに, ながらも)
+change-the-way	Change the way you say it — rephrasing or correcting
+of-course	Of course — naturally, as expected (はずだ, に決まっている)
+innocent	Innocent — blamelessness
+trend	Trend — tendency (がちだ, 傾向がある)
+exception	Exception — except for (をのぞいて, 以外)
+value	Value — worth or merit (かいがある, 価値)
+related-respectively	Related/respectively — each respectively (それぞれ)
+arguments-affirmative	Arguments (affirmative) — affirming an argument
+forced	Forced — causative / being made to (させる)
+advice	Advice — recommending (たほうがいい, べき)
+describe	Describe — describing a thing or scene
+highest-level	Highest level — the very top (最も, 一番)
+experience	Experience — having done before (たことがある)
+give	Give — giving (あげる, くれる)
+period	Period — a span of time (間, 中)
+attach	Attach — attaching or appending
+warning	Warning — caution (ないように, おそれがある)
+situation	Situation — circumstances (状況, 場合)
+immediately-after	Immediately after — right after (とたん, next いなや)
+shortly-before	Shortly before — just before (直前, ところだった)
+through	Through — via, throughout (を通じて, を通して)
+halfway	Halfway — partway through (かけ, 途中)
+contemptuous	Contemptuous — disdain or scorn
+future-time	Future time — a future point in time
+
+## Grammar points (id, then pattern, then meaning)
+
+n3m-g-1364d0	... ことだ	should
+n3m-g-32fcb6	なくては	If not... then no...
+n3m-t-ch-s-l-ng-f79569	... いか + từ chỉ số lượng	How many ... under the leadership, under the authority of ...
+n3m-g-62d435	ひとつ	A little
+n3m-g-527141	あるいは～あるいは～	or, either
+n3m-g-78d726	結局	after all; eventually; in the end ~
+n3m-g-1c97d0	一体	…the heck; …in the world; …on earth
+n3m-g-810c13	み	~ness
+n3m-g-a9512a	込む	to be crowded
+n3m-g-fbb839	なかなか	very; quite; pretty; rather; just not ~
+n3m-g-40834a	か何か	or something
+n3m-g-7e522d	すでに	something has already been done/taken place; is already the case
+n3m-g-f287b4	かな(あ)	I wonder; should I?
+n3m-g-5c14ca	まさか	there's no way; that's impossible; you must be joking
+n3m-g-759882	は～で有名	famous for ~
+n3m-g-bef514	に代わって	instead of; replacing; on behalf of ~
+n3m-g-8ff0f0	代わりに	instead of; as a substitute for​; in exchange for; in return for
+n3m-g-84cb61	に関して	about; regarding; related to ~
+n3m-g-8a031c	確かに	surely, certainly ~
+n3m-g-6cbc0c	ようになる	to reach the point that; to come to be that; to turn into ~
+n3m-g-ac7d86	に比べて	compared to; in comparison to ~
+n3m-g-6faaea	ことだ	should do~ (used for suggestions or giving advice)
+n3m-g-b75189	…も…だが	...how to...that way
+n3m-g-acee7b	... もの	thing...
+n3m-g-3d29ba	ては	whenever; if; when~; repetitive action
+n3m-g-4fe524	～には～の～がある	has its own～
+n3m-g-b24d7f	～つい	accidentally; unintentionally; by mistake
+n3m-g-da3a11	～になれる	to be used to, become
+n3m-g-5310cd	よく(も)	How the hell is it possible, that ...?
+n3m-g-2908f2	ごらん	(please) try to; (please) look
+n3m-g-91e05c	といいなあ/たらいいなあ/ばいいなあ	it would be nice if; should; I hope ~
+n3m-g-eeac9c	に慣れる	to be used to something
+n3m-g-9adc60	ずに	without doing ~
+n3m-g-cf4389	... はず	it must be; it should be (expectation)
+n3m-g-50e692	けっか	as a result of; after ~
+n3m-g-8fd75f	どうも	Confused, bewildered
+n3m-g-bf71cb	なにもかも	anything and everything, just about everything
+n3m-g-2fc7b5	なんとはなしに	I don't know why, aimless
+n3m-g-41955d	なにかにつけて	to take every opportunity
+n3m-g-dbecf1	お … いただく	a person whose position is higher than the speaker does something for you…
+n3m-g-6cb27d	とく	To do something in advance
+n3m-g-bc3829	また	(Choose) or
+n3m-n1-n2-f743c5	N1 の N2	N1 of N2
+n3m-g-e3c2e8	お…です	Have..., are..., will...
+n3m-g-f02ae9	むきもある	There are people…
+n3m-g-73ec49	そこへ	Right at that moment
+n3m-g-c3f81c	... ではないか	right? isn't it?
+n3m-g-7ebc65	... いか...	below~
+n3m-g-dabeb9	… がいい ...	... I hope that ...
+n3m-g-714604	…ば…ところだ（った）	If… (counterfactual condition), then would be ~
+n3m-g-aed1df	中	While (Lasting)
+n3m-g-bb425b	風	in the style of (A)
+n3m-g-1f1543	いかに … とはいえ	What ever...
+n3m-g-0566bb	ともかく	anyhow; anyway; regardless; in any case; whether or not ~
+n3m-g-466ac0	ではないか	right? isn't it?
+n3m-g-8489b2	なら (ば)	if; in case; if it is the case that; if it is true that
+n3m-g-c1f8bf	いいよ	Alright, let's not talk about it anymore.
+n3m-g-49185a	なんだか	somehow, somewhat
+n3m-g-7d1f48	…けれど	Explanation
+n3m-g-15c7f5	…風	in the style of (A)
+n3m-g-03a9a2	いかなる	any kind of; every; whatsoever; whatever
+n3m-g-b15cbd	そうして	and; and then; thus; and now ~
+n3m-g-8ae8e6	とうとう	Eventually, finally...
+n3m-g-8e6bfe	もくされている	to be considered as (A)
+n3m-g-a96bea	ようやく	finally; at last
+n3m-g-45b49d	…ばあいもある	there are cases…
+n3m-n1-n2-bfdda4	N1 の...N2	The N2 of N1...
+n3m-g-0d9fb3	まさか...	There's no way; that's impossible; you must be joking
+n3m-g-e169f9	というものは...だ	something like; something called ~
+n3m-g-8b63bf	いまや	now, these days
+n3m-g-073496	…って	named, called ~
+n3m-g-85ace5	… たらいい	it would be nice if; should; I hope ~
+n3m-g-98de6f	副詞 + する	Having the nature of..., in condition
+n3m-g-3f6413	姿を見せる	figure; appearance
+n3m-g-f1015c	やっぱり	as I thought, absolutely; even so; either way; after all; nonetheless; in any event; all the same
+n3m-g-078018	まわる	to go around
+n3m-g-06ac7c	じつは	as a matter of fact; by the way; to tell you the truth; to be honest; frankly
+n3m-g-336c7f	ところとなる	Being perceived by others (Recognized)
+n3m-g-56a599	...とする	assume, regard X as ~ , suppose
+n3m-g-060bd1	…はずではなかった	cannot be (impossible)
+n3m-g-6f625f	またもや	again
+n3m-g-d78d2e	...って	named; called ~
+n3m-g-ebc616	いかに…か	no matter how
+n3m-g-86e0be	…か…ない (か)	Around ..., sometimes V, not fully V
+n3m-g-815339	ちょっとした ...	quite a bit; somewhat (Positive review)
+n3m-g-270863	いささか	a bit
+n3m-g-5adb07	(の) なら～がいい	if; in the case that ..., you should...
+n3m-g-d03a96	… たら... ところだ	if… (counterfactual condition), then would be ~
+n3m-g-b2f28c	ていては	If one keeps doing something
+n3m-g-13f3c6	いかなる…とも	whatsoever; whatever
+
+## Output format
+
+Return ONLY lines of `id<TAB>category-id`, one per input line, no header, no
+commentary, no code fence. Example:
+
+n1x-gurumi	companion
+n2m-g-b0bf1e	standard?

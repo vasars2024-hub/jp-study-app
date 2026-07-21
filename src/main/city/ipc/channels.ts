@@ -1,23 +1,19 @@
-/**
- * Noctis IPC — fixed `city:` channel literals.
- *
- * String-locked channel registry (ARCHITECTURE.md Section 4). These three are
- * the entire outward contract of the module; no other channel exists.
- */
+import { CivilizationState, EngineEventFlag, InterpretedLearningInput } from '../engine/types';
 
-import { CivilizationState, EngineEventFlag } from '../engine/types';
-
-/** renderer -> main (invoke): boot handshake, returns the current snapshot. */
 export const CITY_GET_STATE = 'city:getState';
-
-/** renderer -> main (invoke): inbound interpreted session -> state/event result. */
 export const CITY_RECORD_SESSION = 'city:recordSession';
-
-/** main -> renderer (push to all windows): unified state/event result. */
 export const CITY_CHANGED = 'city:changed';
+export const CITY_WIRE_VERSION = 1;
 
-/** The unified result shape carried by getState, recordSession, and changed. */
+export interface CitySessionPacket {
+  schemaVersion: number;
+  idempotencyKey: string;
+  input: InterpretedLearningInput;
+}
+
+/** Unified, versioned result used by both invoke replies and all-window push. */
 export interface CityStateMessage {
+  schemaVersion: number;
   state: CivilizationState;
   flags: EngineEventFlag[];
 }

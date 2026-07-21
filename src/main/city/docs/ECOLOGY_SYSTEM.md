@@ -3,6 +3,7 @@ doc_id: noctis.ecology_system
 tier: 7
 authority: domain_specification
 role: ecological_domain_blueprint
+status: reconciled
 depends_on:
   - VISION.md
   - ART_DIRECTION.md
@@ -260,7 +261,7 @@ No growth coefficient may ever be user-visible as a number to optimize, and no g
 
 ### Succession Is Interdependence, Not Technology
 
-The ecology matures along its own axis: **succession**, the degree of interdependence among living systems. Succession is deliberately distinct from the five-era technology machine of `SIMULATION_SYSTEMS.md` Section 9. Eras measure the civilization's relationship to knowledge; succession measures the ecosystem's relationship to itself. The two advance together in a healthy world but are never the same variable, and neither defines the other. Both are monotone: succession stages never regress, exactly as eras never regress. The Abyssal Douse dims *activity*; it never unwinds *structure* (Laws 4 and 5, `SIMULATION_SYSTEMS.md` Section 12).
+The ecology matures along its own axis: **succession**, the degree of interdependence among living systems. Succession is deliberately distinct from the five-era civilization machine of `SIMULATION_SYSTEMS.md` Section 15. Eras measure the civilization's relationship to knowledge; succession measures the ecosystem's relationship to itself. The two advance together in a healthy world but are never the same variable, and neither defines the other. Both are monotone: succession stages never regress, exactly as eras never regress. The Abyssal Douse dims *activity*; it never unwinds *structure* (Laws 4 and 5, `SIMULATION_SYSTEMS.md` Sections 10, 24, and 25).
 
 Stage advancement is a deterministic threshold function `θ_stage(n)` over accumulated ecological structure — network masses, fauna cycle establishment, relationship density — never over wall-clock age. A world studied deeply for a season is further along than a world left idle for a year.
 
@@ -370,7 +371,7 @@ Stage 4: Bio-crystalline technology
          pairs of COSMIC_STELLAR (capability gating per TECHNOLOGY_SYSTEM.md).
 ```
 
-Resonance is the crystal network's form of relationship (Section 6): coupled lattices behave as one system, which is why deep mathematical understanding stabilizes the *whole* environment rather than one ridge. Resonance never generates energy — it distributes and preserves what learning banked (Conservation, Law 2; the Stellar Guard of `SIMULATION_SYSTEMS.md` Section 9 applies to every radiant medium, starlight and resonance alike).
+Resonance is the crystal network's form of relationship (Section 6): coupled lattices behave as one system, which is why deep mathematical understanding stabilizes the *whole* environment rather than one ridge. Resonance never generates energy — it distributes and preserves what learning banked (Conservation, Law 2; the Stellar Guard of `SIMULATION_SYSTEMS.md` Section 15 applies to every radiant medium, starlight and resonance alike).
 
 ---
 
@@ -493,6 +494,10 @@ EcologicalState
 ```
 
 Two laws bind any future refinement of this projection. First, every category must remain derivable from canonical state — the projection adds vocabulary, never hidden variables. Second, the legacy/active split of `SIMULATION_SYSTEMS.md` Section 10 is preserved exactly: the *cumulative legacy record* of `substrateDevelopment`, `mycelialNetwork`, `crystalDevelopment`, and `successionStage` never decreases and is never touched by user absence (Law 5); their *active form* may still transform through internal ecological causality (living change, Law 8); and `ecosystemHealth` and the activity components of the others are renewable and may breathe with presence and absence. No decrease anywhere is ever caused by the user stepping away.
+
+### Era-Readiness Projection
+
+Ecology exposes `x_ecology ∈ [0, 1]`, a secured-maturity projection consumed only by `ERA_PROGRESSION.md`. It is derived from succession stage, crystal-network maturity, secured mycelial depth, habitat interdependence, and circulation reach. It is not identical to succession and cannot gate an era by itself. Active habitat form may transform through internal causality, while the secured maturity already achieved remains available to the era reading and does not fall through ordinary absence. Ecology owns the derivation; Era Progression owns its weight, floor, and combination (`SIMULATION_SYSTEMS.md` Section 15).
 
 ---
 

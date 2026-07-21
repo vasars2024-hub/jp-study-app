@@ -1,5 +1,6 @@
 import type { CsvTable } from '../../../shared/csvEditor';
 import type { DeckColumnMapping } from '../../../shared/deckImport';
+import { useT } from '../../i18n';
 
 type Props = {
   table: CsvTable;
@@ -34,33 +35,40 @@ function buildBack(row: string[], mapping: DeckColumnMapping): string {
 }
 
 export default function CardPreviewPanel({ table, mapping, rowIndex, onClose }: Props) {
+  const { t } = useT();
   const row = rowIndex !== null ? table.rows[rowIndex] : null;
   const front = row ? buildFront(row, mapping) : '';
   const back = row ? buildBack(row, mapping) : '';
+  const empty = t('csv.preview.emptyValue');
 
   return (
     <aside className="csv-editor-preview">
       <div className="csv-editor-preview-head">
-        <span className="csv-editor-preview-label">Card preview</span>
-        <button type="button" className="btn small subtle" onClick={onClose} aria-label="Close preview">
-          Close
+        <span className="csv-editor-preview-label">{t('csv.preview.title')}</span>
+        <button
+          type="button"
+          className="btn small subtle"
+          onClick={onClose}
+          aria-label={t('csv.preview.closeAria')}
+        >
+          {t('common.close')}
         </button>
       </div>
       {rowIndex === null ? (
-        <p className="muted csv-editor-preview-empty">Select a row to preview its flashcard.</p>
+        <p className="muted csv-editor-preview-empty">{t('csv.preview.empty')}</p>
       ) : (
         <>
-          <p className="muted csv-editor-preview-meta">Row {rowIndex + 1}</p>
+          <p className="muted csv-editor-preview-meta">{t('csv.preview.row', { n: rowIndex + 1 })}</p>
           <div className="csv-editor-flashcard">
             <div className="csv-editor-flashcard-side front">
-              <span className="csv-editor-flashcard-tag">Front</span>
+              <span className="csv-editor-flashcard-tag">{t('csv.preview.front')}</span>
               <div className="csv-editor-flashcard-text" lang="ja">
-                {front || '—'}
+                {front || empty}
               </div>
             </div>
             <div className="csv-editor-flashcard-side back">
-              <span className="csv-editor-flashcard-tag">Back</span>
-              <div className="csv-editor-flashcard-text">{back || '—'}</div>
+              <span className="csv-editor-flashcard-tag">{t('csv.preview.back')}</span>
+              <div className="csv-editor-flashcard-text">{back || empty}</div>
             </div>
           </div>
         </>

@@ -20,6 +20,7 @@ export interface LyricsResult {
 }
 
 const CACHE_PREFIX = 'jp-lyrics-';
+const MISS_CACHE_VERSION = 2;
 
 function splitPath(p: string): string[] {
   return p.split(/[\\/]/).filter(Boolean);
@@ -62,9 +63,20 @@ export function saveLyrics(mediaId: string, res: LyricsResult): void {
 /** Remember that nothing was found, so we don't re-query every playback. */
 export function markNoLyrics(mediaId: string): void {
   try {
-    localStorage.setItem(CACHE_PREFIX + mediaId, JSON.stringify({ none: true }));
+    localStorage.setItem(CACHE_PREFIX + mediaId, JSON.stringify({ none: true, version: MISS_CACHE_VERSION }));
   } catch {
     /* ignore */
+  }
+}
+
+export function hasFreshNoLyrics(mediaId: string): boolean {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + mediaId);
+    if (!raw) return false;
+    const v = JSON.parse(raw) as { none?: true; version?: number };
+    return v.none === true && v.version === MISS_CACHE_VERSION;
+  } catch {
+    return false;
   }
 }
 
@@ -133,11 +145,15 @@ function guessSongMetaWithAlbum(item: MediaItem): SongMeta {
 
 /** File-name only — ignores folder paths and album segments from directories. */
 function guessSongMetaFileOnly(item: MediaItem): SongMeta {
-  const base = cleanTag(item.fileName.replace(/\.[a-z0-9]+$/i, ''));
-  const parts = base.split(/\s+[-–—]\s+/);
+  const rawBase = item.fileName.replace(/\.[a-z0-9]+$/i, '');
+  const parts = rawBase.split(/\s+[-–—]\s+/).map(cleanTag).filter(Boolean);
   if (parts.length >= 2) {
+    if (/^\d{1,3}$/.test(parts[0])) {
+      return { artist: '', album: '', title: parts.slice(1).join(' - ').trim() };
+    }
     return { artist: parts[0].trim(), album: '', title: parts.slice(1).join(' - ').trim() };
   }
+  const base = cleanTag(rawBase);
   return { artist: '', album: '', title: base || item.title };
 }
 
@@ -183,6 +199,49 @@ function albumScore(want: string, hit?: string): number {
   return 0;
 }
 
+function textScore(want: string, hit?: string): number {
+  if (!want || !hit) return 0;
+  const a = want.toLowerCase();
+  const b = hit.toLowerCase();
+  if (a === b) return 10;
+  if (b.includes(a) || a.includes(b)) return 5;
+  return 0;
+}
+
+function normalizeSearchTerm(s: string): string {
+  return s
+    .replace(/[’‘]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\bfeat\.?\b|\bft\.?\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function uniqueQueries(meta: SongMeta): string[] {
+  const artist = normalizeSearchTerm(meta.artist);
+  const album = normalizeSearchTerm(meta.album);
+  const title = normalizeSearchTerm(meta.title);
+  const variants = [
+    [artist, title].filter(Boolean).join(' '),
+    [title, artist].filter(Boolean).join(' '),
+    title,
+    [artist, album, title].filter(Boolean).join(' '),
+  ];
+  return [...new Set(variants.map((q) => q.trim()).filter(Boolean))];
+}
+
+function scoreHit(meta: SongMeta, hit: LrclibHit, durationSec: number): number {
+  const durationDelta = durationSec > 0 && hit.duration ? Math.abs(hit.duration - durationSec) : 0;
+  const durationScore = durationSec <= 0 || !hit.duration ? 0 : Math.max(0, 8 - durationDelta);
+  return (
+    Number(!!hit.syncedLyrics) * 30 +
+    textScore(meta.title, hit.trackName) * 3 +
+    textScore(meta.artist, hit.artistName) * 2 +
+    albumScore(meta.album, hit.albumName) +
+    durationScore
+  );
+}
+
 /**
  * Look up lyrics on LRCLIB. Tries an exact match (artist + album + title +
  * duration) first, then a fuzzy search preferring album and duration matches.
@@ -191,30 +250,41 @@ export async function fetchLyrics(meta: SongMeta, durationSec: number): Promise<
   const q = (params: Record<string, string>) => new URLSearchParams(params).toString();
 
   if (meta.artist && meta.title) {
-    const params: Record<string, string> = {
-      artist_name: meta.artist,
-      track_name: meta.title,
-      duration: String(Math.round(durationSec)),
-    };
-    if (meta.album) params.album_name = meta.album;
-    const exact = await getJson<LrclibHit>(`https://lrclib.net/api/get?${q(params)}`);
-    const r = toResult(exact);
-    if (r) return r;
+    const exactParams: Record<string, string>[] = [
+      {
+        artist_name: meta.artist,
+        track_name: meta.title,
+        duration: String(Math.round(durationSec)),
+        ...(meta.album ? { album_name: meta.album } : {}),
+      },
+      {
+        artist_name: meta.artist,
+        track_name: meta.title,
+        duration: String(Math.round(durationSec)),
+      },
+    ];
+    for (const params of exactParams) {
+      const exact = await getJson<LrclibHit>(`https://lrclib.net/api/get?${q(params)}`);
+      const r = toResult(exact);
+      if (r) return r;
+    }
   }
 
-  const query = [meta.artist, meta.album, meta.title].filter(Boolean).join(' ').trim();
-  if (!query) return null;
-  const hits = (await getJson<LrclibHit[]>(`https://lrclib.net/api/search?${q({ q: query })}`)) ?? [];
-  const scored = hits
+  const hits: LrclibHit[] = [];
+  for (const query of uniqueQueries(meta)) {
+    const batch = (await getJson<LrclibHit[]>(`https://lrclib.net/api/search?${q({ q: query })}`)) ?? [];
+    hits.push(...batch);
+    if (batch.some((h) => h.syncedLyrics || h.plainLyrics)) break;
+  }
+  const byId = new Map<string, LrclibHit>();
+  for (const hit of hits) {
+    const key = [hit.trackName, hit.artistName, hit.albumName, hit.duration].join('\u0000');
+    if (!byId.has(key)) byId.set(key, hit);
+  }
+  const scored = [...byId.values()]
     .filter((h) => h.syncedLyrics || h.plainLyrics)
     .sort((a, b) => {
-      const sync = Number(!!b.syncedLyrics) - Number(!!a.syncedLyrics);
-      if (sync !== 0) return sync;
-      const alb = albumScore(meta.album, b.albumName) - albumScore(meta.album, a.albumName);
-      if (alb !== 0) return alb;
-      const da = Math.abs((a.duration ?? 0) - durationSec);
-      const db = Math.abs((b.duration ?? 0) - durationSec);
-      return da - db;
+      return scoreHit(meta, b, durationSec) - scoreHit(meta, a, durationSec);
     });
   const tol = meta.album ? 8 : 5;
   const best = scored.find((h) => durationSec <= 0 || Math.abs((h.duration ?? 0) - durationSec) <= tol) ?? scored[0];

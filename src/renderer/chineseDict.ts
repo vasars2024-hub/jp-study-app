@@ -1,5 +1,6 @@
 // Offline Simplified/Traditional Chinese → English dictionary, backed by
-// CC-CEDICT (bundled at public/cedict/cedict.u8). Returns the same DictResult /
+// CC-CEDICT. Prefers the Phase 6 managed install (`cc-cedict`); falls back to
+// the bundled copy at public/cedict/cedict.u8. Returns the same DictResult /
 // DictEntry shape as the Japanese (Jisho) path, so the dictionary UI, the
 // reader pop-up, saving to Flashcards, and adding to Anki all work unchanged.
 import type { DictEntry, DictResult } from '../shared/types';
@@ -65,10 +66,27 @@ let indexPromise: Promise<CedictIndex> | null = null;
 
 const LINE_RE = /^(\S+)\s+(\S+)\s+\[([^\]]*)\]\s+\/(.+)\/\s*$/;
 
-async function buildIndex(): Promise<CedictIndex> {
+async function loadCedictRaw(): Promise<string> {
+  // Prefer Phase 6 managed install; fall back to the bundled public copy so ZH
+  // lookup never hard-breaks when the asset is not downloaded yet.
+  try {
+    if (typeof window !== 'undefined' && window.api?.assetsIsInstalled) {
+      const installed = await window.api.assetsIsInstalled('cc-cedict');
+      if (installed) {
+        const text = await window.api.assetsReadText('cc-cedict');
+        if (text && text.length > 0) return text;
+      }
+    }
+  } catch {
+    /* fall through to bundled */
+  }
   const res = await fetch(`${location.origin}/cedict/cedict.u8`);
   if (!res.ok) throw new Error(`Could not load the Chinese dictionary (${res.status}).`);
-  const text = await res.text();
+  return res.text();
+}
+
+async function buildIndex(): Promise<CedictIndex> {
+  const text = await loadCedictRaw();
   const byWord = new Map<string, CedictEntry[]>();
   const all: CedictEntry[] = [];
   for (const line of text.split('\n')) {
@@ -91,6 +109,11 @@ async function buildIndex(): Promise<CedictIndex> {
   return { byWord, all };
 }
 
+/** Drop the cached index so a newly installed CC-CEDICT is picked up. */
+export function resetChineseDictCache(): void {
+  indexPromise = null;
+}
+
 function getIndex(): Promise<CedictIndex> {
   if (!indexPromise) indexPromise = buildIndex();
   return indexPromise;
@@ -107,6 +130,38 @@ function toDictEntry(e: CedictEntry): DictEntry {
 }
 
 const hasCjk = (s: string): boolean => /[㐀-鿿豈-﫿]/.test(s);
+
+// ----- classifier (measure word) hints -----------------------------------
+
+export interface ClassifierHint {
+  trad: string;
+  simp: string;
+  pinyin: string; // tone-marked, e.g. "tiáo"
+}
+
+// CEDICT embeds classifier hints as defs like "CL:隻|只[zhi1],條|条[tiao2]"
+// (the trad| part is absent when both forms match, e.g. "CL:个[ge4]").
+const CL_ITEM_RE = /([^,|[\]]+)(?:\|([^,[\]]+))?\[([^\]]*)\]/g;
+
+/** Extract measure-word hints from a CEDICT entry's definition list. */
+export function parseClassifiers(defs: string[]): ClassifierHint[] {
+  const out: ClassifierHint[] = [];
+  const seen = new Set<string>();
+  for (const def of defs) {
+    if (!def.startsWith('CL:')) continue;
+    const body = def.slice(3);
+    CL_ITEM_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = CL_ITEM_RE.exec(body)) !== null) {
+      const trad = m[1].trim();
+      const simp = (m[2] ?? m[1]).trim();
+      if (!trad || seen.has(simp)) continue;
+      seen.add(simp);
+      out.push({ trad, simp, pinyin: pinyinToneMarks(m[3]) });
+    }
+  }
+  return out;
+}
 
 /** Look up a word (Chinese headword) or an English term, offline via CC-CEDICT. */
 export async function lookupChinese(query: string): Promise<DictResult> {

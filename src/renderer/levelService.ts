@@ -16,13 +16,14 @@ import {
   type LevelTier,
   type StudyLang,
 } from '../shared/levelScale';
+import { estimateUserLevel, type LevelEstimate } from '../shared/levelEstimate';
+import { getStudyLang } from './studyEnvironment';
 
-const LANG_KEY = 'jp-study-dict-lang';
 const THRESHOLD_KEY = 'jp-level-threshold';
 export const LEVEL_CHANGED_EVENT = 'level-changed';
 
 export function getActiveStudyLang(): StudyLang {
-  return localStorage.getItem(LANG_KEY) === 'zh' ? 'zh' : 'ja';
+  return getStudyLang();
 }
 
 /** Coverage a list must reach to prove its level (0..1). User-configurable. */
@@ -92,6 +93,16 @@ export function getUserLevel(lang: StudyLang = getActiveStudyLang()): LevelTier 
 }
 
 /**
+ * Badge-ready estimate (short "N3" / "HSK 4") for Statistics and any chrome
+ * that should match EPUB cover labeling. Same math as getUserLevel.
+ */
+export function getLevelEstimate(lang: StudyLang = getActiveStudyLang()): LevelEstimate {
+  return estimateUserLevel(lang, buildInput(lang));
+}
+
+export type { LevelEstimate };
+
+/**
  * Subscribe to anything that can change the computed level: the level lists,
  * the knowledge store (manual grades or an Anki sync), the threshold, and the
  * active study language. Returns an unsubscribe function.
@@ -102,10 +113,12 @@ export function onLevelChange(cb: () => void): () => void {
   window.addEventListener('word-knowledge-changed', h);
   window.addEventListener(LEVEL_CHANGED_EVENT, h);
   window.addEventListener('storage', h);
+  window.addEventListener('study-lang-changed', h);
   return () => {
     unlists();
     window.removeEventListener('word-knowledge-changed', h);
     window.removeEventListener(LEVEL_CHANGED_EVENT, h);
     window.removeEventListener('storage', h);
+    window.removeEventListener('study-lang-changed', h);
   };
 }

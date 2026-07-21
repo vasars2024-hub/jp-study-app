@@ -16,6 +16,7 @@ const KEY = 'jp-study-lockscreen-v1';
 const EVENT = 'jp-lockscreen-changed';
 const SESSION_UNLOCKED = 'jp-lockscreen-unlocked';
 const PENDING_AERO_BOOT_KEY = 'jp-aero-pending-boot';
+const PENDING_WIRED_BOOT_KEY = 'jp-wired-pending-boot';
 
 export const AERO_ENTRY_LOCKED_EVENT = 'shell:aeroEntryLocked';
 
@@ -145,6 +146,28 @@ export function consumePendingAeroBoot(): boolean {
   try {
     if (sessionStorage.getItem(PENDING_AERO_BOOT_KEY) !== '1') return false;
     sessionStorage.removeItem(PENDING_AERO_BOOT_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function armLockscreenOnWiredEntry(): boolean {
+  const s = loadLockscreen();
+  if (!s.enabled || !s.pinHash) return false;
+  clearLockscreenSession();
+  try {
+    sessionStorage.setItem(PENDING_WIRED_BOOT_KEY, '1');
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+export function consumePendingWiredBoot(): boolean {
+  try {
+    if (sessionStorage.getItem(PENDING_WIRED_BOOT_KEY) !== '1') return false;
+    sessionStorage.removeItem(PENDING_WIRED_BOOT_KEY);
     return true;
   } catch {
     return false;

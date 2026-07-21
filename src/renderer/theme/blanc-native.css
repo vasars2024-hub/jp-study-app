@@ -1,0 +1,123 @@
+/*
+ * Blanc-native visual override.
+ *
+ * The parity ports reuse Study OS content components, which carry Study OS
+ * classNames (.anki-card, .flash-*, .media-*, .stats-*, .gx-notebook-*, .tr-*,
+ * .music-*, .lib-*, .btn, .epub-*, .deck-*). Because blancMain loads the full
+ * styles.css, those classes would otherwise drag Study OS's own look into Blanc.
+ * This layer re-skins them, scoped to `.blanc-root`, into Blanc's language: a
+ * calm, neutral, macOS-inspired system — rounded surfaces, hairline borders,
+ * soft hovers, gentle elevation and generous spacing. Study OS is untouched;
+ * every rule here is `.blanc-root`-scoped.
+ *
+ * Imported last in blanc.css so it wins ties against styles.css.
+ */
+
+/* 1. Consistent rounded geometry on reused surfaces and controls. Replaces the
+      old blanket square-corner reset — Blanc is rounded everywhere now. */
+.blanc-root :is(
+  [class^='flash-'], [class*=' flash-'],
+  [class^='media-'], [class*=' media-'],
+  [class^='stats-'], [class*=' stats-'],
+  [class^='music-'], [class*=' music-'],
+  [class^='tr-'], [class*=' tr-'],
+  [class^='gx-notebook'], [class*=' gx-notebook'],
+  [class^='lib-'], [class*=' lib-'],
+  [class^='epub-'], [class*=' epub-'],
+  [class^='deck-'], [class*=' deck-'],
+  .anki-card, .cover-level-badge, .flash-book-cover
+) {
+  border-radius: var(--blanc-radius-md);
+}
+
+/* 2. Borrowed "card" surfaces → Blanc's floating panel: soft dark fill, hairline
+      border, gentle elevation, comfortable radius. No hard edges, no gradients. */
+.blanc-root :is(
+  .anki-card,
+  .flash-group, .flash-row, .flash-card, .flash-strip-card,
+  .flash-review-setup, .flash-explorer, .flash-strip-section, .epub-mine-promo,
+  .flash-review-shell, .flash-done,
+  .media-card, .media-stage, .media-lib-panel, .media-subbar, .media-gen,
+  .stats-card, .stats-section, .stats-level-estimate,
+  .music-row, .music-nowplaying,
+  .tr-history-item, .tr-pane, .tr-output,
+  .gx-notebook-item, .gx-notebook-count
+) {
+  background: var(--blanc-panel);
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-lg);
+  box-shadow: var(--blanc-shadow-soft);
+  background-image: none;
+}
+
+/* 3. Buttons: soft, rounded, borderless-until-hover; primary is a light fill
+      that clearly stands out, secondaries recede until interaction. */
+.blanc-root .btn {
+  border-radius: var(--blanc-radius-sm);
+  background: var(--blanc-tint-soft);
+  border: 1px solid transparent;
+  color: var(--blanc-text);
+  box-shadow: none;
+  background-image: none;
+  transition: background-color var(--blanc-dur) var(--blanc-ease),
+    color var(--blanc-dur) var(--blanc-ease),
+    transform var(--blanc-dur) var(--blanc-ease);
+}
+.blanc-root .btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--blanc-tint);
+}
+.blanc-root .btn.primary,
+.blanc-root .btn.flash-got {
+  background: #f5f5f7;
+  border-color: transparent;
+  color: #16161a;
+  font-weight: 600;
+}
+.blanc-root .btn.primary:hover:not(:disabled),
+.blanc-root .btn.flash-got:hover:not(:disabled) {
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+.blanc-root .btn:disabled {
+  opacity: 0.45;
+}
+
+/* 4. Tabs & chips: rounded pills. Inactive recede to muted text on no fill;
+      active is a soft neutral highlight, never a bright block. */
+.blanc-root :is(.flash-tab, .lib-folder-chip) {
+  border: 1px solid transparent;
+  border-radius: var(--blanc-radius-pill);
+  background: transparent;
+  color: var(--blanc-muted);
+  transition: background-color var(--blanc-dur) var(--blanc-ease),
+    color var(--blanc-dur) var(--blanc-ease);
+}
+.blanc-root :is(.flash-tab:hover, .lib-folder-chip:hover) {
+  background: var(--blanc-hover);
+  color: var(--blanc-text);
+}
+.blanc-root :is(.flash-tab.active, .lib-folder-chip.active) {
+  background: var(--blanc-active);
+  border-color: transparent;
+  color: var(--blanc-text);
+}
+
+/* 5. Rows/strips read as an airy list with a rounded hover, not boxed cards. */
+.blanc-root :is(.flash-strip-card, .aero-flash-group, .aero-flash-card-row) {
+  background: var(--blanc-panel);
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-md);
+  box-shadow: none;
+}
+.blanc-root .flash-strip-card.mastered {
+  border-color: var(--blanc-border-strong);
+}
+
+/* 6. Progress + meters use the neutral accent as a rounded fill. */
+.blanc-root .flash-progress-bar > span,
+.blanc-root .stats-bar-fill,
+.blanc-root .media-gen-bar-fill {
+  background: var(--blanc-accent);
+  border-radius: var(--blanc-radius-pill);
+}

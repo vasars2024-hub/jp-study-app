@@ -17,6 +17,8 @@
  * imports (`THEMES`, `applyTheme`, `bootTheme`, `loadThemeId`, …) keep working.
  */
 
+import { writeLocalStorage } from '../localStorageWrite';
+
 export type ThemeKind = 'base' | 'aero' | 'anime' | 'custom';
 
 /** Reference to a swappable asset bundle (wallpapers / icons / sounds). Fully
@@ -58,9 +60,14 @@ const THEME_KEY = 'jp-os-theme';
 const ENGINE_VERSION_KEY = 'jp-os-theme-engine-v';
 const EVENT = 'jp-theme-changed';
 
+export interface ApplyThemeOptions {
+  /** When false, update the DOM / broadcast without rewriting jp-os-theme (auto-theme). */
+  persist?: boolean;
+}
+
 /** The 13 built-in themes (formerly the `THEMES` array in theme.ts). */
 const BASE_THEMES: Theme[] = [
-  { id: 'study-os', label: 'Study OS (default)', kind: 'base', version: 1, light: false, swatch: { bg: '#0f0e13', text: '#f5f4f7', border: '#2d2b37' } },
+  { id: 'study-os', label: 'GrammarX Default', kind: 'base', version: 1, light: false, swatch: { bg: '#0f0e13', text: '#f5f4f7', border: '#2d2b37' } },
   { id: 'classic-light', label: 'Classic Light', kind: 'base', version: 1, light: true, swatch: { bg: '#ffffff', text: '#1e1e1e', border: '#e0e0e0' } },
   { id: 'dark-nebula', label: 'Dark Nebula', kind: 'base', version: 1, light: false, swatch: { bg: '#0d0d1a', text: '#c0caf5', border: '#2a2a4a' } },
   { id: 'soft-sepia', label: 'Soft Sepia', kind: 'base', version: 1, light: true, swatch: { bg: '#fbf3e8', text: '#5b4637', border: '#d4c5a9' } },
@@ -134,7 +141,7 @@ export function applyThemeAttributes(id: string): void {
  * attributes, persist, and broadcast. This is the single choke point for
  * theme changes, so any listener (React context) sees every switch.
  */
-export function applyTheme(id: string): void {
+export function applyTheme(id: string, opts?: ApplyThemeOptions): void {
   const theme = registry.get(id) ?? registry.get(DEFAULT_THEME_ID)!;
   const root = document.documentElement;
   if (theme.id === DEFAULT_THEME_ID) {
@@ -143,10 +150,8 @@ export function applyTheme(id: string): void {
     root.setAttribute('data-theme', theme.id);
   }
   applyThemeAttributes(theme.id);
-  try {
-    localStorage.setItem(THEME_KEY, theme.id);
-  } catch {
-    /* ignore */
+  if (opts?.persist !== false) {
+    writeLocalStorage(THEME_KEY, theme.id);
   }
   window.dispatchEvent(new CustomEvent(EVENT, { detail: theme.id }));
 }

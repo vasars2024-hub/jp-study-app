@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -10,6 +11,10 @@ export default defineConfig({
   // ERR_CONNECTION_REFUSED, leaving a blank screen. Pinning to 127.0.0.1 fixes it.
   server: {
     host: '127.0.0.1',
+    // Honour an assigned PORT when one is set (dev harnesses run alongside the
+    // Electron dev server, which owns the default). Unset = Vite's default, so
+    // the normal `npm start` flow is unaffected.
+    ...(process.env.PORT ? { port: Number(process.env.PORT) } : {}),
     // Don't watch the large local onnxruntime .wasm engine files copied into
     // public/ort — on Windows the file watcher throws EBUSY on them and crashes
     // the dev server. They're static, so there's nothing to watch anyway.
@@ -49,5 +54,19 @@ export default defineConfig({
   // forge.config.ts). Skipping copyPublicDir keeps the Vite renderer build fast.
   build: {
     copyPublicDir: false,
+    // Two entries, not one (BLANC_REFINEMENT_PLAN.md Pillar 1). The Blanc
+    // Toolbox window loads blanc.html → src/renderer/blancMain.tsx, so it never
+    // pulls in the Study OS desktop shell, widget registry, or city engine.
+    // Rollup still shares common chunks between the two, so this splits what
+    // Blanc *boots*, not what the app ships.
+    //
+    // Only the two real app entries are listed — the *-harness.html files at the
+    // repo root are dev-server-only and must stay out of the production build.
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        blanc: resolve(__dirname, 'blanc.html'),
+      },
+    },
   },
 });

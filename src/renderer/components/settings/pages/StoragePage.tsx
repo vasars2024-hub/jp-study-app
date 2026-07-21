@@ -19,15 +19,22 @@ const KIND_GROUP_KEY: Record<AssetKind, string> = {
   examples: 'storage.group.examples',
   accent: 'storage.group.accent',
   sentences: 'storage.group.sentences',
+  llm: 'storage.group.llm',
 };
 
 const GROUP_ORDER = [
   'storage.group.dictionary',
-  'storage.group.whisper',
+  // Transcription (Whisper) models are managed on the Transcription settings
+  // page, where they download on first use and stay in sync with the player's
+  // model dropdown. The ggml entries in the catalog are reserved for a future
+  // whisper.cpp path and nothing loads them yet, so they're intentionally not
+  // surfaced here — listing them was the "downloads don't match the dropdown"
+  // confusion.
   'storage.group.ocr',
   'storage.group.accent',
   'storage.group.examples',
   'storage.group.sentences',
+  'storage.group.llm',
 ];
 
 function progressPercent(view: AssetView): number {
@@ -77,8 +84,14 @@ export default function StoragePage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const groups = useMemo(() => {
+    // Companion graphs (decoder/vocab) are pulled automatically when the parent
+    // is downloaded — keep the inventory list to the top-level rows.
+    const companionIds = new Set(
+      views.flatMap((v) => v.spec.requires ?? []),
+    );
     const byGroup = new Map<string, AssetView[]>();
     for (const view of views) {
+      if (companionIds.has(view.spec.id)) continue;
       const key = KIND_GROUP_KEY[view.spec.kind];
       const list = byGroup.get(key) ?? [];
       list.push(view);

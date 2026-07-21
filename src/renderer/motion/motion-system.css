@@ -1,0 +1,224 @@
+/* =============================================================================
+   Road to v1.01 — Phase 4.5 · Motion Design & System Animations
+   -----------------------------------------------------------------------------
+   Animations here are functional, not decorative: they guide focus, establish
+   spatial hierarchy, or give tactile feedback. Anything that does none of the
+   three does not belong in this file.
+
+   HARD RULE: animate `transform` and `opacity` only. Animating width/left/
+   height re-triggers the window-dragging lag CLAUDE.md forbids — which is why
+   the liquid meters below are transform-scaled fills, never width tweens.
+
+   All timing comes from the shared duration tokens, which `motionPrefs.ts`
+   rewrites on :root from the Animation Velocity slider. A hard-coded duration
+   in this file would be invisible to that slider — don't add one.
+   ============================================================================= */
+
+/* ---------- Reward burst canvas ----------------------------------------- */
+.motion-reward-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+
+/* ---------- Liquid-fill meters (XP / level bars) -------------------------
+   The fill is a full-width layer scaled on X from its left edge. `--fill` is
+   0–1. Compositor-only, so a filling bar never costs layout. */
+.motion-meter {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-pill, 999px);
+  background: color-mix(in srgb, var(--panel, #222) 82%, transparent);
+}
+.motion-meter-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--fill, 0));
+  transition: transform var(--dur-slow) var(--ease-glass);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent, #4bd6cf) 75%, transparent),
+    var(--accent, #4bd6cf)
+  );
+  will-change: transform;
+}
+/* Surface sheen — the "liquid" read. Rides the fill, so it stops when full. */
+.motion-meter-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    color-mix(in srgb, #fff 35%, transparent) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  animation: motion-meter-sheen var(--dur-xslow) var(--ease-standard) infinite;
+}
+@keyframes motion-meter-sheen {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+
+/* Splash accent at 100% — a small bubble burst, then done. */
+.motion-meter.is-full .motion-meter-splash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: motion-splash var(--dur-slow) var(--ease-spring) both;
+}
+@keyframes motion-splash {
+  0% { opacity: 0; transform: scale(0.9); }
+  55% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* ---------- Score tickers ------------------------------------------------ */
+.motion-ticker {
+  font-variant-numeric: tabular-nums;
+  /* Tabular figures stop the box reflowing as digits roll. */
+}
+
+/* ---------- Popup / modal scale-springs ---------------------------------
+   Scales from the click point: --pop-x / --pop-y are set by the opener in
+   percentages, so the popup grows out of where the user actually clicked
+   rather than materialising at a fixed origin. */
+.motion-pop {
+  transform-origin: var(--pop-x, 50%) var(--pop-y, 50%);
+  animation: motion-pop-in var(--dur-normal) var(--ease-spring) both;
+}
+@keyframes motion-pop-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ---------- Viewport slide-shifts ----------------------------------------
+   View switches read as movement through one contiguous space. Direction is
+   set by the shell via data-motion-dir. */
+.motion-view-enter {
+  animation: motion-slide-in var(--dur-slow) var(--ease-emphasized) both;
+}
+[data-motion-dir='back'] .motion-view-enter {
+  animation-name: motion-slide-in-back;
+}
+@keyframes motion-slide-in {
+  from { opacity: 0; transform: translate3d(2.5%, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes motion-slide-in-back {
+  from { opacity: 0; transform: translate3d(-2.5%, 0, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Badge reveal choreography ------------------------------------
+   3D flip + radial glow burst. `will-change` is scoped to the card that is
+   actually flipping — a blanket will-change on every card eats GPU memory. */
+.motion-badge {
+  perspective: 900px;
+}
+.motion-badge-card {
+  position: relative;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  animation: motion-badge-flip var(--dur-xslow) var(--ease-spring) both;
+  will-change: transform;
+}
+.motion-badge-card > * {
+  backface-visibility: hidden;
+}
+@keyframes motion-badge-flip {
+  0% { opacity: 0; transform: rotateY(-180deg) scale(0.82); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: rotateY(0deg) scale(1); }
+}
+.motion-badge-glow {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent, #4bd6cf) 55%, transparent) 0%,
+    transparent 65%
+  );
+  animation: motion-badge-glow var(--dur-xslow) var(--ease-decelerate) both;
+}
+@keyframes motion-badge-glow {
+  0% { opacity: 0; transform: scale(0.4); }
+  45% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+
+/* ---------- Morpheme highlight glows -------------------------------------
+   Subtitle / manga-overlay words glow by word type. Hue comes from the caller
+   via --glow-hue so one rule serves every difficulty band. */
+.motion-morpheme {
+  position: relative;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.motion-morpheme::before {
+  content: '';
+  position: absolute;
+  inset: -0.15em -0.25em;
+  border-radius: var(--radius-xs, 4px);
+  background: hsla(var(--glow-hue, 190), 90%, 60%, 0.001);
+  box-shadow: 0 0 0 hsla(var(--glow-hue, 190), 90%, 60%, 0);
+  opacity: 0;
+  transition: opacity var(--dur-normal) var(--ease-standard);
+  pointer-events: none;
+}
+.motion-morpheme:hover::before,
+.motion-morpheme.is-glowing::before {
+  opacity: 1;
+  background: hsla(var(--glow-hue, 190), 90%, 60%, 0.18);
+  box-shadow: 0 0 0.75em hsla(var(--glow-hue, 190), 95%, 65%, 0.45);
+}
+
+/* ---------- Companion drag squash/stretch --------------------------------
+   Driven by JS-set --squash / --stretch from the drag vector (CompanionLayer).
+   Applied to the SPRITE, not the companion root: the root owns the
+   translate3d position transform and the two would overwrite each other. */
+.motion-squash,
+.os-companion.is-dragging .os-companion-sprite,
+.os-companion .os-companion-sprite.is-dragging {
+  transform: scale(var(--stretch, 1), var(--squash, 1));
+  transform-origin: center bottom;
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+/* ---------- Snap: velocity 0 or Motion Mode = Disabled -------------------
+   The token rewrite already zeroes new animations, but an animation that is
+   already in flight must also resolve *now* — hence the global override. This
+   is the one place a literal duration is correct: it is the absence of motion,
+   not a timing choice. */
+:root[data-motion-snap='1'] *,
+:root[data-motion-snap='1'] *::before,
+:root[data-motion-snap='1'] *::after,
+:root[data-motion-mode='disabled'] *,
+:root[data-motion-mode='disabled'] *::before,
+:root[data-motion-mode='disabled'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0ms !important;
+}
+
+/* Disabled/off density: never paint the reward canvas. */
+:root[data-motion-mode='disabled'] .motion-reward-canvas,
+:root[data-motion-particles='off'] .motion-reward-canvas {
+  display: none;
+}
+
+/* Infinite ambience (meter sheen) is decorative — drop it under reduced
+   motion even in Performance, where purposeful transitions still run. */
+@media (prefers-reduced-motion: reduce) {
+  .motion-meter-fill::after { animation: none; }
+}
+html.reduce-motion .motion-meter-fill::after,
+:root[data-motion-mode='performance'] .motion-meter-fill::after {
+  animation: none;
+}

@@ -281,6 +281,8 @@ export interface EpubFilterPipelineStep {
   label: string;
   count: number;
   detail?: string;
+  /** Structured values for i18n of `label`/`detail` at render time (by `id`). */
+  params?: Record<string, string | number>;
 }
 
 export interface EpubFilterPipelineBreakdown {
@@ -428,6 +430,7 @@ export function describeEpubFilterPipeline(
       id: 'occurrences',
       label: `After occurrence filter (${op} ${threshold})`,
       count: list.length,
+      params: { op, threshold },
     });
   } else {
     list = list.filter((c) => c.count >= minFrequency);
@@ -436,6 +439,7 @@ export function describeEpubFilterPipeline(
       label: `After book occurrences (≥ ${minFrequency})`,
       count: list.length,
       detail: 'Applied during analyze and again here so export matches the visible floor.',
+      params: { minFrequency },
     });
 
     const useDictionaryRank = exp.filterBy === 'deck-frequency';
@@ -456,6 +460,7 @@ export function describeEpubFilterPipeline(
         id: 'dictionary-rank',
         label: `After dictionary-rank filter (${rangeLabel})`,
         count: list.length,
+        params: { rangeMin, rangeMax },
       });
     } else {
       if (exp.sortBy === 'alphabetical') {
@@ -471,6 +476,7 @@ export function describeEpubFilterPipeline(
         id: 'book-rank-window',
         label: `After book rank window (${rangeMin}–${rangeMax > 0 ? rangeMax : 'end'})`,
         count: list.length,
+        params: { rangeMin, rangeMax },
       });
     }
 
@@ -481,6 +487,7 @@ export function describeEpubFilterPipeline(
           label: 'Max common-rank cutoff',
           count: list.length,
           detail: 'Not applied in Dictionary rank mode.',
+          params: { mode: 'skipped' },
         });
       } else {
         const before = list.length;
@@ -494,6 +501,7 @@ export function describeEpubFilterPipeline(
           label: `After max common-rank cutoff (> ${config.limits.maxCommonRank})`,
           count: list.length,
           detail: before === list.length ? 'No change.' : undefined,
+          params: { mode: 'applied', maxCommonRank: config.limits.maxCommonRank, unchanged: before === list.length ? 1 : 0 },
         });
       }
     }
@@ -513,6 +521,7 @@ export function describeEpubFilterPipeline(
       label: 'After name exclusions',
       count: list.length,
       detail: beforeNames === list.length ? 'No change.' : undefined,
+      params: { unchanged: beforeNames === list.length ? 1 : 0 },
     });
   }
 

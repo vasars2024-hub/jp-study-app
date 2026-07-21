@@ -4,7 +4,7 @@ import type { DesktopPrefs } from '../../desktopPrefs';
 import type { EnvironmentSettings } from '../../environment';
 import type { VizSettings } from '../../visualizerSettings';
 import type { ReaderSettings } from '../../readerSettings';
-import type { WhisperDevice } from '../../whisperSettings';
+import type { WhisperDevice, WhisperModelTier } from '../../whisperSettings';
 import type { LyricsSettings } from '../../lyricsSettings';
 import type { MiniModeSettings } from '../../miniMode';
 
@@ -29,10 +29,13 @@ export type SettingsPageId =
   | 'mini'
   | 'lockscreen'
   | 'study'
+  | 'profile-rules'
   | 'reading'
   | 'transcription'
   | 'visualizer'
+  | 'special'
   | 'display'
+  | 'motion'
   | 'storage'
   | 'memory';
 
@@ -120,6 +123,8 @@ export interface SettingsController extends SettingsWallProps {
   changeReaderSettings: (s: ReaderSettings) => void;
   whisperDevice: WhisperDevice;
   chooseWhisperDevice: (d: WhisperDevice) => void;
+  whisperModelTier: WhisperModelTier;
+  chooseWhisperModelTier: (t: WhisperModelTier) => void;
   lyricsSettings: LyricsSettings;
   setLyricsAlbumSearch: (on: boolean) => void;
   userCss: string;

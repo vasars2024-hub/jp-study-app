@@ -1,9 +1,10 @@
 import type { AiGenerationProgress } from '../../shared/mining';
+import { useT } from '../i18n';
 
-const PHASE_LABELS: Record<AiGenerationProgress['phase'], string> = {
-  invent: 'Invent vocabulary',
-  enrich: 'Build cards',
-  done: 'Complete',
+const PHASE_KEYS: Record<AiGenerationProgress['phase'], string> = {
+  invent: 'aiStudio.progress.invent',
+  enrich: 'aiStudio.progress.enrich',
+  done: 'aiStudio.progress.done',
 };
 
 function phasePercent(progress: AiGenerationProgress): number {
@@ -22,11 +23,12 @@ export default function AiGenerationProgressPanel({
   progress: AiGenerationProgress | null;
   active: boolean;
 }) {
+  const { t } = useT();
   if (!active || !progress) return null;
 
   const pct = phasePercent(progress);
   const indeterminate = isIndeterminate(progress);
-  const phaseLabel = PHASE_LABELS[progress.phase] ?? progress.phase;
+  const phaseLabel = t(PHASE_KEYS[progress.phase] ?? 'aiStudio.progress.enrich');
 
   return (
     <div className="mining-progress-panel ai-gen-progress">

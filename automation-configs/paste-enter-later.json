@@ -1,0 +1,25 @@
+﻿{
+    "initialHours":  6,
+    "initialMinutes":  0,
+    "initialSeconds":  0,
+    "betweenSeconds":  0,
+    "betweenMilliseconds":  500,
+    "moveDurationMs":  300,
+    "steps":  [
+                  {
+                      "type":  "keys",
+                      "keys":  "^n"
+                  },
+                  {
+                      "type":  "click",
+                      "button":  "left"
+                  },
+                  {
+                      "type":  "paste"
+                  },
+                  {
+                      "type":  "enter"
+                  }
+              ],
+    "name":  "paste-enter-later"
+}

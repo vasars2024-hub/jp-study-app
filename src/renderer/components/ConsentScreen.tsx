@@ -1,0 +1,54 @@
+import { useState } from 'react';
+import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
+import { useT } from '../i18n';
+import { sendTelemetryPingIfNeeded } from '../telemetryPing';
+
+// First-launch, one-time consent for the anonymous download heat map. Shown once,
+// before the desktop shell, only when no choice has been recorded yet. Styled to
+// match BootScreen. The only thing "yes" does is send a single country ping; the
+// aggregate /counts map is anonymous and fetched regardless of this choice.
+export default function ConsentScreen() {
+  const { t } = useT();
+  const [done, setDone] = useState(
+    () => localStorage.getItem(TELEMETRY_CONSENT_KEY) != null,
+  );
+
+  if (done) return null;
+
+  const choose = (consent: 'yes' | 'no') => {
+    try {
+      localStorage.setItem(TELEMETRY_CONSENT_KEY, consent);
+      if (consent === 'yes') void sendTelemetryPingIfNeeded();
+    } catch {
+      /* storage unavailable — just dismiss */
+    }
+    setDone(true);
+  };
+
+  return (
+    <div className="consent">
+      <div className="consent-card">
+        <div className="consent-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" width={40} height={40}>
+            <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18 M12 3c-3 3-3 15 0 18" />
+          </svg>
+        </div>
+        <h1>{t('consent.map.title')}</h1>
+        <p>{t('consent.map.body')}</p>
+        <ul className="consent-points">
+          <li>{t('consent.map.point.country')}</li>
+          <li>{t('consent.map.point.once')}</li>
+          <li>{t('consent.map.point.settings')}</li>
+        </ul>
+        <div className="consent-actions">
+          <button className="consent-yes" onClick={() => choose('yes')}>
+            {t('consent.map.yes')}
+          </button>
+          <button className="consent-no" onClick={() => choose('no')}>
+            {t('consent.map.no')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

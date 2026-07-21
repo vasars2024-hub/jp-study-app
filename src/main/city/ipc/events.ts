@@ -1,9 +1,8 @@
 /**
- * Noctis IPC — outbound push event helpers.
+ * Noctis IPC — outbound push-event boundary.
  *
- * Broadcasts structured-clone-safe snapshots to all BrowserWindow instances.
- *
- * TODO: Implement city:changed broadcast per repository house patterns.
+ * The channel contract lives in channels.ts. All-window publication is owned by
+ * service/lifecycle.ts so the CityService remains the only state writer.
  */
 
 export {};

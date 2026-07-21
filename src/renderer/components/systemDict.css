@@ -1,0 +1,39 @@
+/*
+ * System-wide dictionary overlay window (?sysDict=1).
+ *
+ * The window itself is frameless + transparent (see main/systemDictionary.ts),
+ * so the document, body and #root must be see-through — only the popup card
+ * paints. The `.sysdict-window` class is stamped on <html> by main.tsx.
+ */
+html.sysdict-window,
+html.sysdict-window body,
+html.sysdict-window #root {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.sysdict-overlay {
+  position: fixed;
+  inset: 0;
+  /* A thin invisible drag strip along the very top lets the user reposition the
+     floating popup without a title bar. */
+  -webkit-app-region: no-drag;
+}
+
+.sysdict-overlay::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  -webkit-app-region: drag;
+}
+
+/* The reused DictionaryPopup positions itself with fixed left/top; inside the
+   overlay window that anchors to the window's own top-left, which is exactly
+   what we want. */
+.sysdict-overlay .dict-popup {
+  top: 10px !important;
+  left: 10px !important;
+}

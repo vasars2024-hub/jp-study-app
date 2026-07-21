@@ -6,7 +6,16 @@ export type GrammarLang = 'ja' | 'zh';
 
 export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
 
-/** HSK 1–9 official bands + HSK10 advanced/beyond-9 catch-all. */
+/**
+ * HSK 3.0 bands as the standard actually publishes them, plus one slot we own.
+ *
+ * 7-9 is a single combined advanced band upstream, not three levels. This
+ * corpus used to split it into HSK7 / HSK8 / HSK9, which invented two bands the
+ * standard does not define and spread 16 records so thin that each looked
+ * empty. Records that predate the merge keep their original band in
+ * `provenance.sourceLevel`, so the split stays recoverable if HSK ever
+ * publishes one.
+ */
 export type HskLevel =
   | 'HSK1'
   | 'HSK2'
@@ -14,14 +23,32 @@ export type HskLevel =
   | 'HSK4'
   | 'HSK5'
   | 'HSK6'
-  | 'HSK7'
-  | 'HSK8'
-  | 'HSK9'
+  | 'HSK7-9'
   | 'HSK10';
+
+/** Bands this corpus used to publish, mapped onto the band that replaced them. */
+export const LEGACY_HSK_LEVELS: Record<string, HskLevel> = {
+  HSK7: 'HSK7-9',
+  HSK8: 'HSK7-9',
+  HSK9: 'HSK7-9',
+};
 
 export type GrammarLevel = JlptLevel | HskLevel;
 
 export type GrammarRegister = 'neutral' | 'casual' | 'business' | 'literary';
+
+/**
+ * Single source of truth for the register axis.
+ *
+ * The filter panel used to hand-maintain its own copy of this list, which could
+ * drift from the union above without producing a compile error.
+ */
+export const GRAMMAR_REGISTERS: GrammarRegister[] = [
+  'neutral',
+  'casual',
+  'business',
+  'literary',
+];
 
 /**
  * Where a record's function/register tags came from.
@@ -41,6 +68,17 @@ export type GrammarTagSource =
   | 'heuristic'
   /** Derived from the pattern's own morphology by an explicit rule. */
   | 'derived'
+  /**
+   * Assigned by a language model reading the pattern, structure and examples.
+   *
+   * Deliberately its own tier rather than folded into 'authored' or 'derived'.
+   * It is better evidence than the gloss-regex this module exists to atone for —
+   * it reads the pattern itself, and every label was validated against a fixed
+   * value set before it landed — but it is still a guess, so `trusted()` leaves
+   * it out and the "verified tags only" filter hides it by default. Turning
+   * that toggle off is what surfaces it.
+   */
+  | 'classified'
   | 'unknown';
 
 /** How much of a record has been checked by a human. */
@@ -59,6 +97,9 @@ export type GrammarVerification =
  * `grammarx` marks a level slot this app invented. HSK 3.0 publishes bands 1-6
  * plus a combined 7-9; HSK10 in this corpus is our own "beyond 9" slot and must
  * never be presented to users as an official classification.
+ *
+ * `HSK7-9` is now modelled as the single band the standard publishes, so this
+ * function no longer has to launder two invented levels as `hsk3.0`.
  */
 export type GrammarFramework = 'jlpt' | 'hsk3.0' | 'grammarx';
 
@@ -96,9 +137,7 @@ export const HSK_LEVELS: HskLevel[] = [
   'HSK4',
   'HSK5',
   'HSK6',
-  'HSK7',
-  'HSK8',
-  'HSK9',
+  'HSK7-9',
   'HSK10',
 ];
 
@@ -156,7 +195,14 @@ export interface GrammarPoint {
    * source's claim up as settled.
    */
   alternateLevels?: GrammarLevel[];
-  provenance?: GrammarProvenance;
+  /**
+   * Per-record provenance overrides. Partial by design: a source record states
+   * only the fields it actually knows — `sourceLevel` on a relevelled HSK7-9
+   * point, `registerSource: 'classified'` on an LLM-labelled one — and
+   * normalization fills the rest in from its module's defaults. The normalized
+   * record carries the complete shape.
+   */
+  provenance?: Partial<GrammarProvenance>;
 }
 
 /** True for level slots this app invented rather than took from a standard. */

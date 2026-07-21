@@ -2,10 +2,15 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import SystemDictOverlay from './components/SystemDictOverlay';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
 import { bootOsLook } from './components/DesktopSettings';
-import { bootDisplayPrefs } from './displayPrefs';
-import { bootTheme } from './theme';
+import { bootDisplayPrefs, loadDisplayPrefs } from './displayPrefs';
+import { bootMotionPrefs } from './motion/motionPrefs';
+import { installRewardBursts } from './motion/rewardBurst';
+import { bootWindowChrome } from './windowChrome';
+import { bootTheme, onThemeChanged } from './theme';
 import { applyLangAttribute } from './i18n';
 import { bootEnvironment } from './environment';
 import { installAmbientAudio } from './environment/ambientAudio';
@@ -26,10 +31,14 @@ import './styles.css';
 // styles.css so material utilities and the [data-theme='frutiger-aero'] block win.
 import './theme/materials.css';
 import './theme/frutiger-aero.css';
+import './theme/wired-archive.css';
 // Typography roles, colour helpers, and the reduced-motion-aware motion system
 // (Phase 1 · M4). Additive utility layers.
 import './theme/typography.css';
 import './theme/motion.css';
+// Phase 4.5 motion system — loaded after motion.css so the snap override and
+// the meter/badge/morpheme rules win over the Aero utility layer.
+import './motion/motion-system.css';
 // UI primitive library styles (Phase 1 · M5).
 import './components/ui/ui.css';
 // Accessibility foundation (Phase 1 · M8) — imported late to reinforce.
@@ -41,26 +50,107 @@ import './components/shell/shell.css';
 // Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
 // loaded after shell.css so Aero flyout/palette corrections win over base shell styles.
 import './theme/aero-shell.css';
+import './theme/wired-shell.css';
+// WIRED ARCHIVE shared motion library (bespoke spec §1–§2) — wm-* keyframes
+// and the window-lifecycle visuals; loaded after wired-shell.css so its
+// lifecycle rules win over the base fwin styling.
+import './theme/wired-motion.css';
+// WIRED ARCHIVE widget instruments (bespoke spec §6).
+import './theme/wired-widgets.css';
 // XP–Aero application grammar (Phase 4 · M1) — scoped to [data-materials='aero'],
 // loaded after ui.css so the density/material overrides win. Default apps unchanged.
 import './theme/aero-apps.css';
+import './theme/wired-apps.css';
+import './theme/blanc.css';
 // Living-desktop weather overlays (Phase 3 · M3) + atmosphere polish (M5/M6).
 import './environment/weather.css';
 import './environment/atmosphere.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
+import { registerWiredArchive } from './theme/wired-archive';
 import { installNotificationCapture } from './notificationStore';
 import { bootWallpaperFit } from './wallpaperFit';
 import { bootAppBorderSettings } from './appBorderSettings';
 import { installShellSounds } from './shellSounds';
 import { bootPerf } from './theme/perf';
 import { installAssetPackSync } from './theme/assetPacks';
+import { installGlobalInteractionBudget } from './perf/perfHub';
 import { registerAeroProofSoundPack } from './audio/aeroProofPack';
+import { registerWiredArchiveSoundPack } from './audio/wiredArchivePack';
+import { bootWiredArchiveSettings } from './terminalModeSettings';
+import { installWiredArchiveLifecycle } from './wiredArchiveLifecycle';
+import { applyBlancModeClass, isBlancWindow } from './blancMode';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
+
+// Previously nothing captured these outside a dev console (PHASE_6_5_AUDIT.md
+// Phase 8 gap) — forward to the main-process diagnostic log. Never sends
+// event.error's arbitrary payload verbatim beyond message/stack (no DOM
+// nodes, no document content).
+window.addEventListener('error', (event) => {
+  void window.api
+    ?.logRendererError?.({
+      subsystem: 'renderer',
+      operation: 'windowError',
+      detail: `${event.message} @ ${event.filename}:${event.lineno}\n${event.error?.stack ?? ''}`,
+    })
+    .catch(() => undefined);
+});
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason;
+  const detail = reason instanceof Error ? reason.stack || reason.message : String(reason);
+  void window.api
+    ?.logRendererError?.({ subsystem: 'renderer', operation: 'unhandledRejection', detail })
+    .catch(() => undefined);
+});
 
 const isCompanionHost =
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).get('companionHost') === '1';
+
+// Dedicated frameless/transparent overlay window for the system-wide popup
+// dictionary (main/systemDictionary.ts). It reuses the dictionary popup only —
+// none of the desktop shell, environment, or migration boot should run.
+const isSysDictOverlay =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('sysDict') === '1';
+if (isSysDictOverlay) {
+  document.documentElement.classList.add('sysdict-window');
+}
+
+function runWhenIdle(fn: () => void, timeout = 5000): void {
+  const idle = window.requestIdleCallback as
+    | ((cb: IdleRequestCallback, opts?: IdleRequestOptions) => number)
+    | undefined;
+  if (idle) {
+    idle(fn, { timeout });
+    return;
+  }
+  window.setTimeout(fn, Math.min(timeout, 1500));
+}
+
+function prewarmTokenizerLater(): void {
+  runWhenIdle(() => {
+    import('./tokenizer')
+      .then(({ getTokenizer, tokenizeSync }) =>
+        getTokenizer().then(() => {
+          if (import.meta.env.DEV) {
+            const toks = tokenizeSync('食べました');
+            console.log(`[tokenizer] SELFTEST OK: ${toks.map((t) => `${t.surface}→${t.lemma}`).join(', ')}`);
+            import('./wordHighlight').then(({ highlightEl }) => {
+              const div = document.createElement('div');
+              div.innerHTML = '<p>昨日は美味しい寿司を食べました。</p>';
+              highlightEl(div);
+              const spans = div.querySelectorAll('span.wk');
+              console.log(
+                `[highlight] SELFTEST spans=${spans.length}: ${[...spans].map((s) => `${s.textContent}(${s.className})`).join(' ')}`,
+              );
+            });
+          }
+        }),
+      )
+      .catch((e) => console.error('[tokenizer] preload failed:', e?.message ?? e));
+  }, 10000);
+}
 
 // Restore the saved accessibility zoom + OS look (theme, accent, motion)
 // before paint so there is no flash of the default look.
@@ -71,86 +161,114 @@ installZoomResizeHook();
 // Register the secret Aero theme BEFORE bootTheme() so a persisted 'frutiger-aero'
 // selection is recognised and re-applied on launch.
 registerFrutigerAero();
+registerWiredArchive();
 bootTheme();
+// The Blanc window (index.html?blanc=1) shares this entry with Study OS, but
+// has its own visual language and must never adopt the secret material packs
+// (aero/wired). Strip `data-materials` after bootTheme and keep it stripped, so
+// `useAeroMaterials()`/`useWiredMaterials()` stay false and Blanc renders its
+// own flat, sharp look regardless of the shared theme choice. The dedicated
+// blancMain.tsx entry does the same; this covers the fallback entry that is
+// actually loaded today.
+if (isBlancWindow()) {
+  const stripStudyOsMaterials = (): void =>
+    document.documentElement.removeAttribute('data-materials');
+  stripStudyOsMaterials();
+  onThemeChanged(stripStudyOsMaterials);
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(() => {
+      if (document.documentElement.hasAttribute('data-materials')) stripStudyOsMaterials();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-materials'] });
+  }
+}
+applyBlancModeClass();
 // Sets <html lang> from the saved UI language before first paint — CJK glyph
 // shapes depend on it, so doing it later would flash the wrong forms.
 applyLangAttribute();
 bootOsLook();
 bootDisplayPrefs();
+// Motion tokens + velocity scaling (Phase 4.5). AFTER bootDisplayPrefs, which
+// owns the underlying animation level this reads; pre-paint so the first frame
+// already uses the user's timing rather than snapping to it a frame later.
+bootMotionPrefs();
+void bootWindowChrome(loadDisplayPrefs().windowChromeMode);
 // Apply the saved performance tier (data-perf) pre-paint (Phase 1 · M9).
 bootPerf();
+installGlobalInteractionBudget();
+bootWiredArchiveSettings();
 // Register the original source-generated Aero proof sounds before themes resolve
 // their asset packs (Phase 5 · M4).
 registerAeroProofSoundPack();
-// Keep the active theme's asset pack (sounds now; icons/wallpapers hooks) in
-// sync on every theme change — the Anime Edition extension point (Phase 1 · M10).
-installAssetPackSync();
+registerWiredArchiveSoundPack();
 // Capture transient toasts into the Notification Center history (Phase 2 · M6).
 installNotificationCapture();
-// Wallpaper fit (--wall-fit) pre-paint + shell sound routing (Phase 2 · M10/M11).
+// Wallpaper fit (--wall-fit) pre-paint.
 bootWallpaperFit();
 bootAppBorderSettings();
-installShellSounds();
+installWiredArchiveLifecycle();
+runWhenIdle(() => {
+  // Sound/asset hooks are nice-to-have; let the shell paint first.
+  installAssetPackSync();
+  installShellSounds();
+}, 3000);
 
-if (!isCompanionHost) {
+if (!isCompanionHost && !isSysDictOverlay) {
   bootCustomCss();
-  bootEnvironment();
-  // Per-environment ambient soundscapes (Phase 3 · M4) — silent until a sound
-  // pack is added; dormant while the living layer is disabled.
-  installAmbientAudio();
-  // Move legacy localStorage data into IndexedDB (versioned, one-way, safe to
-  // re-run). Fire-and-forget: readers fall back to localStorage until done.
-  // Errors are handled inside the runner (warn + continue); keep a safety net.
-  runStorageMigrations().catch((err) => {
-    const detail =
-      err instanceof Error
-        ? err.message
-        : err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: unknown }).message)
-          : String(err);
-    console.warn('[storage] migration skipped:', detail || 'unknown error');
-  });
-  initProfileState().catch((err) => console.error('[profileState] init failed:', err));
-  initDesktopState().catch((err) => console.error('[desktopState] init failed:', err));
-  initCityState()
-    .then(() => startCitySession())
-    .catch((err) => console.error('[cityState] init failed:', err));
+  // Reward confetti layer (Phase 4.5). Main window only — the companion host
+  // is a click-through overlay and must never paint a full-screen canvas.
+  installRewardBursts();
+  runWhenIdle(() => {
+    bootEnvironment();
+    // Per-environment ambient soundscapes are dormant until a sound pack exists.
+    installAmbientAudio();
+  }, 2500);
+  runWhenIdle(() => {
+    // Move legacy localStorage data into IndexedDB after the shell can respond.
+    runStorageMigrations().catch((err) => {
+      const detail =
+        err instanceof Error
+          ? err.message
+          : err && typeof err === 'object' && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : String(err);
+      console.warn('[storage] migration skipped:', detail || 'unknown error');
+    });
+  }, 8000);
+  runWhenIdle(() => {
+    initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+    initDesktopState().catch((err) => console.error('[desktopState] init failed:', err));
+    initCityState()
+      .then(() => startCitySession())
+      .catch((err) => console.error('[cityState] init failed:', err));
+  }, 3500);
 
-  // Dev-only: prove the Japanese tokenizer actually builds in the renderer (its
-  // result is mirrored to the terminal via the main-process console forwarder).
-  // Pre-warm the Japanese tokenizer at startup so word highlighting and click
-  // lookup are instant when a reader opens.
-  import('./tokenizer')
-    .then(({ getTokenizer, tokenizeSync }) =>
-      getTokenizer().then(() => {
-        if (import.meta.env.DEV) {
-          const toks = tokenizeSync('食べました');
-          console.log(`[tokenizer] SELFTEST OK: ${toks.map((t) => `${t.surface}→${t.lemma}`).join(', ')}`);
-          import('./wordHighlight').then(({ highlightEl }) => {
-            const div = document.createElement('div');
-            div.innerHTML = '<p>昨日は美味しい寿司を食べました。</p>';
-            highlightEl(div);
-            const spans = div.querySelectorAll('span.wk');
-            console.log(
-              `[highlight] SELFTEST spans=${spans.length}: ${[...spans].map((s) => `${s.textContent}(${s.className})`).join(' ')}`,
-            );
-          });
-        }
-      }),
-    )
-    .catch((e) => console.error('[tokenizer] preload failed:', e?.message ?? e));
+  prewarmTokenizerLater();
 
   installKeyboardShortcuts();
-  startReleaseCheck();
+  runWhenIdle(startReleaseCheck, 12000);
 }
 
 const container = document.getElementById('root');
 if (container) {
-  createRoot(container).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  );
-  // Re-apply after mount so compensated size is correct once #root is live.
-  applyZoom(loadZoom());
+  if (isSysDictOverlay) {
+    // Profile state powers the popup's Anki mining target; nothing else boots.
+    initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+    createRoot(container).render(
+      <React.StrictMode>
+        <AppErrorBoundary>
+          <SystemDictOverlay />
+        </AppErrorBoundary>
+      </React.StrictMode>,
+    );
+  } else {
+    createRoot(container).render(
+      <React.StrictMode>
+        <AppErrorBoundary>
+          <App />
+        </AppErrorBoundary>
+      </React.StrictMode>,
+    );
+    // Re-apply after mount so compensated size is correct once #root is live.
+    applyZoom(loadZoom());
+  }
 }

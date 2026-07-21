@@ -1,12 +1,16 @@
-import { app, ipcMain, dialog, shell, BrowserWindow, protocol } from 'electron';
+import { app, ipcMain, dialog, shell, BrowserWindow, protocol, nativeImage } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import AdmZip from 'adm-zip';
 import type { LibraryItem, Progress } from '../shared/types';
+import { INBOX_FOLDER } from '../shared/inboxMeta';
+import { MANGA_FOLDER } from '../shared/libraryFolders';
 import { extractReadableFromUrl } from './readabilityExtract';
+import { fetchReadingContent, type FetchReadingOptions } from './readingFetch';
 import { mt } from './i18n';
+import { extractEpubTitleFromOpf } from './epubMeta';
 
 /** Token → absolute path for localfile:// wallpaper/image streaming. */
 const localFileTokens = new Map<string, string>();
@@ -110,7 +114,7 @@ function dbPath(): string {
 function configPath(): string {
   return path.join(app.getPath('userData'), 'config.json');
 }
-function itemDir(id: string): string {
+export function itemDir(id: string): string {
   return path.join(libraryRoot(), id);
 }
 
@@ -192,8 +196,77 @@ function copyFolderImages(srcDir: string, pagesDir: string): string[] {
   return names;
 }
 
-/** Find the cover image inside an EPUB and copy it into destDir. Returns its name. */
-function extractEpubCover(zip: AdmZip, destDir: string): string | undefined {
+/** Colorfulness (RGB variance) minus a blank/near-monochrome penalty — higher is a better cover candidate. */
+function scoreCoverCandidate(fullPath: string): number {
+  try {
+    const img = nativeImage.createFromPath(fullPath);
+    if (img.isEmpty()) return -1;
+    const small = img.resize({ width: 32, height: 32, quality: 'good' });
+    const { width, height } = small.getSize();
+    const n = width * height;
+    if (!n) return -1;
+    const bgra = small.toBitmap();
+    let sumR = 0;
+    let sumG = 0;
+    let sumB = 0;
+    let extreme = 0;
+    for (let i = 0; i < n; i++) {
+      const o = i * 4;
+      const b = bgra[o];
+      const g = bgra[o + 1];
+      const r = bgra[o + 2];
+      sumR += r;
+      sumG += g;
+      sumB += b;
+      const lum = (r + g + b) / 3;
+      if (lum > 245 || lum < 12) extreme++;
+    }
+    const meanR = sumR / n;
+    const meanG = sumG / n;
+    const meanB = sumB / n;
+    let variance = 0;
+    for (let i = 0; i < n; i++) {
+      const o = i * 4;
+      const b = bgra[o];
+      const g = bgra[o + 1];
+      const r = bgra[o + 2];
+      variance += (r - meanR) ** 2 + (g - meanG) ** 2 + (b - meanB) ** 2;
+    }
+    variance /= n;
+    const blankPenalty = extreme / n; // 0 (no blank pixels) .. 1 (fully blank)
+    return variance * (1 - blankPenalty);
+  } catch {
+    return -1;
+  }
+}
+
+/**
+ * Pick the most cover-like page among the first few extracted pages, instead
+ * of blindly assuming page 1 (which is often a blank or legal-notice page in
+ * scanlated/digital volumes). Only the first 8 pages are considered — cover
+ * art is always near the front, and scanning the whole volume risks landing
+ * on a random mid-volume splash page. Ties (page 1 scoring within 10% of the
+ * best) resolve toward page 1, since it legitimately is the cover in the
+ * common case and the heuristic shouldn't second-guess a clear cover.
+ */
+export function pickCoverPage(pagesDir: string, names: string[]): string {
+  if (!names.length) return '';
+  const candidateCount = Math.min(8, names.length);
+  let best = names[0];
+  let bestScore = scoreCoverCandidate(path.join(pagesDir, names[0]));
+  const epsilon = Math.max(0, bestScore) * 0.1;
+  for (let i = 1; i < candidateCount; i++) {
+    const score = scoreCoverCandidate(path.join(pagesDir, names[i]));
+    if (score > bestScore + epsilon) {
+      bestScore = score;
+      best = names[i];
+    }
+  }
+  return best;
+}
+
+/** Locate and read an EPUB's OPF package document (title/manifest/spine metadata). */
+function readEpubOpf(zip: AdmZip): { opf: string; opfDir: string } | undefined {
   try {
     const container = zip.getEntry('META-INF/container.xml');
     if (!container) return undefined;
@@ -203,6 +276,24 @@ function extractEpubCover(zip: AdmZip, destDir: string): string | undefined {
     if (!opfEntry) return undefined;
     const opf = opfEntry.getData().toString('utf-8');
     const opfDir = path.posix.dirname(opfPath);
+    return { opf, opfDir };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read the book's real title from its OPF `<dc:title>`, if present. */
+function extractEpubTitle(zip: AdmZip): string | undefined {
+  const parsed = readEpubOpf(zip);
+  return parsed ? extractEpubTitleFromOpf(parsed.opf) : undefined;
+}
+
+/** Find the cover image inside an EPUB and copy it into destDir. Returns its name. */
+function extractEpubCover(zip: AdmZip, destDir: string): string | undefined {
+  try {
+    const parsed = readEpubOpf(zip);
+    if (!parsed) return undefined;
+    const { opf, opfDir } = parsed;
 
     const items = [...opf.matchAll(/<item\b[^>]*>/gi)].map((m) => {
       const tag = m[0];
@@ -248,20 +339,64 @@ function importBook(filePath: string): LibraryItem {
   fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(filePath, path.join(dir, 'original.epub'));
   let coverPath: string | undefined;
+  let embeddedTitle: string | undefined;
   try {
-    coverPath = extractEpubCover(new AdmZip(path.join(dir, 'original.epub')), dir);
+    const zip = new AdmZip(path.join(dir, 'original.epub'));
+    coverPath = extractEpubCover(zip, dir);
+    embeddedTitle = extractEpubTitle(zip);
   } catch {
-    /* ignore — falls back to a title gradient */
+    /* ignore — falls back to a title gradient / the filename */
   }
   return {
     id,
-    title: titleFromFile(filePath),
+    title: embeddedTitle || titleFromFile(filePath),
     kind: 'book',
     createdAt: Date.now(),
     sourcePath: filePath,
     epubFile: 'original.epub',
     coverPath,
   };
+}
+
+export function importEpubBufferToLibrary(input: {
+  title: string;
+  sourcePath?: string;
+  buffer: Buffer;
+}): LibraryItem {
+  ensureLibrary();
+  const items = readDb();
+  if (input.sourcePath) {
+    const existing = items.find((item) => item.sourcePath === input.sourcePath);
+    if (existing) return existing;
+  }
+
+  const id = crypto.randomUUID();
+  const dir = itemDir(id);
+  fs.mkdirSync(dir, { recursive: true });
+  const epubPath = path.join(dir, 'original.epub');
+  fs.writeFileSync(epubPath, input.buffer);
+  let coverPath: string | undefined;
+  let embeddedTitle: string | undefined;
+  try {
+    const zip = new AdmZip(epubPath);
+    coverPath = extractEpubCover(zip, dir);
+    embeddedTitle = extractEpubTitle(zip);
+  } catch {
+    /* ignore — falls back to a title gradient / the caller-provided title */
+  }
+  const item: LibraryItem = {
+    id,
+    title: input.title.trim() || embeddedTitle || 'Imported EPUB',
+    kind: 'book',
+    createdAt: Date.now(),
+    sourcePath: input.sourcePath,
+    epubFile: 'original.epub',
+    coverPath,
+  };
+  items.unshift(item);
+  writeDb(items);
+  broadcastLibrary(items);
+  return item;
 }
 
 // PDFs are stored as-is and opened by the reader's PDF loader (which extracts
@@ -284,8 +419,10 @@ function importPdf(filePath: string): LibraryItem {
 
 function importMangaArchive(filePath: string): LibraryItem {
   const id = crypto.randomUUID();
+  const pagesDir = path.join(itemDir(id), 'pages');
   fs.mkdirSync(itemDir(id), { recursive: true });
-  const names = extractMangaPages(filePath, path.join(itemDir(id), 'pages'));
+  const names = extractMangaPages(filePath, pagesDir);
+  const cover = names.length ? pickCoverPage(pagesDir, names) : '';
   return {
     id,
     title: titleFromFile(filePath),
@@ -293,7 +430,7 @@ function importMangaArchive(filePath: string): LibraryItem {
     createdAt: Date.now(),
     sourcePath: filePath,
     pageCount: names.length,
-    coverPath: names[0] ? `pages/${names[0]}` : undefined,
+    coverPath: cover ? `pages/${cover}` : undefined,
   };
 }
 
@@ -307,6 +444,11 @@ function getMangaPages(id: string): string[] {
     .map((f) => `media://${id}/pages/${f}`);
 }
 
+/** Exported for volume OCR jobs. */
+export function listMangaPageUrls(id: string): string[] {
+  return getMangaPages(id);
+}
+
 /** Read a book's epub bytes for the renderer (avoids cross-origin fetch on media://). */
 function readBook(id: string): ArrayBuffer | null {
   const it = readDb().find((x) => x.id === id);
@@ -315,6 +457,119 @@ function readBook(id: string): ArrayBuffer | null {
   if (!fs.existsSync(full)) return null;
   const buf = fs.readFileSync(full);
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
+
+function stripHtmlToText(raw: string): string {
+  return raw
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\b[^>]*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Resolve an EPUB zip entry with slash/case/encoding tolerance. */
+function findEpubZipEntry(zip: AdmZip, zipPath: string): ReturnType<AdmZip['getEntry']> {
+  const norm = zipPath.replace(/\\/g, '/').replace(/^\//, '');
+  const direct =
+    zip.getEntry(norm) ??
+    zip.getEntry(decodeURIComponent(norm)) ??
+    zip.getEntry(norm.replace(/^\.\//, ''));
+  if (direct) return direct;
+  const lower = norm.toLowerCase();
+  for (const entry of zip.getEntries()) {
+    const name = entry.entryName.replace(/\\/g, '/');
+    if (name === norm || name.toLowerCase() === lower) return entry;
+    try {
+      if (decodeURIComponent(name) === norm || decodeURIComponent(name).toLowerCase() === lower) {
+        return entry;
+      }
+    } catch {
+      /* ignore bad % sequences */
+    }
+  }
+  return null;
+}
+
+/**
+ * Lightweight plain-text sample from an EPUB for JLPT/HSK cover badges.
+ * Stops once `maxChars` is reached so large books stay off the UI thread.
+ */
+function sampleBookText(id: string, maxChars = 40_000): string | null {
+  const it = readDb().find((x) => x.id === id);
+  if (!it || it.kind !== 'book') return null;
+  const file = it.epubFile ?? 'original.epub';
+  if (file.toLowerCase().endsWith('.pdf')) return null;
+  const full = path.join(itemDir(id), file);
+  if (!fs.existsSync(full)) return null;
+
+  try {
+    const zip = new AdmZip(full);
+    const parsed = readEpubOpf(zip);
+    const parts: string[] = [];
+    let total = 0;
+
+    const pushText = (html: string): boolean => {
+      const text = stripHtmlToText(html);
+      if (!text) return false;
+      const room = maxChars - total;
+      if (room <= 0) return true;
+      const slice = text.length > room ? text.slice(0, room) : text;
+      parts.push(slice);
+      total += slice.length;
+      return total >= maxChars;
+    };
+
+    if (parsed) {
+      const { opf, opfDir } = parsed;
+      const manifest = new Map<string, string>();
+      for (const match of opf.matchAll(/<item\b[^>]*>/gi)) {
+        const tag = match[0];
+        const itemId = (tag.match(/\bid="([^"]+)"/i) ?? [])[1];
+        const href = (tag.match(/\bhref="([^"]+)"/i) ?? [])[1];
+        if (itemId && href) manifest.set(itemId, href);
+      }
+      const spineIds = [...opf.matchAll(/<itemref\b[^>]*>/gi)]
+        .map((m) => (m[0].match(/\bidref="([^"]+)"/i) ?? [])[1])
+        .filter((x): x is string => Boolean(x));
+
+      for (const spineId of spineIds) {
+        const href = manifest.get(spineId);
+        if (!href) continue;
+        const cleaned = href.replace(/\\/g, '/').replace(/^\//, '');
+        const zipPath =
+          cleaned.includes('/') || !opfDir || opfDir === '.'
+            ? cleaned
+            : path.posix.join(opfDir, cleaned);
+        const entry = findEpubZipEntry(zip, zipPath);
+        if (!entry) continue;
+        if (pushText(entry.getData().toString('utf-8'))) break;
+      }
+    }
+
+    if (total < maxChars) {
+      for (const entry of zip.getEntries()) {
+        if (total >= maxChars) break;
+        const name = entry.entryName.replace(/\\/g, '/').toLowerCase();
+        if (!/\.(xhtml|html|htm)$/.test(name)) continue;
+        if (/(^|\/)nav\.xhtml$/.test(name) || name.includes('toc')) continue;
+        if (pushText(entry.getData().toString('utf-8'))) break;
+      }
+    }
+
+    const out = parts.join('\n').trim();
+    return out || null;
+  } catch {
+    return null;
+  }
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -401,6 +656,382 @@ function broadcastLibrary(items: LibraryItem[]): void {
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send('library:changed', items);
 }
 
+function ensureInboxFolder(): void {
+  const cfg = readConfig();
+  const folders = cfg.folders ?? [];
+  if (!folders.includes(INBOX_FOLDER)) {
+    cfg.folders = [...folders, INBOX_FOLDER];
+    writeConfig(cfg);
+  }
+}
+
+function ensureMangaFolder(): void {
+  const cfg = readConfig();
+  const folders = cfg.folders ?? [];
+  if (!folders.includes(MANGA_FOLDER)) {
+    cfg.folders = [...folders, MANGA_FOLDER];
+    writeConfig(cfg);
+  }
+}
+
+const escXml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function buildEpub(title: string, bodyHtml: string): Buffer {
+  const zip = new AdmZip();
+  zip.addFile('mimetype', Buffer.from('application/epub+zip'));
+  zip.addFile(
+    'META-INF/container.xml',
+    Buffer.from(
+      '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">' +
+        '<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+    ),
+  );
+  zip.addFile(
+    'OEBPS/content.opf',
+    Buffer.from(
+      '<?xml version="1.0" encoding="utf-8"?>' +
+        '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">' +
+        '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">' +
+        `<dc:identifier id="uid">urn:uuid:${crypto.randomUUID()}</dc:identifier>` +
+        `<dc:title>${escXml(title)}</dc:title><dc:language>ja</dc:language>` +
+        '<meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>' +
+        '</metadata>' +
+        '<manifest><item id="ch" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>' +
+        '<spine><itemref idref="ch"/></spine></package>',
+    ),
+  );
+  zip.addFile(
+    'OEBPS/chapter.xhtml',
+    Buffer.from(
+      '<?xml version="1.0" encoding="utf-8"?>' +
+        `<html xmlns="http://www.w3.org/1999/xhtml" lang="ja"><head><title>${escXml(title)}</title></head>` +
+        `<body><h1>${escXml(title)}</h1>${bodyHtml}</body></html>`,
+    ),
+  );
+  return zip.toBuffer();
+}
+
+export interface ImportGeneratedResult {
+  items: LibraryItem[];
+  item: LibraryItem | null;
+  duplicate: boolean;
+}
+
+/**
+ * Import HTML as a minimal EPUB. Used by Immersion export and the extension Inbox.
+ * Dedupes by source URL and/or content hash when inboxMeta is provided.
+ */
+export function importGeneratedArticle(payload: {
+  title?: string;
+  html?: string;
+  source?: string;
+  folder?: string;
+  inboxMeta?: LibraryItem['inboxMeta'];
+}): ImportGeneratedResult {
+  const title = String(payload?.title ?? '').trim().slice(0, 120) || 'Imported text';
+  const html = String(payload?.html ?? '');
+  const items = readDb();
+  if (!html.trim()) return { items, item: null, duplicate: false };
+
+  const hash = payload.inboxMeta?.contentHash;
+  const source = payload.source;
+  const existing = items.find((i) => {
+    if (source && i.sourcePath === source) return true;
+    if (hash && i.inboxMeta?.contentHash === hash) return true;
+    if (source && hash && i.inboxMeta?.sourceUrl === source && i.inboxMeta?.contentHash === hash) {
+      return true;
+    }
+    return false;
+  });
+  if (existing) return { items, item: existing, duplicate: true };
+
+  if (payload.folder === INBOX_FOLDER || payload.inboxMeta) ensureInboxFolder();
+
+  const id = crypto.randomUUID();
+  const dir = itemDir(id);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'original.epub'), buildEpub(title, html));
+  const item: LibraryItem = {
+    id,
+    title,
+    kind: 'book',
+    createdAt: Date.now(),
+    sourcePath: source,
+    epubFile: 'original.epub',
+  };
+  if (payload.folder) item.folder = payload.folder;
+  if (payload.inboxMeta) item.inboxMeta = payload.inboxMeta;
+  items.unshift(item);
+  writeDb(items);
+  broadcastLibrary(items);
+  return { items, item, duplicate: false };
+}
+
+const MANGA_URL_IMPORT_MAX_IMAGES = 500;
+const MANGA_URL_IMPORT_MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MANGA_URL_IMPORT_MAX_TOTAL_BYTES = 400 * 1024 * 1024;
+const MANGA_URL_IMPORT_CONCURRENCY = 6;
+
+/** Reject URLs pointing at loopback/private-network hosts — these come from a web page the extension observed, not a trusted local source. */
+function isPrivateOrLoopbackHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === 'localhost' || h === '::1' || h === '0.0.0.0') return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  if (a === 127) return true; // 127.0.0.0/8 loopback
+  if (a === 10) return true; // 10.0.0.0/8
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  if (a === 192 && b === 168) return true; // 192.168.0.0/16
+  if (a === 169 && b === 254) return true; // link-local
+  return false;
+}
+
+function extFromImageContentType(ct: string): string {
+  if (/jpeg|jpg/i.test(ct)) return '.jpg';
+  if (/png/i.test(ct)) return '.png';
+  if (/webp/i.test(ct)) return '.webp';
+  if (/gif/i.test(ct)) return '.gif';
+  if (/bmp/i.test(ct)) return '.bmp';
+  if (/avif/i.test(ct)) return '.avif';
+  return '.jpg';
+}
+
+function extFromImageUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    const m = pathname.match(/\.(jpe?g|png|webp|gif|bmp|avif)(?:$|\?)/i);
+    if (!m) return '';
+    const ext = m[1].toLowerCase();
+    if (ext === 'jpeg') return '.jpg';
+    return `.${ext}`;
+  } catch {
+    return '';
+  }
+}
+
+function isAcceptableImageContentType(ct: string): boolean {
+  if (!ct) return true; // many CDNs omit CT
+  if (/^image\//i.test(ct)) return true;
+  // Signed CDN blobs often arrive as octet-stream / binary
+  if (/^application\/octet-stream/i.test(ct)) return true;
+  if (/^binary\//i.test(ct)) return true;
+  return false;
+}
+
+/**
+ * Import a manga chapter from a list of already-collected panel image URLs
+ * (the browser extension's long-strip scan — see extensionServer.ts's
+ * /v1/manga-import route). Each image is fetched in the main process
+ * (bounded concurrency, size caps, SSRF guard), written into a fresh
+ * library item's pages/ dir in the order given, and a cover is picked with
+ * the same heuristic as CBZ/folder imports. Tolerates partial failure —
+ * only hard-fails if every image fails to download.
+ */
+export async function importMangaFromImageUrls(payload: {
+  title?: string;
+  url: string;
+  images: string[];
+}): Promise<{ ok: boolean; id?: string; pageCount?: number; failed?: number; error?: string; coverPath?: string }> {
+  const sourceUrl = String(payload.url ?? '').trim();
+  const images = Array.isArray(payload.images) ? payload.images.slice(0, MANGA_URL_IMPORT_MAX_IMAGES) : [];
+  if (!images.length) return { ok: false, error: 'No images provided.' };
+
+  let referer = '';
+  try {
+    referer = new URL(sourceUrl).origin;
+  } catch {
+    /* no referer available */
+  }
+
+  const results: Array<{ buf: Buffer; ext: string } | null> = new Array(images.length).fill(null);
+  let totalBytes = 0;
+  let cursor = 0;
+  let capReached = false;
+
+  async function worker(): Promise<void> {
+    for (;;) {
+      const i = cursor++;
+      if (i >= images.length || capReached) return;
+      const raw = String(images[i] ?? '');
+
+      // data: URLs come from blob: panel conversion in the extension scan.
+      if (raw.startsWith('data:image/')) {
+        try {
+          const m = /^data:(image\/[a-z0-9.+-]+)(;base64)?,(.*)$/i.exec(raw);
+          if (!m) continue;
+          const ct = m[1];
+          const buf = Buffer.from(m[3], m[2] ? 'base64' : 'utf8');
+          if (buf.byteLength < 64 || buf.byteLength > MANGA_URL_IMPORT_MAX_IMAGE_BYTES) continue;
+          if (totalBytes + buf.byteLength > MANGA_URL_IMPORT_MAX_TOTAL_BYTES) {
+            capReached = true;
+            continue;
+          }
+          totalBytes += buf.byteLength;
+          results[i] = { buf, ext: extFromImageContentType(ct) };
+        } catch {
+          /* skip */
+        }
+        continue;
+      }
+
+      let target: URL;
+      try {
+        target = new URL(raw);
+      } catch {
+        continue;
+      }
+      if (target.protocol !== 'http:' && target.protocol !== 'https:') continue;
+      if (isPrivateOrLoopbackHost(target.hostname)) continue;
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), 20000);
+        const res = await fetch(target.toString(), {
+          signal: ctl.signal,
+          redirect: 'follow',
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+            Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+            ...(referer ? { Referer: referer } : {}),
+          },
+        });
+        clearTimeout(t);
+        if (!res.ok) continue;
+        const ct = res.headers.get('content-type') ?? '';
+        if (!isAcceptableImageContentType(ct)) continue;
+        const ab = await res.arrayBuffer();
+        if (ab.byteLength === 0 || ab.byteLength > MANGA_URL_IMPORT_MAX_IMAGE_BYTES) continue;
+        // Reject tiny non-image payloads that slipped past CT checks.
+        if (ab.byteLength < 64) continue;
+        if (totalBytes + ab.byteLength > MANGA_URL_IMPORT_MAX_TOTAL_BYTES) {
+          capReached = true;
+          continue;
+        }
+        totalBytes += ab.byteLength;
+        const ext = extFromImageUrl(target.toString()) || extFromImageContentType(ct);
+        results[i] = { buf: Buffer.from(ab), ext };
+      } catch {
+        /* skip this image, keep going */
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: MANGA_URL_IMPORT_CONCURRENCY }, () => worker()));
+
+  const ok = results.filter((r): r is { buf: Buffer; ext: string } => r != null);
+  if (!ok.length) return { ok: false, error: 'All images failed to download.' };
+
+  ensureMangaFolder();
+
+  const id = crypto.randomUUID();
+  const dir = itemDir(id);
+  const pagesDir = path.join(dir, 'pages');
+  fs.mkdirSync(pagesDir, { recursive: true });
+  const names: string[] = [];
+  ok.forEach((r, seq) => {
+    const outName = `${String(seq + 1).padStart(4, '0')}${r.ext}`;
+    fs.writeFileSync(path.join(pagesDir, outName), r.buf);
+    names.push(outName);
+  });
+
+  const coverName = pickCoverPage(pagesDir, names) || names[0];
+  let coverPath: string | undefined;
+  if (coverName) {
+    // Dedicated cover file so Library thumbs stay stable even if page order changes.
+    const coverExt = path.extname(coverName) || '.jpg';
+    const coverFile = `cover${coverExt}`;
+    try {
+      fs.copyFileSync(path.join(pagesDir, coverName), path.join(dir, coverFile));
+      coverPath = coverFile;
+    } catch {
+      coverPath = `pages/${coverName}`;
+    }
+  }
+
+  const title =
+    String(payload.title ?? '').trim().slice(0, 120) || titleFromFile(sourceUrl || 'Imported manga');
+  const items = readDb();
+  const item: LibraryItem = {
+    id,
+    title,
+    kind: 'manga',
+    createdAt: Date.now(),
+    sourcePath: sourceUrl || undefined,
+    pageCount: names.length,
+    coverPath,
+    folder: MANGA_FOLDER,
+  };
+  items.unshift(item);
+  writeDb(items);
+  broadcastLibrary(items);
+
+  return {
+    ok: true,
+    id,
+    pageCount: names.length,
+    failed: images.length - ok.length,
+    coverPath,
+  };
+}
+
+export function updateLibraryInboxMeta(
+  id: string,
+  patch: Partial<NonNullable<LibraryItem['inboxMeta']>>,
+): LibraryItem[] {
+  const items = readDb();
+  const it = items.find((x) => x.id === id);
+  if (it?.inboxMeta) {
+    it.inboxMeta = { ...it.inboxMeta, ...patch };
+    writeDb(items);
+    broadcastLibrary(items);
+  }
+  return items;
+}
+
+/** Persist known-ratio L-level for file-imported books (no inboxMeta). */
+export function updateLibraryLevelMeta(
+  id: string,
+  patch: NonNullable<LibraryItem['levelMeta']>,
+  opts?: { broadcast?: boolean },
+): LibraryItem[] {
+  const items = readDb();
+  const it = items.find((x) => x.id === id);
+  if (!it || it.kind !== 'book') return items;
+  it.levelMeta = {
+    lang: patch.lang,
+    knownRatio: typeof patch.knownRatio === 'number' ? patch.knownRatio : 0,
+    levelEstimate: patch.levelEstimate ?? null,
+  };
+  writeDb(items);
+  if (opts?.broadcast !== false) broadcastLibrary(items);
+  return items;
+}
+
+/** Persist manga OCR/translate volume status for library cover badges. */
+export function updateLibraryOcrMeta(
+  id: string,
+  patch: NonNullable<LibraryItem['ocrMeta']>,
+  opts?: { broadcast?: boolean },
+): LibraryItem[] {
+  const items = readDb();
+  const it = items.find((x) => x.id === id);
+  if (!it || it.kind !== 'manga') return items;
+  const next: NonNullable<LibraryItem['ocrMeta']> = {
+    ocrPages: Math.max(0, Math.floor(patch.ocrPages)),
+    translatedPages: Math.max(0, Math.floor(patch.translatedPages)),
+    updatedAt: typeof patch.updatedAt === 'number' ? patch.updatedAt : Date.now(),
+  };
+  if (typeof patch.targetLang === 'string' && patch.targetLang) next.targetLang = patch.targetLang;
+  if (typeof patch.completedAt === 'number') next.completedAt = patch.completedAt;
+  it.ocrMeta = next;
+  writeDb(items);
+  if (opts?.broadcast !== false) broadcastLibrary(items);
+  return items;
+}
+
 function startWatching(): void {
   stopWatching();
   const cfg = readConfig();
@@ -468,8 +1099,9 @@ export function registerLibraryIpc(): void {
 
     const src = res.filePaths[0];
     const id = crypto.randomUUID();
+    const pagesDir = path.join(itemDir(id), 'pages');
     fs.mkdirSync(itemDir(id), { recursive: true });
-    const names = copyFolderImages(src, path.join(itemDir(id), 'pages'));
+    const names = copyFolderImages(src, pagesDir);
 
     const items = readDb();
     if (names.length === 0) {
@@ -483,7 +1115,7 @@ export function registerLibraryIpc(): void {
       createdAt: Date.now(),
       sourcePath: src,
       pageCount: names.length,
-      coverPath: `pages/${names[0]}`,
+      coverPath: `pages/${pickCoverPage(pagesDir, names)}`,
     });
     writeDb(items);
     return items;
@@ -720,14 +1352,23 @@ export function registerLibraryIpc(): void {
   });
 
   // Launch a shortcut: a URL opens in the browser, a file/program via Windows.
+  // `target` always originates from desktop:pickShortcut (an OS file-dialog
+  // result) or the Blanc Toolbox file-search results — both are paths the
+  // user already selected via native OS UI, never renderer-typed text. The
+  // checks below (PHASE_6_5_AUDIT.md §3 chained-High finding) don't change
+  // that legitimate flow; they narrow what a *compromised* renderer could
+  // achieve by calling this channel directly with a crafted string.
   ipcMain.handle('desktop:launch', async (_e, target: string) => {
-    if (typeof target !== 'string' || !target) return 'Invalid target.';
+    if (typeof target !== 'string' || !target || target.includes('\0')) return 'Invalid target.';
     if (/^https?:\/\//i.test(target)) {
       await shell.openExternal(target);
       return null;
     }
-    if (!fs.existsSync(target)) return 'That file no longer exists.';
-    const err = await shell.openPath(target);
+    if (!path.isAbsolute(target)) return 'Invalid target.';
+    const resolved = path.resolve(target);
+    if (resolved !== target) return 'Invalid target.';
+    if (!fs.existsSync(resolved)) return 'That file no longer exists.';
+    const err = await shell.openPath(resolved);
     return err || null;
   });
 
@@ -736,6 +1377,13 @@ export function registerLibraryIpc(): void {
   // Fetch + extract a readable article in the main process (no CORS / DOM issues).
   ipcMain.handle('net:extractReadableArticle', async (_e, url: string) => {
     return extractReadableFromUrl(String(url ?? '').trim());
+  });
+
+  // Reading Finder: fetch a candidate's full readable content, following the
+  // same-text "next page" chain, and return plain text for comprehensibility
+  // scoring plus HTML for the reader. (Renderer would hit CORS.)
+  ipcMain.handle('reading:fetchContent', async (_e, url: string, opts?: FetchReadingOptions) => {
+    return fetchReadingContent(String(url ?? '').trim(), opts ?? {});
   });
 
   // Fetch a page's HTML in the main process (the renderer would hit CORS).
@@ -800,66 +1448,44 @@ export function registerLibraryIpc(): void {
 
   // Wrap extracted article/pasted text into a minimal valid EPUB so imported
   // web content behaves exactly like any other book (reader, progress, stats).
-  const escXml = (s: string): string =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const buildEpub = (title: string, bodyHtml: string): Buffer => {
-    const zip = new AdmZip();
-    zip.addFile('mimetype', Buffer.from('application/epub+zip'));
-    zip.addFile(
-      'META-INF/container.xml',
-      Buffer.from(
-        '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">' +
-          '<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
-      ),
-    );
-    zip.addFile(
-      'OEBPS/content.opf',
-      Buffer.from(
-        '<?xml version="1.0" encoding="utf-8"?>' +
-          '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">' +
-          '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">' +
-          `<dc:identifier id="uid">urn:uuid:${crypto.randomUUID()}</dc:identifier>` +
-          `<dc:title>${escXml(title)}</dc:title><dc:language>ja</dc:language>` +
-          '<meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>' +
-          '</metadata>' +
-          '<manifest><item id="ch" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>' +
-          '<spine><itemref idref="ch"/></spine></package>',
-      ),
-    );
-    zip.addFile(
-      'OEBPS/chapter.xhtml',
-      Buffer.from(
-        '<?xml version="1.0" encoding="utf-8"?>' +
-          `<html xmlns="http://www.w3.org/1999/xhtml" lang="ja"><head><title>${escXml(title)}</title></head>` +
-          `<body><h1>${escXml(title)}</h1>${bodyHtml}</body></html>`,
-      ),
-    );
-    return zip.toBuffer();
-  };
-
   ipcMain.handle(
     'library:importGenerated',
     (_e, payload: { title?: string; html?: string; source?: string }) => {
-      const title = String(payload?.title ?? '').trim().slice(0, 120) || 'Imported text';
-      const html = String(payload?.html ?? '');
-      const items = readDb();
-      if (!html.trim()) return items;
-      if (payload?.source && items.some((i) => i.sourcePath === payload.source)) return items;
-      const id = crypto.randomUUID();
-      const dir = itemDir(id);
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, 'original.epub'), buildEpub(title, html));
-      items.unshift({
-        id,
-        title,
-        kind: 'book',
-        createdAt: Date.now(),
-        sourcePath: payload?.source,
-        epubFile: 'original.epub',
-      });
-      writeDb(items);
-      broadcastLibrary(items);
-      return items;
+      return importGeneratedArticle(payload).items;
+    },
+  );
+
+  ipcMain.handle(
+    'library:updateInboxMeta',
+    (_e, id: string, patch: Partial<NonNullable<LibraryItem['inboxMeta']>>) => {
+      if (typeof id !== 'string') return readDb();
+      return updateLibraryInboxMeta(id, patch ?? {});
+    },
+  );
+
+  ipcMain.handle(
+    'library:updateLevelMeta',
+    (
+      _e,
+      id: string,
+      patch: NonNullable<LibraryItem['levelMeta']>,
+      opts?: { broadcast?: boolean },
+    ) => {
+      if (typeof id !== 'string' || !patch || typeof patch !== 'object') return readDb();
+      return updateLibraryLevelMeta(id, patch, opts);
+    },
+  );
+
+  ipcMain.handle(
+    'library:updateOcrMeta',
+    (
+      _e,
+      id: string,
+      patch: NonNullable<LibraryItem['ocrMeta']>,
+      opts?: { broadcast?: boolean },
+    ) => {
+      if (typeof id !== 'string' || !patch || typeof patch !== 'object') return readDb();
+      return updateLibraryOcrMeta(id, patch, opts);
     },
   );
 
@@ -901,11 +1527,30 @@ export function registerLibraryIpc(): void {
     return items;
   });
 
+  ipcMain.handle('library:setCover', (_e, id: string, pageRelPath: string) => {
+    const items = readDb();
+    const it = items.find((x) => x.id === id);
+    if (!it) return items;
+    if (typeof pageRelPath !== 'string' || !pageRelPath.startsWith('pages/') || pageRelPath.includes('..')) {
+      return items;
+    }
+    const full = path.join(itemDir(id), pageRelPath);
+    if (!fs.existsSync(full)) return items;
+    it.coverPath = pageRelPath;
+    writeDb(items);
+    broadcastLibrary(items);
+    return items;
+  });
+
   ipcMain.handle('manga:getPages', (_e, id: string) => getMangaPages(id));
 
   ipcMain.handle('manga:readPage', (_e, mediaUrl: string) => readMangaPage(mediaUrl));
 
   ipcMain.handle('library:readBook', (_e, id: string) => readBook(id));
+
+  ipcMain.handle('library:sampleBookText', (_e, id: string, maxChars?: number) =>
+    sampleBookText(id, typeof maxChars === 'number' && maxChars > 0 ? maxChars : 40_000),
+  );
 
   ipcMain.handle('config:getWatchFolder', () => readConfig().watchFolder ?? null);
 

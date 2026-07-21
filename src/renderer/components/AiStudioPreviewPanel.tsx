@@ -8,13 +8,14 @@ import type {
 } from '../../shared/mining';
 import { buildAiFormatSampleValues, buildAiPromptPreview, renderAiTemplate } from '../../shared/aiPromptBuilder';
 import type { StudyProfile } from '../../shared/profiles';
+import { useT } from '../i18n';
 
-function FormatFacePreview({ label, text }: { label: string; text: string }) {
+function FormatFacePreview({ label, text, emptyLabel }: { label: string; text: string; emptyLabel: string }) {
   return (
     <div className="ai-format-face">
       <div className="card-preview-face-label">{label}</div>
       <pre className="ai-format-face-body" lang="ja">
-        {text || '(empty)'}
+        {text || emptyLabel}
       </pre>
     </div>
   );
@@ -35,6 +36,7 @@ export default function AiStudioPreviewPanel({
   aiConfig: AiEngineConfig;
   wordCount: number;
 }) {
+  const { t, lang } = useT();
   const template = localizedFormat.cardTemplates[0];
 
   const formatPreview = useMemo(() => {
@@ -75,44 +77,49 @@ export default function AiStudioPreviewPanel({
     [generationSource, preset, localizedFormat, aiConfig, template, mappingProfile.targetLang, wordCount],
   );
 
+  const sampleSubtitle = useMemo(
+    () =>
+      t('aiStudio.preview.sampleForPreset', {
+        label: formatPreview?.label ?? localizedFormat.label,
+      }),
+    [lang, formatPreview?.label, localizedFormat.label],
+  );
+
+  const emptyFace = t('aiStudio.preview.emptyFace');
+
   return (
     <aside className="ai-studio-preview-column">
       <section className="card-preview ai-format-preview">
         <div className="card-preview-head">
           <div>
-            <p className="card-preview-label">AI card example</p>
-            <p className="muted card-preview-profile">
-              {formatPreview?.label ?? localizedFormat.label} — sample content for this preset
-            </p>
+            <p className="card-preview-label">{t('aiStudio.preview.cardExample')}</p>
+            <p className="muted card-preview-profile">{sampleSubtitle}</p>
           </div>
         </div>
         {formatPreview ? (
           <div className="card-preview-pair">
-            <FormatFacePreview label="Front" text={formatPreview.front} />
-            <FormatFacePreview label="Back" text={formatPreview.back} />
+            <FormatFacePreview label={t('aiStudio.preview.front')} text={formatPreview.front} emptyLabel={emptyFace} />
+            <FormatFacePreview label={t('aiStudio.preview.back')} text={formatPreview.back} emptyLabel={emptyFace} />
           </div>
         ) : (
-          <p className="muted">No card template for this format.</p>
+          <p className="muted">{t('aiStudio.preview.noTemplate')}</p>
         )}
-        <p className="muted card-preview-hint">
-          Faces above use the preset format after language direction is applied. Sending to Anki runs the field
-          mapping on the left.
-        </p>
+        <p className="muted card-preview-hint">{t('aiStudio.preview.facesHint')}</p>
       </section>
 
       <section className="card-preview ai-prompt-preview">
         <div className="card-preview-head">
           <div>
-            <p className="card-preview-label">AI prompt</p>
+            <p className="card-preview-label">{t('aiStudio.preview.prompt')}</p>
             <p className="muted card-preview-profile">
-              {generationSource === 'preset' ? 'Invent vocabulary mode' : 'Dictionary enrichment mode'}
+              {generationSource === 'preset'
+                ? t('aiStudio.preview.mode.invent')
+                : t('aiStudio.preview.mode.enrich')}
             </p>
           </div>
         </div>
         <pre className="ai-prompt-body">{promptText}</pre>
-        <p className="muted card-preview-hint">
-          Composed from preset instruction, language direction, profile id, and active card templates.
-        </p>
+        <p className="muted card-preview-hint">{t('aiStudio.preview.promptHint')}</p>
       </section>
     </aside>
   );

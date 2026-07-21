@@ -40,6 +40,10 @@ export function Calculator() {
   const [showResult, setShowResult] = useState(false);
   const press = (k: string) => {
     if (k === '') return;
+    // Engineering Pad key clack (§6/§8) — no-op outside the wired pack.
+    if (document.documentElement.getAttribute('data-materials') === 'wired') {
+      window.dispatchEvent(new CustomEvent('wired:switch-clack'));
+    }
     if (k === 'C') {
       setExpr('');
       setShowResult(false);

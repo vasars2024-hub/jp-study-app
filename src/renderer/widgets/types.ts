@@ -29,10 +29,11 @@ export interface WidgetProps {
 export interface WidgetDef {
   /** Stable key stored in WidgetSnapshot.type and the registry. */
   type: string;
-  title: string;
+  /** i18n key for the display title (see shared/i18n/catalogs.ts `widgets.title.*`). */
+  titleKey: string;
   category: WidgetCategory;
-  /** One-line description shown on the gallery card. */
-  description: string;
+  /** i18n key for the one-line description shown on the gallery card (`widgets.desc.*`). */
+  descKey: string;
   defaultSize: { w: number; h: number };
   minSize: { w: number; h: number };
   component: ComponentType<WidgetProps>;

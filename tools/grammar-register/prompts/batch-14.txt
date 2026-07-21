@@ -1,0 +1,162 @@
+You are labelling Chinese grammar patterns by REGISTER — the speech level a
+pattern belongs to. Batch 14 of 14.
+
+## The four values
+
+neutral   - works at any speech level. THE DEFAULT AND MOST COMMON ANSWER.
+casual    - only natural in informal speech between equals or intimates
+            (contractions, blunt sentence-final particles, slang endings).
+business  - honorific / humble / formal-polite. Would appear in a business
+            email, an announcement, or speech to a customer or superior.
+literary  - written or classical. Would appear in an essay, a legal notice, or
+            fiction, but sounds archaic or stiff spoken aloud.
+
+## Rules — read these before answering
+
+- **Most patterns are neutral, and neutral is a real answer, not a fallback.**
+  因为…所以… is the same pair in speech and in a written report, so it is neutral.
+  If you find yourself labelling more than about a fifth of a batch as
+  non-neutral, you are over-assigning.
+- Do NOT infer register from the English meaning text. A gloss reading "a less
+  formal way to say X" describes the pattern's *meaning*; it does not make the
+  pattern casual. Judge from the Chinese form itself.
+- Politeness is not register. A pattern that takes 您 or 请 is still neutral unless
+  the pattern *itself* belongs to formal or written language.
+- If you are unsure, answer neutral and append "?" to flag it for review.
+  A flagged guess is useful; a confident wrong answer is not.
+- Every input line must produce exactly one output line. Do not skip, merge,
+  or reorder.
+
+## Patterns (id, then pattern, then structure, then meaning)
+
+hsk1-meiyou	没有	没(有) + N   |   没(有) + V	not have / did not (past negation)
+hsk1-shenme	什么	什么 + (N)	what
+hsk1-shui	谁	谁 + V   |   V + 谁	who
+hsk1-nar	哪儿 / 哪里	在 + 哪儿   |   去 + 哪儿	where
+hsk1-ji	几	几 + MW + N	how many (small numbers)
+hsk1-duoshao	多少	多少 + (MW) + N	how many / how much
+hsk1-ge	个 (measure words)	Number / 这 / 那 + MW + N	general classifier
+hsk1-zhe-na	这 / 那	这 / 那 + MW + N	this / that
+hsk1-xiang	想	想 + V	want to / would like to
+hsk1-tai-le	太…了	太 + Adj + 了	too / extremely
+hsk1-qing	请	请 + V	please (polite request)
+hsk1-yixia	一下	V + 一下	briefly / a bit (softener)
+hsk2-keyi	可以	可以 + V	may / be allowed to
+hsk2-dei	得 (děi)	得 + V	must / have to
+hsk2-zhengzai	正在…呢	正在 + V + 呢	in the middle of doing
+hsk2-le-change	了 (sentence-final)	Sentence + 了	change of state / new situation
+hsk2-kuaiyao	快要…了	快要 / 就要 + V + 了	about to / soon
+hsk2-deshihou	…的时候	Clause + 的时候	when / while
+hsk2-cong-dao	从…到…	从 + A + 到 + B	from … to …
+hsk2-li	离	A + 离 + B + 远 / 近	away from (distance)
+hsk2-gei	给	给 + Person + V	to give / for the benefit of
+hsk2-dui	对	对 + N + V/Adj	toward / with regard to
+hsk2-you-you	又…又…	又 + Adj/V + 又 + Adj/V	both … and …
+hsk2-yibian	一边…一边…	一边 + V1 + 一边 + V2	while doing … do …
+hsk2-haishi	还是	A + 还是 + B？	or (in questions)
+hsk2-suoyi	因为…所以…	因为 + Cause，所以 + Result	because … therefore …
+hsk2-zui	最	最 + Adj	most (superlative)
+hsk2-youdianr	有点儿	有点儿 + Adj	a bit (undesirable)
+hsk3-yi-jiu	一…就…	一 + V1，就 + V2	as soon as
+hsk3-yuelaiyue	越来越	越来越 + Adj	more and more
+hsk3-yue-yue	越…越…	越 + V/Adj，越 + V/Adj	the more … the more …
+hsk3-zhe	着	V + 着	durative state
+hsk3-resultative	Resultative complements (V+完 / 好 / 懂)	V + 完 / 好 / 懂 / 见	verb plus its outcome
+hsk3-potential	Potential complements (V+得/不+C)	V + 得 / 不 + Complement	can / cannot manage to
+hsk3-qilai	起来	V + 起来	start to / on doing
+hsk3-xiaqu	下去	V + 下去	go on doing
+hsk3-gen-yiyang	跟…一样	A + 跟 + B + 一样 + (Adj)	the same as
+hsk3-zhiyou-cai	只有…才…	只有 + Condition，才 + Result	only if … then …
+hsk3-jile	…极了	Adj + 极了	extremely
+hsk3-de-adv	地 (adverbial 的)	Adj + 地 + V	adverb marker
+hsk3-shibushi	是不是	是不是 + Clause   |   Clause，是不是？	tag question
+hsk3-chabuduo	差不多	差不多 + Num/Adj	almost / about the same
+hsk4-jinguan	尽管…但是…	尽管 + Fact，但是 / 还是 + Clause	even though
+hsk4-yuqi	与其…不如…	与其 + A，不如 + B	rather than … better to …
+hsk4-tongguo	通过	通过 + N，…	by means of / through
+hsk4-yushi	于是	Clause，于是 + Clause	thereupon / so
+hsk4-yinci	因此	Clause。因此，Clause	therefore / hence
+hsk4-conglai	从来不 / 从来没	从来 + 不 / 没(有) + V	never (habitually / ever)
+hsk4-nandao	难道…吗？	难道 + Clause + 吗？	surely not …?
+hsk4-kongpa	恐怕	恐怕 + Clause	I am afraid that / probably
+hsk4-zhishao	至少 / 至多	至少 / 至多 + Quantity	at least / at most
+hsk4-jinliang	尽量	尽量 + V	as far as possible
+hsk5-hekuang	何况	Clause，何况 + Clause	let alone / much less
+hsk5-yimian	以免	Clause，以免 + Undesirable outcome	so as to avoid
+hsk5-yibian-purpose	以便	Clause，以便 + Desired outcome	in order to / so that
+hsk5-cengjing	曾经	曾经 + V + 过	once / formerly
+hsk5-weibi	未必	未必 + Clause	not necessarily
+hsk5-shizhong	始终	始终 + V	all along / from first to last
+hsk6-weiyou	唯有	唯有 + N/Clause，才…	only / none but
+hsk6-dongzhe	动辄	动辄 + V	at every turn / readily
+hsk6-weikong	唯恐	唯恐 + Undesirable outcome	for fear that
+hsk6-yilv	一律	一律 + V	without exception / uniformly
+hsk6-dadi	大抵	大抵 + Clause	broadly / on the whole
+hsk1-shi	是	N1 + 是 + N2	to be (equative copula)
+hsk1-you	有	N + 有 + N	to have / there is
+hsk1-ma	吗	Statement + 吗？	yes/no question particle
+hsk1-bu	不	不 + Verb / Adj	not (habitual / future negation)
+hsk1-le	了	V + 了	completed action / change of state
+hsk1-zai	在	在 + Place / 在 + V	to be at / progressive
+hsk1-de-mod	的	N/Pron + 的 + N	possessive / attributive marker
+hsk1-hen	很	S + 很 + Adj	very / (links adj predicate)
+hsk1-ye	也	S + 也 + V/Adj	also / too
+hsk1-dou	都	Plural S + 都 + V	all / both
+hsk1-he	和	N1 + 和 + N2	and (nouns)
+hsk1-ne	呢	N + 呢？ / Statement + 呢	and you? / ongoing situation particle
+hsk2-yao	要	要 + V	want to / will / need
+hsk2-hui	会	会 + V	can (skill) / will (future)
+hsk2-neng	能	能 + V	can (possibility / permission)
+hsk2-bie	别	别 + V	don't (imperative)
+hsk2-zhen	真	真 + Adj	really / truly
+hsk2-yidian	一点儿	Adj + 一点儿 / V + 一点儿 + N	a little
+hsk2-zai-prog	正在 / 在…呢	正在 + V / 在 + V + 呢	progressive aspect
+hsk2-ba	吧	Statement + 吧	suggestion / softener
+hsk2-bi	比	A 比 B + Adj	comparative “than”
+hsk3-ba-disp	把	S + 把 + O + V + complement	disposal construction (ba)
+hsk3-bei	被	S + 被 (+ Agent) + V	passive marker
+hsk3-de-comp	得 (complement)	V + 得 + Adv/Adj	degree / manner complement
+hsk3-guo	过	V + 过	experiential aspect
+hsk3-cai	才	…才 + V	only then / as late as
+hsk3-jiu	就	…就 + V	then / as early as / emphasis
+hsk3-suiran	虽然…但是…	虽然 + A，但是 + B	although… yet…
+hsk3-ruguo	如果…就…	如果 + Cond，就 + Result	if… then…
+hsk3-yijing	已经…了	已经 + V + 了	already
+hsk3-hai	还	还 + V/Adj	still / also / even
+hsk4-shi-de	是…的	是 + Focus + 的	focus construction (time/place/manner)
+hsk4-budan	不但…而且…	不但 + A，而且 + B	not only… but also…
+hsk4-zhiyao	只要…就…	只要 + Cond，就 + Result	as long as… then…
+hsk4-chule	除了…以外	除了 + X 以外，…	except / besides
+hsk4-lian	连…都/也…	连 + X + 都/也 + V	even…
+hsk4-yizhi	一直	一直 + V	continuously / all along
+hsk4-genju	根据	根据 + N，…	according to
+hsk5-by	并/并且	Clause，并/并且 + Clause	and (also) / moreover
+hsk5-er	而	A，而 + B	but / while (contrast)
+hsk5-yizhi-lead	以至于	…以至于 + Result	so… that… / to the point that
+hsk5-wulun	无论…都…	无论 + Q-word，都 + V	no matter… still…
+hsk5-jiushi	就是…也…	就是 + Cond，也 + Result	even if… still…
+hsk5-buguan	尽管…还是…	尽管 + A，还是 + B	even though… still…
+hsk5-youyu	由于	由于 + Cause，…	owing to / due to
+hsk6-faner	反而	…，反而 + Unexpected	on the contrary / instead
+hsk6-jiushi-emp	恰恰	恰恰 + V/是	precisely / exactly
+hsk6-congwei	从未 / 何曾	从未 + V / 何曾 + V	never (emphatic)
+hsk6-jiarang	即便 / 即使…也…	即便/即使 + Cond，也 + Result	even if… still…
+hsk6-cong-er	从而	…，从而 + Result	thereby / thus
+hsk6-guanyu	关于 / 至于	关于/至于 + Topic，…	regarding / as for
+hsk6-wufei	无非	无非 + 是 + N/Clause	nothing but / merely
+hsk7-ningke	宁可…也…	宁可 + A，也 + (不) B	would rather… than…
+hsk9-qishi	其实不然	…，其实不然	actually not so
+hsk9-buci	不辞而别	不辞而别	leave without saying goodbye
+hsk9-wany	万万不可	万万不可 + V	absolutely must not
+hsk10-weile	未始不可	未始不可	it is not entirely impossible / may well
+hsk10-ningyou	宁有…乎	宁有 + N + 乎	could there possibly be…? (classical)
+hsk10-zai-zai	再…不过	再 + Adj + 不过	couldn’t be more…
+
+## Output format
+
+Return ONLY lines of `id<TAB>register`, one per input line, no header, no
+commentary, no code fence. Example:
+
+n3m-g-1a2b3c	neutral
+n1m-g-0f01e6	literary
+n2m-g-b0bf1e	casual?
