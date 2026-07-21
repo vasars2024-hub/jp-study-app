@@ -52,18 +52,27 @@
      rules reference these instead of hardcoding values so Module A (CSV
      editor) and Module B (EPUB miner) can never drift apart again, and so
      themes only need to override colors. */
+  /* Spacing scale ownership (P1.3): the CORE steps (2xs..xl below, plus the
+     4/8/12/16/20/24 base rhythm) live HERE in styles.css; the larger EXTENSION
+     steps (--space-2xs 2, --space-2xl 32, --space-3xl 48, --space-4xl 64) live
+     in tokens.css. Consumers should reference these tokens, not raw px. */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
   --space-lg: 16px;
+  --space-lg-2: 20px;  /* fills the missing 4px step between lg(16) and xl(24) */
   --space-xl: 24px;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --font-body: 'Segoe UI', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.28);
-  --shadow-toolbar: 0 1px 5px rgba(0, 0, 0, 0.22);
+  /* Legacy shadow aliases repointed onto the canonical elevation ramp
+     (--elevation-*, defined in tokens.css) so the app has ONE shadow system,
+     not two (P1.3). Named themes that override these keep their own values;
+     Aero overrides them too; Wired does not consume them. */
+  --shadow-card: var(--elevation-2);
+  --shadow-toolbar: var(--elevation-1);
 
   /* Shared form-control look (inputs, selects, textareas in both modules). */
   --control-bg: rgba(0, 0, 0, 0.22);
@@ -82,7 +91,9 @@
   --start-cols: 4;
   --desk-icon-w: 92px;
   --desk-icon-h: 88px;
-  --motion-duration: 0.14s;
+  /* Repointed onto the canonical motion scale (--dur-fast = 140ms = 0.14s, an
+     identical value) so shell/personalization share one duration system (P1.3). */
+  --motion-duration: var(--dur-fast);
 
   /* Scrollbars ? track/thumb follow theme + accent (updated by personalization). */
   --scrollbar-size: 8px;
