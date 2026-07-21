@@ -1075,6 +1075,148 @@ html.reduce-motion .os-start-legacy .os-start-app-ic {
   transition: none !important;
 }
 
+/* ---- P2.4 widget gallery --------------------------------------------------
+   Baseline problems: every one of the ~12 visible cards carried a FILLED
+   accent "Add" button, so a dozen primary actions competed in one region
+   (§8: "normally one dominant primary action per local region"); the category
+   was repeated in accent text on every card instead of grouping them; and the
+   cards were bordered boxes stacked on a bordered panel.
+   -------------------------------------------------------------------------- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) {
+  width: min(820px, 92vw);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-5);
+  background: var(--surface-1);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-groups {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-group-label {
+  margin: 0 0 var(--space-sm);
+  font-size: 10.5px;
+  font-weight: var(--font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+/* Responsive card sizing: narrower floor so the grid reflows to 1 column at
+   ~940 instead of overflowing. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: var(--space-sm);
+  padding: 0;
+  overflow: visible;
+}
+
+/* Card: surface contrast, no border (one containment cue — §8). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card {
+  gap: var(--space-2xs);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    border-color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:focus-within {
+  background: var(--surface-3);
+}
+/* Installed reads as a quiet neutral state, never as an accent alarm. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card.installed {
+  border-color: color-mix(in srgb, var(--text) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  align-self: center;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+/* Hover-revealed add: quiet by default, so the eye is not pulled to a dozen
+   competing red buttons. Stays permanently visible for keyboard users and on
+   touch/coarse pointers, where "hover to reveal" would hide the action. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-add {
+  margin-top: 0;
+  opacity: 0.72;
+  transition: opacity var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:hover .widget-card-add,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-add:focus-visible {
+  opacity: 1;
+}
+@media (hover: none), (pointer: coarse) {
+  :where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-add {
+    opacity: 1;
+  }
+}
+
+/* Favorite: a real toggle, gold only when on. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-instant) var(--ease-standard), color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:hover .widget-fav,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav.on,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav:focus-visible {
+  opacity: 1;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+
+/* Tabs: quiet pills, accent reserved for the selected one. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-tab.active {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  border-color: transparent;
+  color: var(--text);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+/* Real empty state instead of a bare line of text. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-3xl) var(--space-lg);
+  color: var(--muted);
+  text-align: center;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-empty-title {
+  margin: 0;
+  font-size: var(--font-size-md, 13px);
+}
+
+html.reduce-motion .widget-gallery .widget-card,
+html.reduce-motion .widget-gallery .widget-card-add,
+html.reduce-motion .widget-gallery .widget-fav {
+  transition: none !important;
+}
+
 html.secret-lifecycle-suspended .os-env-stack,
 html.secret-lifecycle-suspended .os-wall-visualizer,
 html.secret-lifecycle-suspended .os-weather {

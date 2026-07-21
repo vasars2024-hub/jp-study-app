@@ -1972,6 +1972,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           hiddenWidgets={hiddenWidgets}
           onRestore={restoreWidget}
           onClose={() => setGalleryOpen(false)}
+          installedTypes={widgets.map((w) => w.type)}
         />
       )}
 

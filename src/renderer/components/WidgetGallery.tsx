@@ -42,9 +42,22 @@ export interface WidgetGalleryProps {
   hiddenWidgets: WidgetSnapshot[];
   onRestore: (id: string) => void;
   onClose: () => void;
+  /**
+   * Types currently placed on the workspace, so the gallery can distinguish
+   * installed from available. This is the desktop's existing widget state
+   * passed down — NOT a new persistence or tracking system.
+   */
+  installedTypes?: string[];
 }
 
-export default function WidgetGallery({ onAdd, onResetLayout, hiddenWidgets, onRestore, onClose }: WidgetGalleryProps) {
+export default function WidgetGallery({
+  onAdd,
+  onResetLayout,
+  hiddenWidgets,
+  onRestore,
+  onClose,
+  installedTypes = [],
+}: WidgetGalleryProps) {
   const { t, lang } = useT();
   const wired = useWiredMaterials();
   const [prefs, setPrefs] = useState<GalleryPrefs>(loadPrefs);
@@ -91,6 +104,57 @@ export default function WidgetGallery({ onAdd, onResetLayout, hiddenWidgets, onR
 
   const tabs: Tab[] = ['All', 'Favorites', 'Recent', ...WIDGET_CATEGORIES];
 
+  const installed = useMemo(() => new Set(installedTypes), [installedTypes]);
+
+  /**
+   * Group the visible widgets by category for the browsing tabs. Recent is
+   * deliberately left flat — its whole point is the recency order, which
+   * grouping would destroy. A single-category tab needs no headers either.
+   */
+  const grouped = useMemo(() => {
+    if (tab === 'Recent' || (tab !== 'All' && tab !== 'Favorites')) return null;
+    const buckets = WIDGET_CATEGORIES.map((c) => ({
+      category: c,
+      items: visible.filter((w) => w.category === c),
+    })).filter((b) => b.items.length > 0);
+    return buckets.length > 1 ? buckets : null;
+  }, [visible, tab]);
+
+  const renderCard = (w: (typeof WIDGETS)[number]) => {
+    const fav = prefs.favorites.includes(w.type);
+    const isInstalled = installed.has(w.type);
+    return (
+      <div key={w.type} className={`widget-card${isInstalled ? ' installed' : ''}`}>
+        <div className="widget-card-head">
+          <span className="widget-card-title">
+            {wired ? wiredWidgetTitle(w.type, t(w.titleKey)) : t(w.titleKey)}
+          </span>
+          <button
+            className={`widget-fav ${fav ? 'on' : ''}`}
+            title={fav ? t('widgetGallery.unfavorite') : t('widgetGallery.favorite')}
+            aria-pressed={fav}
+            onClick={() => toggleFav(w.type)}
+          >
+            <Icon name="star" size={14} fill={fav} />
+          </button>
+        </div>
+        <div className="widget-card-desc">
+          {wired ? wiredWidgetDesc(w.type, t(w.descKey)) : t(w.descKey)}
+        </div>
+        <div className="widget-card-foot">
+          {isInstalled && <span className="widget-card-badge">{t('widgetGallery.onWorkspace')}</span>}
+          <button
+            className="wgt-btn widget-card-add"
+            onClick={() => onAdd(w.type)}
+            title={isInstalled ? t('widgetGallery.addAnother') : t('widgetGallery.add')}
+          >
+            {isInstalled ? t('widgetGallery.addAnother') : t('widgetGallery.add')}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="widget-gallery-backdrop" onClick={onClose} />
@@ -111,26 +175,32 @@ export default function WidgetGallery({ onAdd, onResetLayout, hiddenWidgets, onR
             <button key={tb} className={`widget-tab ${tab === tb ? 'active' : ''}`} onClick={() => setTab(tb)}>{tabLabel(tb)}</button>
           ))}
         </div>
-        <div className="widget-gallery-grid">
-          {visible.length === 0 && <div className="wgt-empty">{t('widgetGallery.noMatch')}</div>}
-          {visible.map((w) => (
-            <div key={w.type} className="widget-card">
-              <div className="widget-card-head">
-                <span className="widget-card-title">{wired ? wiredWidgetTitle(w.type, t(w.titleKey)) : t(w.titleKey)}</span>
-                <button
-                  className={`widget-fav ${prefs.favorites.includes(w.type) ? 'on' : ''}`}
-                  title={prefs.favorites.includes(w.type) ? t('widgetGallery.unfavorite') : t('widgetGallery.favorite')}
-                  onClick={() => toggleFav(w.type)}
-                >
-                  <Icon name="star" size={14} fill />
-                </button>
-              </div>
-              <div className="widget-card-cat">{t(`widgets.category.${w.category}`)}</div>
-              <div className="widget-card-desc">{wired ? wiredWidgetDesc(w.type, t(w.descKey)) : t(w.descKey)}</div>
-              <button className="wgt-btn primary widget-card-add" onClick={() => onAdd(w.type)}>{t('widgetGallery.add')}</button>
-            </div>
-          ))}
-        </div>
+        {visible.length === 0 ? (
+          <div className="widget-gallery-empty">
+            <Icon name="widgets" size={28} />
+            <p className="widget-gallery-empty-title">{t('widgetGallery.noMatch')}</p>
+            {query.trim() !== '' && (
+              <button className="wgt-btn" onClick={() => setQuery('')}>
+                {t('widgetGallery.clearSearch')}
+              </button>
+            )}
+          </div>
+        ) : grouped ? (
+          <div className="widget-gallery-groups">
+            {grouped.map((b) => (
+              <section key={b.category} className="widget-gallery-group" aria-label={t(`widgets.category.${b.category}`)}>
+                <h3 className="widget-gallery-group-label">{t(`widgets.category.${b.category}`)}</h3>
+                <div className="widget-gallery-grid">
+                  {b.items.map((w) => renderCard(w))}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="widget-gallery-groups">
+            <div className="widget-gallery-grid">{visible.map((w) => renderCard(w))}</div>
+          </div>
+        )}
 
         {hiddenWidgets.length > 0 && (
           <div className="widget-gallery-hidden">
