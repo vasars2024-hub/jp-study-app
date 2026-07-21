@@ -99,7 +99,8 @@ export type ToolboxModuleId =
   | 'counter-reader'
   | 'conjugation-drill'
   | 'review-forecast'
-  | 'pitch-accent';
+  | 'pitch-accent'
+  | 'dev-console';
 
 export type ToolboxModuleCategory =
   | 'study'
@@ -581,6 +582,32 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     },
     migrationNotes:
       'Study-native track item 3. Blanc-only for now: Study OS already renders furigana inline in readers and subtitles, so a second generator surface there would duplicate rather than add.',
+  },
+  {
+    id: 'dev-console',
+    label: 'Developer Console',
+    category: 'system',
+    status: 'ready',
+    capabilities: ['utility', 'notifications'],
+    permissions: [],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: false,
+    supportsGlobalShortcut: false,
+    supportsAutomation: false,
+    acceptsExternalInput: false,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation:
+      'Append-only 2,000-entry ring buffer (shared/blancConsole.ts) fed by the os:toast / ui:toast buses, renderer error and unhandledrejection handlers, and explicit instrumentation at the deck-write path. Filter by category and level, search across serialised payloads, copy as plain text for a bug report.',
+    externalAdapter: {
+      strategy: 'built-in',
+      notes:
+        'Session-only, never persisted: mined words and IPC payloads should not be written to disk by a log. The notification centre remains the summary surface; this is the detail surface.',
+    },
+    migrationNotes:
+      'Pillar 5. Blanc-only. Mining and Anki instrumentation currently comes via the toast buses; direct main-process hooks are still to be added.',
   },
   {
     id: 'pitch-accent',

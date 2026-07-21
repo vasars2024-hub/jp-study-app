@@ -2517,3 +2517,68 @@ html.blanc-mode-enabled.blanc-mode-dark body {
   color: var(--blanc-faint);
   font-size: 0.8em;
 }
+
+/* Developer console (Pillar 5). */
+.blanc-console-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 52vh;
+  overflow-y: auto;
+  font-family: var(--blanc-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.82em;
+}
+
+.blanc-console-entry {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 4px;
+  border-left: 2px solid transparent;
+}
+
+.blanc-console-entry:nth-child(odd) {
+  background: var(--blanc-active, rgba(255, 255, 255, 0.03));
+}
+
+/* Severity reads from the left edge, so scanning for errors does not depend on
+   reading the level column. */
+.blanc-console-entry.level-warn { border-left-color: var(--blanc-accent); }
+.blanc-console-entry.level-error { border-left-color: var(--blanc-danger); }
+
+.blanc-console-time,
+.blanc-console-cat {
+  color: var(--blanc-faint);
+  white-space: nowrap;
+}
+
+.blanc-console-level {
+  text-transform: uppercase;
+  font-size: 0.85em;
+  color: var(--blanc-muted);
+}
+
+.blanc-console-level.level-warn { color: var(--blanc-accent); }
+.blanc-console-level.level-error { color: var(--blanc-danger); }
+
+.blanc-console-msg {
+  color: var(--blanc-text);
+  overflow-wrap: anywhere;
+}
+
+.blanc-console-corr {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: var(--blanc-radius-pill, 999px);
+  background: var(--blanc-hover);
+  color: var(--blanc-muted);
+}
+
+/* Payload sits under the message, dimmed — present for the report, not
+   competing with the message when scanning. */
+.blanc-console-detail {
+  display: block;
+  color: var(--blanc-faint);
+  overflow-wrap: anywhere;
+}

@@ -181,6 +181,9 @@ const BlancForecastPanel = lazy(() =>
 const BlancPitchPanel = lazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancPitchPanel })),
 );
+const BlancConsolePanel = lazy(() =>
+  import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancConsolePanel })),
+);
 
 const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
   read: { label: 'Read', icon: 'library' },
@@ -869,6 +872,7 @@ type BlancToolId =
   | 'conjugation-drill'
   | 'review-forecast'
   | 'pitch-accent'
+  | 'dev-console'
 >;
 
 
@@ -896,6 +900,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
   'conjugation-drill',
   'review-forecast',
   'pitch-accent',
+  'dev-console',
   'coverage',
   'notebook',
   'translate',
@@ -937,6 +942,7 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   'conjugation-drill': 'dice',
   'review-forecast': 'stats',
   'pitch-accent': 'music',
+  'dev-console': 'wrench',
   coverage: 'stats',
   notebook: 'note',
   translate: 'globe',
@@ -995,6 +1001,7 @@ const TOOL_CATEGORY_ORDER: BlancToolCategory[] = ['quick', 'productivity', 'syst
 const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; description: string; shortcut?: string }> = {
   furigana: { category: 'language', description: 'Paste Japanese text and get ruby, Anki bracket furigana, or kana — offline.' },
   'counter-reader': { category: 'language', description: 'Numbers, counters, dates, and clock times to kana — 3本 → さんぼん, with audio.' },
+  'dev-console': { category: 'system', description: 'Append-only event log — mining, deck writes, toasts, and errors, with copy-for-report.' },
   'pitch-accent': { category: 'language', description: 'Pitch-accent contour for a word, with the pattern named and spoken aloud.' },
   'review-forecast': { category: 'language', description: 'Week-ahead review load from Anki, plus local backlog and knowledge bands — read-only.' },
   'conjugation-drill': { category: 'language', description: 'Drill ます, て, た, potential, passive, causative and more across all verb classes.' },
@@ -1094,6 +1101,7 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'conjugation-drill') return <BlancConjugationPanel />;
   if (tool === 'review-forecast') return <BlancForecastPanel />;
   if (tool === 'pitch-accent') return <BlancPitchPanel />;
+  if (tool === 'dev-console') return <BlancConsolePanel />;
   if (tool === 'notebook') return <BlancNotebookPanel />;
   if (tool === 'translate') return <BlancTranslatePanel />;
   if (tool === 'music') return <BlancMusicPanel />;

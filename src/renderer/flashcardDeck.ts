@@ -43,6 +43,7 @@ interface FlashcardDeckStore {
 
 import { IDB_KEYS, mirrorToIdb } from './storage/storage';
 import { emitCompanionEvent } from './environment/companionEvents';
+import { logBlanc } from './blancConsole';
 
 const KEY = 'jp-flashcard-deck';
 const EVENT = 'flashcard-deck-changed';
@@ -126,6 +127,15 @@ export function addDeckCards(entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[]): 
   }
   store.cards = [...created, ...store.cards];
   writeStore(store);
+  // Pillar 5: every deck write is traceable. This is the "where did that card
+  // go" question the console exists to answer, so it records the destination
+  // folders and sources rather than just a count.
+  logBlanc('info', 'deck', `Added ${created.length} card${created.length === 1 ? '' : 's'} to the local deck`, {
+    folders: [...new Set(created.map((c) => c.folder ?? '(unfiled)'))],
+    sources: [...new Set(created.map((c) => c.source))],
+    words: created.slice(0, 5).map((c) => c.word),
+    deckSize: store.cards.length,
+  });
   return store.cards;
 }
 

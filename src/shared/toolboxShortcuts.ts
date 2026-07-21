@@ -304,6 +304,18 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     editable: true,
   },
   {
+    id: 'toolbox.openDevConsole',
+    name: 'Open Developer Console',
+    description: 'Open the Blanc event log.',
+    category: 'System',
+    feature: 'dev-console',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
+  },
+  {
     id: 'toolbox.openPitchAccent',
     name: 'Open Pitch Accent',
     description: 'Look up a word’s pitch-accent contour.',

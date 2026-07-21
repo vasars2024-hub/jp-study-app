@@ -26,6 +26,7 @@ import { applyBlancModeClass } from './blancMode';
 import { bootTheme, onThemeChanged } from './theme';
 import { initProfileState } from './profileState';
 import { installKeyboardShortcuts } from './keyboardShortcuts';
+import { installBlancConsoleCapture } from './blancConsole';
 import { installNotificationCapture } from './notificationStore';
 import { clearOnExitIfConfigured } from './clipboardHistory';
 import { markLockscreenUnlocked, shouldShowLockscreen } from './lockscreenSettings';
@@ -85,6 +86,7 @@ if (typeof MutationObserver !== 'undefined') {
 applyBlancModeClass();
 applyLangAttribute();
 installNotificationCapture();
+installBlancConsoleCapture();
 installKeyboardShortcuts();
 // BlancDeckPanel reads the active profile's Anki deck name.
 void initProfileState().catch((err) => console.error('[profileState] init failed:', err));

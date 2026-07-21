@@ -32,6 +32,22 @@ import {
 } from '../../../shared/japaneseNumbers';
 import { speak } from '../../tts';
 import {
+  CONSOLE_CATEGORIES,
+  atLeastLevel,
+  countByLevel,
+  detailToText,
+  filterEntries,
+  formatEntriesForReport,
+  type ConsoleCategory,
+  type ConsoleLevel,
+} from '../../../shared/blancConsole';
+import {
+  clearBlancConsole,
+  getBlancConsole,
+  getBlancConsoleDropped,
+  onBlancConsoleChanged,
+} from '../../blancConsole';
+import {
   PITCH_PATTERN_LABELS,
   isPitchLookup,
   moraPitch,
@@ -855,6 +871,142 @@ export function BlancPitchPanel() {
             for odaka it lands on the following particle, so the word alone sounds flat.
           </p>
         ) : null}
+      </fieldset>
+    </div>
+  );
+}
+
+const CONSOLE_LEVEL_ORDER: ConsoleLevel[] = ['debug', 'info', 'warn', 'error'];
+
+/**
+ * Pillar 5 — developer console.
+ *
+ * The detail surface the notification centre is not: append-only, structured,
+ * 2,000 entries rather than 100, filterable by category and level, searchable
+ * across the serialised payload, and copyable as plain text for a bug report.
+ *
+ * Session-only by design (see renderer/blancConsole.ts) — persisting mined words
+ * and IPC payloads to disk is not something the log should decide to do.
+ */
+export function BlancConsolePanel() {
+  const [, forceRender] = useState(0);
+  const [query, setQuery] = useState('');
+  const [minLevel, setMinLevel] = useState<ConsoleLevel>('debug');
+  const [category, setCategory] = useState<ConsoleCategory | 'all'>('all');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => onBlancConsoleChanged(() => forceRender((n) => n + 1)), []);
+
+  const all = getBlancConsole();
+  const shown = useMemo(() => {
+    const byFilter = filterEntries(all, {
+      query,
+      categories: category === 'all' ? undefined : [category],
+    });
+    return byFilter.filter((e) => atLeastLevel(e, minLevel));
+  }, [all, query, category, minLevel]);
+  const counts = useMemo(() => countByLevel(all), [all]);
+  const dropped = getBlancConsoleDropped();
+
+  const copyReport = useCallback(() => {
+    void navigator.clipboard.writeText(formatEntriesForReport(shown)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [shown]);
+
+  return (
+    <div className="blanc-tool-detail blanc-console">
+      <fieldset>
+        <legend>Filter</legend>
+        <div className="blanc-command-row">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search messages and payloads…"
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery('')}>Clear</button>
+          )}
+        </div>
+        <div className="blanc-segmented blanc-segmented-wrap">
+          <button
+            type="button"
+            className={category === 'all' ? 'active' : ''}
+            onClick={() => setCategory('all')}
+          >
+            All
+          </button>
+          {CONSOLE_CATEGORIES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={category === c ? 'active' : ''}
+              onClick={() => setCategory(c)}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+        <div className="blanc-segmented">
+          {CONSOLE_LEVEL_ORDER.map((level) => (
+            <button
+              key={level}
+              type="button"
+              className={minLevel === level ? 'active' : ''}
+              onClick={() => setMinLevel(level)}
+            >
+              {level}+
+            </button>
+          ))}
+        </div>
+        <div className="blanc-status-row">
+          <span>{shown.length} of {all.length} entries</span>
+          <span>{counts.error} errors · {counts.warn} warnings</span>
+          {dropped > 0 && (
+            // Honest cap, same contract as toolboxFileSearch's truncation.
+            <span className="blanc-warning">{dropped} older entries dropped</span>
+          )}
+          <button type="button" disabled={!shown.length} onClick={copyReport}>
+            {copied ? 'Copied' : 'Copy for report'}
+          </button>
+          <button type="button" disabled={!all.length} onClick={clearBlancConsole}>
+            Clear
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Events</legend>
+        {shown.length ? (
+          <ol className="blanc-console-list">
+            {shown.map((entry) => (
+              <li key={entry.id} className={`blanc-console-entry level-${entry.level}`}>
+                <span className="blanc-console-time">
+                  {new Date(entry.at).toLocaleTimeString()}
+                </span>
+                <span className={`blanc-console-level level-${entry.level}`}>{entry.level}</span>
+                <span className="blanc-console-cat">{entry.category}</span>
+                <span className="blanc-console-msg">
+                  {entry.message}
+                  {entry.correlationId && (
+                    <span className="blanc-console-corr">{entry.correlationId}</span>
+                  )}
+                  {entry.detail !== undefined && (
+                    <span className="blanc-console-detail">{detailToText(entry.detail)}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="blanc-note">
+            {all.length
+              ? 'No entries match the filter.'
+              : 'Nothing logged yet this session. Mining, deck writes, toasts, and renderer errors appear here.'}
+          </p>
+        )}
       </fieldset>
     </div>
   );
