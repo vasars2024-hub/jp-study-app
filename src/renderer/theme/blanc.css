@@ -1202,6 +1202,65 @@ body {
   color: var(--blanc-text);
 }
 
+/* Audio transcribe-and-mine (study-native track item 6). */
+.blanc-audio-file {
+  color: var(--blanc-muted);
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 26ch;
+}
+
+.blanc-audio-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  color: var(--blanc-muted);
+  font-size: 0.9em;
+}
+
+.blanc-audio-progress progress {
+  flex: 1;
+  height: 6px;
+}
+
+.blanc-audio-cues {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 48vh;
+  overflow-y: auto;
+}
+
+.blanc-audio-cue {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.blanc-audio-cue:hover {
+  background: var(--blanc-hover);
+}
+
+.blanc-audio-time {
+  color: var(--blanc-faint);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8em;
+  white-space: nowrap;
+}
+
+.blanc-audio-line {
+  line-height: 1.7;
+}
+
 /* Review forecast (study-native track item 7). */
 .blanc-forecast-chart {
   display: grid;

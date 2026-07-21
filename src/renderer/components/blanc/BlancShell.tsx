@@ -184,6 +184,9 @@ const BlancPitchPanel = lazy(() =>
 const BlancConsolePanel = lazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancConsolePanel })),
 );
+const BlancAudioMinePanel = lazy(() =>
+  import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancAudioMinePanel })),
+);
 
 const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
   read: { label: 'Read', icon: 'library' },
@@ -873,6 +876,7 @@ type BlancToolId =
   | 'review-forecast'
   | 'pitch-accent'
   | 'dev-console'
+  | 'audio-mine'
 >;
 
 
@@ -901,6 +905,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
   'review-forecast',
   'pitch-accent',
   'dev-console',
+  'audio-mine',
   'coverage',
   'notebook',
   'translate',
@@ -943,6 +948,7 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   'review-forecast': 'stats',
   'pitch-accent': 'music',
   'dev-console': 'wrench',
+  'audio-mine': 'caption',
   coverage: 'stats',
   notebook: 'note',
   translate: 'globe',
@@ -1003,6 +1009,7 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
   'counter-reader': { category: 'language', description: 'Numbers, counters, dates, and clock times to kana — 3本 → さんぼん, with audio.' },
   'dev-console': { category: 'system', description: 'Append-only event log — mining, deck writes, toasts, and errors, with copy-for-report.' },
   'pitch-accent': { category: 'language', description: 'Pitch-accent contour for a word, with the pattern named and spoken aloud.' },
+  'audio-mine': { category: 'language', description: 'Transcribe a local audio or video file with Whisper, then click any word to look it up and mine it.' },
   'review-forecast': { category: 'language', description: 'Week-ahead review load from Anki, plus local backlog and knowledge bands — read-only.' },
   'conjugation-drill': { category: 'language', description: 'Drill ます, て, た, potential, passive, causative and more across all verb classes.' },
   coverage: { category: 'system', description: 'Implementation map and remaining toolbox adapters.' },
@@ -1102,6 +1109,7 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'review-forecast') return <BlancForecastPanel />;
   if (tool === 'pitch-accent') return <BlancPitchPanel />;
   if (tool === 'dev-console') return <BlancConsolePanel />;
+  if (tool === 'audio-mine') return <BlancAudioMinePanel />;
   if (tool === 'notebook') return <BlancNotebookPanel />;
   if (tool === 'translate') return <BlancTranslatePanel />;
   if (tool === 'music') return <BlancMusicPanel />;

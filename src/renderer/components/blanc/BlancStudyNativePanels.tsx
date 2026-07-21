@@ -16,7 +16,7 @@
  * the whole surface if Blanc ever becomes primary, explicitly not piecemeal. So
  * these strings are plain English, matching every other Blanc panel.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   alignFurigana,
   segmentsToBrackets,
@@ -45,6 +45,8 @@ import {
   clearBlancConsole,
   getBlancConsole,
   getBlancConsoleDropped,
+  logBlanc,
+  newCorrelationId,
   onBlancConsoleChanged,
 } from '../../blancConsole';
 import {
@@ -74,6 +76,20 @@ import {
   type ConjugationForm,
   type WordClass,
 } from '../../../shared/conjugate';
+import SubtitleCueLine from '../SubtitleCueLine';
+import { useWhisperTranscribe, type TranscribeCue } from '../../useWhisperTranscribe';
+import {
+  loadWhisperDevice,
+  loadWhisperModelTier,
+  onWhisperDeviceChanged,
+  onWhisperModelChanged,
+  type WhisperDevice,
+  type WhisperModelTier,
+} from '../../whisperSettings';
+import { whisperSpec } from '../../../shared/whisperModels';
+import { formatBytes } from '../../../shared/assetRegistry';
+import { isDownloadedIn, loadDownloaded, onDownloadedChanged } from '../../whisperModelCache';
+import { getStudyLang, onStudyLangChanged } from '../../studyEnvironment';
 
 type FuriganaFormat = 'ruby' | 'brackets' | 'kana';
 
@@ -1006,6 +1022,239 @@ export function BlancConsolePanel() {
               ? 'No entries match the filter.'
               : 'Nothing logged yet this session. Mining, deck writes, toasts, and renderer errors appear here.'}
           </p>
+        )}
+      </fieldset>
+    </div>
+  );
+}
+
+const WHISPER_TIER_LABELS: Record<WhisperModelTier, string> = {
+  'whisper-base': 'Whisper Base',
+  'whisper-small': 'Whisper Small',
+  'kotoba-whisper': 'Kotoba-Whisper v2',
+  'whisper-large-v3-turbo': 'Whisper Large v3 Turbo',
+};
+
+/** m:ss for a cue start, so the transcript reads like subtitles. */
+function formatCueClock(sec: number): string {
+  const total = Number.isFinite(sec) && sec > 0 ? Math.floor(sec) : 0;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Study-native item 6 — Audio transcribe-and-mine.
+ *
+ * Reuses the media player's Whisper path end to end (the `media:extractAudio`
+ * IPC → `whisperWorker` → the shared `whisperModelCache`) through
+ * `useWhisperTranscribe`, so there is no second transcription stack and no
+ * second downloader. Cues render as `SubtitleCueLine`, which makes every
+ * morpheme a click target for the app-wide `GlobalDictionaryOverlay` — that is
+ * the mine path, shared verbatim with the readers and the player, and each mined
+ * card is already traced by the Pillar 5 console via the toast bus. The
+ * transcription lifecycle is logged here too, so a failed extract or a silent
+ * model download is visible in the console rather than only on screen.
+ *
+ * Honest model state: the tier is not gated behind a download — the worker
+ * streams it on first use — but the panel says plainly when a tier is not yet
+ * cached and points at Settings → Transcription rather than implying it is
+ * instant. Model, device, and study language are read from the shared settings,
+ * not duplicated here, per the plan's "do not add a second downloader".
+ */
+export function BlancAudioMinePanel() {
+  const transcription = useWhisperTranscribe();
+  const [fileName, setFileName] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [lang, setLang] = useState<'ja' | 'zh'>(() => getStudyLang());
+  const [tier, setTier] = useState<WhisperModelTier>(() => loadWhisperModelTier(getStudyLang()));
+  const [device, setDevice] = useState<WhisperDevice>(() => loadWhisperDevice());
+  const [downloaded, setDownloaded] = useState(() => loadDownloaded());
+  const [furigana, setFurigana] = useState(true);
+  const [pickError, setPickError] = useState('');
+  const corrRef = useRef('');
+
+  const { state, cues, device: ranOn, progress, download, error } = transcription;
+  const busy = state === 'extracting' || state === 'loading' || state === 'transcribing';
+
+  // Model, device, download record, and study language are all shared settings —
+  // reflect changes made elsewhere (Settings → Transcription) rather than
+  // snapshotting them at mount.
+  useEffect(() => onWhisperModelChanged(setTier), []);
+  useEffect(() => onWhisperDeviceChanged(setDevice), []);
+  useEffect(() => onDownloadedChanged(setDownloaded), []);
+  useEffect(
+    () =>
+      onStudyLangChanged((next) => {
+        // Never retarget an in-flight job; only follow the study language while idle.
+        if (busy) return;
+        setLang(next);
+        setTier(loadWhisperModelTier(next));
+      }),
+    [busy],
+  );
+
+  const spec = whisperSpec(tier);
+  const modelReady = isDownloadedIn(downloaded, tier, device);
+
+  const pickFile = useCallback(async () => {
+    setPickError('');
+    try {
+      const r = await window.api.pickMedia();
+      if (!r) return; // user cancelled the native dialog
+      setFileName(r.item.title || r.item.fileName || 'Selected file');
+      setFileUrl(r.url);
+      transcription.reset();
+      corrRef.current = '';
+    } catch (e) {
+      setPickError(e instanceof Error ? e.message : String(e));
+    }
+  }, [transcription]);
+
+  const transcribe = useCallback(() => {
+    if (!fileUrl) return;
+    corrRef.current = newCorrelationId('audio-mine');
+    logBlanc('info', 'import', `Transcribing "${fileName}"`, { model: tier, device, lang }, corrRef.current);
+    transcription.run(fileUrl, { tier, device, lang });
+  }, [fileUrl, fileName, tier, device, lang, transcription]);
+
+  // Log the terminal states so a silent failure or a finished transcript is
+  // visible in the developer console — the same instrumentation contract as
+  // EPUB mining, reached here through the shared console rather than main hooks.
+  useEffect(() => {
+    if (!corrRef.current) return;
+    if (state === 'done') {
+      logBlanc('info', 'import', `Transcript ready — ${cues.length} lines from "${fileName}"`, { device: ranOn }, corrRef.current);
+    } else if (state === 'error') {
+      logBlanc('error', 'import', `Transcription failed for "${fileName}"`, { detail: error }, corrRef.current);
+    }
+    // Intentionally keyed to `state` alone: this fires on transitions, and the
+    // other values read here are current at each transition. (The project does
+    // not run react-hooks/exhaustive-deps, so there is no directive to add.)
+  }, [state]);
+
+  const statusLine = (() => {
+    switch (state) {
+      case 'extracting':
+        return 'Extracting audio…';
+      case 'loading':
+        return download ? `Downloading ${download.file} — ${download.percent}%` : 'Loading model…';
+      case 'transcribing':
+        return `Transcribing on ${ranOn === 'webgpu' ? 'GPU' : 'CPU'} — ${Math.round(progress * 100)}%`;
+      default:
+        return '';
+    }
+  })();
+
+  return (
+    <div className="blanc-tool-detail blanc-audio-mine">
+      <fieldset>
+        <legend>Source</legend>
+        <p className="blanc-note">
+          Pick a local audio or video file. It is transcribed on this machine with Whisper —
+          nothing is uploaded. Then click any word in a line to look it up and mine it to your deck.
+        </p>
+        <div className="blanc-command-row">
+          <button type="button" onClick={pickFile} disabled={busy}>
+            {fileName ? 'Change file' : 'Choose file…'}
+          </button>
+          {fileName && (
+            <span className="blanc-audio-file" lang="ja" title={fileName}>
+              {fileName}
+            </span>
+          )}
+        </div>
+        {pickError && <p className="blanc-warning">{pickError}</p>}
+        <div className="blanc-status-row">
+          <span>Language</span>
+          {(['ja', 'zh'] as const).map((l) => (
+            <button
+              key={l}
+              type="button"
+              className={lang === l ? 'active' : ''}
+              aria-pressed={lang === l}
+              disabled={busy}
+              onClick={() => setLang(l)}
+            >
+              {l === 'ja' ? 'Japanese' : 'Chinese'}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Model</legend>
+        <p className="blanc-note">
+          {WHISPER_TIER_LABELS[tier]} ({formatBytes(spec.sizeBytes)}) on{' '}
+          {device === 'cpu' ? 'CPU' : 'auto — GPU when available'}. Model and device follow your
+          Transcription settings.
+        </p>
+        {modelReady ? (
+          <p className="blanc-note">Downloaded — runs fully offline.</p>
+        ) : (
+          <p className="blanc-warning">
+            Not downloaded yet. The first run streams about {formatBytes(spec.sizeBytes)} — keep this
+            window open until it finishes. You can pre-download it in Settings → Transcription.
+          </p>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Transcript</legend>
+        <div className="blanc-command-row">
+          <button type="button" onClick={transcribe} disabled={!fileUrl || busy}>
+            Transcribe
+          </button>
+          {busy && (
+            <button type="button" onClick={transcription.cancel}>
+              Stop
+            </button>
+          )}
+          {!busy && (cues.length > 0 || state === 'done' || state === 'error') && (
+            <button type="button" onClick={transcription.reset}>
+              Clear
+            </button>
+          )}
+          <label className="blanc-checkbox">
+            <input type="checkbox" checked={furigana} onChange={(e) => setFurigana(e.target.checked)} />
+            Furigana
+          </label>
+        </div>
+
+        {busy && (
+          <div className="blanc-audio-progress">
+            <span>{statusLine}</span>
+            <progress max={1} value={state === 'transcribing' ? progress : undefined} />
+          </div>
+        )}
+        {state === 'error' && <p className="blanc-warning">{error}</p>}
+
+        {cues.length > 0 ? (
+          <>
+            <ol className="blanc-audio-cues">
+              {cues.map((cue: TranscribeCue, i) => (
+                <li key={`${i}-${cue.start}`} className="blanc-audio-cue">
+                  <span className="blanc-audio-time">{formatCueClock(cue.start)}</span>
+                  <SubtitleCueLine text={cue.text} furigana={furigana} className="blanc-audio-line" />
+                </li>
+              ))}
+            </ol>
+            {state === 'done' && (
+              <p className="blanc-note">
+                {cues.length} lines. Click a word to look it up, then mine it from the popup — mined
+                cards appear in the developer console.
+              </p>
+            )}
+          </>
+        ) : (
+          !busy &&
+          state !== 'error' && (
+            <p className="blanc-note">
+              {fileUrl
+                ? 'Press Transcribe to generate lines from this file.'
+                : 'Choose a file to get started.'}
+            </p>
+          )
         )}
       </fieldset>
     </div>

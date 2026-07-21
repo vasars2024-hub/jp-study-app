@@ -316,6 +316,18 @@ export const TOOLBOX_SHORTCUT_COMMANDS: ToolboxShortcutCommand[] = [
     editable: true,
   },
   {
+    id: 'toolbox.openAudioMine',
+    name: 'Open Audio Transcribe & Mine',
+    description: 'Transcribe a local audio or video file and mine lines to your deck.',
+    category: 'Language',
+    feature: 'audio-mine',
+    defaultShortcut: '',
+    scope: 'toolbox',
+    global: false,
+    worksWhileTyping: false,
+    editable: true,
+  },
+  {
     id: 'toolbox.openPitchAccent',
     name: 'Open Pitch Accent',
     description: 'Look up a word’s pitch-accent contour.',

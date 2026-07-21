@@ -134,11 +134,60 @@ Created 2026-07-20. Supersedes the "Blanc Toolbox module build-out" track in `TA
   types and the action map, not by observation. Same caveat as the `anki` panel
   on 2026-07-20.
 
-  **Remaining study-native items: 2 (pitch accent) and 6 (audio
-  transcribe-and-mine).** Neither is self-contained like 3/4/5 were: item 2 gates
-  on the downloadable `kanjium-accent` asset, item 6 on the Whisper model cache.
-  Both need a real "not installed" state, which is the bulk of the work — budget
-  for that rather than assuming another pure-logic session.
+  **Study-native track complete (item 6 shipped 2026-07-22).** Item 2 (pitch
+  accent) shipped in a later session as `BlancPitchPanel`; item 6 (audio
+  transcribe-and-mine) is described in its own entry below. Both carried the
+  predicted "not installed" state as the bulk of the work — pitch gates on the
+  `kanjium-accent` asset, audio-mine on the Whisper model cache.
+
+- **Study-native item 6 — audio transcribe-and-mine shipped (2026-07-22).** New
+  Blanc panel `BlancAudioMinePanel` (tool id `audio-mine`) plus a reusable
+  renderer hook `useWhisperTranscribe.ts`. It reuses the **media player's**
+  Whisper path end to end rather than standing up a second transcription stack:
+  `window.api.pickMedia()` mints the token, the existing `media:extractAudio` IPC
+  decodes to PCM, `whisperWorker.ts` transcribes in the renderer, and the shared
+  `whisperModelCache` records the tier — so this tool and the Settings
+  "Transcription models" section agree on what is cached, and there is no second
+  downloader. **No new IPC and no preload/`window.d.ts` change** — the whole
+  intake rides existing surfaces, which is what let it land disjoint from the
+  concurrent OCR working tree.
+
+  Cues render as `SubtitleCueLine`, which makes every morpheme a click target for
+  the app-wide `GlobalDictionaryOverlay`. That is the mine path, shared verbatim
+  with the readers, the player, and immersion — the tool adds no mining code of
+  its own, and each mined card is already traced by the Pillar 5 console through
+  the toast bus. The transcription lifecycle (transcribe start, terminal
+  success/failure) is logged under the `import` category with a correlation id,
+  so a failed extract or a silent model download is visible in the console rather
+  than only on screen.
+
+  Honest model state: the tier is **not** gated behind a pre-download — the
+  worker streams it on first use — but the Model fieldset says plainly when a
+  tier is not cached (e.g. "Not downloaded yet. The first run streams about
+  305 MB…") and points at Settings → Transcription instead of implying it is
+  instant. Model, device, and study language are read from the shared settings,
+  not duplicated.
+
+  **Verified live** in `blanc-harness.html`: 0 `.ui-app-chrome`, exactly one
+  `.blanc-tool-detail.blanc-audio-mine`, the three fieldsets, the JA/ZH toggle
+  (Japanese active by default), Transcribe disabled until a file is chosen, and
+  the not-cached model warning. Opened both from the launcher click and the
+  `toolbox:open-tool` command path; the tool appears in the launcher and Recent.
+  **Not verified live:** the actual extract → transcribe → mine chain, which needs
+  a real media file and a downloaded model that the stubbed harness cannot
+  provide. It rests on the media player's already-proven Whisper path and the
+  shared mine overlay, covered by the build and the shared worker rather than by
+  observation here — the same caveat class as the forecast panel's live Anki
+  query.
+
+  **Budget note:** `blanc-budget.cjs` reports Blanc boot over its 916,114-byte
+  budget, but the regression is pre-existing — a baseline build with this change
+  reverted (and the concurrent OCR/lens working-tree changes present) is already
+  935,984 bytes, ~19 KB over. This tool adds ~2.6 KB, all of it either
+  lazy-split (the panel chunk is absent from the eager set) or unavoidable
+  registration metadata and CSS, consistent with every prior study-native tool.
+  The budget should be re-recorded on a clean tree once the concurrent work
+  settles, not bumped under this change.
 
   One CSS fix found only by rendering it: ruby was styled `--blanc-accent`, which
   under the neutral macOS palette is `#e6e6ea` against `--blanc-text` `#f5f5f7` —
@@ -458,8 +507,9 @@ and the budget was re-recorded downward twice.*
   plus `aiMiningCatalog.ts` (30 KB) still eager in boot. Pillars 1's two big
   items (the i18n catalog and the Study OS stylesheet) are **done**: Blanc boot
   went 1.96 MB → 0.90 MB this session.
-- **Pillars 3–8** in full, and **study-native items 2 and 6** (items 1, 3, 4, 5
-  and 7 have shipped).
+- **Pillars 3–8** in full. **The study-native toolbox track is complete** —
+  items 1, 3, 4, 5 and 7 shipped earlier; item 2 (pitch accent) and item 6
+  (audio transcribe-and-mine) landed after this section was first written.
 - **Pillar 2 parity: done.** `node tools/blanc-drift.cjs` reports **0 pending**
   and exits 0. There is no parity gap list any more; the drift script's value from
   here is as an *alarm* — a brand-new Study OS view shows up as unclassified on the
@@ -470,11 +520,12 @@ and the budget was re-recorded downward twice.*
   OS view to compose it, build the Blanc panel, register a Blanc-only tool id if
   the surface has no tab, update `blanc-coverage.json`, verify live.
 
-  **Next session should start from the study-native toolbox track (items 2–7)** —
-  it is the highest-priority remaining track in `/update-blanc`'s ordering now that
-  Pillar 0 violations, tab bail-outs, and Pillar 2 ports are all clear. Item 2
-  (pitch accent) and item 3 (furigana generator) are the cheapest, and both sit on
-  infrastructure the app has already paid for.
+  **The study-native toolbox track is now fully shipped (items 1–7).** With
+  Pillar 0 violations, tab bail-outs, Pillar 2 ports, and the study-native track
+  all clear, `/update-blanc`'s ordering points next at **Pillar 1 item 4**
+  (virtualize long lists; `aiMiningCatalog.ts` still eager in boot) and then the
+  large product-judgement tracks **Pillar 3 (App Drawer)** and **Pillar 6 (master
+  search)** — ask the user for scope on those rather than guessing.
 - Doc debt below is still open.
 
 **Verification note — CLOSED 2026-07-21.** `main.ts`'s `blancUrl()` is confirmed

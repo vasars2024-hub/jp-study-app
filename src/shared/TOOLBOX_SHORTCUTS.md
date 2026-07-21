@@ -27,6 +27,7 @@ This document is intentionally stored under `src/` so it follows the project rul
 | `toolbox.openQuickNotes` | Open Quick Notes | Open the Blanc-local quick notes surface. | quick-notes | Alt+6 | toolbox | Yes |
 | `toolbox.openClipboard` | Open Clipboard | Open the shared clipboard history tool. | clipboard | Alt+7 | toolbox | Yes |
 | `toolbox.openDevConsole` | Open Developer Console | Open the Blanc event log. | dev-console | Unbound | toolbox | Yes |
+| `toolbox.openAudioMine` | Open Audio Transcribe & Mine | Transcribe a local audio or video file and mine lines to your deck. | audio-mine | Unbound | toolbox | Yes |
 | `toolbox.openPitchAccent` | Open Pitch Accent | Look up a word’s pitch-accent contour. | pitch-accent | Unbound | toolbox | Yes |
 | `toolbox.openReviewForecast` | Open Review Forecast | Open the read-only review load forecast. | review-forecast | Unbound | toolbox | Yes |
 | `toolbox.openConjugationDrill` | Open Conjugation Drill | Open the verb and adjective conjugation drill. | conjugation-drill | Unbound | toolbox | Yes |

@@ -100,7 +100,8 @@ export type ToolboxModuleId =
   | 'conjugation-drill'
   | 'review-forecast'
   | 'pitch-accent'
-  | 'dev-console';
+  | 'dev-console'
+  | 'audio-mine';
 
 export type ToolboxModuleCategory =
   | 'study'
@@ -608,6 +609,32 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     },
     migrationNotes:
       'Pillar 5. Blanc-only. Mining and Anki instrumentation currently comes via the toast buses; direct main-process hooks are still to be added.',
+  },
+  {
+    id: 'audio-mine',
+    label: 'Audio Transcribe & Mine',
+    category: 'media',
+    status: 'ready',
+    capabilities: ['media', 'dictionary', 'japanese-analysis', 'flashcards'],
+    permissions: ['file-read', 'anki-connect'],
+    launchContexts: BLANC_READY_CONTEXTS,
+    supportsBackground: false,
+    appearsInBlanc: true,
+    appearsInNormalOs: false,
+    supportsGlobalShortcut: false,
+    supportsAutomation: false,
+    acceptsExternalInput: false,
+    aiRequired: false,
+    localOnlyCapable: true,
+    implementation:
+      'Blanc panel over the media player’s existing Whisper path: the media:extractAudio IPC decodes a picked file to PCM, whisperWorker.ts transcribes it in the renderer, and the shared whisperModelCache records the tier. Cues render as SubtitleCueLine, so the app-wide GlobalDictionaryOverlay supplies click-to-look-up and mine — no second transcription stack, downloader, or mine path.',
+    externalAdapter: {
+      strategy: 'existing-service',
+      notes:
+        'Reuses the installed Whisper model cache and Transcription settings. The model streams on first use; the panel reports a not-yet-cached tier honestly and points at Settings → Transcription rather than pretending it is instant.',
+    },
+    migrationNotes:
+      'Study-native track item 6. Blanc-only: Study OS transcribes inside the Media/Video tab, and this is the dedicated file-in, transcript-out, mine-a-line surface. Mining and transcription lifecycle are traced by the Pillar 5 console.',
   },
   {
     id: 'pitch-accent',
