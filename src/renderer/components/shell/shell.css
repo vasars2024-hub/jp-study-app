@@ -830,6 +830,142 @@ html.reduce-motion .fwin .fwin-b {
   transition: none !important;
 }
 
+/* ---- P2.2 taskbar ---------------------------------------------------------
+   Baseline problems this addresses:
+     - `.os-start-btn` carried `border: 1px solid var(--accent)` while IDLE and
+       a `0 2px 12px rgba(255,46,77,.25)` glow on hover/active. Phase 1's accent
+       classification flagged this idle border as one of the few genuinely
+       decorative accent uses left in the shell layer, deferred to Phase 2.
+     - `.os-task-win.active` and `.os-desktop-switch.active` each stacked TWO
+       accent cues (border-color + inset underline).
+     - every control was a 1px-bordered box, so the bar read as a row of chips.
+   Now: controls are borderless and quiet by default, hover is a soft neutral
+   wash, and the ACTIVE state is a single restrained cue — a raised surface plus
+   a short accent underline. Accent survives only as that active indicator.
+   -------------------------------------------------------------------------- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) {
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+
+/* Shared quiet-control base for every taskbar affordance. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win {
+  position: relative;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  box-shadow: none;
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn:hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch:hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+  box-shadow: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn:focus-visible,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch:focus-visible,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win:focus-visible,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+
+/* Start: brand mark stays red, the button chrome does not. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn {
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text);
+  padding: 0 var(--space-md) 0 var(--space-sm);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn.active {
+  background: color-mix(in srgb, var(--text) 13%, transparent);
+  color: var(--text);
+}
+
+/* Single active cue: raised surface + a short centered accent underline. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win.active,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch.active {
+  background: color-mix(in srgb, var(--text) 11%, transparent);
+  color: var(--text);
+  border-color: transparent;
+  box-shadow: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win.active::after,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 16px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Minimized windows read as dimmer rather than half-transparent chrome. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win.min {
+  opacity: 1;
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+}
+
+/* RESPONSIVENESS FIX (§8: "no primary control clips or becomes inaccessible"
+   at ~940x600). Baseline `.os-task-win` was `flex-shrink: 0` inside a
+   `overflow-x: auto` strip with a hidden scrollbar: at 940px wide the measured
+   strip was clientWidth 290 / scrollWidth 438, so the 4th task button sat at
+   x=614 past the strip's 561 edge — scrolled out of reach behind the tray with
+   no visible scrollbar to reveal it. Letting the buttons shrink keeps every
+   task reachable; the existing span ellipsis handles the truncation and the
+   icon floor keeps them identifiable. Scrolling still works if enough windows
+   are open to exhaust even the floor. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win {
+  flex: 0 1 auto;
+  min-width: 44px;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+}
+
+/* Group apps vs system tray with a hairline rather than relying on gap alone. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray {
+  gap: var(--space-2xs);
+  padding-left: var(--space-sm);
+  margin-left: var(--space-2xs);
+  border-left: 1px solid var(--border);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray-btn:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+}
+/* Clock: balanced against the tray icons instead of crowding the edge. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-clock {
+  padding: 0 var(--space-2xs) 0 var(--space-sm);
+  color: var(--text);
+}
+
+html.reduce-motion .os-taskbar .os-start-btn,
+html.reduce-motion .os-taskbar .os-desktop-switch,
+html.reduce-motion .os-taskbar .os-task-win,
+html.reduce-motion .os-taskbar .os-tray-btn {
+  transition: none !important;
+}
+
 html.secret-lifecycle-suspended .os-env-stack,
 html.secret-lifecycle-suspended .os-wall-visualizer,
 html.secret-lifecycle-suspended .os-weather {
