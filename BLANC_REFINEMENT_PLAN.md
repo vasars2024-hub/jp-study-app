@@ -105,8 +105,39 @@ Created 2026-07-20. Supersedes the "Blanc Toolbox module build-out" track in `TA
   barrel. **Not verified:** the Study OS `FlashcardsView` render (window was closed).
 
 **Stream A (Media & Cards) is complete** — `player`, `video`, and `flashcards`
-are all Blanc-native. Remaining pending surfaces (`novels`, `games`, `visualizer`,
-`immersion`) all belong to Stream B.
+are all Blanc-native.
+
+- **Stream B (Library & Arcade) verified and flipped (2026-07-21, coordinator).**
+  All four surfaces were found already built and correctly shaped — `lazy()` in
+  `BlancShell.tsx`, composing `NovelsContent` / `GameArenaContent` /
+  `ImmersionContent` / `VisualizerContent`, with the Study OS views rewired to the
+  same modules (`NovelsView` 1004 → 119, `GameArenaView` 1053 → 8, `ImmersionView`
+  1027 → 330). They were still marked `pending` because the split reserves flag
+  flips for the coordinator, after verification. **Now verified live in the running
+  Blanc window** (`blanc.html?blanc=1`), each asserting `.ui-app-chrome === 0` with
+  exactly one `.blanc-tool-detail`:
+  - `novels` — 208 titles, three-pane `jiten-workbench`, real rows (`button.jiten-row`,
+    not `<tr>`).
+  - `games` — arena with 13 games, XP/streak/badges.
+  - `visualizer` — live canvas stage + Style/React-to/Colors controls.
+  - `immersion` — toolbar, sites rail, Reader mode, **and Live mode mounting a real
+    `<webview>` guest**. That resolves the open caveat in `BlancImmersionPanel`'s
+    docstring: `<webview>` *is* enabled in the Blanc window, so Live mode is not
+    conditional.
+
+  `blanc-coverage.json` now reports **zero pending surfaces** and
+  `tools/blanc-drift.cjs` exits 0 with "Blanc covers every classified Study OS
+  surface." **Pillar 2 parity is complete.** 952 tests green across 95 files.
+
+  Side effect, disclosed: verifying immersion Live mode loaded NHK Easy in the
+  guest, which increments that site's visit count in immersion history (65 → 66).
+  Real user data, left as-is — reverting a visit counter is more invasive than the
+  increment.
+
+**Verified incidentally:** `main.ts`'s `blancUrl()` — the running Blanc window is
+served from `http://localhost:5173/blanc.html?blanc=1`, the dedicated entry, not
+the `index.html?blanc=1` fallback. The verification note at the end of this Status
+section is therefore closed.
 
 ### Budget: gate is RED and deliberately left red
 
@@ -134,36 +165,40 @@ Silencing an unexplained regression is exactly what this gate exists to prevent.
 **Not done — the remaining work-list:**
 
 - **Pillar 1 item 4** (virtualize long lists).
-- **Pillars 2–8** in full, and **study-native items 2–7**.
-- Run `node tools/blanc-drift.cjs` for the live gap list (**7 pending**). The
-  remaining work, with the source size that sets its cost:
+- **Pillars 3–8** in full, and **study-native items 2–7**.
+- **Pillar 2 parity: done.** `node tools/blanc-drift.cjs` reports **0 pending**
+  and exits 0. There is no parity gap list any more; the drift script's value from
+  here is as an *alarm* — a brand-new Study OS view shows up as unclassified on the
+  next run.
 
-  All remaining pending surfaces belong to **Stream B (Library & Arcade)**:
-
-  | Surface | Study OS view | Lines |
-  |---|---|---|
-  | `novels` | `NovelsView` | 1004 |
-  | `games` | `GameArenaView` | 1053 |
-  | `immersion` | `ImmersionView` | 1027 |
-  | `visualizer` | `VisualizerWidget` (a widget, **not** a `*View`) | — |
-
-  Note: at last check Stream B had already registered tool ids for all four in
-  `BlancShell.tsx` (drift reports 33 Blanc tools) and shipped `VisualizerContent.tsx`
-  + `BlancVisualizerPanel`, but the manifest still lists them `pending` — the
-  coordinator flips those flags only after verifying each, per the split rules.
-
-  The established recipe, unchanged for each:
+  The established recipe is retained for when that happens:
   extract a `*Content.tsx` (hook + presentation-neutral blocks), rewire the Study
   OS view to compose it, build the Blanc panel, register a Blanc-only tool id if
   the surface has no tab, update `blanc-coverage.json`, verify live.
+
+  **Next session should start from the study-native toolbox track (items 2–7)** —
+  it is the highest-priority remaining track in `/update-blanc`'s ordering now that
+  Pillar 0 violations, tab bail-outs, and Pillar 2 ports are all clear. Item 2
+  (pitch accent) and item 3 (furigana generator) are the cheapest, and both sit on
+  infrastructure the app has already paid for.
 - Doc debt below is still open.
 
-**Verification note:** `main.ts`'s `blancUrl()` has not been exercised in a live
-Electron run — the app under test was started before that change, so it still
-used the `index.html?blanc=1` fallback (which works, and is now lazy). Restart
-the app to confirm the dedicated entry end-to-end.
+**Verification note — CLOSED 2026-07-21.** `main.ts`'s `blancUrl()` is confirmed
+live: the running Blanc window's URL is `http://localhost:5173/blanc.html?blanc=1`,
+the dedicated entry, not the `index.html?blanc=1` fallback.
 
-## Parallel split (added 2026-07-21)
+## Parallel split (added 2026-07-21 — RETIRED 2026-07-21, both streams complete)
+
+**Status: dormant.** Stream A and Stream B have both landed and been verified, and
+no second agent is currently on this surface, so the file-ownership rules below are
+not in force — the next session may edit any Blanc file. **Reinstate this entire
+section verbatim before starting two concurrent sessions on Blanc again**, and note
+that the `theme/blanc-media.css` + `theme/blanc-library.css` seam and the
+`BlancMediaPanels` / `BlancLibraryPanels` split it created are worth keeping either
+way: they are good structure independent of the coordination problem that motivated
+them.
+
+The original rationale, for whoever reinstates it:
 
 The remaining 7 surfaces are being worked by **two agents at once, in the same
 working tree**. That means there is no git merge to protect anyone: two sessions

@@ -128,9 +128,14 @@ cloudflare-worker/.wrangler/
 tools/claude-wired-runs/
 # generated harness bundle (source is src/renderer/__devharness__ + root *-harness.html)
 harness-dist/
-# generated Blanc reports (reproducible: tools/blanc-budget.cjs, tools/blanc-drift.cjs)
+# generated Blanc report (reproducible: tools/blanc-budget.cjs --update)
 /blanc-budget.json
-/blanc-coverage.json
+# NOTE: blanc-coverage.json is deliberately NOT ignored. It is not a generated
+# report — nothing reproduces it. It is the hand-maintained triage manifest that
+# tools/blanc-drift.cjs reads (deliberately-excluded reasons, dated coverage
+# notes), and the drift script throws if it is missing. It was ignored in 54fd5d9
+# alongside blanc-budget.json; that made the drift gate unrunnable in CI and on a
+# fresh clone. Un-ignored 2026-07-21.
 # stray artifact
 /.search-result.txt
 # machine-local agent / MCP / automation config

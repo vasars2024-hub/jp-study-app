@@ -1,0 +1,146 @@
+{
+  "$comment": [
+    "Blanc coverage manifest, read by tools/blanc-drift.cjs.",
+    "Every member of DesktopWinSection (src/shared/desktop.ts) must appear here.",
+    "status: covered | deliberately-excluded | pending.",
+    "'covered' must name a real BLANC_TOOL_IDS entry (blancToolId) or a Blanc tab",
+    "surface (blancSurface). A tab-routed bail-out to a Study OS tab is NOT",
+    "coverage, and neither is a render branch that mounts a Study OS *View —",
+    "both are Pillar 0 violations and stay 'pending' until rebuilt Blanc-native."
+  ],
+  "sections": {
+    "library": {
+      "status": "covered",
+      "blancSurface": "BlancReadPanel",
+      "studyOsView": "LibraryView",
+      "note": "Blanc's Read tab is a native panel, not an embed."
+    },
+    "dictionary": {
+      "status": "covered",
+      "blancToolId": "dictionary",
+      "studyOsView": "DictionaryView",
+      "note": "Rebuilt Blanc-native 2026-07-20; composes DictionaryResults."
+    },
+    "grammar": {
+      "status": "covered",
+      "blancToolId": "grammar",
+      "studyOsView": "GrammarView",
+      "note": "Rebuilt Blanc-native 2026-07-20; composes GrammarContent."
+    },
+    "note": {
+      "status": "covered",
+      "blancToolId": "quick-notes",
+      "studyOsView": "NoteView",
+      "note": "Blanc's quick-notes is deliberately local and separate from Notebook."
+    },
+    "musicwidget": {
+      "status": "covered",
+      "blancSurface": "FocusMusicBar",
+      "note": "Taskbar widget; the full music library is tracked under 'music'."
+    },
+    "youtube": {
+      "status": "covered",
+      "blancToolId": "youtube-library",
+      "studyOsView": "YoutubeView"
+    },
+
+    "settings": {
+      "status": "deliberately-excluded",
+      "reason": "Blanc has its own settings panel with its own schema (toolboxSettings). Mirroring Study OS settings would be two editors over different stores."
+    },
+    "city": {
+      "status": "deliberately-excluded",
+      "reason": "City is its own desktop with its own engine and simulation loop. Pulling it into Blanc would defeat Pillar 1 outright."
+    },
+
+    "reading": {
+      "status": "covered",
+      "blancToolId": "reading-finder",
+      "studyOsView": "ReadingFinderView",
+      "note": "Rebuilt Blanc-native 2026-07-20; composes ReadingFinderContent."
+    },
+    "resources": {
+      "status": "covered",
+      "blancToolId": "resources",
+      "studyOsView": "ResourcesView",
+      "note": "Rebuilt Blanc-native 2026-07-20; composes ResourcesContent."
+    },
+    "calendar": {
+      "status": "covered",
+      "blancToolId": "calendar",
+      "studyOsView": "CalendarView",
+      "note": "Rebuilt Blanc-native 2026-07-20; composes CalendarContent."
+    },
+    "flashcards": {
+      "status": "covered",
+      "blancSurface": "Cards tab → BlancFlashcardsPanel",
+      "studyOsView": "FlashcardsView",
+      "note": "Rebuilt Blanc-native 2026-07-21; composes FlashcardsContent (review/mining/csv/ai/overview). AI Studio hidden in Blanc."
+    },
+    "anki": {
+      "status": "covered",
+      "blancSurface": "Deck tab (advanced) → BlancAnkiPanel",
+      "studyOsView": "AnkiView",
+      "note": "Rebuilt Blanc-native 2026-07-20; composes AnkiContent."
+    },
+    "stats": {
+      "status": "covered",
+      "blancSurface": "Stats tab → BlancStatisticsPanel",
+      "studyOsView": "StatisticsView",
+      "note": "Rebuilt Blanc-native 2026-07-20; composes StatsContent."
+    },
+    "player": {
+      "status": "covered",
+      "blancSurface": "Media tab → BlancMediaPanel",
+      "studyOsView": "MediaView",
+      "note": "Rebuilt Blanc-native 2026-07-21; composes MediaContent in 'full' mode."
+    },
+    "video": {
+      "status": "covered",
+      "blancSurface": "Media tab → BlancMediaPanel",
+      "studyOsView": "MediaView",
+      "note": "Same Blanc-native panel as 'player'; MediaContent keeps the 'video' mode for Study OS."
+    },
+    "novels": {
+      "status": "covered",
+      "blancToolId": "novels",
+      "studyOsView": "NovelsView",
+      "note": "Ported Blanc-native 2026-07-21 (Stream B); composes NovelsContent (useNovels + filters/table/inspector). NovelsView is 1004 → 119 lines. Verified live: 208 titles, three-pane jiten-workbench, 0 .ui-app-chrome."
+    },
+    "translate": {
+      "status": "covered",
+      "blancToolId": "translate",
+      "studyOsView": "TranslateView",
+      "note": "Ported Blanc-native 2026-07-20; composes TranslateContent."
+    },
+    "notebook": {
+      "status": "covered",
+      "blancToolId": "notebook",
+      "studyOsView": "NotebookView",
+      "note": "Ported Blanc-native 2026-07-20; composes NotebookContent. quick-notes stays a separate local scratchpad, per plan."
+    },
+    "games": {
+      "status": "covered",
+      "blancToolId": "games",
+      "studyOsView": "GameArenaView",
+      "note": "Ported Blanc-native 2026-07-21 (Stream B); composes GameArenaContent's GameArena, shared verbatim with Study OS. GameArenaView is 1053 → 8 lines. Verified live: arena renders 13 game entries with XP/streak/badges, 0 .ui-app-chrome."
+    },
+    "visualizer": {
+      "status": "covered",
+      "blancToolId": "visualizer",
+      "note": "Ported Blanc-native 2026-07-21 (Stream B); composes VisualizerContent (useVisualizer + VizStage) over the shared audioBus — no second audio graph. Verified live: canvas stage plus Style/React-to/Colors controls, 0 .ui-app-chrome."
+    },
+    "music": {
+      "status": "covered",
+      "blancToolId": "music",
+      "studyOsView": "MusicView",
+      "note": "Ported Blanc-native 2026-07-20; composes MusicContent. Shares playerBus with the FocusMusicBar widget."
+    },
+    "immersion": {
+      "status": "covered",
+      "blancToolId": "immersion",
+      "studyOsView": "ImmersionView",
+      "note": "Ported Blanc-native 2026-07-21 (Stream B); composes ImmersionContent (useImmersion + toolbar/stage/rail/popups). ImmersionView is 1027 → 330 lines. The read-only 'immersion-tracker' tool stays alongside it. Verified live: toolbar, sites rail, reader mode, and Live mode mounting a real <webview> guest in the Blanc window — 0 .ui-app-chrome."
+    }
+  }
+}
