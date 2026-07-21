@@ -20001,6 +20001,23 @@ html.lockscreen-widget-root #root {
   color: var(--accent-2);
   border: 1px solid rgba(108, 123, 255, 0.35);
 }
+/* Account B — Phase 3A. `.rf-level-badge` is Reading-Finder-only (rf-*), with
+   no protected-skin overrides, so it is B-owned.
+
+   It was brand-hued text (`--accent-2`) inside a mismatched *blue* border on
+   cards that are all idle — §8 ("inactive cards have no accent-coloured
+   border/outline", and brand reserved for active/primary). This is one of the
+   207 idle app-family accent uses Account A's P1.7 classification handed to B.
+
+   The JLPT range is metadata, not status, so it becomes a quiet neutral chip:
+   one cue (a soft fill), no border, no brand hue. The sibling
+   `.rf-furigana-badge` keeps its green — that one encodes a real yes/no fact. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .rf-level-badge:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+  border: none;
+}
 .rf-furigana-badge {
   display: inline-flex;
   align-items: center;
