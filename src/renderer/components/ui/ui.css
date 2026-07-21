@@ -349,6 +349,15 @@
   border-bottom: 1px solid var(--glass-border);
   box-shadow: var(--shadow-toolbar);
 }
+/* Every-app pass (user-requested): flatten the toolbar in the default/named
+   themes so it reads as a macOS toolbar — no grey chrome band or drop shadow,
+   just a single hairline separator; the search box and buttons float on the
+   window surface. Guarded so Aero's glass sheen, Wired, and Blanc keep their
+   own toolbar treatment (master §4). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .ui-toolbar:where(:not(.blanc-root *)) {
+  background: transparent;
+  box-shadow: none;
+}
 .ui-toolbar__spacer { flex: 1; }
 .ui-toolbar__sep { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--glass-border); }
 
