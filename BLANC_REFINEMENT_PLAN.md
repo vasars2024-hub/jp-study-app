@@ -50,6 +50,32 @@ Created 2026-07-20. Supersedes the "Blanc Toolbox module build-out" track in `TA
   本[ほん] 読[よ]みます` — note 新 and 読 correctly exclude their okurigana. All
   three output formats verified, including the full kana rendering.
 
+- **Study-native item 5 — counter and number reader shipped (2026-07-21).** New
+  pure `shared/japaneseNumbers.ts` (`numberToKana`, `readCounter` over 13
+  counters, `readDayOfMonth`/`readMonth`/`readHour`/`readTime`, and a `readInput`
+  that returns every applicable interpretation instead of guessing) plus
+  `BlancCounterPanel`, registered as `counter-reader`. 37 tests. The Counter Quiz
+  game is deliberately left alone — it is a static prompt set, and this is the
+  reference reader it is not.
+
+  Counter readings for 1–10 are tabulated per counter rather than derived; the
+  sound-change rules have more exceptions than members. Two bugs were caught by
+  the tests, not by review: the ten-form branch assumed `n < 100` (100枚 →
+  じゅうじゅうまい), and deriving the plain form by stripping `に` from `table[2]`
+  broke on 人, whose form at 2 is the native ふたり (100人 → ひゃくたり). Round
+  hundreds of geminating counters (100本 → ひゃっぽん) are **not** tabulated, so
+  the reader returns nothing for them rather than emitting ひゃくほん, and the
+  panel says a missing row means "not certain", not "impossible".
+
+  Verified live: 3本 → さんぼん, 1234 → せんにひゃくさんじゅうよん, 5月5日 →
+  ごがついつか, 3:45 → さんじよんじゅうごふん, 20歳 → はたち, 5つ → いつつ, and
+  at 100 the all-counters list correctly shows only 枚/人/歳/冊/台.
+
+  **Remaining study-native items: 2 (pitch accent), 4 (conjugation drill), 6
+  (audio transcribe-and-mine), 7 (review forecast).** Items 2 and 4 are still the
+  cheapest — 4 in particular is pure logic beside `deinflect.ts` and needs no new
+  infrastructure.
+
   One CSS fix found only by rendering it: ruby was styled `--blanc-accent`, which
   under the neutral macOS palette is `#e6e6ea` against `--blanc-text` `#f5f5f7` —
   effectively invisible as an annotation. Moved to `--blanc-muted`, and bumped
