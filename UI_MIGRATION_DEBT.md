@@ -342,3 +342,21 @@ screenshotting the intact result.
   `06-maximized` and the launcher/gallery shots were taken with a different window set, because the app's
   session restore dropped the original windows during a mid-phase reload; the shell chrome under comparison is
   unaffected by which apps are open, but the match is not pixel-exact.
+
+---
+
+## Integration checkpoint — Phase 2 (shell) + Phase 3A (app screens)
+
+Merge commit `2f06d7c` on `ui/integration` (worktree `jp-study-app-redesign`). Brings `ui/core-shell`
+(Phase 1 + Phase 2) and `ui/app-screens` (Phase 1 + Phase 3A) together. Only conflict was this ledger's
+coordination header (both branches wrote it) — resolved by union, no content dropped. Code, `catalogs.ts`
+and `styles.css` auto-merged (Phase 2 edits and Phase 3A edits touch disjoint regions of the shared files).
+
+| Gate | Baseline | Result | Verdict |
+|---|---|---|---|
+| Vitest | 946/946 | **946/946 (94 files)** | pass |
+| i18n check | clean | **clean, exit 0** (4006 EN keys translated ja/zh/ru) | pass |
+| TypeScript | 1291 total / 9 src | **1291 total / 9 src** (all pre-existing `satisfies`; 0 in any merged UI file) | pass (unchanged) |
+
+Visual verification of the merged tree tracked in the session task list (shell via the live core-shell
+instance — byte-identical to integration's shell; app screens pending).
