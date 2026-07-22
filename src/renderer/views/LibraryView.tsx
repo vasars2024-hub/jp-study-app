@@ -13,6 +13,7 @@ import {
 import type { LibraryItem } from '../../shared/types';
 import type { BookLevelEstimate } from '../../shared/bookLevelEstimate';
 import Icon from '../components/Icons';
+import BookOcrPanel from '../components/library/BookOcrPanel';
 import { WIKI_CATEGORIES, randomWikiArticle } from '../wikiRandom';
 import { fetchReadableArticle, articleBodyHtml } from '../wikiArticle';
 import { getActiveProfile } from '../profileState';
@@ -84,6 +85,23 @@ function inboxGroupKey(
   }
   if (group === 'source') return hostOf(item.inboxMeta?.sourceUrl ?? item.sourcePath) || '—';
   return '';
+}
+
+
+/**
+ * Can this item be turned into text by OCR?
+ *
+ * Page-image items (a scanned PDF, a .cbz/.zip of pages, an image folder) have
+ * no text layer, so OCR is the only way to read or mine them. A normal EPUB
+ * already carries text and must not be offered the conversion.
+ */
+function canOcrToText(item: LibraryItem): boolean {
+  if (item.kind === 'manga') return true;
+  // Page images still on disk: either not yet converted, or converted once and
+  // eligible for a re-run (the only route to adding a bilingual build).
+  if ((item.pageCount ?? 0) > 0) return true;
+  const file = item.epubFile ?? '';
+  return file.toLowerCase().endsWith('.pdf');
 }
 
 export default function LibraryView({ onOpen: onOpenProp }: Props) {
@@ -1011,6 +1029,8 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                     {t('common.remove')}
                   </Button>
                 </div>
+                {/* Only page-image items have anything to OCR; a normal EPUB already has text. */}
+                {canOcrToText(selectedItem) && <BookOcrPanel item={selectedItem} />}
               </>
             ) : (
               <p className="muted">{t('library.inspector.selectHint')}</p>

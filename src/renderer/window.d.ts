@@ -72,6 +72,8 @@ import type {
   JitenStore,
 } from '../shared/jiten';
 import type { CityStateMessage } from '../main/city/ipc/channels';
+import type { ReadingLensStatus, LensInit, LensOpenMode } from '../main/readingLens';
+import type { LensOcrResult, RegionRect } from '../main/screenOcr';
 
 // Describes the `window.api` bridge exposed by the preload script.
 declare global {
@@ -172,6 +174,16 @@ declare global {
       setProgress(id: string, progress: Progress): Promise<void>;
       getMangaPages(id: string): Promise<string[]>;
       readMangaPage(mediaUrl: string): Promise<string | null>;
+      // Bulk book OCR: scanned PDF / image archive -> readable EPUB.
+      bookOcrRun(
+        req: import('../shared/bookOcrIpc').BookOcrRequest,
+      ): Promise<import('../shared/bookOcrIpc').BookOcrResult>;
+      bookOcrCancel(itemId: string): Promise<{ ok: boolean }>;
+      bookOcrStatus(itemId: string): Promise<{ running: boolean }>;
+      onBookOcrProgress(
+        cb: (p: import('../shared/bookOcrIpc').BookOcrProgress) => void,
+      ): () => void;
+
       mangaOcrAvailable(): Promise<boolean>;
       mangaOcrLoadCache(
         itemId: string,
@@ -663,6 +675,22 @@ declare global {
           registered: boolean;
         }) => void,
       ): () => void;
+
+      // Reading Lens — OS-wide screen-region OCR reader
+      lensGetSettings(): Promise<ReadingLensStatus>;
+      lensSetEnabled(enabled: boolean): Promise<ReadingLensStatus>;
+      lensSetHotkey(
+        hotkey: string,
+      ): Promise<{ ok: boolean; error?: string; status: ReadingLensStatus }>;
+      lensOpen(mode?: LensOpenMode): Promise<void>;
+      lensGetInit(): Promise<LensInit | null>;
+      lensOcr(
+        region: RegionRect & { engine?: 'auto' | 'manga' | 'web' },
+      ): Promise<LensOcrResult>;
+      lensSetInteractive(interactive: boolean): void;
+      lensClose(): Promise<void>;
+      onLensOpen(cb: (init: LensInit) => void): () => void;
+      onLensSettingsChanged(cb: (status: ReadingLensStatus) => void): () => void;
 
       // Downloadable models & dictionaries (Phase 6)
       assetsList(): Promise<{ assets: AssetSpec[]; statuses: AssetStatus[] }>;

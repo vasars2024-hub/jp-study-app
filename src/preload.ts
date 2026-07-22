@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
+import type { LensOcrResult, RegionRect } from './main/screenOcr';
 import type {
   AnkiAddRequest,
   AnkiAddResult,
@@ -204,6 +206,25 @@ const api = {
   /** Read one manga page (by its media:// URL) as a base64 data URL, for OCR. */
   readMangaPage: (mediaUrl: string): Promise<string | null> =>
     ipcRenderer.invoke('manga:readPage', mediaUrl),
+
+  // ----- bulk book OCR (scanned PDF / image archive -> readable EPUB) -----
+  bookOcrRun: (
+    req: import('./shared/bookOcrIpc').BookOcrRequest,
+  ): Promise<import('./shared/bookOcrIpc').BookOcrResult> => ipcRenderer.invoke('bookOcr:run', req),
+  bookOcrCancel: (itemId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('bookOcr:cancel', itemId),
+  bookOcrStatus: (itemId: string): Promise<{ running: boolean }> =>
+    ipcRenderer.invoke('bookOcr:status', itemId),
+  onBookOcrProgress: (
+    cb: (p: import('./shared/bookOcrIpc').BookOcrProgress) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      p: import('./shared/bookOcrIpc').BookOcrProgress,
+    ): void => cb(p);
+    ipcRenderer.on('bookOcr:progress', handler);
+    return () => ipcRenderer.removeListener('bookOcr:progress', handler);
+  },
 
   mangaOcrAvailable: (): Promise<boolean> => ipcRenderer.invoke('mangaOcr:available'),
   mangaOcrLoadCache: (
@@ -1022,6 +1043,38 @@ const api = {
     ): void => cb(status);
     ipcRenderer.on('sysdict:settings-changed', handler);
     return () => ipcRenderer.removeListener('sysdict:settings-changed', handler);
+  },
+
+  // Reading Lens — OS-wide screen-region OCR reader (global hotkey + overlay).
+  lensGetSettings: (): Promise<ReadingLensStatus> => ipcRenderer.invoke('lens:getSettings'),
+  lensSetEnabled: (enabled: boolean): Promise<ReadingLensStatus> =>
+    ipcRenderer.invoke('lens:setEnabled', enabled),
+  lensSetHotkey: (
+    hotkey: string,
+  ): Promise<{ ok: boolean; error?: string; status: ReadingLensStatus }> =>
+    ipcRenderer.invoke('lens:setHotkey', hotkey),
+  /** Open the lens over the display under the cursor. */
+  lensOpen: (mode: LensOpenMode = 'select'): Promise<void> => ipcRenderer.invoke('lens:open', mode),
+  /** The lens renderer pulls its init (display bounds + mode) on mount. */
+  lensGetInit: (): Promise<LensInit | null> => ipcRenderer.invoke('lens:getInit'),
+  /** Capture + OCR a region (window-local DIP coords). */
+  lensOcr: (
+    region: RegionRect & { engine?: 'auto' | 'manga' | 'web' },
+  ): Promise<LensOcrResult> => ipcRenderer.invoke('lens:ocr', region),
+  /** Toggle pass-through: true = capture the mouse, false = click through to the app below. */
+  lensSetInteractive: (interactive: boolean): void => {
+    ipcRenderer.send('lens:setInteractive', interactive);
+  },
+  lensClose: (): Promise<void> => ipcRenderer.invoke('lens:close'),
+  onLensOpen: (cb: (init: LensInit) => void): (() => void) => {
+    const handler = (_e: unknown, init: LensInit): void => cb(init);
+    ipcRenderer.on('lens:open', handler);
+    return () => ipcRenderer.removeListener('lens:open', handler);
+  },
+  onLensSettingsChanged: (cb: (status: ReadingLensStatus) => void): (() => void) => {
+    const handler = (_e: unknown, status: ReadingLensStatus): void => cb(status);
+    ipcRenderer.on('lens:settings-changed', handler);
+    return () => ipcRenderer.removeListener('lens:settings-changed', handler);
   },
 
   // Downloadable models & dictionaries (Phase 6). Nothing heavy ships in the

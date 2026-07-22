@@ -20802,3 +20802,59 @@ html.lockscreen-widget-root #root {
 @media (max-width: 900px) {
   .gx-practice-layout, .gx-notebook-body { grid-template-columns: 1fr; }
 }
+
+/* ---- Book OCR: convert a page-image item into a readable text EPUB ---- */
+
+.book-ocr-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+}
+
+.book-ocr-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--font-size-sm, 0.85em);
+}
+
+.book-ocr-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-size-sm, 0.85em);
+}
+
+.book-ocr-hint,
+.book-ocr-result {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.85em);
+  line-height: 1.5;
+}
+
+.book-ocr-error {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.85em);
+  color: var(--danger, #d05050);
+}
+
+/* Uncertain OCR inside the generated book. The EPUB ships its own copy of
+   these rules; this is for readers that render chapters in app chrome. Marked
+   by underline rather than colour so it survives every reader theme, and stays
+   legible for colour-blind readers. */
+.reader-stage .ocr-uncertain,
+.epub-content .ocr-uncertain {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--warning, #c89b3c);
+}
+
+.reader-stage .ocr-poor,
+.epub-content .ocr-poor {
+  text-decoration: underline wavy;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--danger, #d05050);
+}

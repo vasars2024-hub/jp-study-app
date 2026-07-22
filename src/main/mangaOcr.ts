@@ -44,6 +44,7 @@ import {
   postprocessMangaOcrText,
   shouldDewarp,
 } from '../shared/mangaOcrText';
+import { sequenceConfidence, tokenProbability } from '../shared/ocrConfidence';
 import { sortReadingOrder } from '../shared/readingOrder';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
 import type { LibraryItem } from '../shared/types';
@@ -698,13 +699,19 @@ async function detectRegions(
 
 // ----- manga-ocr recognize -----------------------------------------------
 
+/** Decoded text plus how confident the decoder was, 0-1. */
+interface MangaCropRead {
+  text: string;
+  confidence: number;
+}
+
 async function recognizeCrop(
   rgba: Buffer,
   srcW: number,
   srcH: number,
   box: MokuroBox,
   points: Array<{ x: number; y: number }>,
-): Promise<string> {
+): Promise<MangaCropRead> {
   if (!encoder || !decoder || !vocab) throw new Error('OCR models not loaded');
   const runtime = await loadOrt();
 
@@ -726,6 +733,10 @@ async function recognizeCrop(
   const hidden = encOut[hiddenName];
 
   const tokenIds = [BOS];
+  // Probability the decoder assigned to each token it actually chose. These are
+  // what make a real confidence score possible — see shared/ocrConfidence.ts.
+  const tokenProbs: number[] = [];
+  let finished = false;
   const decInIds = decoder.inputNames.find((n) => /input_ids/i.test(n)) ?? decoder.inputNames[1];
   const decInHidden =
     decoder.inputNames.find((n) => /hidden/i.test(n)) ?? decoder.inputNames[0];
@@ -751,7 +762,11 @@ async function recognizeCrop(
       }
     }
     tokenIds.push(best);
-    if (best === EOS) break;
+    tokenProbs.push(tokenProbability(data, lastRow, vocabSize, best));
+    if (best === EOS) {
+      finished = true;
+      break;
+    }
   }
 
   let text = '';
@@ -759,7 +774,12 @@ async function recognizeCrop(
     if (id < 5) continue;
     text += vocab[id] ?? '';
   }
-  return postprocessMangaOcrText(text);
+  return {
+    text: postprocessMangaOcrText(text),
+    // Never finishing means the token ceiling was hit, which in practice is a
+    // repetition loop; sequenceConfidence caps those rather than rewarding them.
+    confidence: sequenceConfidence(tokenProbs, { truncated: !finished }),
+  };
 }
 
 // ----- cache / corrections -----------------------------------------------
@@ -974,7 +994,7 @@ async function recognizeBox(
   width: number,
   height: number,
   box: MokuroBox,
-): Promise<string> {
+): Promise<MangaCropRead> {
   const points = [
     { x: box[0], y: box[1] },
     { x: box[2], y: box[1] },
@@ -1050,6 +1070,9 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
       stem,
     );
     const correction = corrections[regionId];
+    // How sure the decoder was about this region's text. Starts at 1 so a
+    // reused cached read or a user correction is treated as certain.
+    let readConfidence = 1;
     let lines: string[];
     let rawLines: string[];
     if (correction?.lines) {
@@ -1063,8 +1086,9 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
         rawLines = prevRaw;
       } else {
         try {
-          const text = await recognizeCrop(rgba, width, height, region.box, region.points);
-          rawLines = text ? [text] : [];
+          const read = await recognizeCrop(rgba, width, height, region.box, region.points);
+          rawLines = read.text ? [read.text] : [];
+          readConfidence = read.confidence;
         } catch (err) {
           console.error('[mangaOcr] region raw-backfill failed', regionId, err);
           rawLines = [];
@@ -1073,8 +1097,9 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
       lines = [...correction.lines];
     } else {
       try {
-        const text = await recognizeCrop(rgba, width, height, region.box, region.points);
-        rawLines = text ? [text] : [];
+        const read = await recognizeCrop(rgba, width, height, region.box, region.points);
+        rawLines = read.text ? [read.text] : [];
+        readConfidence = read.confidence;
       } catch (err) {
         console.error('[mangaOcr] region failed', regionId, err);
         rawLines = [];
@@ -1110,7 +1135,11 @@ export async function scanMangaPage(req: MangaOcrScanRequest): Promise<MokuroPag
       lines: junk && !correction?.lines ? [] : lines,
       rawLines,
       regionId,
-      confidence: region.score * confidenceScale,
+      // The decoder's own score, damped for junk/SFX. This used to be
+      // region.score — the detector's *area* proxy — which said nothing about
+      // whether the text was read correctly and always looked high.
+      // A user-corrected region is taken as certain.
+      confidence: correction?.lines ? 1 : readConfidence * confidenceScale,
       kind,
       ...(correction?.order !== undefined ? { order: correction.order } : null),
     });
@@ -1185,15 +1214,20 @@ export async function rescanMangaOcrRegion(req: MangaOcrRegionRescanRequest): Pr
   await ensureModels();
   const { width, height, rgba } = loadPageImage(full);
   let text = '';
+  let confidence = 0;
   try {
-    text = await recognizeBox(rgba, width, height, block.box);
+    const read = await recognizeBox(rgba, width, height, block.box);
+    text = read.text;
+    confidence = read.confidence;
   } catch (err) {
     console.error('[mangaOcr] region rescan failed', req.regionId, err);
   }
   const rawLines = text ? [text] : [];
   const patchedRaw: MokuroPage = {
     ...raw,
-    blocks: raw.blocks.map((b) => (b.regionId === req.regionId ? { ...b, rawLines } : b)),
+    blocks: raw.blocks.map((b) =>
+      b.regionId === req.regionId ? { ...b, rawLines, confidence } : b,
+    ),
   };
   await writeCache(req.itemId, stem, patchedRaw);
   const corrections = await readCorrections(req.itemId, stem);
@@ -1221,8 +1255,11 @@ export async function mergeMangaOcrRegions(req: MangaOcrMergeRequest): Promise<M
   await ensureModels();
   const { width, height, rgba } = loadPageImage(full);
   let text = '';
+  let confidence = 0;
   try {
-    text = await recognizeBox(rgba, width, height, box);
+    const read = await recognizeBox(rgba, width, height, box);
+    text = read.text;
+    confidence = read.confidence;
   } catch (err) {
     console.error('[mangaOcr] region merge failed', idA, idB, err);
   }
@@ -1233,7 +1270,9 @@ export async function mergeMangaOcrRegions(req: MangaOcrMergeRequest): Promise<M
     lines: text ? [text] : [],
     rawLines: text ? [text] : [],
     regionId: regionIdFromBox(box, stem),
-    confidence: Math.max(a.confidence ?? 0, b.confidence ?? 0),
+    // From the combined re-read, not the two old halves: the merged crop was
+    // decoded fresh, so the old scores describe text that no longer exists.
+    confidence,
     kind: a.kind ?? b.kind,
   };
   const remaining = raw.blocks.filter((blk) => blk.regionId !== idA && blk.regionId !== idB);
@@ -1285,28 +1324,31 @@ export async function splitMangaOcrRegion(req: MangaOcrSplitRequest): Promise<Mo
 
   await ensureModels();
   const { width, height, rgba } = loadPageImage(full);
-  const [textA, textB] = await Promise.all([
+  const empty: MangaCropRead = { text: '', confidence: 0 };
+  const [readA, readB] = await Promise.all([
     recognizeBox(rgba, width, height, boxA).catch((err) => {
       console.error('[mangaOcr] region split-half failed', req.regionId, err);
-      return '';
+      return empty;
     }),
     recognizeBox(rgba, width, height, boxB).catch((err) => {
       console.error('[mangaOcr] region split-half failed', req.regionId, err);
-      return '';
+      return empty;
     }),
   ]);
-  const make = (box: MokuroBox, text: string): MokuroBlock => ({
+  // Each half is decoded on its own, so each carries its own score rather than
+  // inheriting the confidence of the region they came from.
+  const make = (box: MokuroBox, read: MangaCropRead): MokuroBlock => ({
     box,
     vertical: block.vertical,
     font_size: block.font_size,
-    lines: text ? [text] : [],
-    rawLines: text ? [text] : [],
+    lines: read.text ? [read.text] : [],
+    rawLines: read.text ? [read.text] : [],
     regionId: regionIdFromBox(box, stem),
-    confidence: block.confidence,
+    confidence: read.confidence,
     kind: block.kind,
   });
   const remaining = raw.blocks.filter((b) => b.regionId !== req.regionId);
-  const newBlocks = [make(boxA, textA), make(boxB, textB)];
+  const newBlocks = [make(boxA, readA), make(boxB, readB)];
   const orderedIndexed = sortReadingOrder(
     [...remaining, ...newBlocks].map((blk) => ({ box: blk.box, blk })),
   );
@@ -1358,8 +1400,11 @@ export async function addMangaOcrRegion(req: MangaOcrAddRegionRequest): Promise<
   const { kind, confidenceScale } = classifyRegionKind({ width: bw, height: bh, pageArea });
 
   let text = '';
+  let readConfidence = 0;
   try {
-    text = await recognizeBox(rgba, width, height, box);
+    const read = await recognizeBox(rgba, width, height, box);
+    text = read.text;
+    readConfidence = read.confidence;
   } catch (err) {
     console.error('[mangaOcr] add-region OCR failed', regionId, err);
   }
@@ -1371,7 +1416,7 @@ export async function addMangaOcrRegion(req: MangaOcrAddRegionRequest): Promise<
     lines,
     rawLines: [...lines],
     regionId,
-    confidence: confidenceScale,
+    confidence: readConfidence * confidenceScale,
     kind,
   };
 
@@ -1427,14 +1472,12 @@ export async function saveMangaOcrRegionOrder(req: MangaOcrOrderRequest): Promis
   return applyCorrections(patchedRaw, corrections);
 }
 
-export async function recognizeMangaOcrDataUrl(dataUrl: string): Promise<string> {
-  await ensureModels();
-  const runtime = await loadOrt();
-  void runtime;
+/** Decode a data URL to RGBA (toBitmap is BGRA on Windows/macOS) plus its dims. */
+function rgbaFromDataUrl(dataUrl: string): { rgba: Buffer; width: number; height: number } | null {
   const img = nativeImage.createFromDataURL(dataUrl);
   if (img.isEmpty()) throw new Error('Could not decode drawing.');
   const { width, height } = img.getSize();
-  if (width < 8 || height < 8) return '';
+  if (width < 8 || height < 8) return null;
   const bgra = img.toBitmap();
   const rgba = Buffer.alloc(width * height * 4);
   for (let i = 0; i < width * height; i++) {
@@ -1444,14 +1487,83 @@ export async function recognizeMangaOcrDataUrl(dataUrl: string): Promise<string>
     rgba[o + 2] = bgra[o];
     rgba[o + 3] = bgra[o + 3];
   }
-  const box: MokuroBox = [0, 0, width, height];
-  const points = [
-    { x: 0, y: 0 },
-    { x: width, y: 0 },
-    { x: width, y: height },
-    { x: 0, y: height },
-  ];
-  return recognizeCrop(rgba, width, height, box, points);
+  return { rgba, width, height };
+}
+
+function wholeImageRegion(width: number, height: number): DetectedRegion {
+  return {
+    box: [0, 0, width, height],
+    score: 1,
+    points: [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: width, y: height },
+      { x: 0, y: height },
+    ],
+  };
+}
+
+export async function recognizeMangaOcrDataUrl(dataUrl: string): Promise<string> {
+  await ensureModels();
+  const decoded = rgbaFromDataUrl(dataUrl);
+  if (!decoded) return '';
+  const { rgba, width, height } = decoded;
+  const region = wholeImageRegion(width, height);
+  return (await recognizeCrop(rgba, width, height, region.box, region.points)).text;
+}
+
+export interface MangaOcrRegionLine {
+  text: string;
+  /** [x0, y0, x1, y1] in source-image pixels. */
+  box: [number, number, number, number];
+  vertical: boolean;
+  confidence: number;
+}
+
+/**
+ * Read every speech bubble in an arbitrary image.
+ *
+ * `recognizeMangaOcrDataUrl` reads its whole input as one block, which is right
+ * for a single cropped bubble and useless for a page — manga-ocr fed a full page
+ * returns one short fragment. This runs comic-text-detector first, so the same
+ * call site works for a lens region containing one bubble and for a whole scanned
+ * page, and the caller gets a box per bubble to hang hotspots on.
+ *
+ * When detection finds nothing the whole image is read as one block, so a tight
+ * crop the detector considers featureless still produces text.
+ *
+ * Confidence is the decoder's own: the geometric mean of the probability it
+ * assigned to each token it chose (see shared/ocrConfidence.ts). It is directly
+ * comparable to the general engine's per-line CTC score, so a reader can trust
+ * the number and callers can weigh the two engines on more than text alone.
+ */
+export async function recognizeMangaOcrRegionsDataUrl(
+  dataUrl: string,
+  opts: { sensitivity?: DetectionSensitivity } = {},
+): Promise<{ text: string; lines: MangaOcrRegionLine[] }> {
+  await ensureModels();
+  const decoded = rgbaFromDataUrl(dataUrl);
+  if (!decoded) return { text: '', lines: [] };
+  const { rgba, width, height } = decoded;
+
+  let regions = await detectRegions(rgba, width, height, opts.sensitivity);
+  if (!regions.length) regions = [wholeImageRegion(width, height)];
+
+  const lines: MangaOcrRegionLine[] = [];
+  for (const region of regions) {
+    const read = await recognizeCrop(rgba, width, height, region.box, region.points);
+    const text = read.text.trim();
+    if (!text) continue;
+    const [x0, y0, x1, y1] = region.box;
+    lines.push({
+      text,
+      box: [x0, y0, x1, y1],
+      vertical: y1 - y0 > x1 - x0,
+      confidence: read.confidence,
+    });
+  }
+  // detectRegions already returns regions in manga reading order.
+  return { text: lines.map((l) => l.text).join('\n'), lines };
 }
 
 // ----- volume analyze / translate ----------------------------------------

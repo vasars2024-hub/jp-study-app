@@ -34,13 +34,9 @@ import {
   getChromeExtensionFolder,
   readInstalledExtensionVersion,
 } from './extensionInstall';
-import { mangaOcrAvailable, recognizeMangaOcrDataUrl } from './mangaOcr';
-import {
-  installedPaddleLangs,
-  paddleOcrAvailable,
-  recognizePaddleOcrDataUrl,
-  type PaddleLang,
-} from './paddleOcr';
+import { mangaOcrAvailable, recognizeMangaOcrRegionsDataUrl } from './mangaOcr';
+import { installedPaddleLangs, paddleOcrAvailable, type PaddleLang } from './paddleOcr';
+import { ocrAuto } from './ocrAuto';
 import { startDownload } from './downloads';
 import { loadProfileRules } from './profileRules';
 import {
@@ -1676,9 +1672,12 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         return;
       }
 
-      // Route by what the page actually is. manga-ocr reads speech bubbles far
-      // better than the general engine, but hallucinates on printed web text —
-      // so it only gets the pages it is good at.
+      // A page category of 'manga' still pins the engine — the site is known to
+      // be manga, which is better evidence than anything derived from one crop.
+      // Everything else goes through ocrAuto, which starts on the general engine
+      // and only falls back to manga-ocr when the general read looks like the
+      // tategaki failure described in shared/ocrRouting.ts. That keeps printed
+      // web text away from manga-ocr, which hallucinates on it.
       if (body.category === 'manga') {
         if (!mangaOcrAvailable()) {
           json(res, 503, {
@@ -1690,12 +1689,11 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
           });
           return;
         }
-        const text = (await recognizeMangaOcrDataUrl(dataUrl)).trim();
+        const manga = await recognizeMangaOcrRegionsDataUrl(dataUrl);
         json(res, 200, {
           ok: true,
-          text,
-          // manga-ocr reads a bubble as one block, so there is exactly one line.
-          lines: text ? [{ text, vertical: false, confidence: 1 }] : [],
+          text: manga.text,
+          lines: manga.lines,
           lang: 'ja',
           engine: 'manga-ocr',
           available: true,
@@ -1731,13 +1729,13 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         return;
       }
 
-      const result = await recognizePaddleOcrDataUrl(dataUrl, { langHint });
+      const result = await ocrAuto(dataUrl, { engine: 'auto', langHint });
       json(res, 200, {
         ok: true,
         text: result.text,
         lines: result.lines,
         lang: result.lang,
-        engine: 'web',
+        engine: result.engine === 'manga' ? 'manga-ocr' : 'web',
         available: true,
       });
     } catch (err) {

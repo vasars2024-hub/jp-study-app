@@ -6,6 +6,7 @@ import GameArenaSettingsSection from '../../../games/GameArenaSettingsSection';
 import StudyLanguageSection from './StudyLanguageSection';
 import ExtensionBridgeSection from './ExtensionBridgeSection';
 import SystemDictionarySection from './SystemDictionarySection';
+import ReadingLensSection from './ReadingLensSection';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import {
@@ -196,6 +197,14 @@ export default function StudyPage() {
         highlight={focusSettingId === 'system-dictionary'}
       >
         <SystemDictionarySection />
+      </SettingsCard>
+      <SettingsCard
+        id="reading-lens"
+        title={t('settings.lens.title')}
+        description={t('settings.lens.desc')}
+        highlight={focusSettingId === 'reading-lens'}
+      >
+        <ReadingLensSection />
       </SettingsCard>
     </>
   );

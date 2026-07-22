@@ -977,6 +977,52 @@ export async function importMangaFromImageUrls(payload: {
   };
 }
 
+/** One item by id, or undefined. */
+export function getLibraryItem(id: string): LibraryItem | undefined {
+  return readDb().find((x) => x.id === id);
+}
+
+/** Absolute paths of an item's page images, in reading order. */
+export function listItemPagePaths(id: string): string[] {
+  const pagesDir = path.join(itemDir(id), 'pages');
+  if (!fs.existsSync(pagesDir)) return [];
+  return fs
+    .readdirSync(pagesDir)
+    .filter((f) => IMAGE_EXT.has(path.extname(f).toLowerCase()))
+    .sort(naturalCompare)
+    .map((f) => path.join(pagesDir, f));
+}
+
+/**
+ * Attach a generated EPUB to an existing item and file it as a readable book.
+ *
+ * Used by the book-OCR job, which turns a page-image item (an imported archive
+ * or a rasterized PDF) into something the reader can paginate and mine. The page
+ * images stay on disk so the original is never lost.
+ */
+export function attachGeneratedEpub(
+  id: string,
+  epub: Buffer,
+  opts: { fileName?: string; title?: string } = {},
+): LibraryItem | undefined {
+  const items = readDb();
+  const it = items.find((x) => x.id === id);
+  if (!it) return undefined;
+  const fileName = opts.fileName ?? 'ocr.epub';
+  fs.writeFileSync(path.join(itemDir(id), fileName), epub);
+  it.epubFile = fileName;
+  it.kind = 'book';
+  // Record that page images are still on disk. Without this the item looks like
+  // an ordinary EPUB once converted, and the UI would stop offering a re-run —
+  // which is the only way to add a bilingual build after a first pass.
+  const pages = listItemPagePaths(id).length;
+  if (pages > 0) it.pageCount = pages;
+  if (opts.title) it.title = opts.title;
+  writeDb(items);
+  broadcastLibrary(items);
+  return it;
+}
+
 export function updateLibraryInboxMeta(
   id: string,
   patch: Partial<NonNullable<LibraryItem['inboxMeta']>>,

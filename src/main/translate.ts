@@ -375,6 +375,21 @@ async function translateText(
   return out.join(' ');
 }
 
+/**
+ * Translate a block of text for the bilingual book build.
+ *
+ * Shares translateText's serialized queue, so a few hundred book pages cannot
+ * starve an interactive translation the user is waiting on — the requests
+ * interleave rather than one blocking the model outright.
+ */
+export async function translateForBook(
+  text: string,
+  source: TransLang,
+  target: TransLang,
+): Promise<string> {
+  return translateText(text, source, target);
+}
+
 export function registerTranslateIpc(): void {
   ipcMain.handle('translate:status', () => {
     const modelPath = resolveModelPath();

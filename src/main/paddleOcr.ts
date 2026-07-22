@@ -25,6 +25,7 @@ import {
   orderDetBoxes,
   type DetBox,
 } from '../shared/dbPostprocess';
+import { columnsFromInkProfile } from '../shared/tategakiColumns';
 import {
   buildCharset,
   ctcGreedyDecode,
@@ -389,11 +390,48 @@ async function recognizeCrop(rec: Recognizer, crop: Bitmap): Promise<CtcDecodeRe
  * 中界品板). Reading it both ways and keeping whichever is more confident
  * settles it from evidence instead of guessing.
  */
-/** Read one detected box, picking the right strategy for its shape. */
+/**
+ * Read one detected box, picking the right strategy for its shape.
+ *
+ * Tategaki gets one more chance first: DB routinely merges several adjacent
+ * columns into a single box (see splitTategakiColumns), and reading such a box
+ * as one unit interleaves the columns character by character while still
+ * reporting high confidence — measured 0.95 on a novel page that came back as
+ * pure noise. Splitting first is what makes vertical text work at all.
+ */
 async function readBox(rec: Recognizer, bmp: Bitmap, box: DetBox): Promise<CtcDecodeResult> {
+  const columns = splitTategakiColumns(bmp, box);
+  if (columns) return recognizeColumns(rec, bmp, box, columns);
   return isVerticalBox(box)
     ? recognizeVerticalBox(rec, bmp, box)
     : recognizeCrop(rec, extractCrop(bmp, box, false));
+}
+
+/**
+ * Read pre-split tategaki columns right-to-left and concatenate them.
+ *
+ * No separator between columns: they are a single run of text that happened to
+ * wrap, so a bubble reading ああッ！！レイリーに並ぶ… must come back as one string.
+ */
+async function recognizeColumns(
+  rec: Recognizer,
+  bmp: Bitmap,
+  box: DetBox,
+  columns: Array<[number, number]>,
+): Promise<CtcDecodeResult> {
+  let text = '';
+  let weighted = 0;
+  let chars = 0;
+  for (const [x0, x1] of columns) {
+    const column: DetBox = { x0, y0: box.y0, x1, y1: box.y1, score: box.score };
+    const decoded = await recognizeVerticalBox(rec, bmp, column);
+    const piece = decoded.text.trim();
+    if (!piece) continue;
+    text += piece;
+    weighted += decoded.confidence * piece.length;
+    chars += piece.length;
+  }
+  return { text, confidence: chars > 0 ? weighted / chars : 0 };
 }
 
 async function recognizeVerticalBox(
@@ -404,6 +442,97 @@ async function recognizeVerticalBox(
   const rotated = await recognizeCrop(rec, extractCrop(bmp, box, true));
   const stacked = await recognizeStackedColumn(rec, bmp, box);
   return scoreRecognition(stacked) >= scoreRecognition(rotated) ? stacked : rotated;
+}
+
+// ----- tategaki column splitting -----------------------------------------
+//
+// The decision logic lives in shared/tategakiColumns.ts so it can be tested
+// against ink profiles captured from real pages; this half just reads pixels.
+
+interface InkProfile {
+  /** Inked pixel count for each x within the box. */
+  counts: number[];
+  /** Left edge of the profile in source-image pixels. */
+  x0: number;
+  h: number;
+}
+
+/**
+ * Per-column ink counts across a box.
+ *
+ * Background is the median luminance rather than an assumed light page, so
+ * light-on-dark text profiles correctly — the same assumption
+ * segmentColumnRows makes.
+ */
+function inkColumnProfile(bmp: Bitmap, box: DetBox): InkProfile | null {
+  const x0 = Math.max(0, Math.floor(box.x0));
+  const y0 = Math.max(0, Math.floor(box.y0));
+  const x1 = Math.min(bmp.width, Math.ceil(box.x1));
+  const y1 = Math.min(bmp.height, Math.ceil(box.y1));
+  const w = x1 - x0;
+  const h = y1 - y0;
+  if (w < 8 || h < 8) return null;
+
+  const luminance = new Uint8Array(w * h);
+  const histogram = new Uint32Array(256);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = ((y + y0) * bmp.width + (x + x0)) * 4;
+      const l =
+        (0.299 * bmp.rgba[o] + 0.587 * bmp.rgba[o + 1] + 0.114 * bmp.rgba[o + 2]) | 0;
+      luminance[y * w + x] = l;
+      histogram[l] += 1;
+    }
+  }
+  const { median: background, range } = histogramStats(histogram, w * h);
+  const inkDelta = Math.max(20, range * 0.25);
+
+  const counts: number[] = [];
+  for (let x = 0; x < w; x++) {
+    let count = 0;
+    for (let y = 0; y < h; y++) {
+      if (Math.abs(luminance[y * w + x] - background) > inkDelta) count += 1;
+    }
+    counts.push(count);
+  }
+  return { counts, x0, h };
+}
+
+/**
+ * Median and range of a luminance histogram.
+ *
+ * Collecting every pixel into an array and sorting it is the obvious way to get
+ * a median, and it is what this module used to do — but a detected box can cover
+ * most of a 1600px page, and a three-million-entry JS array plus a sort of the
+ * same is enough to take the process down. Luminance only has 256 possible
+ * values, so a histogram gives the same answer in one pass and constant memory.
+ */
+function histogramStats(histogram: Uint32Array, total: number): { median: number; range: number } {
+  let min = 0;
+  while (min < 255 && histogram[min] === 0) min += 1;
+  let max = 255;
+  while (max > 0 && histogram[max] === 0) max -= 1;
+
+  const half = total / 2;
+  let seen = 0;
+  let median = min;
+  for (let v = 0; v <= 255; v++) {
+    seen += histogram[v];
+    if (seen >= half) {
+      median = v;
+      break;
+    }
+  }
+  return { median, range: max - min };
+}
+
+/** Column boundaries in source-image pixels, or null when this is not tategaki. */
+function splitTategakiColumns(bmp: Bitmap, box: DetBox): Array<[number, number]> | null {
+  const profile = inkColumnProfile(bmp, box);
+  if (!profile) return null;
+  const columns = columnsFromInkProfile(profile.counts, profile.h);
+  if (!columns) return null;
+  return columns.map(([a, b]) => [a + profile.x0, b + profile.x0] as [number, number]);
 }
 
 /**
@@ -426,19 +555,18 @@ function segmentColumnRows(bmp: Bitmap, box: DetBox): Array<[number, number]> {
   const h = y1 - y0;
   if (w < 2 || h < 2) return [];
 
-  const luminance = new Float32Array(w * h);
-  const sorted: number[] = [];
+  const luminance = new Uint8Array(w * h);
+  const histogram = new Uint32Array(256);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const o = ((y + y0) * bmp.width + (x + x0)) * 4;
-      const l = 0.299 * bmp.rgba[o] + 0.587 * bmp.rgba[o + 1] + 0.114 * bmp.rgba[o + 2];
+      const l =
+        (0.299 * bmp.rgba[o] + 0.587 * bmp.rgba[o + 1] + 0.114 * bmp.rgba[o + 2]) | 0;
       luminance[y * w + x] = l;
-      sorted.push(l);
+      histogram[l] += 1;
     }
   }
-  sorted.sort((a, b) => a - b);
-  const background = sorted[Math.floor(sorted.length / 2)];
-  const range = sorted[sorted.length - 1] - sorted[0];
+  const { median: background, range } = histogramStats(histogram, w * h);
   const inkDelta = Math.max(20, range * 0.25);
   const minInkPerRow = Math.max(1, Math.floor(w * 0.04));
 
@@ -595,7 +723,7 @@ async function pickLanguage(
  */
 export async function recognizePaddleOcrDataUrl(
   dataUrl: string,
-  opts: { langHint?: PaddleLang } = {},
+  opts: { langHint?: PaddleLang; forceLang?: PaddleLang } = {},
 ): Promise<PaddleOcrResult> {
   const candidates = installedPaddleLangs();
   if (!isInstalled(DET_ASSET) || !candidates.length) {
@@ -605,12 +733,18 @@ export async function recognizePaddleOcrDataUrl(
   const bmp = decodeDataUrl(dataUrl);
   const boxes = await detectBoxes(bmp);
   const langHint = opts.langHint && candidates.includes(opts.langHint) ? opts.langHint : undefined;
+  // `forceLang` pins the recognizer to a known language and skips the probe. The
+  // auto-picker exists for the extension, which OCRs pages of unknown language;
+  // a caller that already knows the language (the Reading Lens uses the study
+  // language) must not be second-guessed — on hard, low-res text the probe can
+  // otherwise mis-score and pick e.g. the Cyrillic head for Japanese manga.
+  const forced = opts.forceLang && candidates.includes(opts.forceLang) ? opts.forceLang : undefined;
 
   if (!boxes.length) {
-    return { text: '', lang: langHint ?? candidates[0], lines: [] };
+    return { text: '', lang: forced ?? langHint ?? candidates[0], lines: [] };
   }
 
-  const lang = await pickLanguage(bmp, boxes, langHint, candidates);
+  const lang = forced ?? (await pickLanguage(bmp, boxes, langHint, candidates));
   const rec = await ensureRecognizer(lang);
 
   // Whether the crop as a whole is vertical decides reading order; individual

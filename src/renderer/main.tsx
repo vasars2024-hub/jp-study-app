@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import SystemDictOverlay from './components/SystemDictOverlay';
+import ReadingLensOverlay from './components/lens/ReadingLensOverlay';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
 import { bootOsLook } from './components/DesktopSettings';
@@ -117,6 +118,16 @@ if (isSysDictOverlay) {
   document.documentElement.classList.add('sysdict-window');
 }
 
+// Fullscreen transparent click-through overlay for the Reading Lens
+// (main/readingLens.ts): screen-region OCR + in-place lookup over any app.
+// Like the sysDict overlay, none of the desktop shell/environment boot should run.
+const isReadingLens =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('readingLens') === '1';
+if (isReadingLens) {
+  document.documentElement.classList.add('reading-lens-window');
+}
+
 function runWhenIdle(fn: () => void, timeout = 5000): void {
   const idle = window.requestIdleCallback as
     | ((cb: IdleRequestCallback, opts?: IdleRequestOptions) => number)
@@ -212,7 +223,7 @@ runWhenIdle(() => {
   installShellSounds();
 }, 3000);
 
-if (!isCompanionHost && !isSysDictOverlay) {
+if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
   bootCustomCss();
   // Reward confetti layer (Phase 4.5). Main window only — the companion host
   // is a click-through overlay and must never paint a full-screen canvas.
@@ -263,6 +274,16 @@ if (container) {
         <React.StrictMode>
           <AppErrorBoundary>
             <SystemDictOverlay />
+          </AppErrorBoundary>
+        </React.StrictMode>,
+      );
+    } else if (isReadingLens) {
+      // Mining target comes from the active profile; the shell/environment stay dormant.
+      initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+      createRoot(container).render(
+        <React.StrictMode>
+          <AppErrorBoundary>
+            <ReadingLensOverlay />
           </AppErrorBoundary>
         </React.StrictMode>,
       );

@@ -26,6 +26,7 @@ import { registerStatsIpc } from './main/stats';
 import { registerJitenIpc } from './main/jiten';
 import { initDownloads, registerDownloadIpc } from './main/downloads';
 import { registerMangaOcrIpc } from './main/mangaOcr';
+import { registerBookOcrIpc } from './main/bookOcrJob';
 import { registerMainI18nIpc } from './main/i18n';
 import { startDebugBridge, stopDebugBridge, recordDebugLog } from './main/debugBridge';
 import {
@@ -58,6 +59,12 @@ import {
   startSystemDictionary,
   stopSystemDictionary,
 } from './main/systemDictionary';
+import {
+  configureReadingLens,
+  registerReadingLensIpc,
+  startReadingLens,
+  stopReadingLens,
+} from './main/readingLens';
 import { logDiagnostic, errorDetail } from './main/errorLog';
 
 if (started) {
@@ -1188,6 +1195,7 @@ app.whenReady().then(async () => {
   registerJitenIpc();
   registerDownloadIpc();
   registerMangaOcrIpc();
+  registerBookOcrIpc();
   registerMainI18nIpc();
   registerExtensionBridgeIpc();
   registerWindowChromeIpc(recreateMainWindow);
@@ -1210,10 +1218,19 @@ app.whenReady().then(async () => {
     isDevServer: isDevServer(),
   });
   registerSystemDictionaryIpc();
+  configureReadingLens({
+    rendererUrl,
+    forwardConsole: forwardRendererConsole,
+    attachNavGuards,
+    isDevServer: isDevServer(),
+  });
+  registerReadingLensIpc();
   createWindow();
   startExtensionServer();
   // System-wide popup dictionary: registers its global hotkey + tray if enabled.
   startSystemDictionary();
+  // Reading Lens: registers its own global hotkey (screen-region OCR reader).
+  startReadingLens();
   // Provision + load offline dictionaries in the background so the window paints
   // immediately. Consumers that need glosses (mining, the pop-up) await
   // initYomitan() themselves, and a dict:updated event refreshes the UI.
@@ -1244,5 +1261,6 @@ app.on('will-quit', () => {
   stopBuddyScheduler();
   stopExtensionServer();
   stopSystemDictionary();
+  stopReadingLens();
   stopDebugBridge();
 });
