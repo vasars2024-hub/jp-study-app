@@ -123,22 +123,21 @@
    Secret Frutiger Aero activator (platform chrome, all themes)
    -----------------------------------------------------------------------------
    A near-invisible corner "button" — the hidden discovery from the vision. It
-   reveals a faint glint on hover; double-click toggles the Aero theme. (Typing
+   reveals a faint glint on hover; click toggles the Aero theme. (Typing
    "aero" anywhere outside a text field also toggles it — see SecretAeroTrigger.)
    ============================================================================= */
 .aero-secret-trigger {
   position: fixed;
-  right: 0;
-  bottom: 0;
-  width: 22px;
-  height: 22px;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: default;
+  cursor: pointer;
   opacity: 0;
-  z-index: var(--z-max);
+  z-index: var(--z-max, 2147483000);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
   transition: opacity var(--dur-normal) var(--ease-standard);
 }
 .aero-secret-trigger:hover {

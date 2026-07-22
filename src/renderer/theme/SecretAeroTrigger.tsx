@@ -2,7 +2,7 @@
  * SecretAeroTrigger — the hidden discovery (Phase 1 · M3).
  * -----------------------------------------------------------------------------
  * Renders a near-invisible corner "button" (revealed as a faint glint on hover)
- * that toggles the secret Frutiger Aero theme on double-click. Typing "aero"
+ * that toggles the secret Frutiger Aero theme on click. Typing "aero"
  * anywhere outside a text field toggles it too — an Easter egg. This is the
  * ONLY way into Aero: it is never listed in the theme picker.
  *
@@ -10,7 +10,8 @@
  * OFF, so discovering Aero never loses the user's real theme choice.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useT } from '../i18n';
 import { DEFAULT_THEME_ID, loadThemeId, setTheme } from './engine';
 import { AERO_THEME_ID } from './frutiger-aero';
@@ -27,6 +28,79 @@ import { armLockscreenOnSecretEntry, AERO_ENTRY_LOCKED_EVENT } from '../lockscre
 const SEQUENCE = 'aero';
 const AERO_SHUTDOWN_THEME_DELAY = 820;
 const STUDY_OS_REBOOT_EVENT = 'shell:studyOsReboot';
+const TRIGGER_SIZE = 44;
+
+function readTaskbarHeight(): number {
+  try {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--taskbar-h').trim();
+    const n = parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : 48;
+  } catch {
+    return 48;
+  }
+}
+
+function isAeroMaterialsActive(): boolean {
+  return document.documentElement.getAttribute('data-materials') === 'aero';
+}
+
+/** Pin the activator to the visible desktop corner (4:3 frame in Aero, above taskbar otherwise). */
+function useTriggerPlacement(): CSSProperties {
+  const [style, setStyle] = useState<CSSProperties>(() => ({
+    width: TRIGGER_SIZE,
+    height: TRIGGER_SIZE,
+    right: 0,
+    bottom: readTaskbarHeight(),
+  }));
+
+  useEffect(() => {
+    const update = (): void => {
+      const size = TRIGGER_SIZE;
+      if (isAeroMaterialsActive()) {
+        const frame = document.querySelector('.os-viewport-frame') as HTMLElement | null;
+        if (frame) {
+          const rect = frame.getBoundingClientRect();
+          setStyle({
+            width: size,
+            height: size,
+            top: Math.max(0, rect.bottom - size),
+            left: Math.max(0, rect.right - size),
+            right: 'auto',
+            bottom: 'auto',
+          });
+          return;
+        }
+      }
+      setStyle({
+        width: size,
+        height: size,
+        top: 'auto',
+        left: 'auto',
+        right: 0,
+        bottom: readTaskbarHeight(),
+      });
+    };
+
+    update();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    const stage = document.querySelector('.os-viewport-stage');
+    const frame = document.querySelector('.os-viewport-frame');
+    stage && ro?.observe(stage);
+    frame && ro?.observe(frame);
+
+    window.addEventListener('resize', update);
+    const mo = new MutationObserver(update);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-materials', 'data-taskbar-size'] });
+
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', update);
+      mo.disconnect();
+    };
+  }, []);
+
+  return style;
+}
 
 function isTypingTarget(el: EventTarget | null): boolean {
   const n = el as HTMLElement | null;
@@ -51,6 +125,7 @@ export default function SecretAeroTrigger() {
   const { t, lang } = useT();
   const bufRef = useRef<string>('');
   const [flash, setFlash] = useState<string | null>(null);
+  const placement = useTriggerPlacement();
 
   const toggle = useCallback((): void => {
     const current = loadThemeId();
@@ -100,15 +175,16 @@ export default function SecretAeroTrigger() {
     return () => window.clearTimeout(t);
   }, [flash]);
 
-  return (
+  const ui = (
     <>
       <button
         type="button"
         className="aero-secret-trigger"
+        style={placement}
         tabIndex={-1}
         aria-hidden="true"
         title=""
-        onDoubleClick={toggle}
+        onClick={toggle}
       />
       {flash && (
         <div className="aero-secret-flash" role="status" aria-live="polite">
@@ -117,4 +193,8 @@ export default function SecretAeroTrigger() {
       )}
     </>
   );
+
+  // Portal to <body> so #root zoom / desktop stacking never eats the hit target.
+  if (typeof document !== 'undefined') return createPortal(ui, document.body);
+  return ui;
 }
