@@ -728,6 +728,506 @@ html.reduce-motion .os-aero-boot *::after,
   }
 }
 
+/* =============================================================================
+   PHASE 2 · SHELL REFINEMENT (Account A)
+   -----------------------------------------------------------------------------
+   Visual-only refinement of the desktop shell. Behavior, data contracts,
+   drag/resize handlers, snap logic and window state are untouched.
+
+   SPECIFICITY / PROTECTED-SKIN CONTRACT (carried over from Phase 1, see the
+   P1.4 note in styles.css):
+     `:where(html:not([data-materials='aero']):not([data-materials='wired']))
+      .sel:where(:not(.blanc-root *))`
+   Both `:where()` wrappers contribute ZERO specificity, so each rule below
+   scores exactly the same as the (0,1,0) base rule it refines and wins purely
+   on source order. That matters twice over:
+     - user-preference rules such as `html[data-taskbar-size='compact']
+       .os-task-win` and `html[data-display-transparency='off'] .os-taskbar`
+       are (0,2,0) and therefore still win — taskbar size/transparency prefs
+       are preserved;
+     - `aero-shell.css` / `wired-shell.css` / `blanc.css` are imported AFTER
+       this file (see the import order in `main.tsx`), so the protected skins
+       override on source order as well. The guard is the primary defense and
+       the import order is the backstop.
+   `:not()` is deliberately kept INSIDE `:where()` — a bare `:not()` contributes
+   its argument's specificity, which is the exact defect that had to be fixed in
+   Phase 1 (`998c7f7`).
+
+   MOTION SAFETY: never transition `transform` on `.fwin`. Drag/resize moves the
+   window via transform during the gesture and commits on release; animating it
+   would both fight the gesture and break the perf invariant. Every transition
+   below enumerates its properties explicitly — no `transition: all`.
+   ============================================================================= */
+
+/* ---- P2.1 window chrome ---------------------------------------------------
+   §8: "Active vs inactive windows stay distinguishable without harsh outlines."
+   Baseline focused state was `border-color: var(--accent)` plus a
+   `0 0 0 1px rgba(255,46,77,.35)` ring — a hard red outline around the whole
+   window. Replaced by the elevation ramp: focus now reads as the window
+   lifting off the desktop (elevation-4 vs elevation-2) with a slightly
+   brighter NEUTRAL hairline, and unfocused windows recede via a dimmer border
+   and a muted title. No accent is used for window focus at all.
+   -------------------------------------------------------------------------- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)) {
+  border-color: var(--border);
+  box-shadow: var(--elevation-2);
+  transition:
+    box-shadow var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)).focused {
+  border-color: color-mix(in srgb, var(--text) 20%, var(--border));
+  box-shadow: var(--elevation-4);
+}
+/* Frameless windows (mini/pop-out shells) got the same red focus outline the
+   P2 window-chrome fix removed from `.fwin` but missed here — give them the
+   identical neutral elevation treatment. Guarded like the rest of this file. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin-frameless:where(:not(.blanc-root *)).focused {
+  border-color: color-mix(in srgb, var(--text) 20%, var(--border));
+  box-shadow: var(--elevation-4);
+}
+/* Start-menu file-drop backdrop hardcoded a brand-red wash; track the accent. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-backdrop.drop-ready:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* Title bar: sits one step below the window body so the chrome reads as
+   chrome, and carries the active/inactive signal in text contrast. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)) .fwin-bar {
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-md);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)) .fwin-title {
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)).focused .fwin-title {
+  color: var(--text);
+}
+
+/* Window controls: even hit targets, neutral idle, destructive close keyed off
+   the Phase 1 `--danger` hue rather than brand `--red`, so "close" no longer
+   shares its treatment with the primary action. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)) .fwin-b {
+  width: 30px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)) .fwin-b:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)) .fwin-b:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .fwin:where(:not(.blanc-root *)) .fwin-close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+html.reduce-motion .fwin,
+html.reduce-motion .fwin .fwin-bar,
+html.reduce-motion .fwin .fwin-title,
+html.reduce-motion .fwin .fwin-b {
+  transition: none !important;
+}
+
+/* ---- P2.2 taskbar ---------------------------------------------------------
+   Baseline problems this addresses:
+     - `.os-start-btn` carried `border: 1px solid var(--accent)` while IDLE and
+       a `0 2px 12px rgba(255,46,77,.25)` glow on hover/active. Phase 1's accent
+       classification flagged this idle border as one of the few genuinely
+       decorative accent uses left in the shell layer, deferred to Phase 2.
+     - `.os-task-win.active` and `.os-desktop-switch.active` each stacked TWO
+       accent cues (border-color + inset underline).
+     - every control was a 1px-bordered box, so the bar read as a row of chips.
+   Now: controls are borderless and quiet by default, hover is a soft neutral
+   wash, and the ACTIVE state is a single restrained cue — a raised surface plus
+   a short accent underline. Accent survives only as that active indicator.
+   -------------------------------------------------------------------------- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) {
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+
+/* Shared quiet-control base for every taskbar affordance. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win {
+  position: relative;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  box-shadow: none;
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn:hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch:hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+  box-shadow: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn:focus-visible,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch:focus-visible,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win:focus-visible,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+
+/* Start: brand mark stays red, the button chrome does not. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn {
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text);
+  padding: 0 var(--space-md) 0 var(--space-sm);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-start-btn.active {
+  background: color-mix(in srgb, var(--text) 13%, transparent);
+  color: var(--text);
+}
+
+/* Single active cue: raised surface + a short centered accent underline. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win.active,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch.active {
+  background: color-mix(in srgb, var(--text) 11%, transparent);
+  color: var(--text);
+  border-color: transparent;
+  box-shadow: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win.active::after,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-desktop-switch.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 16px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Minimized windows read as dimmer rather than half-transparent chrome. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win.min {
+  opacity: 1;
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+}
+
+/* RESPONSIVENESS FIX (§8: "no primary control clips or becomes inaccessible"
+   at ~940x600). Baseline `.os-task-win` was `flex-shrink: 0` inside a
+   `overflow-x: auto` strip with a hidden scrollbar: at 940px wide the measured
+   strip was clientWidth 290 / scrollWidth 438, so the 4th task button sat at
+   x=614 past the strip's 561 edge — scrolled out of reach behind the tray with
+   no visible scrollbar to reveal it. Letting the buttons shrink keeps every
+   task reachable; the existing span ellipsis handles the truncation and the
+   icon floor keeps them identifiable. Scrolling still works if enough windows
+   are open to exhaust even the floor. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-task-win {
+  flex: 0 1 auto;
+  min-width: 44px;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+}
+
+/* Group apps vs system tray with a hairline rather than relying on gap alone. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray {
+  gap: var(--space-2xs);
+  padding-left: var(--space-sm);
+  margin-left: var(--space-2xs);
+  border-left: 1px solid var(--border);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-tray-btn:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  color: var(--text);
+}
+/* Clock: balanced against the tray icons instead of crowding the edge. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-taskbar:where(:not(.blanc-root *)) .os-clock {
+  padding: 0 var(--space-2xs) 0 var(--space-sm);
+  color: var(--text);
+}
+
+html.reduce-motion .os-taskbar .os-start-btn,
+html.reduce-motion .os-taskbar .os-desktop-switch,
+html.reduce-motion .os-taskbar .os-task-win,
+html.reduce-motion .os-taskbar .os-tray-btn {
+  transition: none !important;
+}
+
+/* ---- P2.3 launcher (legacy Start) -----------------------------------------
+   Scoped to `.os-start-legacy` throughout so the Aero/Wired start variant
+   (`.os-start-aero-menu`) is never reached — the execution plan requires
+   leaving it untouched, and it shares the `.os-start` root class.
+
+   Baseline problems: 20+ app tiles in ONE flat grid with no grouping, every
+   icon rendered in the same brand red (`.os-start-app-ic { color: var(--red) }`),
+   so the panel read as an undifferentiated wall of identical red squares.
+   -------------------------------------------------------------------------- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) {
+  width: 380px;
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-5);
+  /* Cap the panel so the added group headers can never push the footer off
+     screen at ~940x600; the group list scrolls instead. */
+  max-height: min(76vh, 720px);
+  display: flex;
+  flex-direction: column;
+  animation: osStartIn var(--dur-normal) var(--ease-decelerate);
+}
+@keyframes osStartIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Search: the primary way into the launcher, so it gets real weight — a filled
+   input-like field rather than a faint ghost row. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-search {
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-search:hover {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-search-ph {
+  color: var(--muted);
+}
+
+/* Grouping. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 calc(var(--space-xs) * -1);
+  padding: 0 var(--space-xs);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-group-label {
+  margin: 0 0 var(--space-xs);
+  font-size: 10.5px;
+  font-weight: var(--font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+/* Quieter identical icons. The default app tile is now a neutral raised
+   surface with a --text-toned glyph; brand red is no longer spent on 20
+   identical squares. The categorical `tone-*` tiles (widgets / note / add)
+   keep their distinct hues — they are genuinely different actions, and this
+   is the "Phase-2 icon-tone decision" Phase 1's accent audit deferred. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app-ic {
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: color-mix(in srgb, var(--text) 74%, transparent);
+  box-shadow: none;
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app:hover .os-start-app-ic {
+  background: var(--surface-3);
+  color: var(--text);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app {
+  border-color: transparent;
+  border-radius: var(--radius-md);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app:hover {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border-color: transparent;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-app:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+/* Pinned stays an accent cue (real state), just a quieter one. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .os-start-legacy:where(:not(.blanc-root *)) .os-start-tile.pinned .os-start-app-ic {
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+html.reduce-motion .os-start-legacy,
+html.reduce-motion .os-start-legacy .os-start-search,
+html.reduce-motion .os-start-legacy .os-start-app-ic {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ---- P2.4 widget gallery --------------------------------------------------
+   Baseline problems: every one of the ~12 visible cards carried a FILLED
+   accent "Add" button, so a dozen primary actions competed in one region
+   (§8: "normally one dominant primary action per local region"); the category
+   was repeated in accent text on every card instead of grouping them; and the
+   cards were bordered boxes stacked on a bordered panel.
+   -------------------------------------------------------------------------- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) {
+  width: min(820px, 92vw);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-5);
+  background: var(--surface-1);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-groups {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-group-label {
+  margin: 0 0 var(--space-sm);
+  font-size: 10.5px;
+  font-weight: var(--font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+/* Responsive card sizing: narrower floor so the grid reflows to 1 column at
+   ~940 instead of overflowing. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: var(--space-sm);
+  padding: 0;
+  overflow: visible;
+}
+
+/* Card: surface contrast, no border (one containment cue — §8). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card {
+  gap: var(--space-2xs);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  transition:
+    background var(--dur-instant) var(--ease-standard),
+    border-color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:focus-within {
+  background: var(--surface-3);
+}
+/* Installed reads as a quiet neutral state, never as an accent alarm. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card.installed {
+  border-color: color-mix(in srgb, var(--text) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  align-self: center;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+/* Hover-revealed add: quiet by default, so the eye is not pulled to a dozen
+   competing red buttons. Stays permanently visible for keyboard users and on
+   touch/coarse pointers, where "hover to reveal" would hide the action. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-add {
+  margin-top: 0;
+  opacity: 0.72;
+  transition: opacity var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:hover .widget-card-add,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-add:focus-visible {
+  opacity: 1;
+}
+@media (hover: none), (pointer: coarse) {
+  :where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card-add {
+    opacity: 1;
+  }
+}
+
+/* Favorite: a real toggle, gold only when on. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-instant) var(--ease-standard), color var(--dur-instant) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-card:hover .widget-fav,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav.on,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav:focus-visible {
+  opacity: 1;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-fav:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+
+/* Tabs: quiet pills, accent reserved for the selected one. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-tab.active {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  border-color: transparent;
+  color: var(--text);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+/* Real empty state instead of a bare line of text. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-3xl) var(--space-lg);
+  color: var(--muted);
+  text-align: center;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .widget-gallery:where(:not(.blanc-root *)) .widget-gallery-empty-title {
+  margin: 0;
+  font-size: var(--font-size-md, 13px);
+}
+
+html.reduce-motion .widget-gallery .widget-card,
+html.reduce-motion .widget-gallery .widget-card-add,
+html.reduce-motion .widget-gallery .widget-fav {
+  transition: none !important;
+}
+
 html.secret-lifecycle-suspended .os-env-stack,
 html.secret-lifecycle-suspended .os-wall-visualizer,
 html.secret-lifecycle-suspended .os-weather {

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useSettings } from './SettingsContext';
+import { useT } from '../../i18n';
 
 export default function SettingsCard({
   id,
@@ -8,7 +9,9 @@ export default function SettingsCard({
   trailing,
   children,
   advanced,
-  advancedLabel = 'Advanced',
+  /** Defaults to the translated "Advanced" label; resolved at render, not in
+      the default parameter, since `t` isn't available at that point. */
+  advancedLabel,
   highlight,
   /** Hide this entire card unless Advanced Mode is on. */
   advancedOnly,
@@ -24,6 +27,8 @@ export default function SettingsCard({
   advancedOnly?: boolean;
 }) {
   const { advancedMode } = useSettings();
+  const { t } = useT();
+  const advLabel = advancedLabel ?? t('settings.nav.advanced');
   const [openAdv, setOpenAdv] = useState(false);
   const ref = useRef<HTMLElement>(null);
   const titleId = useId();
@@ -50,7 +55,9 @@ export default function SettingsCard({
         <div className="os-set-card-text">
           <h3 id={titleId} className="os-set-card-title">
             {title}
-            {advancedOnly && <span className="os-set-adv-badge">Advanced</span>}
+            {advancedOnly && (
+              <span className="os-set-adv-badge">{t('settings.card.advancedBadge')}</span>
+            )}
           </h3>
           {description && <p className="os-set-card-desc muted">{description}</p>}
         </div>
@@ -65,13 +72,15 @@ export default function SettingsCard({
             aria-expanded={openAdv}
             onClick={() => setOpenAdv((o) => !o)}
           >
-            {openAdv ? 'Hide' : 'Show'} {advancedLabel}
+            {openAdv
+              ? t('settings.card.hideAdvanced', { label: advLabel })
+              : t('settings.card.showAdvanced', { label: advLabel })}
           </button>
           {openAdv && <div className="os-set-card-advanced-body">{advanced}</div>}
         </div>
       )}
       {advanced && !advancedMode && (
-        <p className="muted os-set-card-adv-hint">Turn on Advanced in the left rail to edit more options here.</p>
+        <p className="muted os-set-card-adv-hint">{t('settings.card.advancedLocked')}</p>
       )}
     </section>
   );

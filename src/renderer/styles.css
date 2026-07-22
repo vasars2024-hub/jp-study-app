@@ -4,35 +4,80 @@
   /* Tell Chromium the UI is dark so NATIVE widgets (select dropdown lists,
      scrollbars, checkboxes) render dark instead of stock white. */
   color-scheme: dark;
-  --bg: #0f0e13;
-  --panel: #17161d;
-  --panel-2: #211f29;
-  --sidebar: #0a0a0e;
+  /* Surface ladder (P1.2) — widened luminance gaps so windows lift off the
+     desktop and raised cards/menus separate from the window body WITHOUT a
+     border. Study-os (default, no data-theme) ONLY: every named theme, Aero
+     ([data-materials='aero']) and Wired ([data-theme='wired-archive']) define
+     their own --bg/--panel/--panel-2/--sidebar and are unaffected.
+       sidebar #0a0910  (recessed rail / wells — darkest)
+       bg      #0d0c12  (desktop backdrop)
+       panel   #1a1823  (window body / primary surface)
+       panel-2 #272433  (raised: cards, menus, popovers) */
+  --bg: #0d0c12;
+  --panel: #1a1823;
+  --panel-2: #272433;
+  --sidebar: #0a0910;
   --text: #f5f4f7;
   --muted: #9d97a6;
   --border: #2d2b37;
   --accent: #ff2e4d;
   --accent-2: #ff6b81;
+  /* Subtle accent wash for hover fills on quiet controls (ghost buttons, etc.).
+     Derives from the live --accent (set by the accent-preset personalization),
+     so it re-tints automatically. Was referenced by .ui-btn--ghost:hover but
+     never defined (P1.4). */
+  --accent-weak: color-mix(in srgb, var(--accent) 14%, transparent);
   --red: #ff2e4d;
   --red-deep: #d21734;
+  /* Destructive / danger family (P1.1 semantic split) — a DEEPER, less-saturated
+     brick red, deliberately distinct from the brighter pink-leaning brand --accent
+     so a destructive action / error never reads as a primary action. --danger was
+     already consumed via var(--danger, <fallback>) in several places but never
+     defined; defining it here unifies those ad-hoc fallbacks. --red stays the brand
+     red (Aero/Wired depend on it) and is NOT the error signal anymore. */
+  --danger: #d13438;
+  --danger-2: #e35b5f;
+  --danger-deep: #a4262c;
+
+  /* Semantic surface ladder aliases (P1.2) — so components stop hardcoding
+     greys and reference an elevation level instead. These are var()/color-mix
+     aliases over each theme's OWN --bg/--panel/--panel-2/--sidebar/--control-bg,
+     so they resolve correctly in every theme, Aero and Wired with no per-theme
+     edits (elevation reads via luminance on dark themes, via the elevation ramp
+     on light ones). */
+  --surface-0: var(--bg);                 /* desktop / app backdrop            */
+  --surface-1: var(--panel);              /* window body / primary surface     */
+  --surface-2: var(--panel-2);            /* raised: cards, menus, popovers    */
+  --surface-3: color-mix(in srgb, var(--panel-2) 86%, #ffffff 14%); /* highest */
+  --surface-sunken: var(--sidebar);       /* recessed rail / inset wells       */
+  --surface-input: var(--control-bg);     /* form-control field background     */
 
   /* ---------- Design tokens ----------
      Single source of truth for spacing, radii, type and elevation. Component
      rules reference these instead of hardcoding values so Module A (CSV
      editor) and Module B (EPUB miner) can never drift apart again, and so
      themes only need to override colors. */
+  /* Spacing scale ownership (P1.3): the CORE steps (2xs..xl below, plus the
+     4/8/12/16/20/24 base rhythm) live HERE in styles.css; the larger EXTENSION
+     steps (--space-2xs 2, --space-2xl 32, --space-3xl 48, --space-4xl 64) live
+     in tokens.css. Consumers should reference these tokens, not raw px. */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
   --space-lg: 16px;
+  --space-lg-2: 20px;  /* fills the missing 4px step between lg(16) and xl(24) */
   --space-xl: 24px;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --font-body: 'Segoe UI', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.28);
-  --shadow-toolbar: 0 1px 5px rgba(0, 0, 0, 0.22);
+  /* Legacy shadow aliases repointed onto the canonical elevation ramp
+     (--elevation-*, defined in tokens.css) so the app has ONE shadow system,
+     not two (P1.3). Named themes that override these keep their own values;
+     Aero overrides them too; Wired does not consume them. */
+  --shadow-card: var(--elevation-2);
+  --shadow-toolbar: var(--elevation-1);
 
   /* Shared form-control look (inputs, selects, textareas in both modules). */
   --control-bg: rgba(0, 0, 0, 0.22);
@@ -51,7 +96,9 @@
   --start-cols: 4;
   --desk-icon-w: 92px;
   --desk-icon-h: 88px;
-  --motion-duration: 0.14s;
+  /* Repointed onto the canonical motion scale (--dur-fast = 140ms = 0.14s, an
+     identical value) so shell/personalization share one duration system (P1.3). */
+  --motion-duration: var(--dur-fast);
 
   /* Scrollbars ? track/thumb follow theme + accent (updated by personalization). */
   --scrollbar-size: 8px;
@@ -773,6 +820,13 @@ h1 {
   font-size: 24px;
 }
 
+/* Base .btn kept verbatim as the skin-safe structural base: Aero
+   ([data-materials='aero']), Wired ([data-materials='wired']) and Blanc
+   (.blanc-root) override .btn COLORS at higher specificity and INHERIT this
+   structure, so leaving it unchanged keeps them pixel-identical to baseline.
+   The refined ui-btn-parity treatment for study-os + the named colour themes
+   is layered lower in this file under a zero-specificity :where() guard that
+   excludes the Aero/Wired material scopes (search "P1.4 refined .btn"). */
 .btn {
   background: var(--panel-2);
   color: var(--text);
@@ -4339,6 +4393,20 @@ mark.lookup-mark,
   margin: 0 0 8px;
   color: var(--accent);
 }
+/* Account B — Phase 3A. `.anki-setup-msg` is used only by AnkiSetup.tsx (part
+   of the Anki screen) with no protected-skin overrides, so it is B-owned.
+   It carried the setup failure text ("Can't reach Anki.") in the BRAND hue —
+   §8 forbids brand and error sharing a treatment.
+
+   Blanc renders this text too (BlancStudyPanels → AnkiDisconnected → AnkiSetup)
+   and overrides --status-error inside .blanc-root, so it is excluded to stay
+   byte-identical. Under Aero/Wired the swap is a no-op by construction: Phase 1
+   (998c7f7) pins --status-error back to var(--red), which equals --accent
+   there — the guard is kept for consistency, not because it changes anything. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .anki-setup-msg:where(:not(.blanc-root *)) {
+  color: var(--status-error);
+}
 .anki-setup-sub {
   margin: 0 0 8px;
   color: var(--muted);
@@ -4530,6 +4598,56 @@ mark.lookup-mark,
 .status-dot.warn {
   background: #d4a04a;
 }
+
+/* ============================================================================
+   Account B — Phase 3A (Anki connection status).
+
+   `.status-banner` / `.status-dot` are used only by anki/AnkiContent.tsx and
+   views/AnkiView.tsx, so they are exclusively B-owned (master §15(1)).
+
+   Same Phase 1 guard as elsewhere: Aero and Wired carry their own overrides in
+   aero-apps.css / wired-apps.css and are excluded here, as is Blanc — all three
+   keep their baselines.
+
+   NOT touched here: `.form-msg.err` has the same brand-hue-as-error defect
+   (`color: var(--accent)`, styles.css:5145) but is shared with AiCardStudio,
+   ProfileSwitcher and SettingsView, so it fails §15(1). Filed as an integration
+   request for Account A rather than edited from this branch.
+   ========================================================================== */
+/* §8: one strong containment cue. Each variant previously had a tinted fill AND
+   a full 1px ring; the ring gives way to a status-hue bar, which reads calmer
+   and still carries the state non-verbally.
+
+   `border: none` must sit on the *variant* rules, not on the bare
+   `.status-banner`: the border is declared by `.status-banner.bad/.warn/.ok`
+   at (0,2,0), so a (0,1,0) reset would silently lose to it. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-banner.bad:where(:not(.blanc-root *)) {
+  /* Was hardcoded rgba(224,85,106). Now the semantic error token Phase 1 split
+     out from the brand hue. */
+  border: none;
+  background: color-mix(in srgb, var(--status-error) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--status-error);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-banner.warn:where(:not(.blanc-root *)) {
+  border: none;
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--status-warning);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-banner.ok:where(:not(.blanc-root *)) {
+  border: none;
+  background: color-mix(in srgb, var(--status-info) 12%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--status-info);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .status-dot.bad:where(:not(.blanc-root *)) {
+  /* Was `var(--accent)` — the brand hue standing in for an error state, which
+     §8 forbids sharing between brand and error. */
+  background: var(--status-error);
+}
+
 .anki-card {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -5850,6 +5968,21 @@ mark.lookup-mark,
   background: var(--panel-2);
   box-shadow: inset 0 0 0 1px var(--accent);
   border-color: var(--accent);
+  color: var(--text);
+}
+/* P1.6: align .gram-level-btn to the shared .ui-segmented language for study-os
+   + named themes only (Aero/Wired/Blanc excluded via the zero-specificity
+   guard; Wired restyles it in-scope). Drops the accent idle-hover BORDER (§8);
+   the selected segment keeps a restrained accent cue, not a full accent ring. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-level-btn:where(:not(.blanc-root *)):hover {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--text) 6%, var(--panel));
+  color: var(--text);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-level-btn:where(:not(.blanc-root *)).active {
+  background: var(--surface-2);
+  border-color: transparent;
+  box-shadow: var(--elevation-1), inset 0 0 0 1px var(--accent-weak);
   color: var(--text);
 }
 .gram-search {
@@ -8973,6 +9106,33 @@ mark.lookup-mark,
 .jiten-row.active {
   background: rgba(180, 50, 58, 0.14);
 }
+
+/* --- Novels / Jiten browser (every-app pass) — calm/macOS refinement,
+   default + named themes only. Replaces the hardcoded legacy-maroon selection
+   tints (rgba(180,50,58,…), which ignore the theme accent and read red under an
+   amber accent) with a neutral hover wash + an accent-FOLLOWING active tint, and
+   repoints the muddy translucent workbench-panel fill onto the surface ladder.
+   All rules carry the Phase 1 guard so Aero/Wired keep their maroon baseline and
+   Blanc keeps its own skin (master §4). Panel border/radius are left intact —
+   a single hairline is a legitimate containment cue (§8). --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-filters:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-table-wrap:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-inspector:where(:not(.blanc-root *)) {
+  background: var(--surface-1);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-row:where(:not(.blanc-root *)):hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-row.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .aero-novels-command:where(:not(.blanc-root *)):hover,
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .aero-novels-command.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .jiten-source-buttons button.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
 .jiten-row-title {
   min-width: 0;
   display: flex;
@@ -9800,6 +9960,21 @@ mark.lookup-mark,
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* --- Statistics (Phase 3B) — calm/macOS refinement, default study-os only.
+   `.stats-card` and `.stats-chart` carried two containment cues (border + fill);
+   collapse each to a single surface cue. The chart bars keep accent — they are
+   meaningful data (§8 allows accent for data/progress). Guarded out of Aero
+   (its protected `aero-stats-*` render branch), Wired, and Blanc (its
+   `[class^='stats-']` re-skin in blanc-native.css). --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .stats-card:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .stats-chart:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
 }
 .stats-section {
   margin-bottom: 26px;
@@ -10919,6 +11094,29 @@ mark.lookup-mark,
   color: var(--accent, #ff2e4d);
   border-color: var(--accent, #ff2e4d);
   background: rgba(255, 46, 77, 0.12);
+}
+
+/* --- Media & Music (every-app pass) — accent-consistency refinement.
+   These selection/active/on states hardcoded rgba(255,46,77) (the default accent
+   literal), so under a personalized amber accent they stayed red while the rest
+   of the UI followed the accent. Repointed to color-mix over var(--accent) so
+   they track the theme — visually identical in default study-os and Aero (both
+   accent #ff2e4d), amber under personalization. Guarded so Aero/Wired keep the
+   literal baseline and Blanc keeps its own skin (master §4). --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .media-folder-row.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .music-row.active:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .music-line.active:where(:not(.blanc-root *)) {
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .mwidget-btn.on:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .music-liked-chip.on:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .music-liked-chip + .music-sort {
   margin-left: 6px;
@@ -13240,6 +13438,106 @@ html[data-taskbar-size='large'] .os-tray-btn {
   background: rgba(255, 46, 77, 0.12);
   border-color: var(--accent);
 }
+/* Danger button hover leaked the brand accent (red bg + accent border) instead
+   of the danger hue — a §8 semantic-state leak Phase 1 fixed on the base but not
+   the hover. Repoint to --danger in default/named themes; Aero/Wired/Blanc keep
+   the baseline above. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn.danger:where(:not(.blanc-root *)):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: var(--danger);
+}
+
+/* ==========================================================================
+   P1.4 refined .btn — reconcile legacy .btn tiers with the .ui-btn primitives
+   --------------------------------------------------------------------------
+   Applies ONLY to study-os + the named colour themes: the zero-specificity
+   guard excludes the three protected systems — Aero/Wired via the
+   `html:not([data-materials='aero']):not([data-materials='wired'])` ancestor,
+   and Blanc via the `:where(:not(.blanc-root *))` on the button itself (Blanc's
+   buttons all live under `.blanc-root`; the `blanc-mode-enabled` <html> flag is
+   NOT used because it is also set on the study-os main window). Protected
+   buttons keep the verbatim base .btn structure + their own in-scope overrides
+   and stay pixel-identical to baseline. Both `:where()` wrappers contribute 0
+   specificity, so these rules match the specificity of the original tier rules
+   above and win purely by source order — per-screen contextual overrides
+   (higher specificity) still win over them as before.
+   Result: ~500 bespoke .btn call-sites get the refined look with no TSX edits,
+   rendering identically to .ui-btn so Account B can adopt either class.
+   ========================================================================== */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  background: var(--control-bg);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  box-shadow: var(--elevation-1), inset 0 1px 0 var(--glass-highlight);
+  transition: filter var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):hover:not(:disabled) {
+  border-color: var(--glass-border);
+  filter: brightness(1.07);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):active:not(:disabled) {
+  transform: translateY(0.5px);
+  filter: brightness(0.96);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):disabled {
+  opacity: var(--alpha-disabled);
+  cursor: default;
+  pointer-events: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)):focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+/* Primary = the single filled brand action per region (matches .ui-btn--primary). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).primary {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 88%, #fff 12%), var(--accent));
+  color: #fff;
+  border-color: color-mix(in srgb, var(--accent) 60%, #000 12%);
+  box-shadow: var(--elevation-1), inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow: var(--elevation-2), inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
+}
+/* Destructive = the deeper --danger hue, distinct from brand (matches .ui-btn--danger under study-os). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).danger {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, #fff 12%), var(--danger));
+  color: #fff;
+  border-color: color-mix(in srgb, var(--danger) 60%, #000 12%);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).danger:hover:not(:disabled) {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, #fff 12%), var(--danger));
+  filter: brightness(1.07);
+}
+/* Quiet ghost tier (matches .ui-btn--ghost) — legacy had none. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).ghost {
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).ghost:hover:not(:disabled) {
+  background: var(--accent-weak);
+  filter: none;
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .btn:where(:not(.blanc-root *)).small {
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+}
+
 .memory-status {
   margin: 4px 0 0;
   font-size: 0.8rem;
@@ -13356,6 +13654,51 @@ html[data-taskbar-size='large'] .os-tray-btn {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ============================================================================
+   Account B — Phase 3A (Settings). App-local: every selector below is scoped to
+   a B-owned `.os-set-*` class and redefines no shared component contract.
+
+   Guarded with the idiom Phase 1 established (see ui.css:59, 121, 165):
+   `:where()` contributes NO specificity, so each rule scores exactly the same
+   as the base rule it refines and wins on source order alone — while Aero
+   (which additionally has its own higher-specificity `:root[data-materials=
+   'aero']` rules), Wired (which inherits the base look and has no rules of its
+   own here) and Blanc are all excluded and keep their baselines untouched.
+   ========================================================================== */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .os-set-card:where(:not(.blanc-root *)) {
+  /* §8: a standard card gets ONE containment cue. Was border + fill together;
+     surface contrast now carries it alone. */
+  border: none;
+  background: var(--surface-2);
+}
+/* Advanced Mode re-tints cards indigo via `.os-settings-v2.is-advanced
+   .os-set-card` (styles.css:12528, specificity (0,3,0)). That is an existing
+   user-facing affordance, so it is preserved — just re-based onto the new
+   surface so Advanced Mode doesn't fall back to the old --panel-2 ladder. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .os-settings-v2.is-advanced
+  .os-set-card:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, #6366f1 5%, var(--surface-2));
+}
+/* Note the `.os-set-nav-v2` ancestor: the live rule that actually wins for the
+   active item is `.os-set-nav-v2 .os-set-nav-item.active` (styles.css:12699,
+   an accent-88%/#000 fill), not the bare `.os-set-nav-item.active` at :12491.
+   Matching that ancestor keeps this at the same (0,3,0) specificity so it wins
+   on source order; Aero's own `:root[data-materials='aero']` rule is likewise
+   (0,3,0) but loads later in aero-apps.css, so Aero still wins there. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .os-set-nav-v2
+  .os-set-nav-item.active:where(:not(.blanc-root *)) {
+  /* Was a near-full accent fill — the loudest accent use on the screen. Surface
+     contrast now carries selection, and accent is reduced to a 2px current-item
+     bar (§6: accent for active nav, not as a fill). */
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--elevation-1), inset 2px 0 0 0 var(--accent);
+}
+
 .os-zoom-row {
   display: flex;
   align-items: center;
@@ -19812,6 +20155,23 @@ html.lockscreen-widget-root #root {
   color: var(--accent-2);
   border: 1px solid rgba(108, 123, 255, 0.35);
 }
+/* Account B — Phase 3A. `.rf-level-badge` is Reading-Finder-only (rf-*), with
+   no protected-skin overrides, so it is B-owned.
+
+   It was brand-hued text (`--accent-2`) inside a mismatched *blue* border on
+   cards that are all idle — §8 ("inactive cards have no accent-coloured
+   border/outline", and brand reserved for active/primary). This is one of the
+   207 idle app-family accent uses Account A's P1.7 classification handed to B.
+
+   The JLPT range is metadata, not status, so it becomes a quiet neutral chip:
+   one cue (a soft fill), no border, no brand hue. The sibling
+   `.rf-furigana-badge` keeps its green — that one encodes a real yes/no fact. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .rf-level-badge:where(:not(.blanc-root *)) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+  border: none;
+}
 .rf-furigana-badge {
   display: inline-flex;
   align-items: center;
@@ -20789,6 +21149,33 @@ html.lockscreen-widget-root #root {
 .gx-notebook-lineage-label { color: inherit; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gx-notebook-lineage-count { font-weight: 700; }
 
+/* --- Notebook (Phase 3B) — calm/macOS refinement, default study-os only.
+   Two-cue cards (border + fill) collapse to a single surface cue; selection
+   drops the full accent ring for a restrained inset hairline. Guarded out of
+   Aero/Wired (baseline skin equivalence, master §4) and Blanc (its own
+   `[class^='gx-notebook']` re-skin in blanc-native.css). :where() keeps the
+   guard at 0 specificity so these win over the base rules on source order only,
+   and app/skin overrides still out-specify them. --- */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-count:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-count:where(:not(.blanc-root *)):hover {
+  background: var(--surface-3);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-count.active:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-item-btn:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gx-notebook-item-btn:where(:not(.blanc-root *)):hover {
+  background: var(--surface-3);
+}
+
 .tr-tabs { margin: 8px 0; }
 .tr-history { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .tr-history-empty { padding: 32px 12px; text-align: center; }
@@ -20857,4 +21244,29 @@ html.lockscreen-widget-root #root {
   text-decoration: underline wavy;
   text-underline-offset: 0.2em;
   text-decoration-color: var(--danger, #d05050);
+}
+
+/* ===================================================================
+   Every-app pass (user-requested) — per-app card polish.
+   Content cards across the long-tail apps carried two containment cues
+   (1px solid var(--border) + var(--panel) fill), a §8 violation. Collapse each
+   to a single surface cue (borderless raised --surface-2). Deliberately EXCLUDED:
+   .cal-month-cell (border = the calendar grid), .consent-card (prominent modal),
+   .flash-card (the study surface reads as a real card), the card-*-menu dropdowns
+   (menu border is structural). All rules guarded so Aero/Wired keep their skin
+   baseline and Blanc keeps its own re-skin (master §4); equal specificity to the
+   originals, so they win on source order only and app/skin overrides still out-
+   specify them.
+   =================================================================== */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .cs-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .gram-item:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .bundle-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .bundle-download-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .media-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .cbh-card:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .guide-item:where(:not(.blanc-root *)),
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .pl-item:where(:not(.blanc-root *)) {
+  border: 0;
+  background: var(--surface-2);
 }

@@ -46,9 +46,19 @@
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
 }
 .ui-btn--danger {
-  --_bg: color-mix(in srgb, var(--red) 14%, var(--control-bg));
-  color: var(--text);
-  border-color: color-mix(in srgb, var(--red) 40%, var(--border));
+  /* Base uses --red so Aero/Wired (which restyle .ui-btn in-scope) stay at
+     baseline; study-os + named themes get the deeper --danger via the guarded
+     rule below. */
+  --_bg: linear-gradient(to bottom, color-mix(in srgb, var(--red) 88%, #fff 12%), var(--red));
+  color: #fff;
+  border-color: color-mix(in srgb, var(--red) 60%, #000 12%);
+}
+/* P1.4: destructive keyed off the deeper --danger for study-os + named themes;
+   Aero/Wired/Blanc (protected) keep the --red base above. :where() = 0
+   specificity so this only wins by source order, not over in-scope skin rules. */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .ui-btn--danger:where(:not(.blanc-root *)) {
+  --_bg: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, #fff 12%), var(--danger));
+  border-color: color-mix(in srgb, var(--danger) 60%, #000 12%);
 }
 .ui-btn--ghost { --_bg: transparent; box-shadow: none; border-color: transparent; }
 .ui-btn--ghost:hover { --_bg: var(--accent-weak); }
@@ -82,12 +92,58 @@
 .ui-icon-btn:disabled { opacity: var(--alpha-disabled); pointer-events: none; }
 
 /* ---------- Surfaces: Card / GlassCard / Panel --------------------------- */
+/* Shared card set (P1.5). Cards separate by SURFACE CONTRAST + a soft
+   elevation, not by a 1px border — borders are reserved for inputs/focus
+   (§8: a standard card uses ≤1 strong containment cue). Built on the P1.2
+   surface ladder so a card reads as "raised" above the window body in every
+   theme. Base / --quiet / --interactive cover the small variant set the app
+   should converge on; app-owned *-card families (Account B) adopt these.
+
+   NOTE: the .ui-card / .ui-panel rules immediately below are the ORIGINAL
+   baseline declarations, kept verbatim because Aero / Wired / Blanc do not
+   override these classes and would otherwise inherit the refinement. The
+   refined surface-contrast treatment is layered further down behind the skin
+   guard, so only study-os + named themes receive it. */
 .ui-card {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--elevation-2);
   padding: var(--space-lg);
+}
+/* Refinement for study-os + named themes only (Aero/Wired/Blanc excluded).
+   The guard conditions sit inside :where() so they add NO specificity — the
+   selector scores exactly (0,1,0), identical to `.ui-card` above, and wins on
+   source order alone. That keeps the variants below (and any app-level card
+   override) able to out-specify it, which a `:not()`-outside-:where() guard
+   would silently break: :not() contributes its argument's specificity. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .ui-card:where(:not(.blanc-root *)) {
+  background: var(--surface-2);
+  border: none;
+}
+/* Quiet: flat grouping surface, no shadow — relies on surface step alone. */
+.ui-card--quiet {
+  background: var(--surface-1);
+  box-shadow: none;
+}
+/* Interactive: clickable card with a restrained hover lift (no accent). */
+.ui-card--interactive {
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.ui-card--interactive:hover {
+  background: var(--surface-3);
+  box-shadow: var(--elevation-3);
+}
+.ui-card--interactive:active {
+  transform: translateY(0.5px);
+}
+.ui-card--interactive:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 .ui-glass-card {
   background: var(--glass-tint);
@@ -103,6 +159,12 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-md);
+}
+/* Same guard/specificity contract as .ui-card above. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .ui-panel:where(:not(.blanc-root *)) {
+  background: var(--surface-1);
+  border: none;
 }
 
 /* ---------- Window ------------------------------------------------------- */
@@ -287,6 +349,15 @@
   border-bottom: 1px solid var(--glass-border);
   box-shadow: var(--shadow-toolbar);
 }
+/* Every-app pass (user-requested): flatten the toolbar in the default/named
+   themes so it reads as a macOS toolbar — no grey chrome band or drop shadow,
+   just a single hairline separator; the search box and buttons float on the
+   window surface. Guarded so Aero's glass sheen, Wired, and Blanc keep their
+   own toolbar treatment (master §4). */
+:where(html:not([data-materials='aero']):not([data-materials='wired'])) .ui-toolbar:where(:not(.blanc-root *)) {
+  background: transparent;
+  box-shadow: none;
+}
 .ui-toolbar__spacer { flex: 1; }
 .ui-toolbar__sep { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--glass-border); }
 
@@ -302,6 +373,51 @@
 .ui-tab:hover { color: var(--text); }
 .ui-tab[aria-selected='true'] { color: var(--accent); border-bottom-color: var(--accent); }
 .ui-tab:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: -2px; }
+
+/* ---------- Segmented control (P1.6, previously missing) -----------------
+   A pill group of mutually-exclusive options. The selected segment reads as a
+   raised surface pill (surface contrast + soft elevation) — accent is used
+   only as a thin selected accent bar/text, never as an idle border. Ad-hoc
+   segmented controls (.gram-level-btn; seg() which is already .btn-based)
+   converge on this language. Selected via [aria-selected], .active or
+   .selected so existing markup can adopt it without JS changes. */
+.ui-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+}
+.ui-segmented__item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+.ui-segmented__item:hover:not([aria-selected='true']):not(.active):not(.selected) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.ui-segmented__item[aria-selected='true'],
+.ui-segmented__item.active,
+.ui-segmented__item.selected {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--elevation-1), inset 0 0 0 1px var(--accent-weak);
+}
+.ui-segmented__item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -1px;
+}
 
 /* ---------- Tooltip (wrapper-relative; zoom-safe, no JS coords) ---------- */
 .ui-tooltip-wrap { position: relative; display: inline-flex; }
