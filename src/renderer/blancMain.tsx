@@ -23,6 +23,9 @@ import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
 import { applyLangAttribute, initI18n } from './i18n';
 import { applyBlancModeClass } from './blancMode';
+import { applyBlancTheme } from './blancThemeApply';
+import { applyBlancCustomCss } from './blancCustomCssApply';
+import { loadToolboxSettings } from './toolboxSettings';
 import { bootTheme, onThemeChanged } from './theme';
 import { initProfileState } from './profileState';
 import { installKeyboardShortcuts } from './keyboardShortcuts';
@@ -84,6 +87,13 @@ if (typeof MutationObserver !== 'undefined') {
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-materials'] });
 }
 applyBlancModeClass();
+// Theme + custom CSS (Pillar 4) must apply at boot, not lazily when the settings
+// panel first mounts: the settings panel is only rendered on the Settings tab, so
+// without this a saved theme would not paint until the user visited it, and — more
+// importantly — the custom-CSS lockout guard would be absent on every other tab.
+const bootToolbox = loadToolboxSettings();
+applyBlancTheme(bootToolbox.themePreset, bootToolbox.themeOverrides);
+applyBlancCustomCss(bootToolbox.customCss);
 applyLangAttribute();
 installNotificationCapture();
 installBlancConsoleCapture();

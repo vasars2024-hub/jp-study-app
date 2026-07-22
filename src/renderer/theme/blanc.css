@@ -2577,6 +2577,35 @@ html.blanc-mode-enabled.blanc-mode-dark body {
   font-size: 0.8em;
 }
 
+/* Custom CSS escape hatch (Pillar 4). */
+.blanc-custom-css {
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  font-family: var(--blanc-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 2;
+  color: var(--blanc-text);
+  background: var(--blanc-panel-soft);
+  border: 1px solid var(--blanc-border);
+  border-radius: var(--blanc-radius-sm, 4px);
+  white-space: pre;
+  overflow: auto;
+}
+
+.blanc-custom-css:focus {
+  outline: none;
+  border-color: var(--blanc-accent);
+}
+
+.blanc-custom-css-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--blanc-faint);
+}
+
 /* Developer console (Pillar 5). */
 .blanc-console-list {
   list-style: none;

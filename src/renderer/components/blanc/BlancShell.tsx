@@ -43,6 +43,8 @@ import {
   saveToolboxSettings,
 } from '../../toolboxSettings';
 import { applyBlancTheme } from '../../blancThemeApply';
+import { applyBlancCustomCss } from '../../blancCustomCssApply';
+import { MAX_CUSTOM_CSS_LENGTH } from '../../../shared/blancCustomCss';
 import {
   BLANC_THEME_PRESETS,
   BLANC_THEME_TOKENS,
@@ -2491,9 +2493,14 @@ function BlancSettingsPanel({
   const [settingsQuery, setSettingsQuery] = useState('');
   const [settingsImport, setSettingsImport] = useState('');
   const [settingsMsg, setSettingsMsg] = useState('');
+  // Draft for the custom-CSS textarea, committed on Apply rather than per
+  // keystroke: applying re-injects two stylesheets, not worth doing on every key.
+  // Re-syncs when the persisted value changes elsewhere (import / clear).
+  const [cssDraft, setCssDraft] = useState(() => loadToolboxSettings().customCss);
 
   useEffect(() => onBlancMemoryChanged(setMemory), []);
   useEffect(() => onToolboxSettingsChanged(setToolboxSettings), []);
+  useEffect(() => setCssDraft(toolboxSettings.customCss), [toolboxSettings.customCss]);
 
   const patchMemory = (patch: Partial<BlancMemorySettings>): void => {
     setMemory(saveBlancMemory(patch));
@@ -2519,6 +2526,13 @@ function BlancSettingsPanel({
   useEffect(() => {
     applyBlancTheme(toolboxSettings.themePreset, toolboxSettings.themeOverrides);
   }, [toolboxSettings.themePreset, toolboxSettings.themeOverrides]);
+
+  // Custom CSS (Pillar 4 escape hatch). Live-apply while editing here; boot-apply
+  // for every other tab lives in blancMain.tsx. Both go through the same guarded
+  // applier, so the lockout guard is re-asserted on every change.
+  useEffect(() => {
+    applyBlancCustomCss(toolboxSettings.customCss);
+  }, [toolboxSettings.customCss]);
 
   const activePresetOverrides = presetById(toolboxSettings.themePreset)?.overrides ?? {};
 
@@ -2997,6 +3011,47 @@ function BlancSettingsPanel({
           keywords are accepted, so a pasted theme cannot inject CSS or hide Blanc&rsquo;s own
           controls.
         </p>
+      </fieldset>
+
+      <fieldset>
+        <legend>{t('blanc.settings.customCss.legend')}</legend>
+        <p className="blanc-note">{t('blanc.settings.customCss.intro')}</p>
+        <textarea
+          className="blanc-custom-css"
+          value={cssDraft}
+          spellCheck={false}
+          maxLength={MAX_CUSTOM_CSS_LENGTH}
+          onChange={(event) => setCssDraft(event.target.value)}
+          placeholder={t('blanc.settings.customCss.placeholder')}
+          aria-label={t('blanc.settings.customCss.legend')}
+        />
+        <div className="blanc-status-row">
+          <span className="blanc-custom-css-count">
+            {cssDraft.length} / {MAX_CUSTOM_CSS_LENGTH}
+          </span>
+          <button
+            type="button"
+            disabled={cssDraft === toolboxSettings.customCss}
+            onClick={() => {
+              patchToolbox({ customCss: cssDraft });
+              setSettingsMsg(t('blanc.settings.customCss.applied'));
+            }}
+          >
+            {t('blanc.settings.customCss.apply')}
+          </button>
+          <button
+            type="button"
+            disabled={!toolboxSettings.customCss && !cssDraft}
+            onClick={() => {
+              setCssDraft('');
+              patchToolbox({ customCss: '' });
+              setSettingsMsg(t('blanc.settings.customCss.cleared'));
+            }}
+          >
+            {t('blanc.settings.customCss.clear')}
+          </button>
+        </div>
+        <p className="blanc-note">{t('blanc.settings.customCss.guardNote')}</p>
       </fieldset>
 
       <fieldset>

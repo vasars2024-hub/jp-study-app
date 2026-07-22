@@ -1,4 +1,5 @@
 import { sanitizeThemeOverrides, type BlancThemeOverrides } from './blancTheme';
+import { sanitizeCustomCss } from './blancCustomCss';
 import { TOOLBOX_MODULES, type ToolboxModuleId } from './toolboxRegistry';
 
 export type ToolboxSettingsCategory =
@@ -60,6 +61,12 @@ export interface ToolboxSettings {
   themePreset: string;
   /** Per-token colour overrides. Validated in blancTheme.ts, not here. */
   themeOverrides: BlancThemeOverrides;
+  /**
+   * Raw custom CSS scoped to the Blanc root (Pillar 4 escape hatch). Stored
+   * verbatim (length-capped); safety comes from the lockout guard at apply time,
+   * not from rewriting this string. See blancCustomCss.ts.
+   */
+  customCss: string;
   searchToolsByTitle: boolean;
   searchToolDescriptions: boolean;
   searchCommands: boolean;
@@ -73,7 +80,7 @@ export interface ToolboxSettings {
 export interface ToolboxSettingDefinition<T extends keyof ToolboxSettings = keyof ToolboxSettings> {
   id: T;
   category: ToolboxSettingsCategory;
-  type: 'boolean' | 'number' | 'select' | 'module-list';
+  type: 'boolean' | 'number' | 'select' | 'module-list' | 'text';
   defaultValue: ToolboxSettings[T];
   description: string;
   keywords: string[];
@@ -123,6 +130,7 @@ export const DEFAULT_TOOLBOX_SETTINGS: ToolboxSettings = {
   categoryOrder: [],
   themePreset: 'default',
   themeOverrides: {},
+  customCss: '',
   searchToolsByTitle: true,
   searchToolDescriptions: true,
   searchCommands: true,
@@ -160,6 +168,7 @@ export const TOOLBOX_SETTING_DEFINITIONS: ToolboxSettingDefinition[] = [
   setting('categoryOrder', 'tool-visibility', 'module-list', 'User-defined order for launcher category sections.', ['order', 'category', 'section', 'arrange']),
   setting('themePreset', 'layout', 'select', 'Named Blanc colour preset.', ['theme', 'colour', 'color', 'preset', 'blood'], ['default', 'blood', 'ink', 'paper']),
   setting('themeOverrides', 'layout', 'module-list', 'Per-token colour overrides layered over the preset.', ['theme', 'colour', 'color', 'token', 'custom']),
+  setting('customCss', 'layout', 'text', 'Raw custom CSS scoped to the Blanc root; a lockout guard keeps the exit and settings controls reachable.', ['css', 'custom', 'style', 'theme', 'escape', 'hatch']),
   setting('searchToolsByTitle', 'search', 'boolean', 'Match tool names during Toolbox search.', ['search', 'title']),
   setting('searchToolDescriptions', 'search', 'boolean', 'Match tool descriptions during Toolbox search.', ['search', 'description']),
   setting('searchCommands', 'search', 'boolean', 'Include registered Toolbox commands in search.', ['search', 'command']),
@@ -217,6 +226,7 @@ export function sanitizeToolboxSettings(input: unknown): ToolboxSettings {
   next.categoryOrder = sanitizeStringList(next.categoryOrder);
   next.themePreset = typeof next.themePreset === 'string' && next.themePreset ? next.themePreset : 'default';
   next.themeOverrides = sanitizeThemeOverrides(next.themeOverrides);
+  next.customCss = sanitizeCustomCss(next.customCss);
   next.sidebarWidth = clampNumber(next.sidebarWidth, 160, 320, DEFAULT_TOOLBOX_SETTINGS.sidebarWidth);
   next.maxRecentTools = clampNumber(next.maxRecentTools, 0, 12, DEFAULT_TOOLBOX_SETTINGS.maxRecentTools);
   next.maxSearchResults = clampNumber(next.maxSearchResults, 5, 100, DEFAULT_TOOLBOX_SETTINGS.maxSearchResults);
