@@ -495,10 +495,13 @@
   z-index: 91;
   display: grid;
   gap: 0.7rem;
+  min-width: 0;
   width: min(24rem, calc(100% - 2rem));
   max-height: 21rem;
   padding: 0.8rem;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
   border: 1px solid rgb(var(--color-gray-700) / 0.94);
   border-radius: 0.72rem;
   background: rgb(13 12 18 / 0.94);
@@ -533,21 +536,26 @@
 
 #media-workspace .study-mining-heading small,
 #media-workspace .study-mining-history small {
+  min-width: 0;
   color: rgb(var(--color-gray-400) / 1);
   font-size: 0.68rem;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 #media-workspace .study-mining-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
 }
 
 #media-workspace .study-mining-grid label {
   display: grid;
   gap: 0.22rem;
+  min-width: 0;
   color: rgb(var(--color-gray-400) / 1);
   font-size: 0.7rem;
 }
@@ -560,6 +568,8 @@
 #media-workspace .study-mining-grid textarea,
 #media-workspace .study-mining-grid select,
 #media-workspace .study-mining-panel button {
+  box-sizing: border-box;
+  max-width: 100%;
   min-height: 1.95rem;
   padding: 0.3rem 0.5rem;
   border: 1px solid rgb(var(--color-gray-700) / 1);
@@ -567,6 +577,13 @@
   background: rgb(var(--color-gray-900) / 0.96);
   color: rgb(var(--color-gray-100) / 1);
   font: inherit;
+}
+
+#media-workspace .study-mining-grid input,
+#media-workspace .study-mining-grid textarea,
+#media-workspace .study-mining-grid select {
+  width: 100%;
+  min-width: 0;
 }
 
 #media-workspace .study-mining-grid textarea {
