@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeStudyCuesAtTime,
   adjacentStudyCue,
   clampStudyPlaybackRate,
   cuePlaybackEndSec,
@@ -29,6 +30,12 @@ describe('videoCoreStudy', () => {
     expect(cuePlaybackStartSec(cues[1], 0.25)).toBe(3.25);
     expect(cuePlaybackEndSec(cues[1], -0.5)).toBe(4);
     expect(cues[1].startMs).toBe(3000);
+  });
+
+  it('resolves a secondary track against the same delayed playback clock', () => {
+    expect(activeStudyCuesAtTime(cues, 3.2, 0.25).map((cue) => cue.index)).toEqual([]);
+    expect(activeStudyCuesAtTime(cues, 3.3, 0.25).map((cue) => cue.index)).toEqual([1]);
+    expect(activeStudyCuesAtTime(cues, 4.75, 0.25).map((cue) => cue.index)).toEqual([]);
   });
 
   it('finds adjacent cues from source time with bounded ends', () => {
@@ -67,11 +74,13 @@ describe('videoCoreStudy', () => {
     expect(normalizeVideoCoreStudyPreferences({
       playbackRate: 9,
       primarySubs: false,
+      dualSubs: false,
       subtitleFontSize: 100,
       preferredAudioLanguage: 'ja',
     })).toMatchObject({
       playbackRate: 3,
       primarySubs: false,
+      dualSubs: false,
       subtitleFontSize: 48,
       preferredAudioLanguage: 'ja',
     });

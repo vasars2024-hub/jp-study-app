@@ -25,6 +25,7 @@ import {
 import { translate } from '../renderer/translator';
 import { getStudyLang } from '../renderer/studyEnvironment';
 import {
+  activeStudyCuesAtTime,
   adjacentStudyCue,
   clampStudyPlaybackRate,
   cuePlaybackStartSec,
@@ -113,6 +114,10 @@ export default function VideoCoreStudyOverlay({
   const [allCues, setAllCues] = React.useState<VideoCoreActiveCue[]>([]);
   const [tracks, setTracks] = React.useState<NormalizedTrackInfo[]>([]);
   const [selectedTrack, setSelectedTrack] = React.useState<number | null>(null);
+  const [secondaryTrack, setSecondaryTrack] = React.useState<number | null>(null);
+  const [secondaryCues, setSecondaryCues] = React.useState<VideoCoreActiveCue[]>([]);
+  const [activeSecondaryCues, setActiveSecondaryCues] =
+    React.useState<VideoCoreActiveCue[]>([]);
   const [selectedAudioTrack, setSelectedAudioTrack] = React.useState<number | null>(null);
   const [subtitleDelaySec, setSubtitleDelaySec] = React.useState(0);
   const [pauseOnLookup, setPauseOnLookup] = React.useState(false);
@@ -128,9 +133,14 @@ export default function VideoCoreStudyOverlay({
   const [abLoop, setAbLoop] = React.useState(false);
   const popupOpenOnDownRef = React.useRef(false);
   const previousCueRef = React.useRef<VideoCoreActiveCue | null>(null);
+  const secondaryCuesRef = React.useRef<VideoCoreActiveCue[]>([]);
 
   const activeCue = activeCues[0] ?? null;
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
+  const secondaryText = activeSecondaryCues
+    .map((cue) => stripAssCueText(cue.text))
+    .filter(Boolean)
+    .join(' ');
   const miningSource = miningSourceFromPlayback(playbackInfo);
 
   const updatePreference = React.useCallback(
@@ -234,6 +244,53 @@ export default function VideoCoreStudyOverlay({
     audioManager.addEventListener('trackchanged', handleTrackChanged);
     return () => audioManager.removeEventListener('trackchanged', handleTrackChanged);
   }, [audioManager]);
+
+  React.useEffect(() => {
+    if (!manager) {
+      setSecondaryTrack(null);
+      return;
+    }
+    const candidates = tracks.filter(
+      (track) => track.type === 'event' && track.number !== selectedTrack,
+    );
+    setSecondaryTrack((current) =>
+      current != null && candidates.some((track) => track.number === current)
+        ? current
+        : candidates[0]?.number ?? null);
+  }, [manager, selectedTrack, tracks]);
+
+  React.useEffect(() => {
+    if (!manager || !video || secondaryTrack == null) {
+      secondaryCuesRef.current = [];
+      setSecondaryCues([]);
+      setActiveSecondaryCues([]);
+      return;
+    }
+    const syncActive = (): void => {
+      setActiveSecondaryCues(
+        activeStudyCuesAtTime(
+          secondaryCuesRef.current,
+          video.currentTime,
+          subtitleDelaySec,
+        ),
+      );
+    };
+    const refreshTimeline = (): void => {
+      const cues = manager.getCuesForTrack(secondaryTrack);
+      secondaryCuesRef.current = cues;
+      setSecondaryCues(cues);
+      syncActive();
+    };
+    refreshTimeline();
+    manager.addEventListener('cuechange', refreshTimeline);
+    video.addEventListener('timeupdate', syncActive);
+    video.addEventListener('seeked', syncActive);
+    return () => {
+      manager.removeEventListener('cuechange', refreshTimeline);
+      video.removeEventListener('timeupdate', syncActive);
+      video.removeEventListener('seeked', syncActive);
+    };
+  }, [manager, secondaryTrack, subtitleDelaySec, video]);
 
   React.useEffect(() => {
     setTranslation('');
@@ -355,6 +412,9 @@ export default function VideoCoreStudyOverlay({
         data-cue-track={activeCue?.trackNumber}
         data-cue-start-ms={activeCue?.startMs}
         data-cue-end-ms={activeCue?.endMs}
+        data-secondary-track={secondaryTrack ?? undefined}
+        data-secondary-cue-count={secondaryCues.length}
+        data-secondary-active-cue={activeSecondaryCues[0]?.index}
       >
         {activeCue && preferences.primarySubs && (!preferences.dictationMode || dictationRevealed) ? (
           <SubtitleCueLine
@@ -377,6 +437,10 @@ export default function VideoCoreStudyOverlay({
           <span className="study-cue-timing">
             Cue {activeCue.index + 1} · track {activeCue.trackNumber} · {activeCue.startMs}–{activeCue.endMs} ms
           </span>
+        )}
+
+        {preferences.dualSubs && secondaryText && (
+          <p className="study-cue-secondary">{secondaryText}</p>
         )}
 
         {preferences.dictationMode && activeCue && (
@@ -487,6 +551,7 @@ export default function VideoCoreStudyOverlay({
           }} /> Loop line</label>
           <label><input type="checkbox" checked={preferences.furigana} onChange={(event) => updatePreference('furigana', event.currentTarget.checked)} /> Furigana</label>
           <label><input type="checkbox" checked={preferences.primarySubs} onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)} /> Japanese subtitles</label>
+          <label><input type="checkbox" checked={preferences.dualSubs} onChange={(event) => updatePreference('dualSubs', event.currentTarget.checked)} /> Dual subtitles</label>
           <label><input type="checkbox" checked={pauseOnLookup} onChange={(event) => setPauseOnLookup(event.currentTarget.checked)} /> Pause on lookup</label>
           <label><input type="checkbox" checked={preferences.dictationMode} onChange={(event) => updatePreference('dictationMode', event.currentTarget.checked)} /> Dictation</label>
           <button type="button" disabled={!activeCue || translationBusy} onClick={() => void translateCue()}>
@@ -537,6 +602,25 @@ export default function VideoCoreStudyOverlay({
               {tracks.map((track) => (
                 <option key={track.number} value={track.number}>{trackLabel(track)}</option>
               ))}
+            </select>
+          </label>
+
+          <label>
+            Secondary subtitles
+            <select
+              value={secondaryTrack ?? ''}
+              disabled={!preferences.dualSubs}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setSecondaryTrack(value ? Number(value) : null);
+              }}
+            >
+              <option value="">Off</option>
+              {tracks
+                .filter((track) => track.type === 'event' && track.number !== selectedTrack)
+                .map((track) => (
+                  <option key={track.number} value={track.number}>{trackLabel(track)}</option>
+                ))}
             </select>
           </label>
 

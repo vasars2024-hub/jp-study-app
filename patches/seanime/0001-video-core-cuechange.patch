@@ -81,7 +81,7 @@ index 39439b6..08a2c55 100644
          if (this.pgsRenderer) this.pgsRenderer.setTimeOffset(-subtitleDelay)
 +        this._updateActiveCues()
      }
-@@ -1038,6 +1074,77 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
+@@ -1038,6 +1074,97 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
      // |      File Tracks      |
      // +-----------------------+
  
@@ -91,6 +91,26 @@ index 39439b6..08a2c55 100644
 +        if (!trackEvents) return []
 +        if (this.cueIndexTrackNumber !== this.currentTrackNumber || this.cueIndexSize !== trackEvents.size) this._rebuildCueIndex(trackEvents)
 +        return [...this.cueIndex]
++    }
++
++    /** All parsed cues for an event track without changing the rendered selection. */
++    getCuesForTrack(trackNumber: number): VideoCoreActiveCue[] {
++        const trackEvents = this.eventTracks[trackNumber]?.events
++        if (!trackEvents) return []
++        const cues: VideoCoreActiveCue[] = []
++        for (const cached of trackEvents.values()) {
++            const e = cached.event
++            cues.push({
++                index: 0,
++                trackNumber: e.trackNumber,
++                text: e.text,
++                startMs: e.startTime,
++                endMs: e.startTime + e.duration,
++            })
++        }
++        cues.sort((a, b) => a.startMs - b.startMs)
++        cues.forEach((cue, index) => { cue.index = index })
++        return cues
 +    }
 +
 +    /** The cues on screen right now. Empty when no event-based track is selected. */

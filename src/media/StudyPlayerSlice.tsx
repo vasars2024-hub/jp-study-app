@@ -328,7 +328,10 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
       switch (message.type) {
         case 'open-and-await':
           setState({
-            active: true,
+            // Do not mount VideoCore until the following "watch" payload supplies real
+            // playback info. Mounting it with null info terminates the just-opened
+            // directstream preparation and makes the parser pull fail intermittently.
+            active: false,
             playbackInfo: null,
             playbackError: null,
             loadingState: 'Opening local file',
@@ -355,6 +358,12 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
         case 'subtitle-event': {
           const events = subtitleEvents(message.payload);
           if (!events.length) break;
+          if (proofConfig) {
+            const tracks = [...new Set(events.map((event) => event.trackNumber))];
+            console.info(
+              `[cue-proof] subtitle-event ${events.length} cue(s), tracks ${tracks.join(', ')}`,
+            );
+          }
           if (manager) {
             publishProof({
               managerClass: manager.constructor.name,

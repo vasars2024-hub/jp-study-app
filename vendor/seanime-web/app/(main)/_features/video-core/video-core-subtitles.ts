@@ -1096,6 +1096,26 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
         return [...this.cueIndex]
     }
 
+    /** All parsed cues for an event track without changing the rendered selection. */
+    getCuesForTrack(trackNumber: number): VideoCoreActiveCue[] {
+        const trackEvents = this.eventTracks[trackNumber]?.events
+        if (!trackEvents) return []
+        const cues: VideoCoreActiveCue[] = []
+        for (const cached of trackEvents.values()) {
+            const e = cached.event
+            cues.push({
+                index: 0,
+                trackNumber: e.trackNumber,
+                text: e.text,
+                startMs: e.startTime,
+                endMs: e.startTime + e.duration,
+            })
+        }
+        cues.sort((a, b) => a.startMs - b.startMs)
+        cues.forEach((cue, index) => { cue.index = index })
+        return cues
+    }
+
     /** The cues on screen right now. Empty when no event-based track is selected. */
     getActiveCues(): VideoCoreActiveCue[] {
         return this.activeCues

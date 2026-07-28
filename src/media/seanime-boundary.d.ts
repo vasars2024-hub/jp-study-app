@@ -150,6 +150,7 @@ declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
 
   export class VideoCoreSubtitleManager extends EventTarget {
     getCues(): VideoCoreActiveCue[];
+    getCuesForTrack(trackNumber: number): VideoCoreActiveCue[];
     getActiveCues(): VideoCoreActiveCue[];
     getTracks(): NormalizedTrackInfo[];
     getSelectedTrackNumberOrNull(): number | null;

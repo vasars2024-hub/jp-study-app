@@ -19,6 +19,7 @@ export interface VideoCoreStudyPreferences {
   loopLine: boolean;
   furigana: boolean;
   primarySubs: boolean;
+  dualSubs: boolean;
   dictationMode: boolean;
   subtitleFontSize: number;
   [key: string]: unknown;
@@ -50,6 +51,7 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     loopLine: raw.loopLine === true,
     furigana: raw.furigana === true,
     primarySubs: raw.primarySubs !== false,
+    dualSubs: raw.dualSubs !== false,
     dictationMode: raw.dictationMode === true,
     subtitleFontSize: fontSize,
   };
@@ -75,6 +77,20 @@ export function cuePlaybackEndSec(
   subtitleDelaySec: number,
 ): number {
   return Math.max(0, cue.endMs / 1000 + subtitleDelaySec);
+}
+
+export function activeStudyCuesAtTime(
+  cues: readonly VideoCoreStudyCue[],
+  playbackTimeSec: number,
+  subtitleDelaySec: number,
+): VideoCoreStudyCue[] {
+  const sourceTimeMs = (playbackTimeSec - subtitleDelaySec) * 1000;
+  const active: VideoCoreStudyCue[] = [];
+  for (const cue of cues) {
+    if (cue.startMs > sourceTimeMs) break;
+    if (sourceTimeMs < cue.endMs) active.push(cue);
+  }
+  return active;
 }
 
 export function clampStudyPlaybackRate(value: number): number {
