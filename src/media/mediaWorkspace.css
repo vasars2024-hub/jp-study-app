@@ -290,7 +290,7 @@
 #media-workspace .study-cue-overlay {
   position: absolute;
   left: 50%;
-  bottom: 5.5rem;
+  bottom: 9.25rem;
   z-index: 90;
   width: min(46rem, calc(100% - 3rem));
   padding: 0.75rem 1rem;
@@ -303,7 +303,7 @@
     inset 0 1px rgb(255 255 255 / 0.04);
   text-align: center;
   backdrop-filter: blur(18px);
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 #media-workspace .study-cue-text {
@@ -323,4 +323,105 @@
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.025em;
+}
+
+#media-workspace .study-cue-translation {
+  margin: 0.55rem 0 0;
+  color: rgb(var(--color-gray-200) / 1);
+  font-size: 0.92rem;
+}
+
+#media-workspace .study-control-dock {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.8rem;
+  left: 1rem;
+  z-index: 92;
+  display: grid;
+  gap: 0.45rem;
+  max-height: 7.5rem;
+  padding: 0.65rem;
+  overflow: auto;
+  border: 1px solid rgb(var(--color-gray-700) / 0.92);
+  border-radius: 0.7rem;
+  background: rgb(13 12 18 / 0.94);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(20px);
+}
+
+#media-workspace .study-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+#media-workspace .study-control-row button,
+#media-workspace .study-control-row select,
+#media-workspace .study-dictation button,
+#media-workspace .study-dictation input {
+  min-height: 1.9rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid rgb(var(--color-gray-700) / 1);
+  border-radius: 0.42rem;
+  background: rgb(var(--color-gray-900) / 0.96);
+  color: rgb(var(--color-gray-100) / 1);
+  font: inherit;
+}
+
+#media-workspace .study-control-row button:hover:not(:disabled),
+#media-workspace .study-dictation button:hover:not(:disabled) {
+  border-color: rgb(var(--color-brand-500) / 0.8);
+  background: rgb(var(--color-brand-950) / 0.9);
+}
+
+#media-workspace .study-control-row button:disabled,
+#media-workspace .study-dictation button:disabled {
+  opacity: 0.45;
+}
+
+#media-workspace .study-control-row label {
+  display: inline-flex;
+  gap: 0.32rem;
+  align-items: center;
+  color: rgb(var(--color-gray-300) / 1);
+  font-size: 0.76rem;
+}
+
+#media-workspace .study-control-row output {
+  min-width: 3.3rem;
+  color: rgb(var(--color-gray-300) / 1);
+  font-size: 0.75rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+#media-workspace .study-dictation {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  align-items: center;
+  margin-top: 0.55rem;
+}
+
+#media-workspace .study-dictation input {
+  width: min(24rem, 60vw);
+}
+
+#media-workspace .study-dictation .is-correct {
+  color: rgb(var(--color-green-400, 74 222 128) / 1);
+}
+
+@media (max-width: 760px) {
+  #media-workspace .study-cue-overlay {
+    bottom: 11rem;
+    width: calc(100% - 1.5rem);
+  }
+
+  #media-workspace .study-control-dock {
+    right: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    max-height: 9.5rem;
+  }
 }

@@ -29,12 +29,13 @@ import type {
 } from '@/app/(main)/_features/video-core/video-core.atoms';
 import type {
   SubtitleManagerCueChangeEvent,
-  VideoCoreActiveCue,
 } from '@/app/(main)/_features/video-core/video-core-subtitles';
 import { getClientIdProof } from '@/lib/server/client-id';
 import { WSEvents } from '@/lib/server/ws-events';
 import { __clientPlatform__ } from '@/types/constants';
 import type { SeanimeConnection } from '../shared/seanime';
+import { stripAssCueText } from '../shared/videoCoreStudy';
+import VideoCoreStudyOverlay from './VideoCoreStudyOverlay';
 
 type ServerMessage = {
   type: string;
@@ -87,14 +88,6 @@ function publishProof(update: Partial<CueProofState>): void {
     ...target.__SEANIME_CUE_PROOF__,
     ...update,
   };
-}
-
-function plainCueText(text: string): string {
-  return text
-    .replace(/\{\\[^}]*\}/g, '')
-    .replace(/\\[Nn]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function subtitleEvents(payload: unknown): MKVParser_SubtitleEvent[] {
@@ -273,22 +266,20 @@ function CueProofDriver({ conn }: { conn: SeanimeConnection }): React.ReactEleme
   return null;
 }
 
-function StudyOverlay(): React.ReactElement {
-  const manager = useAtomValue(vc_subtitleManager);
-  const [cues, setCues] = React.useState<VideoCoreActiveCue[]>([]);
-
-  React.useEffect(() => {
-    setCues(manager?.getActiveCues() ?? []);
-    if (!manager) return;
-
-    publishProof({ managerClass: manager.constructor.name });
-    console.info(`[cue-proof] manager mounted: ${manager.constructor.name}`);
-    const onCueChange = (event: SubtitleManagerCueChangeEvent): void => {
-      setCues(event.detail.cues);
+function StudyOverlay({
+  playbackInfo,
+}: {
+  playbackInfo: VideoCore_VideoPlaybackInfo | null;
+}): React.ReactElement {
+  const onManagerReady = React.useCallback((managerClass: string): void => {
+    publishProof({ managerClass });
+    console.info(`[cue-proof] manager mounted: ${managerClass}`);
+  }, []);
+  const onCueChange = React.useCallback((event: SubtitleManagerCueChangeEvent): void => {
       const previous = proofWindow().__SEANIME_CUE_PROOF__?.cueChanges ?? [];
       const additions = event.detail.cues.map((cue) => ({
         rawText: cue.text,
-        text: plainCueText(cue.text),
+        text: stripAssCueText(cue.text),
         startMs: cue.startMs,
         endMs: cue.endMs,
         currentTimeMs: event.detail.currentTimeMs,
@@ -296,7 +287,6 @@ function StudyOverlay(): React.ReactElement {
       if (additions.length) {
         publishProof({
           phase: 'cuechange',
-          managerClass: manager.constructor.name,
           cueChanges: [...previous, ...additions],
         });
         for (const cue of additions) {
@@ -305,33 +295,13 @@ function StudyOverlay(): React.ReactElement {
           );
         }
       }
-    };
-
-    manager.addEventListener('cuechange', onCueChange);
-    return () => manager.removeEventListener('cuechange', onCueChange);
-  }, [manager]);
-
-  const cue = cues[0];
-  if (!cue) {
-    return (
-      <aside className="study-cue-overlay" data-study-active-cue="none">
-        <span className="study-cue-status">Waiting for subtitle</span>
-      </aside>
-    );
-  }
-
+  }, []);
   return (
-    <aside
-      className="study-cue-overlay"
-      data-study-active-cue="present"
-      data-cue-start-ms={cue.startMs}
-      data-cue-end-ms={cue.endMs}
-    >
-      <p className="study-cue-text">{plainCueText(cue.text)}</p>
-      <span className="study-cue-timing">
-        {cue.startMs}–{cue.endMs} ms
-      </span>
-    </aside>
+    <VideoCoreStudyOverlay
+      playbackInfo={playbackInfo}
+      onManagerReady={onManagerReady}
+      onCueChange={onCueChange}
+    />
   );
 }
 
@@ -443,7 +413,7 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
               void event.currentTarget.play();
             }}
           />
-          <StudyOverlay />
+          <StudyOverlay playbackInfo={state.playbackInfo} />
         </section>
       )}
     </>

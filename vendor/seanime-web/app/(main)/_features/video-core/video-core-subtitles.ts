@@ -70,6 +70,7 @@ export type SubtitleManagerTracksLoadedEvent = CustomEvent<{ tracks: NormalizedT
 
 /** A subtitle cue on screen at the current playback position. */
 export type VideoCoreActiveCue = {
+    index: number
     trackNumber: number
     /** Raw event text. For ASS tracks this still contains override tags. */
     text: string
@@ -641,11 +642,13 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     }
 
     async setSubtitleDelay(subtitleDelay: number) {
+        this.settings = { ...this.settings, subtitleDelay }
         if (this.libassRenderer) {
             await this.libassRenderer.ready
             this.libassRenderer.timeOffset = -subtitleDelay
         }
         if (this.pgsRenderer) this.pgsRenderer.setTimeOffset(-subtitleDelay)
+        this._updateActiveCues()
     }
 
     getFileTrack(trackNumber: number) {
@@ -1085,6 +1088,14 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     // |      File Tracks      |
     // +-----------------------+
 
+    /** All parsed cues for the selected event track, ordered by start time. */
+    getCues(): VideoCoreActiveCue[] {
+        const trackEvents = this.eventTracks[this.currentTrackNumber]?.events
+        if (!trackEvents) return []
+        if (this.cueIndexTrackNumber !== this.currentTrackNumber || this.cueIndexSize !== trackEvents.size) this._rebuildCueIndex(trackEvents)
+        return [...this.cueIndex]
+    }
+
     /** The cues on screen right now. Empty when no event-based track is selected. */
     getActiveCues(): VideoCoreActiveCue[] {
         return this.activeCues
@@ -1095,6 +1106,7 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
         for (const cached of trackEvents.values()) {
             const e = cached.event
             cues.push({
+                index: 0,
                 trackNumber: e.trackNumber,
                 text: e.text,
                 startMs: e.startTime,
@@ -1102,6 +1114,7 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
             })
         }
         cues.sort((a, b) => a.startMs - b.startMs)
+        cues.forEach((cue, index) => { cue.index = index })
         this.cueIndex = cues
         this.cueIndexTrackNumber = this.currentTrackNumber
         this.cueIndexSize = trackEvents.size
@@ -1124,7 +1137,7 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
             this._rebuildCueIndex(trackEvents)
         }
 
-        const timeMs = this.videoElement.currentTime * 1000
+        const timeMs = (this.videoElement.currentTime - this.settings.subtitleDelay) * 1000
         const active: VideoCoreActiveCue[] = []
         for (const cue of this.cueIndex) {
             // cueIndex is sorted by startMs, so nothing past this point has started yet.

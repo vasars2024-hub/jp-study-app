@@ -111,7 +111,19 @@ declare module '@/app/(main)/_features/video-core/video-core.atoms' {
 declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
   import type { MKVParser_SubtitleEvent } from '../../vendor/seanime/generated/types';
 
+  export type NormalizedTrackInfo = {
+    type: 'event' | 'file';
+    language?: string;
+    languageIETF?: string;
+    codecID?: string;
+    label?: string;
+    number: number;
+    forced: boolean;
+    default: boolean;
+  };
+
   export type VideoCoreActiveCue = {
+    index: number;
     trackNumber: number;
     text: string;
     startMs: number;
@@ -122,28 +134,72 @@ declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
     cues: VideoCoreActiveCue[];
     currentTimeMs: number;
   }>;
+  export type SubtitleManagerTrackSelectedEvent = CustomEvent<{
+    trackNumber: number;
+    kind: 'file' | 'event';
+  }>;
+  export type SubtitleManagerTracksLoadedEvent = CustomEvent<{
+    tracks: NormalizedTrackInfo[];
+  }>;
+  type SubtitleManagerEventMap = {
+    cuechange: SubtitleManagerCueChangeEvent;
+    tracksloaded: SubtitleManagerTracksLoadedEvent;
+    trackselected: SubtitleManagerTrackSelectedEvent;
+    trackdeselected: CustomEvent;
+  };
 
   export class VideoCoreSubtitleManager extends EventTarget {
+    getCues(): VideoCoreActiveCue[];
     getActiveCues(): VideoCoreActiveCue[];
+    getTracks(): NormalizedTrackInfo[];
+    getSelectedTrackNumberOrNull(): number | null;
+    selectTrack(trackNumber: number): Promise<void>;
+    setNoTrack(): void;
+    setSubtitleDelay(subtitleDelay: number): Promise<void>;
     onSubtitleEvents(events: MKVParser_SubtitleEvent[]): Promise<void>;
-    addEventListener(
-      type: 'cuechange',
-      listener: (event: SubtitleManagerCueChangeEvent) => void,
+    addEventListener<K extends keyof SubtitleManagerEventMap>(
+      type: K,
+      listener: (event: SubtitleManagerEventMap[K]) => void,
     ): void;
-    removeEventListener(
-      type: 'cuechange',
-      listener: (event: SubtitleManagerCueChangeEvent) => void,
+    removeEventListener<K extends keyof SubtitleManagerEventMap>(
+      type: K,
+      listener: (event: SubtitleManagerEventMap[K]) => void,
     ): void;
   }
+}
+
+declare module '@/app/(main)/_features/video-core/video-core-audio' {
+  export type AudioManagerTrackChangedEvent = CustomEvent<{ trackNumber: number }>;
+
+  export class VideoCoreAudioManager extends EventTarget {
+    getSelectedTrackNumberOrNull(): number | null;
+    selectTrack(trackNumber: number): void;
+    addEventListener(
+      type: 'trackchanged',
+      listener: (event: AudioManagerTrackChangedEvent) => void,
+    ): void;
+    removeEventListener(
+      type: 'trackchanged',
+      listener: (event: AudioManagerTrackChangedEvent) => void,
+    ): void;
+  }
+}
+
+declare module '@/app/(main)/_features/video-core/video-core-atoms' {
+  import type { Atom } from 'jotai';
+
+  export const vc_videoElement: Atom<HTMLVideoElement | null>;
 }
 
 declare module '@/app/(main)/_features/video-core/video-core' {
   import type * as React from 'react';
   import type { Atom } from 'jotai';
+  import type { VideoCoreAudioManager } from '@/app/(main)/_features/video-core/video-core-audio';
   import type { VideoCoreSubtitleManager } from '@/app/(main)/_features/video-core/video-core-subtitles';
   import type { VideoCoreLifecycleState } from '@/app/(main)/_features/video-core/video-core.atoms';
 
   export const vc_subtitleManager: Atom<VideoCoreSubtitleManager | null>;
+  export const vc_audioManager: Atom<VideoCoreAudioManager | null>;
   export function VideoCoreProvider(props: {
     id: string;
     children: React.ReactNode;

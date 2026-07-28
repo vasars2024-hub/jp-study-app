@@ -175,8 +175,8 @@ function applyUnifiedPatch(source, patch) {
     offset += replacement.length - consumed;
   }
 
-  if (hunks !== 6) {
-    throw new Error(`expected 6 cuechange patch hunks, found ${hunks}`);
+  if (hunks !== 7) {
+    throw new Error(`expected 7 cuechange patch hunks, found ${hunks}`);
   }
   return sourceLines.join('\r\n');
 }

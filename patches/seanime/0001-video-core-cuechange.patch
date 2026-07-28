@@ -2,13 +2,14 @@ diff --git a/seanime-web/src/app/(main)/_features/video-core/video-core-subtitle
 index 39439b6..08a2c55 100644
 --- a/seanime-web/src/app/(main)/_features/video-core/video-core-subtitles.ts
 +++ b/seanime-web/src/app/(main)/_features/video-core/video-core-subtitles.ts
-@@ -51,6 +51,16 @@ export type SubtitleManagerTrackSelectedEvent = CustomEvent<{ trackNumber: numbe
+@@ -51,6 +51,17 @@ export type SubtitleManagerTrackSelectedEvent = CustomEvent<{ trackNumber: numbe
  export type SubtitleManagerTrackDeselectedEvent = CustomEvent
  export type SubtitleManagerTrackAddedEvent = CustomEvent<{ track: NormalizedTrackInfo }>
  export type SubtitleManagerTracksLoadedEvent = CustomEvent<{ tracks: NormalizedTrackInfo[] }>
 +
 +/** A subtitle cue on screen at the current playback position. */
 +export type VideoCoreActiveCue = {
++    index: number
 +    trackNumber: number
 +    /** Raw event text. For ASS tracks this still contains override tags. */
 +    text: string
@@ -70,10 +71,28 @@ index 39439b6..08a2c55 100644
          this._disableNativeTextTracks()
          this.libassRenderer?.destroy()
          this.libassRenderer = null
-@@ -1038,6 +1071,67 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
+@@ -596,7 +630,9 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
+     async setSubtitleDelay(subtitleDelay: number) {
++        this.settings = { ...this.settings, subtitleDelay }
+         if (this.libassRenderer) {
+             await this.libassRenderer.ready
+             this.libassRenderer.timeOffset = -subtitleDelay
+         }
+         if (this.pgsRenderer) this.pgsRenderer.setTimeOffset(-subtitleDelay)
++        this._updateActiveCues()
+     }
+@@ -1038,6 +1074,77 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
      // |      File Tracks      |
      // +-----------------------+
  
++    /** All parsed cues for the selected event track, ordered by start time. */
++    getCues(): VideoCoreActiveCue[] {
++        const trackEvents = this.eventTracks[this.currentTrackNumber]?.events
++        if (!trackEvents) return []
++        if (this.cueIndexTrackNumber !== this.currentTrackNumber || this.cueIndexSize !== trackEvents.size) this._rebuildCueIndex(trackEvents)
++        return [...this.cueIndex]
++    }
++
 +    /** The cues on screen right now. Empty when no event-based track is selected. */
 +    getActiveCues(): VideoCoreActiveCue[] {
 +        return this.activeCues
@@ -84,6 +103,7 @@ index 39439b6..08a2c55 100644
 +        for (const cached of trackEvents.values()) {
 +            const e = cached.event
 +            cues.push({
++                index: 0,
 +                trackNumber: e.trackNumber,
 +                text: e.text,
 +                startMs: e.startTime,
@@ -91,6 +111,7 @@ index 39439b6..08a2c55 100644
 +            })
 +        }
 +        cues.sort((a, b) => a.startMs - b.startMs)
++        cues.forEach((cue, index) => { cue.index = index })
 +        this.cueIndex = cues
 +        this.cueIndexTrackNumber = this.currentTrackNumber
 +        this.cueIndexSize = trackEvents.size
@@ -113,7 +134,7 @@ index 39439b6..08a2c55 100644
 +            this._rebuildCueIndex(trackEvents)
 +        }
 +
-+        const timeMs = this.videoElement.currentTime * 1000
++        const timeMs = (this.videoElement.currentTime - this.settings.subtitleDelay) * 1000
 +        const active: VideoCoreActiveCue[] = []
 +        for (const cue of this.cueIndex) {
 +            // cueIndex is sorted by startMs, so nothing past this point has started yet.
