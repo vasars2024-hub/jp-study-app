@@ -54,6 +54,56 @@ with the real modal   368 local files, 60 npm packages
 with the stub         179 local files, 47 npm packages
 ```
 
+## Next surface: `entry`/episodes — measured 2026-07-28, NOT yet adopted
+
+Re-measured before copying anything, per the Phase-3 brief. The measuring tool
+(`import-graph.mjs`) had to be rewritten — the Phase-2 copy lived in a session scratchpad
+and is gone. **Calibration: it reproduces the Phase-2 file counts exactly** (368 as-is,
+179 + the cut file itself with `CUT=media-preview-modal`). Its *package* count is more
+inclusive than Phase 2's (+7: it counts type-only specifiers), so compare deltas measured
+with the same tool, not against Phase 2's absolute package numbers.
+
+| Entry | Local files | npm specifiers |
+|---|---:|---:|
+| `library-view` (currently adopted, stubbed modal) | 179 | 47 (Phase-2 count) |
+| `entry/page.tsx` alone | 362 | 67 |
+| **`library-view` + `entry/page.tsx`** | **369** | **67** |
+| …minus `torrent-search` / `debrid-stream` / `onlinestream` | 295 | 61 |
+
+The entry closure almost entirely *contains* the library closure — together they are only
+369 files. This confirms that adopting `entry` is what restores the real
+`media-preview-modal`; the two are the same superset. **Cost of the step: +190 local files
+and 15 new npm packages.**
+
+```
+@dnd-kit/core  @dnd-kit/modifiers  @dnd-kit/sortable  @dnd-kit/utilities
+@mpv-prism/core  @radix-ui/react-hover-card  @radix-ui/react-progress
+anime4k-webgpu  copy-to-clipboard  hls.js  jassub  jotai-scope
+media-captions  mousetrap  rrweb
+```
+
+### Blocker found: `@mpv-prism/core` — needs a FIFTH substitution
+
+`@mpv-prism/core` is in that list, and **ADR-002 defers mpv-prism** while the plan's risk
+register records its licence as unknown with the mitigation *"Don't ship it"*. Adopting the
+entry surface unmodified would pull it into the dependency tree.
+
+It is contained. The package is imported by exactly four files, all under
+`app/(main)/_features/mpv-core/`:
+
+```
+mpv-core.tsx  mpv-core-player-inner.tsx  mpv-core-stats.tsx  mpv-core.atoms.ts
+```
+
+and only `mpv-core.tsx` is reachable from the entry closure. Stubbing that one file the way
+`media-preview-modal.tsx` was stubbed removes the dependency (67 → 66 specifiers). **Add it
+to the substitution table as the fifth entry when the adoption is performed**, with the same
+rationale line: *upstream's alternative player; ADR-002 defers mpv-prism and its licence is
+unknown, so the feature is stubbed rather than shipped.*
+
+`hls.js`, `jassub`, `anime4k-webgpu` and `media-captions` are the real `video-core`
+dependencies and **are** wanted — they are what Phase 3 is adopting.
+
 ## Boot ordering — the one non-obvious constraint
 
 Upstream reads the auth token via

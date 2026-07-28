@@ -1,10 +1,10 @@
 # Migration current state
 
-Last updated: 2026-07-28 (end of Phase 2 — first adoption)
-Phase: **2 — Media shell on real data — ONE SURFACE ADOPTED. §8 scanner gate: PASS.**
+Last updated: 2026-07-28 (Phase 3 opening — Phase 2 committed, cue semantics answered)
+Phase: **3 — Player + Study Overlay, OPENING. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS.**
 
-Branch `grammarx/phase-1-5` · based on commit `a22e7ba1f72aa7942890ad7eb3ac253b37be0735`
-(Phase-2 work is **uncommitted in the working tree** — see "Commit boundary" below.)
+Branch `grammarx/phase-1-5` · Phase 1+2 committed as **`55df6e9`**, based on
+`a22e7ba1f72aa7942890ad7eb3ac253b37be0735`. See "Phase 3 — opening" for the commit boundary.
 
 > **Correction to the Phase-0 record.** `ENVIRONMENT_BASELINE.md` in the backup says
 > `go — NOT INSTALLED — blocks Phase 1`. **That line is stale.** Go **1.26.5** is
@@ -471,6 +471,131 @@ from parallel work, and staging them would sweep that in:
 
 Decide that boundary deliberately. **Whatever else is included, `LICENSE` and `package.json`
 must be in the same commit as `vendor/seanime-web/`.**
+
+## Phase 3 — opening (2026-07-28)
+
+### Phase 2 is COMMITTED — `55df6e9`
+
+`feat(media): adopt Seanime library surface as a GPL-3.0 Media workspace`
+— 217 files, +52,248 / −215, on `grammarx/phase-1-5`.
+
+**What the boundary included:** `LICENSE` (new, GPL-3.0) + `package.json` + `package-lock.json`
+(ADR-001 satisfied — they land with `vendor/seanime-web/`), the 183-file `vendor/` tree,
+`src/media/`, `src/main/seanime/`, `src/shared/seanime.ts`, `SeanimeDevPanel.tsx`,
+`tailwind.config.ts`, `postcss.config.cjs`, `vite.renderer.config.ts`, `.eslintrc.json`,
+`media-harness.html`, all of `docs/migration/`, and `patches/`.
+
+**How the four contested files were handled.** `src/preload.ts`, `src/main.ts`,
+`src/renderer/App.tsx` and `src/renderer/window.d.ts` carry ~1,050 lines of parallel-session
+work. Crucially, that work `import`s five modules that are **still untracked**
+(`shared/scraperIpc`, `shared/mediaStudyOrchestrator`, `shared/localAgentRuntime`,
+`theme/SecretHistoryTrigger`, `whisperTranscribePcm`) — so committing those files whole would
+have produced a **broken** commit, not merely a polluted one. Instead, Seanime-only versions
+were built and staged directly into the index via `git hash-object` + `git update-index`,
+leaving the **working tree untouched**. Net: exactly **34 added lines, 0 deletions** across the
+four files. The parallel work remains uncommitted and owned by its sessions
+(`git diff` still shows 1,068 insertions there). Script:
+`docs/migration/tools/` sibling of `build-blobs.mjs` (scratchpad).
+
+Deliberately included: the unrelated `jsdom` devDependency — it is inseparable from
+`package-lock.json`'s 225 new packages, and splitting it would have left manifest and lockfile
+inconsistent. Deliberately excluded: `src/main/scraper/`, `src/.coordination/`, `tools/`,
+`src/renderer/data/grammar/`.
+
+Baselines after the commit: **`npm test` 251 files / 2,888 tests pass; `npx tsc --noEmit` 290
+diagnostics / 108 files; porcelain 552 → 537** (exactly the 11 untracked + 4 modified paths
+consumed).
+
+### §9 acceptance gate — live AnkiConnect: **PASS** (first time in any phase)
+
+Exercised early as a standalone de-risk, against the user's real collection (82 decks, 33
+models, AnkiConnect v6 on `127.0.0.1:8765`). **All 14 actions in `AnkiActionMap` work.**
+
+Full round trip in a namespaced probe deck: `createDeck` → `storeMediaFile` ×2 (a real PNG and
+a real 40 ms WAV, i.e. the screenshot + audio-clip attach path) → `canAddNotes` → **`addNote`**
+→ `findNotes` / `notesInfo` / `cardsInfo` read-back → duplicate correctly rejected
+(`allowDuplicate:false`) → `findCards` (the due-forecast path, 7,562 cards due). Japanese text
+survived intact (`猫` / `ねこ`), as did `<img src="…">` and `[sound:…]` references.
+
+Cleanup verified: note deleted, both media files deleted, probe deck deleted — **0 residual
+notes, probe deck absent**. Latencies 16–310 ms; nothing near the 8 s MUTATE timeout.
+
+Note Study OS's own note types are **already provisioned** in the live collection
+(`JP Study App::JA Immersion` = Term/Reading/Sentence, plus EN-JA and ZH-JA Production), so
+`noteTypes.ts` has run against real Anki before; only the *note export* was unproven.
+
+Repro: `node docs/migration/tools/anki-gate.mjs <stamp>`.
+
+### Cue patch — the three assumptions, ANSWERED
+
+Full detail in [`patches/seanime/README.md`](../../patches/seanime/README.md). Headlines:
+
+1. **`startTime`/`duration` are MILLISECONDS** — settled from the producing Go source
+   (`mkvparser.go:616`, `milliseconds := float64(packet.StartTime) / 1e6`), not inferred.
+   The patch needs no conversion. **Upstream's own doc comments say "in seconds" and are
+   wrong** — both the Go struct and the generated `types.ts`. Anyone trusting the generated
+   types would mis-time every cue by 1000×. Worth an upstream PR.
+2. **`timeupdate` runs at 3.81 Hz** (mean gap 262.6 ms, max 290.7 ms over 115 samples in a
+   real Chromium renderer); cue activation lands **76–216 ms late, mean 131 ms**. The
+   estimate of "~250 ms" was right. `requestVideoFrameCallback` is **not** needed, because
+   the cue's own `startMs`/`endMs` are exact — **the Overlay must take timings from the cue,
+   never from `video.currentTime` at `cuechange`**. Then only UI responsiveness carries the
+   lag (<8 % of a 2.75–3.5 s cue), while mining and provenance stay frame-exact.
+3. **Override tags are present** (3 of 6 real cues carried `{\pos}`, `{\i1}`, `{\an8}`,
+   `{\b1}`). Stripping belongs in the Study Overlay at the mining boundary, with the raw text
+   retained in provenance — not in the patch, which must stay generic upstream code.
+
+The patch was applied to the pinned checkout, verified, and reverted; the checkout ends
+**pristine at `9bdd052` with its original three dirty entries**.
+
+**Negative result, recorded honestly:** the two halves were never joined. The data contract
+was proven against the real server and the activation logic in a real renderer, but real
+`subtitle-event` frames never reached a hand-rolled external websocket client, so
+`getActiveCues()` / `cuechange` have still not run inside the real manager class. Three
+addressing schemes were tried (own `?id=`, server-issued id, full `id`+`proof` reconnect —
+all accepted); the server logs the event as sent but it does not arrive. **Next session:
+mount the adopted `websocket-provider.tsx` instead of hand-rolling the client.**
+
+### Test-library finding: there are no soft subtitles to mine
+
+Probed with `ffprobe`. **The Big O** (29 × 2 GB BDRips) is HEVC with **zero subtitle streams**;
+the ~15 `AnimePahe_*.mp4` files are h264 + aac only, i.e. **hardsubbed**. The only subtitle
+files on disk are loose Netflix `.srt` for a Chinese drama.
+
+Two consequences: (a) the cue path could not be exercised against the library as it stands —
+a real MKV had to be built by muxing a real Japanese ASS track into a real 30 s h264/aac clip;
+(b) this is exactly why Study OS's `subtitleDiscovery.ts` / Kitsunekko path is **Retain**, and
+it means Phase 3's mining slice depends on external subtitle acquisition, not on the library.
+
+Also note HEVC: Chromium will not play those BDRips in `video-core` without hardware decode —
+they would go down the transcode path.
+
+### `entry`/episodes closure — measured, NOT adopted
+
+Re-measured before copying, as instructed. **`library-view` + `entry/page.tsx` = 369 local
+files / 67 npm specifiers**, against 179 today: **+190 files and 15 new packages**. The entry
+closure almost entirely contains the library closure, confirming that adopting `entry` is
+what restores the real `media-preview-modal`. Table, calibration notes and the package list
+are in [`vendor/seanime-web/ADOPTION.md`](../../vendor/seanime-web/ADOPTION.md).
+
+**Blocker found: `@mpv-prism/core` is in the closure.** ADR-002 defers mpv-prism and the risk
+register marks its licence unknown with the mitigation "don't ship it". It is contained —
+four files under `_features/mpv-core/`, only `mpv-core.tsx` reachable — so a **fifth
+whole-file substitution** removes it. That decision is recorded in `ADOPTION.md` and must be
+applied when the copy is performed.
+
+The measuring tool was rewritten this session (the Phase-2 copy lived in a scratchpad and was
+lost) and is now **checked in at `docs/migration/tools/import-graph.mjs`** so this does not
+happen a third time. It reproduces the Phase-2 file counts exactly.
+
+### NOT done this session — stated plainly
+
+- **The entry/episodes adoption was not performed.** Only measured. No files copied, no
+  packages installed, no substitution written. The measurement was the instructed
+  precondition, and the `@mpv-prism/core` finding changes the shape of the step.
+- **The Phase-3 opening slice was not built.** `video-core` is not mounted, no Study Overlay
+  sibling exists, and no `activeCue` has been rendered on screen — all of it is downstream of
+  the adoption above.
 
 ## Blocking findings
 
