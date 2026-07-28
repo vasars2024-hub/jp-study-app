@@ -15,7 +15,9 @@ Committed migration line:
 - `03d27a3` — editable VideoCore mining preview, screenshot/audio assets, and Anki
   history/undo contract;
 - `ea77f59` — secondary-track cue timeline and directstream startup-race fix; live
-  dual-track acceptance is negative.
+  dual-track acceptance was negative at that boundary (superseded by `3fe73d0`).
+- `3fe73d0` — terminal subtitle-batch fix, verified 6+6 dual cues, shadowing, Whisper
+  track generation, and Study OS-owned restart continuity.
 
 The old record called Phase 3 closed after the cue seam. That was too narrow. The
 authoritative `SEANIME_MIGRATION_PLAN.md` requires the complete retained control set and
@@ -91,32 +93,37 @@ them. The local adapter deliberately depends only on committed Anki contracts.
 
 ## Remaining Phase 3 work
 
-- real dual subtitles: renderer contract exists, but the fresh two-track directstream
-  delivered one cue on track 4 and zero cues on selected secondary track 3;
-- shadowing and Whisper generation;
+- shadowing microphone hardware proof and one real local Whisper inference; both paths are
+  implemented/build-clean, but neither runtime claim has been promoted without evidence;
 - one uninterrupted namespaced G-PLAY using the mounted preview: both real assets,
   live Anki export, duplicate rejection, undo/cleanup, then restart/resume/history proof;
 - final visual comparison before retiring the old player.
 
+Dual subtitles are now closed. Patch `0002` flushes the terminal directstream batch before
+successful stop/cancellation. The isolated two-track run delivered 6 Japanese + 6 English
+cues and simultaneously rendered `猫が窓辺で寝ている。` /
+`The cat is sleeping by the window.` at 2148–5148 ms. Use
+`docs/migration/tools/build-patched-sidecar.mjs` for a corrected binary; the original
+pinned `seanime.exe` still contains the bug.
+
 ## Next three safe actions
 
-1. Trace/fix the directstream parser feed until one fresh two-track run delivers cues for
-   both track 3 and track 4; then re-run simultaneous rendering.
-2. Port shadowing and Whisper generation onto the same player.
-3. Run the complete namespaced live-Anki G-PLAY plus restart-persistence check; a recorded
-   negative result is valid evidence, a confident false positive is not.
+1. Record one real microphone response and one real local Whisper inference in a safe
+   renderer session; keep any negative result.
+2. Run the complete namespaced live-Anki G-PLAY plus actual restart-persistence check.
+3. Perform the final visual comparison; only then decide whether the old player retires.
 
 ## Current verification
 
 | Gate | Result |
 |---|---|
-| focused mining + study + architecture tests | 19/19 pass |
-| full tests | 253 files / 2,901 tests pass |
+| focused mining + study + architecture tests | 21/21 pass |
+| full tests | 253 files / 2,903 tests pass |
 | TypeScript | accepted 290 diagnostics / 108 files; 0 in slice |
 | lint | accepted 164 problems; 0 changed-path mentions |
-| renderer build | exit 0; 4,580 modules |
-| CSS containment | 6,896/6,896 scoped; 0 unscoped; 0 shell Tailwind tokens |
-| patch apply and generator | exit 0 |
+| renderer build | exit 0; 4,581 modules; Whisper worker emitted |
+| CSS containment | 6,912/6,912 scoped; 0 unscoped; 0 shell Tailwind tokens |
+| patched sidecar builder | exit 0; Go directstream test pass |
 
 `src/media/seanime-boundary.d.ts` remains hand-maintained. TypeScript does not open the
 vendor tree, so production build and live harness are the signature gates.

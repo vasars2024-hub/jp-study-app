@@ -1,6 +1,6 @@
 # Migration current state
 
-Last updated: 2026-07-28 (Phase 3 active — first study-control slice committed and live-proven)
+Last updated: 2026-07-28 (Phase 3 active — dual delivery closed; final G-PLAY gates open)
 Phase: **3 — Player + Study Overlay, ACTIVE. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS. G-PLAY: OPEN.**
 
 Branch `grammarx/phase-1-5` · Phase 1+2 committed as **`55df6e9`**, based on
@@ -1093,5 +1093,102 @@ The exact harness processes were stopped, all three disposable datadirs and the
 temporary dual-track fixture were removed, the browser tab was finalized, and the
 pinned checkout retained its exact three pre-existing dirty entries.
 
-**Dual subtitles remain open.** The next fix belongs at the parser/directstream feed:
-prove both track numbers reach `subtitle-event` before claiming the renderer path passes.
+**Historical verdict, superseded immediately below:** dual subtitles remained open at
+`ea77f59`; the next slice had to prove both track numbers reached `subtitle-event`.
+
+## Phase 3 — dual delivery fix, shadowing, Whisper, and Study OS continuity (2026-07-28)
+
+Commit **`3fe73d0`** closes the dual-subtitle runtime defect and implements the remaining
+study-practice surfaces. Full Phase 3 and G-PLAY remain active because the hardware/model,
+one-run live-Anki, restart, and visual gates below have not all been exercised together.
+
+### Dual subtitles — PASS
+
+The earlier negative was not a renderer or websocket problem. On successful parser
+completion, `internal/directstream/subtitles.go` called `subtitleStream.Stop(true)` before
+`flushBatch(false)`. Stop cancelled the stream context; `sendSubtitleEvents` then rejected
+the cancelled context and silently dropped the terminal batch. The first immediately
+flushed English event survived, while all six Japanese events and the remaining English
+events were lost.
+
+`patches/seanime/0002-directstream-terminal-subtitle-flush.patch` sends the terminal
+batch before successful stop and adds a Go ordering regression. The patch applies cleanly
+to `9bdd052`; `go test ./internal/directstream` passes. The disposable builder
+`docs/migration/tools/build-patched-sidecar.mjs` archives the exact pin, overlays the patch,
+tests, and builds without modifying the pinned checkout.
+
+The fresh isolated two-track run then delivered **6 Japanese + 6 English cues**. At
+`2148–5148 ms`, the mounted real manager simultaneously rendered:
+
+```text
+猫が窓辺で寝ている。
+The cat is sleeping by the window.
+```
+
+The later `この漢字の読み方が分かりません。` /
+`I do not know how to read this kanji.` pair also aligned. Turning dual subtitles off
+removed only English; turning them back on restored English with the Japanese primary cue
+and its mining provenance unchanged.
+
+Two harness-only lifecycle defects were fixed while isolating this:
+
+- the separate proof MP4's bootstrap seek could replace the MKV subtitle stream;
+- Vite's renderer config could overwrite the proof defines, making a reload look valid
+  while serving the ordinary page.
+
+### Shadowing and Whisper — implemented, runtime gates still open
+
+- Shadowing uses the retained microphone stack on the same overlay: exact cue replay via
+  `cue.startMs` / `cue.endMs`, `MediaRecorder`, echo cancellation, noise suppression,
+  automatic gain control, a 60-second limit, local response playback, discard, cue-change
+  cleanup, and mutual exclusion with dictation.
+- Whisper uses the retained local Transformers.js worker and model settings. Electron main
+  validates an absolute local file, extracts 16 kHz mono float PCM with the existing ffmpeg
+  helper, and transfers it to the worker. Partial timestamps are rounded from seconds to
+  exact milliseconds, mounted as a new `Whisper (generated)` manager event track, and
+  selected without introducing a second timeline.
+- Worker creation, transfer, model/download/transcription progress, cancellation, playback
+  change, and error paths are explicit. The production build emitted a dedicated Whisper
+  worker chunk.
+
+The microphone hardware path and a real model inference were **not** exercised after the
+browser proof lease was finalized. Implementation/build/unit evidence is green, but these
+two runtime claims remain open; this is deliberately not promoted to a false positive.
+
+### Restart continuity
+
+The player seam previously set `disableRestoreFromContinuity: true`, while the supervised
+sidecar uses a disposable datadir. Commit `3fe73d0` therefore adds bounded Study OS-owned
+resume storage keyed first by normalized absolute local-file path, then by media/episode
+identity. It persists every two seconds and on pause/unmount, clears at end-of-file, and is
+disabled in disposable proof runs. Mining history already uses bounded Study OS
+localStorage.
+
+Pure tests prove that `C:\Anime\Episode 01.mkv` restores across a changed ephemeral
+playback ID and that a position within five seconds of the end is not restored. An actual
+app restart remains part of the open one-run G-PLAY gate.
+
+### Verification
+
+| Gate | Result |
+|---|---|
+| focused study/mining/architecture tests | **21/21 pass** |
+| full tests | **253 files / 2,903 tests pass** |
+| TypeScript | accepted **290 diagnostics / 108 files**, 0 migration diagnostics |
+| targeted ESLint | **exit 0** |
+| full lint | accepted **164 problems (2 errors, 162 warnings)** |
+| renderer production build | **exit 0**, 4,581 modules; Whisper worker emitted |
+| CSS containment | **6,912/6,912 scoped**, 0 unscoped, 0 shell Tailwind tokens |
+| patched sidecar builder | **exit 0**; Go directstream regression pass; 51.4 s |
+
+The exact proof processes/datadir were removed, the browser tab was finalized, Electron
+and Anki were untouched, and the pinned checkout retained its three pre-existing dirty
+entries.
+
+### Next three safe actions
+
+1. In a safe renderer session, record a real microphone response and run one real local
+   Whisper inference; a recorded negative is acceptable.
+2. Run one namespaced G-PLAY through the mounted preview: both real cue assets, export,
+   duplicate rejection, undo/cleanup, then actual restart/resume/history persistence.
+3. Perform the required final visual comparison before considering the old player retired.

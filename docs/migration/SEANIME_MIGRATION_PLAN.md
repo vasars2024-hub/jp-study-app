@@ -379,14 +379,16 @@ Also **[V]** *"Built-in support for other trackers such as MyAnimeList, Trakt, S
   not established** — this is decision **D1**.
 - Names, logos, `docs/images/seanime-logo.png`, `s3.seanime.app` screenshots, fonts, and the
   `mpv-prism` binaries do **not** inherit the source license **[I]**. Never copy Seanime
-  branding. `mpv-prism`'s license is **[U]**.
+  branding. `mpv-prism` was later confirmed as LGPL-3.0, but remains deferred because its
+  native tarball supply chain and custom Chromium requirements do not fit ADR-002.
 - **[R] Not a compliance guarantee.** If you intend to distribute, get a specialist review
   before Phase 2 begins.
 
 ### Finding B5 — Go becomes a build dependency
 
-Windows server build needs `CGO_ENABLED=1` and a Go 1.23+ toolchain; the web build must
-precede the server build **[V, DEVELOPMENT_AND_BUILD.md]**. Packaging must ship
+The web build must precede the Go server build **[V, DEVELOPMENT_AND_BUILD.md]**. The live
+Phase-1 build later proved that `-tags=nosystray` succeeds with `CGO_ENABLED=0`; a C toolchain
+is therefore not required for the adopted sidecar. Packaging must ship
 `seanime.exe` as an Electron Forge `extraResource` **[R]**. This **supersedes** the CLAUDE.md
 "changes stay inside `src/`" and "do not alter `forge.config`" rules — see §7.
 
@@ -417,7 +419,7 @@ precede the server build **[V, DEVELOPMENT_AND_BUILD.md]**. Packaging must ship
                                        │ HTTP 127.0.0.1:<ephemeral> + WS, generated TS types
                                        │ loopback-only, token-authed, no external bind
 ┌──────────────────────────────────────▼──────────────────────────────────────────────────────┐
-│  seanime.exe  (pinned 9bdd052…, unmodified, own isolated datadir under Study OS appData)     │
+│  seanime.exe  (pinned 9bdd052… + tracked upstreamable patches, isolated Study OS datadir)    │
 │  scanner(Habari) · AniList · library · entries · episodes · progress · schedule · playlists  │
 │  extensions(Goja) · onlinestream · torrents · torrentstream · debrid · auto-downloader       │
 │  mediastream/transcode · directstream · manga · local(offline sync) · SQLite(GORM)           │

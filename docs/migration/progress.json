@@ -3,13 +3,13 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "ea77f59",
+  "commit": "3fe73d0",
   "dirtyPorcelainEntries": 537,
   "untrackedFiles": 446,
   "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 is 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, real-cue seam cfd05fa, core controls a4e495d, mining preview/assets 03d27a3, and the secondary cue timeline ea77f59. Dual-track runtime acceptance is negative; full Phase 3 remains active.",
+  "note": "Phase 1+2 is 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, real-cue seam cfd05fa, core controls a4e495d, mining preview/assets 03d27a3, secondary cue timeline ea77f59, and dual-delivery/shadowing/Whisper/continuity 3fe73d0. Dual tracks are live-proven 6+6; full Phase 3 remains active for hardware/model G-PLAY, restart, and visual gates.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
@@ -143,9 +143,9 @@
   }
  },
  "baselines": {
-  "npmTest": "251 files / 2888 tests passed — verified after the commit",
+  "npmTest": "253 files / 2903 tests passed — verified after 3fe73d0",
   "tscNoEmit": "290 diagnostics / 108 files — verified after the commit, 0 from vendor/",
-  "lint": "164 problems (2 errors, 162 warnings) — verified after dd2ca47"
+  "lint": "164 problems (2 errors, 162 warnings) — verified after 3fe73d0"
  },
  "upstream": {
   "repo": "https://github.com/5rahim/seanime",
@@ -162,9 +162,9 @@
  },
  "openTemporaryRegressions": [],
  "nextActions": [
-  "Trace and fix the directstream parser feed until a fresh two-track run delivers cues for both embedded ASS track numbers.",
-  "Port shadowing mode and Whisper generation onto the same VideoCore player.",
-  "Run the complete namespaced live-Anki G-PLAY path with both assets, duplicate rejection, undo/cleanup, and restart persistence."
+  "Record one real microphone response and one real local Whisper inference in a safe renderer session.",
+  "Run the complete namespaced live-Anki G-PLAY path with both assets, duplicate rejection, undo/cleanup, and actual restart persistence.",
+  "Perform the final visual comparison before retiring the old player."
  ],
  "scannerComparison": {
   "gate": "section 8 — \">= parity on match rate\"",
@@ -487,8 +487,8 @@
   }
  },
  "phase3DualSubtitles": {
-  "implementationCommit": "ea77f59",
-  "verdict": "NEGATIVE — renderer timeline implemented; live directstream supplied only one of two embedded ASS tracks",
+  "implementationCommit": "ea77f59 + 3fe73d0",
+  "verdict": "PASS — patched directstream delivered both six-cue ASS tracks and the renderer showed aligned primary + secondary cues",
   "implemented": "VideoCoreSubtitleManager.getCuesForTrack exposes a read-only event-track timeline. The Study Overlay resolves a selected secondary track on the same delay-adjusted VideoCore clock without changing primary mining provenance.",
   "fixture": "Disposable MKV with aligned Japanese ASS track 3 and English ASS track 4.",
   "runtime": {
@@ -498,20 +498,45 @@
     "3 Japanese (probe)",
     "4 English (probe)"
    ],
-   "websocket": "subtitle-event 1 cue(s), tracks 4",
-   "secondary": "Track 3 selected; 0 cues delivered.",
+   "websocket": "patched sidecar delivered 6 Japanese + 6 English cues",
+   "secondary": "2148-5148ms simultaneously rendered 猫が窓辺で寝ている。 / The cat is sleeping by the window.; off/on toggle preserved primary provenance and restored English",
+   "rootCause": "Successful parser completion called subtitleStream.Stop(true) before flushBatch(false). Stop cancelled the context, so sendSubtitleEvents dropped the terminal batch.",
+   "fix": "patches/seanime/0002-directstream-terminal-subtitle-flush.patch flushes before successful stop and carries an upstream Go ordering regression.",
    "startupRace": "Fixed: open-and-await no longer mounts VideoCore with null playback info and cancels directstream preparation.",
    "cleanup": "Exact processes stopped; three disposable datadirs and temporary dual fixture removed; browser finalized; Electron and Anki untouched."
   },
   "verification": {
-   "focused": "19/19 mining + study + architecture tests pass",
-   "tests": "253 files / 2901 tests pass",
+   "focused": "21/21 mining + study + architecture tests pass",
+   "tests": "253 files / 2903 tests pass",
    "tsc": "expected 290 diagnostics / 108 files; 0 slice diagnostics",
    "targetedLint": "exit 0",
    "lint": "expected 164 problems; 0 slice mentions",
-   "rendererBuild": "exit 0; 4580 modules",
-   "cssContainment": "6896/6896 scoped; 0 unscoped; 0 shell --tw- tokens",
-   "patchAndGenerator": "exit 0"
+   "rendererBuild": "exit 0; 4581 modules",
+   "cssContainment": "6912/6912 scoped; 0 unscoped; 0 shell --tw- tokens",
+   "patchedSidecarBuilder": "exit 0; go test ./internal/directstream pass; pinned checkout untouched"
+  }
+ },
+ "phase3PracticeAndContinuity": {
+  "implementationCommit": "3fe73d0",
+  "verdict": "IMPLEMENTED — build/unit clean; microphone hardware, real Whisper inference, actual restart, and one-run G-PLAY remain open",
+  "shadowing": "Same-cue replay from exact startMs/endMs, retained MediaRecorder stack, 60s cap, response playback/discard, cleanup, and dictation mutual exclusion.",
+  "whisper": "Validated absolute local path -> existing ffmpeg 16kHz mono PCM -> retained Transformers.js worker -> rounded millisecond subtitle events -> new selected Whisper (generated) manager track.",
+  "continuity": "Bounded Study OS localStorage keyed by normalized local-file path or media/episode identity; saves every two seconds and on pause/unmount; clears near EOF; disabled in proof harnesses.",
+  "runtimeNotClaimed": [
+   "microphone hardware recording",
+   "real model download/inference",
+   "mounted-preview live Anki export in the same run",
+   "actual app restart/resume/history",
+   "final visual comparison"
+  ],
+  "verification": {
+   "focused": "21/21 pass",
+   "tests": "253 files / 2903 tests pass",
+   "tsc": "expected 290 diagnostics / 108 files; 0 migration diagnostics",
+   "targetedLint": "exit 0",
+   "lint": "expected 164 problems",
+   "rendererBuild": "exit 0; 4581 modules; dedicated Whisper worker chunk",
+   "cssContainment": "6912/6912 scoped; 0 unscoped; 0 shell --tw- tokens"
   }
  },
  "knownGaps": {
@@ -604,5 +629,11 @@
   "onlySubsOnDisk": "loose Netflix .srt for a Chinese drama",
   "consequence": "The cue path could not be exercised against the library as it stands; a fixture MKV was built by muxing a real Japanese ASS track into a real 30s h264/aac clip. Phase-3 mining therefore depends on Study OS subtitle discovery (Kitsunekko), not on the library — which is exactly why that capability is Retain in section 8."
  },
- "notDoneThisSession": []
+ "notDoneThisSession": [
+  "Real microphone shadowing capture.",
+  "Real local Whisper model download/inference.",
+  "One uninterrupted mounted-preview live-Anki G-PLAY with duplicate and undo cleanup.",
+  "Actual app restart proving resume and mining-history persistence.",
+  "Final visual comparison before old-player retirement."
+ ]
 }

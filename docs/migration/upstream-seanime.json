@@ -16,7 +16,11 @@
     "insideStudyOsRepo": false
   },
   "adoption": {
-    "serverStrategy": "sidecar-unmodified",
+    "serverStrategy": "pinned-sidecar-with-upstreamable-patches",
+    "serverPatches": [
+      "patches/seanime/0002-directstream-terminal-subtitle-flush.patch"
+    ],
+    "sidecarBuilder": "docs/migration/tools/build-patched-sidecar.mjs",
     "uiStrategy": "source-adoption",
     "playerModule": "seanime-web/src/app/(main)/_features/video-core",
     "playerModulesDeferred": [
@@ -43,7 +47,7 @@
         "DEVELOPMENT_AND_BUILD.md"
       ],
       "consequence": "Cannot host Denshi's native player inside stock Electron. video-core adopted instead.",
-      "licenseOfMpvPrism": "unknown"
+      "licenseOfMpvPrism": "LGPL-3.0"
     },
     {
       "id": "B3",
@@ -53,9 +57,9 @@
     },
     {
       "id": "B5",
-      "summary": "Go 1.23+ with CGO_ENABLED=1 required to build the server; not installed on this machine.",
+      "summary": "CLOSED: Go 1.26.5 is installed; the nosystray server build succeeds with CGO disabled.",
       "evidence": ["DEVELOPMENT_AND_BUILD.md", "docs/migration/CURRENT_STATE.md"],
-      "consequence": "Phase 1 blocked until installed."
+      "consequence": "No blocker for the nosystray sidecar build; a C toolchain is only relevant to the deferred systray build."
     }
   ],
   "assetsNotLicensedByCode": [

@@ -158,3 +158,41 @@ Putting `clientId` only in the JSON body is insufficient even when the websocket
 was accepted. The server can log a targeted send while the browser receives nothing. The
 durable reproducer is `docs/migration/tools/cue-manager-harness.mjs`; it uses an isolated
 temporary datadir and copied one-file library and never starts a second Electron instance.
+
+## 0002 — flush the terminal directstream subtitle batch before cancellation
+
+Closes the parser-feed loss found by the real two-track Phase 3 fixture. The renderer and
+websocket transport were healthy: Seanime discovered both ASS tracks, but the sidecar sent
+only the first immediately flushed event. At end-of-file, `subtitleStream.Stop(true)`
+cancelled the stream context before `flushBatch(false)` tried to send the remaining events.
+`sendSubtitleEvents` correctly rejects a cancelled context, so the final batch was lost.
+
+The patch preserves the existing error path and changes successful completion ordering to:
+
+```text
+flush terminal subtitle events -> stop/cancel the completed stream
+```
+
+It also adds an upstream Go regression that asserts `flush` precedes `stop`. Verification:
+
+- `git apply --check` against pinned commit `9bdd052` — pass;
+- `go test ./internal/directstream` with the patch overlaid — pass;
+- isolated patched-sidecar run — both six-cue ASS tracks delivered (**6 Japanese + 6
+  English**);
+- simultaneous manager output at `2148–5148 ms`:
+  `猫が窓辺で寝ている。` and `The cat is sleeping by the window.`;
+- disabling dual subtitles left the Japanese primary cue intact; enabling it restored the
+  English cue on the same VideoCore clock.
+
+Build the corrected sidecar without modifying the pinned checkout:
+
+```powershell
+node docs/migration/tools/build-patched-sidecar.mjs `
+  "$env:TEMP\seanime-phase3.exe"
+$env:SEANIME_EXE = "$env:TEMP\seanime-phase3.exe"
+```
+
+The builder takes tracked source from `git archive` at the exact pin, copies only the
+already-generated `web/` embed input, applies the patch in a disposable directory, runs the
+upstream regression, and then builds with `-tags=nosystray`. Its temporary source directory
+is always removed.

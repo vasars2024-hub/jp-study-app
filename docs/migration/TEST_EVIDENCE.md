@@ -241,3 +241,58 @@ are not accepted.
 The exact Node/sidecar processes were stopped, all disposable datadirs and temporary
 dual-track files were removed, the browser tab was finalized, Electron and Anki were
 untouched, and pinned upstream remained at its three pre-existing dirty entries.
+
+## 2026-07-28 — Phase 3 continuation: terminal batch fix and practice surfaces
+
+Environment: Windows · branch `grammarx/phase-1-5` · implementation `3fe73d0` ·
+Seanime pin `9bdd052`.
+
+### Automated
+
+| Gate | Result |
+|---|---|
+| focused study + mining + architecture tests | **21/21 passed** |
+| `npm test -- --run` | **253 files, 2,903 tests, 0 failed** |
+| `npx tsc --noEmit` | expected exit 2; **290 diagnostics / 108 files**, 0 migration diagnostics |
+| targeted ESLint | **exit 0** |
+| `npm run lint` | expected exit 1; **164 problems (2 errors, 162 warnings)** |
+| renderer production build | **exit 0**, 4,581 modules; dedicated Whisper worker emitted |
+| CSS containment | **6,912/6,912 scoped**, 0 unscoped, 0 shell `--tw-` |
+| patched sidecar builder | **exit 0**, `go test ./internal/directstream` pass, 51.4 s |
+
+The typecheck briefly rose to 292/109 because the Vite worker constructor lacked an
+ambient type and its error callback became implicit `any`; the scoped worker declaration
+removed both, restoring the exact baseline. No baseline was changed.
+
+### Runtime — dual subtitles now pass
+
+The negative above was traced to successful parser shutdown: `Stop(true)` cancelled the
+context before the terminal subtitle batch was sent. Patch `0002` reverses that ordering
+and adds an upstream Go regression.
+
+The fresh patched-sidecar run delivered **6 Japanese + 6 English cues**. Simultaneous real
+manager output included:
+
+```text
+2148–5148 ms  猫が窓辺で寝ている。
+2148–5148 ms  The cat is sleeping by the window.
+```
+
+Later in the loop, `この漢字の読み方が分かりません。` aligned with
+`I do not know how to read this kanji.`. Disabling dual subtitles removed only the
+secondary English text; re-enabling restored it with six secondary cues and unchanged
+Japanese mining provenance.
+
+### Explicitly not yet accepted
+
+Shadowing, Whisper, and restart continuity are implemented and build/unit clean, but this
+run did not claim:
+
+- a real microphone capture;
+- a real Whisper model download/inference;
+- mounted-preview export to the live Anki collection;
+- actual app restart/resume/history persistence;
+- final visual parity.
+
+Those remain the G-PLAY exit work. The browser proof lease was finalized after dual-cue
+acceptance, so inventing a hardware/model result would have been a false positive.
