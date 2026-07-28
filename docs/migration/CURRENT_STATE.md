@@ -1,6 +1,6 @@
 # Migration current state
 
-Last updated: 2026-07-28 (Phase 3 active — dual delivery and Whisper closed; final G-PLAY gates open)
+Last updated: 2026-07-28 (Phase 3 active — dual delivery, Whisper, and visual comparison closed; G-PLAY runtime gates open)
 Phase: **3 — Player + Study Overlay, ACTIVE. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS. G-PLAY: OPEN.**
 
 Branch `grammarx/phase-1-5` · Phase 1+2 committed as **`55df6e9`**, based on
@@ -1193,12 +1193,30 @@ app restart remains part of the open one-run G-PLAY gate.
 | targeted ESLint | **exit 0** |
 | full lint | accepted **164 problems (2 errors, 162 warnings)** |
 | renderer production build | **exit 0**, 4,581 modules; Whisper worker emitted |
-| CSS containment | **6,912/6,912 scoped**, 0 unscoped, 0 shell Tailwind tokens |
+| CSS containment | **6,915/6,915 scoped**, 0 unscoped, 0 shell Tailwind tokens |
 | patched sidecar builder | **exit 0**; Go directstream regression pass; 51.4 s |
 
 The exact proof processes/datadir were removed, the browser tab was finalized, Electron
 and Anki were untouched, and the pinned checkout retained its three pre-existing dirty
 entries.
+
+### Final visual comparison — PASS after one correction
+
+The recorded old-player image at `debug/shots/win1-1785172724152.png` was compared at
+normal scale with a fresh adopted-player real-cue image at
+`debug/shots/phase3-adopted-player-dual-cue-20260728.jpg`.
+
+The first comparison caught a real regression: the mounted card preview's two-column form
+used intrinsic control widths, producing horizontal overflow and clipping at the
+1,294 × 845 Chrome proof viewport. Commit **`29582e0`** changes those columns to
+`minmax(0, 1fr)`, bounds every form control, and keeps only vertical overflow.
+
+The fresh comparison then passed: video remained unobscured at the center, simultaneous
+English/Japanese cues were readable, exact cue timing remained visible, the full retained
+control dock stayed reachable, and the card preview showed both columns and provenance with
+no horizontal scrollbar. Production build and CSS-containment results above include this
+correction. G-VIS is therefore closed; this does not substitute for the still-open one-run
+G-PLAY and restart proof.
 
 ### Next three safe actions
 
@@ -1206,4 +1224,4 @@ entries.
    response; a recorded negative is acceptable.
 2. Run one namespaced G-PLAY through the mounted preview: both real cue assets, export,
    duplicate rejection, undo/cleanup, then actual restart/resume/history persistence.
-3. Perform the required final visual comparison before considering the old player retired.
+3. Only after both runtime gates pass, retire the old player and close Phase 3.

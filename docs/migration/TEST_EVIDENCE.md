@@ -321,3 +321,33 @@ focused tests stayed 21/21, TypeScript stayed at 290/108, and CSS containment st
 The microphone button was reached on a real active cue, but not pressed: Chrome microphone
 permission and audio capture require explicit user approval. No microphone result is
 claimed.
+
+### Final visual comparison — PASS (`29582e0`)
+
+Compared:
+
+- before: `debug/shots/win1-1785172724152.png`;
+- adopted player: `debug/shots/phase3-adopted-player-dual-cue-20260728.jpg`;
+- proof viewport: 1,294 × 845 at Chrome 100% zoom.
+
+The first adopted-player capture was a negative result: intrinsic form-control widths made
+the 24rem card-preview grid overflow horizontally and clip its Term/Meaning fields. The
+fix uses zero-minimum grid tracks, bounded 100%-width controls, and vertical-only panel
+overflow.
+
+The fresh real-cue capture showed `I do not know how to read this kanji.` and
+`この漢字の読み方が分かりません。` simultaneously; cue 5, track 4, and exact
+`21000–24000 ms` timing remained visible. The entire control dock was reachable, and the
+card preview displayed both columns plus provenance without a horizontal scrollbar.
+
+After the correction:
+
+```text
+renderer build: 4,581 modules, exit 0
+media CSS: 6,915/6,915 scoped
+unscoped selectors: 0
+shell --tw- tokens: 0
+```
+
+This closes G-VIS. Microphone capture and the uninterrupted mounted-preview
+Anki/restart G-PLAY remain open.

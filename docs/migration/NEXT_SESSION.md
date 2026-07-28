@@ -20,6 +20,8 @@ Committed migration line:
   track generation, and Study OS-owned restart continuity.
 - `1c51d6c` — deterministic WebGPU preflight/CPU fallback plus a disposable ffmpeg-PCM
   harness; live `whisper-base` inference generated and mounted 3 cues.
+- `29582e0` — card-preview containment correction found by the final old/new visual
+  comparison; G-VIS now passes at the normal Chrome proof viewport.
 
 The old record called Phase 3 closed after the cue seam. That was too narrow. The
 authoritative `SEANIME_MIGRATION_PLAN.md` requires the complete retained control set and
@@ -98,8 +100,12 @@ them. The local adapter deliberately depends only on committed Anki contracts.
 - shadowing microphone hardware proof; implementation is build-clean, but Chrome
   microphone permission was not accepted without explicit user approval;
 - one uninterrupted namespaced G-PLAY using the mounted preview: both real assets,
-  live Anki export, duplicate rejection, undo/cleanup, then restart/resume/history proof;
-- final visual comparison before retiring the old player.
+  live Anki export, duplicate rejection, undo/cleanup, then restart/resume/history proof.
+
+The final visual comparison is closed. Its first run exposed horizontal overflow in the
+mounted preview; `29582e0` corrected the grid/control containment, and the rerun retained
+readable dual cues, exact timing, the full control dock, and a two-column preview without
+horizontal scrolling.
 
 Dual subtitles are now closed. Patch `0002` flushes the terminal directstream batch before
 successful stop/cancellation. The isolated two-track run delivered 6 Japanese + 6 English
@@ -113,7 +119,7 @@ pinned `seanime.exe` still contains the bug.
 1. With explicit permission approval, record and play back one real microphone response;
    keep any negative result.
 2. Run the complete namespaced live-Anki G-PLAY plus actual restart-persistence check.
-3. Perform the final visual comparison; only then decide whether the old player retires.
+3. If both runtime gates pass, retire the old player and close Phase 3.
 
 ## Current verification
 

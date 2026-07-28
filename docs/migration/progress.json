@@ -3,13 +3,13 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "1c51d6c",
+  "commit": "29582e0",
   "dirtyPorcelainEntries": 537,
   "untrackedFiles": 446,
   "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 is 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, real-cue seam cfd05fa, core controls a4e495d, mining preview/assets 03d27a3, secondary cue timeline ea77f59, dual delivery/practice/continuity 3fe73d0, and deterministic Whisper CPU recovery 1c51d6c. Dual tracks are live-proven 6+6 and local whisper-base inference is live-proven; full Phase 3 remains active for microphone, mounted-preview G-PLAY, restart, and visual gates.",
+  "note": "Phase 1+2 is 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, real-cue seam cfd05fa, core controls a4e495d, mining preview/assets 03d27a3, secondary cue timeline ea77f59, dual delivery/practice/continuity 3fe73d0, deterministic Whisper CPU recovery 1c51d6c, and final card-preview visual containment 29582e0. Dual tracks, local whisper-base inference, and G-VIS are live-proven; full Phase 3 remains active for microphone and the mounted-preview Anki/restart G-PLAY.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
@@ -164,7 +164,7 @@
  "nextActions": [
   "With explicit permission approval, record and play back one real microphone shadowing response.",
   "Run the complete namespaced live-Anki G-PLAY path with both assets, duplicate rejection, undo/cleanup, and actual restart persistence.",
-  "Perform the final visual comparison before retiring the old player."
+  "If both runtime gates pass, retire the old player and close Phase 3."
  ],
  "scannerComparison": {
   "gate": "section 8 — \">= parity on match rate\"",
@@ -518,15 +518,15 @@
  },
  "phase3PracticeAndContinuity": {
   "implementationCommit": "1c51d6c",
-  "verdict": "WHISPER RUNTIME PASS — microphone hardware, actual restart, and one-run mounted-preview G-PLAY remain open",
+  "verdict": "WHISPER + G-VIS PASS — microphone hardware, actual restart, and one-run mounted-preview G-PLAY remain open",
   "shadowing": "Same-cue replay from exact startMs/endMs, retained MediaRecorder stack, 60s cap, response playback/discard, cleanup, and dictation mutual exclusion.",
   "whisper": "PASS — fresh forced-CPU whisper-base run consumed ffmpeg-produced 16 kHz mono PCM, generated 3 lines, selected Whisper (generated) track 5, and mounted cue 1 at exact 0-24000 ms with text 【音楽】. A prior Auto run reached decoder download 70% then exposed the unusable-WebGPU-adapter failure; 1c51d6c preflights the adapter and cleanly selects WASM.",
+  "visualComparison": "PASS after correction — the first 1294x845 capture found intrinsic-width horizontal overflow in the card preview; 29582e0 bounded its grid and controls. The fresh capture retained readable simultaneous dual cues, exact timing, the full dock, and a two-column preview without horizontal scrolling.",
   "continuity": "Bounded Study OS localStorage keyed by normalized local-file path or media/episode identity; saves every two seconds and on pause/unmount; clears near EOF; disabled in proof harnesses.",
   "runtimeNotClaimed": [
    "microphone hardware recording",
    "mounted-preview live Anki export in the same run",
-   "actual app restart/resume/history",
-   "final visual comparison"
+   "actual app restart/resume/history"
   ],
   "verification": {
    "focused": "21/21 pass",
@@ -535,7 +535,7 @@
    "targetedLint": "exit 0",
    "lint": "expected 164 problems",
    "rendererBuild": "exit 0; 4581 modules; dedicated Whisper worker chunk",
-   "cssContainment": "6912/6912 scoped; 0 unscoped; 0 shell --tw- tokens"
+   "cssContainment": "6915/6915 scoped; 0 unscoped; 0 shell --tw- tokens"
   }
  },
  "knownGaps": {
@@ -631,7 +631,6 @@
  "notDoneThisSession": [
  "Real microphone shadowing capture.",
   "One uninterrupted mounted-preview live-Anki G-PLAY with duplicate and undo cleanup.",
-  "Actual app restart proving resume and mining-history persistence.",
-  "Final visual comparison before old-player retirement."
+  "Actual app restart proving resume and mining-history persistence."
  ]
 }
