@@ -3,18 +3,18 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "dd2ca47",
+  "commit": "cfd05fa",
   "dirtyPorcelainEntries": 537,
   "untrackedFiles": 446,
   "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 COMMITTED as 55df6e9. Phase 3 Task 1 entry/video-core closure COMMITTED as dd2ca47 (206 files, +48509/-100). The task boundary did not include src/preload.ts, src/main.ts, src/renderer/App.tsx or src/renderer/window.d.ts; their parallel-session work remains untouched.",
+  "note": "Phase 1+2 COMMITTED as 55df6e9. Phase 3 Task 1 entry/video-core closure COMMITTED as dd2ca47 with its record in ffc703f. Tasks 2+3 COMMITTED as cfd05fa (9 files, +994/-9). The scoped player seam did not stage or modify unrelated parallel-session paths.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
- "currentPhaseName": "Player + Study Overlay — opening",
- "phaseComplete": false,
+ "currentPhaseName": "Player + Study Overlay — closed",
+ "phaseComplete": true,
  "gateG1": {
   "verdict": "PASS",
   "processLifecycleWindows": "PASS — no orphan or port leak under graceful stop, simulated crash, or hard kill",
@@ -369,8 +369,44 @@
    "evidence": "3 of 6 real ASS cues carried override tags: \\pos(960,900), \\i1..\\i0, \\an8 and \\b1",
    "guidance": "Strip at the mining boundary; retain raw text in provenance. The manager is upstream code and must stay generic (upstream translation wants a different treatment)."
   },
-  "runtimeStatus": "PARTIAL — proven in two halves, not joined. Data contract verified against the real server (directstream -> mkvparser, tracks=3); activation logic verified in a real renderer running the patch algorithm over real ASS cues with a real playing video. Real subtitle-event frames never reached a hand-rolled external websocket client, so getActiveCues()/cuechange have still not run inside the real manager class.",
-  "blocker": "Websocket addressing for nativeplayer events. SendEventTo(clientId) — tried own ?id= uuid, server-issued client-identity id, and full ?id=&proof= reconnect (accepted, echoed back). Server logs the event as sent; it does not arrive. NEXT: mount the adopted websocket-provider.tsx instead of hand-rolling the client."
+  "runtimeStatus": "PASS — real MKVParser_SubtitleEvent frames reached a mounted real VideoCoreSubtitleManager through the adopted WebsocketProvider and produced real cuechange while the full adopted VideoCore played. Observed cues: 2148-5148ms 猫が窓辺で寝ている。; 6648-9398ms 今日は本当にいい天気ですね。 No cue or manager was mocked.",
+  "blocker": "RESOLVED. Directstream uses WSEvents.NATIVE_PLAYER, and targeted REST calls require X-Seanime-Client-Id, X-Seanime-Client-Id-Proof and X-Seanime-Client-Platform in addition to the token. Body-only clientId was the confident false-negative path."
+ },
+ "phase3PlayerSlice": {
+  "implementationCommit": "cfd05fa",
+  "verdict": "PASS — Tasks 2 and 3 closed",
+  "mounted": "Adopted WebsocketProvider wraps the Media workspace; full adopted VideoCore/VideoCoreProvider and sibling Study Overlay are mounted.",
+  "eventPath": "real directstream subtitle-event on WSEvents.NATIVE_PLAYER -> StudyPlayerSlice -> real vc_subtitleManager (VideoCoreSubtitleManager) -> cuechange -> StudyOverlay",
+  "realCueChanges": [
+   {
+    "text": "猫が窓辺で寝ている。",
+    "startMs": 2148,
+    "endMs": 5148
+   },
+   {
+    "text": "今日は本当にいい天気ですね。",
+    "startMs": 6648,
+    "endMs": 9398
+   }
+  ],
+  "sidecarCorroboration": "track 3 S_TEXT/ASS; startTime=2148 duration=3000 and startTime=6648 duration=2750",
+  "parserBytes": 11871913,
+  "timingRule": "Overlay reads cue.startMs/cue.endMs only; never video.currentTime.",
+  "harness": "docs/migration/tools/cue-manager-harness.mjs — isolated temp datadir, copied single-file library, private MP4 Range server, full cleanup; no Electron or Anki.",
+  "generator": "make-jassub-substitution.mjs applies 0001-video-core-cuechange.patch in memory with guarded six-hunk parsing before JASSUB substitutions; pinned checkout remains untouched.",
+  "failedExperiments": [
+   "Hand-rolled websocket with own id, server-issued id, and id+proof reconnect: server logged targeted sends but client received no events.",
+   "Body-only clientId: directstream accepted but targeted frames were absent; required identity proof/platform headers were missing.",
+   "GET /api/v1/settings on a fresh sidecar returned 500 because no settings row existed; POST /api/v1/start is required.",
+   "Scanning a scratch directory with same-basename MKV and MP4 left the MKV unmatched; the accepted harness copies only the MKV."
+  ],
+  "verification": {
+   "rendererBuild": "exit 0; 4576 modules; 25.58s",
+   "cssContainment": "6847/6847 scoped; 0 unscoped; 0 shell --tw- tokens",
+   "tests": "251 files / 2888 tests pass",
+   "tsc": "expected exit 2; 290 diagnostics / 108 files; 0 vendor",
+   "lint": "expected exit 1; 164 problems (2 errors, 162 warnings)"
+  }
  },
  "knownGaps": {
   "liveAnkiConnect": "CLOSED 2026-07-28 — all 14 AnkiActionMap actions verified live.",
@@ -462,8 +498,5 @@
   "onlySubsOnDisk": "loose Netflix .srt for a Chinese drama",
   "consequence": "The cue path could not be exercised against the library as it stands; a fixture MKV was built by muxing a real Japanese ASS track into a real 30s h264/aac clip. Phase-3 mining therefore depends on Study OS subtitle discovery (Kitsunekko), not on the library — which is exactly why that capability is Retain in section 8."
  },
- "notDoneThisSession": [
-  "The two cue-proof halves are still not joined: no real subtitle-event has caused cuechange inside a mounted real VideoCoreSubtitleManager.",
-  "The Phase-3 opening slice is still not built: video-core is not mounted inside the Study OS shell, no sibling Study Overlay exists, and no real activeCue is rendered on screen."
- ]
+ "notDoneThisSession": []
 }

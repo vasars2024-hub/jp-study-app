@@ -1,182 +1,135 @@
 # Next session handoff
 
-Updated 2026-07-28 after **Phase 3 Task 1 closed**.
+Updated 2026-07-28 after **Phase 3 closed**.
 
 ## Where you are
 
 Repo `C:/Users/Arseniy/Projects/jp-study-app` · branch `grammarx/phase-1-5`.
 
-**Phase 1 and Phase 2 are COMMITTED as `55df6e9`. Task 1's entry/video-core closure is
-COMMITTED as `dd2ca47`.** Gate G-1: PASS. §8 scanner gate: PASS. §9 live-AnkiConnect gate:
-PASS. The cue patch's three open assumptions are answered.
+Committed migration line:
 
-The adopted surface is now **369 files with six guarded whole-file substitutions** and passes
-the production renderer build. What remains is the honest runtime join (Task 2) and the
-smallest player + sibling Overlay slice (Task 3). No real cue has fired inside the mounted
-manager yet.
+- `55df6e9` — Phase 1 and Phase 2;
+- `dd2ca47` — Phase 3 Task 1 entry/video-core adoption;
+- `ffc703f` — Task 1 durable record;
+- `cfd05fa` — Phase 3 Tasks 2/3 live subtitle join and smallest player slice.
 
-`CURRENT_STATE.md`'s "Phase 3 — continuation" section is the full Task 1 record.
+The adopted closure is **369 files: 363 upstream-identical + 6 guarded whole-file
+substitutions**. The Media workspace mounts the adopted websocket provider and full
+VideoCore. A sibling Study Overlay receives real `cuechange` from the real
+`VideoCoreSubtitleManager` and uses `cue.startMs` / `cue.endMs`.
+
+`CURRENT_STATE.md` contains the complete evidence and failed experiments. Phase 3 has no
+remaining implementation task.
 
 ## Verify before doing anything
 
 ```bash
-git rev-parse --abbrev-ref HEAD   # grammarx/phase-1-5
-git log --oneline -1              # dd2ca47 feat(media): adopt Seanime entry and video-core closure
-go version                        # go1.26.5 — if it does not resolve, that is a STALE SHELL,
-                                  # not a missing toolchain (C:\Program Files\Go\bin\go.exe,
-                                  # present on the MACHINE PATH; a fresh shell picks it up)
+git rev-parse --abbrev-ref HEAD
+git log --oneline -5
+git -C C:/Users/Arseniy/Projects/seanime-upstream status --short
 ```
 
-Pinned checkout `C:/Users/Arseniy/Projects/seanime-upstream` must be at `9bdd052` with exactly
-three dirty entries (`jassub-worker.js`, `routeTree.gen.ts`, `?? seanime.exe`). It was left
-pristine after the patch was applied and reverted.
+The pinned checkout must remain at `9bdd052` with exactly its three pre-existing dirty
+entries:
 
-`ENVIRONMENT_BASELINE.md` in the Phase-0 backup still says `go — NOT INSTALLED`. Knowingly
-stale, left unedited because the backup is covered by `SHA256SUMS.txt`.
-**Source-of-truth order is repo/system state > recorded prose. Never modify the backup.**
+```text
+ M seanime-web/public/jassub/jassub-worker.js
+ M seanime-web/src/routeTree.gen.ts
+?? seanime.exe
+```
+
+Never clean the main worktree. It contains extensive unrelated concurrent work. Stage only
+explicit migration paths.
+
+## Phase 3 acceptance — settled, do not re-derive
+
+- Real adopted provider identity:
+  `8b42797e-4798-40b6-992e-79c065a914e8` in the accepted isolated run.
+- Real parser stream: **11,871,913 bytes** consumed.
+- Real manager cues:
+
+  ```text
+  2148-5148ms  猫が窓辺で寝ている。
+  6648-9398ms  今日は本当にいい天気ですね。
+  ```
+
+- Sidecar corroboration: track 3 `S_TEXT/ASS`; events
+  `startTime=2148 duration=3000` and `startTime=6648 duration=2750`.
+- Full adopted VideoCore was active and its h264/aac remux was playing.
+- The sibling Overlay reads exact demuxer timings from the cue. It never uses
+  `video.currentTime` for provenance or mining boundaries.
+- No synthetic cue or mocked subtitle manager was used.
+
+## The transport contract that matters
+
+Directstream local-file messages arrive on `WSEvents.NATIVE_PLAYER`, not
+`WSEvents.VIDEOCORE`.
+
+The REST request that starts targeted playback must carry:
+
+```text
+X-Seanime-Token
+X-Seanime-Client-Id
+X-Seanime-Client-Id-Proof
+X-Seanime-Client-Platform
+```
+
+Putting `clientId` only in the JSON body reproduces the old false negative: the server
+accepts and logs a targeted send, but the browser receives no `watch` or
+`subtitle-event`.
+
+Fresh isolated sidecars need `POST /api/v1/start` before settings exist. A scan directory
+must not contain a same-basename MP4 beside the MKV, or the MKV can remain unmatched. The
+parser stream must actually be consumed before cues are emitted.
+
+## Durable repro
+
+```bash
+node docs/migration/tools/cue-manager-harness.mjs <cue-probe.mkv> <cue-probe.mp4>
+```
+
+The harness:
+
+- derives the repo path instead of hard-coding a user directory;
+- accepts `SEANIME_CUE_PROOF_EXE` or defaults to the sibling pinned checkout;
+- creates a temporary sidecar datadir and copied one-file library;
+- serves the private MP4 remux with byte-range support;
+- captures sidecar stdout in `%TEMP%`;
+- cleans its process tree and disposable datadir on exit.
+
+It does not start Electron and does not touch the live Anki collection.
+
+## Fixed verification baselines
+
+| Command | Accepted result |
+|---|---|
+| `npx vite build --config vite.renderer.config.ts` | exit 0; 4,576 modules |
+| `node docs/migration/tools/check-media-css-containment.mjs` | 6,847/6,847 scoped; 0 shell Tailwind tokens |
+| `npm test` | 251 files / 2,888 tests pass |
+| `npx tsc --noEmit` | expected exit 2; 290 diagnostics / 108 files; 0 vendor |
+| `npm run lint` | expected exit 1; 164 problems (2 errors, 162 warnings) |
+
+`src/media/seanime-boundary.d.ts` is hand-maintained. TypeScript deliberately never opens
+the vendor tree, so the production build and real browser harness—not a green boundary
+re-check—are the upstream-signature gates.
 
 ## Next three safe actions
 
-1. **Join the two halves of the cue proof.** Mount the adopted `websocket-provider.tsx`
-   in the dev harness instead of hand-rolling another client. Acceptance is a real
-   `MKVParser_SubtitleEvent` causing `cuechange` inside the real
-   `VideoCoreSubtitleManager`, with real cue text and millisecond timings logged. A recorded
-   negative result is a valid outcome.
-2. **Mount `video-core` + the Study Overlay as siblings** inside the Media workspace, playing
-   one real local file and sharing one player timeline. Do not port the full study-control
-   set.
-3. **Render the live cue with exact provenance timing.** Read `cue.startMs` / `cue.endMs`;
-   never substitute `video.currentTime` at event receipt.
+1. Keep Phase 3 closed. Do not expand the deliberately minimal player/Overlay seam as
+   incidental cleanup.
+2. If the Seanime pin changes, regenerate
+   `video-core-subtitles.ts`, confirm the guarded in-memory cue patch still applies, and
+   repeat both the production build and live cue harness.
+3. Prepare the upstream cuechange patch together with the incorrect seconds→milliseconds
+   documentation correction, then begin the next phase named by
+   `SEANIME_MIGRATION_PLAN.md`.
 
-## What is settled — do NOT re-derive
+## Destructive-risk constraints
 
-- **Task 1 is closed.** Closure: 369 files. Manifest: 67 → 81 runtime dependencies
-  (+14 wanted packages, 54 transitives installed). Active substitutions: server URL,
-  sea-link, navigation, MPV atoms, JASSUB integration, media-captions CSS. Production build:
-  pass. CSS: 6,841/6,841 scoped; shell Tailwind tokens: 0. Full record and re-sync commands
-  are in `vendor/seanime-web/ADOPTION.md`.
-- **The reachable MPV importer is `mpv-core.atoms.ts`, not `mpv-core.tsx`.** The former
-  documentation was wrong. mpv-prism is LGPL-3.0 but stays excluded under ADR-002 and because
-  its dependency is an out-of-registry tarball URL.
-- **`MKVParser_SubtitleEvent.startTime`/`duration` are MILLISECONDS.** From the producing Go
-  source: `mkvparser.go:616  milliseconds := float64(packet.StartTime) / 1e6`. The patch is
-  correct as written. **Upstream's Go struct comment AND the generated `types.ts` both say
-  "in seconds" and are WRONG** — trusting them costs a 1000× timing error. Worth an upstream
-  PR next to the patch.
-- **`timeupdate` is 3.81 Hz** (mean gap 262.6 ms, max 290.7 ms, 115 real samples); cue
-  activation is **76–216 ms late**. `requestVideoFrameCallback` is not needed **provided the
-  Overlay reads timings from `cue.startMs`/`cue.endMs` (exact, from the demuxer) and never
-  from `video.currentTime` at `cuechange`.** Then mining/provenance stay frame-exact and only
-  UI responsiveness carries the lag.
-- **ASS override tags reach `text` raw** (`{\pos}`, `{\i1}`, `{\an8}`, `{\b1}`). Strip in the
-  Overlay at the mining boundary; keep raw text in provenance. Not in the patch.
-- **Live AnkiConnect works end to end** — all 14 `AnkiActionMap` actions, including
-  `storeMediaFile` for screenshot + audio clip, and duplicate rejection. Re-run any time with
-  `node docs/migration/tools/anki-gate.mjs <stamp>` (self-cleaning; it creates and deletes its
-  own probe deck — it never touches existing notes).
-- **The test library has NO soft subtitles.** The Big O is HEVC with zero subtitle streams;
-  the AnimePahe `.mp4`s are hardsubbed h264+aac. Don't waste time looking for one — build a
-  fixture (see below), and note that Phase 3 mining depends on Study OS's subtitle-discovery
-  path, not on the library.
-
-## Driving directstream from an external client — four preconditions
-
-Each failure returns a bare `HTTP 500 {"message":"Internal Server Error"}`; the real reason is
-only in the server log, so always capture stdout.
-
-1. the path must be a **registered `LocalFile`** (a library scan is required — an arbitrary
-   path is rejected with *"could not find local file"*);
-2. it must be **matched** (`mediaId != 0`);
-3. the `mediaId` must be **seeded into the collection** via
-   `POST /api/v1/library/unknown-media { mediaIds }` — otherwise *"media not found in anime
-   collection: N"*, because the simulated collection starts empty;
-4. the demuxer only advances **as a client consumes the stream** — no cues until something
-   pulls `/directstream/stream`.
-
-`node docs/migration/tools/cue-runtime.mjs <mkv>` performs all four and is the starting point.
-
-## Reproducing the cue fixture
-
-There is no subtitled file in the library, so build one (ffprobe/ffmpeg are at
-`…\WinGet\Packages\Gyan.FFmpeg_*\ffmpeg-8.1.1-full_build\bin\`):
-
-```bash
-ffmpeg -y -i "<a real AnimePahe .mp4>" -i cue-probe.ass \
-  -map 0:v:0 -map 0:a:0 -map 1:0 -t 30 -c:v copy -c:a copy -c:s ass \
-  -metadata:s:s:0 language=jpn cue-probe.mkv
-```
-
-`cue-probe.ass` authors cues at exactly 2000/6500/11000/16000/21000/24000 ms with override
-tags, so runtime values can be checked to the millisecond. Chromium cannot play Matroska —
-for renderer-side tests use an `.mp4` remux of the same clip.
-
-## Failed / negative experiments — keep these, they cost real time
-
-Carried over from Phase 2:
-
-- **Seeding *prior* seasons makes matching worse** — 44/62 with all seasons vs 51/62 with only
-  the current season, and 11 silent mis-matches vs 0.
-- **The `unknownGroups` seeding loop cannot bootstrap a collection** (12/62, below cold start).
-- **`GET /api/v1/library/collection` is not the tracker collection** — only media with local
-  files, so it reads 0 before a scan.
-- **A `mediaId` is not a correct match** — `metadata.type === "special"` is the fallback bucket.
-- **Adopted source under `src/` breaks `architectureBaseline.test.ts`** (179 orphan modules).
-- **`getOnInit: true` on the auth-token atom** reads localStorage at module-eval → silent 401 →
-  `location.replace("/public/auth")` → blank screen, no console error. Hence `seanimeBootstrap.ts`.
-- **A dev harness must `chdir` to the repo root**, or Tailwind loads its default config and
-  every `theme('colors.brand.*')` call fails.
-- **Don't write patches through a shell heredoc containing `\u0000`.**
-
-New this session:
-
-- **Websocket addressing for nativeplayer events is unsolved from an external client.** Three
-  schemes tried — our own `?id=` uuid, the server-issued `client-identity` id, and a full
-  reconnect with `?id=&proof=` (accepted and echoed back). In every case the server logged
-  *"Signaling player that stream is ready"* but no `watch`/`subtitle-event` frame arrived.
-  Stop hand-rolling the client; mount `websocket-provider.tsx`.
-- **A scratchpad is session-scoped and WILL be lost.** Phase 2's `import-graph.mjs`,
-  `start-sidecar.mjs`, `media-harness-server.mjs` and the populated `seanime-datadir-runD` are
-  all gone. Anything reusable now lives in `docs/migration/tools/`. Put it there, not in a
-  scratchpad, and not in `tools/` (a parallel session owns that).
-- **`git status --porcelain` counts an untracked directory as ONE entry**, so the 552 → 537
-  drop after the commit is 11 untracked paths + 4 modified, not 15 files.
-
-## Do not
-
-- `git clean -fd` / `git reset --hard` / `git checkout -- .` — the tree is intentionally dirty
-  (537 entries). All 16 files of `src/main/scraper/` are untracked.
-- `git gc --prune` or any history rewrite — 20 dangling commits hold parked work, and
-  `C:/Users/Arseniy/Projects/jp-study-app-noctis-beta` shares this object store.
-- Commit `src/preload.ts`, `src/main.ts`, `src/renderer/App.tsx` or `src/renderer/window.d.ts`
-  wholesale. They still carry ~1,068 lines of parallel-session work that imports five
-  **untracked** modules; committing them whole produces a broken tree.
-- Touch `src/main/anki/`, `src/.coordination/study-mode/`, `tools/`, or
-  `src/renderer/data/grammar/` (parallel sessions).
-- Hand-edit anything under `vendor/`. Substitutions are whole-file replacements, always.
-- Restructure `DesktopShell.tsx`, the desktop grid, the dragging layer, or the taskbar.
-- Ship Seanime's name, logo or screenshots in UI.
-- Launch a second Electron instance while the user's app is running — it shares
-  `%APPDATA%\jp-study-app`. Use the harness pattern instead.
-- Re-open **R5** (grammar corpus de-branding). Closed.
-
-## Known-failing baselines — not your bug
-
-| Command | Expected | Verified this session |
-|---|---|---|
-| `npx tsc --noEmit` | exit 2, **290 diagnostics, 108 files** | 290 |
-| `npm run lint` | exit 1, 164 problems (2 errors) | 164 |
-| `npm test` | **exit 0, 251 files, 2,888 tests** | 251 / 2,888 passed |
-
-A test failure **is** your bug. Type and lint diagnostics must be diffed against the baseline.
-
-## Unresolved
-
-- **R1 all but closed** — the cue patch's semantics are settled; only the websocket join
-  remains, and it is a transport problem, not a patch problem.
-- **§9 AnkiConnect — CLOSED.** No longer an acceptance gap.
-- **Virtualization still unproven at scale** — `MediaCardLazyGrid` engages above 48 items and
-  the test library has 15 titles. The `entry` adoption may finally get you past it.
-- **Two Study OS parser bugs remain spun off, and are probably MOOT** — §8 adopts Seanime's
-  scanner, so decide whether `parseMediaFileName` has a future before spending time there.
-- **English-only** stays ACCEPTED under ADR-003; the EN/JA/ZH/RU sweep is a hard exit gate on
-  Phase 4.
+- Do not launch a second Electron instance while the app is running; instances share
+  `%APPDATA%/jp-study-app`.
+- Anki is live on the real 82-deck collection. Use only the namespaced, self-cleaning probe
+  deck if its gate must be repeated.
+- Do not edit or clean the pinned upstream checkout. The substitution generator applies
+  the cue patch in memory.
+- Never run `git clean -fd`, `git reset --hard`, or broad staging in the main worktree.

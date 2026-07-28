@@ -686,6 +686,105 @@ does not mount the player or Study Overlay. Those remain Tasks 2 and 3.
 3. Render the real active cue and its exact `cue.startMs` / `cue.endMs`; never derive mining
    timing from `video.currentTime`.
 
+## Phase 3 — Tasks 2 and 3 closed (2026-07-28)
+
+### Runtime join and smallest player slice — implementation commit `cfd05fa`
+
+`feat(media): join live subtitles to study overlay`
+— 9 files, +994 / −9.
+
+The adopted `WebsocketProvider` now wraps the Media workspace. A thin Study OS host mounts
+the full adopted `VideoCore` / `VideoCoreProvider`, forwards real native-player
+`subtitle-event` payloads into the real `VideoCoreSubtitleManager`, and renders a sibling
+Study Overlay from the manager's `cuechange` signal. This deliberately stops at the
+requested seam; the full study-control set was not ported.
+
+The overlay preserves raw ASS text in proof state, strips override tags only for display,
+and reads timing exclusively from `cue.startMs` / `cue.endMs`. It never derives mining
+timing from `video.currentTime`.
+
+#### Real browser acceptance: **PASS**
+
+The durable harness starts an isolated `seanime.exe` datadir and a Vite page, copies the
+private fixture into a disposable one-file library, serves its h264/aac MP4 remux with
+Range support, and mounts the production provider/player components. No second Electron
+instance was started and the live Anki collection was not touched.
+
+Observed in the in-app Chromium browser:
+
+```text
+[cue-proof] adopted provider connected as 8b42797e-4798-40b6-992e-79c065a914e8
+[cue-proof] parser stream consumed 11871913 bytes
+[cue-proof] cuechange 2148-5148ms "猫が窓辺で寝ている。"
+[cue-proof] cuechange 6648-9398ms "今日は本当にいい天気ですね。"
+```
+
+At the same time, the isolated sidecar reported track 3 as `S_TEXT/ASS` and emitted real
+parser events with `startTime=2148 duration=3000` and
+`startTime=6648 duration=2750`. The adopted VideoCore was active and the remux was playing.
+This is the required real `MKVParser_SubtitleEvent → VideoCoreSubtitleManager →
+cuechange → sibling Study Overlay` path; no cue or manager was mocked.
+
+#### Transport findings that closed the earlier false negative
+
+- Directstream local-file lifecycle messages are on **`WSEvents.NATIVE_PLAYER`**, not the
+  videocore channel.
+- Targeted REST calls require all of
+  `X-Seanime-Client-Id`, `X-Seanime-Client-Id-Proof`, and
+  `X-Seanime-Client-Platform`, plus the token. Supplying `clientId` only in the body makes
+  the server accept the request and log the send while the browser receives nothing.
+- A fresh sidecar can return 500 from `GET /api/v1/settings` because no settings row exists;
+  initialize it through `POST /api/v1/start`, then use `PATCH /api/v1/settings` later.
+- Scanning the scratch directory containing both an MKV and a same-basename MP4 remux can
+  leave the MKV unmatched. The harness copies only the MKV into its disposable library.
+- The parser advances only while its directstream response is consumed. The proof consumes
+  all 11,871,913 bytes independently while VideoCore plays the browser-compatible remux.
+
+These are recorded negative experiments, not discarded noise: a hand-rolled websocket
+under three addressing schemes, body-only client addressing, missing fresh-sidecar
+settings, and scanning the duplicate-basename scratch directory all failed before the
+accepted path above.
+
+#### Reproducibility boundary
+
+- `docs/migration/tools/cue-manager-harness.mjs` is the isolated live acceptance harness.
+- `docs/migration/tools/make-jassub-substitution.mjs` now applies
+  `patches/seanime/0001-video-core-cuechange.patch` in memory with guarded six-hunk parsing,
+  then applies the JASSUB substitutions. The pinned checkout remains untouched.
+- `src/media/seanime-boundary.d.ts` now describes the mounted provider/player seam. This is
+  still a manual contract: `tsc` never opens `vendor/`; the production build and runtime
+  acceptance are the real upstream-signature checks.
+- The adopted closure remains **369 files: 363 upstream-identical + 6 guarded
+  substitutions**. The cue patch is part of the generated JASSUB substitution, not a
+  seventh hand-edited vendor file.
+
+#### Final commands and results
+
+| Command | Result |
+|---|---|
+| `node docs/migration/tools/cue-manager-harness.mjs <cue-probe.mkv> <cue-probe.mp4>` | real provider identity; directstream accepted; 11,871,913 parser bytes; two real manager `cuechange` events |
+| `npx vite build --config vite.renderer.config.ts` | **exit 0**, 4,576 modules transformed, 25.58 s |
+| `node docs/migration/tools/check-media-css-containment.mjs` | **exit 0**, 6,847/6,847 scoped; 0 unscoped; 0 shell Tailwind tokens |
+| `npm test` | **exit 0**, 251 files / 2,888 tests passed |
+| `npx tsc --noEmit` | expected exit 2, **290 diagnostics / 108 files**, 0 from `vendor/` |
+| `npm run lint` | expected exit 1, **164 problems (2 errors, 162 warnings)** |
+| `node --check docs/migration/tools/{make-jassub-substitution,cue-manager-harness}.mjs` | **exit 0** |
+
+The first post-implementation type/lint pass exposed the unextended manual boundary and one
+new constant-condition lint error (302 diagnostics / 110 files; 165 lint problems). After
+extending the boundary and using an unconditional `for (;;)` stream loop, both returned
+exactly to their fixed baselines above.
+
+#### Next three safe actions
+
+1. Treat Phase 3 as closed. Do not widen the player slice or port the full study-control set
+   in a cleanup pass.
+2. On any upstream version bump, regenerate the JASSUB substitution and repeat the
+   production build plus real cue-manager harness; a green `tsc` boundary alone is not
+   acceptance.
+3. Prepare the upstreamable cue patch together with the milliseconds documentation fix,
+   then open the next migration phase from `SEANIME_MIGRATION_PLAN.md`.
+
 ## Blocking findings
 
 ~~**Go is not installed.**~~ **RESOLVED** — Go 1.26.5 present; `CGO_ENABLED=1` turned out

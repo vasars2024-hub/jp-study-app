@@ -118,45 +118,43 @@ Stripping belongs in the **Study Overlay**, not in the patch and not in the mana
 Suggested Overlay-side treatment: drop `{\...}` blocks, convert `\N`/`\n` to spaces, then
 collapse whitespace — applied at the mining boundary, keeping the raw text in provenance.
 
-### Still NOT verified — the honest remaining gap
+### End-to-end verification — CLOSED (Phase 3, commit `cfd05fa`)
 
-The cue path was proven in two halves, not one:
+The two halves are now joined in a real in-app Chromium renderer:
 
-- **Data contract** — verified against the real server: `directstream/play/localfile` on a
-  real MKV drives `mkvparser`, which reports the real track set. Units settled from source.
-- **Activation logic** — verified in a real renderer, running this patch's algorithm over
-  real ASS cues with a real playing video.
+1. the adopted `WebsocketProvider` connected with a server-issued client identity;
+2. a real matched MKV was started through `directstream/play/localfile`;
+3. the parser stream was consumed in full (**11,871,913 bytes**);
+4. real `subtitle-event` frames on `WSEvents.NATIVE_PLAYER` reached the mounted adopted
+   `VideoCoreSubtitleManager`;
+5. the manager emitted real `cuechange` events while the full adopted `VideoCore` played;
+6. the sibling Study Overlay read exact `cue.startMs` / `cue.endMs`, never
+   `video.currentTime`.
 
-What was **not** achieved is the two halves joined: real `MKVParser_SubtitleEvent`s arriving
-over the websocket into a mounted `VideoCoreSubtitleManager`. The blocker is transport, not
-the patch — see "Driving directstream from an external client" below. Nothing observed
-contradicts the patch; `getActiveCues()` / `cuechange` have still never run inside the real
-manager class.
+Observed manager output:
 
-### Driving directstream from an external client — what it takes (learned the hard way)
+```text
+[cue-proof] cuechange 2148-5148ms "猫が窓辺で寝ている。"
+[cue-proof] cuechange 6648-9398ms "今日は本当にいい天気ですね。"
+```
 
-`POST /api/v1/directstream/play/localfile` has four preconditions, and failing any one of
-them returns a bare `HTTP 500 {"message":"Internal Server Error"}` with the real reason only
-in the server log:
+The sidecar independently logged track 3 as `S_TEXT/ASS`, with parser events
+`startTime=2148 duration=3000` and `startTime=6648 duration=2750`. This closes the patch's
+runtime acceptance without a synthetic cue or mocked manager.
 
-1. the path must be a **registered `LocalFile`** in the DB — an arbitrary path on disk is
-   rejected with *"could not find local file"*. A library scan is required;
-2. the file must be **matched** (`mediaId != 0`);
-3. that `mediaId` must be **in the anime collection** — *"media not found in anime
-   collection: N"*. With the simulated platform the collection is empty, so it must be
-   seeded with `POST /api/v1/library/unknown-media { mediaIds }` first;
-4. the demuxer only advances **as a client consumes the stream**, so no cues are emitted
-   until something actually pulls `/directstream/stream`.
+### Driving directstream from the adopted browser client
 
-With all four satisfied the server does its half — the log shows *"Loading content type"*,
-*"Metadata parsing complete tracks=3"*, *"Signaling player that stream is ready"*.
+The four earlier preconditions still apply: scan a registered file, ensure it is matched,
+seed its media into the simulated collection, and consume the parser stream. Two additional
+transport facts close the earlier addressing dead end:
 
-**The unresolved part is websocket addressing.** Every nativeplayer event is sent with
-`SendEventTo(clientId, …)`. The server issues its own identity in a `client-identity` frame
-(`{clientId, proof}`) and expects a reconnect with `?id=&proof=`. All three combinations
-were tried — our own `?id=` uuid, the server-issued id, and a full reconnect with id+proof
-(accepted, echoed back) — and in none of them did a `watch` or `subtitle-event` frame reach
-the external client, though the server logged it as sent. Something further (platform tag,
-or a handshake the embedded web UI performs) is still missing. **Resolve this by mounting
-the adopted `websocket-provider.tsx` rather than hand-rolling the client** — it is the
-component that already does this correctly.
+- directstream lifecycle and subtitle messages use **`WSEvents.NATIVE_PLAYER`**, not
+  `WSEvents.VIDEOCORE`;
+- the REST request that starts targeted playback must carry the adopted identity contract:
+  `X-Seanime-Client-Id`, `X-Seanime-Client-Id-Proof`, and
+  `X-Seanime-Client-Platform`, in addition to `X-Seanime-Token`.
+
+Putting `clientId` only in the JSON body is insufficient even when the websocket identity
+was accepted. The server can log a targeted send while the browser receives nothing. The
+durable reproducer is `docs/migration/tools/cue-manager-harness.mjs`; it uses an isolated
+temporary datadir and copied one-file library and never starts a second Electron instance.
