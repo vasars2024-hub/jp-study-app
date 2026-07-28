@@ -18,6 +18,8 @@ Committed migration line:
   dual-track acceptance was negative at that boundary (superseded by `3fe73d0`).
 - `3fe73d0` — terminal subtitle-batch fix, verified 6+6 dual cues, shadowing, Whisper
   track generation, and Study OS-owned restart continuity.
+- `1c51d6c` — deterministic WebGPU preflight/CPU fallback plus a disposable ffmpeg-PCM
+  harness; live `whisper-base` inference generated and mounted 3 cues.
 
 The old record called Phase 3 closed after the cue seam. That was too narrow. The
 authoritative `SEANIME_MIGRATION_PLAN.md` requires the complete retained control set and
@@ -93,8 +95,8 @@ them. The local adapter deliberately depends only on committed Anki contracts.
 
 ## Remaining Phase 3 work
 
-- shadowing microphone hardware proof and one real local Whisper inference; both paths are
-  implemented/build-clean, but neither runtime claim has been promoted without evidence;
+- shadowing microphone hardware proof; implementation is build-clean, but Chrome
+  microphone permission was not accepted without explicit user approval;
 - one uninterrupted namespaced G-PLAY using the mounted preview: both real assets,
   live Anki export, duplicate rejection, undo/cleanup, then restart/resume/history proof;
 - final visual comparison before retiring the old player.
@@ -108,8 +110,8 @@ pinned `seanime.exe` still contains the bug.
 
 ## Next three safe actions
 
-1. Record one real microphone response and one real local Whisper inference in a safe
-   renderer session; keep any negative result.
+1. With explicit permission approval, record and play back one real microphone response;
+   keep any negative result.
 2. Run the complete namespaced live-Anki G-PLAY plus actual restart-persistence check.
 3. Perform the final visual comparison; only then decide whether the old player retires.
 

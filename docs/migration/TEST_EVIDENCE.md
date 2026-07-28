@@ -285,14 +285,39 @@ Japanese mining provenance.
 
 ### Explicitly not yet accepted
 
-Shadowing, Whisper, and restart continuity are implemented and build/unit clean, but this
-run did not claim:
+Shadowing, Whisper, and restart continuity were implemented and build/unit clean, but this
+run did not yet claim:
 
 - a real microphone capture;
-- a real Whisper model download/inference;
+- a real Whisper model download/inference (closed by the later `1c51d6c` run below);
 - mounted-preview export to the live Anki collection;
 - actual app restart/resume/history persistence;
 - final visual parity.
 
 Those remain the G-PLAY exit work. The browser proof lease was finalized after dual-cue
 acceptance, so inventing a hardware/model result would have been a false positive.
+
+### Runtime addendum — local Whisper inference PASS (`1c51d6c`)
+
+The harness produced 16 kHz mono float PCM with the same ffmpeg arguments as Electron main
+and served it from the disposable datadir. The first Auto run downloaded
+`whisper-base` but failed because Chrome exposed WebGPU without a usable adapter. The worker
+was corrected to probe before ONNX pipeline creation, avoiding a poisoned GPU-first backend
+and selecting WASM cleanly.
+
+The fresh CPU run completed:
+
+```text
+Generated 3 subtitle lines.
+Subtitle track: Whisper (generated)
+Cue 1 · track 5 · 0–24000 ms · 【音楽】
+```
+
+The generated cue rendered in the Study Overlay and populated the mounted card preview
+with track 5 and exact `0–24000 ms` provenance. Production build remained 4,581 modules;
+focused tests stayed 21/21, TypeScript stayed at 290/108, and CSS containment stayed
+6,912/6,912.
+
+The microphone button was reached on a real active cue, but not pressed: Chrome microphone
+permission and audio capture require explicit user approval. No microphone result is
+claimed.

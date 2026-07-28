@@ -1,6 +1,6 @@
 # Migration current state
 
-Last updated: 2026-07-28 (Phase 3 active — dual delivery closed; final G-PLAY gates open)
+Last updated: 2026-07-28 (Phase 3 active — dual delivery and Whisper closed; final G-PLAY gates open)
 Phase: **3 — Player + Study Overlay, ACTIVE. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS. G-PLAY: OPEN.**
 
 Branch `grammarx/phase-1-5` · Phase 1+2 committed as **`55df6e9`**, based on
@@ -1136,7 +1136,7 @@ Two harness-only lifecycle defects were fixed while isolating this:
 - Vite's renderer config could overwrite the proof defines, making a reload look valid
   while serving the ordinary page.
 
-### Shadowing and Whisper — implemented, runtime gates still open
+### Shadowing open; Whisper runtime — PASS
 
 - Shadowing uses the retained microphone stack on the same overlay: exact cue replay via
   `cue.startMs` / `cue.endMs`, `MediaRecorder`, echo cancellation, noise suppression,
@@ -1151,9 +1151,24 @@ Two harness-only lifecycle defects were fixed while isolating this:
   change, and error paths are explicit. The production build emitted a dedicated Whisper
   worker chunk.
 
-The microphone hardware path and a real model inference were **not** exercised after the
-browser proof lease was finalized. Implementation/build/unit evidence is green, but these
-two runtime claims remain open; this is deliberately not promoted to a false positive.
+The first real `whisper-base` run produced a useful negative: download reached 70%, then
+Chrome reported no WebGPU adapter. Initializing ONNX on that failed backend prevented the
+intended same-worker WASM recovery. Commit **`1c51d6c`** now probes for a usable adapter
+before pipeline creation and exposes an explicit Auto/CPU selector.
+
+The fresh forced-CPU run then **passed** against ffmpeg-produced PCM from the 30-second
+local fixture:
+
+```text
+Generated 3 subtitle lines.
+selected track: Whisper (generated), track 5
+cue 1: 0–24000 ms  【音楽】
+```
+
+The generated cue became the real manager’s primary timeline and populated the mounted
+card preview with the same exact `0–24000 ms` provenance. The model/worker/track runtime
+gate is closed. Only the microphone hardware path remains open because accepting Chrome’s
+microphone permission requires explicit user approval.
 
 ### Restart continuity
 
@@ -1187,8 +1202,8 @@ entries.
 
 ### Next three safe actions
 
-1. In a safe renderer session, record a real microphone response and run one real local
-   Whisper inference; a recorded negative is acceptable.
+1. With explicit microphone-permission approval, record and play back one real shadowing
+   response; a recorded negative is acceptable.
 2. Run one namespaced G-PLAY through the mounted preview: both real cue assets, export,
    duplicate rejection, undo/cleanup, then actual restart/resume/history persistence.
 3. Perform the required final visual comparison before considering the old player retired.
