@@ -1,7 +1,7 @@
 # Migration current state
 
-Last updated: 2026-07-28 (Phase 3 active — dual delivery, Whisper, and visual comparison closed; G-PLAY runtime gates open)
-Phase: **3 — Player + Study Overlay, ACTIVE. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS. G-PLAY: OPEN.**
+Last updated: 2026-07-28 (Phase 3 active — dual delivery, Whisper, and visual comparison closed; G-PLAY attempted live and **NEGATIVE** — see "G-PLAY first live attempt")
+Phase: **3 — Player + Study Overlay, ACTIVE. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS. G-PLAY: OPEN — first live attempt returned a recorded negative.**
 
 Branch `grammarx/phase-1-5` · Phase 1+2 committed as **`55df6e9`**, based on
 `a22e7ba1f72aa7942890ad7eb3ac253b37be0735`. See "Phase 3 — opening" for the commit boundary.
@@ -1249,3 +1249,80 @@ claimed as the required app restart/resume/history result.
 2. Run one namespaced G-PLAY through the mounted preview: both real cue assets, export,
    duplicate rejection, undo/cleanup, then actual restart/resume/history persistence.
 3. Only after both runtime gates pass, retire the old player and close Phase 3.
+
+### G-PLAY first live attempt — NEGATIVE, cue delivery never starts (2026-07-28)
+
+The prepared environment was launched for real: one Electron instance with
+`SEANIME_SIDECAR=1`, the verified patched executable, and the external datadir. No second
+instance was started, and Anki was never contacted.
+
+What the mounted production surface **did** prove:
+
+```text
+sidecar        state ready · v3.10.2 · isolated datadir · 1 titles · 1 files · 0 unmatched
+fixture        154587 (mal 52991) · ep 1
+play           POST /api/v1/directstream/play/localfile -> 200
+video          real frames rendered; readyState 4; duration 30.386s; no media error
+manager        VideoCoreSubtitleManager mounted (real class, logged by the seam)
+tracks         subtitle "English (probe) (default)" + secondary "Japanese (probe) (default)"
+controls       full retained dock rendered (line nav, frame step, delay, speed, auto-pause,
+               loop, A-B, track pickers, furigana, dictation, shadowing)
+```
+
+What it **did not** prove, and this is the blocking result:
+
+```text
+cueChanges     0   across ~25s of real playback spanning the known cue ranges, and again
+                   after an explicit seek
+sidecar log    only "mkvparser > Metadata parsing complete attachments=0 chapters=1
+                   cues=19 tracks=4" — no subtitle stream is ever started
+```
+
+**Zero real `MKVParser_SubtitleEvent`s were delivered.** Per the standing rule, nothing
+downstream is claimed: no cue was mined, no asset captured, no Anki export attempted.
+
+Root cause, located in the pinned upstream (not yet isolated to a single confirmed
+trigger):
+
+- the server starts subtitle streaming only from a **client** event — a
+  `LoadedMetadataEvent` with `key.Target == player.TargetVideoCore`
+  (`internal/directstream/stream.go` §517-548), or a `SeekedEvent` (§551-553);
+- `internal/videocore/videocore.go` §916-922 **drops** `video-loaded-metadata` when the
+  module holds no playback state (`ps, ok := vc.GetPlaybackState(); if !ok { continue }`);
+- playback state is only established by `video-loaded` (§897-906), and is cleared when the
+  stream is terminated.
+
+In this run the first play attempt was terminated by the client immediately after the
+stream became ready (`directstream > Video terminated`), which is exactly what clears that
+state. The retry then streamed video correctly but its metadata and seek events were
+dropped, so no subtitle stream was ever started.
+
+**A hypothesis that was tested and disproved:** draining the directstream body by hand
+(11,873,146 bytes, matching the isolated proof's parser byte count) does **not** trigger
+subtitle generation. Consuming the stream is not the trigger; the client event is. Do not
+re-derive this.
+
+Relevant seam detail for whoever continues: in `src/media/StudyPlayerSlice.tsx` the
+`onLoadedMetadata` handler opens with `if (!proofConfig) return;`, so **both** the
+bootstrap-`seeked` suppression and the parser-stream pull exist only on the proof path.
+The production path has neither guard. That is a concrete lead for the termination race,
+but it has **not** been tested as the fix and must not be recorded as one.
+
+### Correction to the "adopt the entry surface" scope
+
+The mounted UI has **no click-path to start playback**. The media-entry card's Watch
+button calls `setPlayNext(...)` then `router.push(ANIME_LINK)`
+(`vendor/seanime-web/app/(main)/_features/media/_components/media-entry-card.tsx` §178-182),
+and the entry/episode-list route is not part of the adopted seam. Playback in this run was
+therefore started by calling the same real endpoint the seam's own driver calls. This is a
+real scope gap in Phase 3, not a harness shortcut: G-PLAY cannot be completed purely by
+clicking the adopted UI until the entry surface owns a play affordance.
+
+### Session hygiene notes
+
+- The sidecar's no-client watchdog exits the process (code 1) shortly after the last
+  websocket client disconnects. A renderer reload therefore kills it; restart it from the
+  dev panel and expect a **new ephemeral port**. This is benign, not a defect.
+- The app's first-launch telemetry consent screen renders *before* the desktop shell and
+  blocks every surface behind it, including the Media workspace button. It must be
+  answered by the user before any further UI-driven run.

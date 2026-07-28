@@ -129,12 +129,61 @@ cues and simultaneously rendered `猫が窓辺で寝ている。` /
 `docs/migration/tools/build-patched-sidecar.mjs` for a corrected binary; the original
 pinned `seanime.exe` still contains the bug.
 
+## G-PLAY was attempted live and came back NEGATIVE — read this first
+
+The environment is fine. The player is fine. **Cue delivery never starts**, so G-PLAY
+cannot proceed past step one. Full evidence is in `CURRENT_STATE.md` under "G-PLAY first
+live attempt". Summary:
+
+- real sidecar, real fixture, `directstream/play/localfile -> 200`, real frames,
+  `readyState 4`, `duration 30.386s`, real `VideoCoreSubtitleManager`, both probe tracks
+  discovered, full control dock — all good;
+- **0 cue changes** across ~25 s of real playback and after an explicit seek;
+- the sidecar only ever ran *metadata* parsing; no subtitle stream was started.
+
+Nothing downstream was claimed. No cue mined, no asset captured, no Anki call made.
+
+**Do not re-derive these two facts:**
+
+1. Draining the directstream body by hand (11,873,146 bytes) does **not** trigger subtitle
+   generation. Consuming the stream is not the trigger — a *client event* is.
+2. The mounted UI has no click-path to start playback. The card's Watch button routes to
+   the unadopted entry page (`media-entry-card.tsx` §178-182), so playback must be started
+   through the real endpoint until the entry surface is adopted.
+
+### The lead to test next
+
+Upstream starts subtitle streaming only on a client `LoadedMetadataEvent` with
+`Target == TargetVideoCore` (`internal/directstream/stream.go` §517-548) or a `SeekedEvent`
+(§551-553). `internal/videocore/videocore.go` §916-922 silently drops
+`video-loaded-metadata` when it holds no playback state, and that state is cleared on
+stream termination. In the observed run the first play attempt was terminated right after
+the stream became ready, so every later event was dropped.
+
+In `src/media/StudyPlayerSlice.tsx`, `onLoadedMetadata` begins `if (!proofConfig) return;`
+— so the bootstrap-`seeked` suppression that prevents exactly this termination exists
+**only on the proof path**. Testing whether that guard belongs on the production path is
+the obvious next experiment. It is a hypothesis, not a known fix; record whatever it
+returns, including a negative.
+
+## Two environment traps
+
+- The sidecar's no-client watchdog exits the process (code 1) shortly after the last
+  websocket client disconnects, so a renderer reload kills it. Restart from the dev panel
+  and re-read the port — it is **ephemeral and changes every start**.
+- The first-launch telemetry consent screen renders before the desktop shell and blocks
+  every surface behind it, including the Media workspace button. It is currently
+  **unanswered** and must be answered by the user before any UI-driven run.
+
 ## Next three safe actions
 
-1. With explicit permission approval, record and play back one real microphone response;
+1. Answer the consent screen (user), then test the `onLoadedMetadata` guard hypothesis
+   above and record the result either way.
+2. Only once real cues are observed, run the namespaced live-Anki G-PLAY plus the actual
+   restart-persistence check.
+3. With explicit permission approval, record and play back one real microphone response;
    keep any negative result.
-2. Run the complete namespaced live-Anki G-PLAY plus actual restart-persistence check.
-3. If both runtime gates pass, retire the old player and close Phase 3.
+4. Only after both runtime gates pass, retire the old player and close Phase 3.
 
 ## Current verification
 
