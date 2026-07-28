@@ -3,13 +3,13 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "a4e495d",
+  "commit": "03d27a3",
   "dirtyPorcelainEntries": 537,
   "untrackedFiles": 446,
   "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 committed as 55df6e9. Phase 3 entry/video-core adoption committed as dd2ca47, real-cue seam as cfd05fa, and the first full-plan study-control slice as a4e495d. Full Phase 3 remains active until every retained control and the one-run G-PLAY path pass.",
+  "note": "Phase 1+2 committed as 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, the real-cue seam is cfd05fa, core controls are a4e495d, and editable preview plus real cue assets are 03d27a3. Full Phase 3 remains active until every retained control and the one-run G-PLAY path pass.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
@@ -162,9 +162,9 @@
  },
  "openTemporaryRegressions": [],
  "nextActions": [
-  "Bridge the active VideoCore cue and video element into the retained StudyOrchestratorWorkspace draft, assets, and provenance contract without introducing a second clock.",
-  "Attach screenshot and exact cue-bounded audio capture to an editable card preview while preserving raw cue text and demuxer timings.",
-  "Wire duplicate warning, undo, Anki destination, and mining history, then run the complete namespaced live-Anki G-PLAY path followed by restart persistence."
+  "Port real dual-subtitle rendering without introducing a second timeline or losing primary-cue provenance.",
+  "Port shadowing mode and Whisper generation onto the same VideoCore player.",
+  "Run the complete namespaced live-Anki G-PLAY path with both assets, duplicate rejection, undo/cleanup, and restart persistence."
  ],
  "scannerComparison": {
   "gate": "section 8 — \">= parity on match rate\"",
@@ -449,12 +449,42 @@
   "remaining": [
    "real dual subtitles",
    "shadowing and Whisper generation",
-   "screenshot and cue-bounded audio capture",
-   "editable card preview and one-action mining",
-   "duplicate warning, undo, destination, history, and full provenance",
    "single-run live-Anki G-PLAY plus restart persistence",
    "final visual comparison before old-player retirement"
   ]
+ },
+ "phase3MiningPreview": {
+  "implementationCommit": "03d27a3",
+  "verdict": "PASS — editable preview and real cue assets; live-Anki G-PLAY remains open",
+  "implemented": [
+   "editable word/sentence card preview",
+   "same-element screenshot with burned cue text",
+   "delay-adjusted cue-bounded audio capture",
+   "Anki destination selection and one-action MineNoteRequest",
+   "duplicate outcome history",
+   "undo by exported note ID",
+   "bounded persisted mining history",
+   "cue, episode, media, asset, draft, and note provenance"
+  ],
+  "runtime": {
+   "source": "Sousou no Frieren, Episode 1",
+   "cue": "track 3, index 0, 2148-5148ms",
+   "screenshot": "jp-video-cue-3-0-2148.png, 113329 bytes",
+   "audio": "jp-video-cue-3-0-2148.webm, 48843 bytes",
+   "retention": "Both assets remained after editing the term to 猫.",
+   "clockRestore": "Same VideoCore element restored to paused, 1x, 2.151889s.",
+   "anki": "Not invoked; live 82-deck collection untouched.",
+   "isolation": "Exact harness processes stopped, disposable datadir removed, browser harness tab finalized."
+  },
+  "verification": {
+   "focused": "18/18 mining + study + architecture tests pass",
+   "tests": "253 files / 2900 tests pass",
+   "tsc": "expected exit 2; 290 diagnostics / 108 files; 0 mining paths",
+   "targetedLint": "exit 0",
+   "lint": "expected exit 1; 164 problems (2 errors, 162 warnings); 0 mining-path mentions",
+   "rendererBuild": "exit 0; 4580 modules",
+   "cssContainment": "6895/6895 scoped; 0 unscoped; 0 shell --tw- tokens"
+  }
  },
  "knownGaps": {
   "liveAnkiConnect": "CLOSED 2026-07-28 — all 14 AnkiActionMap actions verified live.",

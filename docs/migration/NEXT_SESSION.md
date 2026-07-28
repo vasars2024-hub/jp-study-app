@@ -11,7 +11,9 @@ Committed migration line:
 - `55df6e9` — Phase 1 and Phase 2;
 - `dd2ca47` / `ffc703f` — Phase 3 entry/video-core adoption and record;
 - `cfd05fa` / `d96d140` — real subtitle join and opening player seam;
-- `a4e495d` — first full-plan continuation slice: core study controls on VideoCore.
+- `a4e495d` — first full-plan continuation slice: core study controls on VideoCore;
+- `03d27a3` — editable VideoCore mining preview, screenshot/audio assets, and Anki
+  history/undo contract.
 
 The old record called Phase 3 closed after the cue seam. That was too narrow. The
 authoritative `SEANIME_MIGRATION_PLAN.md` requires the complete retained control set and
@@ -70,36 +72,47 @@ Observed: real element at 0.75×, +0.1 s subtitle delay, delayed auto-pause, rep
 line loop, A–B transition, three furigana readings, and exact dictation match. The
 isolated processes and temp datadir were removed afterward.
 
+## Mining preview now implemented
+
+`VideoCoreMiningPanel` stays on the one VideoCore clock and exposes editable word/sentence
+fields, deck selection, screenshot capture, exact cue-range audio capture, Mine card,
+duplicate history, and undo. `videoCoreMining.ts` preserves cue → episode → media →
+assets → draft provenance and builds the committed `MineNoteRequest`.
+
+The isolated real-sidecar proof captured cue 3:0 (`2148–5148 ms`) into a **113,329-byte
+PNG** and **48,843-byte WebM**, retained both after editing the term to `猫`, and restored
+the video to paused, 1×, `2.151889s`. No Anki mutation was invoked.
+
+Do not import the currently untracked `StudyOrchestratorWorkspace.tsx` or related
+orchestrator contracts into this migration line unless their owning session first commits
+them. The local adapter deliberately depends only on committed Anki contracts.
+
 ## Remaining Phase 3 work
 
 - real dual subtitles;
 - shadowing and Whisper generation;
-- screenshot and exact cue-bounded audio clip;
-- editable card preview and one-action mining;
-- duplicate warning, undo, Anki destination, mining history;
-- complete cue → episode → media → assets → draft → exported-note provenance;
-- single-run G-PLAY with live AnkiConnect, followed by restart/resume/history proof;
+- one uninterrupted namespaced G-PLAY using the mounted preview: both real assets,
+  live Anki export, duplicate rejection, undo/cleanup, then restart/resume/history proof;
 - final visual comparison before retiring the old player.
 
 ## Next three safe actions
 
-1. Bridge the active VideoCore cue/player into the retained
-   `StudyOrchestratorWorkspace` draft and provenance contract without a second timeline.
-2. Attach screenshot and cue-bounded audio capture to that draft, then expose editable
-   preview.
-3. Add duplicate/undo/destination/history and run the complete namespaced live-Anki
-   G-PLAY plus restart-persistence check.
+1. Port dual-subtitle rendering without creating a second timeline or losing primary-cue
+   provenance.
+2. Port shadowing and Whisper generation onto the same player.
+3. Run the complete namespaced live-Anki G-PLAY plus restart-persistence check; a recorded
+   negative result is valid evidence, a confident false positive is not.
 
 ## Current verification
 
 | Gate | Result |
 |---|---|
-| focused study + architecture tests | 14/14 pass |
-| full tests | 252 files / 2,894 tests pass |
+| focused mining + study + architecture tests | 18/18 pass |
+| full tests | 253 files / 2,900 tests pass |
 | TypeScript | accepted 290 diagnostics / 108 files; 0 in slice |
 | lint | accepted 164 problems; 0 changed-path mentions |
-| renderer build | exit 0; 4,578 modules |
-| CSS containment | 6,865/6,865 scoped; 0 unscoped; 0 shell Tailwind tokens |
+| renderer build | exit 0; 4,580 modules |
+| CSS containment | 6,895/6,895 scoped; 0 unscoped; 0 shell Tailwind tokens |
 | patch apply and generator | exit 0 |
 
 `src/media/seanime-boundary.d.ts` remains hand-maintained. TypeScript does not open the

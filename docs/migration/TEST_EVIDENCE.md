@@ -157,3 +157,46 @@ This evidence passes the **first control slice**, not full Phase 3. G-PLAY remai
 for dual subtitles, shadowing, Whisper, screenshot/audio assets, editable mining preview,
 duplicate/undo/destination/history/provenance, the one-run live-Anki export, restart
 persistence, and final visual comparison.
+
+## 2026-07-28 — Phase 3 continuation: mining preview and real cue assets
+
+Environment: Windows · branch `grammarx/phase-1-5` · implementation `03d27a3` ·
+Seanime pin `9bdd052`.
+
+### Automated
+
+| Command | Result | Classification |
+|---|---|---|
+| focused mining + study + architecture tests | **18/18 passed** | pass |
+| `npm test` | **253 files, 2,900 tests, 0 failed** | pass |
+| `npx tsc --noEmit` | expected exit 2; **290 diagnostics / 108 files**, 0 mining paths | fixed baseline |
+| targeted changed-path ESLint | **exit 0**, no warnings or errors | pass |
+| `npm run lint` | expected exit 1; **164 problems (2 errors, 162 warnings)**, 0 mining-path mentions | fixed baseline |
+| renderer production build | **exit 0**, 4,580 modules | pass |
+| CSS containment | **6,895/6,895 scoped**, 0 unscoped, 0 shell `--tw-` | pass |
+
+### Runtime — real VideoCore frame and audio
+
+Tool: the isolated cue-manager harness plus the in-app browser. The Seanime provider,
+websocket, parser, VideoCore, selected ASS cue, video frame, and audio stream were live.
+Electron-only preload calls were inert. Anki was intentionally not mutated.
+
+On the real first cue:
+
+```text
+source       Sousou no Frieren · Episode 1
+cue          track 3 · index 0 · 2148–5148 ms
+screenshot   jp-video-cue-3-0-2148.png · 113,329 bytes
+audio        jp-video-cue-3-0-2148.webm · 48,843 bytes
+```
+
+The preview retained both assets and the original cue/source provenance after the term
+was edited from the full sentence to `猫`. The Mine button was enabled. Audio capture
+temporarily sought and played the exact delay-adjusted cue interval at 1×; afterward the
+same VideoCore element was paused at `2.151889s` with rate `1`, matching its prior state.
+
+The Mine, duplicate-history, destination, and undo code paths are implemented but were
+not clicked. Therefore this is **asset and preview acceptance only**, not a live-Anki
+G-PLAY pass. Harness processes were stopped by exact PID, the disposable datadir was
+removed, the browser harness tab was finalized, the running Electron app was not
+duplicated, and the live 82-deck Anki collection was untouched.

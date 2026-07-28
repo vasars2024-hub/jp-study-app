@@ -979,3 +979,71 @@ weakened, and the full suite then passed.
 3. Wire duplicate/undo/destination/history, then run the complete namespaced live-Anki
    G-PLAY path and restart persistence check. A negative runtime result is a valid record;
    never promote a false positive.
+
+## Phase 3 — VideoCore mining preview and cue assets (2026-07-28)
+
+Commit **`03d27a3`** completes the next implementation slice without adopting the
+parallel session's untracked study-orchestrator files. It uses the committed Anki IPC and
+shared note contract directly, so this commit remains independently buildable.
+
+### Implemented
+
+- An editable sentence/word card preview is mounted beside the real VideoCore study
+  overlay. It retains the selected cue while capture temporarily moves the playback
+  clock outside that cue.
+- Screenshot capture reads the current VideoCore frame and burns the raw cue display
+  text into a PNG.
+- Cue audio capture uses `captureStream()` / `MediaRecorder` on the same VideoCore
+  element, seeks to the delay-adjusted demuxer boundaries, records at 1×, then restores
+  the previous time, rate, and paused/playing state.
+- The draft carries raw and display cue text, exact `startMs` / `endMs`, selected track
+  and cue index, playback/media/episode/local-file identity, asset names/types/sizes,
+  and capture time through to one `MineNoteRequest`.
+- Anki destination selection, duplicate outcomes, bounded persisted history, and undo
+  by exported note ID are implemented. These Anki mutations were deliberately not
+  clicked during the isolated browser proof.
+
+The adapter was implemented locally instead of importing
+`StudyOrchestratorWorkspace.tsx`: that workspace and its related contracts are untracked
+parallel-session work, so depending on them would make this migration commit incomplete
+and would take ownership of unrelated changes.
+
+### Live evidence
+
+The same real sidecar/ASS fixture produced cue 3:0 at **2148–5148 ms**. From that cue the
+mounted preview attached:
+
+```text
+jp-video-cue-3-0-2148.png   113,329 bytes
+jp-video-cue-3-0-2148.webm   48,843 bytes
+```
+
+Both assets remained attached after editing the term to `猫`; provenance still named
+`Sousou no Frieren`, Episode 1, track 3, cue 0, the raw Japanese text, and the exact
+demuxer range. After audio capture the real element was restored to paused, 1×, and
+`2.151889s`. No Anki write occurred. The exact harness processes were stopped, its
+temporary datadir was removed, and the browser harness tab was closed.
+
+### Verification
+
+| Command | Result |
+|---|---|
+| focused mining + study + architecture tests | **18/18 pass** |
+| `npm test` | **253 files / 2,900 tests pass** |
+| `npx tsc --noEmit` | accepted exit 2; **290 diagnostics / 108 files**, 0 mining paths |
+| targeted ESLint | **exit 0** |
+| `npm run lint` | accepted exit 1; **164 problems (2 errors, 162 warnings)**, 0 mining paths |
+| renderer production build | **exit 0**, 4,580 modules |
+| CSS containment | **6,895/6,895 scoped**, 0 unscoped, 0 shell Tailwind tokens |
+
+### What remains before Phase 3 can close
+
+- real dual subtitles;
+- shadowing mode and Whisper generation;
+- a single uninterrupted namespaced G-PLAY run that uses this preview to mine both
+  assets into live Anki, observes duplicate rejection, undoes/cleans the probe note,
+  restarts, and proves resume plus history persistence;
+- the required final visual comparison before the old player retires.
+
+The code paths for mine, duplicate history, destination, and undo now exist, but they are
+**implemented, not live-accepted**. G-PLAY remains open.
