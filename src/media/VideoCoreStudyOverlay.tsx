@@ -14,7 +14,14 @@ import type {
   VideoCoreActiveCue,
 } from '@/app/(main)/_features/video-core/video-core-subtitles';
 import type { AudioManagerTrackChangedEvent } from '@/app/(main)/_features/video-core/video-core-audio';
-import type { MKVParser_TrackInfo } from '../../vendor/seanime/generated/types';
+import type {
+  MKVParser_SubtitleEvent,
+  MKVParser_TrackInfo,
+} from '../../vendor/seanime/generated/types';
+import {
+  WHISPER_MODEL_SPECS,
+  type WhisperModelTier,
+} from '../shared/whisperModels';
 import DictionaryPopup from '../renderer/components/DictionaryPopup';
 import SubtitleCueLine from '../renderer/components/SubtitleCueLine';
 import {
@@ -23,7 +30,18 @@ import {
   noteLookupPointerDown,
 } from '../renderer/wordLookup';
 import { translate } from '../renderer/translator';
-import { getStudyLang } from '../renderer/studyEnvironment';
+import { getStudyLang, setStudyLang } from '../renderer/studyEnvironment';
+import {
+  loadWhisperDevice,
+  loadWhisperModelTier,
+  onWhisperDeviceChanged,
+  onWhisperModelChanged,
+  setWhisperModelTier,
+  whisperHfId,
+  type WhisperDevice,
+} from '../renderer/whisperSettings';
+import { markTierDownloaded } from '../renderer/whisperModelCache';
+import WhisperWorker from '../renderer/whisperWorker?worker';
 import {
   activeStudyCuesAtTime,
   adjacentStudyCue,
@@ -31,10 +49,12 @@ import {
   cuePlaybackStartSec,
   evaluateVideoCoreDictation,
   isCueEndTransition,
+  nextVideoCoreWhisperTrackNumber,
   normalizeVideoCoreStudyPreferences,
   PLAYER_PREFERENCES_STORAGE_KEY,
   resolveStudyLoopSeekSec,
   stripAssCueText,
+  whisperCuesToVideoCoreEvents,
   type VideoCoreDictationEvaluation,
   type VideoCoreStudyPreferences,
 } from '../shared/videoCoreStudy';
@@ -42,6 +62,24 @@ import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import VideoCoreMiningPanel from './VideoCoreMiningPanel';
 
 const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
+
+type WhisperGenerationState =
+  | 'idle'
+  | 'extracting'
+  | 'loading'
+  | 'transcribing'
+  | 'done'
+  | 'error';
+
+type WhisperWorkerMessage = {
+  type?: string;
+  status?: string;
+  progress?: number;
+  file?: string;
+  device?: 'webgpu' | 'wasm';
+  message?: string;
+  cues?: Array<{ start: number; end: number; text: string }>;
+};
 
 type CuePopup = {
   query: string;
@@ -134,6 +172,30 @@ export default function VideoCoreStudyOverlay({
   const popupOpenOnDownRef = React.useRef(false);
   const previousCueRef = React.useRef<VideoCoreActiveCue | null>(null);
   const secondaryCuesRef = React.useRef<VideoCoreActiveCue[]>([]);
+  const shadowRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const shadowStreamRef = React.useRef<MediaStream | null>(null);
+  const shadowStopTimerRef = React.useRef<number | null>(null);
+  const shadowAudioUrlRef = React.useRef('');
+  const shadowGenerationRef = React.useRef(0);
+  const whisperWorkerRef = React.useRef<Worker | null>(null);
+  const whisperGenerationRef = React.useRef(0);
+  const whisperCuesRef = React.useRef<Array<{ start: number; end: number; text: string }>>([]);
+  const [shadowRecording, setShadowRecording] = React.useState(false);
+  const [shadowAudioUrl, setShadowAudioUrl] = React.useState('');
+  const [shadowError, setShadowError] = React.useState('');
+  const [whisperModel, setWhisperModel] = React.useState<WhisperModelTier>(
+    () => loadWhisperModelTier(getStudyLang()),
+  );
+  const [whisperDevice, setWhisperDevice] = React.useState<WhisperDevice>(
+    loadWhisperDevice,
+  );
+  const [whisperLanguage, setWhisperLanguage] =
+    React.useState<'ja' | 'zh'>(getStudyLang);
+  const [whisperState, setWhisperState] =
+    React.useState<WhisperGenerationState>('idle');
+  const [whisperMessage, setWhisperMessage] = React.useState('');
+  const [whisperProgress, setWhisperProgress] = React.useState(0);
+  const [whisperError, setWhisperError] = React.useState('');
 
   const activeCue = activeCues[0] ?? null;
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
@@ -157,6 +219,9 @@ export default function VideoCoreStudyOverlay({
   React.useEffect(() => {
     localStorage.setItem(PLAYER_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
   }, [preferences]);
+
+  React.useEffect(() => onWhisperDeviceChanged(setWhisperDevice), []);
+  React.useEffect(() => onWhisperModelChanged(setWhisperModel), []);
 
   React.useEffect(() => {
     if (!video) return;
@@ -401,7 +466,295 @@ export default function VideoCoreStudyOverlay({
     setDictationResult(evaluateVideoCoreDictation(dictationInput, plainText));
   }, [dictationInput, plainText]);
 
+  const clearShadowRecording = React.useCallback((): void => {
+    shadowGenerationRef.current += 1;
+    const url = shadowAudioUrlRef.current;
+    shadowAudioUrlRef.current = '';
+    setShadowAudioUrl('');
+    if (url) URL.revokeObjectURL(url);
+  }, []);
+
+  const stopShadowRecording = React.useCallback((): void => {
+    if (shadowStopTimerRef.current != null) {
+      window.clearTimeout(shadowStopTimerRef.current);
+      shadowStopTimerRef.current = null;
+    }
+    const recorder = shadowRecorderRef.current;
+    if (recorder?.state === 'recording') recorder.stop();
+  }, []);
+
+  const startShadowRecording = React.useCallback(async (): Promise<void> => {
+    if (shadowRecorderRef.current?.state === 'recording') return;
+    setShadowError('');
+    clearShadowRecording();
+    const generation = shadowGenerationRef.current;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('Microphone recording is not supported in this player.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      if (generation !== shadowGenerationRef.current) {
+        for (const track of stream.getTracks()) track.stop();
+        return;
+      }
+      shadowStreamRef.current = stream;
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+      ].find((candidate) => MediaRecorder.isTypeSupported(candidate));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: Blob[] = [];
+      shadowRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        setShadowError('The microphone recording stopped unexpectedly.');
+      };
+      recorder.onstop = () => {
+        if (shadowStopTimerRef.current != null) {
+          window.clearTimeout(shadowStopTimerRef.current);
+          shadowStopTimerRef.current = null;
+        }
+        for (const track of stream.getTracks()) track.stop();
+        if (shadowStreamRef.current === stream) shadowStreamRef.current = null;
+        if (shadowRecorderRef.current === recorder) shadowRecorderRef.current = null;
+        setShadowRecording(false);
+        if (!chunks.length || generation !== shadowGenerationRef.current) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        shadowAudioUrlRef.current = url;
+        setShadowAudioUrl(url);
+      };
+      recorder.start(250);
+      setShadowRecording(true);
+      shadowStopTimerRef.current = window.setTimeout(() => {
+        if (recorder.state === 'recording') recorder.stop();
+      }, 60_000);
+    } catch (recordingError) {
+      for (const track of shadowStreamRef.current?.getTracks() ?? []) track.stop();
+      shadowStreamRef.current = null;
+      shadowRecorderRef.current = null;
+      setShadowRecording(false);
+      setShadowError(
+        recordingError instanceof Error
+          ? recordingError.message
+          : 'Could not start microphone recording.',
+      );
+    }
+  }, [clearShadowRecording]);
+
+  React.useEffect(() => {
+    stopShadowRecording();
+    clearShadowRecording();
+    setShadowError('');
+  }, [
+    activeCue?.index,
+    activeCue?.trackNumber,
+    clearShadowRecording,
+    stopShadowRecording,
+  ]);
+
+  React.useEffect(() => () => {
+    shadowGenerationRef.current += 1;
+    if (shadowStopTimerRef.current != null) {
+      window.clearTimeout(shadowStopTimerRef.current);
+    }
+    const recorder = shadowRecorderRef.current;
+    if (recorder?.state === 'recording') recorder.stop();
+    for (const track of shadowStreamRef.current?.getTracks() ?? []) track.stop();
+    const url = shadowAudioUrlRef.current;
+    if (url) URL.revokeObjectURL(url);
+  }, []);
+
+  const stopWhisperGeneration = React.useCallback((): void => {
+    whisperGenerationRef.current += 1;
+    whisperWorkerRef.current?.terminate();
+    whisperWorkerRef.current = null;
+    whisperCuesRef.current = [];
+    setWhisperState('idle');
+    setWhisperMessage('');
+    setWhisperProgress(0);
+  }, []);
+
+  const runWhisperGeneration = React.useCallback(async (): Promise<void> => {
+    const localFilePath = playbackInfo?.localFile?.path;
+    if (!manager || !localFilePath) {
+      setWhisperState('error');
+      setWhisperError('Whisper generation requires a local Seanime library file.');
+      return;
+    }
+
+    stopWhisperGeneration();
+    const generation = whisperGenerationRef.current;
+    setWhisperError('');
+    setWhisperProgress(0);
+    setWhisperState('extracting');
+    setWhisperMessage('Extracting 16 kHz mono audio with ffmpeg…');
+
+    let audio: Float32Array;
+    try {
+      const buffer = await window.api.seanimeExtractAudio(localFilePath);
+      if (generation !== whisperGenerationRef.current) return;
+      audio = new Float32Array(buffer);
+      if (!audio.length) throw new Error('No audio track was found.');
+    } catch (error) {
+      if (generation !== whisperGenerationRef.current) return;
+      setWhisperState('error');
+      setWhisperError(
+        error instanceof Error ? error.message : 'Audio extraction failed.',
+      );
+      return;
+    }
+
+    setWhisperState('loading');
+    setWhisperMessage('Loading the local Whisper model…');
+    let worker: Worker;
+    try {
+      worker = new WhisperWorker();
+    } catch (error) {
+      setWhisperState('error');
+      setWhisperError(
+        error instanceof Error ? error.message : 'The Whisper worker could not start.',
+      );
+      return;
+    }
+    whisperWorkerRef.current = worker;
+    whisperCuesRef.current = [];
+
+    const fail = (message: string): void => {
+      if (generation !== whisperGenerationRef.current) return;
+      worker.terminate();
+      if (whisperWorkerRef.current === worker) whisperWorkerRef.current = null;
+      setWhisperState('error');
+      setWhisperError(message);
+    };
+
+    worker.onmessage = (event: MessageEvent<WhisperWorkerMessage>) => {
+      if (generation !== whisperGenerationRef.current) return;
+      const message = event.data;
+      if (
+        message.type === 'progress'
+        && message.status === 'progress'
+        && typeof message.progress === 'number'
+      ) {
+        const file = message.file?.split('/').pop() || 'model';
+        setWhisperMessage(
+          `Downloading ${file} — ${Math.round(message.progress)}%`,
+        );
+        return;
+      }
+      if (message.type === 'status' && message.status === 'transcribing') {
+        const device = message.device === 'webgpu' ? 'webgpu' : 'wasm';
+        markTierDownloaded(whisperModel, device, whisperDevice);
+        setWhisperState('transcribing');
+        setWhisperMessage(
+          `Transcribing on ${device === 'webgpu' ? 'the GPU' : 'the CPU'}…`,
+        );
+        return;
+      }
+      if (message.type === 'partial') {
+        if (Array.isArray(message.cues)) {
+          whisperCuesRef.current.push(...message.cues);
+        }
+        setWhisperProgress(message.progress ?? 0);
+        return;
+      }
+      if (message.type === 'error') {
+        fail(message.message || 'Whisper subtitle generation failed.');
+        return;
+      }
+      if (message.type !== 'done') return;
+
+      void (async () => {
+        const trackNumber = nextVideoCoreWhisperTrackNumber(
+          manager.getTracks().map((track) => track.number),
+        );
+        const subtitleEvents = whisperCuesToVideoCoreEvents(
+          whisperCuesRef.current,
+          trackNumber,
+        ) as MKVParser_SubtitleEvent[];
+        if (!subtitleEvents.length) {
+          fail('Whisper completed without producing subtitle cues.');
+          return;
+        }
+        const track: MKVParser_TrackInfo = {
+          number: trackNumber,
+          uid: trackNumber,
+          type: 'subtitle',
+          codecID: 'S_TEXT/ASS',
+          name: 'Whisper (generated)',
+          language: whisperLanguage,
+          languageIETF: whisperLanguage,
+          default: false,
+          forced: false,
+          enabled: true,
+        };
+        try {
+          await manager.addEventTrack(track);
+          await manager.onSubtitleEvents(subtitleEvents);
+          await manager.selectTrack(trackNumber);
+          if (generation !== whisperGenerationRef.current) return;
+          setTracks(manager.getTracks());
+          setSelectedTrack(manager.getSelectedTrackNumberOrNull());
+          setAllCues(manager.getCues());
+          setActiveCues(manager.getActiveCues());
+          setWhisperState('done');
+          setWhisperMessage(`Generated ${subtitleEvents.length} subtitle lines.`);
+          setWhisperProgress(1);
+          worker.terminate();
+          if (whisperWorkerRef.current === worker) whisperWorkerRef.current = null;
+        } catch (error) {
+          fail(error instanceof Error ? error.message : 'Could not mount Whisper cues.');
+        }
+      })();
+    };
+    worker.onerror = (error) => {
+      fail(error.message || 'The Whisper worker failed to start.');
+    };
+    try {
+      worker.postMessage(
+        {
+          audio,
+          model: whisperHfId(whisperModel),
+          prefer: whisperDevice,
+          lang: whisperLanguage,
+        },
+        [audio.buffer],
+      );
+    } catch (error) {
+      fail(error instanceof Error ? error.message : 'Audio could not be sent to Whisper.');
+    }
+  }, [
+    manager,
+    playbackInfo?.localFile?.path,
+    stopWhisperGeneration,
+    whisperDevice,
+    whisperLanguage,
+    whisperModel,
+  ]);
+
+  React.useEffect(() => {
+    stopWhisperGeneration();
+    setWhisperError('');
+  }, [playbackInfo?.id, stopWhisperGeneration]);
+
+  React.useEffect(() => () => {
+    whisperGenerationRef.current += 1;
+    whisperWorkerRef.current?.terminate();
+  }, []);
+
   const audioTracks: MKVParser_TrackInfo[] = playbackInfo?.mkvMetadata?.audioTracks ?? [];
+  const whisperBusy = whisperState === 'extracting'
+    || whisperState === 'loading'
+    || whisperState === 'transcribing';
 
   return (
     <>
@@ -468,6 +821,54 @@ export default function VideoCoreStudyOverlay({
               </span>
             )}
           </div>
+        )}
+
+        {preferences.shadowingMode && activeCue && (
+          <section
+            className="study-shadowing"
+            aria-label="Shadowing practice"
+            data-shadow-recording={shadowRecording ? 'recording' : 'idle'}
+            data-shadow-response={shadowAudioUrl ? 'ready' : 'none'}
+          >
+            <div className="study-shadowing-copy">
+              <strong>Shadowing practice</strong>
+              <span>Replay the original line, then record your response for comparison.</span>
+            </div>
+            <div className="study-shadowing-actions">
+              <button type="button" onClick={() => seekCue(activeCue)}>
+                Replay original
+              </button>
+              {!shadowRecording ? (
+                <button type="button" onClick={() => void startShadowRecording()}>
+                  {shadowAudioUrl ? 'Record again' : 'Record response'}
+                </button>
+              ) : (
+                <button type="button" onClick={stopShadowRecording}>
+                  Stop recording
+                </button>
+              )}
+              {shadowAudioUrl && (
+                <button type="button" onClick={clearShadowRecording}>
+                  Discard response
+                </button>
+              )}
+              {shadowRecording && (
+                <span className="study-shadowing-live">Recording · 60 second limit</span>
+              )}
+            </div>
+            {shadowAudioUrl && (
+              <audio
+                className="study-shadowing-audio"
+                aria-label="Shadowing response playback"
+                controls
+                preload="metadata"
+                src={shadowAudioUrl}
+              />
+            )}
+            {shadowError && (
+              <p className="study-shadowing-error" role="alert">{shadowError}</p>
+            )}
+          </section>
         )}
 
         {translation && <p className="study-cue-translation">{translation}</p>}
@@ -553,7 +954,18 @@ export default function VideoCoreStudyOverlay({
           <label><input type="checkbox" checked={preferences.primarySubs} onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)} /> Japanese subtitles</label>
           <label><input type="checkbox" checked={preferences.dualSubs} onChange={(event) => updatePreference('dualSubs', event.currentTarget.checked)} /> Dual subtitles</label>
           <label><input type="checkbox" checked={pauseOnLookup} onChange={(event) => setPauseOnLookup(event.currentTarget.checked)} /> Pause on lookup</label>
-          <label><input type="checkbox" checked={preferences.dictationMode} onChange={(event) => updatePreference('dictationMode', event.currentTarget.checked)} /> Dictation</label>
+          <label><input type="checkbox" checked={preferences.dictationMode} onChange={(event) => {
+            updatePreference('dictationMode', event.currentTarget.checked);
+            if (event.currentTarget.checked) {
+              updatePreference('shadowingMode', false);
+              stopShadowRecording();
+            }
+          }} /> Dictation</label>
+          <label><input type="checkbox" checked={preferences.shadowingMode} onChange={(event) => {
+            updatePreference('shadowingMode', event.currentTarget.checked);
+            if (event.currentTarget.checked) updatePreference('dictationMode', false);
+            else stopShadowRecording();
+          }} /> Shadowing</label>
           <button type="button" disabled={!activeCue || translationBusy} onClick={() => void translateCue()}>
             {translationBusy ? 'Translating…' : 'Translate line'}
           </button>
@@ -638,6 +1050,66 @@ export default function VideoCoreStudyOverlay({
                 ))}
               </select>
             </label>
+          )}
+        </div>
+
+        <div className="study-control-row study-whisper-controls">
+          <label>
+            Whisper model
+            <select
+              aria-label="Whisper model"
+              value={whisperModel}
+              disabled={whisperBusy}
+              onChange={(event) => {
+                const tier = event.currentTarget.value as WhisperModelTier;
+                setWhisperModel(tier);
+                setWhisperModelTier(tier);
+              }}
+            >
+              {WHISPER_MODEL_SPECS.map((model) => (
+                <option key={model.id} value={model.id}>{model.id}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Transcription language
+            <select
+              aria-label="Whisper language"
+              value={whisperLanguage}
+              disabled={whisperBusy}
+              onChange={(event) => {
+                const language = event.currentTarget.value as 'ja' | 'zh';
+                setWhisperLanguage(language);
+                setStudyLang(language);
+              }}
+            >
+              <option value="ja">Japanese</option>
+              <option value="zh">Chinese</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={whisperBusy || !manager || !playbackInfo?.localFile?.path}
+            onClick={() => void runWhisperGeneration()}
+          >
+            Generate subtitles
+          </button>
+          {whisperBusy && (
+            <button type="button" onClick={stopWhisperGeneration}>Stop generation</button>
+          )}
+          <output
+            className={whisperState === 'error' ? 'study-whisper-error' : ''}
+            aria-label="Whisper status"
+            aria-live="polite"
+          >
+            {whisperError || whisperMessage || `Device: ${whisperDevice}`}
+          </output>
+          {whisperBusy && (
+            <progress
+              aria-label="Whisper progress"
+              max={1}
+              value={whisperProgress}
+            />
           )}
         </div>
       </section>

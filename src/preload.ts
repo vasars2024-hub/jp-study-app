@@ -1332,6 +1332,8 @@ const api = {
   /** Loopback base URL + auth token, so the adopted Media workspace client can connect. */
   seanimeConnection: (): Promise<SeanimeConnection> =>
     ipcRenderer.invoke(SEANIME_CHANNELS.connection),
+  seanimeExtractAudio: (localFilePath: string): Promise<ArrayBuffer> =>
+    ipcRenderer.invoke(SEANIME_CHANNELS.extractAudio, localFilePath),
   onSeanimeStatus: (cb: (s: SeanimeStatus) => void): (() => void) => {
     const handler = (_e: unknown, s: SeanimeStatus): void => cb(s);
     ipcRenderer.on(SEANIME_CHANNELS.statusEvent, handler);

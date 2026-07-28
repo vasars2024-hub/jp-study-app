@@ -109,7 +109,10 @@ declare module '@/app/(main)/_features/video-core/video-core.atoms' {
 }
 
 declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
-  import type { MKVParser_SubtitleEvent } from '../../vendor/seanime/generated/types';
+  import type {
+    MKVParser_SubtitleEvent,
+    MKVParser_TrackInfo,
+  } from '../../vendor/seanime/generated/types';
 
   export type NormalizedTrackInfo = {
     type: 'event' | 'file';
@@ -158,6 +161,7 @@ declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
     setNoTrack(): void;
     setSubtitleDelay(subtitleDelay: number): Promise<void>;
     onSubtitleEvents(events: MKVParser_SubtitleEvent[]): Promise<void>;
+    addEventTrack(track: MKVParser_TrackInfo): Promise<void>;
     addEventListener<K extends keyof SubtitleManagerEventMap>(
       type: K,
       listener: (event: SubtitleManagerEventMap[K]) => void,

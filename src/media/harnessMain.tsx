@@ -36,6 +36,9 @@ const noop = (): void => {
 (window as unknown as { api: Record<string, unknown> }).api = {
   seanimeConnection: async () => __SEANIME_CONN__,
   seanimeStatus: async () => ({ kind: 'ready' }),
+  seanimeExtractAudio: async () => {
+    throw new Error('Whisper audio extraction is unavailable in the browser proof harness.');
+  },
   onSeanimeStatus: () => noop,
   playerWindowId: async () => 1,
   playerGetSnapshot: async () => null,

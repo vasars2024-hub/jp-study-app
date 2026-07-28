@@ -11,6 +11,8 @@
  * Every response is wrapped by the server in `{ data: T }`.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { ipcMain, webContents } from 'electron';
 import type {
   Anime_Entry,
@@ -34,6 +36,7 @@ import {
   startSeanime,
   stopSeanime,
 } from './supervisor';
+import { extractAudioPcm } from '../media';
 
 async function api<T>(route: string): Promise<T> {
   const base = seanimeBaseUrl();
@@ -113,6 +116,15 @@ export function registerSeanimeIpc(): void {
       token: seanimeAuthToken(),
     }),
   );
+  ipcMain.handle(SEANIME_CHANNELS.extractAudio, async (_event, localFilePath: string) => {
+    if (typeof localFilePath !== 'string' || !path.isAbsolute(localFilePath)) {
+      throw new Error('Seanime audio extraction requires an absolute local-file path.');
+    }
+    const resolved = path.resolve(localFilePath);
+    const stat = fs.statSync(resolved);
+    if (!stat.isFile()) throw new Error('Seanime audio source is not a file.');
+    return extractAudioPcm(resolved);
+  });
   ipcMain.handle(SEANIME_CHANNELS.probe, async () => {
     try {
       return { ok: true as const, result: await probeSeanime() };

@@ -1,0 +1,57 @@
+diff --git a/internal/directstream/subtitles.go b/internal/directstream/subtitles.go
+index f5f2c7c..a453291 100644
+--- a/internal/directstream/subtitles.go
++++ b/internal/directstream/subtitles.go
+@@ -107,6 +107,15 @@ func subtitleFlushConfigFor(streamType player.PlaybackType, offset int64) subtit
+ 	return config
+ }
+ 
++func flushTerminalSubtitleBatch(err error, flush func(), stop func(bool)) {
++	// Stop cancels the stream context, and sendSubtitleEvents rejects a cancelled
++	// context. The terminal batch must therefore be sent before a successful stop.
++	flush()
++	if err == nil {
++		stop(true)
++	}
++}
++
+ func subtitleEventId(event *mkvparser.SubtitleEvent) string {
+ 	if event == nil {
+ 		return ""
+@@ -584,9 +593,10 @@ func (s *BaseStream) startSubtitleStreamP(stream Stream, playbackCtx context.Con
+ 					s.logger.Warn().Err(err).Int64("offset", offset).Msg("directstream: Error streaming subtitles")
+ 				} else {
+ 					s.logger.Info().Int64("offset", offset).Msg("directstream: Subtitle streaming completed by parser.")
+-					subtitleStream.Stop(true)
+ 				}
+-				flushBatch(false)
++				flushTerminalSubtitleBatch(err, func() {
++					flushBatch(false)
++				}, subtitleStream.Stop)
+ 				return // Terminate goroutine
+ 			}
+ 		}
+diff --git a/internal/directstream/subtitles_test.go b/internal/directstream/subtitles_test.go
+index b6b7894..06a3043 100644
+--- a/internal/directstream/subtitles_test.go
++++ b/internal/directstream/subtitles_test.go
+@@ -85,6 +85,19 @@ func TestSubtitleFlushConfigForTorrentThrottlesBatches(t *testing.T) {
+ 	require.Less(t, torrentSeekConfig.minSendInterval, torrentConfig.minSendInterval)
+ }
+ 
++func TestFlushTerminalSubtitleBatchFlushesBeforeSuccessfulStop(t *testing.T) {
++	var order []string
++
++	flushTerminalSubtitleBatch(nil, func() {
++		order = append(order, "flush")
++	}, func(completed bool) {
++		require.True(t, completed)
++		order = append(order, "stop")
++	})
++
++	require.Equal(t, []string{"flush", "stop"}, order)
++}
++
+ func TestShouldSendSubtitleEventSkipsCachedEvents(t *testing.T) {
+ 	// seeks can rediscover old subtitles, but the browser only needs each event once
+ 	stream := &BaseStream{subtitleEventCache: result.NewMap[string, *mkvparser.SubtitleEvent]()}

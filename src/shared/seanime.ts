@@ -92,5 +92,6 @@ export const SEANIME_CHANNELS = {
   stop: 'seanime:stop',
   probe: 'seanime:probe',
   connection: 'seanime:connection',
+  extractAudio: 'seanime:extractAudio',
   statusEvent: 'seanime:statusEvent',
 } as const;

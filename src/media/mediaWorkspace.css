@@ -369,7 +369,8 @@
 #media-workspace .study-control-row button,
 #media-workspace .study-control-row select,
 #media-workspace .study-dictation button,
-#media-workspace .study-dictation input {
+#media-workspace .study-dictation input,
+#media-workspace .study-shadowing button {
   min-height: 1.9rem;
   padding: 0.25rem 0.55rem;
   border: 1px solid rgb(var(--color-gray-700) / 1);
@@ -380,13 +381,15 @@
 }
 
 #media-workspace .study-control-row button:hover:not(:disabled),
-#media-workspace .study-dictation button:hover:not(:disabled) {
+#media-workspace .study-dictation button:hover:not(:disabled),
+#media-workspace .study-shadowing button:hover:not(:disabled) {
   border-color: rgb(var(--color-brand-500) / 0.8);
   background: rgb(var(--color-brand-950) / 0.9);
 }
 
 #media-workspace .study-control-row button:disabled,
-#media-workspace .study-dictation button:disabled {
+#media-workspace .study-dictation button:disabled,
+#media-workspace .study-shadowing button:disabled {
   opacity: 0.45;
 }
 
@@ -406,6 +409,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+#media-workspace .study-whisper-controls output {
+  min-width: min(22rem, 45vw);
+  text-align: left;
+}
+
+#media-workspace .study-whisper-controls progress {
+  width: min(12rem, 25vw);
+  accent-color: rgb(var(--color-brand-500) / 1);
+}
+
+#media-workspace .study-whisper-controls .study-whisper-error {
+  color: rgb(var(--color-red-300, 252 165 165) / 1);
+}
+
 #media-workspace .study-dictation {
   display: flex;
   gap: 0.4rem;
@@ -420,6 +437,55 @@
 
 #media-workspace .study-dictation .is-correct {
   color: rgb(var(--color-green-400, 74 222 128) / 1);
+}
+
+#media-workspace .study-shadowing {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgb(var(--color-brand-700) / 0.62);
+  border-radius: 0.55rem;
+  background: rgb(var(--color-brand-950) / 0.28);
+  text-align: left;
+}
+
+#media-workspace .study-shadowing-copy {
+  display: grid;
+  gap: 0.12rem;
+}
+
+#media-workspace .study-shadowing-copy strong {
+  color: rgb(var(--color-gray-100) / 1);
+  font-size: 0.78rem;
+}
+
+#media-workspace .study-shadowing-copy span,
+#media-workspace .study-shadowing-live,
+#media-workspace .study-shadowing-error {
+  color: rgb(var(--color-gray-400) / 1);
+  font-size: 0.72rem;
+}
+
+#media-workspace .study-shadowing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+#media-workspace .study-shadowing-live {
+  color: rgb(var(--color-brand-300) / 1);
+}
+
+#media-workspace .study-shadowing-audio {
+  width: 100%;
+  height: 2.1rem;
+}
+
+#media-workspace .study-shadowing-error {
+  margin: 0;
+  color: rgb(var(--color-red-300, 252 165 165) / 1);
 }
 
 #media-workspace .study-mining-panel {

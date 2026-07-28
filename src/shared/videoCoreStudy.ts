@@ -21,6 +21,7 @@ export interface VideoCoreStudyPreferences {
   primarySubs: boolean;
   dualSubs: boolean;
   dictationMode: boolean;
+  shadowingMode: boolean;
   subtitleFontSize: number;
   [key: string]: unknown;
 }
@@ -32,7 +33,38 @@ export interface VideoCoreDictationEvaluation {
   expected: string;
 }
 
+export interface VideoCoreWhisperCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface VideoCoreWhisperEvent {
+  trackNumber: number;
+  text: string;
+  startTime: number;
+  duration: number;
+  codecID: 'S_TEXT/ASS';
+  extraData: Record<string, string>;
+}
+
+export interface VideoCoreResumeSource {
+  playbackId?: string;
+  localFilePath?: string;
+  streamPath?: string;
+  mediaId?: number;
+  episodeNumber?: number;
+}
+
+export interface VideoCoreResumePosition {
+  key: string;
+  positionSec: number;
+  updatedAt: number;
+}
+
 export const PLAYER_PREFERENCES_STORAGE_KEY = 'jp-media-player-preferences-v1';
+export const VIDEO_CORE_RESUME_STORAGE_KEY = 'jp-video-core-resume-v1';
+export const VIDEO_CORE_RESUME_LIMIT = 100;
 
 export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStudyPreferences {
   const raw = value && typeof value === 'object' && !Array.isArray(value)
@@ -53,6 +85,7 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     primarySubs: raw.primarySubs !== false,
     dualSubs: raw.dualSubs !== false,
     dictationMode: raw.dictationMode === true,
+    shadowingMode: raw.shadowingMode === true,
     subtitleFontSize: fontSize,
   };
 }
@@ -137,6 +170,123 @@ export function evaluateVideoCoreDictation(
     answer,
     expected,
   };
+}
+
+export function nextVideoCoreWhisperTrackNumber(
+  trackNumbers: readonly number[],
+): number {
+  return Math.max(0, ...trackNumbers.filter(Number.isFinite)) + 1;
+}
+
+export function whisperCuesToVideoCoreEvents(
+  cues: readonly VideoCoreWhisperCue[],
+  trackNumber: number,
+): VideoCoreWhisperEvent[] {
+  return cues.flatMap((cue) => {
+    const text = cue.text.trim();
+    if (
+      !text
+      || !Number.isFinite(cue.start)
+      || !Number.isFinite(cue.end)
+      || cue.end <= cue.start
+    ) {
+      return [];
+    }
+    const startTime = Math.round(Math.max(0, cue.start) * 1000);
+    const endTime = Math.round(Math.max(0, cue.end) * 1000);
+    const duration = Math.max(1, endTime - startTime);
+    return [{
+      trackNumber,
+      text,
+      startTime,
+      duration,
+      codecID: 'S_TEXT/ASS' as const,
+      extraData: {
+        readorder: '0',
+        layer: '0',
+        style: 'Default',
+        name: '',
+        marginl: '0',
+        marginr: '0',
+        marginv: '0',
+        effect: '',
+      },
+    }];
+  });
+}
+
+function resumeText(value: unknown, max = 1200): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+export function videoCoreResumeKey(source: VideoCoreResumeSource): string {
+  const localFilePath = resumeText(source.localFilePath)
+    .replace(/\\/g, '/')
+    .toLocaleLowerCase('en-US');
+  if (localFilePath) return `file:${localFilePath}`;
+  if (Number.isFinite(source.mediaId)) {
+    const episode = Number.isFinite(source.episodeNumber)
+      ? `:episode:${Math.round(source.episodeNumber as number)}`
+      : '';
+    return `media:${Math.round(source.mediaId as number)}${episode}`;
+  }
+  const streamPath = resumeText(source.streamPath);
+  if (streamPath) return `stream:${streamPath}`;
+  const playbackId = resumeText(source.playbackId, 240);
+  return playbackId ? `playback:${playbackId}` : '';
+}
+
+export function normalizeVideoCoreResumePositions(
+  value: unknown,
+): VideoCoreResumePosition[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-VIDEO_CORE_RESUME_LIMIT).flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const raw = item as Partial<VideoCoreResumePosition>;
+    const key = resumeText(raw.key);
+    if (
+      !key
+      || typeof raw.positionSec !== 'number'
+      || !Number.isFinite(raw.positionSec)
+      || typeof raw.updatedAt !== 'number'
+      || !Number.isFinite(raw.updatedAt)
+    ) return [];
+    return [{
+      key,
+      positionSec: Math.max(0, Math.min(86_400, raw.positionSec)),
+      updatedAt: Math.max(0, Math.round(raw.updatedAt)),
+    }];
+  });
+}
+
+export function upsertVideoCoreResumePosition(
+  positions: readonly VideoCoreResumePosition[],
+  entry: VideoCoreResumePosition,
+): VideoCoreResumePosition[] {
+  const normalized = normalizeVideoCoreResumePositions([entry])[0];
+  if (!normalized) return normalizeVideoCoreResumePositions(positions);
+  return [
+    ...normalizeVideoCoreResumePositions(positions)
+      .filter((position) => position.key !== normalized.key),
+    normalized,
+  ].slice(-VIDEO_CORE_RESUME_LIMIT);
+}
+
+export function resolveVideoCoreResumePosition(
+  positions: readonly VideoCoreResumePosition[],
+  key: string,
+  durationSec?: number,
+): number {
+  const entry = normalizeVideoCoreResumePositions(positions)
+    .find((position) => position.key === key);
+  if (!entry || entry.positionSec < 1) return 0;
+  if (
+    typeof durationSec === 'number'
+    && Number.isFinite(durationSec)
+    && durationSec > 0
+    && entry.positionSec >= durationSec - 5
+  ) return 0;
+  return entry.positionSec;
 }
 
 export function adjacentStudyCue(

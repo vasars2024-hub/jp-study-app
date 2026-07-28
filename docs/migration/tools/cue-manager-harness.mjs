@@ -15,7 +15,11 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer as createViteServer } from 'vite';
+import {
+  createServer as createViteServer,
+  loadConfigFromFile,
+  mergeConfig,
+} from 'vite';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -135,8 +139,16 @@ if (!healthy) {
 }
 
 process.chdir(REPO);
-const vite = await createViteServer({
-  configFile: path.join(REPO, 'vite.renderer.config.ts'),
+const rendererConfigPath = path.join(REPO, 'vite.renderer.config.ts');
+const loadedRendererConfig = await loadConfigFromFile(
+  { command: 'serve', mode: 'development' },
+  rendererConfigPath,
+);
+if (!loadedRendererConfig) {
+  throw new Error(`could not load Vite renderer config: ${rendererConfigPath}`);
+}
+const vite = await createViteServer(mergeConfig(loadedRendererConfig.config, {
+  configFile: false,
   root: REPO,
   appType: 'mpa',
   server: {
@@ -157,14 +169,16 @@ const vite = await createViteServer({
     'import.meta.env.SEA_PUBLIC_PLATFORM': JSON.stringify('web'),
   },
   plugins: [fixturePlugin()],
-});
+}));
 await vite.listen();
 
 let closing = false;
 async function cleanup() {
   if (closing) return;
   closing = true;
-  await vite.close().catch(() => {});
+  await vite.close().catch((error) => {
+    console.error('failed to close Vite proof server', error);
+  });
   if (sidecar.exitCode === null) {
     spawnSync('taskkill', ['/pid', String(sidecar.pid), '/T', '/F'], {
       windowsHide: true,
@@ -192,4 +206,6 @@ console.log(
   })}`,
 );
 
-await new Promise(() => {});
+await new Promise((resolve) => {
+  process.once('exit', resolve);
+});

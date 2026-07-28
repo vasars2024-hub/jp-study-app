@@ -436,6 +436,7 @@ declare global {
       setMediaPosition(id: string, sec: number): Promise<void>;
       setMediaSubOffset(id: string, sec: number): Promise<void>;
       extractAudio(url: string): Promise<ArrayBuffer>;
+      seanimeExtractAudio(localFilePath: string): Promise<ArrayBuffer>;
       convertMedia(url: string): Promise<MediaOpen | null>;
       downloadYouTube(url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }>;
       onYoutubeProgress(cb: (p: { stage: string; percent: number }) => void): () => void;

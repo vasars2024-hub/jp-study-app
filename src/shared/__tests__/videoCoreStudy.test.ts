@@ -8,8 +8,14 @@ import {
   evaluateVideoCoreDictation,
   isCueEndTransition,
   normalizeVideoCoreStudyPreferences,
+  normalizeVideoCoreResumePositions,
+  nextVideoCoreWhisperTrackNumber,
+  resolveVideoCoreResumePosition,
   resolveStudyLoopSeekSec,
   stripAssCueText,
+  upsertVideoCoreResumePosition,
+  videoCoreResumeKey,
+  whisperCuesToVideoCoreEvents,
   type VideoCoreStudyCue,
 } from '../videoCoreStudy';
 
@@ -75,12 +81,14 @@ describe('videoCoreStudy', () => {
       playbackRate: 9,
       primarySubs: false,
       dualSubs: false,
+      shadowingMode: true,
       subtitleFontSize: 100,
       preferredAudioLanguage: 'ja',
     })).toMatchObject({
       playbackRate: 3,
       primarySubs: false,
       dualSubs: false,
+      shadowingMode: true,
       subtitleFontSize: 48,
       preferredAudioLanguage: 'ja',
     });
@@ -89,5 +97,39 @@ describe('videoCoreStudy', () => {
   it('scores Japanese dictation without punctuation differences', () => {
     expect(evaluateVideoCoreDictation('猫が窓辺で寝ている', '猫が窓辺で寝ている。'))
       .toMatchObject({ exact: true, score: 100 });
+  });
+
+  it('converts Whisper seconds to exact VideoCore milliseconds on a new track', () => {
+    expect(nextVideoCoreWhisperTrackNumber([1, 3, 4])).toBe(5);
+    expect(whisperCuesToVideoCoreEvents([
+      { start: 2.148, end: 5.148, text: '  猫が窓辺で寝ている。  ' },
+      { start: 8, end: 8, text: 'invalid' },
+    ], 5)).toEqual([
+      expect.objectContaining({
+        trackNumber: 5,
+        text: '猫が窓辺で寝ている。',
+        startTime: 2148,
+        duration: 3000,
+        codecID: 'S_TEXT/ASS',
+      }),
+    ]);
+  });
+
+  it('persists restart position by stable local-file identity and rejects the end', () => {
+    const key = videoCoreResumeKey({
+      playbackId: 'ephemeral-id',
+      localFilePath: 'C:\\Anime\\Episode 01.mkv',
+      mediaId: 154587,
+      episodeNumber: 1,
+    });
+    expect(key).toBe('file:c:/anime/episode 01.mkv');
+    const positions = upsertVideoCoreResumePosition([], {
+      key,
+      positionSec: 125.25,
+      updatedAt: 1000,
+    });
+    expect(normalizeVideoCoreResumePositions([null, ...positions])).toEqual(positions);
+    expect(resolveVideoCoreResumePosition(positions, key, 140)).toBe(125.25);
+    expect(resolveVideoCoreResumePosition(positions, key, 128)).toBe(0);
   });
 });

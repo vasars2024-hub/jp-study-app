@@ -23,6 +23,7 @@ import {
   VideoCoreProvider,
   vc_subtitleManager,
 } from '@/app/(main)/_features/video-core/video-core';
+import { vc_videoElement } from '@/app/(main)/_features/video-core/video-core-atoms';
 import type {
   VideoCoreLifecycleState,
   VideoCore_VideoPlaybackInfo,
@@ -34,7 +35,14 @@ import { getClientIdProof } from '@/lib/server/client-id';
 import { WSEvents } from '@/lib/server/ws-events';
 import { __clientPlatform__ } from '@/types/constants';
 import type { SeanimeConnection } from '../shared/seanime';
-import { stripAssCueText } from '../shared/videoCoreStudy';
+import {
+  normalizeVideoCoreResumePositions,
+  resolveVideoCoreResumePosition,
+  stripAssCueText,
+  upsertVideoCoreResumePosition,
+  VIDEO_CORE_RESUME_STORAGE_KEY,
+  videoCoreResumeKey,
+} from '../shared/videoCoreStudy';
 import VideoCoreStudyOverlay from './VideoCoreStudyOverlay';
 
 type ServerMessage = {
@@ -101,6 +109,7 @@ function subtitleEvents(payload: unknown): MKVParser_SubtitleEvent[] {
 function toVideoCorePlaybackInfo(
   nativeInfo: NativePlayer_PlaybackInfo,
   proofConfig?: CueProofConfig,
+  resumePositionSec = 0,
 ): VideoCore_VideoPlaybackInfo {
   return {
     id: nativeInfo.id,
@@ -113,9 +122,39 @@ function toVideoCorePlaybackInfo(
     media: nativeInfo.media,
     episode: nativeInfo.episode,
     streamType: proofConfig ? 'unknown' : nativeInfo.streamType,
+    // Study OS owns continuity because the supervised sidecar datadir is disposable.
     disableRestoreFromContinuity: true,
-    initialState: { paused: false },
+    ...(proofConfig
+      ? { initialState: { paused: true } }
+      : resumePositionSec > 0
+        ? { initialState: { currentTime: resumePositionSec } }
+        : {}),
   };
+}
+
+function resumeKeyForPlayback(
+  playbackInfo: VideoCore_VideoPlaybackInfo | NativePlayer_PlaybackInfo,
+): string {
+  return videoCoreResumeKey({
+    playbackId: playbackInfo.id,
+    localFilePath: playbackInfo.localFile?.path,
+    streamPath: playbackInfo.streamPath,
+    mediaId: playbackInfo.media?.id,
+    episodeNumber: playbackInfo.episode?.episodeNumber,
+  });
+}
+
+function loadResumePosition(playbackInfo: NativePlayer_PlaybackInfo): number {
+  const key = resumeKeyForPlayback(playbackInfo);
+  if (!key) return 0;
+  try {
+    const positions = normalizeVideoCoreResumePositions(
+      JSON.parse(localStorage.getItem(VIDEO_CORE_RESUME_STORAGE_KEY) ?? '[]'),
+    );
+    return resolveVideoCoreResumePosition(positions, key);
+  } catch {
+    return 0;
+  }
 }
 
 async function consumeParserStream(
@@ -136,6 +175,11 @@ async function consumeParserStream(
     const chunk = await reader.read();
     if (chunk.done) break;
     bytes += chunk.value.byteLength;
+    // This proof plays a separate browser-friendly MP4 while pulling the MKV only to
+    // drive Seanime's parser. An unthrottled drain finishes in ~200 ms and closes the
+    // request before the subtitle goroutine can flush later tracks. Real playback
+    // naturally applies this backpressure, so preserve it in the harness too.
+    await new Promise((resolve) => window.setTimeout(resolve, 25));
   }
   publishProof({ parserBytes: bytes });
   console.info(`[cue-proof] parser stream consumed ${bytes} bytes`);
@@ -305,11 +349,72 @@ function StudyOverlay({
   );
 }
 
+function ResumeTracker({
+  playbackInfo,
+  disabled,
+}: {
+  playbackInfo: VideoCore_VideoPlaybackInfo | null;
+  disabled: boolean;
+}): React.ReactElement | null {
+  const video = useAtomValue(vc_videoElement);
+
+  React.useEffect(() => {
+    if (!video || !playbackInfo || disabled) return;
+    const key = resumeKeyForPlayback(playbackInfo);
+    if (!key) return;
+    let lastSavedSec = -1;
+
+    const persist = (finished = false): void => {
+      const positionSec = video.currentTime;
+      if (!Number.isFinite(positionSec)) return;
+      try {
+        const current = normalizeVideoCoreResumePositions(
+          JSON.parse(localStorage.getItem(VIDEO_CORE_RESUME_STORAGE_KEY) ?? '[]'),
+        );
+        const atEnd = finished
+          || (
+            Number.isFinite(video.duration)
+            && video.duration > 0
+            && positionSec >= video.duration - 5
+          );
+        const next = atEnd
+          ? current.filter((position) => position.key !== key)
+          : upsertVideoCoreResumePosition(current, {
+              key,
+              positionSec,
+              updatedAt: Date.now(),
+            });
+        localStorage.setItem(VIDEO_CORE_RESUME_STORAGE_KEY, JSON.stringify(next));
+        lastSavedSec = positionSec;
+      } catch {
+        // Continuity is best-effort; playback itself must never fail on storage errors.
+      }
+    };
+    const handleTimeUpdate = (): void => {
+      if (Math.abs(video.currentTime - lastSavedSec) >= 2) persist();
+    };
+    const handlePause = (): void => persist();
+    const handleEnded = (): void => persist(true);
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('ended', handleEnded);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('ended', handleEnded);
+      persist();
+    };
+  }, [disabled, playbackInfo, video]);
+
+  return null;
+}
+
 function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactElement {
   const [state, setState] = React.useState<VideoCoreLifecycleState>(initialState);
   const manager = useAtomValue(vc_subtitleManager);
   const pendingEvents = React.useRef<MKVParser_SubtitleEvent[]>([]);
   const pulledPlaybackIds = React.useRef(new Set<string>());
+  const pendingParserInfo = React.useRef<NativePlayer_PlaybackInfo | null>(null);
   const proofConfig = proofWindow().__SEANIME_CUE_PROOF_CONFIG__;
 
   React.useEffect(() => {
@@ -339,20 +444,18 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
           break;
         case 'watch': {
           const nativeInfo = message.payload as NativePlayer_PlaybackInfo;
+          const resumePositionSec = proofConfig ? 0 : loadResumePosition(nativeInfo);
           setState({
             active: true,
-            playbackInfo: toVideoCorePlaybackInfo(nativeInfo, proofConfig),
+            playbackInfo: toVideoCorePlaybackInfo(
+              nativeInfo,
+              proofConfig,
+              resumePositionSec,
+            ),
             playbackError: null,
             loadingState: null,
           });
-          if (proofConfig && !pulledPlaybackIds.current.has(nativeInfo.id)) {
-            pulledPlaybackIds.current.add(nativeInfo.id);
-            void consumeParserStream(conn, nativeInfo).catch((error: unknown) => {
-              const text = error instanceof Error ? error.message : String(error);
-              publishProof({ phase: 'failed', error: text });
-              console.error(`[cue-proof] ${text}`);
-            });
-          }
+          if (proofConfig) pendingParserInfo.current = nativeInfo;
           break;
         }
         case 'subtitle-event': {
@@ -403,6 +506,10 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
   return (
     <>
       <CueProofDriver conn={conn} />
+      <ResumeTracker
+        playbackInfo={state.playbackInfo}
+        disabled={Boolean(proofConfig)}
+      />
       {state.active && (
         <section
           className="study-player-slice"
@@ -417,9 +524,35 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
             onTerminateStream={() => setState(initialState)}
             onLoadedMetadata={(event) => {
               if (!proofConfig) return;
-              event.currentTarget.muted = true;
-              event.currentTarget.playbackRate = 1;
-              void event.currentTarget.play().catch(() => undefined);
+              const video = event.currentTarget;
+              video.muted = true;
+              video.playbackRate = 1;
+              video.pause();
+              // Chromium emits one zero-position `seeked` while establishing a new
+              // media resource. In the split-file proof only, suppress that synthetic
+              // bootstrap signal so VideoCore does not ask the sidecar to replace the
+              // MKV subtitle generation that is about to start.
+              video.addEventListener(
+                'seeked',
+                (seekEvent) => {
+                  if (video.currentTime <= 0.05) seekEvent.stopImmediatePropagation();
+                },
+                { capture: true, once: true },
+              );
+
+              const nativeInfo = pendingParserInfo.current;
+              if (!nativeInfo || pulledPlaybackIds.current.has(nativeInfo.id)) return;
+              pulledPlaybackIds.current.add(nativeInfo.id);
+              // VideoCore emits an initial seek while it establishes the MP4's media
+              // timeline. Let that settle before opening the MKV parser response or the
+              // sidecar correctly cancels the just-opened subtitle stream.
+              window.setTimeout(() => {
+                void consumeParserStream(conn, nativeInfo).catch((error: unknown) => {
+                  const text = error instanceof Error ? error.message : String(error);
+                  publishProof({ phase: 'failed', error: text });
+                  console.error(`[cue-proof] ${text}`);
+                });
+              }, 250);
             }}
           />
           <StudyOverlay playbackInfo={state.playbackInfo} />
