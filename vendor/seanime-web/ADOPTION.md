@@ -46,7 +46,7 @@ re-copy it from the pinned checkout".
 | `components/shared/sea-link.tsx` | Upstream renders `@tanstack/react-router`'s `<Link>`, which throws outside a `RouterProvider`. Renders a plain `<a>`; this is what removes the router dependency. |
 | `lib/navigation.ts` | Same reason: `useRouter`/`usePathname`/`useSearchParams` were built on `useNavigate`/`useLocation`. Same exported API, no router. |
 | `app/(main)/_features/mpv-core/mpv-core.atoms.ts` | Removes the one reachable type-only `@mpv-prism/core` import and supplies its structural track interface locally. ADR-002 still defers the alternative player. |
-| `app/(main)/_features/video-core/video-core-subtitles.ts` | Replaces upstream's Rsbuild-only JASSUB integration with generated runtime/worker/WASM/font assets under `src/media/jassub`, imported through Vite URLs. |
+| `app/(main)/_features/video-core/video-core-subtitles.ts` | Replaces upstream's Rsbuild-only JASSUB integration with generated runtime/worker/WASM/font assets under `src/media/jassub`, imported through Vite URLs, and mechanically applies `patches/seanime/0001-video-core-cuechange.patch` in memory. |
 | `app/(main)/_features/video-core/video-core-media-captions.ts` | Redirects two global package stylesheets to a generated `src/media/mediaCaptions.css` whose selectors are all scoped beneath `#media-workspace`. |
 
 The former fourth substitution,

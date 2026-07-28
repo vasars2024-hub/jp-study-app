@@ -76,3 +76,100 @@ declare module '@/app/(main)/_features/anime-library/_screens/library-view' {
     type?: 'carousel' | 'grid';
   }): React.ReactElement;
 }
+
+declare module '@/app/(main)/_hooks/handle-websockets' {
+  export function useWebsocketMessageListener<TData = unknown>(options: {
+    type: string;
+    onMessage: (message: TData) => void;
+    deps?: unknown[];
+  }): void;
+}
+
+declare module '@/app/websocket-provider' {
+  import type * as React from 'react';
+  import type { Atom } from 'jotai';
+
+  export const clientIdAtom: Atom<string | null>;
+  export const websocketConnectedAtom: Atom<boolean>;
+  export function WebsocketProvider(props: {
+    children: React.ReactNode;
+  }): React.ReactElement;
+}
+
+declare module '@/app/(main)/_features/video-core/video-core.atoms' {
+  import type { VideoCore_VideoPlaybackInfo as AdoptedVideoCorePlaybackInfo } from '../../vendor/seanime/generated/types';
+
+  export type VideoCore_VideoPlaybackInfo = AdoptedVideoCorePlaybackInfo;
+  export type VideoCoreLifecycleState = {
+    active: boolean;
+    playbackInfo: AdoptedVideoCorePlaybackInfo | null;
+    playbackError: string | null;
+    loadingState: string | null;
+  };
+}
+
+declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
+  import type { MKVParser_SubtitleEvent } from '../../vendor/seanime/generated/types';
+
+  export type VideoCoreActiveCue = {
+    trackNumber: number;
+    text: string;
+    startMs: number;
+    endMs: number;
+  };
+
+  export type SubtitleManagerCueChangeEvent = CustomEvent<{
+    cues: VideoCoreActiveCue[];
+    currentTimeMs: number;
+  }>;
+
+  export class VideoCoreSubtitleManager extends EventTarget {
+    getActiveCues(): VideoCoreActiveCue[];
+    onSubtitleEvents(events: MKVParser_SubtitleEvent[]): Promise<void>;
+    addEventListener(
+      type: 'cuechange',
+      listener: (event: SubtitleManagerCueChangeEvent) => void,
+    ): void;
+    removeEventListener(
+      type: 'cuechange',
+      listener: (event: SubtitleManagerCueChangeEvent) => void,
+    ): void;
+  }
+}
+
+declare module '@/app/(main)/_features/video-core/video-core' {
+  import type * as React from 'react';
+  import type { Atom } from 'jotai';
+  import type { VideoCoreSubtitleManager } from '@/app/(main)/_features/video-core/video-core-subtitles';
+  import type { VideoCoreLifecycleState } from '@/app/(main)/_features/video-core/video-core.atoms';
+
+  export const vc_subtitleManager: Atom<VideoCoreSubtitleManager | null>;
+  export function VideoCoreProvider(props: {
+    id: string;
+    children: React.ReactNode;
+  }): React.ReactElement;
+  export function VideoCore(props: {
+    id: string;
+    state: VideoCoreLifecycleState;
+    inline?: boolean;
+    inlineClassName?: string;
+    onTerminateStream: () => void;
+    onLoadedMetadata?: (
+      event: React.SyntheticEvent<HTMLVideoElement, Event>,
+    ) => void;
+  }): React.ReactElement;
+}
+
+declare module '@/lib/server/client-id' {
+  export function getClientIdProof(): string;
+}
+
+declare module '@/lib/server/ws-events' {
+  export enum WSEvents {
+    NATIVE_PLAYER = 'native-player',
+  }
+}
+
+declare module '@/types/constants' {
+  export const __clientPlatform__: 'denshi' | 'web' | 'desktop';
+}

@@ -10,7 +10,7 @@
 //   2. bundle the worker exactly as upstream's rsbuild.config.ts does;
 //   3. copy the pinned WASM files and upstream default font into src/media;
 //   4. generate a whole-file video-core-subtitles.ts substitution that imports those
-//      assets through Vite's ?url contract.
+//      assets through Vite's ?url contract and includes the tracked cuechange patch.
 //
 // It refuses to write if any guarded upstream line moves.
 //
@@ -25,6 +25,7 @@ const UPSTREAM = 'C:/Users/Arseniy/Projects/seanime-upstream/seanime-web';
 const REL = 'app/(main)/_features/video-core/video-core-subtitles.ts';
 const DEST_REL = `vendor/seanime-web/${REL}`;
 const DEST = path.join(REPO, DEST_REL);
+const CUE_PATCH = path.join(REPO, 'patches/seanime/0001-video-core-cuechange.patch');
 const RUNTIME_DIR = path.join(REPO, 'src/media/jassub');
 const ASSET_DIR = path.join(RUNTIME_DIR, 'assets');
 
@@ -113,7 +114,75 @@ fs.copyFileSync(
   path.join(ASSET_DIR, 'Roboto-Medium.ttf'),
 );
 
+function applyUnifiedPatch(source, patch) {
+  const sourceLines = source.replace(/\r\n/g, '\n').split('\n');
+  const patchLines = patch.replace(/\r\n/g, '\n').split('\n');
+  let line = 0;
+  let offset = 0;
+  let hunks = 0;
+
+  while (line < patchLines.length) {
+    const header = patchLines[line].match(
+      /^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@/,
+    );
+    if (!header) {
+      line += 1;
+      continue;
+    }
+
+    const oldStart = Number(header[1]);
+    const spliceAt = oldStart - 1 + offset;
+    let cursor = spliceAt;
+    const replacement = [];
+    line += 1;
+    hunks += 1;
+
+    while (line < patchLines.length && !patchLines[line].startsWith('@@ ')) {
+      const patchLine = patchLines[line];
+      if (
+        patchLine.startsWith('diff --git ') ||
+        patchLine.startsWith('--- ') ||
+        patchLine.startsWith('+++ ')
+      ) {
+        break;
+      }
+      if (patchLine === '\\ No newline at end of file') {
+        line += 1;
+        continue;
+      }
+
+      const marker = patchLine[0];
+      const content = patchLine.slice(1);
+      if (marker === ' ' || marker === '-') {
+        if (sourceLines[cursor] !== content) {
+          throw new Error(
+            `cue patch guard moved in hunk ${hunks}: expected ${JSON.stringify(content)}, ` +
+              `found ${JSON.stringify(sourceLines[cursor])}`,
+          );
+        }
+        if (marker === ' ') replacement.push(content);
+        cursor += 1;
+      } else if (marker === '+') {
+        replacement.push(content);
+      } else if (patchLine !== '') {
+        throw new Error(`unsupported cue patch line in hunk ${hunks}: ${patchLine}`);
+      }
+      line += 1;
+    }
+
+    const consumed = cursor - spliceAt;
+    sourceLines.splice(spliceAt, consumed, ...replacement);
+    offset += replacement.length - consumed;
+  }
+
+  if (hunks !== 6) {
+    throw new Error(`expected 6 cuechange patch hunks, found ${hunks}`);
+  }
+  return sourceLines.join('\r\n');
+}
+
 let subtitles = fs.readFileSync(path.join(UPSTREAM, 'src', REL), 'utf8');
+subtitles = applyUnifiedPatch(subtitles, fs.readFileSync(CUE_PATCH, 'utf8'));
 const sourceReplacements = [
   [
     'import JASSUB from "jassub"\r\n',
@@ -144,10 +213,11 @@ const substitutionHeader = `/**
  *
  * Upstream relies on Rsbuild-specific JASSUB worker handling and public asset paths.
  * Study OS uses a generated runtime adapter plus Vite-managed asset URLs so the restored
- * video-core builds and its worker/WASM/font files ship with the renderer.
+ * video-core builds and its worker/WASM/font files ship with the renderer. The tracked
+ * cuechange patch is applied in memory so the pinned checkout remains untouched.
  *
- * Apart from the JASSUB import and five asset URL lines, this file is byte-identical to
- * pinned upstream 9bdd052. Regenerate it with:
+ * Apart from the tracked cuechange patch, JASSUB import, and five asset URL lines, this
+ * file is byte-identical to pinned upstream 9bdd052. Regenerate it with:
  *   node docs/migration/tools/make-jassub-substitution.mjs
  *
  * Whole-file replacement, never an inline vendor edit. See vendor/seanime-web/ADOPTION.md.

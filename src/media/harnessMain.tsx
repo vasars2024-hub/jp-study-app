@@ -19,6 +19,12 @@ import { createRoot } from 'react-dom/client';
 import { bootstrapSeanimeConnection } from './seanimeBootstrap';
 
 declare const __SEANIME_CONN__: { baseUrl: string; token: string };
+declare const __CUE_PROOF_CONFIG__:
+  | { mkvPath: string; videoUrl: string }
+  | undefined;
+
+(window as unknown as { __SEANIME_CUE_PROOF_CONFIG__?: typeof __CUE_PROOF_CONFIG__ })
+  .__SEANIME_CUE_PROOF_CONFIG__ = __CUE_PROOF_CONFIG__;
 
 const noop = (): void => {
   /* the harness only needs the connection call */

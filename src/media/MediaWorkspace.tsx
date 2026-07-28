@@ -22,10 +22,12 @@ import { setSeanimeBaseUrl } from '@/api/client/server-url';
 import { useSetServerStatus } from '@/app/(main)/_hooks/use-server-status';
 import { useHandleLibraryCollection } from '@/app/(main)/_features/anime-library/_lib/handle-library-collection';
 import { LibraryView } from '@/app/(main)/_features/anime-library/_screens/library-view';
+import { WebsocketProvider } from '@/app/websocket-provider';
 // Straight from the vendored generated contract, the same import the main process uses —
 // not through the `@/` alias, so this stays a real compile-time type.
 import type { Status } from '../../vendor/seanime/generated/types';
 import type { SeanimeConnection } from '../shared/seanime';
+import StudyPlayerSlice from './StudyPlayerSlice';
 import './mediaWorkspace.css';
 
 /**
@@ -117,7 +119,10 @@ export default function MediaWorkspace({ conn }: { conn: SeanimeConnection }): R
     <div id="media-workspace" className="dark">
       <QueryClientProvider client={queryClient}>
         <StatusGate conn={conn}>
-          <LibraryScreen />
+          <WebsocketProvider>
+            <LibraryScreen />
+            <StudyPlayerSlice conn={conn} />
+          </WebsocketProvider>
         </StatusGate>
       </QueryClientProvider>
     </div>

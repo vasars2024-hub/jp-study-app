@@ -3,10 +3,11 @@
  *
  * Upstream relies on Rsbuild-specific JASSUB worker handling and public asset paths.
  * Study OS uses a generated runtime adapter plus Vite-managed asset URLs so the restored
- * video-core builds and its worker/WASM/font files ship with the renderer.
+ * video-core builds and its worker/WASM/font files ship with the renderer. The tracked
+ * cuechange patch is applied in memory so the pinned checkout remains untouched.
  *
- * Apart from the JASSUB import and five asset URL lines, this file is byte-identical to
- * pinned upstream 9bdd052. Regenerate it with:
+ * Apart from the tracked cuechange patch, JASSUB import, and five asset URL lines, this
+ * file is byte-identical to pinned upstream 9bdd052. Regenerate it with:
  *   node docs/migration/tools/make-jassub-substitution.mjs
  *
  * Whole-file replacement, never an inline vendor edit. See vendor/seanime-web/ADOPTION.md.
@@ -66,6 +67,16 @@ export type SubtitleManagerTrackSelectedEvent = CustomEvent<{ trackNumber: numbe
 export type SubtitleManagerTrackDeselectedEvent = CustomEvent
 export type SubtitleManagerTrackAddedEvent = CustomEvent<{ track: NormalizedTrackInfo }>
 export type SubtitleManagerTracksLoadedEvent = CustomEvent<{ tracks: NormalizedTrackInfo[] }>
+
+/** A subtitle cue on screen at the current playback position. */
+export type VideoCoreActiveCue = {
+    trackNumber: number
+    /** Raw event text. For ASS tracks this still contains override tags. */
+    text: string
+    startMs: number
+    endMs: number
+}
+export type SubtitleManagerCueChangeEvent = CustomEvent<{ cues: VideoCoreActiveCue[], currentTimeMs: number }>
 export type SubtitleManagerDestroyedEvent = CustomEvent
 export type SubtitleManagerSettingsUpdatedEvent = CustomEvent<{ settings: VideoCoreSettings }>
 
@@ -76,6 +87,7 @@ interface VideoCoreSubtitleManagerEventMap {
     "tracksloaded": SubtitleManagerTracksLoadedEvent
     "destroyed": SubtitleManagerDestroyedEvent
     "settingsupdated": SubtitleManagerSettingsUpdatedEvent
+    "cuechange": SubtitleManagerCueChangeEvent
 }
 
 type CachedEvent = {
@@ -148,6 +160,16 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     // Remember the translated file tracks to avoid re-fetching them
     private translatedFileTracks = new Map<number, { translating: boolean }>()
 
+    // --- active cue tracking (drives the "cuechange" event) ---
+    // Indexed lazily from the already-recorded event cache; rebuilt when the selected
+    // track changes or when new events arrive for it.
+    private cueIndex: VideoCoreActiveCue[] = []
+    private cueIndexTrackNumber: number = NO_TRACK_NUMBER
+    private cueIndexSize = -1
+    private activeCues: VideoCoreActiveCue[] = []
+    private activeCueKey = ""
+    private readonly _onTimeUpdateForCues = () => this._updateActiveCues()
+
     constructor({
         videoElement,
         jassubOffscreenRender,
@@ -169,6 +191,11 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     }) {
         super()
         this.videoElement = videoElement
+        // "timeupdate" is the activation clock. The cue cache is filled at demux time, which
+        // runs ahead of playback, so dispatching from onSubtitleEvents() would report cues
+        // that are not on screen yet.
+        this.videoElement.addEventListener("timeupdate", this._onTimeUpdateForCues)
+        this.videoElement.addEventListener("seeked", this._onTimeUpdateForCues)
         this.jassubOffscreenRender = jassubOffscreenRender
         this.playbackInfo = playbackInfo
         this.settings = settings
@@ -232,6 +259,13 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
 
     destroy() {
         subtitleLog.info("Destroying subtitle manager")
+        this.videoElement.removeEventListener("timeupdate", this._onTimeUpdateForCues)
+        this.videoElement.removeEventListener("seeked", this._onTimeUpdateForCues)
+        this.cueIndex = []
+        this.cueIndexTrackNumber = NO_TRACK_NUMBER
+        this.cueIndexSize = -1
+        this.activeCues = []
+        this.activeCueKey = ""
         this._disableNativeTextTracks()
         this.libassRenderer?.destroy()
         this.libassRenderer = null
@@ -1050,6 +1084,67 @@ Style: Default, Roboto Medium,24,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0
     // +-----------------------+
     // |      File Tracks      |
     // +-----------------------+
+
+    /** The cues on screen right now. Empty when no event-based track is selected. */
+    getActiveCues(): VideoCoreActiveCue[] {
+        return this.activeCues
+    }
+
+    private _rebuildCueIndex(trackEvents: Map<string, CachedEvent>) {
+        const cues: VideoCoreActiveCue[] = []
+        for (const cached of trackEvents.values()) {
+            const e = cached.event
+            cues.push({
+                trackNumber: e.trackNumber,
+                text: e.text,
+                startMs: e.startTime,
+                endMs: e.startTime + e.duration,
+            })
+        }
+        cues.sort((a, b) => a.startMs - b.startMs)
+        this.cueIndex = cues
+        this.cueIndexTrackNumber = this.currentTrackNumber
+        this.cueIndexSize = trackEvents.size
+    }
+
+    private _updateActiveCues() {
+        const trackEvents = this.eventTracks[this.currentTrackNumber]?.events
+
+        if (!trackEvents) {
+            // No event-based track selected (or a PGS/file track) - report "no cues" once.
+            if (this.activeCues.length > 0 || this.activeCueKey !== "") {
+                this.activeCues = []
+                this.activeCueKey = ""
+                this._dispatchCueChange()
+            }
+            return
+        }
+
+        if (this.cueIndexTrackNumber !== this.currentTrackNumber || this.cueIndexSize !== trackEvents.size) {
+            this._rebuildCueIndex(trackEvents)
+        }
+
+        const timeMs = this.videoElement.currentTime * 1000
+        const active: VideoCoreActiveCue[] = []
+        for (const cue of this.cueIndex) {
+            // cueIndex is sorted by startMs, so nothing past this point has started yet.
+            if (cue.startMs > timeMs) break
+            if (timeMs < cue.endMs) active.push(cue)
+        }
+
+        const key = JSON.stringify(active.map(c => [c.startMs, c.endMs, c.text]))
+        if (key === this.activeCueKey) return
+        this.activeCues = active
+        this.activeCueKey = key
+        this._dispatchCueChange()
+    }
+
+    private _dispatchCueChange() {
+        const event: SubtitleManagerCueChangeEvent = new CustomEvent("cuechange", {
+            detail: { cues: this.activeCues, currentTimeMs: this.videoElement.currentTime * 1000 },
+        })
+        this.dispatchEvent(event)
+    }
 
     private _recordSubtitleEvent(event: MKVParser_SubtitleEvent): { isNew: boolean, cachedEntry?: CachedEvent } {
         // no track map
