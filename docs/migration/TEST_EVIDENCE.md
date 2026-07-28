@@ -93,3 +93,67 @@ real persisted study document. No fixtures. The Scraper's schedule rows use exam
    media. Phase 1's scanner comparison needs real anime files, or it proves nothing.
 7. **Metadata provider health is degraded right now** — Jikan `Degraded` at 749 ms, AniList
    `Unknown` (capture 7). Re-check before treating any Phase-1 catalogue result as a baseline.
+
+## 2026-07-28 — Phase 3 continuation: core study controls on VideoCore
+
+Environment: Windows · branch `grammarx/phase-1-5` · implementation `a4e495d` ·
+Seanime pin `9bdd052`.
+
+### Automated
+
+| Command | Result | Classification |
+|---|---|---|
+| focused `videoCoreStudy` + architecture tests | **14/14 passed** | pass |
+| `npm test` | **252 files, 2,894 tests, 0 failed** | pass |
+| `npx tsc --noEmit` | expected exit 2; **290 diagnostics / 108 files**, 0 in changed slice | fixed baseline |
+| `npm run lint` | expected exit 1; **164 problems (2 errors, 162 warnings)**, 0 changed-path mentions | fixed baseline |
+| `npx vite build --config vite.renderer.config.ts` | **exit 0**, 4,578 modules | pass |
+| `check-media-css-containment.mjs` | **6,865/6,865 scoped**, 0 unscoped, 0 shell `--tw-` | pass |
+| upstream `git apply --check` + substitution generator | **exit 0** | pass |
+
+The first full suite run found one new architecture finding: the overlay repeated the old
+player’s storage-key literal. The implementation moved access behind its shared migration
+contract; the baseline was not updated, and the subsequent full suite passed.
+
+### Runtime — isolated real Seanime sidecar
+
+Tool: the dev-only `cue-manager-harness.mjs` plus the in-app browser against
+`http://127.0.0.1:58134/media-harness.html`. Dependencies were **live**, not stubbed,
+except for inert Electron player-bus preload calls that cannot exist in a browser page.
+The Seanime provider, REST calls, websocket, parser, VideoCore, subtitle manager, video
+element, audio manager, and study controls were the production paths.
+
+Evidence:
+
+- adopted provider connected as
+  `cc8a86ef-1ed4-4a08-9f07-842fbbaf45df`;
+- directstream accepted and parser consumed **11,871,913 bytes**;
+- real `VideoCoreSubtitleManager` mounted;
+- real ASS cues:
+
+  ```text
+  2148-5148ms  猫が窓辺で寝ている。
+  6648-9398ms  今日は本当にいい天気ですね。
+  ```
+
+- playback speed selected `0.75`; the real video element reported `0.75`;
+- subtitle delay displayed `+0.1s`;
+- cue-end auto-pause stopped at about `5.37s` for the delayed `5.248s` boundary;
+- line loop stayed inside cue 1’s delayed range;
+- paused cue 1 at `2.248s`; dictation answer `猫が窓辺で寝ている。` returned
+  **Exact match**;
+- furigana rendered ruby readings `ねこ`, `まどべ`, `ね`;
+- A–B UI displayed `2.25s` / `14.55s`; after crossing B, playback returned inside
+  the interval at `6.02s`.
+
+No cue or subtitle/audio manager was mocked. The harness Node and isolated Seanime
+processes were stopped by exact PID, the resolved disposable datadir was removed, the
+running Electron app was not duplicated, Anki was untouched, and the pinned upstream
+checkout retained exactly its three pre-existing dirty entries.
+
+### Scope verdict
+
+This evidence passes the **first control slice**, not full Phase 3. G-PLAY remains open
+for dual subtitles, shadowing, Whisper, screenshot/audio assets, editable mining preview,
+duplicate/undo/destination/history/provenance, the one-run live-Anki export, restart
+persistence, and final visual comparison.

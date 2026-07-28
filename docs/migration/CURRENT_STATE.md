@@ -1,10 +1,16 @@
 # Migration current state
 
-Last updated: 2026-07-28 (Phase 3 opening — Phase 2 committed, cue semantics answered)
-Phase: **3 — Player + Study Overlay, OPENING. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS.**
+Last updated: 2026-07-28 (Phase 3 active — first study-control slice committed and live-proven)
+Phase: **3 — Player + Study Overlay, ACTIVE. §8 scanner gate: PASS. §9 AnkiConnect gate: PASS. G-PLAY: OPEN.**
 
 Branch `grammarx/phase-1-5` · Phase 1+2 committed as **`55df6e9`**, based on
 `a22e7ba1f72aa7942890ad7eb3ac253b37be0735`. See "Phase 3 — opening" for the commit boundary.
+
+> **Superseding correction.** The sections below that say “Phase 3 closed” refer only to
+> the entry adoption and real-cue player seam delivered by `dd2ca47` / `cfd05fa`. The
+> authoritative plan requires every retained study control plus the complete one-run
+> mining/export/restart path. Full Phase 3 remains active; the latest durable state is the
+> final “Phase 3 — full-plan continuation” section in this file.
 
 > **Correction to the Phase-0 record.** `ENVIRONMENT_BASELINE.md` in the backup says
 > `go — NOT INSTALLED — blocks Phase 1`. **That line is stale.** Go **1.26.5** is
@@ -775,10 +781,10 @@ new constant-condition lint error (302 diagnostics / 110 files; 165 lint problem
 extending the boundary and using an unconditional `for (;;)` stream loop, both returned
 exactly to their fixed baselines above.
 
-#### Next three safe actions
+#### Historical next actions — superseded by the full-plan continuation below
 
-1. Treat Phase 3 as closed. Do not widen the player slice or port the full study-control set
-   in a cleanup pass.
+1. The cue-seam task was closed here; the later audit established that this did **not**
+   close full Phase 3.
 2. On any upstream version bump, regenerate the JASSUB substitution and repeat the
    production build plus real cue-manager harness; a green `tsc` boundary alone is not
    acceptance.
@@ -871,3 +877,105 @@ Carried over from Phase 0, unchanged:
   and `tools/import-mazii-grammar.py` (9 new deletions in `git status`). That is the
   highest-risk item in the publishability audit, so re-check `LICENSING_PLAN.md` against
   the working tree before relying on the table above.
+
+## Phase 3 — full-plan continuation: core study controls on VideoCore (2026-07-28)
+
+This section supersedes every earlier instruction to treat the whole phase as closed.
+Commit **`a4e495d`** ports the first coherent control slice onto the same adopted
+VideoCore video element and subtitle/audio managers; it does not satisfy G-PLAY by itself.
+
+### Contract extension
+
+- `VideoCoreSubtitleManager.getCues()` exposes the selected event track’s full, ordered
+  cue timeline. Each cue carries a stable `index`, exact demuxer `startMs` / `endMs`,
+  track number, and raw text.
+- Subtitle delay is now manager state: `setSubtitleDelay()` updates settings, offsets the
+  renderer, and immediately re-evaluates the active cue against
+  `(video.currentTime - subtitleDelay) * 1000`.
+- The guarded upstream patch now has seven hunks and still applies cleanly to pin
+  `9bdd052`. The substitution generator ran successfully; upstream remained at its exact
+  three pre-existing dirty entries.
+- `src/shared/videoCoreStudy.ts` owns delay-aware seek/loop arithmetic, ASS display
+  stripping, bounded rate normalization, compatibility-preserving preference loading,
+  and deterministic dictation scoring. Raw ASS text remains available for provenance.
+
+### Controls implemented in this slice
+
+| Control | Current state |
+|---|---|
+| Previous / replay / next line | **implemented and live-proven** against manager cues |
+| Subtitle offset | **implemented and live-proven**; manager activation follows the delayed clock |
+| Frame step | **implemented** at ±1/30 s on the one VideoCore video element |
+| Playback speed | **implemented and live-proven** at 0.75×; stored in the existing preference record |
+| Auto-pause / line loop / A–B loop | **implemented and live-proven** against exact cue/delay boundaries |
+| Japanese subtitle visibility | **implemented** |
+| Subtitle and audio track selection | **implemented** through the real managers |
+| Click lookup / optional pause | **implemented** using the retained lookup and dictionary surface |
+| Selection / line translation | **implemented** using the retained translator |
+| Furigana | **implemented and live-proven**; the real cue produced three ruby readings |
+| Dictation | **implemented and live-proven**; exact Japanese answer scored 100% |
+
+### Live evidence
+
+The isolated harness used a disposable Seanime datadir and did not start Electron or touch
+Anki. The adopted provider connected as
+`cc8a86ef-1ed4-4a08-9f07-842fbbaf45df`; the real parser consumed **11,871,913 bytes**,
+mounted `VideoCoreSubtitleManager`, and emitted:
+
+```text
+2148-5148ms  猫が窓辺で寝ている。
+6648-9398ms  今日は本当にいい天気ですね。
+```
+
+Observed control transitions on that real clock:
+
+- playback element and speed selector both read `0.75`;
+- subtitle delay display read `+0.1s`;
+- auto-pause stopped at about `5.37s` for cue 1’s delayed `5.248s` boundary (normal
+  `timeupdate` granularity);
+- line loop repeatedly returned to cue 1 and remained inside `2.248–5.248s`;
+- pausing on cue 1 at `2.248s`, entering `猫が窓辺で寝ている。`, and checking produced
+  **Exact match**;
+- furigana rendered `ねこ`, `まどべ`, and `ね`;
+- A–B boundaries displayed `2.25s` and `14.55s`; after crossing B, playback returned
+  inside the interval at `6.02s`.
+
+The exact harness processes were stopped and its resolved temporary datadir was removed.
+The pinned upstream checkout was not edited or cleaned.
+
+### Verification after the control port
+
+| Command | Result |
+|---|---|
+| focused study + architecture tests | **14/14 pass** |
+| `npm test` | **252 files / 2,894 tests pass** |
+| `npx tsc --noEmit` | accepted exit 2; **290 diagnostics / 108 files**, 0 in this slice |
+| `npm run lint` | accepted exit 1; **164 problems (2 errors, 162 warnings)**, 0 changed-path mentions |
+| renderer production build | **exit 0**, 4,578 modules |
+| CSS containment | **6,865/6,865 scoped**, 0 unscoped, 0 shell Tailwind tokens |
+| patch apply + generator | **exit 0** |
+
+The first full test run correctly rejected a duplicate storage-key literal. The key moved
+behind the migration’s shared compatibility contract; the architecture baseline was not
+weakened, and the full suite then passed.
+
+### What remains before Phase 3 can close
+
+- real dual-subtitle rendering, shadowing mode, and Whisper generation;
+- screenshot and cue-bounded audio capture wired into the retained asset pipeline;
+- editable card preview, one-action mining, duplicate warning, undo, Anki destination,
+  mining history, and complete cue → episode → media → assets → draft → note provenance;
+- one uninterrupted G-PLAY run: representative local file, audio/subtitle selection
+  including ASS, real cue mining, both assets, preview, live Anki export, restart, resume
+  position, and history persistence;
+- the required final visual comparison before the old player can retire.
+
+### Next three safe actions
+
+1. Bridge the active VideoCore cue and video element into the retained
+   `StudyOrchestratorWorkspace` draft/asset contract without introducing a second clock.
+2. Add screenshot plus exact cue-bounded audio capture, preserving raw cue timing and
+   provenance through editable preview.
+3. Wire duplicate/undo/destination/history, then run the complete namespaced live-Anki
+   G-PLAY path and restart persistence check. A negative runtime result is a valid record;
+   never promote a false positive.

@@ -3,18 +3,18 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "cfd05fa",
+  "commit": "a4e495d",
   "dirtyPorcelainEntries": 537,
   "untrackedFiles": 446,
   "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 COMMITTED as 55df6e9. Phase 3 Task 1 entry/video-core closure COMMITTED as dd2ca47 with its record in ffc703f. Tasks 2+3 COMMITTED as cfd05fa (9 files, +994/-9). The scoped player seam did not stage or modify unrelated parallel-session paths.",
+  "note": "Phase 1+2 committed as 55df6e9. Phase 3 entry/video-core adoption committed as dd2ca47, real-cue seam as cfd05fa, and the first full-plan study-control slice as a4e495d. Full Phase 3 remains active until every retained control and the one-run G-PLAY path pass.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
- "currentPhaseName": "Player + Study Overlay — closed",
- "phaseComplete": true,
+ "currentPhaseName": "Player + Study Overlay — active",
+ "phaseComplete": false,
  "gateG1": {
   "verdict": "PASS",
   "processLifecycleWindows": "PASS — no orphan or port leak under graceful stop, simulated crash, or hard kill",
@@ -162,9 +162,9 @@
  },
  "openTemporaryRegressions": [],
  "nextActions": [
-  "Join the two halves of the cue proof by mounting the adopted websocket-provider.tsx in the dev harness. Accept only a real MKVParser_SubtitleEvent causing cuechange inside the real VideoCoreSubtitleManager; a recorded negative result is valid.",
-  "Mount video-core inside the Study OS Media workspace with the Study Overlay as a SIBLING reading the same player state (never a second timeline). Stop at one real local file and one rendered real cue.",
-  "Render exact cue.startMs/cue.endMs in the Overlay and retain raw cue text in provenance; never derive mining timing from video.currentTime."
+  "Bridge the active VideoCore cue and video element into the retained StudyOrchestratorWorkspace draft, assets, and provenance contract without introducing a second clock.",
+  "Attach screenshot and exact cue-bounded audio capture to an editable card preview while preserving raw cue text and demuxer timings.",
+  "Wire duplicate warning, undo, Anki destination, and mining history, then run the complete namespaced live-Anki G-PLAY path followed by restart persistence."
  ],
  "scannerComparison": {
   "gate": "section 8 — \">= parity on match rate\"",
@@ -374,7 +374,7 @@
  },
  "phase3PlayerSlice": {
   "implementationCommit": "cfd05fa",
-  "verdict": "PASS — Tasks 2 and 3 closed",
+  "verdict": "PASS — opening real-cue seam closed; full Phase 3 remains active",
   "mounted": "Adopted WebsocketProvider wraps the Media workspace; full adopted VideoCore/VideoCoreProvider and sibling Study Overlay are mounted.",
   "eventPath": "real directstream subtitle-event on WSEvents.NATIVE_PLAYER -> StudyPlayerSlice -> real vc_subtitleManager (VideoCoreSubtitleManager) -> cuechange -> StudyOverlay",
   "realCueChanges": [
@@ -393,7 +393,7 @@
   "parserBytes": 11871913,
   "timingRule": "Overlay reads cue.startMs/cue.endMs only; never video.currentTime.",
   "harness": "docs/migration/tools/cue-manager-harness.mjs — isolated temp datadir, copied single-file library, private MP4 Range server, full cleanup; no Electron or Anki.",
-  "generator": "make-jassub-substitution.mjs applies 0001-video-core-cuechange.patch in memory with guarded six-hunk parsing before JASSUB substitutions; pinned checkout remains untouched.",
+  "generator": "make-jassub-substitution.mjs applies 0001-video-core-cuechange.patch in memory before JASSUB substitutions; the patch now has seven guarded hunks and the pinned checkout remains untouched.",
   "failedExperiments": [
    "Hand-rolled websocket with own id, server-issued id, and id+proof reconnect: server logged targeted sends but client received no events.",
    "Body-only clientId: directstream accepted but targeted frames were absent; required identity proof/platform headers were missing.",
@@ -407,6 +407,54 @@
    "tsc": "expected exit 2; 290 diagnostics / 108 files; 0 vendor",
    "lint": "expected exit 1; 164 problems (2 errors, 162 warnings)"
   }
+ },
+ "phase3StudyControls": {
+  "implementationCommit": "a4e495d",
+  "verdict": "PASS — first coherent control slice; G-PLAY remains open",
+  "contract": "VideoCoreSubtitleManager.getCues() returns ordered selected-track cues with stable index, raw text, track number, and exact demuxer startMs/endMs. Subtitle delay is manager state and cue activation uses the delayed VideoCore clock.",
+  "implemented": [
+   "previous/replay/next line",
+   "frame step",
+   "subtitle offset",
+   "persisted playback speed",
+   "auto-pause",
+   "line loop",
+   "A-B loop",
+   "subtitle and audio track selection",
+   "Japanese subtitle visibility",
+   "click lookup with optional pause",
+   "selection and line translation",
+   "furigana",
+   "dictation"
+  ],
+  "runtime": {
+   "providerClientId": "cc8a86ef-1ed4-4a08-9f07-842fbbaf45df",
+   "parserBytes": 11871913,
+   "realCueChanges": [
+    "2148-5148ms 猫が窓辺で寝ている。",
+    "6648-9398ms 今日は本当にいい天気ですね。"
+   ],
+   "observed": "0.75x real playback, +0.1s subtitle delay, delayed cue-end auto-pause, repeated line loop, A-B transition, three ruby readings, and exact Japanese dictation match",
+   "isolation": "Disposable sidecar datadir; no Electron and no Anki. Exact harness processes stopped and temp datadir removed."
+  },
+  "verification": {
+   "focused": "14/14 study + architecture tests pass",
+   "tests": "252 files / 2894 tests pass",
+   "tsc": "expected exit 2; 290 diagnostics / 108 files; 0 in slice",
+   "lint": "expected exit 1; 164 problems (2 errors, 162 warnings); 0 changed-path mentions",
+   "rendererBuild": "exit 0; 4578 modules",
+   "cssContainment": "6865/6865 scoped; 0 unscoped; 0 shell --tw- tokens",
+   "patchAndGenerator": "exit 0"
+  },
+  "remaining": [
+   "real dual subtitles",
+   "shadowing and Whisper generation",
+   "screenshot and cue-bounded audio capture",
+   "editable card preview and one-action mining",
+   "duplicate warning, undo, destination, history, and full provenance",
+   "single-run live-Anki G-PLAY plus restart persistence",
+   "final visual comparison before old-player retirement"
+  ]
  },
  "knownGaps": {
   "liveAnkiConnect": "CLOSED 2026-07-28 — all 14 AnkiActionMap actions verified live.",
