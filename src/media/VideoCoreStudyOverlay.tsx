@@ -37,6 +37,8 @@ import {
   type VideoCoreDictationEvaluation,
   type VideoCoreStudyPreferences,
 } from '../shared/videoCoreStudy';
+import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
+import VideoCoreMiningPanel from './VideoCoreMiningPanel';
 
 const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
 
@@ -71,6 +73,33 @@ function trackLabel(track: NormalizedTrackInfo): string {
   return `${identity}${flags ? ` (${flags})` : ''}`;
 }
 
+function miningSourceFromPlayback(
+  playbackInfo: VideoCore_VideoPlaybackInfo | null,
+): VideoCoreMiningSource | null {
+  if (!playbackInfo) return null;
+  const mediaTitle = playbackInfo.media?.title?.userPreferred
+    || playbackInfo.media?.title?.romaji
+    || playbackInfo.media?.title?.english
+    || playbackInfo.media?.title?.native;
+  return {
+    playbackId: playbackInfo.id,
+    playbackType: String(playbackInfo.playbackType),
+    streamType: playbackInfo.streamType,
+    ...(playbackInfo.streamPath ? { streamPath: playbackInfo.streamPath } : {}),
+    ...(playbackInfo.localFile?.path
+      ? { localFilePath: playbackInfo.localFile.path }
+      : {}),
+    ...(playbackInfo.media?.id != null ? { mediaId: playbackInfo.media.id } : {}),
+    ...(mediaTitle ? { mediaTitle } : {}),
+    ...(playbackInfo.episode?.episodeNumber != null
+      ? { episodeNumber: playbackInfo.episode.episodeNumber }
+      : {}),
+    ...(playbackInfo.episode?.displayTitle || playbackInfo.episode?.episodeTitle
+      ? { episodeTitle: playbackInfo.episode.displayTitle || playbackInfo.episode.episodeTitle }
+      : {}),
+  };
+}
+
 export default function VideoCoreStudyOverlay({
   playbackInfo,
   onManagerReady,
@@ -102,6 +131,7 @@ export default function VideoCoreStudyOverlay({
 
   const activeCue = activeCues[0] ?? null;
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
+  const miningSource = miningSourceFromPlayback(playbackInfo);
 
   const updatePreference = React.useCallback(
     <K extends keyof VideoCoreStudyPreferences>(
@@ -311,7 +341,7 @@ export default function VideoCoreStudyOverlay({
 
   const checkDictation = React.useCallback((): void => {
     if (!plainText) return;
-                  setDictationResult(evaluateVideoCoreDictation(dictationInput, plainText));
+    setDictationResult(evaluateVideoCoreDictation(dictationInput, plainText));
   }, [dictationInput, plainText]);
 
   const audioTracks: MKVParser_TrackInfo[] = playbackInfo?.mkvMetadata?.audioTracks ?? [];
@@ -331,7 +361,6 @@ export default function VideoCoreStudyOverlay({
             className="study-cue-text"
             text={plainText}
             furigana={preferences.furigana}
-            style={{ fontSize: preferences.subtitleFontSize }}
             onMouseDown={(event) => {
               popupOpenOnDownRef.current = !!popup;
               noteLookupPointerDown(event);
@@ -382,13 +411,28 @@ export default function VideoCoreStudyOverlay({
 
       <section className="study-control-dock" aria-label="Study playback controls">
         <div className="study-control-row">
-          <button type="button" disabled={!allCues.length} onClick={() => jumpCue(-1)}>
+          <button
+            type="button"
+            data-study-action="previous-cue"
+            disabled={!allCues.length}
+            onClick={() => jumpCue(-1)}
+          >
             Previous line
           </button>
-          <button type="button" disabled={!activeCue} onClick={() => seekCue(activeCue)}>
+          <button
+            type="button"
+            data-study-action="replay-cue"
+            disabled={!activeCue}
+            onClick={() => seekCue(activeCue)}
+          >
             Replay line
           </button>
-          <button type="button" disabled={!allCues.length} onClick={() => jumpCue(1)}>
+          <button
+            type="button"
+            data-study-action="next-cue"
+            disabled={!allCues.length}
+            onClick={() => jumpCue(1)}
+          >
             Next line
           </button>
           <button
@@ -513,6 +557,14 @@ export default function VideoCoreStudyOverlay({
           )}
         </div>
       </section>
+
+      <VideoCoreMiningPanel
+        cue={activeCue}
+        displayText={plainText}
+        source={miningSource}
+        video={video}
+        subtitleDelaySec={subtitleDelaySec}
+      />
 
       {popup && (
         <DictionaryPopup

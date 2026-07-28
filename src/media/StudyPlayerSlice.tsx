@@ -410,7 +410,7 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
               if (!proofConfig) return;
               event.currentTarget.muted = true;
               event.currentTarget.playbackRate = 1;
-              void event.currentTarget.play();
+              void event.currentTarget.play().catch(() => undefined);
             }}
           />
           <StudyOverlay playbackInfo={state.playbackInfo} />
