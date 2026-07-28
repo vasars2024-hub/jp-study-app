@@ -36,6 +36,7 @@ import {
   loadWhisperModelTier,
   onWhisperDeviceChanged,
   onWhisperModelChanged,
+  setWhisperDevice as persistWhisperDevice,
   setWhisperModelTier,
   whisperHfId,
   type WhisperDevice,
@@ -1054,6 +1055,21 @@ export default function VideoCoreStudyOverlay({
         </div>
 
         <div className="study-control-row study-whisper-controls">
+          <label>
+            Whisper device
+            <select
+              aria-label="Whisper device"
+              value={whisperDevice}
+              disabled={whisperBusy}
+              onChange={(event) => {
+                const device = event.currentTarget.value as WhisperDevice;
+                persistWhisperDevice(device);
+              }}
+            >
+              <option value="auto">Auto (GPU, then CPU)</option>
+              <option value="cpu">CPU</option>
+            </select>
+          </label>
           <label>
             Whisper model
             <select

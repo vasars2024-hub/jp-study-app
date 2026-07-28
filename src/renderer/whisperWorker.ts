@@ -55,6 +55,20 @@ async function load(model: string, prefer: 'auto' | 'cpu'): Promise<any> {
 
   if (prefer === 'cpu') return loadWasm();
 
+  // Chromium can expose `navigator.gpu` while still having no usable adapter (remote
+  // desktop, disabled driver, or WebGPU flag off). Letting ONNX initialize WebGPU first
+  // can leave its backend registry unable to recover to WASM in the same worker. Probe
+  // before pipeline creation so CPU fallback remains clean and deterministic.
+  const gpu = (navigator as Navigator & {
+    gpu?: { requestAdapter: () => Promise<unknown | null> };
+  }).gpu;
+  if (!gpu) return loadWasm();
+  try {
+    if (!await gpu.requestAdapter()) return loadWasm();
+  } catch {
+    return loadWasm();
+  }
+
   try {
     transcriber = await pipeline('automatic-speech-recognition', model, {
       device: 'webgpu',

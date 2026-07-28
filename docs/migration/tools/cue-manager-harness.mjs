@@ -15,6 +15,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ffmpegPath from 'ffmpeg-static';
 import {
   createServer as createViteServer,
   loadConfigFromFile,
@@ -51,6 +52,14 @@ function fixturePlugin() {
   return {
     name: 'cue-proof-fixture',
     configureServer(server) {
+      server.middlewares.use('/cue-probe.pcm', (_request, response) => {
+        const stat = fs.statSync(proofPcm);
+        response.statusCode = 200;
+        response.setHeader('Cache-Control', 'no-store');
+        response.setHeader('Content-Type', 'application/octet-stream');
+        response.setHeader('Content-Length', stat.size);
+        fs.createReadStream(proofPcm).pipe(response);
+      });
       server.middlewares.use('/cue-probe.mp4', (request, response) => {
         const stat = fs.statSync(MP4);
         const range = request.headers.range;
@@ -93,10 +102,37 @@ function fixturePlugin() {
 const sidecarPort = await reservePort();
 const vitePort = await reservePort();
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seanime-cue-manager-'));
+const proofPcm = path.join(dataDir, 'cue-probe.f32le');
 const fixtureLibrary = path.join(dataDir, 'cue-library');
 const serverMkv = path.join(fixtureLibrary, 'Sousou no Frieren - 01.mkv');
 fs.mkdirSync(fixtureLibrary, { recursive: true });
 fs.copyFileSync(MKV, serverMkv);
+const audioExtraction = spawnSync(
+  ffmpegPath,
+  [
+    '-i',
+    MP4,
+    '-vn',
+    '-ac',
+    '1',
+    '-ar',
+    '16000',
+    '-f',
+    'f32le',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    proofPcm,
+  ],
+  { encoding: 'utf8', windowsHide: true },
+);
+if (audioExtraction.error) throw audioExtraction.error;
+if (audioExtraction.status !== 0 || !fs.existsSync(proofPcm)) {
+  throw new Error(
+    `proof audio extraction failed: ${audioExtraction.stderr?.trim() || audioExtraction.status}`,
+  );
+}
 const password = crypto.randomBytes(24).toString('hex');
 const token = crypto.createHash('sha256').update(password).digest('hex');
 const baseUrl = `http://127.0.0.1:${sidecarPort}`;
