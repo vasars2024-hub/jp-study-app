@@ -3,13 +3,13 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "03d27a3",
+  "commit": "ea77f59",
   "dirtyPorcelainEntries": 537,
   "untrackedFiles": 446,
   "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 committed as 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, the real-cue seam is cfd05fa, core controls are a4e495d, and editable preview plus real cue assets are 03d27a3. Full Phase 3 remains active until every retained control and the one-run G-PLAY path pass.",
+  "note": "Phase 1+2 is 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, real-cue seam cfd05fa, core controls a4e495d, mining preview/assets 03d27a3, and the secondary cue timeline ea77f59. Dual-track runtime acceptance is negative; full Phase 3 remains active.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
@@ -162,7 +162,7 @@
  },
  "openTemporaryRegressions": [],
  "nextActions": [
-  "Port real dual-subtitle rendering without introducing a second timeline or losing primary-cue provenance.",
+  "Trace and fix the directstream parser feed until a fresh two-track run delivers cues for both embedded ASS track numbers.",
   "Port shadowing mode and Whisper generation onto the same VideoCore player.",
   "Run the complete namespaced live-Anki G-PLAY path with both assets, duplicate rejection, undo/cleanup, and restart persistence."
  ],
@@ -484,6 +484,34 @@
    "lint": "expected exit 1; 164 problems (2 errors, 162 warnings); 0 mining-path mentions",
    "rendererBuild": "exit 0; 4580 modules",
    "cssContainment": "6895/6895 scoped; 0 unscoped; 0 shell --tw- tokens"
+  }
+ },
+ "phase3DualSubtitles": {
+  "implementationCommit": "ea77f59",
+  "verdict": "NEGATIVE — renderer timeline implemented; live directstream supplied only one of two embedded ASS tracks",
+  "implemented": "VideoCoreSubtitleManager.getCuesForTrack exposes a read-only event-track timeline. The Study Overlay resolves a selected secondary track on the same delay-adjusted VideoCore clock without changing primary mining provenance.",
+  "fixture": "Disposable MKV with aligned Japanese ASS track 3 and English ASS track 4.",
+  "runtime": {
+   "providerClientId": "f6dbda04-4197-4ac0-97bc-9668dd55940b",
+   "parserBytes": 11873146,
+   "tracksDiscovered": [
+    "3 Japanese (probe)",
+    "4 English (probe)"
+   ],
+   "websocket": "subtitle-event 1 cue(s), tracks 4",
+   "secondary": "Track 3 selected; 0 cues delivered.",
+   "startupRace": "Fixed: open-and-await no longer mounts VideoCore with null playback info and cancels directstream preparation.",
+   "cleanup": "Exact processes stopped; three disposable datadirs and temporary dual fixture removed; browser finalized; Electron and Anki untouched."
+  },
+  "verification": {
+   "focused": "19/19 mining + study + architecture tests pass",
+   "tests": "253 files / 2901 tests pass",
+   "tsc": "expected 290 diagnostics / 108 files; 0 slice diagnostics",
+   "targetedLint": "exit 0",
+   "lint": "expected 164 problems; 0 slice mentions",
+   "rendererBuild": "exit 0; 4580 modules",
+   "cssContainment": "6896/6896 scoped; 0 unscoped; 0 shell --tw- tokens",
+   "patchAndGenerator": "exit 0"
   }
  },
  "knownGaps": {

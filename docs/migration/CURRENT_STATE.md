@@ -1047,3 +1047,51 @@ temporary datadir was removed, and the browser harness tab was closed.
 
 The code paths for mine, duplicate history, destination, and undo now exist, but they are
 **implemented, not live-accepted**. G-PLAY remains open.
+
+## Phase 3 — secondary VideoCore timeline, negative runtime gate (2026-07-28)
+
+Commit **`ea77f59`** adds the renderer half of real dual subtitles:
+
+- the guarded upstream extension now exposes `getCuesForTrack(trackNumber)` without
+  changing the primary rendered/selected track;
+- the Study Overlay selects a secondary event track and resolves it against the same
+  delay-adjusted VideoCore clock;
+- secondary text renders independently of the primary cue, while mining continues to
+  use only the primary selected-track cue;
+- the old `open-and-await` harness race is fixed: VideoCore no longer mounts with null
+  playback info and accidentally terminates directstream preparation.
+
+The implementation is production-build clean, but the live gate is a recorded
+**negative**, not a pass. A disposable MKV contained Japanese ASS track 3 and English
+ASS track 4 over the same six cue ranges. Seanime exposed both tracks in the UI, but the
+fresh directstream websocket delivered exactly:
+
+```text
+subtitle-event 1 cue(s), tracks 4
+```
+
+Provider `f6dbda04-4197-4ac0-97bc-9668dd55940b` consumed **11,873,146 bytes**. The
+secondary track was selected as track 3 but its manager timeline remained at **0 cues**.
+Therefore simultaneous real-track rendering could not occur. Browser reloads were not
+counted as retries because the sidecar deduplicates subtitle events for a stream; the
+decisive run used a fresh isolated sidecar.
+
+Verification after the slice:
+
+| Gate | Result |
+|---|---|
+| focused mining + study + architecture tests | **19/19 pass** |
+| full tests | **253 files / 2,901 tests pass** |
+| TypeScript | accepted **290 diagnostics / 108 files**, 0 slice diagnostics |
+| targeted ESLint | **exit 0** |
+| full lint | accepted **164 problems**, 0 slice mentions |
+| renderer build | **exit 0**, 4,580 modules |
+| CSS containment | **6,896/6,896 scoped**, 0 unscoped, 0 shell Tailwind tokens |
+| patch apply + substitution generator | **exit 0** |
+
+The exact harness processes were stopped, all three disposable datadirs and the
+temporary dual-track fixture were removed, the browser tab was finalized, and the
+pinned checkout retained its exact three pre-existing dirty entries.
+
+**Dual subtitles remain open.** The next fix belongs at the parser/directstream feed:
+prove both track numbers reach `subtitle-event` before claiming the renderer path passes.

@@ -200,3 +200,44 @@ not clicked. Therefore this is **asset and preview acceptance only**, not a live
 G-PLAY pass. Harness processes were stopped by exact PID, the disposable datadir was
 removed, the browser harness tab was finalized, the running Electron app was not
 duplicated, and the live 82-deck Anki collection was untouched.
+
+## 2026-07-28 — Phase 3 continuation: dual-track negative acceptance
+
+Environment: Windows · branch `grammarx/phase-1-5` · implementation `ea77f59` ·
+Seanime pin `9bdd052`.
+
+### Automated
+
+| Gate | Result |
+|---|---|
+| focused mining + study + architecture tests | **19/19 passed** |
+| `npm test` | **253 files, 2,901 tests, 0 failed** |
+| `npx tsc --noEmit` | expected exit 2; **290 diagnostics / 108 files**, 0 slice diagnostics |
+| targeted ESLint | **exit 0** |
+| `npm run lint` | expected exit 1; **164 problems**, 0 slice mentions |
+| renderer production build | **exit 0**, 4,580 modules |
+| CSS containment | **6,896/6,896 scoped**, 0 unscoped, 0 shell `--tw-` |
+| upstream patch apply + generator | **exit 0** |
+
+### Runtime — fresh two-track fixture
+
+The disposable fixture contained Japanese ASS track 3 and English ASS track 4 with six
+aligned cue ranges. Both appeared in the real manager’s track menus. The startup-race fix
+allowed directstream to complete without the earlier intermittent cancellation.
+
+The fresh provider connected as
+`f6dbda04-4197-4ac0-97bc-9668dd55940b` and consumed **11,873,146 bytes**, but tracing
+showed only:
+
+```text
+[cue-proof] subtitle-event 1 cue(s), tracks 4
+```
+
+Track 3 was selected as the secondary track; `data-secondary-cue-count` remained `0`.
+This is a **valid negative result**: the renderer can keep and resolve a second timeline,
+but the real parser/directstream feed did not supply that timeline, so dual subtitles
+are not accepted.
+
+The exact Node/sidecar processes were stopped, all disposable datadirs and temporary
+dual-track files were removed, the browser tab was finalized, Electron and Anki were
+untouched, and pinned upstream remained at its three pre-existing dirty entries.

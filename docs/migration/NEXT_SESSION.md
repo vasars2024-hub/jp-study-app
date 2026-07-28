@@ -13,7 +13,9 @@ Committed migration line:
 - `cfd05fa` / `d96d140` — real subtitle join and opening player seam;
 - `a4e495d` — first full-plan continuation slice: core study controls on VideoCore;
 - `03d27a3` — editable VideoCore mining preview, screenshot/audio assets, and Anki
-  history/undo contract.
+  history/undo contract;
+- `ea77f59` — secondary-track cue timeline and directstream startup-race fix; live
+  dual-track acceptance is negative.
 
 The old record called Phase 3 closed after the cue seam. That was too narrow. The
 authoritative `SEANIME_MIGRATION_PLAN.md` requires the complete retained control set and
@@ -89,7 +91,8 @@ them. The local adapter deliberately depends only on committed Anki contracts.
 
 ## Remaining Phase 3 work
 
-- real dual subtitles;
+- real dual subtitles: renderer contract exists, but the fresh two-track directstream
+  delivered one cue on track 4 and zero cues on selected secondary track 3;
 - shadowing and Whisper generation;
 - one uninterrupted namespaced G-PLAY using the mounted preview: both real assets,
   live Anki export, duplicate rejection, undo/cleanup, then restart/resume/history proof;
@@ -97,8 +100,8 @@ them. The local adapter deliberately depends only on committed Anki contracts.
 
 ## Next three safe actions
 
-1. Port dual-subtitle rendering without creating a second timeline or losing primary-cue
-   provenance.
+1. Trace/fix the directstream parser feed until one fresh two-track run delivers cues for
+   both track 3 and track 4; then re-run simultaneous rendering.
 2. Port shadowing and Whisper generation onto the same player.
 3. Run the complete namespaced live-Anki G-PLAY plus restart-persistence check; a recorded
    negative result is valid evidence, a confident false positive is not.
@@ -107,12 +110,12 @@ them. The local adapter deliberately depends only on committed Anki contracts.
 
 | Gate | Result |
 |---|---|
-| focused mining + study + architecture tests | 18/18 pass |
-| full tests | 253 files / 2,900 tests pass |
+| focused mining + study + architecture tests | 19/19 pass |
+| full tests | 253 files / 2,901 tests pass |
 | TypeScript | accepted 290 diagnostics / 108 files; 0 in slice |
 | lint | accepted 164 problems; 0 changed-path mentions |
 | renderer build | exit 0; 4,580 modules |
-| CSS containment | 6,895/6,895 scoped; 0 unscoped; 0 shell Tailwind tokens |
+| CSS containment | 6,896/6,896 scoped; 0 unscoped; 0 shell Tailwind tokens |
 | patch apply and generator | exit 0 |
 
 `src/media/seanime-boundary.d.ts` remains hand-maintained. TypeScript does not open the
