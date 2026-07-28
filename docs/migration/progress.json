@@ -1,0 +1,344 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-07-28",
+  "repo": {
+    "branch": "grammarx/phase-1-5",
+    "commit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735",
+    "dirtyPorcelainEntries": 545,
+    "untrackedFiles": 356,
+    "modifiedUnstaged": 169,
+    "deleted": 20,
+    "staged": 0,
+    "note": "Phase-2 work is UNCOMMITTED in the working tree. src/preload.ts (624 pre-existing added lines), src/renderer/window.d.ts (427), src/renderer/App.tsx (37+/42-) and package.json (unrelated jsdom dev-dep) all carry parallel work; staging them would sweep it in. ADR-001 requires LICENSE + package.json to land in the SAME commit as vendor/seanime-web/."
+  },
+  "currentPhase": 2,
+  "currentPhaseName": "Media shell on real data — first surface adopted",
+  "phaseComplete": false,
+  "gateG1": {
+    "verdict": "PASS",
+    "processLifecycleWindows": "PASS — no orphan or port leak under graceful stop, simulated crash, or hard kill",
+    "generatedTypesCompileTs522": "PASS — tsc 5.2.2 exit 0 (upstream pins TS ^7.0.2)",
+    "playerProbe": "PASS — usable contract plus one small scoped extension point"
+  },
+  "probes": {
+    "A_videoCore": "PASS — adoption, not port. Time/tracks/seek/screenshot/delay and raw cue data reachable via exported Jotai atoms; missing only an activeCue/cuechange event. Section 9 fallback to the old <video> player is not needed.",
+    "B_noAniListLogin": "PASS with caveat — SimulatedPlatform is first-class (isSimulated:true verified live); AniList remains an unauthenticated metadata source only. Caveat: cold-start scan on an empty collection fails with '[matcher] no media fed into the matcher'; needs enhanced:true plus POST /api/v1/library/unknown-media seeding."
+  },
+  "goToolchain": {
+    "version": "go1.26.5 windows/amd64",
+    "cgoEnabled": 0,
+    "buildTags": "nosystray",
+    "cCompilerRequired": false,
+    "note": "Contradicts blocker B5 and ENVIRONMENT_BASELINE.md; both are stale. Narrow B5 to the systray build."
+  },
+  "scannerColdStartMatchRate": {
+    "matched": 15,
+    "total": 59,
+    "percent": 25.4,
+    "warning": "Deliberate worst case — no tracker account, enhanced legacy mode, AnimePahe-mangled filenames. NOT Habari's parity figure. The section 8 comparison against a populated collection is still open.",
+    "supersededBy": "scannerComparison",
+    "note": "Cold-start worst case. NOT Habari parity. Superseded 2026-07-28."
+  },
+  "studyOsUserDataChanged": false,
+  "blockedOn": [],
+  "decisions": {
+    "ADR-001": {
+      "title": "GPL-3.0 for the combined work",
+      "status": "accepted",
+      "appliesAt": "phase-2"
+    },
+    "ADR-002": {
+      "title": "Adopt video-core, defer mpv-prism",
+      "status": "accepted"
+    },
+    "ADR-003": {
+      "title": "Media workspace English-only through phases 2-3",
+      "status": "accepted",
+      "temporaryRegression": true,
+      "exitGate": "phase-4"
+    },
+    "ADR-004": {
+      "title": "Root-config supersession",
+      "status": "accepted"
+    },
+    "ADR-005": {
+      "title": "featureStatus registry is authoritative over state reports",
+      "status": "accepted"
+    },
+    "R5": "CLOSED by user decision. Grammar corpus de-branded: n{1..4}-supplement.ts exporting N*_SUPPLEMENT, provenance supplement-<level>; tools/_mazii_n*.json and tools/import-mazii-grammar.py deleted. LICENSING_PLAN.md and CURRENT_STATE.md corrected 2026-07-28. Do not re-open.",
+    "adoptionShape": "Feature + UI kit with Tailwind scoped (46 new packages), chosen by the user 2026-07-28 over the 19-package strip-the-UI-kit option."
+  },
+  "phase0": {
+    "P0-1-git-bundle": {
+      "status": "done",
+      "artifact": "jp-study-app-all-refs.bundle",
+      "bytes": 167682041
+    },
+    "P0-2-patches": {
+      "status": "done",
+      "stagedBytes": 0,
+      "unstagedBytes": 1188143
+    },
+    "P0-3-untracked-archive": {
+      "status": "done",
+      "files": 442,
+      "bytes": 902741,
+      "secretsFound": 0
+    },
+    "P0-4-hashes-restore": {
+      "status": "done",
+      "artifacts": 14
+    },
+    "P0-5-environment-baseline": {
+      "status": "done"
+    },
+    "P0-6-reconciliation-ledger": {
+      "status": "done",
+      "unit": "MASTER_PLAN ### subsection",
+      "sectionsMapped": 22,
+      "sectionsTotal": 22,
+      "subsectionsAccounted": 255,
+      "subsectionsTotal": 255,
+      "unaccounted": 0,
+      "perSubsectionRowsFilled": false,
+      "perSubsectionRowsPolicy": "filled when each section's phase opens"
+    },
+    "P0-7-baselines": {
+      "status": "done"
+    },
+    "P0-8-visual-sweep": {
+      "status": "done-for-foundation",
+      "captured": 8,
+      "gate": "G-VIS",
+      "gateClosedForPhases": "1-4",
+      "deferredCaptures": {
+        "phase-5": [
+          "series-detail",
+          "manga-reader",
+          "novel-reader"
+        ],
+        "phase-7": [
+          "ai-permission"
+        ],
+        "n/a": [
+          "anki (retain, untouched)"
+        ]
+      }
+    },
+    "P0-9-pin-seanime": {
+      "status": "done"
+    },
+    "P0-10-publishability-audit": {
+      "status": "partial",
+      "runtimeDepsCleared": 17,
+      "dataAssetsFlagged": 7,
+      "highRisk": 2,
+      "unknownRisk": 4
+    },
+    "P0-11-history-hygiene": {
+      "status": "done",
+      "readOnly": true,
+      "pruned": false
+    }
+  },
+  "baselines": {
+    "npmTest": "251 files / 2888 tests passed — unchanged",
+    "tsc": "290 diagnostics / 108 files — unchanged; 0 from vendor/",
+    "lint": "164 problems (2 errors, 162 warnings) — unchanged"
+  },
+  "upstream": {
+    "repo": "https://github.com/5rahim/seanime",
+    "commit": "9bdd052afdfc2c2f31293fdb21a27ef8e8bbcce9",
+    "license": "GPL-3.0",
+    "localCheckout": "C:/Users/Arseniy/Projects/seanime-upstream",
+    "apiRoutes": 188
+  },
+  "backup": {
+    "path": "C:/Users/Arseniy/jp-study-app-backups/2026-07-27-phase0",
+    "sizeMB": 165,
+    "artifacts": 14,
+    "verify": "sha256sum -c SHA256SUMS.txt"
+  },
+  "openTemporaryRegressions": [],
+  "nextActions": [
+    "Commit Phase 2 with a deliberate boundary — LICENSE + package.json MUST be in the same commit as vendor/seanime-web/. 225 installed packages and 179 adopted files exist only in the working tree.",
+    "Prove the cue patch at runtime: verify MKVParser_SubtitleEvent.startTime/duration really are milliseconds, and whether timeupdate (~4Hz) is precise enough or requestVideoFrameCallback is needed.",
+    "Adopt the entry/episodes surface using vendor/seanime-web/ADOPTION.md. Re-measure the closure first — restoring the real media-preview-modal takes it from 179 files/47 packages to 368/60."
+  ],
+  "scannerComparison": {
+    "gate": "section 8 — \">= parity on match rate\"",
+    "verdict": "PASS — adopt Seanime for library scanning",
+    "library": {
+      "files": 62,
+      "detail": "hardlinks into a temp dir; originals never moved or renamed",
+      "sources": [
+        "The Big O [BDRip 1440x1080 x265 FLAC] — 29 mkv (26 eps + 3 creditless)",
+        "33 AnimePahe_*.mp4 from Downloads"
+      ]
+    },
+    "scoringRule": "A file is CORRECT only when the mapped episode exists in the assigned season. metadata.type===\"special\" is Seanime fallback for \"franchise matched, episode number did not fit\", so it is scored against the season episode count too; type \"nc\" (creditless) counts as correct.",
+    "runs": [
+      {
+        "id": "A",
+        "collection": "cold start, none (Phase-1 repro)",
+        "resolved": "15/62",
+        "correct": null,
+        "mismatched": null,
+        "unmatched": 47
+      },
+      {
+        "id": "B",
+        "collection": "seeded from unknownGroups",
+        "resolved": "12/62",
+        "correct": null,
+        "mismatched": null,
+        "unmatched": 50
+      },
+      {
+        "id": "C",
+        "collection": "all seasons seeded",
+        "resolved": "55/62",
+        "correct": "44/62 (71.0%)",
+        "mismatched": 11,
+        "unmatched": 7
+      },
+      {
+        "id": "D",
+        "collection": "current season only — BEST",
+        "resolved": "51/62",
+        "correct": "51/62 (82.3%)",
+        "mismatched": 0,
+        "unmatched": 11
+      },
+      {
+        "id": "studyos",
+        "collection": "n/a — provider search",
+        "resolved": "29/62",
+        "correct": "13/62 (21.0%)",
+        "mismatched": 16,
+        "unmatched": 33
+      },
+      {
+        "id": "studyos+underscoreFix",
+        "collection": "n/a",
+        "resolved": "29/62",
+        "correct": "13/62",
+        "mismatched": 16,
+        "unmatched": 33
+      },
+      {
+        "id": "studyos+bothFixes",
+        "collection": "n/a",
+        "resolved": "62/62",
+        "correct": "31/62 (50.0%)",
+        "mismatched": 31,
+        "unmatched": 0
+      }
+    ],
+    "headline": "Seanime 82.3% correct with ZERO wrong matches vs Study OS best case 50.0% with 31 wrong matches.",
+    "structuralReason": "Seanime resolves seasons and converts absolute episode numbers to season-relative. Verified: The Big O split across AniList 567 (files 01-13) and 129608 (14-26 as eps 1-13); SPYxFAMILY abs 48-50 -> S3 eps 10-12; Frieren abs 35 -> S2 ep 7. Study OS has no season model, so every file lands on season 1.",
+    "caveat": "Jikan returned HTTP 504 throughout, so Study OS fell back to AniList (its designed behaviour). The Jikan primary was never exercised.",
+    "studyOsBugsFound": [
+      "parseMediaFileName never normalises underscores: AnimePahe_X_-_01_1080p.mp4 -> kind=unknown, episode=null, episode number baked into seriesKey -> category inbox -> dropped before any provider lookup (33/62 files).",
+      "Release-source prefix not stripped: anilistSearch(\"AnimePahe Gnosia\") returns 0 candidates; all 15 AnimePahe series scored 0.00 for this reason alone."
+    ]
+  },
+  "adoptionBlastRadius": {
+    "measuredBeforeWritingCode": true,
+    "entry": "app/(main)/_features/anime-library/_screens/library-view.tsx",
+    "scopes": [
+      {
+        "scope": "as-is",
+        "localFiles": 368,
+        "npmPackages": 60,
+        "newToStudyOs": 59
+      },
+      {
+        "scope": "minus media-preview-modal",
+        "localFiles": 179,
+        "npmPackages": 47,
+        "newToStudyOs": 46
+      },
+      {
+        "scope": "minus preview-modal and UI kit",
+        "localFiles": 83,
+        "npmPackages": 20,
+        "newToStudyOs": 19
+      }
+    ],
+    "singleDecisiveEdge": "media-entry-card -> media-preview-modal, which transitively reaches video-core (hls.js, jassub, anime4k-webgpu, media-captions), mpv-core, onlinestream, torrent-search, debrid and playlists.",
+    "unavoidable": [
+      "jotai",
+      "jotai-derive",
+      "jotai-family",
+      "jotai-immer",
+      "@tanstack/react-query"
+    ],
+    "reactVersionMatch": "confirmed — Study OS 19.2.6, seanime-web ^19",
+    "tailwind": "3.4.17, Preflight ON upstream and no prefix. Contained via corePlugins.preflight=false + important:\"#media-workspace\" + container:false. 6183/6183 built selectors scoped; shell main.css has zero Tailwind.",
+    "decision": "User chose the 46-package option (feature + UI kit, Tailwind scoped) on 2026-07-28."
+  },
+  "adopted": {
+    "path": "vendor/seanime-web/",
+    "files": 179,
+    "pinnedCommit": "9bdd052afdfc2c2f31293fdb21a27ef8e8bbcce9",
+    "substitutions": [
+      "api/client/server-url.ts",
+      "components/shared/sea-link.tsx",
+      "lib/navigation.ts",
+      "app/(main)/_features/media/_containers/media-preview-modal.tsx"
+    ],
+    "substitutionRule": "whole-file replacements only — no upstream line is ever hand-edited",
+    "whyVendorNotSrc": "vendor/** is already lint-excluded; tools/architecture-audit.cjs walks src/ only (the 179 files broke architectureBaseline.test.ts as orphan modules under src/media/seanime/); and tsc resolves @/* through a hand-written boundary instead of opening the tree.",
+    "depsRuntime": "17 -> 63 (+46)",
+    "depsDev": "+7 (tailwindcss, postcss, autoprefixer, 4 tailwind plugins)",
+    "packagesInstalled": 225,
+    "configTouched": [
+      "vite.renderer.config.ts (one alias, ADR-004)",
+      "tailwind.config.ts (new)",
+      "postcss.config.cjs (new)",
+      ".eslintrc.json (ignore tailwind.config.ts; import/no-unresolved off for src/media/**)"
+    ],
+    "configUntouched": [
+      "tsconfig.json",
+      "forge.config.ts",
+      "DesktopShell.tsx",
+      "desktop grid",
+      "dragging layer",
+      "taskbar"
+    ],
+    "typedBoundary": "src/media/seanime-boundary.d.ts — hand-maintained; tsconfig has NO paths for @/* on purpose. TypeScript will NOT catch an upstream signature change; the build or runtime will.",
+    "verifiedLive": {
+      "posters": "13 real <img> from s4.anilist.co, driven by the run-D scan",
+      "seasonSplit": "UI shows both \"THE Big O\" and \"THE Big O (2003)\"",
+      "restyle": "--color-brand-500: 255 46 77 (Study OS --accent), --color-gray-950: 13 12 18 (--bg)",
+      "codeSplit": "adopted bundle is a lazy chunk; nothing adopted in the boot path with the flag off",
+      "virtualization": "MediaCardLazyGrid present and ADR-satisfying, but engages above 48 items and the library has 15 titles — NOT exercised at scale",
+      "how": "dev-server harness (media-harness.html) against a real seanime.exe. NOT via Electron: the running app shares %APPDATA%/jp-study-app, so a second instance risked corrupting live user data."
+    },
+    "hardestFailure": "atomWithStorage(..., {getOnInit:true}) snapshots localStorage at module-eval, so a token written from a React effect is too late -> silent 401 -> location.replace(\"/public/auth\") -> blank screen with no console error. Hence src/media/seanimeBootstrap.ts."
+  },
+  "licenseFlip": {
+    "adr": "ADR-001",
+    "done": true,
+    "committed": false,
+    "license": "LICENSE created — GPL-3.0 verbatim from upstream (674 lines)",
+    "packageJson": "\"license\": \"MIT\" -> \"GPL-3.0-or-later\"",
+    "note": "Working tree is self-consistent — there is no GPL-source-under-MIT state. But it is UNCOMMITTED, and LICENSE + package.json MUST land in the same commit as vendor/seanime-web/."
+  },
+  "cuePatch": {
+    "file": "patches/seanime/0001-video-core-cuechange.patch",
+    "shape": "94 insertions, 0 deletions — purely additive",
+    "appliesCleanly": true,
+    "typechecks": "tsc --noEmit exit 0 in seanime-web with the patch applied",
+    "keptAsPatch": "pinned checkout left pristine; upstream-submittable, not a fork",
+    "deviation": "Dispatches from timeupdate/seeked, NOT from onSubtitleEvents()/_recordSubtitleEvent() as originally planned — those run at demux time, ahead of playback, so a dispatch there means \"a cue was parsed\", not \"a cue is on screen\".",
+    "runtimeProof": "NOT PERFORMED — needs the player mounted against a mediastream session, which is Phase-3 surface Phase 2 deliberately excluded. Cue semantics are unproven at runtime; see patches/seanime/README.md for the three assumptions to check."
+  },
+  "knownGaps": [
+    "Live AnkiConnect has still never been exercised — unchanged since Phase 0, still the Phase-3 acceptance gap.",
+    "Virtualization present but not exercised above the 48-item threshold.",
+    "Two Study OS parseMediaFileName bugs found and spun off, not fixed.",
+    "The typed boundary in src/media/seanime-boundary.d.ts is hand-maintained and will silently drift on an upstream bump."
+  ]
+}

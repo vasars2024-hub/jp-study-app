@@ -19,6 +19,7 @@ import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
 import { registerMiningIpc } from './main/mining';
 import { registerImmersionIpc } from './main/immersion';
 import { registerSystemMetricsIpc } from './main/systemMetrics';
+import { registerSeanimeIpc, stopSeanime } from './main/seanime';
 import { registerReleaseIpc } from './main/release';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
@@ -1188,6 +1189,8 @@ app.whenReady().then(async () => {
   registerMiningIpc();
   registerImmersionIpc();
   registerSystemMetricsIpc();
+  // Phase-1 Seanime sidecar proof. Inert unless SEANIME_SIDECAR=1.
+  registerSeanimeIpc();
   registerReleaseIpc();
   registerResourcesCatalogIpc();
   registerCollectedToolsIpc();
@@ -1258,6 +1261,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stopSeanime();
   stopBuddyScheduler();
   stopExtensionServer();
   stopSystemDictionary();

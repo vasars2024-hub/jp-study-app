@@ -1,0 +1,177 @@
+/**
+ * Media workspace stylesheet — the only file in the project with @tailwind directives.
+ *
+ * Three jobs, in order:
+ *   1. Emit Tailwind's component + utility layers. `@tailwind base` is deliberately NOT
+ *      here: Preflight is disabled in tailwind.config.ts because it is a global element
+ *      reset that would restyle the Frutiger-Aero shell, the taskbar and window chrome.
+ *   2. Re-create, scoped to #media-workspace, only the Preflight rules the adopted
+ *      components actually depend on.
+ *   3. Map Seanime's palette onto Study OS tokens. Upstream already expresses `brand` and
+ *      `gray` as `rgb(var(--color-*) / <alpha-value>)`, so this is a pure variable
+ *      redefinition — no adopted class name is touched, which is what keeps the Media
+ *      workspace reading as Study OS while staying upstream-syncable.
+ */
+
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   2. Scoped Preflight replacement.
+   Tailwind's border utilities set border-WIDTH only; Preflight is what supplies
+   `border-style: solid` on `*`. Without this block every `border` class in the
+   adopted source renders invisible. The rest is the minimum the components assume.
+   --------------------------------------------------------------------------- */
+#media-workspace,
+#media-workspace *,
+#media-workspace *::before,
+#media-workspace *::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: rgb(var(--color-gray-700) / 1);
+}
+
+#media-workspace h1,
+#media-workspace h2,
+#media-workspace h3,
+#media-workspace h4,
+#media-workspace h5,
+#media-workspace h6,
+#media-workspace p,
+#media-workspace figure,
+#media-workspace blockquote,
+#media-workspace dl,
+#media-workspace dd {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+#media-workspace ul,
+#media-workspace ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#media-workspace img,
+#media-workspace svg,
+#media-workspace video,
+#media-workspace canvas {
+  display: block;
+  vertical-align: middle;
+  max-width: 100%;
+  height: auto;
+}
+
+#media-workspace button,
+#media-workspace input,
+#media-workspace select,
+#media-workspace textarea {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  background-image: none;
+}
+
+#media-workspace button {
+  cursor: pointer;
+  text-transform: none;
+}
+
+#media-workspace a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+#media-workspace [hidden] {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   3. Study OS token mapping.
+   Ramp orientation matches upstream (50 = lightest, 950 = darkest). The anchors are
+   Study OS's own variables from src/renderer/styles.css:
+     --text #f5f4f7 -> gray-50      --muted #9d97a6 -> gray-400
+     --panel-2 #272433 -> gray-800  --panel #1a1823 -> gray-900   --bg #0d0c12 -> gray-950
+     --accent #ff2e4d -> brand-500
+   --------------------------------------------------------------------------- */
+#media-workspace {
+  /* brand — Study OS deep red, replacing Seanime's indigo */
+  --color-brand-50: 255 241 243;
+  --color-brand-100: 255 224 229;
+  --color-brand-200: 255 194 203;
+  --color-brand-300: 255 151 168;
+  --color-brand-400: 255 99 127;
+  --color-brand-500: 255 46 77;
+  --color-brand-600: 224 20 56;
+  --color-brand-700: 184 15 45;
+  --color-brand-800: 143 12 35;
+  --color-brand-900: 107 10 27;
+  --color-brand-950: 61 5 16;
+  --color-brand-default: 255 46 77;
+
+  /* gray — Study OS surface ladder */
+  --color-gray-50: 245 244 247;
+  --color-gray-100: 230 228 234;
+  --color-gray-200: 203 200 210;
+  --color-gray-300: 169 165 179;
+  --color-gray-400: 157 151 166;
+  --color-gray-500: 111 106 122;
+  --color-gray-600: 77 73 88;
+  --color-gray-700: 56 53 68;
+  --color-gray-800: 39 36 51;
+  --color-gray-900: 26 24 35;
+  --color-gray-950: 13 12 18;
+  --color-gray-default: 111 106 122;
+
+  --radius: 0.5rem;
+  --radius-md: 0.5rem;
+
+  --background: #0d0c12;
+  --foreground: theme('colors.gray.200');
+  --brand: theme('colors.brand.400');
+  --border: theme('colors.gray.700');
+  --ring: theme('colors.brand.500');
+  --muted: theme('colors.gray.400');
+  --muted-highlight: theme('colors.gray.300');
+  --paper: theme('colors.gray.950');
+  --paper-lighter: theme('colors.gray.900');
+  --subtle: rgba(255, 255, 255, 0.04);
+  --subtle-highlight: rgba(255, 255, 255, 0.07);
+  --media-card-popup-background: theme('colors.gray.900');
+  --hover-from-background-color: theme('colors.gray.900');
+
+  /* Named hues the adopted components reference directly. */
+  --gray: theme('colors.gray.500');
+  --red: theme('colors.red.500');
+  --orange: theme('colors.orange.500');
+  --amber: theme('colors.amber.500');
+  --yellow: theme('colors.yellow.500');
+  --lime: theme('colors.lime.500');
+  --green: theme('colors.green.500');
+  --emerald: theme('colors.emerald.500');
+  --teal: theme('colors.teal.500');
+  --cyan: theme('colors.cyan.500');
+  --sky: theme('colors.sky.500');
+  --blue: theme('colors.blue.500');
+  --indigo: theme('colors.indigo.500');
+  --violet: theme('colors.violet.500');
+  --purple: theme('colors.purple.500');
+  --fuchsia: theme('colors.fuchsia.500');
+  --pink: theme('colors.pink.500');
+  --rose: theme('colors.rose.500');
+
+  /* The workspace is a section inside the shell, so it fills its host and scrolls
+     itself — the desktop window must never gain a second scrollbar. */
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--background);
+  color: rgb(var(--color-gray-200) / 1);
+  font-size: 14px;
+  line-height: 1.5;
+}

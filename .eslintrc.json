@@ -12,5 +12,17 @@
     "plugin:import/electron",
     "plugin:import/typescript"
   ],
-  "parser": "@typescript-eslint/parser"
+  "parser": "@typescript-eslint/parser",
+  "ignorePatterns": [
+    "vendor/**",
+    "tailwind.config.ts"
+  ],
+  "overrides": [
+    {
+      "files": ["src/media/**/*.ts", "src/media/**/*.tsx"],
+      "rules": {
+        "import/no-unresolved": "off"
+      }
+    }
+  ]
 }

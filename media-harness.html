@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Media workspace harness</title>
+  </head>
+  <body style="margin: 0; background: #0d0c12">
+    <!--
+      Dev-server-only harness for the adopted MEDIA workspace.
+
+      It exists so the adopted surface can be exercised against a REAL sidecar without
+      launching a second Electron instance — two instances would share
+      %APPDATA%/jp-study-app and could corrupt live user data.
+
+      Like the other *-harness.html files at this root, it is never built: the production
+      input list in vite.renderer.config.ts is exactly index.html + blanc.html.
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/media/harnessMain.tsx"></script>
+  </body>
+</html>

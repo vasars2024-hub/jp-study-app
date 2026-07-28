@@ -1,4 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import {
+  SEANIME_CHANNELS,
+  type SeanimeConnection,
+  type SeanimeProbeResult,
+  type SeanimeStatus,
+} from './shared/seanime';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { LensOcrResult, RegionRect } from './main/screenOcr';
 import type {
@@ -1315,6 +1321,22 @@ const api = {
     store: unknown,
   ): Promise<{ schemaVersion: 1; rules: Array<Record<string, unknown>> }> =>
     ipcRenderer.invoke('profileRules:set', store),
+
+  // ---- Seanime sidecar (Phase 1 dev-only proof; inert unless SEANIME_SIDECAR=1) ----
+  seanimeStatus: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.status),
+  seanimeStart: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.start),
+  seanimeStop: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.stop),
+  seanimeProbe: (): Promise<
+    { ok: true; result: SeanimeProbeResult } | { ok: false; error: string }
+  > => ipcRenderer.invoke(SEANIME_CHANNELS.probe),
+  /** Loopback base URL + auth token, so the adopted Media workspace client can connect. */
+  seanimeConnection: (): Promise<SeanimeConnection> =>
+    ipcRenderer.invoke(SEANIME_CHANNELS.connection),
+  onSeanimeStatus: (cb: (s: SeanimeStatus) => void): (() => void) => {
+    const handler = (_e: unknown, s: SeanimeStatus): void => cb(s);
+    ipcRenderer.on(SEANIME_CHANNELS.statusEvent, handler);
+    return () => ipcRenderer.removeListener(SEANIME_CHANNELS.statusEvent, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

@@ -32,6 +32,8 @@ const BlancLockscreen = lazy(() =>
   import('./components/blanc/BlancShell').then((m) => ({ default: m.BlancLockscreen })),
 );
 import ToastHost from './components/ToastHost';
+import SeanimeDevPanel from './components/SeanimeDevPanel';
+import MediaWorkspaceHost from '../media/MediaWorkspaceHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { registerCommandHandler } from './keyboardShortcuts';
 import { addDeckCards } from './flashcardDeck';
@@ -697,6 +699,10 @@ export default function App() {
       <SecretAeroTrigger />
       <GlobalDictionaryOverlay />
       <ToastHost />
+      {/* Phase-1 Seanime proof. Self-hides unless the sidecar flag is armed. */}
+      <SeanimeDevPanel />
+      {/* Phase-2 MEDIA workspace (adopted library/lists). Same self-hiding rule. */}
+      <MediaWorkspaceHost />
     </>
   );
 }

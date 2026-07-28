@@ -5,6 +5,19 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config
 export default defineConfig({
   plugins: [react()],
+  // ADR-004's single permitted alias. The adopted Seanime source under
+  // vendor/seanime-web/ imports itself as "@/..." exactly as it does upstream, so the
+  // tree stays byte-identical to the pinned checkout and an upstream sync is a
+  // mechanical diff. Study OS code never uses "@/" (verified: 0 occurrences), so this
+  // claims an otherwise-unused namespace.
+  //
+  // It lives under vendor/ rather than src/ for the same reason the generated types
+  // already do: vendor/** is lint-excluded, and the architecture audit
+  // (tools/architecture-audit.cjs) walks src/ only. Third-party source should not be
+  // hand-edited to satisfy this repo's own lint and layering rules.
+  resolve: {
+    alias: { '@': resolve(__dirname, 'vendor/seanime-web') },
+  },
   // Bind the dev server to IPv4 loopback. By default Vite listens on
   // "localhost", which on this machine resolves to IPv6 (::1) — and the Electron
   // window (which loads http://localhost:5173) then fails with

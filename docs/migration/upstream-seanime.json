@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "name": "seanime",
+    "url": "https://github.com/5rahim/seanime",
+    "defaultBranch": "main",
+    "pinnedCommit": "9bdd052afdfc2c2f31293fdb21a27ef8e8bbcce9",
+    "pinnedCommitDate": "2026-07-23T10:15:22Z",
+    "pinnedCommitMessage": "changelog",
+    "license": "GPL-3.0",
+    "retrievedAt": "2026-07-27",
+    "retrievalMethod": "git init + git fetch --depth 1 origin <sha>",
+    "localCheckout": "C:/Users/Arseniy/Projects/seanime-upstream",
+    "localCheckoutFileCount": 1756,
+    "localCheckoutSizeMB": 42,
+    "insideStudyOsRepo": false
+  },
+  "adoption": {
+    "serverStrategy": "sidecar-unmodified",
+    "uiStrategy": "source-adoption",
+    "playerModule": "seanime-web/src/app/(main)/_features/video-core",
+    "playerModulesDeferred": [
+      "seanime-web/src/app/(main)/_features/mpv-core",
+      "seanime-web/src/app/(main)/_features/native-player"
+    ],
+    "apiContract": {
+      "generatedFrom": "go generate ./codegen/main.go",
+      "generatedInto": [
+        "seanime-web/api/generated/types.ts",
+        "seanime-web/api/generated/endpoint.types.ts",
+        "seanime-web/api/generated/hooks_template.ts"
+      ],
+      "routeCount": 188
+    }
+  },
+  "blockers": [
+    {
+      "id": "B1",
+      "summary": "mpv-prism is distributed as prebuilt tarballs from seanime.app, not in the GPL source tree; Denshi pins Electron 42.4.0 from a custom mirror (custom Chromium for codec support).",
+      "evidence": [
+        "mpv-prism.lock.json",
+        "seanime-denshi/package.json:build.electronDownload.mirror",
+        "DEVELOPMENT_AND_BUILD.md"
+      ],
+      "consequence": "Cannot host Denshi's native player inside stock Electron. video-core adopted instead.",
+      "licenseOfMpvPrism": "unknown"
+    },
+    {
+      "id": "B3",
+      "summary": "Seanime has no i18n and lists localization as 'Not planned'.",
+      "evidence": ["README.md#Not-planned"],
+      "consequence": "Adopted surfaces arrive English-only. Covered by ADR-003."
+    },
+    {
+      "id": "B5",
+      "summary": "Go 1.23+ with CGO_ENABLED=1 required to build the server; not installed on this machine.",
+      "evidence": ["DEVELOPMENT_AND_BUILD.md", "docs/migration/CURRENT_STATE.md"],
+      "consequence": "Phase 1 blocked until installed."
+    }
+  ],
+  "assetsNotLicensedByCode": [
+    "Seanime name and logo",
+    "docs/images/seanime-logo.png",
+    "screenshots hosted on s3.seanime.app",
+    "mpv-prism binary packages",
+    "bundled fonts"
+  ],
+  "syncPolicy": {
+    "bumpTrigger": "deliberate only",
+    "onBump": "re-run codegen, treat generated-type diffs as the upstream changelog, re-run parity ledger rows touching changed subsystems",
+    "rehearsalPhase": 9
+  }
+}

@@ -798,6 +798,19 @@ declare global {
       ): void;
       profileRulesGet(): Promise<ProfileRulesStore>;
       profileRulesSet(store: unknown): Promise<ProfileRulesStore>;
+
+      // ---- Seanime sidecar (Phase 1 dev-only proof) ----
+      seanimeStatus(): Promise<import('../shared/seanime').SeanimeStatus>;
+      seanimeStart(): Promise<import('../shared/seanime').SeanimeStatus>;
+      seanimeStop(): Promise<import('../shared/seanime').SeanimeStatus>;
+      seanimeProbe(): Promise<
+        | { ok: true; result: import('../shared/seanime').SeanimeProbeResult }
+        | { ok: false; error: string }
+      >;
+      seanimeConnection(): Promise<import('../shared/seanime').SeanimeConnection>;
+      onSeanimeStatus(
+        cb: (s: import('../shared/seanime').SeanimeStatus) => void,
+      ): () => void;
     };
   }
 }
