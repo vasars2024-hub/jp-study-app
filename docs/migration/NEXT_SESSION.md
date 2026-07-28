@@ -1,23 +1,27 @@
 # Next session handoff
 
-Written 2026-07-28 at the end of the **Phase 3 opening** session.
+Updated 2026-07-28 after **Phase 3 Task 1 closed**.
 
 ## Where you are
 
 Repo `C:/Users/Arseniy/Projects/jp-study-app` · branch `grammarx/phase-1-5`.
 
-**Phase 1 and Phase 2 are COMMITTED as `55df6e9`.** Gate G-1: PASS. §8 scanner gate: PASS.
-**§9 live-AnkiConnect gate: PASS** (exercised for the first time in any phase). The cue
-patch's three open assumptions are **answered**. The `entry`/episodes closure is **measured
-but not adopted**, and the Phase-3 player slice is **not built**.
+**Phase 1 and Phase 2 are COMMITTED as `55df6e9`. Task 1's entry/video-core closure is
+COMMITTED as `dd2ca47`.** Gate G-1: PASS. §8 scanner gate: PASS. §9 live-AnkiConnect gate:
+PASS. The cue patch's three open assumptions are answered.
 
-`CURRENT_STATE.md`'s "Phase 3 — opening" section is the full record. This file is the handoff.
+The adopted surface is now **369 files with six guarded whole-file substitutions** and passes
+the production renderer build. What remains is the honest runtime join (Task 2) and the
+smallest player + sibling Overlay slice (Task 3). No real cue has fired inside the mounted
+manager yet.
+
+`CURRENT_STATE.md`'s "Phase 3 — continuation" section is the full Task 1 record.
 
 ## Verify before doing anything
 
 ```bash
 git rev-parse --abbrev-ref HEAD   # grammarx/phase-1-5
-git log --oneline -1              # 55df6e9 feat(media): adopt Seanime library surface…
+git log --oneline -1              # dd2ca47 feat(media): adopt Seanime entry and video-core closure
 go version                        # go1.26.5 — if it does not resolve, that is a STALE SHELL,
                                   # not a missing toolchain (C:\Program Files\Go\bin\go.exe,
                                   # present on the MACHINE PATH; a fresh shell picks it up)
@@ -33,22 +37,27 @@ stale, left unedited because the backup is covered by `SHA256SUMS.txt`.
 
 ## Next three safe actions
 
-1. **Adopt `entry`/episodes** — the measurement is done, so this is now a mechanical step.
-   `+190 local files (179 → 369)` and **15 new npm packages**. Follow
-   `vendor/seanime-web/ADOPTION.md` exactly, and **write the fifth substitution**: stub
-   `_features/mpv-core/mpv-core.tsx`, because `@mpv-prism/core` is otherwise pulled in and
-   ADR-002 defers mpv-prism (licence unknown, "don't ship it"). `hls.js`, `jassub`,
-   `anime4k-webgpu`, `media-captions` **are** wanted — they are `video-core`.
-   Re-check `src/media/seanime-boundary.d.ts` afterwards: it is hand-maintained and
-   TypeScript will **not** catch an upstream signature change.
-2. **Mount `video-core` + the Study Overlay sibling** (the actual Phase-3 opening slice).
-   When you do, finish joining the cue path — see the one open item below.
-3. **Join the two halves of the cue proof.** Mount the adopted `websocket-provider.tsx`
-   instead of hand-rolling a websocket client, then confirm `cuechange` fires inside the real
-   `VideoCoreSubtitleManager`. Everything else about the patch is now settled.
+1. **Join the two halves of the cue proof.** Mount the adopted `websocket-provider.tsx`
+   in the dev harness instead of hand-rolling another client. Acceptance is a real
+   `MKVParser_SubtitleEvent` causing `cuechange` inside the real
+   `VideoCoreSubtitleManager`, with real cue text and millisecond timings logged. A recorded
+   negative result is a valid outcome.
+2. **Mount `video-core` + the Study Overlay as siblings** inside the Media workspace, playing
+   one real local file and sharing one player timeline. Do not port the full study-control
+   set.
+3. **Render the live cue with exact provenance timing.** Read `cue.startMs` / `cue.endMs`;
+   never substitute `video.currentTime` at event receipt.
 
 ## What is settled — do NOT re-derive
 
+- **Task 1 is closed.** Closure: 369 files. Manifest: 67 → 81 runtime dependencies
+  (+14 wanted packages, 54 transitives installed). Active substitutions: server URL,
+  sea-link, navigation, MPV atoms, JASSUB integration, media-captions CSS. Production build:
+  pass. CSS: 6,841/6,841 scoped; shell Tailwind tokens: 0. Full record and re-sync commands
+  are in `vendor/seanime-web/ADOPTION.md`.
+- **The reachable MPV importer is `mpv-core.atoms.ts`, not `mpv-core.tsx`.** The former
+  documentation was wrong. mpv-prism is LGPL-3.0 but stays excluded under ADR-002 and because
+  its dependency is an out-of-registry tarball URL.
 - **`MKVParser_SubtitleEvent.startTime`/`duration` are MILLISECONDS.** From the producing Go
   source: `mkvparser.go:616  milliseconds := float64(packet.StartTime) / 1e6`. The patch is
   correct as written. **Upstream's Go struct comment AND the generated `types.ts` both say
@@ -155,7 +164,7 @@ New this session:
 | Command | Expected | Verified this session |
 |---|---|---|
 | `npx tsc --noEmit` | exit 2, **290 diagnostics, 108 files** | 290 |
-| `npm run lint` | exit 1, 164 problems (2 errors) | not re-run |
+| `npm run lint` | exit 1, 164 problems (2 errors) | 164 |
 | `npm test` | **exit 0, 251 files, 2,888 tests** | 251 / 2,888 passed |
 
 A test failure **is** your bug. Type and lint diagnostics must be diffed against the baseline.

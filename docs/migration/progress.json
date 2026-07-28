@@ -3,13 +3,13 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "55df6e9",
+  "commit": "dd2ca47",
   "dirtyPorcelainEntries": 537,
-  "untrackedFiles": 356,
-  "modifiedUnstaged": 169,
+  "untrackedFiles": 446,
+  "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 COMMITTED as 55df6e9 (217 files, +52248/-215). LICENSE + package.json landed with vendor/seanime-web/ per ADR-001. src/preload.ts, src/main.ts, src/renderer/App.tsx and src/renderer/window.d.ts were committed as Seanime-ONLY blobs staged via `git hash-object` + `git update-index` (34 added lines, 0 deletions); the working tree was never touched and still holds ~1068 lines of parallel-session work whose supporting modules are untracked. Committing those four files whole would produce a BROKEN tree, not merely a polluted one.",
+  "note": "Phase 1+2 COMMITTED as 55df6e9. Phase 3 Task 1 entry/video-core closure COMMITTED as dd2ca47 (206 files, +48509/-100). The task boundary did not include src/preload.ts, src/main.ts, src/renderer/App.tsx or src/renderer/window.d.ts; their parallel-session work remains untouched.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
@@ -145,7 +145,7 @@
  "baselines": {
   "npmTest": "251 files / 2888 tests passed — verified after the commit",
   "tscNoEmit": "290 diagnostics / 108 files — verified after the commit, 0 from vendor/",
-  "lint": "164 problems (2 errors, 162 warnings) — not re-run this session"
+  "lint": "164 problems (2 errors, 162 warnings) — verified after dd2ca47"
  },
  "upstream": {
   "repo": "https://github.com/5rahim/seanime",
@@ -162,9 +162,9 @@
  },
  "openTemporaryRegressions": [],
  "nextActions": [
-  "Adopt entry/episodes per vendor/seanime-web/ADOPTION.md (+190 files, 15 packages) AND write the fifth substitution stubbing _features/mpv-core/mpv-core.tsx to keep @mpv-prism/core out. Re-check src/media/seanime-boundary.d.ts afterwards — it is hand-maintained and tsc will not catch an upstream signature change.",
-  "Mount video-core inside the Study OS shell with the Study Overlay as a SIBLING reading video-core state (never a second timeline) — the Phase-3 opening slice, not yet built.",
-  "Join the two halves of the cue proof by mounting the adopted websocket-provider.tsx instead of hand-rolling a websocket client, then confirm cuechange fires inside the real VideoCoreSubtitleManager."
+  "Join the two halves of the cue proof by mounting the adopted websocket-provider.tsx in the dev harness. Accept only a real MKVParser_SubtitleEvent causing cuechange inside the real VideoCoreSubtitleManager; a recorded negative result is valid.",
+  "Mount video-core inside the Study OS Media workspace with the Study Overlay as a SIBLING reading the same player state (never a second timeline). Stop at one real local file and one rendered real cue.",
+  "Render exact cue.startMs/cue.endMs in the Overlay and retain raw cue text in provenance; never derive mining timing from video.currentTime."
  ],
  "scannerComparison": {
   "gate": "section 8 — \">= parity on match rate\"",
@@ -276,24 +276,26 @@
    "@tanstack/react-query"
   ],
   "reactVersionMatch": "confirmed — Study OS 19.2.6, seanime-web ^19",
-  "tailwind": "3.4.17, Preflight ON upstream and no prefix. Contained via corePlugins.preflight=false + important:\"#media-workspace\" + container:false. 6183/6183 built selectors scoped; shell main.css has zero Tailwind.",
+  "tailwind": "3.4.17 upstream. Final Task-1 production build: 6841/6841 MediaWorkspace selectors scoped to #media-workspace; shell main CSS has zero --tw- tokens. Tailwind forms and media-captions CSS required two additional source-boundary containment fixes.",
   "decision": "User chose the 46-package option (feature + UI kit, Tailwind scoped) on 2026-07-28."
  },
  "adopted": {
   "path": "vendor/seanime-web/",
-  "files": 179,
+  "files": 369,
   "pinnedCommit": "9bdd052afdfc2c2f31293fdb21a27ef8e8bbcce9",
   "substitutions": [
    "api/client/server-url.ts",
    "components/shared/sea-link.tsx",
    "lib/navigation.ts",
-   "app/(main)/_features/media/_containers/media-preview-modal.tsx"
+   "app/(main)/_features/mpv-core/mpv-core.atoms.ts",
+   "app/(main)/_features/video-core/video-core-subtitles.ts",
+   "app/(main)/_features/video-core/video-core-media-captions.ts"
   ],
   "substitutionRule": "whole-file replacements only — no upstream line is ever hand-edited",
   "whyVendorNotSrc": "vendor/** is already lint-excluded; tools/architecture-audit.cjs walks src/ only (the 179 files broke architectureBaseline.test.ts as orphan modules under src/media/seanime/); and tsc resolves @/* through a hand-written boundary instead of opening the tree.",
-  "depsRuntime": "17 -> 63 (+46)",
+  "depsRuntime": "Task 1 manifest truth: 67 -> 81 (+14 direct runtime packages); npm install added 54 transitives. @mpv-prism/core excluded.",
   "depsDev": "+7 (tailwindcss, postcss, autoprefixer, 4 tailwind plugins)",
-  "packagesInstalled": 225,
+  "packagesInstalled": "Phase 2 added 225; Phase 3 Task 1 added 54 and changed 1",
   "configTouched": [
    "vite.renderer.config.ts (one alias, ADR-004)",
    "tailwind.config.ts (new)",
@@ -322,10 +324,10 @@
  "licenseFlip": {
   "adr": "ADR-001",
   "done": true,
-  "committed": false,
+  "committed": true,
   "license": "LICENSE created — GPL-3.0 verbatim from upstream (674 lines)",
   "packageJson": "\"license\": \"MIT\" -> \"GPL-3.0-or-later\"",
-  "note": "Working tree is self-consistent — there is no GPL-source-under-MIT state. But it is UNCOMMITTED, and LICENSE + package.json MUST land in the same commit as vendor/seanime-web/."
+  "note": "ADR-001 boundary landed in 55df6e9: LICENSE + package.json + package-lock.json committed with the first vendor/seanime-web surface."
  },
  "cuePatch": {
   "file": "patches/seanime/0001-video-core-cuechange.patch",
@@ -410,7 +412,7 @@
  },
  "entrySurfaceClosure": {
   "measuredOn": "2026-07-28",
-  "adopted": false,
+  "adopted": true,
   "tool": "docs/migration/tools/import-graph.mjs (rewritten this session; the Phase-2 copy lived in a scratchpad and was lost)",
   "calibration": "Reproduces Phase-2 file counts exactly (368 as-is; 179 + the cut file with CUT=media-preview-modal). Package count is +7 vs Phase 2 because it also counts type-only specifiers — compare deltas from the same tool.",
   "measurements": {
@@ -431,7 +433,7 @@
     "packages": 61
    }
   },
-  "step": "+190 local files (179 -> 369), 15 new npm packages",
+  "step": "Completed in dd2ca47: +190 local files (179 -> 369); 14 direct packages installed; measured @mpv-prism/core excluded by substitution.",
   "newPackages": [
    "@dnd-kit/core",
    "@dnd-kit/modifiers",
@@ -450,7 +452,7 @@
    "rrweb"
   ],
   "finding": "The entry closure almost entirely CONTAINS the library closure (together only 369), confirming that adopting entry is what restores the real media-preview-modal.",
-  "blocker": "@mpv-prism/core enters the closure. ADR-002 defers mpv-prism and the risk register marks its licence unknown (\"do not ship it\"). Contained to four files under _features/mpv-core/, only mpv-core.tsx reachable, so a FIFTH whole-file substitution removes it (67 -> 66 specifiers). Recorded in vendor/seanime-web/ADOPTION.md; apply it when copying.",
+  "blocker": "RESOLVED. The reachable file is mpv-core.atoms.ts, not mpv-core.tsx. Its type-only import is replaced by a structural interface. mpv-prism is LGPL-3.0 but remains excluded under ADR-002 and because upstream uses an out-of-registry tarball URL.",
   "wanted": "hls.js, jassub, anime4k-webgpu, media-captions ARE wanted — they are video-core."
  },
  "testLibrarySubtitles": {
@@ -461,7 +463,7 @@
   "consequence": "The cue path could not be exercised against the library as it stands; a fixture MKV was built by muxing a real Japanese ASS track into a real 30s h264/aac clip. Phase-3 mining therefore depends on Study OS subtitle discovery (Kitsunekko), not on the library — which is exactly why that capability is Retain in section 8."
  },
  "notDoneThisSession": [
-  "The entry/episodes adoption was MEASURED but NOT performed — no files copied, no packages installed, no substitution written.",
-  "The Phase-3 opening slice was NOT built — video-core is not mounted, no Study Overlay sibling exists, no activeCue rendered on screen."
+  "The two cue-proof halves are still not joined: no real subtitle-event has caused cuechange inside a mounted real VideoCoreSubtitleManager.",
+  "The Phase-3 opening slice is still not built: video-core is not mounted inside the Study OS shell, no sibling Study Overlay exists, and no real activeCue is rendered on screen."
  ]
 }

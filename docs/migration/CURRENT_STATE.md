@@ -597,6 +597,95 @@ happen a third time. It reproduces the Phase-2 file counts exactly.
   sibling exists, and no `activeCue` has been rendered on screen — all of it is downstream of
   the adoption above.
 
+## Phase 3 — continuation: entry surface adopted (2026-07-28)
+
+### Task 1: **CLOSED** — implementation commit `dd2ca47`
+
+`feat(media): adopt Seanime entry and video-core closure`
+— 206 files, +48,509 / −100.
+
+The earlier “not performed” statement above is the record of the opening session; this
+continuation supersedes it.
+
+#### Exact boundary
+
+- Adopted `library-view + entry/page.tsx`: **369 local files** at pinned upstream `9bdd052`.
+  The initial copy reconciled as **188 unchanged + 1 overwritten + 176 added + 4 kept =
+  369**. After the two build-driven integration substitutions, the final dry run is
+  **363 upstream-identical + 6 kept substitutions = 369**, with zero stale files.
+- Restored upstream's real `media-preview-modal.tsx`; its Phase-2 no-op substitution is gone.
+- Added **14 direct runtime packages** at the exact versions from upstream's lockfile.
+  The current manifest moved **67 → 81 dependencies**. `npm install` added 54 transitive
+  packages. `@mpv-prism/core` is not installed.
+- Added five reproducible tools under `docs/migration/tools/`: closure adoption, the MPV
+  substitution, JASSUB integration, media-captions CSS scoping, and built-CSS containment.
+- Added generated JASSUB 2.5.6 runtime, worker, two WASM binaries, and Roboto font under
+  `src/media/jassub/`. The worker setup follows upstream's `rsbuild.config.ts`, but all
+  shipped URLs are Vite-managed.
+
+#### Six whole-file substitutions
+
+1. `api/client/server-url.ts` — runtime ephemeral sidecar origin.
+2. `components/shared/sea-link.tsx` — no RouterProvider requirement.
+3. `lib/navigation.ts` — router-free exported navigation contract.
+4. `_features/mpv-core/mpv-core.atoms.ts` — structural `MpvPrismTrack`, no package import.
+5. `_features/video-core/video-core-subtitles.ts` — generated JASSUB runtime/assets.
+6. `_features/video-core/video-core-media-captions.ts` — scoped package CSS.
+
+The MPV correction matters: the reachable importer is `mpv-core.atoms.ts`, not
+`mpv-core.tsx`. The chain is
+`entry/page.tsx → torrent-stream/playback-play-pill.tsx → mpv-core.atoms.ts`.
+The package's licence is now known (**LGPL-3.0**), but ADR-002 still defers the feature and
+the dependency is a hash-pinned tarball URL on `seanime.app`, not a registry package.
+
+#### Build findings and containment
+
+The first production renderer build failed in JASSUB's unused fallback worker:
+Vite attempted an IIFE code-split worker build, which Rollup rejects. It also exposed that
+upstream's `/jassub/*` and `/fonts/Roboto-Medium.ttf` paths did not exist in Study OS.
+The guarded JASSUB substitution closes both problems without changing a root build config or
+editing `node_modules`.
+
+The first CSS measurement found **36 unscoped selectors**: 26 from
+`@tailwindcss/forms` and 10 from `media-captions`. The stylesheet-local Tailwind config and
+the media-captions substitution close both leaks. Final production result:
+
+```
+MediaWorkspace-DKC8CtF3.css  6,841 / 6,841 selectors scoped to #media-workspace
+main-CKGuxUdq.css            0 occurrences of --tw-
+```
+
+#### Commands and results
+
+| Command | Result |
+|---|---|
+| `node docs/migration/tools/adopt-closure.mjs <library-view> <entry-page> --dry` | 369 files; 363 unchanged; 6/6 substitutions kept; 0 stale |
+| `npx vite build --config vite.renderer.config.ts` | **exit 0**, 4,575 modules transformed, 24.72 s |
+| `node docs/migration/tools/check-media-css-containment.mjs` | **exit 0**, 6,841/6,841 scoped; 0 shell Tailwind tokens |
+| `npm test` | **exit 0**, 251 files / 2,888 tests passed |
+| `npx tsc --noEmit` | expected exit 2, **290 diagnostics / 108 files**, 0 from `vendor/` |
+| `npm run lint` | expected exit 1, **164 problems (2 errors, 162 warnings)** |
+
+`src/media/seanime-boundary.d.ts` was checked against the pinned real exports and still
+matches. This is a manual result: `tsc` does not open the adopted tree.
+
+#### What this proves—and does not
+
+Task 1 proves the complete entry/video-core closure builds, its runtime assets ship, the
+typed boundary remains valid, and its CSS cannot leak into the shell. It does **not** prove
+that a real `MKVParser_SubtitleEvent` reaches a mounted `VideoCoreSubtitleManager`, and it
+does not mount the player or Study Overlay. Those remain Tasks 2 and 3.
+
+#### Next three safe actions
+
+1. Mount the adopted `websocket-provider.tsx` in the dev harness and join the real
+   directstream subtitle event to `VideoCoreSubtitleManager`. A recorded negative result is
+   acceptable; never claim success from a synthetic cue.
+2. If and only if Task 2 is real, mount `video-core` inside the Study OS Media workspace and
+   add the Study Overlay as a sibling reading the same player state.
+3. Render the real active cue and its exact `cue.startMs` / `cue.endMs`; never derive mining
+   timing from `video.currentTime`.
+
 ## Blocking findings
 
 ~~**Go is not installed.**~~ **RESOLVED** — Go 1.26.5 present; `CGO_ENABLED=1` turned out
