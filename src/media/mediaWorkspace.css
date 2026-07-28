@@ -13,8 +13,103 @@
  *      workspace reading as Study OS while staying upstream-syncable.
  */
 
+@config "./tailwind.media.config.cjs";
+
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Scoped equivalent of @tailwindcss/forms' class strategy.
+ *
+ * The plugin's component layer does not honor Tailwind's `important` selector, so keeping
+ * it enabled would leak `.form-input` and friends into the desktop shell. These are the
+ * exact class rules used by the adopted controls, with only `#media-workspace` added.
+ */
+#media-workspace .form-input,
+#media-workspace .form-textarea,
+#media-workspace .form-select,
+#media-workspace .form-multiselect {
+  appearance: none;
+  background-color: #fff;
+  border-color: rgb(var(--color-gray-500) / var(--tw-border-opacity, 1));
+  border-width: 1px;
+  border-radius: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  --tw-shadow: 0 0 #0000;
+}
+
+#media-workspace .form-input:focus,
+#media-workspace .form-textarea:focus,
+#media-workspace .form-select:focus,
+#media-workspace .form-multiselect:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  --tw-ring-inset: var(--tw-empty, );
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: #223f67;
+  --tw-ring-offset-shadow:
+    var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow:
+    var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  border-color: #223f67;
+}
+
+#media-workspace .form-input::-moz-placeholder,
+#media-workspace .form-textarea::-moz-placeholder,
+#media-workspace .form-input::placeholder,
+#media-workspace .form-textarea::placeholder {
+  color: rgb(var(--color-gray-500) / var(--tw-text-opacity, 1));
+  opacity: 1;
+}
+
+#media-workspace .form-input::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+#media-workspace .form-input::-webkit-date-and-time-value {
+  min-height: 1.5em;
+  text-align: inherit;
+}
+
+#media-workspace .form-input::-webkit-datetime-edit {
+  display: inline-flex;
+}
+
+#media-workspace .form-input::-webkit-datetime-edit,
+#media-workspace .form-input::-webkit-datetime-edit-year-field,
+#media-workspace .form-input::-webkit-datetime-edit-month-field,
+#media-workspace .form-input::-webkit-datetime-edit-day-field,
+#media-workspace .form-input::-webkit-datetime-edit-hour-field,
+#media-workspace .form-input::-webkit-datetime-edit-minute-field,
+#media-workspace .form-input::-webkit-datetime-edit-second-field,
+#media-workspace .form-input::-webkit-datetime-edit-millisecond-field,
+#media-workspace .form-input::-webkit-datetime-edit-meridiem-field {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+#media-workspace .form-select {
+  background-image:
+    url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+  print-color-adjust: exact;
+}
+
+#media-workspace .form-select:where([size]:not([size="1"])) {
+  background-image: initial;
+  background-position: initial;
+  background-repeat: unset;
+  background-size: initial;
+  padding-right: 0.75rem;
+  print-color-adjust: unset;
+}
 
 /* ---------------------------------------------------------------------------
    2. Scoped Preflight replacement.
