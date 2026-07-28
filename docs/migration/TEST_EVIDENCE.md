@@ -351,3 +351,29 @@ shell --tw- tokens: 0
 
 This closes G-VIS. Microphone capture and the uninterrupted mounted-preview
 Anki/restart G-PLAY remain open.
+
+### G-PLAY preparation — READY (`8d10aa1`)
+
+The new preparer ran against the verified patched executable and
+`cue-probe-dual.mkv`, retaining only a caller-owned temp datadir. Its manifest records:
+
+```text
+server 3.10.2 · simulated user
+fixture: Sousou no Frieren - 01.mkv
+mediaId: 154587
+datadir: C:\Users\Arseniy\AppData\Local\Temp\seanime-phase3-gplay-20260728
+```
+
+A separate clean sidecar process then reopened that datadir and returned:
+
+```text
+health: ready
+collection items: 1
+local files: 1
+fixture mediaId: 154587
+```
+
+Both exact processes were stopped and no patched sidecar remained. The current Electron
+app was inspected and restored to its desktop; it still runs the old player with the flag
+off. Therefore this evidence proves a restart-ready isolated fixture, not app
+restart/resume/history and not the live-Anki G-PLAY.

@@ -1218,6 +1218,30 @@ no horizontal scrollbar. Production build and CSS-containment results above incl
 correction. G-VIS is therefore closed; this does not substitute for the still-open one-run
 G-PLAY and restart proof.
 
+### G-PLAY isolated datadir — READY, acceptance still open
+
+Commit **`8d10aa1`** adds `docs/migration/tools/prepare-gplay-datadir.mjs`. It refuses to
+overwrite an existing directory, starts only the patched sidecar, copies the representative
+dual-subtitle fixture into a one-file library, scans/matches/seeds it, writes a manifest,
+and stops while retaining the caller-owned datadir.
+
+The prepared acceptance state is:
+
+```text
+SEANIME_DATADIR=C:\Users\Arseniy\AppData\Local\Temp\seanime-phase3-gplay-20260728
+fixture mediaId: 154587
+collection items after sidecar reopen: 1
+local files after sidecar reopen: 1
+server: 3.10.2, simulated user
+```
+
+The already-running Electron instance was inspected without changing its data. It is the
+old player with `SEANIME_SIDECAR` disabled, so it cannot host G-PLAY and was left running.
+The final run therefore still requires that instance to close before one Electron process
+is relaunched with `SEANIME_SIDECAR=1`, the verified patched executable, and the prepared
+external datadir. Reopening the sidecar proves preparation persistence only; it is not
+claimed as the required app restart/resume/history result.
+
 ### Next three safe actions
 
 1. With explicit microphone-permission approval, record and play back one real shadowing

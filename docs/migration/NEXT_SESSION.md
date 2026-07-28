@@ -22,6 +22,8 @@ Committed migration line:
   harness; live `whisper-base` inference generated and mounted 3 cues.
 - `29582e0` — card-preview containment correction found by the final old/new visual
   comparison; G-VIS now passes at the normal Chrome proof viewport.
+- `8d10aa1` — reusable isolated G-PLAY datadir preparer; the prepared one-file collection
+  reopens as media ID `154587` without touching Study OS userData.
 
 The old record called Phase 3 closed after the cue seam. That was too narrow. The
 authoritative `SEANIME_MIGRATION_PLAN.md` requires the complete retained control set and
@@ -106,6 +108,19 @@ The final visual comparison is closed. Its first run exposed horizontal overflow
 mounted preview; `29582e0` corrected the grid/control containment, and the rerun retained
 readable dual cues, exact timing, the full control dock, and a two-column preview without
 horizontal scrolling.
+
+The final Electron run is pre-staged at
+`C:\Users\Arseniy\AppData\Local\Temp\seanime-phase3-gplay-20260728`. A clean sidecar
+reopen returned one collection item and one local file (`mediaId: 154587`). Launch with:
+
+```text
+SEANIME_SIDECAR=1
+SEANIME_EXE=C:\Users\Arseniy\AppData\Local\Temp\seanime-phase3-verified.exe
+SEANIME_DATADIR=C:\Users\Arseniy\AppData\Local\Temp\seanime-phase3-gplay-20260728
+```
+
+Do not launch while the existing `electron-forge start` instance is alive. It was inspected
+and is still the old player with the sidecar flag off.
 
 Dual subtitles are now closed. Patch `0002` flushes the terminal directstream batch before
 successful stop/cancellation. The isolated two-track run delivered 6 Japanese + 6 English

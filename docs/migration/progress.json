@@ -3,13 +3,13 @@
  "updated": "2026-07-28",
  "repo": {
   "branch": "grammarx/phase-1-5",
-  "commit": "29582e0",
+  "commit": "8d10aa1",
   "dirtyPorcelainEntries": 537,
   "untrackedFiles": 446,
   "modifiedUnstaged": 166,
   "deleted": 20,
   "staged": 0,
-  "note": "Phase 1+2 is 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, real-cue seam cfd05fa, core controls a4e495d, mining preview/assets 03d27a3, secondary cue timeline ea77f59, dual delivery/practice/continuity 3fe73d0, deterministic Whisper CPU recovery 1c51d6c, and final card-preview visual containment 29582e0. Dual tracks, local whisper-base inference, and G-VIS are live-proven; full Phase 3 remains active for microphone and the mounted-preview Anki/restart G-PLAY.",
+  "note": "Phase 1+2 is 55df6e9. Phase 3 entry/video-core adoption is dd2ca47, real-cue seam cfd05fa, core controls a4e495d, mining preview/assets 03d27a3, secondary cue timeline ea77f59, dual delivery/practice/continuity 3fe73d0, deterministic Whisper CPU recovery 1c51d6c, final card-preview visual containment 29582e0, and isolated G-PLAY preparation 8d10aa1. Dual tracks, local whisper-base inference, and G-VIS are live-proven; full Phase 3 remains active for microphone and the mounted-preview Anki/restart G-PLAY.",
   "baseCommit": "a22e7ba1f72aa7942890ad7eb3ac253b37be0735"
  },
  "currentPhase": 3,
@@ -537,6 +537,21 @@
    "rendererBuild": "exit 0; 4581 modules; dedicated Whisper worker chunk",
    "cssContainment": "6915/6915 scoped; 0 unscoped; 0 shell --tw- tokens"
   }
+ },
+ "gplayPreparation": {
+  "implementationCommit": "8d10aa1",
+  "verdict": "READY — isolated fixture persists across a sidecar reopen; Electron/Anki/restart acceptance remains open",
+  "dataDir": "C:/Users/Arseniy/AppData/Local/Temp/seanime-phase3-gplay-20260728",
+  "executable": "C:/Users/Arseniy/AppData/Local/Temp/seanime-phase3-verified.exe",
+  "fixtureMediaId": 154587,
+  "reopen": {
+   "healthy": true,
+   "serverVersion": "3.10.2",
+   "simulatedUser": true,
+   "collectionItems": 1,
+   "localFiles": 1
+  },
+  "safety": "The existing Electron instance is still running the old player with SEANIME_SIDECAR disabled. It was restored to its desktop; no second Electron was launched and Anki was untouched."
  },
  "knownGaps": {
   "liveAnkiConnect": "CLOSED 2026-07-28 — all 14 AnkiActionMap actions verified live.",
