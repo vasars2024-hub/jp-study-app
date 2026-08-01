@@ -1,0 +1,138 @@
+{
+  "slice": 31,
+  "date": "2026-08-01",
+  "status": "The video.* keypress line is CLOSED — every one of the ten rows has now moved a real observable from a real key event. Music keyboard navigation EXISTS and has been pressed. Slice 29's phase-E regression is gone. And the last open question about the video-terminated race is answered from the sidecar's own source rather than by another probe.",
+
+  "oneLine": "Four items closed: a blocked harness phase, the five unpressable rows, a nine-slice-old feature decision, and a race nobody could reproduce.",
+
+  "itemA_phaseERegression": {
+    "wasRecordedAs": "slice 29: retirement-step3-harness.mjs phase E regressed — allCues held only cue 0 where passing runs had cues 0 and 1. Deterministic across three runs and three independently prepared datadirs. Attributed to another session editing this tree while the harness ran (over a hundred src files sharing a bulk mtime of 09:13:04-05), and left with 're-run once the tree is quiet'.",
+    "verdict": "CONFIRMED and CLEARED. The attribution was right.",
+    "measured": "With the tree quiet (nothing modified since 10:03:45 local, run started 10:35), phase E passed first time: replay -> 6.563732 (cue1 6.5), previous -> 2.048001 (cue0 2), next -> 6.559389.",
+    "consequence": "Slice 29's phase H — written, never run, and the reason slice 30 had to route around it into the packaged harness — ran and PASSED on the dev route too: ; moved the offset 0 -> -0.1 and ' moved it back, with an unbound x control. The dev route and the packaged route now agree.",
+    "evidence": "docs/migration/proof/retirement-step3-20260801073501/new-route-plays-and-shell-survives.json"
+  },
+
+  "itemB_theFiveUnboundRows": {
+    "wasRecordedAs": "slices 19-30: subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop and toggleFurigana ship defaultKeys: ''. effectiveKeys returns '' and chordMatches is false for EVERY chord, so they are unpressable BY DESIGN. Slice 30 stated it as a fact about what the rows ARE and named the missing test: bind-then-press through ShortcutSettings, which needs a settings-driving phase no harness has.",
+    "verdict": "CLOSED. That phase exists now and passes twice.",
+    "phase": "retirement-step3-harness.mjs phase I, split in two halves: the BIND runs before the workspace opens, the PRESS after phase H.",
+    "whyTheSplit": ".seanime-host is a full-viewport aria-modal dialog at z-index 9999 and the settings window sits under it. Binding with the player up would only work because .click() does not hit-test — the same shortcut that once let a harness in this track 'verify' a taskbar button as a Blanc surface.",
+    "measuredTwice": {
+      "bind": "every row read data-shortcut-keys='' before and its chord after, with no .sc-conflict marker",
+      "press": {
+        "video.subEarlierLarge": "Ctrl+Alt+1 — subtitle offset 0 -> -0.5",
+        "video.subLaterLarge": "Ctrl+Alt+2 — subtitle offset -0.5 -> 0",
+        "video.toggleFurigana": "Ctrl+Alt+3 — furigana false -> true",
+        "video.toggleAutoPause": "Ctrl+Alt+4 — autoPause false -> true",
+        "video.toggleLoop": "Ctrl+Alt+5 — loopLine false -> true"
+      },
+      "control": "Ctrl+Alt+9, never bound, same family, same dispatch call, same modifier bits — offset and all three preferences unchanged"
+    },
+    "evidence": [
+      "docs/migration/proof/retirement-step3-20260801074907/new-route-plays-and-shell-survives.json",
+      "docs/migration/proof/retirement-step3-20260801075424/new-route-plays-and-shell-survives.json"
+    ],
+    "chordChoice": "Ctrl+Alt+<digit>. A chord must be free in BOTH keymaps — slice 22 paid for that when q, absent from this catalog, turned out to be previousChapter in the adopted player's vc_defaultKeybindings. The vendor map is entirely bare Key*/Arrow*/Bracket* codes and this catalog uses Ctrl+Alt+0/-/= but no Ctrl+Alt+<1..9>. Not taken on trust: each bound row is read back for the .sc-conflict marker.",
+    "twoEnablersAddedToSrc": {
+      "data-shortcut-id / -keys / -capture": "on the ShortcutSettings row and its capture button. That surface had NO language-independent handle: every string on it goes through useT() and the app ships four UI languages, so a phase keyed to the English label or to the word 'Unbound' would pass on an English machine and fail after a language switch. Same idiom as data-study-action in the player overlay.",
+      "data-study-pref": "on the furigana / autoPause / loopLine checkboxes. The three toggle rows change a PREFERENCE — neither a `seeked` event (phase G's instrument) nor the subtitle-offset <output> (phase H's) can see it."
+    }
+  },
+
+  "itemC_musicKeyboardNavigation": {
+    "wasRecordedAs": "slices 20, 21, 22, 23, 24, 25, 26, 28 and 30 each carried 'music keyboard nav needs its OWN music.* catalog rows — a decision to take deliberately, never by reusing video.* ids'.",
+    "verdict": "TAKEN, and pressed live.",
+    "theTrap": "registerCommandHandler keeps a stack per id and runCommand takes stack[stack.length - 1] — the LAST registrant wins. MediaWorkspaceHost mounts at App level, so the lyrics pane and the video overlay really are mounted together whenever the media workspace is open over Music. Sharing an id would hand one surface both gestures according to mount order.",
+    "shipped": {
+      "rows": ["music.prevLine", "music.replayLine", "music.nextLine"],
+      "category": "Music",
+      "defaultKeys": "'' for all three",
+      "whyUnbound": "the same choice music.playPause three lines above already makes. Every free single letter belongs to the adopted player's keymap, the Music block spends all four Ctrl+Arrow* chords on track and volume, and Ctrl+Alt+Arrow* is virtual-desktop navigation. An unbound row a user binds beats a default chosen to fill a column — and bind-then-press is no longer an untested claim.",
+      "notBuiltIns": "unlike their neighbours (music.playPause/next/prev/volume*, which are builtinHandler cases against playerBus), these three need the cue sheet of the track on screen, which lives in the lyrics pane. So they work while Music is open, which is the only place a lyric line means anything.",
+      "registeredOnce": "through refs. The handlers close over the cue sheet and the playhead, both of which change every tick; re-registering on each change would churn a last-wins stack many times a second.",
+      "registeredUnconditionally": "including while the sheet is unsynced, where the handler correctly does nothing. Gating the registration would leave the id unowned and let some other stack entry answer for it."
+    },
+    "measuredLive": {
+      "harness": "music-mining-harness.mjs phase S — 28 phases, all PASS",
+      "bind": "all three captured through Settings → Shortcuts: '' -> Ctrl+Alt+6 / +7 / +8, no conflict marker",
+      "S2_prev": "Ctrl+Alt+6: cue 2 @ 2.5s -> cue 1 @ 1.5s",
+      "S3_next": "Ctrl+Alt+8: cue 1 @ 1.5s -> cue 2 @ 2.5s",
+      "S4_replay": "Ctrl+Alt+7: @ 4.3s -> @ 2.5s, drifted-off-start=true",
+      "S5_control": "Ctrl+Alt+9, unbound: cue 2 @ 2.5s -> cue 2 @ 2.5s",
+      "evidence": "docs/migration/proof/music-mining-live-20260801075900/music-mining-live.json"
+    },
+    "aGuardWasNARROWED_notDeleted": "musicMining.test.ts banned the substring `registerCommandHandler` in the pane outright. That was correct at slice 20, when the pane registered nothing and this decision was still open — but it had become a ban on the ANSWER rather than on the defect. It now asserts what was always the real invariant: the two surfaces' id sets stay disjoint. musicCueNavCommands.test.ts holds the other half (the pane registers all three music.* ids; the overlay's set is still exactly ten)."
+  },
+
+  "itemD_whyTheTerminateNeverKillsTheOpen": {
+    "wasRecordedAs": "slice 24 found the client sends `video-terminated` ~190ms into an open and shipped a silence-based recovery. Slice 25 refuted one route and confirmed another (a second open while a file is playing). Slice 26 found the two halves anti-correlated. Slice 28 watched the terminate land INSIDE the open window twice more and the open survive both times, and wrote the honest position: 'across every non-StrictMode measurement — small file, cold file, large file, packaged build — no instance of this branch actually killing an open has ever been observed', leaving STORAGE LATENCY as the only untested shape.",
+    "verdict": "ANSWERED from the pinned sidecar's source. It is not luck, not timing, and not something a slower disk could change.",
+    "theMechanism": "internal/directstream/stream.go's listenToPlayerEvents drops a TerminatedEvent on IDENTITY, at one of two guards, depending on how far the replacement has got:",
+    "guard1": "stream.go:467 — while the replacement is still PREPARING (currentStream is empty), a terminate whose key.PlaybackID == m.replacedPlaybackId is ignored: 'Ignoring termination event of replaced playback session during preparation'. replacedPlaybackId is set in BeginOpenWithTarget (stream.go:100-106) and only when a previous stream existed.",
+    "guard2": "stream.go:492 — once the new stream is LIVE, a terminate whose key.PlaybackID != m.currentPlaybackId is ignored: 'Ignoring termination event of older playback session for active stream'.",
+    "coverageIsContinuous": "replacedPlaybackId is set under playbackMu in BeginOpen and cleared under the same lock either when the new stream goes live (stream.go:437) or on AbortOpen (stream.go:228). Guard 2 takes over exactly where guard 1 stops. There is no window in which an old-session terminate reaches the cancel path.",
+    "theCancelPathRequires": "stream.go:473-484 — currentStream empty AND the terminate not matching replacedPlaybackId. With no previous stream replacedPlaybackId is '', so guard 1 cannot match and any terminate from the preparing client cancels. That is the FIRST OPEN of a sidecar session — which is precisely where slices 23 and 24 measured it killing the open, and precisely the case where an A-to-B transition cannot produce a terminate because there is no A.",
+    "soTheHalvesAreMutuallyExclusive": "slice 26 observed anti-correlation statistically. This is the mechanism: the terminate can only kill the first open, and the first open is the one case where the A-to-B null branch does not fire.",
+    "corroboration": "not source-only. Slice 28's OWN sidecar log carries guard 2 firing: proof/blanc-open-retry-20260801101500/sidecar-seanime-2026-08-01_09-45-12.log line 139 — 'Ignoring termination event of older playback session for active stream currentPlaybackId=b80a9e7e-… playbackId=1a081a92-…', naming both ids, at 09:45:25, immediately after that run's second open.",
+    "consequenceForStorageLatency": "slice 28 left storage latency as the only untested shape on the theory that a slower first read would widen the open window. Widening a window cannot help an event that is discarded on identity rather than on timing. This is not 'untested' — it is structurally excluded, and no probe against a network share or a spinning disk would add anything.",
+    "theBoundaryOfTheClaim": [
+      "Guard 1 requires key.PlaybackID != ''. A terminate carrying an EMPTY playback id during a replacement preparation would fall through and cancel. Slice 28's log shows the client does carry one, so this is the edge of the claim rather than a live risk.",
+      "This is the PINNED sidecar — upstream 9bdd052, server version 3.10.2 as reported in the run logs. An upstream bump has to be re-read against these two guards.",
+      "Slice 24's recovery in shared/directstreamOpenRecovery.ts stays. It is what covers the first-open case, which IS reachable, and it has saved that open on four independently prepared datadirs."
+    ]
+  },
+
+  "processFindingThisSlicePaidFor": {
+    "what": "Slice 21's hazard — 'the tree is not stable while you work in it' — recurred TWICE in this session, and both times the live writer was THIS session.",
+    "how": "Editing any src file while a dev-route harness runs pushes an HMR update, or a full reload, into the very renderer under measurement. keyboardShortcuts.ts is imported almost everywhere, so the blast radius is the whole tree.",
+    "theSignature_andHowToTellItApart": {
+      "selfInflicted": "phase C reports the open 'stalled' with sliceState: null and sliceText: null — the slice is not in the DOM AT ALL. Or phase C passes with the video advancing at readyState 4 and then the play-to-20s wait times out. Runs: proof/retirement-step3-20260801074224 (ABC, FAIL) and -20260801075110 (ABC, FAIL).",
+      "theRealIntermittency": "phase C reports 'stalled at \"Sousou no Frieren … Waiting for\"' — the slice is mounted and rendering its own waiting state. That is the known directstream open intermittency, and the harness's retry absorbs it: the second confirmation run needed attempt 3 and then passed all nine phases."
+    },
+    "theRule": "freeze the tree for the whole run, not just before it. Slice 30's answer to an unstable tree was a frozen packaged artifact; the answer to a tree YOU are destabilising is simply to stop typing until the run finishes.",
+    "aClaimInThisRecordWasWrong": {
+      "firstWrittenAs": "the product's open recovery did not rescue attempts 1 or 2 in the main window, citing reopenAttempts: 1",
+      "wrong": "reopenAttempts is PHASE F's field — the harness's re-request count during the restart/resume phase, where 1 means it opened first try. Nothing to do with directstreamOpenRecovery. The run says nothing either way: this harness has never had an instrument for the recovery. Same shape as the failures this track keeps recording — a number that WAS in the record, read as if it answered a question it was never about.",
+      "whatTheEvidenceSupports": [
+        "phase C needed 3 attempts (openAttempts: 3, top level)",
+        "both stalls rendered a string starting 'Waiting for'. The only catalog entry it can be is mediaWorkspace.study.waitingSubtitle — and StudyPlayerSlice.tsx:948 renders that overlay on state.active ALONE, with playbackInfo still allowed to be null. So the text is consistent with BOTH 'the open is still in flight' and 'the open finished and no media ever flowed', and the 60-character truncation threw away everything that might have discriminated.",
+        "one negative IS sound: the slice did not show the recovery's give-up state. A silently-cancelled preparation would have run 8s silence -> re-open -> 8s silence -> failed, setting mediaWorkspace.openStalled in roughly 18s, comfortably inside the 45s each attempt waits. Whatever happened, it was not that."
+      ],
+      "previouslyUnnamedPossibility": "directstreamOpenVerdict returns 'playing' UNCONDITIONALLY FIRST when playbackArrived is true, and that flag is set the moment a watch payload is applied. So 'the watch arrived and then the MediaSource never produced a segment' is outside the recovery's scope BY CONSTRUCTION: episode chrome, an overlay, a <video> at readyState 0, forever, with no error — the same user experience slice 24 fixed, by a different cause. NOT established that this run hit it. Established that the record cannot rule it out.",
+      "instrumentAdded": "openFileWithRetry now writes a structured diagnostic per stalled attempt into record.openStalls — full untruncated innerText (four UI languages, so no English substring test), data-study-player, and videoPresent / readyState / networkState / srcKind / bufferedRanges. videoPresent=false means the open is in flight or the recovery gave up; videoPresent=true with readyState 0/1 means media never flowed. Next time phase C retries, the record will say which."
+    }
+  },
+
+  "gates": {
+    "vitest": "333 files / 3,809 tests — measured total in a tree shared with three tracks (baseline this session: 332 / 3,803; +1 file and +6 tests are this slice's)",
+    "tsc": "288 — the baseline, unchanged. Zero errors introduced: the single diagnostic in a file this slice touched is MusicContent.tsx(349,5), a pre-existing RefObject<HTMLDivElement | null> nullability issue on activeLineRef in useMusic(), untouched by this slice and already counted in the 288.",
+    "i18n": "exit 0 at 6,352 keys — +3 (commands.music.prevLine / replayLine / nextLine), translated in ja/zh/ru",
+    "eslint": "0 errors on every changed file. One pre-existing warning survives at keyboardShortcuts.ts:713 (Forbidden non-null assertion, in firstOsChord, not this slice's).",
+    "architectureAudit": "exit 0, 'Nothing new'",
+    "nodeCheck": "clean on both changed harnesses"
+  },
+
+  "changed": {
+    "src": [
+      "src/renderer/keyboardShortcuts.ts — three music.* catalog rows",
+      "src/renderer/components/music/MusicContent.tsx — registers them from the lyrics pane",
+      "src/renderer/components/ShortcutSettings.tsx — data-shortcut-id / -keys / -capture",
+      "src/media/VideoCoreStudyOverlay.tsx — data-study-pref on three checkboxes",
+      "src/shared/i18n/catalogs/{en,ja,zh,ru}.ts — three command labels",
+      "src/renderer/__tests__/musicCueNavCommands.test.ts — NEW, 6 tests",
+      "src/shared/__tests__/musicMining.test.ts — one guard narrowed to its real invariant"
+    ],
+    "tools": [
+      "docs/migration/tools/retirement-step3-harness.mjs — phase I",
+      "docs/migration/tools/music-mining-harness.mjs — phase S"
+    ]
+  },
+
+  "notProvenLive": [
+    "The per-row mining rollup has still never run against a live Anki — this run's mine was RECORDED as failed because Anki was not running, which is the designed behaviour and exercises everything except acceptance.",
+    "The stacked two-channel statistics chart still needs a day with BOTH read and watch activity.",
+    "The Continue-Watching widget has still never been seen live at a non-default size; forcing one mutates the user's persisted desktop layout.",
+    "Old-player DELETION remains a product decision, not cleanup — MediaCenterView cannot go while music renders it, and deleting the video/library surfaces would make SEANIME_SIDECAR=0 stop being a real rollback. Keeping it as the disabled-sidecar fallback is still the recommendation on file."
+  ]
+}

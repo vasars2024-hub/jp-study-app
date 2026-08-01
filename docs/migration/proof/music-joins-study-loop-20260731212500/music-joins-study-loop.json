@@ -1,0 +1,99 @@
+{
+  "slice": "Phase 6 slice 17 — music joins the study loop",
+  "date": "2026-07-31",
+  "authorisation": "USER GOAL 2026-07-31: 'keep on continuing until the seanime integration is done AND MUSIC IS WELL INTEGRATED and everything is polished'. This REVERSES the earlier recorded decision that music was deliberately excluded from the migration (progress.json crossTrack: 'Music was deliberately excluded by user decision'). That exclusion was about ROUTING music to the adopted workspace, which is still not done and still would not make sense — MediaWorkspace has nothing music-shaped in it. What the new goal asks for is different and better: music should participate in the same STUDY loop.",
+  "theGapMeasuredBeforeAnyFix": {
+    "what": "Music was the one immersion surface with no way out of it. It has live lyrics (useLiveLyrics), an active-line highlight, LRC file loading and word lookup — everything needed to READ a song — and zero mining. `grep -n 'mine|anki' MusicContent.tsx` returned nothing.",
+    "consequence": "A lyric line you worked out could not become a card, and music never appeared in Review. Video's loop — VideoCoreStudyCue -> createVideoCoreMiningDraft -> buildVideoCoreMineRequest -> window.api.ankiMineNote -> appendVideoCoreMiningHistory, read by SeanimeWatchLoopPanel — ran right past it.",
+    "sizeOfMusic": "src/renderer/components/music/MusicContent.tsx, 658 lines, rendered by two shells: MediaCenterView's `music` tab and Blanc's BlancMusicPanel."
+  },
+  "theDesignDecisionThatMATTERS": {
+    "choice": "Music enters the EXISTING loop. It does not get a parallel one.",
+    "why": "VideoCoreMiningSource already carries playbackId / playbackType / streamType / localFilePath / mediaTitle, and VideoCoreStudyCue is just index, trackNumber, text and a time range — none of that is video-specific. Two histories would mean two Review panels and two chances to disagree about what the user has mined. That is the exact shape this track has been paying down all week (mediaWorkspaceAvailability, the socket pool, MediaSurfaceShell).",
+    "consequence": "Review shows a mined lyric with NO changes to Review. shared/musicMining.ts is an adapter, not a subsystem."
+  },
+  "theOneHonestDifficulty": {
+    "problem": "useLiveLyrics yields either `synced` cues (from an .lrc, with real timestamps) or `plain` lines (no timing at all). Provenance exists so a card can be traced back to the moment it came from, so inventing a timestamp for a plain line would be a lie told in the one record whose whole job is to be true.",
+    "resolution": "Both are minable and they are DISTINGUISHED rather than blurred. synced -> streamType 'music-lrc' with the cue's own start/end. plain -> streamType 'music-plain' with a ZERO-LENGTH range at the playback position when the user pressed mine. That is not the line's timing and does not claim to be; it is where the listener was, and startMs === endMs is the marker of it. A reader of the history can always tell which kind of locator it holds.",
+    "alsoRefused": "A line labelled `synced` that arrives without usable timing returns null rather than silently downgrading to a listening position — that would hide a caller's mislabelling inside the traceability record. Blank lines (spacers in a lyric sheet) and nonsensical indices are refused in the pure layer, not in the UI, so no caller can mine one by wiring a button up slightly differently."
+  },
+  "whatWasBuilt": {
+    "src/shared/musicMining.ts": "Pure adapter: musicMiningSource (identifies a song by PATH, not MediaItem.id, because the id is regenerated on library re-import and two lines from one track must group together in Review), musicStudyCue, and two provenance readers.",
+    "src/renderer/components/music/useMusicMining.ts": "The action. Uses video's draft/request/history functions unchanged and writes the same VIDEO_CORE_MINING_HISTORY_KEY. History is read-modify-written on each mine rather than held in React state, because the video mining panel owns an in-memory copy while the workspace is open and two owners of one key would race. A FAILED mine is still recorded, so Review shows the attempt rather than losing it.",
+    "MusicLyricsPane": "A per-line Mine button — per line, not per active-cue, so the user mines what they are READING rather than what is playing. It stops mouse-down and mouse-up propagation: the lyrics pane turns a mouse-up into a dictionary lookup, and without that a click on the button would also open the popup over the card just made.",
+    "css": "Hover-reveal, with `:focus-visible` also revealing it — `opacity: 0` alone would hide a focused control from keyboard users, which is the standard trap in hover-reveal patterns.",
+    "i18n": "6 new keys x 4 languages (en/ja/zh/ru), 6,339 total."
+  },
+  "gates": {
+    "vitest": {
+      "files": 330,
+      "tests": 3759,
+      "delta": "+12 tests, +1 file"
+    },
+    "tsc": {
+      "errors": 288,
+      "baseline": 288,
+      "inChangedFiles": 0,
+      "note": "the pre-existing MusicContent.tsx:342 RefObject error is untouched and predates this slice"
+    },
+    "i18n": {
+      "exit": 0,
+      "keys": 6339,
+      "newKeys": 6,
+      "translated": "ja/zh/ru"
+    },
+    "architectureAudit": {
+      "exit": 0,
+      "result": "Nothing new"
+    },
+    "eslint": {
+      "exit": 0,
+      "warnings": 0
+    },
+    "cssContainment": {
+      "exit": 0,
+      "scoped": "6950/6950",
+      "unscoped": 0
+    }
+  },
+  "notProvenLive": "SUPERSEDED — PROVEN LIVE 2026-07-31, see provenLive below.",
+  "whatIsSTILLNotIntegratedAboutMusic": [
+    "No cue navigation (previous/next/replay line) in the lyrics pane — double-click-to-seek is still the only transport.",
+    "Music is absent from the readiness view (SeanimeStudyLibraryPanel), which enumerates video files. A song has no episode/library concept, so this needs a design decision rather than a wiring change.",
+    "The `music` section still renders MediaCenterView rather than any adopted surface. That remains correct: the workspace has no music surface, and routing it there would delete a working feature.",
+    "RESOLVED 2026-07-31 — audio assets, see slice18_audioOnTheCard."
+  ],
+  "provenLive": {
+    "harness": "docs/migration/tools/music-mining-harness.mjs",
+    "record": "docs/migration/proof/music-mining-live-20260731225500/music-mining-live.json",
+    "result": "PASS, 11 phases, in a real Electron window driven over CDP.",
+    "whatItDrove": "Seeds one song into <userData>/media.json (the file media:list reads, so no import dialog), seeds jp-lyrics-<id> in localStorage (the cache useLiveLyrics consults before any network call, so no dependence on lrclib), declines the first-run consent dialog, opens Music, plays the song, then CLICKS the Mine button on the second lyric line.",
+    "assertions": [
+      "E — 3 lyric lines rendered and 3 mine buttons, one per line.",
+      "F — resting opacity 0, focused opacity 1: the hover-reveal does not hide the control from keyboard/AT focus.",
+      "G — the click wrote an entry to jp-video-core-mining-history-v1.",
+      "H — provenance is playbackType=music, streamType=music-lrc, cue=[1500,2500]ms, text='瞼閉じればそこに' — the exact cue timing from the seeded LRC, which is what Review reads.",
+      "I — NO dictionary popup opened. The lyrics pane turns a mouse-up into a lookup, so this is the assertion that the button's propagation-stopping actually works in a real renderer.",
+      "J — the button reported the outcome rather than silently doing nothing."
+    ],
+    "stillNotProven": "Anki accepting the note. Anki was not running, so the mine FAILED and was recorded as a failure — which is the designed behaviour and still exercises cue construction, draft, request, history entry, localStorage write and provenance. Only the gateway's acceptance is untested live.",
+    "oneRealFINDING": "Phase F initially failed with focused opacity 0. Dumping the page's own CSS rules showed they were correct and that the button WAS document.activeElement matching :focus — the instrument was wrong: getComputedStyle read the value mid-transition, 150ms before the reveal completed. The harness now awaits the transition. Recorded because 'the test failed so the code is broken' would have sent the next session chasing a stylesheet that was fine.",
+    "aCSSCHANGEThatCameOutOfIt": "The reveal selector was changed from :focus-visible to :focus. This was NOT proven necessary by the run (the failure was the measurement artifact above), but it is right on its own terms: :focus-visible matches only browser-judged keyboard focus, so a button focused programmatically or by assistive tech would remain at opacity 0 while being the focused element. The :focus-visible ring is unchanged.",
+    "aMISTAKEWorthRecording": "The harness first placed its Electron --user-data-dir INSIDE the repo, under docs/migration/proof/. Vite's file watcher then tried to watch <profile>/Network/Cookies, which Chromium holds locked, threw EBUSY and KILLED THE DEV SERVER — including the developer's own running one, twice, before it was diagnosed. It presents as 'the renderer never became usable', which looks nothing like its cause. The profile now lives outside the repo. NOTE: retirement-step3-harness.mjs has the same trap and has not been fixed."
+  },
+  "slice18_audioOnTheCard": {
+    "status": "DONE 2026-07-31 — the item this record listed first under 'what is STILL not integrated'.",
+    "whatWasDone": "A mined lyric now carries the line's AUDIO, recorded from the song, using the same recorder video uses.",
+    "theExtraction": "recordCueAudio lived inside VideoCoreMiningPanel typed to HTMLVideoElement. Nothing about it is video-specific — captureStream, play, pause and currentTime are all HTMLMediaElement — so it MOVED to src/media/cueAudioCapture.ts typed on the base element rather than being copied. A second copy would be a second set of restore-the-player semantics to get wrong, and that function's `finally` is the delicate part: it hands the user's playback back exactly as it found it, including whether it was paused. Video now calls the shared one; the cue -> playback-range conversion stayed in the video panel because the subtitle delay is a video concern.",
+    "theLeaderConstraint": "playerBus has a leader/follower model — only the leader window owns the live <audio>. New accessor getLeaderAudioElement() returns null in a follower, and the caller mines WITHOUT audio rather than failing. A capture in a follower would silently produce an empty blob.",
+    "syncedOnly": "Audio is recorded only for `synced` lyrics. A plain line's range is zero-length by design (it records where the listener was, not the line's duration), so recording it would ask MediaRecorder for zero seconds. Refused rather than fudged.",
+    "failureIsNotFatal": "A capture failure (too short, no audio track, MediaRecorder unavailable) still mines the card. Losing the card because the audio failed would be strictly worse than the previous behaviour of no audio at all. The outcome distinguishes withAudio so the button can say which happened.",
+    "provenLive": {
+      "record": "docs/migration/proof/music-mining-live-20260731231500/music-mining-live.json",
+      "result": "PASS, 12 phases. Phase H2 asserts the attached asset: jp-music-cue-1-1500.webm, audio/webm;codecs=opus, 16,709 bytes.",
+      "aWEAKAssertionCaughtAndFIXED": "The first version of phase H2 asserted `bytes > 0` against a 0.4 s SILENT wav fixture, and passed with a 275-byte opus container that had recorded nothing — the cue range (1.5-2.5 s) was past the end of the 0.4 s file, and opus compresses silence to almost nothing. The fixture is now 4 s of a 440 Hz tone and the threshold is 2 KB. 275 -> 16,709 bytes is the difference between an assertion that looks right and one that means something."
+    },
+    "i18n": "2 further keys (music.mineRecording, music.minedWithAudio) x 4 languages. 6,341 total.",
+    "gates": "tests 3763/330; tsc 288 baseline; i18n exit 0; audit exit 0 'Nothing new'; ESLint exit 0; CSS containment 6950/6950."
+  }
+}

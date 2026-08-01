@@ -1,0 +1,44 @@
+{
+  "slice": "Phase 6 slice 11 — resume last episode as a real command",
+  "date": "2026-07-31",
+  "result": "PASS",
+  "what": "Slice 7 put a Continue-watching group in the command palette, but only in `search` mode. `Ctrl+Space` — the binding literally labelled 'Open command palette' — opens `commands` mode, where that group does not exist. Slice 10 had just made the palette reachable over the full-screen media workspace, which is exactly where a user wants the next episode and exactly where no list surface is on screen. `video.resumeLast` is a BUILT-IN command, so it appears in both palette modes, is bindable in the shortcuts settings, and works with no view registered.",
+  "harness": "src/renderer/__devharness__/resume-last-harness.html",
+  "reproduce": "npx vite --config vite.renderer.config.ts --port 5174, then open http://localhost:5174/src/renderer/__devharness__/resume-last-harness.html and read window.__resumeLastProbe (or await window.runResumeLastProbe()).",
+  "engine": "Chromium, Browser pane, viewport 1440x900 read from document.documentElement in the same probe",
+
+  "chain": [
+    "PASS  the palette mounted over the workspace",
+    "PASS  a click at the palette reaches the palette, not the workspace (hit: palette)",
+    "PASS  the palette input holds focus — which is what keeps the player keymap off",
+    "PASS  \"resume\" matches the command in COMMANDS mode (rows: 2)",
+    "PASS  Enter dispatched exactly one open request (got 1)",
+    "PASS  it opened the most recent file, not the first in the store (c:/anime/frieren/sousou no frieren - 07.mkv)",
+    "PASS  with a resume position (737s of 742s watched)"
+  ],
+  "dispatched": {
+    "event": "seanime:media-workspace-open",
+    "localFilePath": "c:/anime/frieren/sousou no frieren - 07.mkv",
+    "startAtSec": 737,
+    "note": "742s watched minus CONTINUE_WATCHING_REWIND_SEC. The store was seeded older-file-first on purpose, so 'most recent' was a real choice and not the array order."
+  },
+  "layers": { "palette": 20001, "workspace": 9999 },
+
+  "whyABuiltIn": "Its `video.*` neighbours are registered by the legacy video view and read 'needs view' in the palette until that view is open. This one has to work from inside the media workspace, where that view is not mounted. Unbound by default (`defaultKeys: ''`) because every free single letter belongs to the adopted player's own keymap — a default chord here would collide, and this track has already recorded that the adopted handler is on `document` with no capture, so a collision fires both.",
+
+  "failurePaths": {
+    "no-workspace": "MediaWorkspaceHost renders null and registers no listener while the sidecar is disabled, so a dispatch would be a command that appears to work. Toasted as mediaWorkspace.resumeLast.unavailable.",
+    "nothing-watched": "Empty, corrupt, or non-`file:` resume store. Toasted as mediaWorkspace.resumeLast.nothing.",
+    "why": "Both look identical from outside — nothing happens — and a silent no-op is the failure mode this seam has produced three separate times. The function returns an outcome rather than a boolean so the toast can say which one it was. Toasts are visible over the workspace as of slice 10; before it they were at 5000, behind the 9999 overlay."
+  },
+
+  "guardVerification": "The `no-workspace` guard was verified load-bearing: removing the line makes `reports no-workspace and dispatches nothing when no host is mounted` fail with 'expected opened to be no-workspace'.",
+
+  "probeCorrections": [
+    "First run reported FAIL on 'the palette mounted over the workspace'. React flushes state from a plain window listener AFTER the dispatch returns, and createRoot().render() is asynchronous too, so the query ran before the mount. That reads exactly like the stacking defect the probe exists to catch. Every step now settles first.",
+    "'it opened the most recent file' failed against the correct file: the assertion matched 'Frieren - 07' case-sensitively, but a resume key is lower-cased and forward-slashed on the way into the store, so the path coming back out is not the one seeded. Now case-insensitive.",
+    "The palette z-index read back as '' rather than 20001. `pick()` closes the palette, and a DETACHED node's getComputedStyle returns an empty declaration — not `auto` — so a read taken after Enter looks like a token that failed to resolve. The layer is now read before Enter."
+  ],
+
+  "gates": "tests 3,696/323 (+7, +1 file, all this slice's); tsc 288 — the recorded baseline, 0 in any changed file (the new .tsx harness included); i18n exit 0 at 6,329 keys (+3: one command label and two toast messages, translated in ja/zh/ru); architecture audit exit 0 'Nothing new'; ESLint exit 0 on every changed file, the one warning in keyboardShortcuts.ts being the pre-existing non-null assertion at line 657 in `firstOsChord`. Builds not run — dev server up (EBUSY); no CSS touched by this slice."
+}

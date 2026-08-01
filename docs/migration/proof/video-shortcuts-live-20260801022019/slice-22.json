@@ -1,0 +1,65 @@
+{
+  "slice": 22,
+  "title": "Somebody finally pressed R. The video shortcuts are proven live — and the control found a key that is not ours.",
+  "date": "2026-08-01",
+  "evidence": "docs/migration/proof/retirement-step3-20260731222019/new-route-plays-and-shell-survives.json (phase G)",
+  "firstRun": "docs/migration/proof/retirement-step3-20260731221652/ — R/W/S already correct there; the run FAILED on its own control, which is the finding below.",
+  "reproduce": "node docs/migration/tools/prepare-gplay-datadir.mjs <cue-probe-dual.mkv> <empty-dir> && node docs/migration/tools/retirement-step3-harness.mjs --datadir=<that dir>   (needs the Vite dev server on 5173; a prepared datadir is SINGLE-USE for playback, so build a fresh one per run)",
+
+  "whatWasClosed": {
+    "standingItem": "Slice 19 (2026-07-31) moved ten video.* registrations out of useMedia — where they acted on a videoRef that had been null in every window since slice 16 deleted the element that set it — into VideoCoreStudyOverlay, and re-pointed their catalog defaults onto R/W/S/;/'. It also found that effectiveKeys returned defaultKeys RAW while chordMatches compared against the always-normalized output of chordFromEvent, so 10 of 101 defaults could never match a keypress. Every part of that was proven by unit guard and source sweep, and slice 19, 20 and 21 each recorded the same open item: NOBODY HAS PRESSED R IN A RUNNING WINDOW.",
+    "nowPressed": true,
+    "why phase E did not already cover it": "Phase E clicks [data-study-action] buttons. The keyboard path — window keydown -> chordFromEvent -> effectiveKeys normalization -> chordMatches -> the handler stack -> the overlay — shares only the final handler. It is a different path with a different failure mode, and it is the one a user actually uses."
+  },
+
+  "measurements": {
+    "cueStartsFromFile": [2, 6.5, 11, 16, 21, 24],
+    "parkedAt": 7.3,
+    "replayKeyR": { "seekedTo": 6.620808, "expected": 6.5, "ok": true },
+    "prevKeyW": { "seekedTo": 2.059812, "expected": 2, "ok": true },
+    "nextKeyS": { "seekedTo": 6.565682, "expected": 6.5, "ok": true },
+    "unboundKeyX": { "seekedTo": null, "expected": null, "ok": true },
+    "measuredBy": "capture-phase `seeked` events, not polled currentTime — phase E's own instrument, reused rather than re-invented. The cue controls resume playback, so a polled reading returns the cue start plus whatever played since; an earlier session read 2.96 against a real start of 2.15 and concluded the control was broken.",
+    "focusAtPress": ["r:BODY", "w:BODY", "s:BODY", "x:BODY"],
+    "whyFocusIsRecorded": "isTypingTarget() suppresses unmodified chords by design, so a stray focused input would read as 'the shortcut does nothing'. The phase blurs activeElement and records what it was."
+  },
+
+  "keysAreSentLowercase": {
+    "what": "CDP Input.dispatchKeyEvent sends key: 'r', which is what a real unshifted press produces. The catalog default is written 'R'.",
+    "why": "This only matches if slice 19's effectiveKeys normalization is still in place. If it regressed, this phase fails and the BUTTON phase above still passes — which is precisely the asymmetry that let the original defect live silently for a slice."
+  },
+
+  "theControlFoundSomething": {
+    "whatHappened": "The first run used `q` as the unbound control. R, W and S were all correct in that run; the phase FAILED because `q` seeked to 0.",
+    "why": "`q` is absent from this app's shortcut catalog, so it looked free. `KeyQ` is in the ADOPTED PLAYER's own vc_defaultKeybindings (vendor/seanime-web/app/(main)/_features/video-core/video-core.atoms.ts), which the catalog knows nothing about.",
+    "twoMaps": {
+      "vendor": "A B D E F H I J K M N P Q Z, plus BracketLeft/BracketRight and the arrows",
+      "appCatalog": "H R S W ; ' 1",
+      "controlMustBeFreeInBoth": "x is in neither — the same test slice 19 applied when it chose R/W/S/;/' from what vc_defaultKeybindings leaves free."
+    },
+    "isThisADefect": "No, and it is not written up as one. `q` is not a Study OS binding and nothing in this app claims it. The finding is about HARNESS DESIGN: 'absent from our catalog' is not the same as 'unbound' in a window that also mounts a third-party player with its own keymap. Slice 19 already found the one case where that mattered for real — [ and ] dispatched a dead subtitle nudge AND the adopted player's speed control — and fixed it.",
+    "value": "This is what the control is for. Without it the phase would have asserted only that SOMETHING seeks while keys are pressed; an auto-pause tick or a cue advance would have satisfied all three assertions equally."
+  },
+
+  "gates": {
+    "note": "The change is confined to docs/migration/tools/retirement-step3-harness.mjs. No src/ file changed in this slice, so the src gates are re-run for confirmation rather than because anything could have moved them.",
+    "vitest": "3788 / 331 files — unchanged from slice 21",
+    "tsc": "288 — the baseline",
+    "i18n": "exit 0, 6348 keys",
+    "architectureAudit": "exit 0, 'Nothing new'",
+    "harnessSyntax": "node --check clean"
+  },
+
+  "fullRunResult": {
+    "phases": "A taskbar identity, B window dragging, C real playback, E exact cue seeking by CLICK, G exact cue seeking by KEY, D quit with no orphan, F resume across restart",
+    "allPass": true,
+    "F": "quit at 11.846 -> restarted -> resumed at 14.156",
+    "D": "zero orphans"
+  },
+
+  "stillNotProvenLive": [
+    "Blanc's toolbox player has still never been watched playing a file. The 23:25 attempt in proof/blanc-player-live-20260731232500/ ran with the sidecar STOPPED, so six of its eight phases are INFO, not PASS. This is now the oldest untouched item on the list.",
+    "The other six video.* rows the overlay registers (subEarlier/subLater/large, toggleAutoPause, toggleLoop, toggleFurigana) still have not been pressed. Phase G presses the three that seek, because a seek is measurable by a `seeked` event; the others change preferences or subtitle delay and need a different instrument.",
+    "Music keyboard navigation still does not exist, and must not be built by reusing video.* ids — registerCommandHandler is a last-registrant-wins stack."
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "gate": "Phase 5 vertical slice (b) — the retained novel/EPUB reader, bound to the canonical reading model, to a mined Anki card",
+  "verdict": "PASS",
+  "capturedAt": "2026-07-30T08:30:00Z",
+  "gateDefinition": {
+    "question": "SEANIME_MIGRATION_PLAN.md:620 makes \"both vertical slices from your brief\" the Phase 5 gate, and that phrase was not defined in any migration document.",
+    "resolvedBy": "user decision, 2026-07-30",
+    "slices": [
+      "(a) manga — Seanime catalogue → chapter → pages → the Study OS reader → OCR → mined card. PROVEN: proof/phase5-manga-ocr-20260730/",
+      "(b) novel/EPUB — the retained Study OS reader → dictionary → mined card, bound to the canonical model. PROVEN: this artifact"
+    ],
+    "note": "PDF was explicitly not part of the gate — it shares the page locator but no PDF reader exists to exercise it."
+  },
+  "environment": {
+    "electron": "single dev instance, electron-forge start, React.StrictMode ENABLED",
+    "sidecar": "NOT running — this slice is entirely Study OS code and must not depend on Seanime",
+    "anki": "live collection, 83 decks before and after; namespaced self-cleaning probe deck StudyOS::_Phase5NovelProbe",
+    "driver": "the app's own debug bridge (127.0.0.1:39273) — no Windows mouse/keyboard control",
+    "book": {
+      "id": "7cc53a32-8803-45a2-93de-31722bd406af",
+      "title": "02 クビシメロマンチスト 人間失格・零崎人識",
+      "kind": "book",
+      "epubFile": "original.epub",
+      "storedProgressBeforeRun": { "location": "p:12:0.6207", "percent": 0.031123033372213726 },
+      "note": "a real book from the user's own library, not a fixture — restored byte-for-byte afterwards"
+    }
+  },
+  "path": "Start → Library → the book card → the retained NovelReader (vertical-rl Japanese layout) → click 無防備 → dictionary popup → + Add to Anki",
+  "proved": [
+    "the retained NovelReader opened a real EPUB and restored the stored position through readingLocatorFromProgress — part 12 preserved (see defectFoundAndFixed: before the fix this was silently zeroed)",
+    "a real click-lookup on 無防備 returned real JMdict senses in two languages: 'defenseless; defenceless; unprotected; vulnerable' (JMdict Japanese–English) and the Japanese–Russian entry, with reading むぼうび and COMMON/PITCH metadata",
+    "+ Add to Anki produced note 1785399659697 on JP Study App::JA Immersion with Term 無防備 / Reading むぼうび and Sentence = と、言おうと思っていたのだが、しかし、そんな無防備に近い、全く相手に拒否されることを考えていない笑みを向けられると、さすがのぼくでも毒気を抜かれる。 — the exact sentence the word was clicked in, which is the value that ties the reader to the card",
+    "a second Add on the same term was refused and the button reported 'Already in Anki'; the deck still held one note",
+    "the write path goes through progressFromReadingLocator: after two page turns, closing the reader persisted location 'p:14:0.0000' / percent 0.03777751998857796 — the exact p:<part>:<frac> four-decimal shape, with the part advanced by the two turns"
+  ],
+  "defectFoundAndFixed": {
+    "title": "Opening a book destroyed its stored p:<part>:<frac> position",
+    "where": "src/renderer/views/NovelReader.tsx — the load effect's cleanup",
+    "mechanism": "The load effect restores the position asynchronously (window.api.readBook → loadEpub/loadPdf → partRef/localFracRef). Its cleanup wrote the position back unconditionally. If the effect was torn down before that async load resolved, the cleanup persisted the INITIAL refs — part 0, fraction 0 — because `const [part] = useState(0)` and `localFracRef = useRef(0)`. `percent` survived intact, because `curGlobalRef` is seeded from `item.progress.percent`, which is exactly why the damage was invisible: the reader reopened at the right percentage via its coarse fallback mapping while the precise locator was gone.",
+    "whyItFiredEveryTime": "React.StrictMode tears the first mount down on every mount in development. In a production build it needs a real early close (a large EPUB closed before it finishes loading).",
+    "observedLive": "before opening: p:12:0.6207 — immediately after opening: p:0:0.0000, percent unchanged at 0.0311",
+    "fix": "a positionRestoredRef guard: the cleanup returns without writing until the stored position has actually been restored into the refs, and the flag resets at the top of the effect so a book change cannot persist the previous book's part",
+    "afterFixObservedLive": "reopening the same book wrote p:12:0.0000 — the part is preserved",
+    "regressionTest": "src/renderer/__tests__/novelReaderProgressGuard.test.ts — mounts the reader with readBook left pending, unmounts, and asserts setProgress was not called. Verified to FAIL on the unguarded code (one call, with p:0:0.0000) and pass with the guard."
+  },
+  "secondaryObservation": {
+    "what": "The restored within-part fraction is snapped by the paged layout: 0.6207 came back as 0.0000.",
+    "mechanism": "applyLocal computes the page as round(lf * (pages - 1)) and then rewrites localFracRef as page / (pages - 1), which is exactly 0 when the part occupies a single page at the current font and viewport.",
+    "classification": "NOT recorded as a defect — a single-page part genuinely has no sub-position, so 0.0000 is the only representable value. Recorded because it is the reason a reopened position can shift slightly (percent 0.0311 → 0.0282 here), and because a future session comparing stored fractions should not read it as corruption."
+  },
+  "toolingGapFound": {
+    "what": "Two renderer component tests have never run.",
+    "detail": "vitest.config.ts includes only src/renderer/__tests__/**/*.test.ts, but src/renderer/__tests__/ contains externalPlayerPanel.test.tsx and mediaTrackingSourcesHistory.test.tsx. Both are silently skipped — `vitest run <path>` on a .tsx file there reports 'No test files found'.",
+    "notFixedHere": "the include glob lives in root config, which CLAUDE.md places out of scope for this work; the new regression test is therefore written with createElement in a .test.ts file",
+    "consequence": "any renderer component test added as .test.tsx in that directory is dead on arrival"
+  },
+  "cleanup": {
+    "note": "deleted (1785399659697); probe deck removed; deck count 83 → 84 → 83; zero note types minted",
+    "libraryRestored": "library.json restored from the pre-run backup, so the book's real position is back at p:12:0.6207 / percent 0.031123033372213726",
+    "runtimeFilesVerifiedFromPowerShell": {
+      "library.json": "MATCH",
+      "profiles.json": "MATCH",
+      "profile-rules.json": "MATCH",
+      "media.json": "MATCH",
+      "study-orchestrator-v2.json": "MATCH"
+    }
+  },
+  "verification": {
+    "tests": "3,192 / 3,192 pass, 293 / 293 files (one file and one test added)",
+    "i18n": "exit 0 — 5,993 English keys present in ja/zh/ru (no new UI strings)",
+    "architectureAudit": "exit 0, nothing new; 3 known pending",
+    "tsc": "288 diagnostics — identical to the recorded baseline, so none added; the 4 in NovelReader.tsx are pre-existing (item.lang on LibraryItem, line 111)",
+    "targetedLint": "exit 0 — 0 errors; 9 pre-existing no-non-null-assertion warnings in NovelReader.tsx",
+    "mainSsrBuild": "exit 0",
+    "preloadBuild": "exit 0",
+    "rendererBuild": "exit 0",
+    "cssContainment": "6,924 / 6,924 scoped; 0 unscoped; 0 shell --tw- tokens"
+  }
+}

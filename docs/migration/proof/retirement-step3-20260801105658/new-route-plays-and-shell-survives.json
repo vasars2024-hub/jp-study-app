@@ -1,0 +1,1602 @@
+{
+  "harness": "retirement-step3-harness.mjs",
+  "question": "Through the new routing path: is the taskbar identity intact, does window dragging survive the workspace closing, and does a real file actually play?",
+  "startedAt": "2026-08-01T10:56:58.110Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice32k\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice32k",
+  "phases": {
+    "A": {
+      "what": "taskbar identity for the two swapped sections and the unswapped one",
+      "labels": {
+        "video": "Video\n×",
+        "player": "Media\n×",
+        "music": "Music\n×"
+      },
+      "distinct": true,
+      "allNamed": true,
+      "result": "PASS"
+    },
+    "B": {
+      "what": "window dragging after the full-screen workspace has opened and closed",
+      "grip": {
+        "x": 125,
+        "y": 48
+      },
+      "posBefore": {
+        "left": "60px",
+        "top": "24px",
+        "x": 69,
+        "y": 30
+      },
+      "posAfter": {
+        "left": "132px",
+        "top": "72px",
+        "x": 132,
+        "y": 72
+      },
+      "moved": true,
+      "result": "PASS"
+    },
+    "C": {
+      "what": "a real local file opened and played through the new routing path",
+      "sidecar": {
+        "pid": 37984,
+        "port": 57025,
+        "version": "3.10.2"
+      },
+      "startedAt": 0.320254,
+      "currentTime": 4.335306,
+      "duration": 30.386,
+      "readyState": 4,
+      "paused": false,
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "textTracks": 2,
+      "advanced": true,
+      "result": "PASS"
+    },
+    "E": {
+      "what": "exact cue seeking through the overlay's own replay/previous/next controls",
+      "measuredBy": "capture-phase `seeked` events, not polled currentTime",
+      "track": "English (probe) (default)",
+      "cueStartsFromFile": [
+        2,
+        6.5,
+        11,
+        16,
+        21,
+        24
+      ],
+      "parkedAt": 7.3,
+      "replayFromInsideCue1": {
+        "seekedTo": 6.600452,
+        "expected": 6.5,
+        "ok": true
+      },
+      "previousToCue0": {
+        "seekedTo": 2.082722,
+        "expected": 2,
+        "ok": true
+      },
+      "nextBackToCue1": {
+        "seekedTo": 6.577015,
+        "expected": 6.5,
+        "ok": true
+      },
+      "playheadAtClick": {
+        "replayJump": {
+          "before": 7.3,
+          "seekedTo": 6.600452,
+          "after": 7.696669
+        },
+        "jumpPrev": {
+          "before": 7.698884,
+          "seekedTo": 2.082722,
+          "after": 3.139486
+        },
+        "jumpNext": {
+          "before": 3.140207,
+          "seekedTo": 6.577015,
+          "after": 7.639921
+        }
+      },
+      "cueDeliveryLimit": "Only cues 0 and 1 are ever delivered for this fixture, however far playback runs — measured across several runs: from a playhead of 11.85 s, next-cue returned cue 1 (6.5) and replay-cue was disabled for want of an active cue, both of which are exactly what adjacentStudyCue does when allCues holds two entries. So the NAVIGATION is verified exact here; full-timeline subtitle DELIVERY is not, and is a directstream property this run cannot establish. G-PLAY mined a card from cue 0 through the workspace own entry (proof/gplay-20260730).",
+      "result": "PASS"
+    },
+    "G": {
+      "what": "the video.* shortcuts driven by real KEY EVENTS, not by clicking their buttons",
+      "why": "Slice 19 re-homed ten video.* registrations onto VideoCoreStudyOverlay and fixed effectiveKeys to normalize, which is what made R/W/S matchable at all. Every part of that was proven by unit guard and source sweep; nothing had pressed a key. Phase E clicks the buttons, which does not exercise chordFromEvent, effectiveKeys, chordMatches or the handler stack.",
+      "sentAs": "lowercase event.key via CDP Input.dispatchKeyEvent — the catalog default is 'R', so this only matches if effectiveKeys still normalizes",
+      "parkedAt": 7.3,
+      "cueStartsFromFile": [
+        2,
+        6.5,
+        11,
+        16,
+        21,
+        24
+      ],
+      "replayKeyR": {
+        "seekedTo": 6.687307,
+        "expected": 6.5,
+        "ok": true
+      },
+      "prevKeyW": {
+        "seekedTo": 2.146125,
+        "expected": 2,
+        "ok": true
+      },
+      "nextKeyS": {
+        "seekedTo": 6.673874,
+        "expected": 6.5,
+        "ok": true
+      },
+      "unboundKeyX": {
+        "seekedTo": null,
+        "expected": null,
+        "ok": true,
+        "why": "the control — three seeks alone would not prove the BINDING fired"
+      },
+      "qIsNotFree": "The first run of this phase used q as the control and it seeked to 0. q is absent from this app's catalog but present in the ADOPTED PLAYER's own vc_defaultKeybindings, which the catalog knows nothing about. Recorded in proof/retirement-step3-20260731221652/ with R/W/S already correct in that same run. A control key has to be free in BOTH maps.",
+      "focusAtPress": [
+        "r:BODY",
+        "w:BODY",
+        "s:BODY",
+        "x:BODY"
+      ],
+      "result": "PASS"
+    },
+    "H": {
+      "what": "the two remaining PRESSABLE video.* rows — subEarlier (;) and subLater (') — driven by real key events",
+      "why": "Slices 19, 20, 21 and 22 each carried the same open item: the other video.* rows have never been pressed. Phase G could not close them because its instrument is a `seeked` event and these rows do not seek — they move the subtitle delay.",
+      "instrument": "the <output> in the subtitle-offset cluster, matched by text shape rather than by its i18n aria-label; NOT data-timing-delay, which only exists while drift tracking is active",
+      "delayAtStart": 0,
+      "subEarlierSemicolon": {
+        "key": ";",
+        "before": 0,
+        "after": -0.1,
+        "expected": -0.1,
+        "ok": true
+      },
+      "subLaterQuote": {
+        "key": "'",
+        "before": -0.1,
+        "after": 0,
+        "expected": 0,
+        "ok": true
+      },
+      "unboundKeyX": {
+        "before": 0,
+        "after": 0,
+        "ok": true,
+        "why": "the control — two deltas alone would not prove the BINDING fired"
+      },
+      "theOtherFiveRows": "subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop and toggleFurigana ship with defaultKeys: '' — effectiveKeys returns '' and chordMatches is false for every chord, so they are unpressable BY DESIGN until a user binds them. \"Press them\" is therefore the wrong test. What is untested for those is bind-then-press through ShortcutSettings, which needs a settings-driving phase this harness does not have.",
+      "result": "PASS"
+    },
+    "I": {
+      "what": "BIND-then-press for the five video.* rows that ship with no default binding",
+      "why": "subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop and toggleFurigana carry defaultKeys: '', so effectiveKeys returns '' and chordMatches is false for every chord — they are unpressable by design and phases G and H could not reach them. The untested claim was never \"does the key work\" but \"does binding it in Settings make it work\", and nothing had ever driven that surface.",
+      "boundThrough": "Settings → Shortcuts, the real capture button, a real CDP key event — not a setBinding() call from the console",
+      "rowsFoundBy": "data-shortcut-id / data-shortcut-capture, because every visible string on that surface goes through useT() and the app ships four UI languages",
+      "advancedSectionAlreadyOpen": true,
+      "bind": [
+        {
+          "id": "video.subEarlierLarge",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+1",
+          "conflict": false
+        },
+        {
+          "id": "video.subLaterLarge",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+2",
+          "conflict": false
+        },
+        {
+          "id": "video.toggleFurigana",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+3",
+          "conflict": false
+        },
+        {
+          "id": "video.toggleAutoPause",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+4",
+          "conflict": false
+        },
+        {
+          "id": "video.toggleLoop",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+5",
+          "conflict": false
+        }
+      ],
+      "press": [
+        {
+          "id": "video.subEarlierLarge",
+          "chord": "Ctrl+Alt+1",
+          "kind": "delay",
+          "before": 0,
+          "after": -0.5,
+          "expected": -0.5
+        },
+        {
+          "id": "video.subLaterLarge",
+          "chord": "Ctrl+Alt+2",
+          "kind": "delay",
+          "before": -0.5,
+          "after": 0,
+          "expected": 0
+        },
+        {
+          "id": "video.toggleFurigana",
+          "chord": "Ctrl+Alt+3",
+          "kind": "pref",
+          "pref": "furigana",
+          "before": false,
+          "after": true,
+          "expected": true
+        },
+        {
+          "id": "video.toggleAutoPause",
+          "chord": "Ctrl+Alt+4",
+          "kind": "pref",
+          "pref": "autoPause",
+          "before": false,
+          "after": true,
+          "expected": true
+        },
+        {
+          "id": "video.toggleLoop",
+          "chord": "Ctrl+Alt+5",
+          "kind": "pref",
+          "pref": "loopLine",
+          "before": false,
+          "after": true,
+          "expected": true
+        }
+      ],
+      "control": {
+        "chord": "Ctrl+Alt+9",
+        "before": {
+          "delay": 0,
+          "furigana": true,
+          "autoPause": true,
+          "loopLine": true
+        },
+        "after": {
+          "delay": 0,
+          "furigana": true,
+          "autoPause": true,
+          "loopLine": true
+        },
+        "ok": true,
+        "why": "same chord family, same dispatch, no binding — five moving observables alone would not prove the BINDING is what fired"
+      },
+      "chordChoice": "Ctrl+Alt+<digit>. A chord has to be free in BOTH keymaps: the adopted player binds bare Key*/Arrow*/Bracket* codes and this catalog uses Ctrl+Alt+0/-/= but no Ctrl+Alt+<1..9>. Not taken on trust — each bound row is read back for the .sc-conflict marker the settings row renders when a chord is shared.",
+      "result": "PASS"
+    },
+    "D": {
+      "what": "quit with a player active — the sidecar must not outlive the app",
+      "sidecarPid": 37984,
+      "orphaned": false,
+      "result": "PASS"
+    },
+    "F": {
+      "what": "the position survives a real app restart, reopened through the new route",
+      "positionBeforeQuit": 8.779676,
+      "resumeStoreWrittenBeforeQuit": true,
+      "resumeStoreSurvivedRestart": true,
+      "storedEntries": 1,
+      "resumedAt": 8.538096,
+      "reopenAttempts": 1,
+      "resumed": true,
+      "result": "PASS"
+    }
+  },
+  "probeCorrections": [
+    "Phase B first reported \"no draggable point on the title bar\", which reads as the drag-layer defect it was written to catch. It was not: a cold profile shows the consent screen and `.consent` covers the viewport, so `elementFromPoint` over the title bar returned the overlay. Earlier harnesses never noticed because querySelector and .click() do not hit-test. The run now declines consent before any pointer-driven phase. Keep that ordering.",
+    "Phase B then found the workspace REOPENED after being closed, which surfaced a real defect this harness was not looking for: MediaWorkspaceHost already listened for os:open 'video', and MediaWorkspaceSectionView dispatched on mount as well, so video opened twice and the section's dispatch — gated behind an async seanimeStatus() round trip — landed after a fast close and reopened it. Fixed by making the host's listener the single owner (now covering 'player' too) and removing the mount dispatch. Phase B is what caught it."
+  ],
+  "mediaBytes": 11873146,
+  "consentDismissed": true,
+  "mediaSamples": [
+    {
+      "label": "phase C",
+      "attempt": 1,
+      "samples": [
+        {
+          "atMs": 0,
+          "videoPresent": false
+        },
+        {
+          "atMs": 232,
+          "videoPresent": false
+        },
+        {
+          "atMs": 432,
+          "videoPresent": false
+        },
+        {
+          "atMs": 642,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 1572,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 1812,
+          "videoPresent": true,
+          "readyState": 1,
+          "networkState": 2,
+          "bufferedRanges": 1,
+          "currentTime": 0
+        },
+        {
+          "atMs": 2072,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 3,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 2407,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 2612,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 2822,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 3032,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 3242,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 3443,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 3652,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 3862,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 4068,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 4273,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 4490,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 4702,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 4908,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 5113,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 5327,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 5533,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 5743,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 5955,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 6163,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 6379,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 6592,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 6807,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 7019,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 7222,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 7427,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 7629,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 7838,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 8048,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 8256,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 8472,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 8687,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 8892,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9103,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9316,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9519,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9730,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9942,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 10158,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 10362,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 10578,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 10787,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 11003,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 11208,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 0,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 11418,
+          "videoPresent": false
+        },
+        {
+          "atMs": 11722,
+          "videoPresent": false
+        },
+        {
+          "atMs": 11932,
+          "videoPresent": false
+        },
+        {
+          "atMs": 12133,
+          "videoPresent": false
+        },
+        {
+          "atMs": 12342,
+          "videoPresent": false
+        },
+        {
+          "atMs": 12558,
+          "videoPresent": false
+        },
+        {
+          "atMs": 12762,
+          "videoPresent": false
+        },
+        {
+          "atMs": 12971,
+          "videoPresent": false
+        },
+        {
+          "atMs": 13183,
+          "videoPresent": false
+        },
+        {
+          "atMs": 13398,
+          "videoPresent": false
+        },
+        {
+          "atMs": 13608,
+          "videoPresent": false
+        },
+        {
+          "atMs": 13822,
+          "videoPresent": false
+        },
+        {
+          "atMs": 14037,
+          "videoPresent": false
+        },
+        {
+          "atMs": 14244,
+          "videoPresent": false
+        },
+        {
+          "atMs": 14452,
+          "videoPresent": false
+        },
+        {
+          "atMs": 14659,
+          "videoPresent": false
+        },
+        {
+          "atMs": 14867,
+          "videoPresent": false
+        },
+        {
+          "atMs": 15072,
+          "videoPresent": false
+        },
+        {
+          "atMs": 15277,
+          "videoPresent": false
+        },
+        {
+          "atMs": 15482,
+          "videoPresent": false
+        },
+        {
+          "atMs": 15687,
+          "videoPresent": false
+        },
+        {
+          "atMs": 15903,
+          "videoPresent": false
+        },
+        {
+          "atMs": 16112,
+          "videoPresent": false
+        },
+        {
+          "atMs": 16322,
+          "videoPresent": false
+        },
+        {
+          "atMs": 16537,
+          "videoPresent": false
+        },
+        {
+          "atMs": 16743,
+          "videoPresent": false
+        },
+        {
+          "atMs": 16952,
+          "videoPresent": false
+        },
+        {
+          "atMs": 17160,
+          "videoPresent": false
+        },
+        {
+          "atMs": 17362,
+          "videoPresent": false
+        },
+        {
+          "atMs": 17577,
+          "videoPresent": false
+        },
+        {
+          "atMs": 17782,
+          "videoPresent": false
+        },
+        {
+          "atMs": 18003,
+          "videoPresent": false
+        },
+        {
+          "atMs": 18212,
+          "videoPresent": false
+        },
+        {
+          "atMs": 18422,
+          "videoPresent": false
+        },
+        {
+          "atMs": 18632,
+          "videoPresent": false
+        },
+        {
+          "atMs": 18847,
+          "videoPresent": false
+        },
+        {
+          "atMs": 19052,
+          "videoPresent": false
+        },
+        {
+          "atMs": 19262,
+          "videoPresent": false
+        },
+        {
+          "atMs": 19472,
+          "videoPresent": false
+        },
+        {
+          "atMs": 19682,
+          "videoPresent": false
+        },
+        {
+          "atMs": 19883,
+          "videoPresent": false
+        },
+        {
+          "atMs": 20091,
+          "videoPresent": false
+        },
+        {
+          "atMs": 20293,
+          "videoPresent": false
+        },
+        {
+          "atMs": 20502,
+          "videoPresent": false
+        },
+        {
+          "atMs": 20707,
+          "videoPresent": false
+        },
+        {
+          "atMs": 20912,
+          "videoPresent": false
+        },
+        {
+          "atMs": 21113,
+          "videoPresent": false
+        },
+        {
+          "atMs": 21327,
+          "videoPresent": false
+        },
+        {
+          "atMs": 21528,
+          "videoPresent": false
+        },
+        {
+          "atMs": 21741,
+          "videoPresent": false
+        },
+        {
+          "atMs": 21952,
+          "videoPresent": false
+        },
+        {
+          "atMs": 22162,
+          "videoPresent": false
+        },
+        {
+          "atMs": 22372,
+          "videoPresent": false
+        },
+        {
+          "atMs": 22582,
+          "videoPresent": false
+        },
+        {
+          "atMs": 22794,
+          "videoPresent": false
+        },
+        {
+          "atMs": 23002,
+          "videoPresent": false
+        },
+        {
+          "atMs": 23204,
+          "videoPresent": false
+        },
+        {
+          "atMs": 23408,
+          "videoPresent": false
+        },
+        {
+          "atMs": 23612,
+          "videoPresent": false
+        },
+        {
+          "atMs": 23827,
+          "videoPresent": false
+        },
+        {
+          "atMs": 24032,
+          "videoPresent": false
+        },
+        {
+          "atMs": 24236,
+          "videoPresent": false
+        },
+        {
+          "atMs": 24442,
+          "videoPresent": false
+        },
+        {
+          "atMs": 24651,
+          "videoPresent": false
+        },
+        {
+          "atMs": 24858,
+          "videoPresent": false
+        },
+        {
+          "atMs": 25066,
+          "videoPresent": false
+        },
+        {
+          "atMs": 25272,
+          "videoPresent": false
+        },
+        {
+          "atMs": 25482,
+          "videoPresent": false
+        },
+        {
+          "atMs": 25685,
+          "videoPresent": false
+        },
+        {
+          "atMs": 25892,
+          "videoPresent": false
+        },
+        {
+          "atMs": 26107,
+          "videoPresent": false
+        },
+        {
+          "atMs": 26316,
+          "videoPresent": false
+        },
+        {
+          "atMs": 26525,
+          "videoPresent": false
+        },
+        {
+          "atMs": 26731,
+          "videoPresent": false
+        },
+        {
+          "atMs": 26943,
+          "videoPresent": false
+        },
+        {
+          "atMs": 27152,
+          "videoPresent": false
+        },
+        {
+          "atMs": 27362,
+          "videoPresent": false
+        },
+        {
+          "atMs": 27577,
+          "videoPresent": false
+        },
+        {
+          "atMs": 27790,
+          "videoPresent": false
+        },
+        {
+          "atMs": 28004,
+          "videoPresent": false
+        },
+        {
+          "atMs": 28212,
+          "videoPresent": false
+        },
+        {
+          "atMs": 28421,
+          "videoPresent": false
+        },
+        {
+          "atMs": 28624,
+          "videoPresent": false
+        },
+        {
+          "atMs": 28831,
+          "videoPresent": false
+        },
+        {
+          "atMs": 29033,
+          "videoPresent": false
+        },
+        {
+          "atMs": 29237,
+          "videoPresent": false
+        },
+        {
+          "atMs": 29442,
+          "videoPresent": false
+        },
+        {
+          "atMs": 29651,
+          "videoPresent": false
+        },
+        {
+          "atMs": 29859,
+          "videoPresent": false
+        },
+        {
+          "atMs": 30062,
+          "videoPresent": false
+        },
+        {
+          "atMs": 30267,
+          "videoPresent": false
+        },
+        {
+          "atMs": 30472,
+          "videoPresent": false
+        },
+        {
+          "atMs": 30682,
+          "videoPresent": false
+        },
+        {
+          "atMs": 30894,
+          "videoPresent": false
+        },
+        {
+          "atMs": 31111,
+          "videoPresent": false
+        },
+        {
+          "atMs": 31321,
+          "videoPresent": false
+        },
+        {
+          "atMs": 31532,
+          "videoPresent": false
+        },
+        {
+          "atMs": 31741,
+          "videoPresent": false
+        },
+        {
+          "atMs": 31951,
+          "videoPresent": false
+        },
+        {
+          "atMs": 32161,
+          "videoPresent": false
+        },
+        {
+          "atMs": 32372,
+          "videoPresent": false
+        },
+        {
+          "atMs": 32582,
+          "videoPresent": false
+        },
+        {
+          "atMs": 32792,
+          "videoPresent": false
+        },
+        {
+          "atMs": 33001,
+          "videoPresent": false
+        },
+        {
+          "atMs": 33208,
+          "videoPresent": false
+        },
+        {
+          "atMs": 33417,
+          "videoPresent": false
+        },
+        {
+          "atMs": 33619,
+          "videoPresent": false
+        },
+        {
+          "atMs": 33826,
+          "videoPresent": false
+        },
+        {
+          "atMs": 34036,
+          "videoPresent": false
+        },
+        {
+          "atMs": 34242,
+          "videoPresent": false
+        },
+        {
+          "atMs": 34451,
+          "videoPresent": false
+        },
+        {
+          "atMs": 34657,
+          "videoPresent": false
+        },
+        {
+          "atMs": 34867,
+          "videoPresent": false
+        },
+        {
+          "atMs": 35073,
+          "videoPresent": false
+        },
+        {
+          "atMs": 35277,
+          "videoPresent": false
+        },
+        {
+          "atMs": 35486,
+          "videoPresent": false
+        },
+        {
+          "atMs": 35691,
+          "videoPresent": false
+        },
+        {
+          "atMs": 35902,
+          "videoPresent": false
+        },
+        {
+          "atMs": 36107,
+          "videoPresent": false
+        },
+        {
+          "atMs": 36317,
+          "videoPresent": false
+        },
+        {
+          "atMs": 36519,
+          "videoPresent": false
+        },
+        {
+          "atMs": 36722,
+          "videoPresent": false
+        },
+        {
+          "atMs": 36932,
+          "videoPresent": false
+        },
+        {
+          "atMs": 37146,
+          "videoPresent": false
+        },
+        {
+          "atMs": 37352,
+          "videoPresent": false
+        },
+        {
+          "atMs": 37556,
+          "videoPresent": false
+        },
+        {
+          "atMs": 37766,
+          "videoPresent": false
+        },
+        {
+          "atMs": 37971,
+          "videoPresent": false
+        },
+        {
+          "atMs": 38179,
+          "videoPresent": false
+        },
+        {
+          "atMs": 38392,
+          "videoPresent": false
+        },
+        {
+          "atMs": 38601,
+          "videoPresent": false
+        },
+        {
+          "atMs": 38816,
+          "videoPresent": false
+        },
+        {
+          "atMs": 39026,
+          "videoPresent": false
+        },
+        {
+          "atMs": 39237,
+          "videoPresent": false
+        },
+        {
+          "atMs": 39440,
+          "videoPresent": false
+        },
+        {
+          "atMs": 39646,
+          "videoPresent": false
+        },
+        {
+          "atMs": 39861,
+          "videoPresent": false
+        },
+        {
+          "atMs": 40066,
+          "videoPresent": false
+        },
+        {
+          "atMs": 40276,
+          "videoPresent": false
+        },
+        {
+          "atMs": 40486,
+          "videoPresent": false
+        },
+        {
+          "atMs": 40688,
+          "videoPresent": false
+        },
+        {
+          "atMs": 40896,
+          "videoPresent": false
+        },
+        {
+          "atMs": 41106,
+          "videoPresent": false
+        },
+        {
+          "atMs": 41307,
+          "videoPresent": false
+        },
+        {
+          "atMs": 41526,
+          "videoPresent": false
+        },
+        {
+          "atMs": 41736,
+          "videoPresent": false
+        },
+        {
+          "atMs": 41946,
+          "videoPresent": false
+        },
+        {
+          "atMs": 42156,
+          "videoPresent": false
+        },
+        {
+          "atMs": 42366,
+          "videoPresent": false
+        },
+        {
+          "atMs": 42577,
+          "videoPresent": false
+        },
+        {
+          "atMs": 42787,
+          "videoPresent": false
+        },
+        {
+          "atMs": 42991,
+          "videoPresent": false
+        },
+        {
+          "atMs": 43197,
+          "videoPresent": false
+        },
+        {
+          "atMs": 43406,
+          "videoPresent": false
+        },
+        {
+          "atMs": 43616,
+          "videoPresent": false
+        },
+        {
+          "atMs": 43826,
+          "videoPresent": false
+        },
+        {
+          "atMs": 44030,
+          "videoPresent": false
+        },
+        {
+          "atMs": 44236,
+          "videoPresent": false
+        },
+        {
+          "atMs": 44446,
+          "videoPresent": false
+        },
+        {
+          "atMs": 44656,
+          "videoPresent": false
+        },
+        {
+          "atMs": 44866,
+          "videoPresent": false
+        },
+        {
+          "atMs": 45076,
+          "videoPresent": false
+        }
+      ]
+    },
+    {
+      "label": "phase C",
+      "attempt": 2,
+      "samples": [
+        {
+          "atMs": 0,
+          "videoPresent": false
+        },
+        {
+          "atMs": 216,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 506,
+          "videoPresent": true,
+          "readyState": 1,
+          "networkState": 2,
+          "bufferedRanges": 1,
+          "currentTime": 0
+        },
+        {
+          "atMs": 737,
+          "videoPresent": true,
+          "readyState": 4,
+          "networkState": 1,
+          "bufferedRanges": 1,
+          "currentTime": 0.114673
+        }
+      ]
+    },
+    {
+      "label": "phase F",
+      "attempt": 1,
+      "samples": [
+        {
+          "atMs": 0,
+          "videoPresent": false
+        },
+        {
+          "atMs": 260,
+          "videoPresent": false
+        },
+        {
+          "atMs": 476,
+          "videoPresent": false
+        },
+        {
+          "atMs": 685,
+          "videoPresent": false
+        },
+        {
+          "atMs": 897,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1110,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1320,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1530,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1734,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1941,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2150,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2352,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2560,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2770,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2975,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3177,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3379,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3597,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3802,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4004,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4210,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4420,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4636,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4840,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5047,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5256,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5460,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5671,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5880,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6091,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6300,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6507,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6712,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6913,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7120,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7335,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7538,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7740,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7955,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8170,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8373,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8575,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8786,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8988,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9450,
+          "videoPresent": true,
+          "readyState": 1,
+          "networkState": 1,
+          "bufferedRanges": 1,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9735,
+          "videoPresent": true,
+          "readyState": 1,
+          "networkState": 1,
+          "bufferedRanges": 1,
+          "currentTime": 8.743541
+        }
+      ]
+    }
+  ],
+  "openStalls": [
+    {
+      "label": "phase C",
+      "attempt": 1,
+      "slicePresent": true,
+      "sliceState": "active",
+      "text": "Playback Error\n\nThe media server accepted this file and then stopped preparing it. Try opening it again.\n\nClose Player\nWaiting for subtitle\nPrevious line\nReplay line\nNext line\nFrame −\nFrame +\n−0.1s subs\n+0.0s\n+0.1s subs\n0.70x\n0.75x\n0.85x\n0.90x\n1.00x\n1.25x\n1.50x\nMore\n\nSelect a real subtitle cue to prepare a card.",
+      "videoPresent": false,
+      "readyState": null,
+      "networkState": null,
+      "srcKind": "none",
+      "bufferedRanges": null,
+      "currentTime": null
+    }
+  ],
+  "openAttempts": 2,
+  "verdict": "PASS",
+  "finishedAt": "2026-08-01T10:59:22.494Z"
+}

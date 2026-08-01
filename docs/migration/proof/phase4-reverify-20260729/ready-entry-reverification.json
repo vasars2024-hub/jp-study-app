@@ -1,0 +1,49 @@
+{
+  "proof": "Phase 4 acceptance gate — every `ready` featureStatus entry re-verified live on the new backend",
+  "criterion": "SEANIME_MIGRATION_PLAN.md:617 — every `ready` entry in featureStatus.ts is still `ready` on the new backend, re-verified live, and no entry is promoted without a recorded run.",
+  "date": "2026-07-29",
+  "tool": "mcp__jp-app (app_eval / app_dom against the running Electron app, http://localhost:5173, window 1280x860)",
+  "method": "Driven through the app's own UI and its real renderer→preload→main path. Main's scraper log bus was tailed throughout as the witness that a check reached the real backend — ipcScraperPort.route() silently falls back to sample data when a real call throws, so a rendered value is not by itself proof of a live call.",
+  "methodologyWarning": "Do not verify by importing app modules in the console. Under Vite a dynamic import resolves to a SECOND module instance with its own state; an early attempt this session read an empty settings store that way and produced two false failures (page.sources, page.torrents). Both are fine when driven through the app.",
+  "sidecar": { "state": "ready", "version": "3.10.2", "port": 64233, "datadir": "isolated test profile in %TEMP%" },
+  "entries": {
+    "shell.nav": { "verdict": "ready", "run": "Route changes across Dashboard / New Scrape / History / Source Manager / Torrent Manager / Results / Plugins / Site Rules / Scheduled Tasks / Selector Tester / Regex Tester; page content changed on each." },
+    "shell.search": { "verdict": "ready", "run": "Query 'cron' returned Scheduled Tasks — matched on the English keyword list, not the title." },
+    "shell.statusbar": { "verdict": "ready", "run": "Live systemStats {memoryMb, cpuPercent, activeJobs}; status strip showed 'Idle · Last scrape: AniList · 28/28 · Next scheduled: Disabled'." },
+    "shell.persistence": { "verdict": "ready", "run": "validation.maxTitleLength 200→207, Save, confirmed written to jp-scraper-settings-v1 under the active profile with an undo-history entry; shell state (page, drawerCategory) persisted too. Reverted to 200." },
+    "page.discover": { "verdict": "ready", "run": "Live catalogue search returned 6 candidates for 'Frieren'." },
+    "page.new-scrape": { "verdict": "ready", "run": "job-ms55zc1k-2 on 'Sousou no Frieren': Jikan answered 504, engine fell back to AniList (5 candidates), matched 'Frieren: Beyond Journey's End', 28 episodes, validation 28 kept / 0 flagged, saved." },
+    "page.history": { "verdict": "ready", "run": "7 stored jobs listed with per-run provider, profile, found/failed counts and durations." },
+    "page.sources": { "verdict": "ready", "run": "Real probes logged by main: 'Probing Jikan (MyAnimeList) (api.jikan.moe)' → 504 in 606ms (degraded); 'Probing AniList (graphql.anilist.co)' → 404 on the probe path in 628ms. Health written back to the rows. The degraded verdicts are live external conditions, not app faults." },
+    "page.sources.providers": { "verdict": "ready", "run": "Sidecar inventory returned state=ready with phase4-local-proof (online-stream) and local-manga (manga-source)." },
+    "page.torrents": { "verdict": "ready", "run": "Live nyaa.si search for 'Frieren': main logged '75 results', '74 results after filters'; table rendered the rows." },
+    "page.scheduled": { "verdict": "ready", "run": "2 schedules, next run computed from cron '0 19 * * 0' as Aug 2 07:00 PM. 'Run now' started job-ms5617lk-3, which handled the unreachable sample URL (ENOTFOUND), fell back to the URL slug, and continued into the catalogue." },
+    "page.site-rules": { "verdict": "ready", "run": "New rule against en.wikipedia.org/wiki/List_of_Frieren_episodes; main logged GET → 200 OK · 625,396 B · 635ms; 62 rows matched; extraction preview produced real episode titles with Japanese text and numbers. Test rule deleted afterwards; profile back to 0 rules." },
+    "page.plugins": { "verdict": "ready", "run": "2 manifests read off disk: Jimaku Bridge v0.3.1, plus 'broken-one' correctly reported incompatible with the JSON parse error logged." },
+    "page.results": {
+      "verdict": "ready after a fix",
+      "defectFound": "Repeat runs of one series read '500% catalogue coverage · 140 / 28'. The library holds one entry per job but used result.seriesId (per series) as the entry id, so summarizeSeriesResults' row join matched every run's rows to every entry.",
+      "fix": "librarySeriesId() + buildResultLibrary() in resultLibrary.ts; DataPages.tsx now builds the library through them. Regression test added in scraperResultLibrary.test.ts.",
+      "run": "Re-checked live after the fix: 8 entries, each 100% catalogue coverage (Frieren 28/28, One Piece 1,147/1,147 with its 1,078 warnings intact)."
+    },
+    "page.selector-tester": { "verdict": "ready", "run": "'li.ep' evaluated against the page sample: 3 matches with real row text." },
+    "page.regex-tester": { "verdict": "ready", "run": "Pattern '- (\\\\d+) \\\\((\\\\d+p)\\\\)' over injected release names: 2 matches, 2 capture groups each (SubsPlease/01, Judas/02), state Valid." },
+    "page.http-inspector": { "verdict": "ready", "run": "GET https://api.jikan.moe/v4/anime/52991 → 200 OK · 4,943 B · 549ms, logged by main with real timings." },
+    "result.episodes": { "verdict": "ready", "run": "28 rows from job-ms55zc1k-2 with titles, type, language, resolution and source columns." },
+    "result.details": { "verdict": "ready", "run": "Live AniList detail: 'Frieren: Beyond Journey's End' / 葬送のフリーレン, TV, fall 2023, FINISHED, with synopsis." },
+    "result.metadata": { "verdict": "ready", "run": "13/13 fields present, 1 provider, community rating 9.1, 2 external ids, each value attributed to its provider." },
+    "result.logs": { "verdict": "ready", "run": "11 lines, 0 errors, 1 warning, 3 channels, with real timestamps and the Jikan 504 warning." },
+    "result.torrents": { "verdict": "ready", "run": "74 live nyaa rows rendered with name, group, resolution, seeders, size, age and tracker." },
+    "result.streams": { "verdict": "ready", "run": "The fresh job resolved 1 playable stream through the Seanime extension ('Resolved 1 playable stream(s) for 1 episode(s) through Seanime extensions'), shown as 'Phase 4 Local Proof · local-proof 720p mp4'. Playback and mining were proven separately on 2026-07-28 and again this session." },
+    "set.sources": { "verdict": "ready", "run": "Source-mode and priority-chain controls render and drive the live profile; source mode 'streaming only' is what made the engine log 'no index was searched'." },
+    "set.torrent": { "verdict": "ready", "run": "Indexer preferences and release filtering render against the active profile." },
+    "set.episodes": { "verdict": "ready", "run": "Ordering / dedup / language controls render (natural sort, etc.)." },
+    "set.validation": { "verdict": "ready", "run": "Edited, saved and reverted through the drawer — the persistence run above." },
+    "set.developer": { "verdict": "ready", "run": "Diagnostics group renders; 'Sample Data Mode' correctly reports why it is on." }
+  },
+  "notHeldToThisGate": {
+    "reason": "These are registered `untested` or `shell`, so the criterion does not apply to them; none were promoted.",
+    "entries": ["page.dashboard", "page.profiles", "page.downloads", "page.exports", "page.script-console", "page.torrents.acquisition", "result.images", "set.qbittorrent", "set.logging", "set.export", "set.profiles", "set.network", "set.browser", "set.antibot", "set.extraction", "set.images", "set.metadata", "set.cache", "set.performance", "set.scheduler", "set.notifications", "set.ui"]
+  },
+  "sideEffects": "One scrape job and one scheduled run were created (they are ordinary app history). A settings value was changed and reverted. A site rule was created, validated and deleted. Nothing was written to Anki. No user credential, sidecar token or signed URL appears in this record."
+}

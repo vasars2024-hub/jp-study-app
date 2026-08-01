@@ -1,0 +1,81 @@
+{
+  "gate": "player-retirement blocker: disposable-datadir",
+  "date": "2026-07-30",
+  "claim": "The sidecar datadir is durable. A normal run with SEANIME_SIDECAR=1 and no SEANIME_DATADIR now uses <userData>/seanime, it survives a full app quit, a restart reuses it, and no seanime-phase1-* temp datadir is minted.",
+  "changed": [
+    "src/main/seanime/dataDir.ts (new) — resolution, one-time legacy adoption, log line",
+    "src/main/seanime/supervisor.ts — resolves through it; stop() no longer deletes anything",
+    "src/main/__tests__/seanimeDataDir.test.ts (new) — 12 tests incl. source guards against mkdtemp/rmSync returning"
+  ],
+  "environment": {
+    "flags": "SEANIME_SIDECAR=1; SEANIME_DATADIR unset; SEANIME_EXE unset (exe resolved through exePath.ts)",
+    "sidecarVersion": "3.10.2",
+    "driver": "the app's own debug bridge (no Windows mouse/keyboard control)",
+    "electronInstances": "one at a time; run 1 fully quit before run 2 launched"
+  },
+  "preState": {
+    "durableDataDir": "absent — C:/Users/Arseniy/AppData/Roaming/jp-study-app/seanime did not exist",
+    "leftoverTempDataDirs": [
+      { "dir": "%TEMP%/seanime-phase1-1AJAZG", "dbBytes": 188416, "dbMtime": "2026-07-29T00:50:26" },
+      { "dir": "%TEMP%/seanime-phase1-1B4yqk", "dbBytes": 188416, "dbMtime": "2026-07-29T00:53:49" }
+    ],
+    "note": "Both are crash residue from 2026-07-29 — a temp-datadir run that was killed rather than stopped. The newest by database mtime is 1B4yqk, so that is the one adoption must pick."
+  },
+  "run1": {
+    "status": {
+      "kind": "ready",
+      "port": 49697,
+      "pid": 33228,
+      "dataDir": "C:\\Users\\Arseniy\\AppData\\Roaming\\jp-study-app\\seanime",
+      "version": "3.10.2",
+      "error": null
+    },
+    "adoptionVerifiedFromPowerShell": {
+      "seanime.db": "188416 bytes, mtime 2026-07-29T00:53:49 — the byte count AND the preserved mtime of 1B4yqk's database, i.e. copied rather than created empty",
+      "seanime-logo.png": "20568 bytes, mtime 2026-07-29T00:53:48 — also from the adopted profile",
+      "logsSkipped": "the source's seanime-2026-07-29_00-53-49.log is NOT present; MIGRATION_SKIP omits logs/ and cache/",
+      "sourceIntact": "%TEMP%/seanime-phase1-1B4yqk/seanime.db still exists — a copy, not a move",
+      "sidecarOwnDirs": "assets/, cache/, extensions/ created by the sidecar itself at 13:08:29"
+    }
+  },
+  "quit": {
+    "how": "CloseMainWindow() on the Electron main window, i.e. a real quit through will-quit",
+    "electronProcessesAfter": 0,
+    "seanimeProcessesAfter": 0,
+    "dataDirSurvived": true,
+    "dbBytesAfterQuit": 188416,
+    "whyThisIsTheGate": "Phase 1's stop() removed the datadir here. That single fs.rmSync is what made every launch start with no settings and no library."
+  },
+  "run2": {
+    "marker": "claude-restart-marker.txt written into the datadir between the two launches and still present after run 2 started — same directory, not a recreated one (removed afterwards)",
+    "status": {
+      "kind": "ready",
+      "port": 58897,
+      "dataDir": "C:\\Users\\Arseniy\\AppData\\Roaming\\jp-study-app\\seanime",
+      "version": "3.10.2",
+      "error": null
+    },
+    "sidecarLogsInDataDir": [
+      "seanime-2026-07-30_13-08-30.log (run 1, 4937 bytes)",
+      "seanime-2026-07-30_13-10-31.log (run 2)"
+    ],
+    "noNewTempDataDir": "%TEMP% still holds exactly the two 2026-07-29 leftovers; nothing new was minted and neither was re-adopted (adoption is skipped once the durable profile has a database)"
+  },
+  "cleanliness": {
+    "userDataFilesCompared": 29,
+    "changed": ["DIPS"],
+    "verdict": "DIPS is Chromium's bounce-tracking database and is documented in NEXT_SESSION.md as ordinary app-launch behaviour, not migration residue. Every runtime JSON (library.json, media.json, profiles.json, profile-rules.json, study-orchestrator-v2.json, anki-intervals.json, …) is byte-identical to the pre-run backup.",
+    "verifiedFrom": "PowerShell (SHA256), never the Bash overlay"
+  },
+  "repoGates": {
+    "vitest": "3212 / 3212 pass, 295 / 295 files (was 3200 / 294 — the 12 new tests in 1 new file)",
+    "tsc": "288 diagnostics — identical to the baseline, none in the changed files",
+    "eslint": "exit 0 on dataDir.ts, supervisor.ts and the new test",
+    "architectureAudit": "exit 0, nothing new, 3 known pending",
+    "i18nCheck": "exit 0 — no new UI strings (the datadir line goes to the raw log tail the dev panel already renders)"
+  },
+  "stillOpenForRetirement": {
+    "id": "no-bundled-binary",
+    "detail": "forge.config.ts still ships extraResource: ['public'] only, so a packaged build has no seanime.exe and exePath.ts's <resourcesPath>/seanime/seanime.exe slot is empty. NOT DONE HERE because CLAUDE.md forbids altering root project configuration (forge.config, vite.*.config, tsconfig.json) — this needs an explicit user decision, and the plan puts packaging in Phase 9."
+  }
+}

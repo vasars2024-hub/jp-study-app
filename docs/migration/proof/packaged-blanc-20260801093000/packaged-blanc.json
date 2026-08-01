@@ -1,0 +1,98 @@
+{
+  "harness": "packaged-blanc-harness.mjs",
+  "question": "Does Blanc's player work in a PACKAGED build, and does slice 24's recovery stay unused there? The recovery being NEEDED is a failure here, not a success.",
+  "startedAt": "2026-08-01T06:04:55.369Z",
+  "app": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-c\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-c",
+  "phases": [
+    {
+      "name": "A the packaged app boots and the desktop mounts",
+      "result": "PASS",
+      "detail": "pid 7664, app://bundle/index.html, consent declined: true"
+    },
+    {
+      "name": "B the sidecar is the one inside the package",
+      "result": "PASS",
+      "detail": "pid 34340, port 65346, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe"
+    },
+    {
+      "name": "C Blanc opens as its own packaged window",
+      "result": "PASS",
+      "detail": "app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}"
+    },
+    {
+      "name": "D a file plays in the packaged Blanc, first try",
+      "result": "FAIL",
+      "detail": "never loaded"
+    },
+    {
+      "name": "E the recovery was never needed — one POST, one socket, no terminate",
+      "result": "FAIL",
+      "detail": "POSTs 0 (want 1), sockets 0 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at nullms"
+    }
+  ],
+  "mainUrl": "app://bundle/index.html",
+  "sidecar": {
+    "pid": 34340,
+    "port": 65346,
+    "version": "3.10.2",
+    "exePath": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "fromPackage": true
+  },
+  "blancUrl": "app://bundle/blanc.html?blanc=1",
+  "libraryItems": [
+    {
+      "id": "92f15520-0b03-403c-b349-4cb3555b836b",
+      "fileName": "Sousou no Frieren - 01.mkv"
+    }
+  ],
+  "failureDiagnosis": {
+    "dom": {
+      "statusRows": [
+        "1 items\nSousou no Frieren - 01",
+        "1 shown"
+      ],
+      "legends": [
+        "Source",
+        "Transcription",
+        "From YouTube",
+        "Player",
+        "Library"
+      ],
+      "anyMediaWorkspace": 1,
+      "blancFrame": 1,
+      "studyPlayerSlice": null,
+      "mediaPanelText": "Media\nNo songs in library\nImport audio in Music app\nLanguage\nEnglish\n日本語\n中文\nРусский\nAdvanced\nDark\n09:06 AM\nSource\nAdd files…\nAdd folder…\nLoad subtitles…\nGenerate subtitles\n1 items\nSousou no Frieren - 01\nAuto-add folder…\nTranscription\nBase (fast) · downloads on first use\nSmall · downloads on first use\nKotoba (JA) · downloads on first use\nLarge-v3 turbo · downloads on first use\n日本語\n中文\nFrom YouTube\nN"
+    },
+    "exceptions": [],
+    "failedLoads": [],
+    "cspViolations": [
+      {
+        "text": "Connecting to 'http://127.0.0.1:65346/api/v1/status' violates the following Content Security Policy directive: \"connect-src 'self' app: media: playfile: localfile: https://huggingface.co https://*.huggingface.co https://*.hf.co\". The action has been blocked.",
+        "url": "app://bundle/assets/StudyPlayerSlice-Dsl6nlhS.js"
+      }
+    ]
+  },
+  "productionShape": {
+    "directstreamPosts": 0,
+    "socketsOpened": 0,
+    "socketsClosed": 0,
+    "videoTerminatedBeforeWatch": 0,
+    "watchAtMs": null,
+    "rows": []
+  },
+  "result": "FAIL",
+  "finishedAt": "2026-08-01T06:06:31.511Z",
+  "log": [
+    "[packaged-blanc] PASS — A the packaged app boots and the desktop mounts: pid 7664, app://bundle/index.html, consent declined: true",
+    "[packaged-blanc] PASS — B the sidecar is the one inside the package: pid 34340, port 65346, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "[packaged-blanc] PASS — C Blanc opens as its own packaged window: app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}",
+    "[packaged-blanc]   D: the video never loaded",
+    "[packaged-blanc]   D: csp [{\"text\":\"Connecting to 'http://127.0.0.1:65346/api/v1/status' violates the following Content Security Policy directive: \\\"connect-src 'self' app: media: playfile: localfile: https://huggingface.co https://*.huggingface.co https://*.hf.co\\\". The action has been blocked.\",\"url\":\"app://bundle/assets/StudyPlayerSlice-Dsl6nlhS.js\"}]",
+    "[packaged-blanc]   D: exceptions []",
+    "[packaged-blanc]   D: dom {\"statusRows\":[\"1 items\\nSousou no Frieren - 01\",\"1 shown\"],\"legends\":[\"Source\",\"Transcription\",\"From YouTube\",\"Player\",\"Library\"],\"anyMediaWorkspace\":1,\"blancFrame\":1,\"studyPlayerSlice\":null,\"mediaPanelText\":\"Media\\nNo songs in library\\nImport audio in Music app\\nLanguage\\nEnglish\\n日本語\\n中文\\nРусский\\nAdvanced\\nDark\\n09:06 AM\\nSource\\nAdd files…\\nAdd folder…\\nLoad subtitles…\\nGenerate subtitles\\n1 items\\nSousou no Frieren - 01\\nAuto-add folder…\\nTranscription\\nBase (fast) · downloads on first use",
+    "[packaged-blanc] FAIL — D a file plays in the packaged Blanc, first try: never loaded",
+    "[packaged-blanc] FAIL — E the recovery was never needed — one POST, one socket, no terminate: POSTs 0 (want 1), sockets 0 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at nullms"
+  ]
+}

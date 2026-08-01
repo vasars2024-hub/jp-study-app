@@ -1,0 +1,58 @@
+{
+  "phases": [
+    {
+      "name": "A attach",
+      "result": "PASS",
+      "detail": "electron pid 46288, http://localhost:5173/"
+    },
+    {
+      "name": "B consent",
+      "result": "INFO",
+      "detail": "No thanks"
+    },
+    {
+      "name": "C open blanc",
+      "result": "INFO",
+      "detail": "a Blanc surface is present in this window"
+    },
+    {
+      "name": "D keydown listeners after Blanc",
+      "result": "INFO",
+      "detail": "{\"document\":0,\"window\":0}"
+    },
+    {
+      "name": "E sidecar",
+      "result": "INFO",
+      "detail": "stopped"
+    },
+    {
+      "name": "F blanc-study-player box",
+      "result": "INFO",
+      "detail": "{\"present\":false}"
+    },
+    {
+      "name": "G blanc status rows",
+      "result": "INFO",
+      "detail": "[]"
+    },
+    {
+      "name": "H legacy player absent",
+      "result": "PASS",
+      "detail": "0 legacy player elements in the DOM"
+    }
+  ],
+  "startedAt": "2026-07-31T19:17:13.394Z",
+  "sidecarKind": "stopped",
+  "result": "PASS",
+  "finishedAt": "2026-07-31T19:17:33.817Z",
+  "log": [
+    "[blanc-player] PASS — A attach: electron pid 46288, http://localhost:5173/",
+    "[blanc-player] INFO — B consent: No thanks",
+    "[blanc-player] INFO — C open blanc: a Blanc surface is present in this window",
+    "[blanc-player] INFO — D keydown listeners after Blanc: {\"document\":0,\"window\":0}",
+    "[blanc-player] INFO — E sidecar: stopped",
+    "[blanc-player] INFO — F blanc-study-player box: {\"present\":false}",
+    "[blanc-player] INFO — G blanc status rows: []",
+    "[blanc-player] PASS — H legacy player absent: 0 legacy player elements in the DOM"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "slice": 27,
+  "date": "2026-08-01",
+  "status": "Blanc's player works in a PACKAGED build for the first time. Two packaged-only defects were found and fixed; all six phases pass on two consecutive runs.",
+  "question": "Does the toolbox player work in a real packaged build, and does slice 24's recovery stay UNUSED there?",
+  "answer": "Yes, now. It did not before this slice, and the reason was never in the player.",
+
+  "whyThisWasNeverSeenInDev": "Both defects live in the packaged Content-Security-Policy, which is registered only when the app:// protocol is (production). Dev serves from the Vite origin, which that header never touches. Slice 25's 'StrictMode off' run was a model of production; this is the first time the real thing was measured.",
+
+  "defect1": {
+    "name": "connect-src blocked every renderer call to the sidecar",
+    "symptom": "The player never loaded. No POST, no socket, no exception, no failed load — every channel read empty.",
+    "whyItWasInvisible": "A CSP block is not an exception and not a failed load: the request never reaches the network stack, so Network.* says nothing, and the gate's fetch rejects with a plain TypeError the caller catches. The browser's only report is a Log entry with source 'security'. The first two harness runs looked like 'nothing happened' because, in every channel being watched, nothing had.",
+    "evidence": "Connecting to 'http://127.0.0.1:65346/api/v1/status' violates the following Content Security Policy directive: \"connect-src 'self' app: media: playfile: localfile: https://huggingface.co ...\". The action has been blocked. (source: app://bundle/assets/StudyPlayerSlice-Dsl6nlhS.js)",
+    "fix": "src/main.ts — added http://127.0.0.1:* and ws://127.0.0.1:* to connect-src. Both: the player also holds a /events websocket.",
+    "whyThePortIsWildcarded": "A CSP binds to a document at load time, so the live port cannot be named. Blanc can open before the sidecar has a port at all, and the supervisor can restart the server onto a new port while that document stays loaded. Neither is reachable by re-registering the header.",
+    "howItGotThere": "The 2026-07-17 audit verified before writing the CSP that the renderer made no direct fetch() calls to EXTERNAL hosts, which was true. The sidecar is loopback, so it was never in scope of the question that was asked. That entry also flagged 'not yet verified live, scheduled for Batch C/E's packaged pass' — this is that pass."
+  },
+
+  "defect2": {
+    "name": "media-src blocked the video element, one directive behind the first",
+    "symptom": "With connect-src fixed: a live socket, one clean POST, watch at 1514ms — and still no picture.",
+    "evidence": "Loading media from 'http://127.0.0.1:59797/api/v1/directstream/stream?id=...' violates the following Content Security Policy directive: \"media-src 'self' app: media: playfile: localfile: blob:\". The action has been blocked.",
+    "fix": "src/main.ts — added http://127.0.0.1:* to media-src.",
+    "lesson": "connect-src and media-src cover different steps of the same open: connect-src the fetch() that PREPARES the stream, media-src the element that then PLAYS it. A grep for renderer fetch() calls cannot see the second one. Any host added for playback has to be checked against both."
+  },
+
+  "defect3": {
+    "name": "a local open POSTed twice, under two different client ids",
+    "foundBy": "Phase E, which only became measurable once defect 2 was fixed and playback actually happened. E's apparent PASS in the intermediate run was a false pass: with media blocked, the open never got far enough to issue the second POST.",
+    "measured": "two POSTs 2ms apart (4136ms, 4138ms), same file path, clientId 129bfd3a-... then 5a060345-..., same initiator (StudyPlayerSlice launch effect). Not the recovery — that runs on a 1s interval and could not fire at 2ms.",
+    "cause": "The client id is not settled when the socket reports open. requests.ts publishes one from the /api/v1/status HTTP response; the server then names its own over the socket ~10ms later (seanimeSocketPool's CLIENT_IDENTITY handler). Both ids are non-empty, so both pass a !clientId guard. clientId is the launch effect's first dependency and its cleanup nulls launchedRequestRef, so the id change re-ran the effect and re-opened the same request.",
+    "whichPostWasWrong": "The FIRST. The socket is registered server-side under the id the server named, so the first POST prepared a stream the sidecar would never route to this socket — orphaned, and left prepared. This is why suppressing the second POST would have been the wrong fix.",
+    "fix": "A new clientIdentityConfirmedAtom, written by StudyWebsocketProvider from a new onIdentityConfirmed listener on the socket pool. The launch effect gates on it as well as on connected.",
+    "fallback": "IDENTITY_CONFIRM_FALLBACK_MS = 2000 in seanimeSocketPool.ts. Measured arrival on a healthy sidecar is ~10ms, so it is never reached in practice; it exists so a server that never sends CLIENT_IDENTITY degrades to the old behaviour instead of never opening the player.",
+    "stickiness": "Confirmation is sticky across reconnects by design. A reconnect re-sends the confirmed id as ?id=, so clearing it on close would re-block opens during a routine blip and turn a momentary drop into a stalled player."
+  },
+
+  "finalRun": {
+    "evidence": "docs/migration/proof/packaged-blanc-20260801100500/packaged-blanc.json",
+    "confirmationRun": "docs/migration/proof/packaged-blanc-20260801095500/packaged-blanc.json",
+    "phases": "A/B/C/D/E/F all PASS, twice consecutively",
+    "productionShape": {
+      "directstreamPosts": 1,
+      "socketsOpened": 1,
+      "socketsClosed": 0,
+      "videoTerminatedBeforeWatch": 0
+    },
+    "playback": "0.007 -> 7.274s, 1920x1080, inside the Blanc frame",
+    "recoveryFired": false
+  },
+
+  "whatThisSettles": "Slice 24's recovery is not merely inert in a dev build with StrictMode off (slice 25) — it is inert in a real packaged build, which was the open question. The packaged sidecar discriminator (phase B) also stayed green throughout: the running seanime.exe is the one inside the package, not the pinned sibling checkout.",
+
+  "harnessChange": {
+    "file": "docs/migration/tools/packaged-blanc-harness.mjs",
+    "added": "Log.entryAdded tracing plus a cspViolations field on the failure path, and POST rows now carry the request body and initiator stack. The CSP capture is what turned 'nothing happened' into a named cause; the initiator/body capture is what distinguished a duplicate open from the recovery without guessing."
+  },
+
+  "flake": {
+    "run": "docs/migration/proof/packaged-blanc-20260801094500",
+    "symptom": "phase B read exe null, then Runtime.evaluate timed out",
+    "assessment": "transient — no leftover processes, and the same build passed twice immediately afterwards on fresh datadirs. Recorded rather than hidden; if it recurs, the ExecutablePath query is the thing to make retrying."
+  },
+
+  "gates": {
+    "vitest": "332 files / 3803 tests, all passing — unchanged from slice 26",
+    "tsc": 288,
+    "eslint": "0 errors on the four touched files (12 pre-existing non-null-assertion warnings in main.ts, none on new lines)",
+    "filesChanged": [
+      "src/main.ts",
+      "src/media/seanimeSocketPool.ts",
+      "src/media/StudyWebsocketProvider.tsx",
+      "src/media/StudyPlayerSlice.tsx"
+    ]
+  },
+
+  "notDone": "No unit test covers the identity gate. The pure-logic-in-shared/ pattern this repo uses does not fit it well — the change is timer and listener wiring around a live WebSocket, and the parts that are pure (the ownership and heartbeat modules) already have tests. The packaged harness is what covers it, and it now does so on every run via phase E."
+}

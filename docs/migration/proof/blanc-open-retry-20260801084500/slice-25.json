@@ -1,0 +1,83 @@
+{
+  "slice": 25,
+  "title": "Three control runs with StrictMode OFF. One of slice 24's two production claims is refuted; the other is measured for the first time.",
+  "date": "2026-08-01",
+  "question": "Slice 24 fixed the first open in Blanc and claimed two things about production it had not observed: that the recovery would never fire in a packaged build, and that the same cancel reaches any build when /api/v1/status resolves after the open. Neither was measured. This slice measures both — without packaging, by removing React.StrictMode from blancMain.tsx for three runs, which is how a production React build behaves at the effect level.",
+
+  "whyNotAPackagedRun": {
+    "theStandingItem": "'A packaged Blanc has never been driven at all' — slice 24's top item, still open after this slice.",
+    "theExistingPackageCannotAnswerIt": "out/jp-study-app-win32-x64 is from 2026-07-30 and predates the whole Blanc line. Grepped its renderer assets: `MediaPlayerSurface` 0 files, `blanc-study-player` 0 files, `openStalled` 0 files. Driving it would measure a build with no Blanc player in it.",
+    "whyAFreshOneWasNotBuilt": "The developer's own app was running (electron with --user-data-dir=C:\\Users\\Arseniy\\AppData\\Roaming\\jp-study-app, started 07:11). A package is a ~4 GB build that would fight it for the machine for several minutes, and the standing rule here is never to kill or crowd out the running app for a build. The Jul-30 package was renamed aside first (attempted; the rename failed while a shell still held the directory) — do that before packaging.",
+    "whatStrictModeOffBuysInstead": "The dev/prod difference that matters to this defect is exactly one thing: whether effects are double-invoked on mount. Removing StrictMode reproduces the production effect lifecycle without a build. It does NOT cover packaging concerns (app:// protocol, asar paths, the packaged sidecar slot) — those remain unproven."
+  },
+
+  "runA": {
+    "what": "StrictMode off, ordinary timing",
+    "record": "docs/migration/proof/blanc-open-retry-20260801081500/blanc-open-retry.json",
+    "result": "step 1 PASS",
+    "measured": {
+      "socketsOpened": 1,
+      "socketsClosed": 0,
+      "directstreamPosts": 1,
+      "videoTerminatedFramesSent": 0,
+      "discordPresenceCancels": 0
+    },
+    "conclusion": "The whole failure signature is gone: one socket instead of two, no close, no `video-terminated` at all, and the doubled `discord/presence/cancel` that marked the adopted lifecycle effect's null branch running twice is absent. **The recovery never fired.** That is what a packaged build should look like, measured at the effect level.",
+    "andOneNumberWorthKeeping": "The COLD open took 5.27 s from POST (1044 ms) to `watch` — a slow metadata parse, entirely healthy. A total-elapsed deadline of 5 s would have re-opened it needlessly; the silence rule kept it alive because `open-and-await` re-armed the clock at 1465 ms. This is the first direct evidence for choosing silence over elapsed time."
+  },
+
+  "runB": {
+    "what": "StrictMode off, Blanc's first /api/v1/status held for 6 s (CDP Fetch interception, narrow pattern so the video stream is not paused)",
+    "record": "docs/migration/proof/blanc-open-retry-20260801082500/blanc-open-retry.json",
+    "hypothesisUnderTest": "slice 24: 'the same branch runs in any build when /api/v1/status resolves after the open was issued, because waitForWatchHistory and shouldWaitForWatchHistory both derive from serverStatus.settings.library.enableWatchContinuity'",
+    "result": "REFUTED",
+    "measured": { "statusHeldMs": 6000, "firstDirectstreamPostAtMs": 7968 },
+    "conclusion": "The open was not issued until AFTER the hold released. The adopted surface waits for the same query whose resolution would flip the dep, so the ordering that route requires cannot occur: **the thing that would cancel the open is the thing the open waits for.** Slice 24's claim was derived from a dep list and it was wrong. It is corrected in that slice's record rather than quietly dropped."
+  },
+
+  "runD": {
+    "what": "StrictMode off, full probe — step 2 is now the A-to-B case: a NEW open issued while a file is already playing",
+    "record": "docs/migration/proof/blanc-open-retry-20260801084500/blanc-open-retry.json",
+    "whyThisIsTheRealProductionRoute": "`open-and-await` sets `state.playbackInfo` to null by design, so on a second open `state.playbackInfo?.id` changes from the playing file's id to `undefined` — the first dep of the adopted lifecycle effect. Its null branch then dispatches `video-terminated` at a preparation that is in flight. No StrictMode required. Continue-watching, the palette's resume and Statistics' By-show rows all issue exactly this kind of open.",
+    "result": "CONFIRMED that the terminate fires; NOT observed killing the open",
+    "measured": {
+      "directstreamPosts": 1,
+      "videoTerminatedFramesSent": 1,
+      "firstPostAtMs": 32,
+      "firstTerminatedAtMs": 64,
+      "firstWatchAtMs": 65,
+      "terminatedInsideTheOpenWindow": true,
+      "recoveryFired": false
+    },
+    "window": [
+      "32  POST /api/v1/directstream/play/localfile",
+      "41  open-and-await            <- BeginOpen ok",
+      "64  ws SEND videocore x3      <- one is video-terminated, INSIDE the open window",
+      "64  open-and-await x2         <- the preparation is still advancing",
+      "65  watch                     <- it completed anyway, by 1 ms"
+    ],
+    "conclusion": "The mechanism is real in production shape. It did not bite here because the file was WARM — opened 10 s earlier, so the whole preparation took 33 ms and beat the terminate. Run A measured a COLD preparation at 5.27 s: the same window, ~160x wider. So the exposure is switching to a cold file while one is playing, and the recovery is what stops that being a dead panel.",
+    "whatWouldFinishIt": "A second, different file in the library so step 2's open is cold. `prepare-gplay-datadir.mjs` seeds exactly one, and the sidecar's scan owns which paths are playable, so this needs a fixture change rather than a probe change."
+  },
+
+  "aProbeCorrectionThisSliceHadToMake": {
+    "what": "Step 2's completion condition was `readyState >= 2` on the video element. Slice 24 made step 1 succeed — so the OLD video was already loaded and that wait returned in ~30 ms, closing the trace window before the second open had done anything, and reporting `firstWatchAtMs: null` with the video 'ready'. Step 3 then threw `Cannot read properties of null` because the element really is replaced mid-transition.",
+    "fix": "The completion condition for a SECOND open is now a `watch` frame FOR THAT OPEN, read from the trace, followed by a bounded wait for the element to come back.",
+    "lesson": "Third time in two slices: **an assertion is vacuous when the thing it waits for was already true.** Slice 24's phase I asserted a key worked with no active cue to act on; this asserted a second open had completed by looking at the first one's video. Fixing the defect a probe was built around is exactly when its assertions go stale."
+  },
+
+  "gates": {
+    "srcUnchanged": "blancMain.tsx was edited as a control and restored from a copy, verified by sha256 37D23AA3…3E8BFFF8. `React.StrictMode` is present at lines 135/139 again. No other src file changed in this slice.",
+    "vitest": "332 files / 3803 tests pass",
+    "tsc": "288 — the documented baseline",
+    "harnessSyntax": "node --check clean",
+    "onlyPermanentChange": "docs/migration/tools/blanc-player-open-retry-probe.mjs — the STATUS_DELAY_MS hold, the step-2 trace window and step 2b"
+  },
+
+  "stillNotProvenLive": [
+    "A packaged Blanc, for real: the app:// protocol, asar paths and the packaged sidecar slot are untouched by this slice. Rename out/jp-study-app-win32-x64 aside, `npm run package`, then drive it — when the machine is free.",
+    "The A-to-B cancel actually killing an open. Both halves are measured (the terminate fires in production shape; a cold preparation takes 5.27 s) but their combination has not been observed. It needs a second, colder file in the fixture library.",
+    "The other six video.* rows the overlay registers still have not been pressed anywhere — slice 22's item, unchanged.",
+    "Music keyboard navigation still does not exist, and must not be built by reusing video.* ids."
+  ]
+}

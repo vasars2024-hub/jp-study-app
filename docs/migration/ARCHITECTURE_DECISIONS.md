@@ -66,7 +66,15 @@ exposes a cue-level timeline usable by the Study Overlay — the Phase-1 probe.
 
 ## ADR-003 — Media workspace ships English-only through Phases 2–3
 
-**Date** 2026-07-27 · **Status** accepted · **temporary regression, time-boxed**
+**Date** 2026-07-27 · **Status** **closed 2026-07-29 at the Phase 4 exit gate** ·
+temporary regression, time-boxed — *ended*
+
+**Closure.** `ADOPTED_MEDIA_I18N_ALLOWLIST` is empty and
+`src/shared/__tests__/mediaWorkspaceI18n.test.ts` keeps it that way, rejecting raw English JSX
+and untranslated `aria-label`/`placeholder`/`title` across all five host-owned adopted surfaces.
+Verified live in the running app, on a real provider stream, by switching languages through
+Settings › Language: EN/JA/ZH/RU all repaint the workspace, player and mining chrome with no
+missing strings. Evidence: `docs/migration/proof/i18n-20260729/adr-003-language-proof.json`.
 
 **Context.** `CLAUDE.md` makes EN/JA/ZH/RU a hard test gate (`src/shared/__tests__/i18n.test.ts`).
 Seanime README lists *"Built-in localization (translations)"* under **Not planned**, so every

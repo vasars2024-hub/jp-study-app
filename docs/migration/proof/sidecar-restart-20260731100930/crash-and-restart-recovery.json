@@ -1,0 +1,228 @@
+{
+  "title": "The sidecar crash and dev-panel-restart recovery path, inside a real Electron app",
+  "date": "2026-07-31",
+  "why": "The keepalive proof closed the workspace-close case and explicitly left the crash / dev-panel-restart path unexercised: MediaWorkspaceHost.tsx:64 was BELIEVED to re-provision the renderer but nothing had killed a sidecar mid-session and watched it happen.",
+  "isolation": {
+    "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-restart-20260731100930\\userData",
+    "seanimeDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-restart-20260731100930\\seanime-datadir",
+    "note": "the developer instance and %APPDATA%/jp-study-app are untouched; the only process killed is a pid this instance itself reported"
+  },
+  "generations": [
+    {
+      "generation": 1,
+      "pid": 25552,
+      "port": 54682,
+      "rendererClientId": "7a69fb2f-32a5-4562-9a39-0f900739187d",
+      "storedTokenMatchesSupervisor": true
+    },
+    {
+      "generation": 2,
+      "pid": 48460,
+      "port": 52317,
+      "via": "crash recovery",
+      "rendererClientId": "7a69fb2f-32a5-4562-9a39-0f900739187d"
+    },
+    {
+      "generation": "2b",
+      "pid": 42724,
+      "via": "revived by the host after an explicit stop with the workspace open (phase E0)"
+    },
+    {
+      "generation": 3,
+      "pid": 33480,
+      "port": 62487,
+      "via": "dev-panel stop + start, workspace closed",
+      "rendererClientId": "7a69fb2f-32a5-4562-9a39-0f900739187d"
+    }
+  ],
+  "phases": {
+    "A": {
+      "result": "PASS",
+      "killedPid": 25552,
+      "sidecarProcessGone": true,
+      "reportedOffline": true,
+      "firstStatusAfterKill": {
+        "kind": "offline",
+        "error": "sidecar exited with code 1"
+      },
+      "why": "A crash must be reported as `offline` with the child's exit code, not as `stopped` — the supervisor did not initiate this, and the auto-start effect keys off the kind."
+    },
+    "B": {
+      "result": "PASS",
+      "recoveryMs": 1305,
+      "newPid": 48460,
+      "newPort": 52317,
+      "pidChanged": true,
+      "portChanged": true,
+      "unattended": true,
+      "why": "MediaWorkspaceHost's [open, status] effect calls seanimeStart() for any kind that is not ready/starting/disabled. No user action and no harness click is involved."
+    },
+    "C": {
+      "result": "PASS",
+      "storedTokenChanged": true,
+      "storedTokenMatchesNewGeneration": true,
+      "rendererClientIdOnGeneration2": "7a69fb2f-32a5-4562-9a39-0f900739187d",
+      "rendererClientIsNew": false,
+      "provisioningGateCleared": true,
+      "why": "Three independent links: bootstrapSeanimeConnection wrote the new token; a websocket the new server ACCEPTED proves the adopted client is using it rather than the module-eval snapshot; and the pane being back proves MediaWorkspace's provisioning gate cleared instead of parking on its notice."
+    },
+    "D": {
+      "lineDiffMode": "append",
+      "connectionLinesSinceKill": [
+        "2026-07-31 13:09:48 |INF| ws > Monitoring connection as desktop sidecar",
+        "2026-07-31 13:09:49 |DBG| ws > Client connected id=study-os-supervisor platform=",
+        "2026-07-31 13:09:49 |DBG| ws > Client connected id=7a69fb2f-32a5-4562-9a39-0f900739187d platform=",
+        "2026-07-31 13:09:49 |DBG| ws > Client connected id=7a69fb2f-32a5-4562-9a39-0f900739187d platform=",
+        "2026-07-31 13:09:49 |DBG| ws > Client disconnection id=7a69fb2f-32a5-4562-9a39-0f900739187d"
+      ],
+      "keepaliveReconnectedAfterRestart": true,
+      "result": "PASS",
+      "closedVia": "close-button",
+      "heldMs": 35011,
+      "sidecarProcessAlive": true,
+      "sidecarPortStillListening": true,
+      "pidUnchanged": true,
+      "portUnchanged": true,
+      "statusKind": "ready",
+      "why": "startSeanime() calls keepalive.start() on every ready, but only the FIRST generation had ever been observed. If it armed once per session the fix would protect one sidecar and quietly hand every later one back to the switch. The module harness measured an unprotected server exiting after 14,268 ms, so anything under ~15s here would be dead."
+    },
+    "E0": {
+      "result": "PASS",
+      "revivedWithoutAnyStartCall": true,
+      "msUntilRevived": 5720,
+      "statusAfterStop": "starting",
+      "revivedPid": 42724,
+      "revivedPort": 57615,
+      "keepaliveHeldOnRevivedGeneration": true,
+      "rendererClientOnRevivedGeneration": "7a69fb2f-32a5-4562-9a39-0f900739187d",
+      "supervisorLogTail": [
+        "2026-07-31 13:10:35 DBG\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Loaded built-in manga provider extension id=local-manga",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mmediastream\u001b[0m\u001b[90m >\u001b[0m Module initialized",
+        "2026-07-31 13:10:35 DBG\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Loaded built-in extension id=local-manga",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=extensions-reloaded",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Loading external extensions",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Interrupting Goja VMs",
+        "2026-07-31 13:10:35 DBG\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Killed Goja VMs count=0",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Unloading external extensions",
+        "2026-07-31 13:10:35 DBG\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Unloaded external extensions count=0",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mtorrentstream\u001b[0m\u001b[90m >\u001b[0m Module is disabled",
+        "2026-07-31 13:10:35 DBG\u001b[90m -\u001b[0m \u001b[36mtorrentstream\u001b[0m\u001b[90m >\u001b[0m Shutting down module",
+        "2026-07-31 13:10:35 DBG\u001b[90m -\u001b[0m \u001b[36mextensions\u001b[0m\u001b[90m >\u001b[0m Loaded external extensions",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=refreshed-anilist-anime-collection",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=server-ready",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36msimulated platform\u001b[0m\u001b[90m >\u001b[0m Refreshing manga collection",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=extensions-reloaded",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=refreshed-anilist-manga-collection",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Serving embedded web interface",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Web assets path: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-restart-20260731100930\\seanime-datadir\\assets",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Manga downloads path: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-restart-20260731100930\\seanime-datadir\\manga",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Offline assets path: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-restart-20260731100930\\seanime-datadir\\offline\\assets",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Server Address: 127.0.0.1:57615",
+        "2026-07-31 13:10:35 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Seanime started at http://127.0.0.1:57615",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=check-for-announcements",
+        "2026-07-31 13:10:35 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m method=GET status=200 uri=/api/v1/status latency_human=1.5788ms"
+      ],
+      "keepaliveLogLines": [],
+      "keepaliveLogLinesNote": "Routinely EMPTY, and that is not evidence of anything: pushLog keeps 40 lines and the sidecar writes dozens during startup, so the `keepalive:` line is pushed out before a poll can see it. The same caveat is recorded in keepalive-electron-harness.mjs. Read keepaliveHeldOnRevivedGeneration instead — it comes from the SERVER naming its own clients, which nothing in the supervisor can flatter.",
+      "whyItMatters": "A generation with no keepalive is exposed to the dead-man switch again — the exact condition the keepalive was written to remove. It survives only for as long as no websocket client has EVER connected to it, because the switch arms on the first connect; the moment the workspace reconnects and then closes, it is on a 10s fuse.",
+      "finding": "With the media workspace OPEN, an explicit seanimeStop() is reversed by MediaWorkspaceHost's recovery effect within the poll interval — the dev panel's Stop button cannot stop the sidecar while the workspace is on screen. The harness issued no start call of its own here."
+    },
+    "E": {
+      "result": "PASS",
+      "statusAfterStop": "stopped",
+      "stayedStoppedFor5s": true,
+      "pidBeforeCycle": 42724,
+      "childGoneAfterStop": true,
+      "newPid": 33480,
+      "newPort": 62487,
+      "storedTokenMatchesNewGeneration": true,
+      "rendererClientIdOnGeneration3": "7a69fb2f-32a5-4562-9a39-0f900739187d",
+      "provisioningGateCleared": true,
+      "keepaliveReconnected": true,
+      "why": "The dev panel has no single restart button — a restart is Stop then Start. It differs from a crash in that the supervisor initiates it, so `stopped` (not `offline`) is the correct kind and the keepalive is released deliberately rather than by a child exit. Run with the workspace CLOSED so the status can rest at `stopped`; see phase E0 for what happens when it is open."
+    },
+    "F": {
+      "result": "PASS",
+      "electronExited": true,
+      "sidecarPidsSpawned": [
+        25552,
+        48460,
+        42724,
+        33480
+      ],
+      "survivingSidecarPids": [],
+      "generationsSpawned": 4,
+      "why": "Four sidecars were spawned in one session. A restart path that leaked even one would leave it holding the durable datadir's SQLite database while the next launch spawned another against the same file — the exact hazard --desktop-sidecar is kept for."
+    }
+  },
+  "verdict": "PASS",
+  "probeCorrections": [
+    "SAMPLED THE LOG ONCE, TOO EARLY. `keepalive.start()` is called just BEFORE `setStatus({kind:\"ready\"})`, so at the instant the renderer sees `ready` the socket is still in flight. A single read there reported `keepaliveReconnected: false` for a generation whose connect line landed one second later. Now polled by waitForKeepalive().",
+    "READ A LOG FILE FROM A PROCESS THE HARNESS HAD JUST KILLED. An earlier cut closed the workspace ~1s after the revival and killed that sidecar seconds later; its log ended mid-startup with no client lines at all, which read as \"the revived generation never gets a keepalive\". It does — all four generations of a clean run log `Client connected id=study-os-supervisor`. Absence of a line in a truncated log is not absence of the event."
+  ],
+  "electronPid": 50488,
+  "statusTransitions": [
+    "starting",
+    "starting(pid 25552, port 54682)",
+    "ready(pid 25552, port 54682)",
+    "offline",
+    "starting",
+    "starting(pid 48460, port 52317)",
+    "ready(pid 48460, port 52317)",
+    "stopped",
+    "starting",
+    "starting(pid 42724, port 57615)",
+    "ready(pid 42724, port 57615)",
+    "stopped",
+    "starting",
+    "starting(pid 33480, port 62487)",
+    "ready(pid 33480, port 62487)"
+  ],
+  "sidecarLogEvidence": {
+    "countdownStarted": false,
+    "countdownExited": false,
+    "note": "Both false is the expected shape. countdownStarted true with countdownExited false would mean the switch armed and a keepalive reconnected inside its 10s window."
+  },
+  "mainProcessOutputTail": [
+    "[renderer] Server error AxiosError: Request failed with status code 500",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 3, socket state: CONNECTING",
+    "[renderer] \u001b[34m[VIDEO CORE PLAYLIST]\u001b[39m  No playback info or episodes found, clearing playlist state",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 1, socket state: null",
+    "[renderer] \u001b[34m[VIDEO CORE PLAYLIST]\u001b[39m  No playback info or episodes found, clearing playlist state",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 2, socket state: null",
+    "[renderer] Server error AxiosError: Request failed with status code 500",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 3, socket state: CONNECTING",
+    "[renderer] \u001b[34m[VIDEO CORE PLAYLIST]\u001b[39m  No playback info or episodes found, clearing playlist state",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 1, socket state: null",
+    "[renderer] \u001b[34m[VIDEO CORE PLAYLIST]\u001b[39m  No playback info or episodes found, clearing playlist state",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 2, socket state: null",
+    "[renderer] Server error AxiosError: Request failed with status code 500",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 3, socket state: CONNECTING",
+    "[renderer] \u001b[34m[VIDEO CORE PLAYLIST]\u001b[39m  No playback info or episodes found, clearing playlist state",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 1, socket state: null",
+    "[renderer] \u001b[34m[VIDEO CORE PLAYLIST]\u001b[39m  No playback info or episodes found, clearing playlist state",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 2, socket state: null",
+    "[renderer] Server error AxiosError: Request failed with status code 500",
+    "[renderer] \u001b[34m[VIDEO CORE]\u001b[39m  Cleaning up",
+    "[renderer] \u001b[100m[VideoCoreEvents]\u001b[49m  Video terminated",
+    "[renderer] \u001b[34m[WebsocketSender]\u001b[39m  Queued message of type videocore, queue size: 3, socket state: CONNECTING"
+  ]
+}

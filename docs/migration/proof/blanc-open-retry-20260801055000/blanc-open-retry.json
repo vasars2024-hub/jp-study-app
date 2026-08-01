@@ -1,0 +1,80 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "startedAt": "2026-08-01T02:47:52.617Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-probe-datadir-a\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-probe-datadir-a",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 45652, port 52266, v3.10.2"
+    },
+    {
+      "name": "1 first open (fresh mount, inside the StrictMode double-mount)",
+      "result": "FAIL",
+      "detail": "{\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+      "shot": {
+        "videoPresent": false,
+        "frame": true,
+        "sliceState": "idle",
+        "sliceText": "Opening local file"
+      }
+    },
+    {
+      "name": "2 second open (same mounted session, new requestId)",
+      "result": "PASS",
+      "detail": "{\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":3.244999,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+      "shot": {
+        "videoPresent": true,
+        "readyState": 4,
+        "networkState": 1,
+        "currentTime": 3.244999,
+        "duration": 30.386,
+        "paused": false,
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "sliceState": "active"
+      }
+    },
+    {
+      "name": "3 the clock moves and there are real pixels",
+      "result": "PASS",
+      "detail": "3.427 -> 7.585s, 1920x1080"
+    }
+  ],
+  "sidecar": {
+    "pid": 45652,
+    "port": 52266,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "fb99d1ea-8e2a-4fb7-82f4-62df0bf3a500",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "settled": {
+    "frame": true,
+    "sliceState": "idle"
+  },
+  "playback": {
+    "startedAt": 3.427498,
+    "videoPresent": true,
+    "readyState": 4,
+    "networkState": 1,
+    "currentTime": 7.585076,
+    "duration": 30.386,
+    "paused": false,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "sliceState": "active"
+  },
+  "result": "DONE",
+  "finishedAt": "2026-08-01T02:49:05.195Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 45652, port 52266, v3.10.2",
+    "[probe] FAIL — 1 first open (fresh mount, inside the StrictMode double-mount): {\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+    "[probe]   letting the socket settle for 10000 ms",
+    "[probe] PASS — 2 second open (same mounted session, new requestId): {\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":3.244999,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+    "[probe] PASS — 3 the clock moves and there are real pixels: 3.427 -> 7.585s, 1920x1080"
+  ]
+}

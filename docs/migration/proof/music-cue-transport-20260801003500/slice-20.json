@@ -1,0 +1,75 @@
+{
+  "slice": 20,
+  "title": "The music cue transport was in the tree, ungated. Landed properly.",
+  "date": "2026-08-01",
+  "reproduce": "npx vitest run src/shared/__tests__/musicMining.test.ts",
+  "whatWasFound": {
+    "notADefect": "The feature slice 17's backlog listed as missing (item 2: 'no cue navigation (prev/next/replay line) in the lyrics pane') was ALREADY IMPLEMENTED in this permanently-dirty tree — buttons, CSS, and five i18n keys translated in ja/zh/ru — with zero tests, no progress.json entry and no handoff section. A session reading the backlog would have built it twice; a session reading the diff would have shipped it unproven.",
+    "soTheSliceWas": "Finish landing it: one converter, testable functions, guards, and a corrected justification."
+  },
+  "secondAnswerRemoved": {
+    "what": "The pane converted lyric cues to VideoCoreStudyCue inline in a useMemo, while the Mine button beside it went through musicStudyCue in shared/musicMining.ts.",
+    "theyDisagree": "musicStudyCue refuses a blank line and a 'synced' line whose timing is unusable (end < start, non-finite, absent). The inline map accepted both. The transport could therefore step onto a line whose Mine button would refuse it.",
+    "reachableToday": false,
+    "honestScope": "All three parsers in subtitles.ts (parseLrc, parseAss, parseSrtVtt) drop empty-text cues, so no refusable line reaches the pane through them. This removes the second answer before a fourth parser or a hand-picked file makes it live. It is NOT a bug fix and is not written up as one."
+  },
+  "loadBearingDetail": {
+    "rule": "musicCueReplaySec looks its cue up by cue.index, never by array position.",
+    "why": "activeIndex from useLiveLyrics counts LYRIC lines. Refusing a line makes lyric index and array position diverge, and positional indexing then targets the wrong line SILENTLY — with a blank line at index 1, cues[2] is the line at 22s while the correct answer is the line at 18s.",
+    "guard": "A test asserts both halves: the correct answer, and that the naive positional form would have been wrong. That is the discriminator, and the reason this is a function rather than a closure."
+  },
+  "staleJustificationCorrected": {
+    "wasInSource": "Buttons rather than key bindings because 'the video overlay already binds W/S/R on document without capture, and adding a second uncaptured set here would fire both.'",
+    "whyItIsNowFalse": "Slice 19 deleted that hardcoded switch. The overlay registers the catalog's own video.replayLine/prevLine/nextLine ids; there is one dispatcher.",
+    "theRealReasonNowRecorded": "registerCommandHandler keeps a STACK per id and runCommand takes stack[stack.length - 1] — the LAST registrant wins. A music surface registering those ids would take them from VideoCoreStudyOverlay whenever it mounted later: mount-order-dependent ownership, precisely the invisible second owner slice 19 collapsed.",
+    "consequenceForFutureWork": "Music keyboard navigation needs its OWN music.* catalog rows, rebindable and visible in Settings → Shortcuts. A decision to take deliberately, not to smuggle into this component.",
+    "guard": "Fails if registerCommandHandler or any video.* id appears in MusicContent.tsx."
+  },
+  "controlRuns": {
+    "method": "Files copied aside and restored by sha256 from PowerShell, never git checkout — this tree is permanently dirty. Both restores verified OK against the recorded hashes.",
+    "runs": [
+      {
+        "control": "musicCueReplaySec indexes cues[activeIndex] positionally",
+        "result": "3 guards FAIL (29 tests: 3 failed, 26 passed)"
+      },
+      {
+        "control": "the pane's inline cue conversion restored",
+        "result": "1 guard FAIL (29 tests: 1 failed, 28 passed)"
+      }
+    ]
+  },
+  "probeCorrection": "The source guards strip comments before sweeping. They had to: the block they guard now names adjacentStudyCue, registerCommandHandler and all three video.* ids IN PROSE, in order to explain why they are not used there. Slices 12 and 19 each lost a round to this exact trap. The code() helper is slice 19's, reused unchanged.",
+  "docCorrections": [
+    "NEXT_SESSION.md's READ FIRST block and music-mining-harness.mjs's header both claimed 'retirement-step3-harness.mjs still has the user-data-dir-in-repo trap'. VERIFIED FALSE: that harness's workRoot is path.join(os.tmpdir(), ...) at line 83 and its userDataDir hangs off it. It never had that trap. Both claims struck through / corrected rather than deleted.",
+    "It DID still have the CDP-target trap — its filter was `t.type === 'page' && new URL(t.url).search === ''`, and about:blank parses with an empty search, so it could attach to the pre-navigation document and make every localStorage read fail with 'Access is denied for this document'. Now requires the scheme (http/https/app) as well."
+  ],
+  "files": [
+    "src/shared/musicMining.ts — musicTransportCues / musicCueStepSec / musicCueReplaySec added; adjacentStudyCue is now a VALUE import, previously type-only",
+    "src/renderer/components/music/MusicContent.tsx — pane routes through the three shared functions; inline conversion and the direct adjacentStudyCue import removed; the stale keybinding justification replaced",
+    "src/shared/__tests__/musicMining.test.ts — 13 tests in two new describe blocks",
+    "docs/migration/tools/retirement-step3-harness.mjs — CDP target filter now requires the scheme",
+    "docs/migration/tools/music-mining-harness.mjs — header comment corrected"
+  ],
+  "gates": {
+    "tests": "3,787 / 331 (+13, +0 files) — baseline measured at 3,774 / 331 before the change",
+    "tsc": "288 errors, the baseline exactly. The one error in a changed file (MusicContent.tsx RefObject<HTMLDivElement | null>) is PRE-EXISTING and unmoved except in line number (343 -> 348).",
+    "i18n": "exit 0 at 6,348 keys, unchanged — the transport's five keys were already written and already translated in ja/zh/ru",
+    "architectureAudit": "exit 0, 'Nothing new', 3 known findings still pending",
+    "eslint": "exit 0, 0 warnings on all three changed src files",
+    "build": "renderer build to a scratch --outDir clean in 30.79 s (never touches dist/, so the dev server keeps running)",
+    "cssContainment": "6,950/6,950 scoped, 0 unscoped, 0 Tailwind tokens in the shell"
+  },
+  "chunkQuestionMeasured": {
+    "question": "musicMining.ts imported VideoCoreStudyCue as a TYPE ONLY, which is erased. It now imports adjacentStudyCue as a VALUE, so every consumer of musicMining gains a runtime edge to videoCoreStudy. Did that duplicate videoCoreStudy into the music chunk?",
+    "method": "grep the built chunks for module-unique literals",
+    "result": {
+      "music-cue-nav": "MusicContent-*.js",
+      "music-plain": "MusicContent-*.js",
+      "jp-video-core-resume-v1": "localAgentAutomationStore-*.js"
+    },
+    "musicContentChunkBytes": 27105,
+    "verdict": "NOT duplicated. videoCoreStudy stays in the shared chunk. The edge already existed anyway — the pane imported adjacentStudyCue directly before this slice. It cost nothing."
+  },
+  "notProvenLive": "No one has pressed prev/replay/next in a running window. The transport is proven as pure functions and the wiring by source guard. music-mining-harness.mjs drives this same pane over CDP and would extend to it in one phase — it already seeds a synced 3-cue sheet and plays it. Two standing items of the same kind remain: nobody has pressed R (slice 19), and Blanc's toolbox player has still never been watched playing a file — the 23:25 attempt in proof/blanc-player-live-20260731232500/ ran with the sidecar STOPPED, so six of its eight phases are INFO rather than PASS and it did not close that item.",
+  "result": "PASS"
+}

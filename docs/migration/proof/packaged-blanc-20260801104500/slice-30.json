@@ -1,0 +1,48 @@
+{
+  "slice": 30,
+  "date": "2026-08-01",
+  "status": "CLOSED for the two rows that can be pressed at all — `;` and `'` are now proven by real key events in a PACKAGED build, twice. The standing item from slices 19, 20, 21, 22 and 29 is resolved as far as a keypress can resolve it.",
+
+  "theStandingItem": "Slice 19 re-homed ten video.* registrations onto VideoCoreStudyOverlay and fixed effectiveKeys to normalize. Slices 19, 20 and 21 each recorded that nobody had pressed a key; slice 22 pressed R/W/S and recorded that the rows which do NOT seek were still unpressed, because its instrument is a `seeked` event. Slice 29 wrote the phase for them and could not run it.",
+
+  "howThisGotUnblocked": {
+    "problem": "slice 29's phase H sits behind phase E in a DEV-route harness, and phase E regressed under another session's concurrent edits to the working tree. Re-running it would keep measuring a tree nobody has a stable picture of.",
+    "solution": "move the phase to the PACKAGED harness. A packaged artifact is frozen at build time and does not move when the working tree does; a dev-route harness re-reads the tree on every run. The build used here is the same 09:28 artifact that passed all six phases twice in slice 27, unchanged.",
+    "generalLesson": "when the tree is unstable, a frozen artifact is not merely an acceptable substitute for a dev run — it is the only route whose result means anything. This is worth reaching for the next time slice 21's hazard recurs."
+  },
+
+  "measured": {
+    "run1": {
+      "evidence": "docs/migration/proof/packaged-blanc-20260801104500/packaged-blanc.json",
+      "subEarlierSemicolon": { "before": 0, "after": -0.1, "expected": -0.1 },
+      "subLaterQuote": { "before": -0.1, "after": 0, "expected": 0 },
+      "unboundKeyX": { "before": 0, "after": 0, "expected": "unchanged" },
+      "allPhases": "A/B/C/D/E/F/G all PASS"
+    },
+    "run2": {
+      "evidence": "docs/migration/proof/packaged-blanc-20260801105500/packaged-blanc.json",
+      "identical": true,
+      "note": "same three transitions, same control"
+    }
+  },
+
+  "whatThisProves": "The full keyboard path for these two rows in a real packaged build: window keydown -> chordFromEvent -> effectiveKeys normalization -> chordMatches -> the handler stack -> VideoCoreStudyOverlay's changeSubtitleDelay -> the rendered offset. Slice 22 proved that path for the three rows that seek; this proves it for the two that move the subtitle delay, which is a different handler and a different observable.",
+
+  "theControl": "`x` was pressed last and the offset did not move. Without it, two deltas would prove only that SOMETHING moves the delay while keys are being pressed. `x` is free in BOTH the catalog and the adopted player's own vc_defaultKeybindings — the distinction slice 22 paid for when it first used `q` and got a seek to 0.",
+
+  "twoInstrumentTrapsPaidFor": {
+    "notDataTimingDelay": "`data-timing-delay` looks like the obvious seam and is not: it lives on the drift-tracking section and only renders while `driftTracking && timingDrift`. A phase built on it reads null in an ordinary run and looks like a broken shortcut rather than a missing instrument.",
+    "textShapeNotAriaLabel": "the offset `<output>` is matched by text shape (/^[+-]?\\d+(\\.\\d+)?s$/), not by its aria-label, because every label here goes through useT() and this app ships four UI languages. A selector keyed to English would pass on an English machine and fail after a language switch.",
+    "punctuationKeys": "`;` and `'` are not letters, so the `Key${K}` code and letter VK table that phase G of the dev harness uses do not describe them. A wrong code/VK pair dispatches happily and matches nothing — which reads exactly like 'the binding does not fire'. Semicolon/186 and Quote/222 are set explicitly.",
+    "whereTheControlsLive": "the subtitle-offset cluster is in the `study-control-primary` row, NOT behind the `toggle-study-controls` expander — so no expansion step is needed, and a phase that adds one is testing the expander instead."
+  },
+
+  "whatRemains": "Five rows — subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop, toggleFurigana — ship with defaultKeys: ''. effectiveKeys returns '' and chordMatches is false for EVERY chord, so they are unpressable by design until a user binds them. 'Press them' is the wrong test and no harness work will make that keypress exist. The untested claim for those five is bind-then-press through ShortcutSettings (Settings -> Shortcuts does expose the Video category), which needs a settings-driving phase no harness currently has. This is a statement about what the rows ARE, not a deferral.",
+
+  "gates": {
+    "srcUnchanged": true,
+    "note": "no src file changed this slice; slice 27's totals stand (vitest 332 files / 3,803 tests, tsc 288)",
+    "changed": ["docs/migration/tools/packaged-blanc-harness.mjs (phase G)"],
+    "alsoStillOnDisk": "slice 29's phase H in retirement-step3-harness.mjs, still unverified and still blocked by that harness's phase E — kept rather than deleted, because it is the right phase for the dev route once the tree is quiet"
+  }
+}

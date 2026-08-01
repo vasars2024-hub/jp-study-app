@@ -1,0 +1,400 @@
+{
+  "phases": [
+    {
+      "name": "A seed library",
+      "result": "PASS",
+      "detail": "media.json written with harness-song-1"
+    },
+    {
+      "name": "B attach",
+      "result": "PASS",
+      "detail": "electron pid 26736, CDP attached to http://localhost:5173/"
+    },
+    {
+      "name": "C seed lyrics",
+      "result": "PASS",
+      "detail": "3 synced cues cached, mining history cleared"
+    },
+    {
+      "name": "D0 first-run consent",
+      "result": "PASS",
+      "detail": "consent dialog: No thanks"
+    },
+    {
+      "name": "D open and play",
+      "result": "PASS",
+      "detail": "music app open, song row activated"
+    },
+    {
+      "name": "E lyrics render",
+      "result": "PASS",
+      "detail": "3 lyric lines, 3 mine buttons"
+    },
+    {
+      "name": "F hover-reveal",
+      "result": "PASS",
+      "detail": "resting opacity 0, focused opacity 1"
+    },
+    {
+      "name": "G mine writes history",
+      "result": "PASS",
+      "detail": "status=failed term=\"瞼閉じればそこに\""
+    },
+    {
+      "name": "H provenance",
+      "result": "PASS",
+      "detail": "playbackType=music streamType=music-lrc cue=[1500,2500] text=\"瞼閉じればそこに\""
+    },
+    {
+      "name": "H2 audio attached",
+      "result": "PASS",
+      "detail": "jp-music-cue-1-1500.webm audio/webm;codecs=opus 17675 bytes"
+    },
+    {
+      "name": "I no dictionary popup",
+      "result": "PASS",
+      "detail": "lyrics-pane lookup did not fire"
+    },
+    {
+      "name": "J outcome shown",
+      "result": "PASS",
+      "detail": "button label after mining: \"Mining failed\""
+    },
+    {
+      "name": "K0 transport rendered",
+      "result": "PASS",
+      "detail": "3 cue-nav buttons (expect prev/replay/next)"
+    },
+    {
+      "name": "K previous line",
+      "result": "PASS",
+      "detail": "cue 2 @ 4.4s -> cue 1 @ 1.5s (expect cue 1 @ 1.5s)"
+    },
+    {
+      "name": "L next line",
+      "result": "PASS",
+      "detail": "cue 1 @ 1.5s -> cue 2 @ 2.5s (expect cue 2 @ 2.5s)"
+    },
+    {
+      "name": "M replay line",
+      "result": "PASS",
+      "detail": "cue 2 @ 8.8s -> @ 2.5s (expect a jump BACK to 2.5s; drifted-off-start=true)"
+    },
+    {
+      "name": "N slot order is the named order",
+      "result": "PASS",
+      "detail": "rendered order [\"music-cue-prev\",\"music-cue-replay\",\"music-cue-next\"]"
+    },
+    {
+      "name": "O prev clamps at the first line",
+      "result": "PASS",
+      "detail": "press1=1.5s/cue1 press2=0.5s/cue0 press3=0.5s/cue0"
+    },
+    {
+      "name": "P next clamps at the last line",
+      "result": "PASS",
+      "detail": "press1=1.5s/cue1 press2=2.5s/cue2 press3=2.5s/cue2"
+    },
+    {
+      "name": "Q replay is disabled when no line is active",
+      "result": "PASS",
+      "detail": "at 0s active=-1 replayDisabled=true clickRefused=true; prev from there landed at 0.5s (cue 0)"
+    },
+    {
+      "name": "R transport clicks opened no dictionary popup",
+      "result": "PASS",
+      "detail": "no lookup popup after the full transport sweep"
+    },
+    {
+      "name": "S1 bind music.prevLine",
+      "result": "PASS",
+      "detail": "{\"keys\":\"\",\"conflict\":false} -> {\"keys\":\"Ctrl+Alt+6\",\"conflict\":false} via the capture button"
+    },
+    {
+      "name": "S1 bind music.replayLine",
+      "result": "PASS",
+      "detail": "{\"keys\":\"\",\"conflict\":false} -> {\"keys\":\"Ctrl+Alt+7\",\"conflict\":false} via the capture button"
+    },
+    {
+      "name": "S1 bind music.nextLine",
+      "result": "PASS",
+      "detail": "{\"keys\":\"\",\"conflict\":false} -> {\"keys\":\"Ctrl+Alt+8\",\"conflict\":false} via the capture button"
+    },
+    {
+      "name": "S2 previous line by key",
+      "result": "PASS",
+      "detail": "Ctrl+Alt+6: cue 2 @ 2.5s -> cue 1 @ 1.5s (expect cue 1 @ 1.5s)"
+    },
+    {
+      "name": "S3 next line by key",
+      "result": "PASS",
+      "detail": "Ctrl+Alt+8: cue 1 @ 1.5s -> cue 2 @ 2.5s (expect cue 2 @ 2.5s)"
+    },
+    {
+      "name": "S4 replay line by key",
+      "result": "PASS",
+      "detail": "Ctrl+Alt+7: @ 4.3s -> @ 2.5s (expect a jump BACK to 2.5s; drifted-off-start=true)"
+    },
+    {
+      "name": "S5 an unbound chord of the same family does nothing",
+      "result": "PASS",
+      "detail": "Ctrl+Alt+9: cue 2 @ 2.5s -> cue 2 @ 2.5s (expect unchanged)"
+    }
+  ],
+  "startedAt": "2026-08-01T07:57:30.835Z",
+  "transport": {
+    "cueStarts": [
+      0.5,
+      1.5,
+      2.5
+    ],
+    "tolerance": 0.15,
+    "readings": {
+      "beforePrev": {
+        "activeIndex": 2,
+        "lineCount": 3,
+        "seekValue": 4.4,
+        "seekMax": 20,
+        "timeText": "0:04",
+        "navButtons": 3
+      },
+      "afterPrev": {
+        "activeIndex": 1,
+        "lineCount": 3,
+        "seekValue": 1.5,
+        "seekMax": 20,
+        "timeText": "0:01",
+        "navButtons": 3
+      },
+      "beforeNext": {
+        "activeIndex": 1,
+        "lineCount": 3,
+        "seekValue": 1.5,
+        "seekMax": 20,
+        "timeText": "0:01",
+        "navButtons": 3
+      },
+      "afterNext": {
+        "activeIndex": 2,
+        "lineCount": 3,
+        "seekValue": 2.5,
+        "seekMax": 20,
+        "timeText": "0:02",
+        "navButtons": 3
+      },
+      "beforeReplay": {
+        "activeIndex": 2,
+        "lineCount": 3,
+        "seekValue": 8.8,
+        "seekMax": 20,
+        "timeText": "0:08",
+        "navButtons": 3
+      },
+      "afterReplay": {
+        "activeIndex": 2,
+        "lineCount": 3,
+        "seekValue": 2.5,
+        "seekMax": 20,
+        "timeText": "0:02",
+        "navButtons": 3
+      },
+      "backTrail": [
+        {
+          "at": 1.5,
+          "active": 1
+        },
+        {
+          "at": 0.5,
+          "active": 0
+        },
+        {
+          "at": 0.5,
+          "active": 0
+        }
+      ],
+      "forwardTrail": [
+        {
+          "at": 1.5,
+          "active": 1
+        },
+        {
+          "at": 2.5,
+          "active": 2
+        },
+        {
+          "at": 2.5,
+          "active": 2
+        }
+      ],
+      "beforeFirstLine": {
+        "activeIndex": -1,
+        "lineCount": 3,
+        "seekValue": 0,
+        "seekMax": 20,
+        "timeText": "0:00",
+        "navButtons": 3
+      },
+      "prevFromBeforeFirstLine": {
+        "activeIndex": 0,
+        "lineCount": 3,
+        "seekValue": 0.5,
+        "seekMax": 20,
+        "timeText": "0:00",
+        "navButtons": 3
+      }
+    },
+    "pauseState": "paused",
+    "pauseStateBeforeReplay": "paused",
+    "slots": {
+      "order": [
+        "music-cue-prev",
+        "music-cue-replay",
+        "music-cue-next"
+      ],
+      "prev": 1,
+      "replay": 1,
+      "next": 1
+    },
+    "keyboard": {
+      "bind": [
+        {
+          "id": "music.prevLine",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+6",
+          "conflict": false,
+          "chord": "Ctrl+Alt+6",
+          "started": true
+        },
+        {
+          "id": "music.replayLine",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+7",
+          "conflict": false,
+          "chord": "Ctrl+Alt+7",
+          "started": true
+        },
+        {
+          "id": "music.nextLine",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+8",
+          "conflict": false,
+          "chord": "Ctrl+Alt+8",
+          "started": true
+        }
+      ],
+      "press": {
+        "prev": {
+          "before": {
+            "activeIndex": 2,
+            "lineCount": 3,
+            "seekValue": 2.5,
+            "seekMax": 20,
+            "timeText": "0:02",
+            "navButtons": 3
+          },
+          "after": {
+            "activeIndex": 1,
+            "lineCount": 3,
+            "seekValue": 1.5,
+            "seekMax": 20,
+            "timeText": "0:01",
+            "navButtons": 3
+          }
+        },
+        "next": {
+          "before": {
+            "activeIndex": 1,
+            "lineCount": 3,
+            "seekValue": 1.5,
+            "seekMax": 20,
+            "timeText": "0:01",
+            "navButtons": 3
+          },
+          "after": {
+            "activeIndex": 2,
+            "lineCount": 3,
+            "seekValue": 2.5,
+            "seekMax": 20,
+            "timeText": "0:02",
+            "navButtons": 3
+          }
+        },
+        "replay": {
+          "before": {
+            "activeIndex": 2,
+            "lineCount": 3,
+            "seekValue": 4.3,
+            "seekMax": 20,
+            "timeText": "0:04",
+            "navButtons": 3
+          },
+          "after": {
+            "activeIndex": 2,
+            "lineCount": 3,
+            "seekValue": 2.5,
+            "seekMax": 20,
+            "timeText": "0:02",
+            "navButtons": 3
+          },
+          "drifted": true
+        },
+        "control": {
+          "chord": "Ctrl+Alt+9",
+          "before": {
+            "activeIndex": 2,
+            "lineCount": 3,
+            "seekValue": 2.5,
+            "seekMax": 20,
+            "timeText": "0:02",
+            "navButtons": 3
+          },
+          "after": {
+            "activeIndex": 2,
+            "lineCount": 3,
+            "seekValue": 2.5,
+            "seekMax": 20,
+            "timeText": "0:02",
+            "navButtons": 3
+          }
+        }
+      },
+      "pauseState": "already paused",
+      "pauseStateBeforeReplay": "paused"
+    }
+  },
+  "ankiPresent": false,
+  "note": "Anki was NOT running. The mine failed and was RECORDED as a failure, which is the designed behaviour — everything this slice added (cue, draft, request, history entry, localStorage write, provenance) is exercised either way. Only Anki acceptance is unproven.",
+  "result": "PASS",
+  "finishedAt": "2026-08-01T07:58:12.170Z",
+  "log": [
+    "[music-mining] PASS — A seed library: media.json written with harness-song-1",
+    "[music-mining] PASS — B attach: electron pid 26736, CDP attached to http://localhost:5173/",
+    "[music-mining] PASS — C seed lyrics: 3 synced cues cached, mining history cleared",
+    "[music-mining] PASS — D0 first-run consent: consent dialog: No thanks",
+    "[music-mining] PASS — D open and play: music app open, song row activated",
+    "[music-mining] PASS — E lyrics render: 3 lyric lines, 3 mine buttons",
+    "[music-mining] PASS — F hover-reveal: resting opacity 0, focused opacity 1",
+    "[music-mining] PASS — G mine writes history: status=failed term=\"瞼閉じればそこに\"",
+    "[music-mining] PASS — H provenance: playbackType=music streamType=music-lrc cue=[1500,2500] text=\"瞼閉じればそこに\"",
+    "[music-mining] PASS — H2 audio attached: jp-music-cue-1-1500.webm audio/webm;codecs=opus 17675 bytes",
+    "[music-mining] PASS — I no dictionary popup: lyrics-pane lookup did not fire",
+    "[music-mining] PASS — J outcome shown: button label after mining: \"Mining failed\"",
+    "[music-mining] PASS — K0 transport rendered: 3 cue-nav buttons (expect prev/replay/next)",
+    "[music-mining] PASS — K previous line: cue 2 @ 4.4s -> cue 1 @ 1.5s (expect cue 1 @ 1.5s)",
+    "[music-mining] PASS — L next line: cue 1 @ 1.5s -> cue 2 @ 2.5s (expect cue 2 @ 2.5s)",
+    "[music-mining] PASS — M replay line: cue 2 @ 8.8s -> @ 2.5s (expect a jump BACK to 2.5s; drifted-off-start=true)",
+    "[music-mining] PASS — N slot order is the named order: rendered order [\"music-cue-prev\",\"music-cue-replay\",\"music-cue-next\"]",
+    "[music-mining] PASS — O prev clamps at the first line: press1=1.5s/cue1 press2=0.5s/cue0 press3=0.5s/cue0",
+    "[music-mining] PASS — P next clamps at the last line: press1=1.5s/cue1 press2=2.5s/cue2 press3=2.5s/cue2",
+    "[music-mining] PASS — Q replay is disabled when no line is active: at 0s active=-1 replayDisabled=true clickRefused=true; prev from there landed at 0.5s (cue 0)",
+    "[music-mining] PASS — R transport clicks opened no dictionary popup: no lookup popup after the full transport sweep",
+    "[music-mining] PASS — S1 bind music.prevLine: {\"keys\":\"\",\"conflict\":false} -> {\"keys\":\"Ctrl+Alt+6\",\"conflict\":false} via the capture button",
+    "[music-mining] PASS — S1 bind music.replayLine: {\"keys\":\"\",\"conflict\":false} -> {\"keys\":\"Ctrl+Alt+7\",\"conflict\":false} via the capture button",
+    "[music-mining] PASS — S1 bind music.nextLine: {\"keys\":\"\",\"conflict\":false} -> {\"keys\":\"Ctrl+Alt+8\",\"conflict\":false} via the capture button",
+    "[music-mining] PASS — S2 previous line by key: Ctrl+Alt+6: cue 2 @ 2.5s -> cue 1 @ 1.5s (expect cue 1 @ 1.5s)",
+    "[music-mining] PASS — S3 next line by key: Ctrl+Alt+8: cue 1 @ 1.5s -> cue 2 @ 2.5s (expect cue 2 @ 2.5s)",
+    "[music-mining] PASS — S4 replay line by key: Ctrl+Alt+7: @ 4.3s -> @ 2.5s (expect a jump BACK to 2.5s; drifted-off-start=true)",
+    "[music-mining] PASS — S5 an unbound chord of the same family does nothing: Ctrl+Alt+9: cue 2 @ 2.5s -> cue 2 @ 2.5s (expect unchanged)",
+    "[music-mining] Anki was NOT running. The mine failed and was RECORDED as a failure, which is the designed behaviour — everything this slice added (cue, draft, request, history entry, localStorage write, provenance) is exercised either way. Only Anki acceptance is unproven."
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "preparedAt": "2026-07-28T10:01:35.533Z",
+  "executable": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-verified.exe",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728",
+  "libraryPath": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728\\cue-library",
+  "mkvPath": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728\\cue-library\\Sousou no Frieren - 01.mkv",
+  "sourceMkv": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\cue-probe-dual.mkv",
+  "mediaIds": [
+    154587
+  ],
+  "fixture": {
+    "mediaId": 154587,
+    "path": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728\\cue-library\\Sousou no Frieren - 01.mkv"
+  },
+  "serverVersion": "3.10.2",
+  "simulatedUser": true
+}

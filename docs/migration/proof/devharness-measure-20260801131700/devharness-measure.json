@@ -1,0 +1,112 @@
+{
+  "harness": "devharness-measure.mjs",
+  "question": "Does the stacked two-channel chart resolve its percentage heights on a day that has BOTH channels, and does the Continue-Watching widget fit its rows at a non-default size?",
+  "startedAt": "2026-08-01T10:17:07.638Z",
+  "stackedChart": {
+    "url": "http://127.0.0.1:5174/src/renderer/__devharness__/study-ledger-harness.html?state=mixed",
+    "totalBars": 14,
+    "barsWithBothChannels": 6,
+    "collapsedSegments": 0,
+    "stacksOverflowingTheirTrack": 0,
+    "sample": [
+      {
+        "trackPx": 97,
+        "stackPx": 97,
+        "fills": [
+          {
+            "channel": "watch",
+            "declared": "25%",
+            "px": 24.25
+          },
+          {
+            "channel": "read",
+            "declared": "12.5%",
+            "px": 12.13
+          }
+        ],
+        "sumPx": 36.38
+      },
+      {
+        "trackPx": 97,
+        "stackPx": 97,
+        "fills": [
+          {
+            "channel": "watch",
+            "declared": "16.6667%",
+            "px": 16.16
+          },
+          {
+            "channel": "read",
+            "declared": "48.6111%",
+            "px": 47.14
+          }
+        ],
+        "sumPx": 63.3
+      },
+      {
+        "trackPx": 97,
+        "stackPx": 97,
+        "fills": [
+          {
+            "channel": "watch",
+            "declared": "41.6667%",
+            "px": 40.41
+          },
+          {
+            "channel": "read",
+            "declared": "30.5556%",
+            "px": 29.63
+          }
+        ],
+        "sumPx": 70.04
+      },
+      {
+        "trackPx": 97,
+        "stackPx": 97,
+        "fills": [
+          {
+            "channel": "watch",
+            "declared": "33.3333%",
+            "px": 32.33
+          },
+          {
+            "channel": "read",
+            "declared": "11.1111%",
+            "px": 10.77
+          }
+        ],
+        "sumPx": 43.1
+      }
+    ],
+    "result": "PASS"
+  },
+  "continueWatchingWidget": {
+    "url": "http://127.0.0.1:5174/src/renderer/__devharness__/continue-watching-harness.html?state=populated",
+    "frames": [
+      {
+        "label": "default 320 × 250",
+        "clientH": 218,
+        "scrollH": 218,
+        "overflowsPx": 0,
+        "rows": 3
+      },
+      {
+        "label": "minimum 240 × 130",
+        "clientH": 98,
+        "scrollH": 98,
+        "overflowsPx": 0,
+        "rows": 1
+      },
+      {
+        "label": "tall 360 × 400",
+        "clientH": 368,
+        "scrollH": 368,
+        "overflowsPx": 0,
+        "rows": 4
+      }
+    ],
+    "framesOverflowing": 0,
+    "result": "PASS"
+  },
+  "verdict": "PASS"
+}

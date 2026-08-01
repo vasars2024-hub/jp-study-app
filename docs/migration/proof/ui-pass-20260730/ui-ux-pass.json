@@ -1,0 +1,116 @@
+{
+  "date": "2026-07-30",
+  "scope": "UI/UX pass over every Seanime-delivered renderer surface (Phases 1-5), before starting Phase 6.",
+  "surfacesAudited": [
+    "src/media/MediaWorkspaceHost.tsx — host chrome, launcher, offline/failed states",
+    "src/media/MediaWorkspace.tsx — status gate (no change needed; already explicit-terminal-state)",
+    "src/media/VideoCoreStudyOverlay.tsx — the study control dock",
+    "src/media/VideoCoreMiningPanel.tsx — the card-preview/mining panel",
+    "src/renderer/components/reading/MangaProviderBrowser.tsx — Phase 5 provider dialog",
+    "src/renderer/components/SeanimeDevPanel.tsx — audited, deliberately unchanged (throwaway Phase-1 dev surface, untranslated by ADR-003 design)"
+  ],
+
+  "findingsFixed": {
+    "rawMachineEnumsInUserFacingText": {
+      "what": "MediaWorkspaceHost interpolated SeanimeStatus['kind'] into a sentence ('sidecar ready') and VideoCoreMiningPanel rendered VideoCoreMiningHistoryStatus directly ('exported · <deck>'). Both put raw lowercase English into the JA/ZH/RU chrome that every other string in these surfaces goes through.",
+      "fix": "New src/shared/mediaWorkspaceLabels.ts holds both maps as Record<Union, string>, so an added enum variant is a compile error. 10 new keys in all four languages.",
+      "pinnedBy": "src/shared/__tests__/mediaWorkspaceLabels.test.ts — resolves every mapped key against the real catalogs, which is the half tsc cannot see (a missing key renders as the key itself).",
+      "note": "The English label may legitimately equal the enum token ('sidecar ready' is just correct English). The test asserts the raw token is absent from ja/zh/ru only — the first version of that assertion was wrong and was corrected."
+    },
+
+    "controlDockAlwaysScrolled": {
+      "what": "max-height: 7.5rem with four flat rows of ~35 controls. Four rows at ~1.9rem plus gaps is ~9.4rem, so the dock overflowed on every playback and its last row — the whole Whisper transcription pipeline — sat below an invisible fold. 'Furigana' carried the same visual weight as a model/device/language picker.",
+      "fix": "Split into an always-visible primary row (cue loop, frame step, subtitle offset, speed) that never scrolls, plus a collapsed-by-default advanced section that scrolls on its own. Five labelled groups: Display, Practice, Loop, Tracks, Transcribe.",
+      "BREAKING_FOR_BRIDGE_DRIVEN_PROOFS": "The advanced section is COLLAPSED by default. A run that needs the subtitle/audio track selectors, A-B loop, or any Whisper control must first click [data-study-action=\"toggle-study-controls\"]. Nothing in src/, docs/ or tools/ referenced these selectors programmatically (verified by grep), so no automated gate broke — but past live runs reached them directly."
+    },
+
+    "modeCheckboxesWereReallyRadios": {
+      "what": "Dictation and Shadowing were two checkboxes whose onChange each cleared the other. Exclusivity was enforced but never announced.",
+      "fix": "One role=radiogroup over a derived PracticeMode enum ('off' | 'dictation' | 'shadowing'). The two stored booleans and the persisted preference shape are untouched."
+    },
+
+    "noStudyLoopKeyboardShortcuts": {
+      "what": "The three most-used actions in a study player — previous/replay/next CUE — were mouse-only.",
+      "fix": "W = previous line, S = next line, R = replay line, ';' / '\\'' = subtitle offset -/+0.1s. Guarded on defaultPrevented, any modifier, and editable targets (the dictation input and the mining form both sit over the player).",
+      "IMPORTANT_the_adopted_player_already_owns_a_keymap": "vendor/seanime-web/app/(main)/_features/video-core/video-core.atoms.ts `vc_defaultKeybindings` claims KeyA/KeyD (seek +/-30s), the arrows (fine seek), BracketLeft/Right (speed), KeyE/KeyQ/KeyM/KeyJ/KeyK/KeyN/KeyB/KeyF/KeyP/KeyI/KeyH/KeyZ; video-core-preferences.tsx additionally hardcodes Space, Enter, Home, End, Escape and Comma/Period (24fps frame step). Its handler is also on `document` with no capture, so a collision fires BOTH. The five codes above were chosen from what is left free — re-check that file before moving any of them."
+    },
+
+    "miningPanelCoveredTheVideoWithNoWayOut": {
+      "what": "A 21rem-tall absolute overlay, always open, no collapse or close affordance. On a narrow window it became full-width and ate the video.",
+      "fix": "Collapsible via [data-study-action=\"toggle-mining-panel\"] (aria-expanded). Heading and result message are pinned rows; only the form body scrolls. Collapsed, two 'armed' dots still report whether a screenshot and cue audio are attached."
+    },
+
+    "attachedAssetsWereInvisibleBeforeCommit": {
+      "what": "Both assets go straight to Anki, and the only feedback was a byte count ('Screenshot ready · 159 KB'). You attached a frame blind and could only inspect it by mining and then undoing.",
+      "fix": "Screenshot thumbnail and an <audio controls> preview, built from draft.screenshotBase64 / draft.audioBase64 which were already in the draft."
+    },
+
+    "silentLiveRegions": {
+      "what": "Three regions were created together with their content, which is not reliably announced: the mining result <output> (so 'Duplicate warning' and every failure were silent), the manga download footer, and the subtitle-offset <output> had aria-label but no aria-live.",
+      "fix": "All three now exist before content arrives; the manga footer uses hidden={!message} rather than conditional mounting."
+    },
+
+    "workspaceHostWasNotADialog": {
+      "what": "A fixed inset-0 z-9999 full-screen layer with no role, no aria-modal, no Escape, and no focus management — keyboard users could not dismiss it and tabbed into the desktop behind it.",
+      "fix": "role=dialog + aria-modal, Escape to close, focus moved to Close on open and returned to the launcher on close.",
+      "escapeGuard": "Escape is ignored while `.study-player-slice[data-study-player=\"active\"]` exists — the adopted VideoCore owns that layer and its own exit path, and closing the host would drop a live directstream."
+    },
+
+    "contrastFailure": {
+      "what": "#media-workspace .study-mining-provenance dt used --color-gray-500 (111,106,122) on the 0.94-alpha panel at 0.72rem (~11.5px).",
+      "measured": "3.73:1 — below WCAG AA's 4.5:1 for text that size.",
+      "fix": "gray-400 (157,151,166) on the same background measures 6.87:1 and still reads as a label. The new .study-control-legend uses gray-400 for the same reason."
+    },
+
+    "mangaDialogDetails": {
+      "backdropClosedOnPress": "onMouseDown={onClose} discarded the dialog on the press, so a text-selection drag that began on the backdrop closed it with nothing to undo. Now requires press AND release to both land on the backdrop.",
+      "focusOnOpen": "The search input's autoFocus only renders once providers resolve, so until then focus sat on the catalogue behind the modal. The dialog itself is now focused on mount.",
+      "orderToggleHadNoAccessibleName": "aria-label on a plain <div> is ignored; added role=group.",
+      "loadingAndErrorStates": "role=status + aria-busy while providers load, role=alert on the load failure.",
+      "unexplainedDisabledRows": "Downloads are serialised so every other row goes inert while one runs, which reads as the dialog having broken. Added aria-busy on the active row and a title on the others."
+    },
+
+    "unexplainedDisabledControls": {
+      "openLocalVideo": "Disabled unless the sidecar is ready, with no stated reason — now titled with the current state.",
+      "secondarySubtitles": "Inert until Dual subtitles is on — now says so.",
+      "mineCard": "Disabled with no term — now carries both a title and a visible hint."
+    },
+
+    "hostChromeWasInlineStyles": {
+      "what": "Every host control was hand-styled inline with hardcoded hex fallbacks, bypassing the app's token system.",
+      "fix": "Moved to .seanime-host-* classes in src/renderer/styles.css using --surface-2/--border/--accent/--success/--warning/--danger-2. Deliberately NOT in mediaWorkspace.css: that file is the layer *inside* #media-workspace and every selector in it must be scoped (check-media-css-containment.mjs enforces it); the host is the layer around it.",
+      "statusIsNotColourAlone": "The sidecar dot is always accompanied by its text label (WCAG 1.4.1)."
+    }
+  },
+
+  "auditedAndDeliberatelyNotChanged": {
+    "focusRings": "An early read of this pass claimed the media workspace had no focus indicators. That was WRONG and is recorded so it is not 'fixed' again: src/renderer/styles.css:1012 applies html[data-display-focus='normal'|'strong'] *:focus-visible app-wide, displayPrefs.ts defaults focusRing to 'normal' and stamps root.dataset.displayFocus, and nothing inside #media-workspace overrides outline for the Study OS controls (only the scoped .form-* block does, on :focus, and these controls do not use those classes). Adopted upstream components DO kill their own rings via Tailwind focus:outline-none under important:'#media-workspace' — that is an upstream-syncability question, not a Study OS defect.",
+    "seanimeDevPanel": "Untranslated and inline-styled by explicit ADR-003 design; it is the throwaway Phase-1 proof surface and renders only when the sidecar flag is on. Left alone. Its fixed position (right 16 / bottom 16) is why the workspace launcher sits at bottom 190.",
+    "mangaReaderAndNovelReader": "Retained Study OS readers, not Seanime-delivered surfaces. Out of scope for this pass."
+  },
+
+  "gates": {
+    "tests": "3229/3229 pass, 297/297 files (from 3215/295 — +14 tests in 2 new files)",
+    "tsc": "288 — identical to the baseline, and zero diagnostics in any changed file",
+    "i18n": "exit 0 — 6020 English keys present in ja/zh/ru (from 5993; 27 added)",
+    "architectureAudit": "exit 0, 'nothing new'; 3 known pending unchanged; 1201 modules scanned (from 1199)",
+    "targetedLint": "exit 0, zero output, on all 7 changed/new files",
+    "mainSsrBuild": "exit 0",
+    "preloadBuild": "exit 0",
+    "rendererBuild": "exit 0",
+    "cssContainment": "6949/6949 scoped; 0 unscoped; 0 shell --tw- tokens (from 6924 — all 25 new selectors are scoped)",
+    "lintNote": "npx eslint src/media/ reports 66 errors, ALL in src/media/jassub/assets/jassub-worker.js and src/media/jassub/runtime.js — vendored jassub assets, pre-existing, never touched here. Lint the changed files, not the directory."
+  },
+
+  "newBaselines": { "tests": "3229/3229, 297/297 files", "tsc": "288", "i18nKeys": 6020, "cssSelectors": 6949 },
+
+  "toolingLearned": {
+    "rendererComponentTestsCanRunNow": "The standing note is that vitest.config.ts includes only src/renderer/__tests__/**/*.test.ts, so the two .test.tsx files there have never run and component tests were considered off the table. A `// @vitest-environment jsdom` docblock on a .test.ts file solves it with NO root-config change: src/renderer/__tests__/videoCoreMiningPanelStructure.test.ts does a real createRoot render of VideoCoreMiningPanel and asserts its markup. jsdom is already in devDependencies. Still write .test.ts with createElement, and still put the file under src/renderer/__tests__.",
+    "ssrCannotRenderThisPanel": "renderToStaticMarkup was tried first and every assertion passed vacuously: the mining draft is derived in a useEffect, so under SSR the component never leaves its 'waiting for a cue' state. Check what state your render actually reached before trusting a markup assertion.",
+    "srcMediaTestsDirIsDead": "src/media/__tests__/ exists, is EMPTY, and is outside every include glob. Do not put tests there.",
+    "fixturesMustGoThroughTheFactories": "A hand-written VideoCoreMiningHistoryEntry literal without `provenance` is silently dropped by normalizeVideoCoreMiningHistory, which made a history-row assertion pass against an empty list. The fixture now builds via createVideoCoreMiningDraft + createVideoCoreMiningHistoryEntry.",
+    "mutationCheckedTheNewTest": "The history-status test was run against a deliberately reverted component to confirm it fails. It did — and the run also exposed that the companion assertion `not.toContain('>exported<')` never matched the real old markup (`>exported ·`), so it had been passing on both the fixed and broken code. Tightened to /`>exported\\s`/. Worth repeating: assert against the actual pre-fix output, not an imagined one."
+  },
+
+  "notVerifiedLive": "No Electron run and no sidecar were started for this pass. It is renderer markup, CSS and i18n; correctness is carried by tsc, the three builds, the CSS containment check, the new markup test and the label test. The two things a live run should still confirm are geometry, not logic: that the collapsed dock leaves the primary row fully visible at the normal proof viewport, and that the collapsed mining panel no longer covers the video. Whoever does the next bridge-driven run must click [data-study-action=\"toggle-study-controls\"] before reaching the track or Whisper controls."
+}

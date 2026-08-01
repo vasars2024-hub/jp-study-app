@@ -1,0 +1,62 @@
+{
+  "date": "2026-07-30",
+  "gate": "Phase 6 slice 1 — does the Seanime↔Study OS path join work against real data?",
+  "method": "Offline. No Electron launch, no sidecar, no mouse control. The user's real seanime.db and media.json were copied with PowerShell (hash-verified both ways), the SHIPPED src/shared/seanimeStudyLibrary.ts was bundled with the vendored esbuild and run over them. Same pattern as manga-ocr-harness.mjs.",
+
+  "HEADLINE_FINDING": {
+    "what": "The real durable Seanime profile at <userData>/seanime has an EMPTY library.",
+    "evidence": {
+      "local_files.value": "a 2-byte blob decoding to the literal string \"[]\" — an array of 0",
+      "settings": "0 rows, so no library path has ever been configured",
+      "scan_summaries": "0 rows, so no scan has ever run",
+      "seanime.db": "188,416 bytes — that is SQLite page overhead from table creation, not content. 31 tables exist; only 6 have any rows, all of them settings singletons."
+    },
+    "consequence": "The end-to-end live check this session's own handoff asked for — call window.api.seanimeStudyLibrary() through the bridge and confirm the entries join — CANNOT produce a meaningful result today. The Seanime side is empty, so the join would return [] and the run would look like a clean pass while proving nothing. That is the same shape as the Phase 5 manga proofs running for two sessions on a 1×1 GIF.",
+    "correction_to_this_sessions_own_handoff": "The gate was specified wrong. It named a live bridge call as the next step without first checking whether the real profile had any library content to join. Checking the data cost one PowerShell copy and one script; the live run would have cost an app launch and returned a false green.",
+    "correction_to_how_the_datadir_proof_reads": "proof/datadir-durable-20260730/ is still valid — it proved adoption and survival of the datadir across a real quit/relaunch. But the datadir it adopted (seanime-phase1-1B4yqk) contained an EMPTY library, so that proof says nothing about library content, and its '188,416 bytes with mtime preserved' should not be read as '188 KB of library'."
+  },
+
+  "whatWasVerifiedInstead": {
+    "claim": "The path normalisation actually joins the user's real library paths, across every format a Go server could plausibly emit.",
+    "studyOsSide": "REAL — all 30 items from the user's media.json, every one with a usable path, all 30 in native Windows backslash form, producing 30 DISTINCT normalised keys (no collisions on real data).",
+    "seanimeSide": "SYNTHESISED from those same real paths, re-emitted in six format variants. Stated plainly because it is the limit of this check: there is no real Seanime-side payload to join against without running a scan.",
+    "variantsAllJoined30of30": [
+      "as-is (backslash — the one form ever observed from the sidecar)",
+      "forward slashes",
+      "lowercased drive letter",
+      "lowercased entirely",
+      "doubled separators",
+      "trailing whitespace"
+    ],
+    "negativeControl": "A path only the Seanime side knows about (C:\\Nowhere\\not-in-study-os.mkv) stayed `unlinked` rather than being silently joined."
+  },
+
+  "realStateDistribution": {
+    "note": "The shipped join over the user's real 30 items with no readiness snapshots cached. This is a genuine design signal for the Phase 6 surface, not a synthetic number.",
+    "total": 30,
+    "ready": 0,
+    "stale": 0,
+    "unanalyzed": 1,
+    "missingSubtitles": 29,
+    "unlinked": 0,
+    "designImplication": "29 of 30 real library items have NO Japanese subtitle. The dominant state the Phase 6 surface will show is `missing-subtitles`, not `ready`. A surface built around 'here are your ready titles' would be almost entirely empty on this user's real data. It must lead with the actionable gap instead. The preparation queue already orders correctly — the single `unanalyzed` item (The Big O - 01) comes first, ahead of 29 `missing-subtitles`."
+  },
+
+  "safety": {
+    "appRunning": "No — verified no electron process and no debug/bridge.json before starting.",
+    "mutations": "None. Read-only throughout.",
+    "sourceHashesBeforeAndAfter": {
+      "seanime.db": "EE6F946B545813978785F939C76189AFA7EF8CB66B240B050D89A6717863E4FD (identical before and after)",
+      "media.json": "DC2C4E37F832A7073B262C973AD4D64CB163AB0F46837826F24CC20986731F52 (identical before and after)"
+    },
+    "userDataCopies": "The scratchpad copies of seanime.db and media.json were deleted after the run.",
+    "readVia": "PowerShell for every %APPDATA% read and every hash — the Bash tool serves a stale overlay for paths outside the repo on this machine."
+  },
+
+  "toolingNotes": {
+    "sqlJsIsAvailable": "node_modules/sql.js reads a seanime.db from a buffer with no native build. Import it by absolute file URL when the script lives in the scratchpad — a bare specifier cannot resolve against the repo's node_modules.",
+    "esbuildBinaryPath": "node_modules/esbuild/bin/esbuild is a JS shim and spawns ENOENT. The real binary is node_modules/@esbuild/win32-x64/esbuild.exe."
+  },
+
+  "whatIsStillUnproven": "That a real Seanime scan emits paths in the form this join expects. Only a scan can show that, and a scan is a user decision: it writes settings and local_files into their Seanime profile, walks a media directory, and queries AniList for metadata. It is NOT blocking the renderer surface — the join is verified against real Study OS paths and the negative control holds — but it is the one remaining assumption and it should be closed the first time a scan happens for any other reason."
+}

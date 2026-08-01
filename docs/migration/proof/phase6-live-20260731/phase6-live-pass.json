@@ -1,0 +1,140 @@
+{
+  "title": "Phase 6 live pass — the surfaces of slices 2–8 driven in the real app",
+  "date": "2026-07-31",
+  "branch": "grammarx/phase-1-5",
+  "driver": "the app's own debug bridge on 127.0.0.1:39273 — no Windows mouse or keyboard control",
+  "why": "Slices 6, 7 and 8 all landed with the same gap: geometry and contrast were closed against a dev harness, but nobody had watched a real episode and seen the app's own surfaces move. NEXT_SESSION.md named this as the obvious opening.",
+
+  "environment": {
+    "app": "already running from a previous session (electron pid 21292); renderer reloaded at 08:13 local, AFTER the last slice-8 edit, so the code under test was current",
+    "sidecar": "ready, isolated Phase 3/5 profile C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728 — NOT the real <userData>/seanime",
+    "library": "one real file: Sousou no Frieren - 01.mkv, mediaId 154587, episode 1",
+    "anki": "not running for the whole pass — every Anki verdict below is the unreachable path",
+    "baselineLedger": "jp-study-stats-v1-ja held one day (2026-07-30, 331.835s read / 2142 chars). No 2026-07-31 entry, no watchSeconds anywhere, and no `shows` key at all."
+  },
+
+  "proven": {
+    "libraryReadinessReviewSwitch": {
+      "result": "PASS",
+      "detail": "All three segments render and switch under real clicks at measured coordinates. Readiness showed the real joined row (title, episode, absolute path) in state `Not imported` with its next action and Import/Open buttons. Review rendered its true empty state ('Nothing mined yet') because mining history is []."
+    },
+    "ankiVerdictAgainstLiveCollection": {
+      "result": "PASS (unreachable path)",
+      "detail": "'Anki is not reachable, so nothing can be mined yet. — Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.' Rendered in the danger colour, naming its own fix."
+    },
+    "watchTimeAccruesAgainstARealVideo": {
+      "result": "PASS — this was the headline unknown",
+      "openedVia": "the app's own `seanime:media-workspace-open` event carrying localFilePath, with the path read straight from the live API so the double-escaping trap could not apply",
+      "player": "real directstream, readyState 4, duration 30.386, resume position 3.566 applied on open",
+      "timedRun": {
+        "method": "measured in-page (performance.now) rather than from the shell, because shell-side sleeps were too coarse to judge a wall-clock claim",
+        "wallClockFromPlayResolvedToPause": 20.002,
+        "claimedByAccumulator": 20.0,
+        "ledgerDelta": 20.0,
+        "mediaAdvanced": 19.996,
+        "verdict": "Rule 1 (wall-clock while playing, not media time) holds to 2 ms over a real 20-second run."
+      },
+      "backwardsSeekCounts": "The dock's own `Previous line` seeked from 30.386 back to 2.673 and resumed; the interval was credited. Rule 5 exercised with the app's real control.",
+      "ledgerAfter": {
+        "day": "2026-07-31",
+        "entry": { "seconds": 0, "chars": 0, "watchSeconds": 115.55 },
+        "shows": {
+          "id": "file:c:/users/arseniy/appdata/local/temp/seanime-phase3-gplay-20260728/cue-library/sousou no frieren - 01.mkv",
+          "title": "Sousou no Frieren — 1"
+        },
+        "note": "The show id is videoCoreResumeKey — the same join key the continue-watching row, the readiness row and the mined cards use. Confirmed identical live."
+      }
+    },
+    "theLoadBearingRefusal": {
+      "result": "PASS",
+      "detail": "Statistics rendered `0s READ TODAY` and `5m TOTAL TIME` (read only) beside `1m WATCHED TODAY`, `1m TOTAL WATCHED`, `1 SHOWS WATCHED`. Watch seconds were never folded into the read channel on any surface. The three watch cards appeared only because something had been watched.",
+      "streak": "DAY STREAK moved 1 → 2 and DAYS ACTIVE → 2, because 2026-07-30 (read) and 2026-07-31 (watch) both count. This is the documented behaviour change, observed live.",
+      "chart": "The 14-day chart drew the red Reading bar on Thu and a separate blue Watching bar on Fri under a named Reading/Watching legend. stats-bar-stack measured 97px inside a 97px stats-bar-track — no overflow."
+    },
+    "byShowRowResumes": {
+      "result": "PASS",
+      "detail": "A real <button> with accessible name 'Resume Sousou no Frieren — 1'. It dispatched seanime:media-workspace-open with the localFilePath and — because the resume store had cleared at EOF — OMITTED startAtSec rather than fabricating one, which is exactly the documented rule. Reaching the player from Statistics also confirms the App-level mount of MediaWorkspaceHost."
+    },
+    "continueWatchingPaletteGroup": {
+      "result": "PASS end to end",
+      "detail": "Search mode showed a 'Continue watching' group ranked first for the query, labelled with the file and 'Resume at 0:22'. Activating the row dispatched { localFilePath, startAtSec: 16.838 } — a deliberate 5s rewind from the stored 21.838 — the sidecar served it with no error, and playback added 13.73s to the same show tally.",
+      "closesAnOpenAssumption": "seanimeContinueWatching.ts:88 claims the lower-cased, forward-slashed fallback path is 'fine to open on Windows'. That had never been tested. It is now: c:/users/... opened against the real sidecar with no localfile error."
+    },
+    "continueWatchingWidget": {
+      "result": "PASS",
+      "detail": "Added to the real desktop at its registry defaultSize 320x250. .wgt-cw-list measured clientHeight 99 == scrollHeight 99 — not clipped. Two rows at 47px each, both fully visible, both real buttons. No progress bar on either, correctly, because neither has a measured duration (rule 3).",
+      "unexpectedAndGood": "The second row was 'The Big O - 01 | 2:34', which is NOT in the VideoCore resume store — it came from the legacy Media Center's MediaItem.positionSec. Slice 7's two-store reconciliation is working against real user data, not just fixtures.",
+      "layoutSafety": "desktop-layout.json was backed up first, and after removing the widget through the app's own menu the file was byte-identical to the backup (sha256 88597705362319f7, 3881 bytes)."
+    }
+  },
+
+  "defectsFound": [
+    {
+      "id": "workspace-header-unreachable-during-playback",
+      "severity": "high — no way out of the media workspace once a file is open",
+      "status": "FIXED and verified live in this session",
+      "symptom": "With a player active, clicking Close, Library, Readiness, Review or Open local video does nothing at all. Nothing looks disabled or broken.",
+      "rootCause": ".seanime-host-bar was position:static / z-index:auto, while .study-player-slice inside the same stacking context is position:fixed / z-index:80 and spans the whole viewport, so it paints over the header. The element actually swallowing the clicks is the adopted player's [data-vc-element=\"top-playback-info\"] — a caption strip with ZERO buttons of its own, showInfo = paused || hoveringControlBar, and no pointer-events management.",
+      "whyItWasATrap": "MediaWorkspaceHost.tsx:153 deliberately refuses Escape while .study-player-slice[data-study-player=\"active\"], and VideoCore's own control bar sits translated below the fold in this seam. Header covered + Escape refused + native controls hidden = no in-app exit.",
+      "evidence": "document.elementFromPoint at the Close button's own centre returned top-playback-info in every state tested (paused, playing, after 6s idle). A real dispatched click at those coordinates was received by top-playback-info and the workspace stayed open.",
+      "fix": "src/renderer/styles.css .seanime-host-bar { position: relative; z-index: 100 } — the host's chrome must outrank the player it contains.",
+      "verification": "After HMR, computed position:relative / z-index:100, elementFromPoint returns the button, and a real bridge click at (1885,20) closed the workspace. Repeated successfully three times."
+    },
+    {
+      "id": "study-library-health-not-pluralized",
+      "severity": "low — visible wrong grammar on the Phase 6 surface",
+      "status": "FIXED and verified live in this session",
+      "symptom": "A one-file library rendered '1 files · 1 need work · 0 ready to study'.",
+      "rootCause": "'studyLibrary.health' was one flat interpolation carrying three counts. CLAUDE.md i18n rule 5 requires CLDR plural forms, but the plural machinery selects on a single `count`, so one key could never have covered three independently-inflecting numbers. Only visible because the real library has exactly one file; every harness fixture had more.",
+      "fix": "Split into studyLibrary.health.total / .queued / .ready, each a plural entry taking its own `count`, joined with ' · ' at the call site. Russian given full one/few/many/other, which the catalog-hygiene test enforces (it caught an other-only first cut).",
+      "verification": "Live panel now reads '1 file · 1 needs work · 0 ready to study'."
+    },
+    {
+      "id": "command-palette-renders-behind-the-media-workspace",
+      "severity": "medium — NOT fixed, needs a shell-level decision",
+      "status": "OPEN — reported, deliberately not fixed in this pass",
+      "detail": ".palette is z-index 1201; .seanime-host is z-index 9999 with an opaque background. With the workspace open the palette mounts, takes focus and receives keystrokes while being completely invisible behind the workspace, and every click at a row's coordinates lands on the workspace instead.",
+      "whyNotFixedHere": "Deciding what outranks what across the whole shell is broader than the Phase 6 seam, and the practical impact on slice 7 is limited because its palette group is designed for entry from OUTSIDE the workspace. Raising the palette above 9999, or suppressing it while the workspace is open, are both defensible and it is not this track's call."
+    }
+  ],
+
+  "observationsNotDefects": [
+    {
+      "what": "The same file is named two different ways on two surfaces.",
+      "detail": "Statistics 'By show' says 'Sousou no Frieren — 1' (the player passed a real title to recordWatching); the Continue Watching row and palette entry say 'sousou no frieren - 01.mkv' (the lower-cased basename from the resume key). Both are documented fallbacks, and they diverge here only because this file is `unlinked` — not in the Study OS media library, and with no mining history. The Big O row, which IS in the library, shows a proper title. A future slice could prefer the stats `shows` title or the Seanime library title before falling back to the basename."
+    },
+    {
+      "what": "The sidecar's no-client watchdog fires on every workspace close, and the renderer keeps the stale token.",
+      "detail": "Observed three times: closing the workspace dropped the last websocket client, the sidecar exited with code 1, the supervisor restarted it on a new ephemeral port (51812 → 64510 → 61480), and the renderer's directstream URL then 401'd — visible as 'Video error → switching to HLS → Unrecoverable HLS error' and a player stuck at readyState 0. This is the already-recorded open defect, not a new one, but the pass raises its priority: slice 7 exists precisely to enter the player from outside the workspace, and every such entry after a close is exposed to it. A renderer reload is still the only recovery."
+    }
+  ],
+
+  "notDone": [
+    "The stacked two-channel chart column was never exercised live — no single day has both read and watch time, so every column drew one segment. The 2px-overflow fix from the harness is therefore still harness-only evidence; the single-segment case measured clean (97px stack in a 97px track).",
+    "The Continue Watching widget was measured only at its default 320x250. The registry minimum 240x130 was not re-tested live, because a CSS-only resize does not move the React prop the compact layout derives from, so it would not have exercised the derived behaviour the harness already covers.",
+    "The per-row mining rollup on readiness rows was only seen in its zero state — mining history is empty and Anki was down all session, so no card could be mined to populate it.",
+    "Builds and the CSS containment check were NOT run: the Forge dev server was up for the whole session and `vite build` into a locked dist/ dies with EBUSY. This session's CSS change is in renderer/styles.css, the shell sheet, not mediaWorkspace.css, so it cannot affect containment."
+  ],
+
+  "gates": {
+    "tests": "3,501 passed / 312 files — all green",
+    "tsc": "287 — the post-slice-8 baseline, 0 diagnostics in any file changed this session",
+    "i18n": "exit 0 at 6,157 keys (net +2: one key removed, three added)",
+    "architectureAudit": "exit 0 — 'Nothing new', 3 known pending",
+    "eslint": "exit 0 on every changed file",
+    "buildsAndContainment": "NOT run — EBUSY, see notDone"
+  },
+
+  "filesChanged": [
+    "src/renderer/styles.css — .seanime-host-bar stacking fix",
+    "src/renderer/components/reading/SeanimeStudyLibraryPanel.tsx — three pluralized fragments",
+    "src/shared/i18n/catalogs/{en,ja,zh,ru}.ts — studyLibrary.health split into .total/.queued/.ready"
+  ],
+
+  "userDataTouched": {
+    "jp-study-stats-v1-ja": "115.55s of real watch time added under 2026-07-31, plus a `shows` tally for the Frieren fixture. This is genuine time the file actually played; it is left in place rather than reverted, and it is what moved the streak to 2.",
+    "jp-video-core-resume-v1": "left holding a real mid-file position (22.272s) from the last paused run",
+    "desktop-layout.json": "backed up, mutated, restored — byte-identical afterwards",
+    "everythingElse": "untouched; no Anki mutation was attempted at any point (Anki was not running)"
+  }
+}

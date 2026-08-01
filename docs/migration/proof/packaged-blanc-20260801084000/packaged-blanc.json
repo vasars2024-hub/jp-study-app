@@ -1,0 +1,68 @@
+{
+  "harness": "packaged-blanc-harness.mjs",
+  "question": "Does Blanc's player work in a PACKAGED build, and does slice 24's recovery stay unused there? The recovery being NEEDED is a failure here, not a success.",
+  "startedAt": "2026-08-01T05:36:49.927Z",
+  "app": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-a\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-a",
+  "phases": [
+    {
+      "name": "A the packaged app boots and the desktop mounts",
+      "result": "PASS",
+      "detail": "pid 10048, app://bundle/index.html, consent declined: true"
+    },
+    {
+      "name": "B the sidecar is the one inside the package",
+      "result": "PASS",
+      "detail": "pid 1344, port 63198, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe"
+    },
+    {
+      "name": "C Blanc opens as its own packaged window",
+      "result": "PASS",
+      "detail": "app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}"
+    },
+    {
+      "name": "D a file plays in the packaged Blanc, first try",
+      "result": "FAIL",
+      "detail": "never loaded"
+    },
+    {
+      "name": "E the recovery was never needed — one POST, one socket, no terminate",
+      "result": "FAIL",
+      "detail": "POSTs 0 (want 1), sockets 0 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at nullms"
+    }
+  ],
+  "mainUrl": "app://bundle/index.html",
+  "sidecar": {
+    "pid": 1344,
+    "port": 63198,
+    "version": "3.10.2",
+    "exePath": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "fromPackage": true
+  },
+  "blancUrl": "app://bundle/blanc.html?blanc=1",
+  "libraryItems": [
+    {
+      "id": "d002d238-8fd5-4cc5-a0d3-001636e3766f",
+      "fileName": "Sousou no Frieren - 01.mkv"
+    }
+  ],
+  "productionShape": {
+    "directstreamPosts": 0,
+    "socketsOpened": 0,
+    "socketsClosed": 0,
+    "videoTerminatedBeforeWatch": 0,
+    "watchAtMs": null,
+    "rows": []
+  },
+  "result": "FAIL",
+  "finishedAt": "2026-08-01T05:38:33.831Z",
+  "log": [
+    "[packaged-blanc] PASS — A the packaged app boots and the desktop mounts: pid 10048, app://bundle/index.html, consent declined: true",
+    "[packaged-blanc] PASS — B the sidecar is the one inside the package: pid 1344, port 63198, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "[packaged-blanc] PASS — C Blanc opens as its own packaged window: app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}",
+    "[packaged-blanc]   D: the video never loaded",
+    "[packaged-blanc] FAIL — D a file plays in the packaged Blanc, first try: never loaded",
+    "[packaged-blanc] FAIL — E the recovery was never needed — one POST, one socket, no terminate: POSTs 0 (want 1), sockets 0 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at nullms"
+  ]
+}

@@ -1,0 +1,247 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "hypothesisCorrection": "Half right, and the wrong half is the half that names a fix. Step 1b (slice 24) measured the frames: the disconnect is a co-symptom, and the cancel is a `video-terminated` the CLIENT sends ~190ms later from the adopted lifecycle effect. A socket-lifetime fix would have changed nothing. See docs/migration/proof/blanc-player-live-20260801075500/slice-24.json.",
+  "startedAt": "2026-08-01T04:56:09.405Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nostrict-b\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nostrict-b",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 34900, port 65288, v3.10.2"
+    },
+    {
+      "name": "1 first open (fresh mount, inside the StrictMode double-mount)",
+      "result": "PASS",
+      "detail": "{\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":0.301153,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+      "shot": {
+        "videoPresent": true,
+        "readyState": 4,
+        "networkState": 1,
+        "currentTime": 0.301153,
+        "duration": 30.386,
+        "paused": false,
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "sliceState": "active"
+      }
+    },
+    {
+      "name": "1b what the client actually did during the failing open",
+      "result": "MEASURED",
+      "detail": "{\"socketsOpened\":1,\"socketsClosed\":0,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":null,\"firstPostAtMs\":7968,\"firstTerminatedAtMs\":null}",
+      "rows": 36
+    }
+  ],
+  "sidecar": {
+    "pid": 34900,
+    "port": 65288,
+    "version": "3.10.2"
+  },
+  "statusHold": {
+    "requestedMs": 6000,
+    "heldAt": 1785560183305,
+    "releasedAt": 1785560189308
+  },
+  "item": {
+    "id": "96aa171d-2a42-4c48-8218-a312519aef87",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "trace": [
+    {
+      "ms": 1876,
+      "event": "HTTP OPTIONS /api/v1/status"
+    },
+    {
+      "ms": 1887,
+      "event": "HTTP GET /api/v1/status"
+    },
+    {
+      "ms": 7912,
+      "event": "HTTP 204 /api/v1/status"
+    },
+    {
+      "ms": 7917,
+      "event": "HTTP 200 /api/v1/status"
+    },
+    {
+      "ms": 7954,
+      "event": "ws OPEN /events id=96032f53-f667-4932-be0c-920fe3d9bb68",
+      "requestId": "15460.793"
+    },
+    {
+      "ms": 7964,
+      "event": "ws RECV client-identity",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"client-identity\",\"payload\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"platform\":\"\",\"proof\":\"eyJlbmRwb2ludCI6ImNsaWVudC1pZDo5NjAzMmY1My1mNjY3LTQ5MzItYmUwYy05MjBmZTNkOWJiNjgiLCJpYXQiOjE3ODU1NjAxODksImV4cCI6MTc4NTY0NjU4OX0.Zr…"
+    },
+    {
+      "ms": 7966,
+      "event": "HTTP OPTIONS /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 7968,
+      "event": "HTTP POST /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 7969,
+      "event": "HTTP 204 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 7971,
+      "event": "ws RECV native-player",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 8322,
+      "event": "ws RECV native-player",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 8326,
+      "event": "ws RECV native-player",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading metadata...\"}}\n"
+    },
+    {
+      "ms": 8342,
+      "event": "ws RECV native-player",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"watch\",\"payload\":{\"id\":\"abc9c65a-e52b-4e42-88dd-7b87cd03321c\",\"streamType\":\"localfile\",\"streamPath\":\"C:\\\\Users\\\\Arseniy\\\\AppData\\\\Local\\\\Temp\\\\blanc-nostrict-b\\\\cue-library\\\\Sousou no Frieren - 01.…"
+    },
+    {
+      "ms": 8342,
+      "event": "HTTP 200 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 8379,
+      "event": "HTTP OPTIONS /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 8380,
+      "event": "HTTP OPTIONS /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 8382,
+      "event": "HTTP 204 /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 8383,
+      "event": "HTTP 204 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 8413,
+      "event": "ws SEND videocore",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"type\":\"video-loaded\",\"payload\":{\"state\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"playerType\":\"web\",\"playbackInfo\":{\"id\":\"abc9c65a-e52b-4e42-88dd-7b…"
+    },
+    {
+      "ms": 8413,
+      "event": "HTTP GET /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 8413,
+      "event": "HTTP GET /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 8524,
+      "event": "HTTP GET /api/v1/directstream/stream?id=abc9c65a-e52b-4e42-88dd-7b87cd03321c&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDE4OSwiZXhwIjoxNzg1NjQ2NTg5fQ.iSypb0-yD7wQdPWl8YVHewSdkyPVldzR6nzK0rKgNnQ"
+    },
+    {
+      "ms": 8535,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=abc9c65a-e52b-4e42-88dd-7b87cd03321c&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDE4OSwiZXhwIjoxNzg1NjQ2NTg5fQ.iSypb0-yD7wQdPWl8YVHewSdkyPVldzR6nzK0rKgNnQ"
+    },
+    {
+      "ms": 8580,
+      "event": "ws SEND videocore",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"type\":\"video-loaded-metadata\"}}"
+    },
+    {
+      "ms": 8580,
+      "event": "ws SEND videocore",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"type\":\"video-loaded-metadata\",\"payload\":{\"id\":\"abc9c65a-e52b-4e42-88dd-7b87cd03321c\",\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"currentTime\":0,\"durati…"
+    },
+    {
+      "ms": 8595,
+      "event": "ws RECV native-player",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":4,\"text\":\"The cat is sleeping by the window.\",\"startTime\":2000,\"duration\":3000,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"margi…"
+    },
+    {
+      "ms": 8602,
+      "event": "HTTP GET /api/v1/directstream/stream?id=abc9c65a-e52b-4e42-88dd-7b87cd03321c&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDE4OSwiZXhwIjoxNzg1NjQ2NTg5fQ.iSypb0-yD7wQdPWl8YVHewSdkyPVldzR6nzK0rKgNnQ&thumbnail=true"
+    },
+    {
+      "ms": 8624,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=abc9c65a-e52b-4e42-88dd-7b87cd03321c&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDE4OSwiZXhwIjoxNzg1NjQ2NTg5fQ.iSypb0-yD7wQdPWl8YVHewSdkyPVldzR6nzK0rKgNnQ&thumbnail=true"
+    },
+    {
+      "ms": 8655,
+      "event": "HTTP GET /api/v1/directstream/stream?id=abc9c65a-e52b-4e42-88dd-7b87cd03321c&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDE4OSwiZXhwIjoxNzg1NjQ2NTg5fQ.iSypb0-yD7wQdPWl8YVHewSdkyPVldzR6nzK0rKgNnQ"
+    },
+    {
+      "ms": 8661,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=abc9c65a-e52b-4e42-88dd-7b87cd03321c&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDE4OSwiZXhwIjoxNzg1NjQ2NTg5fQ.iSypb0-yD7wQdPWl8YVHewSdkyPVldzR6nzK0rKgNnQ"
+    },
+    {
+      "ms": 8703,
+      "event": "ws SEND videocore",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"type\":\"video-seeked\",\"payload\":{\"currentTime\":0.000304,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 8703,
+      "event": "ws SEND videocore",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"type\":\"video-can-play\",\"payload\":{\"currentTime\":0.012023,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 8705,
+      "event": "ws SEND videocore",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"96032f53-f667-4932-be0c-920fe3d9bb68\",\"type\":\"video-resumed\",\"payload\":{\"currentTime\":0.012476,\"duration\":30.386}}}"
+    },
+    {
+      "ms": 8707,
+      "event": "ws RECV native-player",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":4,\"text\":\"The weather is really nice today.\",\"startTime\":6500,\"duration\":2750,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"margin…"
+    },
+    {
+      "ms": 9037,
+      "event": "ws RECV native-player",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":3,\"text\":\"今日は本当にいい天気ですね。\",\"startTime\":6648,\"duration\":2750,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"marginl\":\"0\",\"marginr\":\"0…"
+    },
+    {
+      "ms": 9045,
+      "event": "ws RECV videocore",
+      "requestId": "15460.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"type\":\"in-sight-data\",\"payload\":{\"characters\":[{\"mal_id\":188176,\"url\":\"https://myanimelist.net/character/188176/Fern\",\"images\":{\"jpg\":{\"image_url\":\"https://cdn.myanimelist.net/images/characters/12/619183.jpg?…"
+    }
+  ],
+  "traceSummary": {
+    "socketsOpened": 1,
+    "socketsClosed": 0,
+    "directstreamPosts": 1,
+    "videoTerminatedFramesSent": 0,
+    "firstCloseAtMs": null,
+    "firstPostAtMs": 7968,
+    "firstTerminatedAtMs": null
+  },
+  "conclusion": "A_ONLY: step 2 deliberately skipped.",
+  "result": "DONE",
+  "finishedAt": "2026-08-01T04:56:30.483Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 34900, port 65288, v3.10.2",
+    "[probe]   holding http://127.0.0.1:65288/api/v1/status for 6000 ms",
+    "[probe] PASS — 1 first open (fresh mount, inside the StrictMode double-mount): {\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":0.301153,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+    "[probe] MEASURED — 1b what the client actually did during the failing open: {\"socketsOpened\":1,\"socketsClosed\":0,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":null,\"firstPostAtMs\":7968,\"firstTerminatedAtMs\":null}"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-01_07-56-13.log"
+}

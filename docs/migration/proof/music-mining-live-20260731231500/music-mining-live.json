@@ -1,0 +1,84 @@
+{
+  "phases": [
+    {
+      "name": "A seed library",
+      "result": "PASS",
+      "detail": "media.json written with harness-song-1"
+    },
+    {
+      "name": "B attach",
+      "result": "PASS",
+      "detail": "electron pid 48684, CDP attached to http://localhost:5173/"
+    },
+    {
+      "name": "C seed lyrics",
+      "result": "PASS",
+      "detail": "3 synced cues cached, mining history cleared"
+    },
+    {
+      "name": "D0 first-run consent",
+      "result": "PASS",
+      "detail": "consent dialog: No thanks"
+    },
+    {
+      "name": "D open and play",
+      "result": "PASS",
+      "detail": "music app open, song row activated"
+    },
+    {
+      "name": "E lyrics render",
+      "result": "PASS",
+      "detail": "3 lyric lines, 3 mine buttons"
+    },
+    {
+      "name": "F hover-reveal",
+      "result": "PASS",
+      "detail": "resting opacity 0, focused opacity 1"
+    },
+    {
+      "name": "G mine writes history",
+      "result": "PASS",
+      "detail": "status=failed term=\"瞼閉じればそこに\""
+    },
+    {
+      "name": "H provenance",
+      "result": "PASS",
+      "detail": "playbackType=music streamType=music-lrc cue=[1500,2500] text=\"瞼閉じればそこに\""
+    },
+    {
+      "name": "H2 audio attached",
+      "result": "PASS",
+      "detail": "jp-music-cue-1-1500.webm audio/webm;codecs=opus 16709 bytes"
+    },
+    {
+      "name": "I no dictionary popup",
+      "result": "PASS",
+      "detail": "lyrics-pane lookup did not fire"
+    },
+    {
+      "name": "J outcome shown",
+      "result": "PASS",
+      "detail": "button label after mining: \"Mining failed\""
+    }
+  ],
+  "startedAt": "2026-07-31T19:06:25.685Z",
+  "ankiPresent": false,
+  "note": "Anki was NOT running. The mine failed and was RECORDED as a failure, which is the designed behaviour — everything this slice added (cue, draft, request, history entry, localStorage write, provenance) is exercised either way. Only Anki acceptance is unproven.",
+  "result": "PASS",
+  "finishedAt": "2026-07-31T19:06:36.584Z",
+  "log": [
+    "[music-mining] PASS — A seed library: media.json written with harness-song-1",
+    "[music-mining] PASS — B attach: electron pid 48684, CDP attached to http://localhost:5173/",
+    "[music-mining] PASS — C seed lyrics: 3 synced cues cached, mining history cleared",
+    "[music-mining] PASS — D0 first-run consent: consent dialog: No thanks",
+    "[music-mining] PASS — D open and play: music app open, song row activated",
+    "[music-mining] PASS — E lyrics render: 3 lyric lines, 3 mine buttons",
+    "[music-mining] PASS — F hover-reveal: resting opacity 0, focused opacity 1",
+    "[music-mining] PASS — G mine writes history: status=failed term=\"瞼閉じればそこに\"",
+    "[music-mining] PASS — H provenance: playbackType=music streamType=music-lrc cue=[1500,2500] text=\"瞼閉じればそこに\"",
+    "[music-mining] PASS — H2 audio attached: jp-music-cue-1-1500.webm audio/webm;codecs=opus 16709 bytes",
+    "[music-mining] PASS — I no dictionary popup: lyrics-pane lookup did not fire",
+    "[music-mining] PASS — J outcome shown: button label after mining: \"Mining failed\"",
+    "[music-mining] Anki was NOT running. The mine failed and was RECORDED as a failure, which is the designed behaviour — everything this slice added (cue, draft, request, history entry, localStorage write, provenance) is exercised either way. Only Anki acceptance is unproven."
+  ]
+}

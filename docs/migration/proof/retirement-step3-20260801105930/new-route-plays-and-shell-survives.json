@@ -1,0 +1,694 @@
+{
+  "harness": "retirement-step3-harness.mjs",
+  "question": "Through the new routing path: is the taskbar identity intact, does window dragging survive the workspace closing, and does a real file actually play?",
+  "startedAt": "2026-08-01T10:59:30.040Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice32l\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice32l",
+  "phases": {
+    "A": {
+      "what": "taskbar identity for the two swapped sections and the unswapped one",
+      "labels": {
+        "video": "Video\n×",
+        "player": "Media\n×",
+        "music": "Music\n×"
+      },
+      "distinct": true,
+      "allNamed": true,
+      "result": "PASS"
+    },
+    "B": {
+      "what": "window dragging after the full-screen workspace has opened and closed",
+      "grip": {
+        "x": 121,
+        "y": 46
+      },
+      "posBefore": {
+        "left": "60px",
+        "top": "24px",
+        "x": 67,
+        "y": 29
+      },
+      "posAfter": {
+        "left": "132px",
+        "top": "72px",
+        "x": 132,
+        "y": 72
+      },
+      "moved": true,
+      "result": "PASS"
+    },
+    "C": {
+      "what": "a real local file opened and played through the new routing path",
+      "sidecar": {
+        "pid": 26092,
+        "port": 63862,
+        "version": "3.10.2"
+      },
+      "startedAt": 0.206221,
+      "currentTime": 4.216512,
+      "duration": 30.386,
+      "readyState": 4,
+      "paused": false,
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "textTracks": 2,
+      "advanced": true,
+      "result": "PASS"
+    },
+    "E": {
+      "what": "exact cue seeking through the overlay's own replay/previous/next controls",
+      "measuredBy": "capture-phase `seeked` events, not polled currentTime",
+      "track": "English (probe) (default)",
+      "cueStartsFromFile": [
+        2,
+        6.5,
+        11,
+        16,
+        21,
+        24
+      ],
+      "parkedAt": 7.3,
+      "replayFromInsideCue1": {
+        "seekedTo": 6.605889,
+        "expected": 6.5,
+        "ok": true
+      },
+      "previousToCue0": {
+        "seekedTo": 2.121726,
+        "expected": 2,
+        "ok": true
+      },
+      "nextBackToCue1": {
+        "seekedTo": 6.597563,
+        "expected": 6.5,
+        "ok": true
+      },
+      "playheadAtClick": {
+        "replayJump": {
+          "before": 7.3,
+          "seekedTo": 6.605889,
+          "after": 7.662163
+        },
+        "jumpPrev": {
+          "before": 7.690673,
+          "seekedTo": 2.121726,
+          "after": 3.22775
+        },
+        "jumpNext": {
+          "before": 3.228738,
+          "seekedTo": 6.597563,
+          "after": 7.683706
+        }
+      },
+      "cueDeliveryLimit": "Only cues 0 and 1 are ever delivered for this fixture, however far playback runs — measured across several runs: from a playhead of 11.85 s, next-cue returned cue 1 (6.5) and replay-cue was disabled for want of an active cue, both of which are exactly what adjacentStudyCue does when allCues holds two entries. So the NAVIGATION is verified exact here; full-timeline subtitle DELIVERY is not, and is a directstream property this run cannot establish. G-PLAY mined a card from cue 0 through the workspace own entry (proof/gplay-20260730).",
+      "result": "PASS"
+    },
+    "G": {
+      "what": "the video.* shortcuts driven by real KEY EVENTS, not by clicking their buttons",
+      "why": "Slice 19 re-homed ten video.* registrations onto VideoCoreStudyOverlay and fixed effectiveKeys to normalize, which is what made R/W/S matchable at all. Every part of that was proven by unit guard and source sweep; nothing had pressed a key. Phase E clicks the buttons, which does not exercise chordFromEvent, effectiveKeys, chordMatches or the handler stack.",
+      "sentAs": "lowercase event.key via CDP Input.dispatchKeyEvent — the catalog default is 'R', so this only matches if effectiveKeys still normalizes",
+      "parkedAt": 7.3,
+      "cueStartsFromFile": [
+        2,
+        6.5,
+        11,
+        16,
+        21,
+        24
+      ],
+      "replayKeyR": {
+        "seekedTo": 6.62916,
+        "expected": 6.5,
+        "ok": true
+      },
+      "prevKeyW": {
+        "seekedTo": 2.142603,
+        "expected": 2,
+        "ok": true
+      },
+      "nextKeyS": {
+        "seekedTo": 6.621959,
+        "expected": 6.5,
+        "ok": true
+      },
+      "unboundKeyX": {
+        "seekedTo": null,
+        "expected": null,
+        "ok": true,
+        "why": "the control — three seeks alone would not prove the BINDING fired"
+      },
+      "qIsNotFree": "The first run of this phase used q as the control and it seeked to 0. q is absent from this app's catalog but present in the ADOPTED PLAYER's own vc_defaultKeybindings, which the catalog knows nothing about. Recorded in proof/retirement-step3-20260731221652/ with R/W/S already correct in that same run. A control key has to be free in BOTH maps.",
+      "focusAtPress": [
+        "r:BODY",
+        "w:BODY",
+        "s:BODY",
+        "x:BODY"
+      ],
+      "result": "PASS"
+    },
+    "H": {
+      "what": "the two remaining PRESSABLE video.* rows — subEarlier (;) and subLater (') — driven by real key events",
+      "why": "Slices 19, 20, 21 and 22 each carried the same open item: the other video.* rows have never been pressed. Phase G could not close them because its instrument is a `seeked` event and these rows do not seek — they move the subtitle delay.",
+      "instrument": "the <output> in the subtitle-offset cluster, matched by text shape rather than by its i18n aria-label; NOT data-timing-delay, which only exists while drift tracking is active",
+      "delayAtStart": 0,
+      "subEarlierSemicolon": {
+        "key": ";",
+        "before": 0,
+        "after": -0.1,
+        "expected": -0.1,
+        "ok": true
+      },
+      "subLaterQuote": {
+        "key": "'",
+        "before": -0.1,
+        "after": 0,
+        "expected": 0,
+        "ok": true
+      },
+      "unboundKeyX": {
+        "before": 0,
+        "after": 0,
+        "ok": true,
+        "why": "the control — two deltas alone would not prove the BINDING fired"
+      },
+      "theOtherFiveRows": "subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop and toggleFurigana ship with defaultKeys: '' — effectiveKeys returns '' and chordMatches is false for every chord, so they are unpressable BY DESIGN until a user binds them. \"Press them\" is therefore the wrong test. What is untested for those is bind-then-press through ShortcutSettings, which needs a settings-driving phase this harness does not have.",
+      "result": "PASS"
+    },
+    "I": {
+      "what": "BIND-then-press for the five video.* rows that ship with no default binding",
+      "why": "subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop and toggleFurigana carry defaultKeys: '', so effectiveKeys returns '' and chordMatches is false for every chord — they are unpressable by design and phases G and H could not reach them. The untested claim was never \"does the key work\" but \"does binding it in Settings make it work\", and nothing had ever driven that surface.",
+      "boundThrough": "Settings → Shortcuts, the real capture button, a real CDP key event — not a setBinding() call from the console",
+      "rowsFoundBy": "data-shortcut-id / data-shortcut-capture, because every visible string on that surface goes through useT() and the app ships four UI languages",
+      "advancedSectionAlreadyOpen": true,
+      "bind": [
+        {
+          "id": "video.subEarlierLarge",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+1",
+          "conflict": false
+        },
+        {
+          "id": "video.subLaterLarge",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+2",
+          "conflict": false
+        },
+        {
+          "id": "video.toggleFurigana",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+3",
+          "conflict": false
+        },
+        {
+          "id": "video.toggleAutoPause",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+4",
+          "conflict": false
+        },
+        {
+          "id": "video.toggleLoop",
+          "keysBefore": "",
+          "keysAfter": "Ctrl+Alt+5",
+          "conflict": false
+        }
+      ],
+      "press": [
+        {
+          "id": "video.subEarlierLarge",
+          "chord": "Ctrl+Alt+1",
+          "kind": "delay",
+          "before": 0,
+          "after": -0.5,
+          "expected": -0.5
+        },
+        {
+          "id": "video.subLaterLarge",
+          "chord": "Ctrl+Alt+2",
+          "kind": "delay",
+          "before": -0.5,
+          "after": 0,
+          "expected": 0
+        },
+        {
+          "id": "video.toggleFurigana",
+          "chord": "Ctrl+Alt+3",
+          "kind": "pref",
+          "pref": "furigana",
+          "before": false,
+          "after": true,
+          "expected": true
+        },
+        {
+          "id": "video.toggleAutoPause",
+          "chord": "Ctrl+Alt+4",
+          "kind": "pref",
+          "pref": "autoPause",
+          "before": false,
+          "after": true,
+          "expected": true
+        },
+        {
+          "id": "video.toggleLoop",
+          "chord": "Ctrl+Alt+5",
+          "kind": "pref",
+          "pref": "loopLine",
+          "before": false,
+          "after": true,
+          "expected": true
+        }
+      ],
+      "control": {
+        "chord": "Ctrl+Alt+9",
+        "before": {
+          "delay": 0,
+          "furigana": true,
+          "autoPause": true,
+          "loopLine": true
+        },
+        "after": {
+          "delay": 0,
+          "furigana": true,
+          "autoPause": true,
+          "loopLine": true
+        },
+        "ok": true,
+        "why": "same chord family, same dispatch, no binding — five moving observables alone would not prove the BINDING is what fired"
+      },
+      "chordChoice": "Ctrl+Alt+<digit>. A chord has to be free in BOTH keymaps: the adopted player binds bare Key*/Arrow*/Bracket* codes and this catalog uses Ctrl+Alt+0/-/= but no Ctrl+Alt+<1..9>. Not taken on trust — each bound row is read back for the .sc-conflict marker the settings row renders when a chord is shared.",
+      "result": "PASS"
+    },
+    "D": {
+      "what": "quit with a player active — the sidecar must not outlive the app",
+      "sidecarPid": 26092,
+      "orphaned": false,
+      "result": "PASS"
+    },
+    "F": {
+      "what": "the position survives a real app restart, reopened through the new route",
+      "positionBeforeQuit": 8.772099,
+      "resumeStoreWrittenBeforeQuit": true,
+      "resumeStoreSurvivedRestart": true,
+      "storedEntries": 1,
+      "resumedAt": 8.555151,
+      "reopenAttempts": 1,
+      "resumed": true,
+      "result": "PASS"
+    }
+  },
+  "probeCorrections": [
+    "Phase B first reported \"no draggable point on the title bar\", which reads as the drag-layer defect it was written to catch. It was not: a cold profile shows the consent screen and `.consent` covers the viewport, so `elementFromPoint` over the title bar returned the overlay. Earlier harnesses never noticed because querySelector and .click() do not hit-test. The run now declines consent before any pointer-driven phase. Keep that ordering.",
+    "Phase B then found the workspace REOPENED after being closed, which surfaced a real defect this harness was not looking for: MediaWorkspaceHost already listened for os:open 'video', and MediaWorkspaceSectionView dispatched on mount as well, so video opened twice and the section's dispatch — gated behind an async seanimeStatus() round trip — landed after a fast close and reopened it. Fixed by making the host's listener the single owner (now covering 'player' too) and removing the mount dispatch. Phase B is what caught it."
+  ],
+  "mediaBytes": 11873146,
+  "consentDismissed": true,
+  "mediaSamples": [
+    {
+      "label": "phase C",
+      "attempt": 1,
+      "samples": [
+        {
+          "atMs": 0,
+          "videoPresent": false
+        },
+        {
+          "atMs": 205,
+          "videoPresent": false
+        },
+        {
+          "atMs": 407,
+          "videoPresent": false
+        },
+        {
+          "atMs": 611,
+          "videoPresent": false
+        },
+        {
+          "atMs": 821,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1027,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1231,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1442,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1653,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1866,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2077,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2290,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2501,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2713,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2925,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3136,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3347,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3559,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3770,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3982,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4196,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4409,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4622,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4836,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5048,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5258,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5471,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5684,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5897,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6110,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6324,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6536,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6748,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6961,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7174,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7385,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7599,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7812,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8023,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8235,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 8554,
+          "videoPresent": true,
+          "readyState": 4,
+          "networkState": 1,
+          "bufferedRanges": 1,
+          "currentTime": 0.009286
+        }
+      ]
+    },
+    {
+      "label": "phase F",
+      "attempt": 1,
+      "samples": [
+        {
+          "atMs": 0,
+          "videoPresent": false
+        },
+        {
+          "atMs": 235,
+          "videoPresent": false
+        },
+        {
+          "atMs": 445,
+          "videoPresent": false
+        },
+        {
+          "atMs": 655,
+          "videoPresent": false
+        },
+        {
+          "atMs": 860,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1069,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1286,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1494,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1695,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1904,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2114,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2325,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2540,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2744,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2954,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3166,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3375,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3584,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3795,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4005,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4214,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4424,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4635,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4839,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5044,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5260,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5470,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5680,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5884,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6094,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6304,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6516,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6724,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6934,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7144,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7354,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7564,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7774,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7980,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8184,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8394,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8604,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8815,
+          "videoPresent": false
+        },
+        {
+          "atMs": 9029,
+          "videoPresent": false
+        },
+        {
+          "atMs": 9245,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9534,
+          "videoPresent": true,
+          "readyState": 1,
+          "networkState": 1,
+          "bufferedRanges": 1,
+          "currentTime": 8.515132
+        },
+        {
+          "atMs": 9819,
+          "videoPresent": true,
+          "readyState": 4,
+          "networkState": 1,
+          "bufferedRanges": 1,
+          "currentTime": 8.673262
+        }
+      ]
+    }
+  ],
+  "openStalls": [],
+  "openAttempts": 1,
+  "verdict": "PASS",
+  "finishedAt": "2026-08-01T11:01:17.522Z"
+}

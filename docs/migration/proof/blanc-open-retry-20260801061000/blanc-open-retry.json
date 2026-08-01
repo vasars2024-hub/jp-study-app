@@ -1,0 +1,274 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "startedAt": "2026-08-01T02:54:11.220Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-geom-datadir-c\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-geom-datadir-c",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 52980, port 53802, v3.10.2"
+    },
+    {
+      "name": "1 first open (fresh mount, inside the StrictMode double-mount)",
+      "result": "FAIL",
+      "detail": "{\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+      "shot": {
+        "videoPresent": false,
+        "frame": true,
+        "sliceState": "idle",
+        "sliceText": "Opening local file"
+      }
+    },
+    {
+      "name": "2 second open (same mounted session, new requestId)",
+      "result": "PASS",
+      "detail": "{\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":3.390253,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+      "shot": {
+        "videoPresent": true,
+        "readyState": 4,
+        "networkState": 1,
+        "currentTime": 3.390253,
+        "duration": 30.386,
+        "paused": false,
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "sliceState": "active"
+      }
+    },
+    {
+      "name": "3 the clock moves and there are real pixels",
+      "result": "PASS",
+      "detail": "3.598 -> 7.619s, 1920x1080"
+    },
+    {
+      "name": "4 the playing video occupies real space inside the toolbox frame",
+      "result": "FAIL",
+      "detail": "frame 392x0 (scrollHeight 0), slice 392x0 fixed, video 392x0; painted at the video centre: fieldset.; nav clickable false"
+    }
+  ],
+  "sidecar": {
+    "pid": 52980,
+    "port": 53802,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "055d752f-ba44-47f6-abed-78818529325e",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "settled": {
+    "frame": true,
+    "sliceState": "idle"
+  },
+  "playback": {
+    "startedAt": 3.598352,
+    "videoPresent": true,
+    "readyState": 4,
+    "networkState": 1,
+    "currentTime": 7.618712,
+    "duration": 30.386,
+    "paused": false,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "sliceState": "active"
+  },
+  "geometry": {
+    "viewport": {
+      "w": 544,
+      "h": 421
+    },
+    "frame": {
+      "tag": "div",
+      "cls": "dark blanc-study-player",
+      "x": 101,
+      "y": 285,
+      "w": 392,
+      "h": 0,
+      "position": "relative",
+      "display": "block",
+      "overflow": "hidden auto",
+      "contain": "layout paint",
+      "maxHeight": "221px",
+      "height": "0px",
+      "minHeight": "0px",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 0,
+      "clientHeight": 0
+    },
+    "slice": {
+      "tag": "section",
+      "cls": "study-player-slice",
+      "x": 101,
+      "y": 285,
+      "w": 392,
+      "h": 0,
+      "position": "fixed",
+      "display": "grid",
+      "overflow": "hidden",
+      "contain": "none",
+      "maxHeight": "none",
+      "height": "0px",
+      "minHeight": "0px",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 36,
+      "clientHeight": 0
+    },
+    "video": {
+      "tag": "video",
+      "cls": "",
+      "x": 101,
+      "y": 285,
+      "w": 392,
+      "h": 0,
+      "position": "static",
+      "display": "block",
+      "overflow": "clip",
+      "contain": "none",
+      "maxHeight": "189.45px",
+      "height": "0px",
+      "minHeight": "auto",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 0,
+      "clientHeight": 0
+    },
+    "chainFromVideoToFrame": [
+      {
+        "tag": "video",
+        "cls": "",
+        "x": 101,
+        "y": 285,
+        "w": 392,
+        "h": 0,
+        "position": "static",
+        "display": "block",
+        "overflow": "clip",
+        "contain": "none",
+        "maxHeight": "189.45px",
+        "height": "0px",
+        "minHeight": "auto",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 0,
+        "clientHeight": 0
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full flex items-center justify-center",
+        "x": 101,
+        "y": 285,
+        "w": 392,
+        "h": 0,
+        "position": "relative",
+        "display": "flex",
+        "overflow": "visible",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "0px",
+        "minHeight": "auto",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 0,
+        "clientHeight": 0
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full bg-black overflow-clip flex items-cen",
+        "x": 101,
+        "y": 285,
+        "w": 392,
+        "h": 0,
+        "position": "relative",
+        "display": "flex",
+        "overflow": "clip",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "0px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 300,
+        "clientHeight": 0
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full study-video-core",
+        "x": 101,
+        "y": 285,
+        "w": 392,
+        "h": 0,
+        "position": "relative",
+        "display": "block",
+        "overflow": "visible",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "0px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 0,
+        "clientHeight": 0
+      },
+      {
+        "tag": "section",
+        "cls": "study-player-slice",
+        "x": 101,
+        "y": 285,
+        "w": 392,
+        "h": 0,
+        "position": "fixed",
+        "display": "grid",
+        "overflow": "hidden",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "0px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 36,
+        "clientHeight": 0
+      },
+      {
+        "tag": "div",
+        "cls": "dark blanc-study-player",
+        "x": 101,
+        "y": 285,
+        "w": 392,
+        "h": 0,
+        "position": "relative",
+        "display": "block",
+        "overflow": "hidden auto",
+        "contain": "layout paint",
+        "maxHeight": "221px",
+        "height": "0px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 0,
+        "clientHeight": 0
+      }
+    ],
+    "videoRendersPixels": true,
+    "videoCentre": {
+      "x": 297,
+      "y": 285
+    },
+    "whatIsPaintedThere": "fieldset.",
+    "videoIsTheThingPaintedThere": false,
+    "navStillClickable": false,
+    "docScrollsSideways": false
+  },
+  "result": "DONE",
+  "finishedAt": "2026-08-01T02:55:24.734Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 52980, port 53802, v3.10.2",
+    "[probe] FAIL — 1 first open (fresh mount, inside the StrictMode double-mount): {\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+    "[probe]   letting the socket settle for 10000 ms",
+    "[probe] PASS — 2 second open (same mounted session, new requestId): {\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":3.390253,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+    "[probe] PASS — 3 the clock moves and there are real pixels: 3.598 -> 7.619s, 1920x1080",
+    "[probe] FAIL — 4 the playing video occupies real space inside the toolbox frame: frame 392x0 (scrollHeight 0), slice 392x0 fixed, video 392x0; painted at the video centre: fieldset.; nav clickable false"
+  ]
+}

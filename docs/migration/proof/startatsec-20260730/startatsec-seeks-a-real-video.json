@@ -1,0 +1,78 @@
+{
+  "gate": "Phase 6 slice 6 — startAtSec actually moves a real video",
+  "verdict": "PASS",
+  "closed": "2026-07-30",
+  "why": "startAtSec is the mechanism that makes the watch-to-review loop a loop rather than a list: it is what takes a struggling Anki card back to the exact line it was mined from. It was unit-tested end to end but had NEVER moved a real video. This closes that.",
+  "driver": "the app's own debug bridge on 127.0.0.1:39273 — no Windows mouse or keyboard control",
+  "environment": {
+    "launch": "detached Start-Process cmd /c 'npm start'",
+    "SEANIME_SIDECAR": "1",
+    "SEANIME_DATADIR": "C:/Users/Arseniy/AppData/Local/Temp/seanime-phase3-gplay-20260728 — the isolated G-PLAY fixture profile, deliberately NOT the real <userData>/seanime",
+    "SEANIME_EXE": "C:/Users/Arseniy/AppData/Local/Temp/seanime-phase3-verified.exe",
+    "sidecar": "ready, v3.10.2, port 50916, pid 8140 (ports are ephemeral — see the port-mismatch finding below)",
+    "fixture": "cue-library/Sousou no Frieren - 01.mkv, 11,873,146 bytes, duration 30.386s, dual ASS subtitle tracks",
+    "screenshot": "startatsec-replay-12.5s.png — documents the live environment (sidecar panel showing the isolated datadir, real player, full study dock). The landing itself is evidenced by the capture-phase media-event logs below, not by the still."
+  },
+  "method": "A capture-phase document listener recorded loadedmetadata/play/seeking/seeked with video.currentTime, rather than polling. The replay request is the app's own `seanime:media-workspace-open` event carrying { localFilePath, startAtSec } — deliberately not pickMedia(), whose native dialog a bridge-driven run cannot answer.",
+  "discriminator": "The resume store already held a position for this exact file from the earlier G-PLAY run: jp-video-core-resume-v1 = positionSec 3.566411. So 'startAtSec was honoured' and 'the stored resume was honoured' predict different, distinguishable landings.",
+  "runs": [
+    {
+      "startAtSec": 12.5,
+      "storedResumeAtTheTime": 3.566411,
+      "log": [
+        { "t": "loadedmetadata", "ct": 0, "rs": 1 },
+        { "t": "seeking", "ct": 0, "rs": 1 },
+        { "t": "seeked", "ct": 0, "rs": 4 },
+        { "t": "play", "ct": 12.5, "rs": 1 },
+        { "t": "seeking", "ct": 12.5, "rs": 1 },
+        { "t": "seeked", "ct": 12.515, "rs": 4 }
+      ],
+      "verdict": "landed at 12.5, NOT at the stored 3.566"
+    },
+    {
+      "startAtSec": 25.0,
+      "storedResumeAtTheTime": 22.2,
+      "log": [
+        { "t": "loadedmetadata", "ct": 0, "rs": 1 },
+        { "t": "seeking", "ct": 0, "rs": 1 },
+        { "t": "seeked", "ct": 0.004, "rs": 4 },
+        { "t": "play", "ct": 25, "rs": 1 },
+        { "t": "seeking", "ct": 25, "rs": 1 },
+        { "t": "seeked", "ct": 25.006, "rs": 4 }
+      ],
+      "verdict": "landed at 25.0, NOT at the stored 22.2 — a second, different supplied value, so the mechanism tracks the parameter rather than a constant"
+    },
+    {
+      "startAtSec": 12.5,
+      "log": [
+        { "t": "play", "ct": 12.5, "rs": 1 },
+        { "t": "seeking", "ct": 12.5, "rs": 1 },
+        { "t": "seeked", "ct": 12.5, "rs": 4 }
+      ],
+      "verdict": "reproduced exactly on a third run"
+    }
+  ],
+  "conclusion": "Three runs, two distinct supplied values, each landing on the supplied value to within 15 ms, each overriding a different stored resume position. startAtSec moves a real video.",
+  "openQuestionFoundHere": {
+    "what": "Reopening the SAME already-active file with NO startAtSec did not apply the stored resume position — it restarted at 0 and played forward.",
+    "evidenceItIsNotAMeasurementError": "The store was planted with positionSec 8.8 under the exact key the app itself writes (file:c:/users/.../sousou no frieren - 01.mkv), and re-read immediately before dispatch to confirm the ResumeTracker had not overwritten it. It still read 8.8. The video logged play ct=0.017 and played forward to 7.178.",
+    "notARegressionFromThisSlice": "The no-startAtSec path is byte-identical to before the change: `requestedSec ?? (…loadResumePosition(nativeInfo)…)` falls through to the same call with the same argument when startAtSec is absent.",
+    "andResumeIsKnownToWorkElsewhere": "proof/gplay-20260730 recorded `play t=6 -> seeking t=6 -> seeked t=6` after a real app RESTART, i.e. on a cold player mount. The failing case here is a reopen while the player is already active on that same file.",
+    "status": "MEASURED BUT UNEXPLAINED. Deliberately not diagnosed further from a single probe, and deliberately not written up as 'resume is broken' — that is the one-probe-conclusion error this track has made before. Next step if it matters: reopen after a full app restart, and instrument loadResumePosition's return value directly."
+  },
+  "twoEnvironmentFindings": [
+    {
+      "what": "The sidecar port is ephemeral AND the renderer's connection can be stale against it. A first attempt produced a permanently idle player: the renderer logged 'WebsocketSender … socket state: null' and window.api.seanimeConnection() reported baseUrl port 50916 while seanimeStatus() reported 60938.",
+      "sequenceThatWorks": "start the sidecar -> reload the renderer -> re-read BOTH seanimeStatus().port and seanimeConnection().baseUrl and require them to AGREE -> only then dispatch the open. Do not trust either one alone."
+    },
+    {
+      "what": "The debug bridge's /eval takes its code in a field named `js`, not `code`. A wrong field name returns { ok:false, error:'missing js' }, which reads like a bridge fault rather than a caller mistake.",
+      "alsoConfirmed": "/screenshot WRITES a PNG to debug/shots/ and returns { ok, path, size } as JSON. Piping the response body to a .png file yields a 137-byte JSON file, not an image."
+    }
+  ],
+  "cleanup": {
+    "resumeStore": "restored to its exact pre-run value — positionSec 3.566411, updatedAt 1785398192436",
+    "datadir": "the isolated fixture profile was used throughout; the real <userData>/seanime was never touched",
+    "anki": "not invoked at any point in this run"
+  }
+}

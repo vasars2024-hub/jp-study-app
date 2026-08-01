@@ -1,0 +1,792 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "hypothesisCorrection": "Half right, and the wrong half is the half that names a fix. Step 1b (slice 24) measured the frames: the disconnect is a co-symptom, and the cancel is a `video-terminated` the CLIENT sends ~190ms later from the adopted lifecycle effect. A socket-lifetime fix would have changed nothing. See docs/migration/proof/blanc-player-live-20260801075500/slice-24.json.",
+  "startedAt": "2026-08-01T04:59:00.830Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nostrict-d\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nostrict-d",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 9016, port 56975, v3.10.2"
+    },
+    {
+      "name": "1 first open (fresh mount, inside the StrictMode double-mount)",
+      "result": "PASS",
+      "detail": "{\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":0.243445,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+      "shot": {
+        "videoPresent": true,
+        "readyState": 4,
+        "networkState": 1,
+        "currentTime": 0.243445,
+        "duration": 30.386,
+        "paused": false,
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "sliceState": "active"
+      }
+    },
+    {
+      "name": "1b what the client actually did during the failing open",
+      "result": "MEASURED",
+      "detail": "{\"socketsOpened\":1,\"socketsClosed\":0,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":null,\"firstPostAtMs\":1044,\"firstTerminatedAtMs\":null}",
+      "rows": 47
+    },
+    {
+      "name": "2 second open (same mounted session, new requestId)",
+      "result": "PASS",
+      "detail": "{\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":3.004197,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+      "shot": {
+        "videoPresent": true,
+        "readyState": 4,
+        "networkState": 1,
+        "currentTime": 3.004197,
+        "duration": 30.386,
+        "paused": false,
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "sliceState": "active"
+      }
+    },
+    {
+      "name": "2b was the A-to-B open cancelled the same way",
+      "result": "MEASURED",
+      "detail": "{\"directstreamPosts\":1,\"videoTerminatedFramesSent\":1,\"firstPostAtMs\":32,\"firstTerminatedAtMs\":64,\"firstWatchAtMs\":65,\"terminatedInsideTheOpenWindow\":true,\"recoveryFired\":false}",
+      "rows": 44
+    },
+    {
+      "name": "3 the clock moves and there are real pixels",
+      "result": "PASS",
+      "detail": "3.007 -> 6.971s, 1920x1080"
+    },
+    {
+      "name": "4 the playing video occupies real space inside the toolbox frame",
+      "result": "PASS",
+      "detail": "frame 392x221 (scrollHeight 221), slice 392x221 relative, video 392x189 at y 191, visible=true"
+    },
+    {
+      "name": "5 Blanc's own nav is still reachable behind the player",
+      "result": "PASS",
+      "detail": "nav rect {\"x\":8,\"y\":60,\"w\":44,\"h\":36}, point {\"x\":30,\"y\":78} inside viewport: true; at that point: svg.[object SVGAnimatedString]; is that the player frame: false"
+    }
+  ],
+  "sidecar": {
+    "pid": 9016,
+    "port": 56975,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "a5794f2e-ceef-450a-b810-9175cb5d63be",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "trace": [
+    {
+      "ms": 846,
+      "event": "HTTP OPTIONS /api/v1/status"
+    },
+    {
+      "ms": 847,
+      "event": "HTTP GET /api/v1/status"
+    },
+    {
+      "ms": 847,
+      "event": "HTTP 204 /api/v1/status"
+    },
+    {
+      "ms": 873,
+      "event": "HTTP 200 /api/v1/status"
+    },
+    {
+      "ms": 996,
+      "event": "ws OPEN /events id=8a348ab8-c20c-4b16-97d8-6d140bcddbf2",
+      "requestId": "35356.793"
+    },
+    {
+      "ms": 1041,
+      "event": "ws RECV client-identity",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"client-identity\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"platform\":\"\",\"proof\":\"eyJlbmRwb2ludCI6ImNsaWVudC1pZDo4YTM0OGFiOC1jMjBjLTRiMTYtOTdkOC02ZDE0MGJjZGRiZjIiLCJpYXQiOjE3ODU1NjAzNjgsImV4cCI6MTc4NTY0Njc2OH0.HC…"
+    },
+    {
+      "ms": 1043,
+      "event": "HTTP OPTIONS /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1044,
+      "event": "HTTP 204 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1044,
+      "event": "HTTP POST /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1056,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 1703,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 1707,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading metadata...\"}}\n"
+    },
+    {
+      "ms": 1718,
+      "event": "HTTP 200 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1719,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"watch\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"streamType\":\"localfile\",\"streamPath\":\"C:\\\\Users\\\\Arseniy\\\\AppData\\\\Local\\\\Temp\\\\blanc-nostrict-d\\\\cue-library\\\\Sousou no Frieren - 01.…"
+    },
+    {
+      "ms": 1758,
+      "event": "HTTP OPTIONS /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 1761,
+      "event": "HTTP OPTIONS /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 1761,
+      "event": "HTTP 204 /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 1761,
+      "event": "HTTP 204 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 11160,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-loaded\",\"payload\":{\"state\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"playerType\":\"web\",\"playbackInfo\":{\"id\":\"55a94704-6802-4209-9cc0-d3…"
+    },
+    {
+      "ms": 11161,
+      "event": "HTTP GET /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 11161,
+      "event": "HTTP GET /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 11164,
+      "event": "HTTP GET /api/v1/directstream/stream?id=55a94704-6802-4209-9cc0-d30aff9e1969&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM2OSwiZXhwIjoxNzg1NjQ2NzY5fQ.umv6iVUfh4OvMy_rGpUgdnzsUwhUgd_M4LCrO23rtKo"
+    },
+    {
+      "ms": 11165,
+      "event": "HTTP 200 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 11166,
+      "event": "ws RECV videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"type\":\"in-sight-data\",\"payload\":{\"characters\":[{\"mal_id\":188176,\"url\":\"https://myanimelist.net/character/188176/Fern\",\"images\":{\"jpg\":{\"image_url\":\"https://cdn.myanimelist.net/images/characters/12/619183.jpg?…"
+    },
+    {
+      "ms": 11167,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11167,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11167,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11167,
+      "event": "HTTP 200 /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 11168,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11168,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11169,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11169,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11169,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11169,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-status\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 11185,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=55a94704-6802-4209-9cc0-d30aff9e1969&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM2OSwiZXhwIjoxNzg1NjQ2NzY5fQ.umv6iVUfh4OvMy_rGpUgdnzsUwhUgd_M4LCrO23rtKo"
+    },
+    {
+      "ms": 11207,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-loaded-metadata\"}}"
+    },
+    {
+      "ms": 11207,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-loaded-metadata\",\"payload\":{\"id\":\"55a94704-6802-4209-9cc0-d30aff9e1969\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"durati…"
+    },
+    {
+      "ms": 11222,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":4,\"text\":\"The cat is sleeping by the window.\",\"startTime\":2000,\"duration\":3000,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"margi…"
+    },
+    {
+      "ms": 11228,
+      "event": "HTTP GET /api/v1/directstream/stream?id=55a94704-6802-4209-9cc0-d30aff9e1969&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM2OSwiZXhwIjoxNzg1NjQ2NzY5fQ.umv6iVUfh4OvMy_rGpUgdnzsUwhUgd_M4LCrO23rtKo&thumbnail=true"
+    },
+    {
+      "ms": 11238,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=55a94704-6802-4209-9cc0-d30aff9e1969&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM2OSwiZXhwIjoxNzg1NjQ2NzY5fQ.umv6iVUfh4OvMy_rGpUgdnzsUwhUgd_M4LCrO23rtKo&thumbnail=true"
+    },
+    {
+      "ms": 11259,
+      "event": "HTTP GET /api/v1/directstream/stream?id=55a94704-6802-4209-9cc0-d30aff9e1969&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM2OSwiZXhwIjoxNzg1NjQ2NzY5fQ.umv6iVUfh4OvMy_rGpUgdnzsUwhUgd_M4LCrO23rtKo"
+    },
+    {
+      "ms": 11262,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=55a94704-6802-4209-9cc0-d30aff9e1969&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM2OSwiZXhwIjoxNzg1NjQ2NzY5fQ.umv6iVUfh4OvMy_rGpUgdnzsUwhUgd_M4LCrO23rtKo"
+    },
+    {
+      "ms": 11289,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-seeked\",\"payload\":{\"currentTime\":0,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 11289,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-can-play\",\"payload\":{\"currentTime\":0.010058,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 11313,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-resumed\",\"payload\":{\"currentTime\":0.010638,\"duration\":30.386}}}"
+    },
+    {
+      "ms": 11313,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":3,\"text\":\"猫が窓辺で寝ている。\",\"startTime\":2148,\"duration\":3000,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"marginl\":\"0\",\"marginr\":\"0\",\"m…"
+    },
+    {
+      "ms": 11381,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-subtitle-track\",\"payload\":{\"trackNumber\":4,\"kind\":\"event\"}}}"
+    }
+  ],
+  "traceSummary": {
+    "socketsOpened": 1,
+    "socketsClosed": 0,
+    "directstreamPosts": 1,
+    "videoTerminatedFramesSent": 0,
+    "firstCloseAtMs": null,
+    "firstPostAtMs": 1044,
+    "firstTerminatedAtMs": null
+  },
+  "settled": {
+    "frame": true,
+    "sliceState": "active"
+  },
+  "traceStep2": [
+    {
+      "ms": 32,
+      "event": "HTTP POST /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 33,
+      "event": "HTTP OPTIONS /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 34,
+      "event": "HTTP 204 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 41,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 41,
+      "event": "HTTP 200 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 64,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-subtitle-track\",\"payload\":{\"trackNumber\":4,\"kind\":\"event\"}}}"
+    },
+    {
+      "ms": 64,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-terminated\",\"payload\":{\"id\":\"\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"playerType\":\"web\",\"playbackType\":\"\"}}}"
+    },
+    {
+      "ms": 64,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-anime-4k\",\"payload\":{\"option\":\"off\"}}}"
+    },
+    {
+      "ms": 64,
+      "event": "HTTP POST /api/v1/discord/presence/cancel"
+    },
+    {
+      "ms": 64,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 64,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading metadata...\"}}\n"
+    },
+    {
+      "ms": 64,
+      "event": "HTTP OPTIONS /api/v1/discord/presence/cancel"
+    },
+    {
+      "ms": 65,
+      "event": "HTTP 204 /api/v1/discord/presence/cancel"
+    },
+    {
+      "ms": 65,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"watch\",\"payload\":{\"id\":\"2c4dff90-cbbe-4520-ba1e-0317fb403e65\",\"streamType\":\"localfile\",\"streamPath\":\"C:\\\\Users\\\\Arseniy\\\\AppData\\\\Local\\\\Temp\\\\blanc-nostrict-d\\\\cue-library\\\\Sousou no Frieren - 01.…"
+    },
+    {
+      "ms": 84,
+      "event": "HTTP OPTIONS /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 87,
+      "event": "HTTP OPTIONS /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 87,
+      "event": "HTTP 204 /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 87,
+      "event": "HTTP 204 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 88,
+      "event": "HTTP OPTIONS /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 89,
+      "event": "HTTP 204 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 123,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-loaded\",\"payload\":{\"state\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"playerType\":\"web\",\"playbackInfo\":{\"id\":\"2c4dff90-cbbe-4520-ba1e-03…"
+    },
+    {
+      "ms": 124,
+      "event": "HTTP GET /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 124,
+      "event": "HTTP GET /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 124,
+      "event": "HTTP GET /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 124,
+      "event": "HTTP 200 /api/v1/discord/presence/cancel"
+    },
+    {
+      "ms": 127,
+      "event": "HTTP GET /api/v1/directstream/stream?id=2c4dff90-cbbe-4520-ba1e-0317fb403e65&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM4OSwiZXhwIjoxNzg1NjQ2Nzg5fQ.3nggtpn6WYVF6nSEPivyioN206HBiXE42ba256XA8bs"
+    },
+    {
+      "ms": 130,
+      "event": "HTTP 200 /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 131,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=2c4dff90-cbbe-4520-ba1e-0317fb403e65&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM4OSwiZXhwIjoxNzg1NjQ2Nzg5fQ.3nggtpn6WYVF6nSEPivyioN206HBiXE42ba256XA8bs"
+    },
+    {
+      "ms": 133,
+      "event": "HTTP 200 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 136,
+      "event": "HTTP 200 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 169,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-loaded-metadata\"}}"
+    },
+    {
+      "ms": 169,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-loaded-metadata\",\"payload\":{\"id\":\"2c4dff90-cbbe-4520-ba1e-0317fb403e65\",\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"currentTime\":0,\"durati…"
+    },
+    {
+      "ms": 179,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":4,\"text\":\"The cat is sleeping by the window.\",\"startTime\":2000,\"duration\":3000,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"margi…"
+    },
+    {
+      "ms": 183,
+      "event": "HTTP GET /api/v1/directstream/stream?id=2c4dff90-cbbe-4520-ba1e-0317fb403e65&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM4OSwiZXhwIjoxNzg1NjQ2Nzg5fQ.3nggtpn6WYVF6nSEPivyioN206HBiXE42ba256XA8bs&thumbnail=true"
+    },
+    {
+      "ms": 192,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=2c4dff90-cbbe-4520-ba1e-0317fb403e65&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM4OSwiZXhwIjoxNzg1NjQ2Nzg5fQ.3nggtpn6WYVF6nSEPivyioN206HBiXE42ba256XA8bs&thumbnail=true"
+    },
+    {
+      "ms": 210,
+      "event": "HTTP GET /api/v1/directstream/stream?id=2c4dff90-cbbe-4520-ba1e-0317fb403e65&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM4OSwiZXhwIjoxNzg1NjQ2Nzg5fQ.3nggtpn6WYVF6nSEPivyioN206HBiXE42ba256XA8bs"
+    },
+    {
+      "ms": 213,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=2c4dff90-cbbe-4520-ba1e-0317fb403e65&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDM4OSwiZXhwIjoxNzg1NjQ2Nzg5fQ.3nggtpn6WYVF6nSEPivyioN206HBiXE42ba256XA8bs"
+    },
+    {
+      "ms": 231,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-seeked\",\"payload\":{\"currentTime\":0,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 232,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-can-play\",\"payload\":{\"currentTime\":0,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 232,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-resumed\",\"payload\":{\"currentTime\":3,\"duration\":30.386}}}"
+    },
+    {
+      "ms": 242,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":3,\"text\":\"猫が窓辺で寝ている。\",\"startTime\":2148,\"duration\":3000,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"marginl\":\"0\",\"marginr\":\"0\",\"m…"
+    },
+    {
+      "ms": 315,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-seeked\",\"payload\":{\"currentTime\":3,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 315,
+      "event": "ws RECV native-player",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":4,\"text\":\"The weather is really nice today.\",\"startTime\":6500,\"duration\":2750,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"margin…"
+    },
+    {
+      "ms": 319,
+      "event": "ws SEND videocore",
+      "requestId": "35356.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"8a348ab8-c20c-4b16-97d8-6d140bcddbf2\",\"type\":\"video-subtitle-track\",\"payload\":{\"trackNumber\":4,\"kind\":\"event\"}}}"
+    }
+  ],
+  "traceStep2Summary": {
+    "directstreamPosts": 1,
+    "videoTerminatedFramesSent": 1,
+    "firstPostAtMs": 32,
+    "firstTerminatedAtMs": 64,
+    "firstWatchAtMs": 65,
+    "terminatedInsideTheOpenWindow": true,
+    "recoveryFired": false
+  },
+  "playback": {
+    "startedAt": 3.006776,
+    "videoPresent": true,
+    "readyState": 4,
+    "networkState": 1,
+    "currentTime": 6.970882,
+    "duration": 30.386,
+    "paused": false,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "sliceState": "active"
+  },
+  "geometry": {
+    "viewport": {
+      "w": 544,
+      "h": 421
+    },
+    "frame": {
+      "tag": "div",
+      "cls": "dark blanc-study-player",
+      "x": 101,
+      "y": 175,
+      "w": 392,
+      "h": 221,
+      "position": "relative",
+      "display": "block",
+      "overflow": "hidden auto",
+      "contain": "layout paint",
+      "maxHeight": "221px",
+      "height": "221px",
+      "minHeight": "0px",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 221,
+      "clientHeight": 221
+    },
+    "slice": {
+      "tag": "section",
+      "cls": "study-player-slice",
+      "x": 101,
+      "y": 175,
+      "w": 392,
+      "h": 221,
+      "position": "relative",
+      "display": "grid",
+      "overflow": "hidden",
+      "contain": "none",
+      "maxHeight": "none",
+      "height": "221px",
+      "minHeight": "0px",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 221,
+      "clientHeight": 221
+    },
+    "video": {
+      "tag": "video",
+      "cls": "",
+      "x": 101,
+      "y": 191,
+      "w": 392,
+      "h": 189,
+      "position": "static",
+      "display": "block",
+      "overflow": "clip",
+      "contain": "none",
+      "maxHeight": "189.45px",
+      "height": "189.438px",
+      "minHeight": "auto",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 189,
+      "clientHeight": 189
+    },
+    "chainFromVideoToFrame": [
+      {
+        "tag": "video",
+        "cls": "",
+        "x": 101,
+        "y": 191,
+        "w": 392,
+        "h": 189,
+        "position": "static",
+        "display": "block",
+        "overflow": "clip",
+        "contain": "none",
+        "maxHeight": "189.45px",
+        "height": "189.438px",
+        "minHeight": "auto",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 189,
+        "clientHeight": 189
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full flex items-center justify-center",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "flex",
+        "overflow": "visible",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "auto",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full bg-black overflow-clip flex items-cen",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "flex",
+        "overflow": "clip",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 521,
+        "clientHeight": 221
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full study-video-core",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "block",
+        "overflow": "visible",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      },
+      {
+        "tag": "section",
+        "cls": "study-player-slice",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "grid",
+        "overflow": "hidden",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      },
+      {
+        "tag": "div",
+        "cls": "dark blanc-study-player",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "block",
+        "overflow": "hidden auto",
+        "contain": "layout paint",
+        "maxHeight": "221px",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      }
+    ],
+    "videoRendersPixels": true,
+    "videoCentre": {
+      "x": 297,
+      "y": 286
+    },
+    "whatIsPaintedThere": "div.study-control-row study-control-primary",
+    "videoIsTheThingPaintedThere": false,
+    "navStillClickable": true,
+    "navDiag": {
+      "navFound": true,
+      "navRect": {
+        "x": 8,
+        "y": 60,
+        "w": 44,
+        "h": 36
+      },
+      "navPoint": {
+        "x": 30,
+        "y": 78
+      },
+      "navPointInsideViewport": true,
+      "whatIsAtNavPoint": "svg.[object SVGAnimatedString]",
+      "navPointIsOverThePlayerFrame": false,
+      "scroll": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "docScrollsSideways": false
+  },
+  "result": "DONE",
+  "finishedAt": "2026-08-01T04:59:53.656Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 9016, port 56975, v3.10.2",
+    "[probe] PASS — 1 first open (fresh mount, inside the StrictMode double-mount): {\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":0.243445,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+    "[probe] MEASURED — 1b what the client actually did during the failing open: {\"socketsOpened\":1,\"socketsClosed\":0,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":null,\"firstPostAtMs\":1044,\"firstTerminatedAtMs\":null}",
+    "[probe]   letting the socket settle for 10000 ms",
+    "[probe] PASS — 2 second open (same mounted session, new requestId): {\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":3.004197,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+    "[probe] MEASURED — 2b was the A-to-B open cancelled the same way: {\"directstreamPosts\":1,\"videoTerminatedFramesSent\":1,\"firstPostAtMs\":32,\"firstTerminatedAtMs\":64,\"firstWatchAtMs\":65,\"terminatedInsideTheOpenWindow\":true,\"recoveryFired\":false}",
+    "[probe] PASS — 3 the clock moves and there are real pixels: 3.007 -> 6.971s, 1920x1080",
+    "[probe] PASS — 4 the playing video occupies real space inside the toolbox frame: frame 392x221 (scrollHeight 221), slice 392x221 relative, video 392x189 at y 191, visible=true",
+    "[probe] PASS — 5 Blanc's own nav is still reachable behind the player: nav rect {\"x\":8,\"y\":60,\"w\":44,\"h\":36}, point {\"x\":30,\"y\":78} inside viewport: true; at that point: svg.[object SVGAnimatedString]; is that the player frame: false"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-01_07-59-05.log"
+}

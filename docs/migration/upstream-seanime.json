@@ -20,6 +20,11 @@
     "serverPatches": [
       "patches/seanime/0002-directstream-terminal-subtitle-flush.patch"
     ],
+    "uiPatches": [
+      "patches/seanime/0001-video-core-cuechange.patch",
+      "patches/seanime/0003-video-core-active-player-and-loaded-announce.patch"
+    ],
+    "uiPatchNote": "These are applied to the adopted copy under vendor/seanime-web/ and kept here in upstream-path form. On a deliberate bump, re-apply them to the re-adopted source or confirm upstream has taken the fix; 0003 is load-bearing for subtitle delivery.",
     "sidecarBuilder": "docs/migration/tools/build-patched-sidecar.mjs",
     "uiStrategy": "source-adoption",
     "playerModule": "seanime-web/src/app/(main)/_features/video-core",

@@ -1,0 +1,55 @@
+{
+  "harness": "media-routing-harness.mjs",
+  "question": "Do player/video route to the adopted workspace, does music stay legacy, and does SEANIME_SIDECAR=0 still leave a media surface?",
+  "startedAt": "2026-07-31T13:13:37.452Z",
+  "phases": {
+    "A": {
+      "what": "os:open 'video' on a default run",
+      "handoffPanel": true,
+      "workspaceOpen": true,
+      "legacyMediaCenterPresent": false,
+      "result": "PASS"
+    },
+    "B": {
+      "what": "os:open 'player' (library) on a default run",
+      "handoffPanel": true,
+      "workspaceOpen": true,
+      "legacyMediaCenterPresent": false,
+      "result": "PASS"
+    },
+    "C": {
+      "what": "os:open 'music' — deliberately NOT migrated; the workspace has no music surface",
+      "legacyMediaCenterPresent": true,
+      "handoffPanel": false,
+      "mediaCenterNav": [
+        "Home\nYour media at a glance",
+        "Music\nListening room",
+        "Study Mode\nMine and review",
+        "Discover\nMAL + AniList"
+      ],
+      "stillOffersLegacyVideoOrLibrary": false,
+      "result": "PASS"
+    },
+    "D": {
+      "what": "SEANIME_SIDECAR=0 — the documented rollback must still have a media surface",
+      "legacyMediaCenterPresent": true,
+      "fallbackNoticeShown": true,
+      "workspaceOpen": false,
+      "mediaCenterNav": [
+        "Home",
+        "Library",
+        "Video",
+        "Music",
+        "Study Mode",
+        "Discover"
+      ],
+      "legacyTabsRestored": true,
+      "result": "PASS"
+    }
+  },
+  "probeCorrections": [
+    "Phases A and B first waited on \".media-workspace-section, .seanime-host\" — either marker. On the cold first open the workspace overlay won that race, so the run recorded handoffPanel:false for A and true for B and had proved only that *something* opened, not that this change's own component rendered. Both phases now wait on the panel specifically, and A reports true. Do not relax this back to an either-marker wait."
+  ],
+  "verdict": "PASS",
+  "finishedAt": "2026-07-31T13:13:54.994Z"
+}

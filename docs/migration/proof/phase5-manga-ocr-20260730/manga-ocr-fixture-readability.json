@@ -1,0 +1,127 @@
+{
+  "proof": "Phase 5 — shipped manga OCR pipeline run on a readable fixture page, outside Electron",
+  "date": "2026-07-30",
+  "tool": "docs/migration/tools/manga-ocr-harness.mjs",
+  "method": "src/main/mangaOcr.ts bundled with only electron (nativeImage -> sharp), ./downloads (-> the real installed ONNX models), ./library (-> a temp item dir) and ./translate stubbed. Detection and recognition are the shipped code and the real models.",
+  "sensitivity": "normal",
+  "pagesDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\phase5-manga-fixture-pages",
+  "fixture": {
+    "font": "C:/Windows/Fonts/YuGothM.ttc",
+    "pageWidth": 1200,
+    "pageHeight": 1700
+  },
+  "models": {
+    "manga-ocr": 343454249,
+    "manga-ocr-decoder": 117480262,
+    "manga-ocr-vocab": 30216,
+    "comic-text-detector": 94669756
+  },
+  "mangaOcrAvailable": true,
+  "pages": [
+    {
+      "name": "page-1",
+      "imgWidth": 1200,
+      "imgHeight": 1700,
+      "elapsedMs": 2463,
+      "regionCount": 3,
+      "expectedBubbles": [
+        "猫が窓辺で寝ている。",
+        "とても静かだね。",
+        "本を読もう。"
+      ],
+      "readRegions": [
+        {
+          "text": "猫が窓辺で寝ている。",
+          "rawText": "猫が窓辺で寝ている。",
+          "box": [
+            826,
+            252,
+            935,
+            518
+          ],
+          "vertical": true,
+          "kind": "text",
+          "confidence": 1
+        },
+        {
+          "text": "とても静かだね。",
+          "rawText": "とても静かだね。",
+          "box": [
+            269,
+            865,
+            374,
+            1129
+          ],
+          "vertical": true,
+          "kind": "text",
+          "confidence": 1
+        },
+        {
+          "text": "本を読もう。",
+          "rawText": "本を読もう。",
+          "box": [
+            792,
+            1407,
+            894,
+            1566
+          ],
+          "vertical": true,
+          "kind": "text",
+          "confidence": 1
+        }
+      ],
+      "matchedExactly": [
+        "猫が窓辺で寝ている。",
+        "とても静かだね。",
+        "本を読もう。"
+      ],
+      "missing": []
+    },
+    {
+      "name": "page-2",
+      "imgWidth": 1200,
+      "imgHeight": 1700,
+      "elapsedMs": 1210,
+      "regionCount": 2,
+      "expectedBubbles": [
+        "今日は本当にいい天気ですね。",
+        "公園へ行きませんか。"
+      ],
+      "readRegions": [
+        {
+          "text": "今日は本当にいい天気ですね。",
+          "rawText": "今日は本当にいい天気ですね。",
+          "box": [
+            818,
+            209,
+            925,
+            580
+          ],
+          "vertical": true,
+          "kind": "text",
+          "confidence": 0.996
+        },
+        {
+          "text": "公園へ行きませんか。",
+          "rawText": "公園へ行きませんか。",
+          "box": [
+            277,
+            896,
+            384,
+            1159
+          ],
+          "vertical": true,
+          "kind": "text",
+          "confidence": 0.999
+        }
+      ],
+      "matchedExactly": [
+        "今日は本当にいい天気ですね。",
+        "公園へ行きませんか。"
+      ],
+      "missing": []
+    }
+  ],
+  "verdict": "PASS",
+  "note": "Every drawn bubble was read back exactly by the shipped pipeline, so the fixture is genuinely readable and an OCR miss in the app would be a real defect."
+}

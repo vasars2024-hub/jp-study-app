@@ -1,0 +1,147 @@
+{
+  "harness": "packaged-blanc-harness.mjs",
+  "question": "Does Blanc's player work in a PACKAGED build, and does slice 24's recovery stay unused there? The recovery being NEEDED is a failure here, not a success.",
+  "startedAt": "2026-08-01T07:12:57.998Z",
+  "app": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-j\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-j",
+  "phases": [
+    {
+      "name": "A the packaged app boots and the desktop mounts",
+      "result": "PASS",
+      "detail": "pid 7924, app://bundle/index.html, consent declined: true"
+    },
+    {
+      "name": "B the sidecar is the one inside the package",
+      "result": "PASS",
+      "detail": "pid 30908, port 61594, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe"
+    },
+    {
+      "name": "C Blanc opens as its own packaged window",
+      "result": "PASS",
+      "detail": "app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}"
+    },
+    {
+      "name": "D a file plays in the packaged Blanc, first try",
+      "result": "PASS",
+      "detail": "0.224 -> 5.888s, 1920x1080, inside the Blanc frame: true"
+    },
+    {
+      "name": "E the recovery was never needed — one POST, one socket, no terminate",
+      "result": "PASS",
+      "detail": "POSTs 1 (want 1), sockets 1 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at 815ms"
+    },
+    {
+      "name": "F the toolbox frame bounds the surface without collapsing it",
+      "result": "PASS",
+      "detail": "viewport 544x421, frame 392x221, video 392x189, legacy player nodes 0"
+    },
+    {
+      "name": "G the two pressable video.* rows move the subtitle offset",
+      "result": "PASS",
+      "detail": "; 0 -> -0.1 (want -0.1), ' -0.1 -> 0 (want 0.0), unbound x 0 -> 0 (want unchanged)"
+    }
+  ],
+  "mainUrl": "app://bundle/index.html",
+  "sidecar": {
+    "pid": 30908,
+    "port": 61594,
+    "version": "3.10.2",
+    "exePath": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "fromPackage": true
+  },
+  "blancUrl": "app://bundle/blanc.html?blanc=1",
+  "libraryItems": [
+    {
+      "id": "2d9ddf06-f61a-4ded-87d4-27a49d8c175e",
+      "fileName": "Sousou no Frieren - 01.mkv"
+    }
+  ],
+  "playback": {
+    "currentTime": 5.888025,
+    "duration": 30.386,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "readyState": 4,
+    "inBlancFrame": true,
+    "windowIsBlanc": true,
+    "startedAt": 0.224078
+  },
+  "productionShape": {
+    "directstreamPosts": 1,
+    "socketsOpened": 1,
+    "socketsClosed": 0,
+    "videoTerminatedBeforeWatch": 0,
+    "watchAtMs": 815,
+    "rows": [
+      {
+        "ms": 372,
+        "kind": "ws-open"
+      },
+      {
+        "ms": 392,
+        "kind": "post",
+        "body": "{\"path\":\"C:\\\\Users\\\\Arseniy\\\\AppData\\\\Local\\\\Temp\\\\packaged-blanc-j\\\\cue-library\\\\Sousou no Frieren - 01.mkv\",\"clientId\":\"ba1bb876-966b-46e0-a75c-5adc17376790\"}",
+        "initiator": [
+          "Q3@StudyPlayerSlice-CJVhO60x.js:324",
+          "(anon)@StudyPlayerSlice-CJVhO60x.js:324",
+          "tl@localAgentAutomationStore-C_ORh1X2.js:47",
+          "T1@localAgentAutomationStore-C_ORh1X2.js:47",
+          "wn@localAgentAutomationStore-C_ORh1X2.js:47",
+          "T1@localAgentAutomationStore-C_ORh1X2.js:47"
+        ]
+      },
+      {
+        "ms": 815,
+        "kind": "watch"
+      }
+    ]
+  },
+  "geometry": {
+    "viewport": {
+      "w": 544,
+      "h": 421
+    },
+    "frame": {
+      "w": 392,
+      "h": 221,
+      "y": 175
+    },
+    "video": {
+      "w": 392,
+      "h": 189,
+      "y": 191
+    },
+    "legacy": 0
+  },
+  "shortcutPresses": {
+    "delayAtStart": 0,
+    "subEarlierSemicolon": {
+      "key": ";",
+      "before": 0,
+      "after": -0.1
+    },
+    "subLaterQuote": {
+      "key": "'",
+      "before": -0.1,
+      "after": 0
+    },
+    "unboundKeyX": {
+      "key": "x",
+      "before": 0,
+      "after": 0
+    },
+    "theOtherFiveRows": "subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop and toggleFurigana ship defaultKeys: '' — unpressable by design until bound, so the untested claim there is bind-then-press through ShortcutSettings, not a keypress"
+  },
+  "result": "PASS",
+  "finishedAt": "2026-08-01T07:13:19.271Z",
+  "log": [
+    "[packaged-blanc] PASS — A the packaged app boots and the desktop mounts: pid 7924, app://bundle/index.html, consent declined: true",
+    "[packaged-blanc] PASS — B the sidecar is the one inside the package: pid 30908, port 61594, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "[packaged-blanc] PASS — C Blanc opens as its own packaged window: app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}",
+    "[packaged-blanc] PASS — D a file plays in the packaged Blanc, first try: 0.224 -> 5.888s, 1920x1080, inside the Blanc frame: true",
+    "[packaged-blanc] PASS — E the recovery was never needed — one POST, one socket, no terminate: POSTs 1 (want 1), sockets 1 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at 815ms",
+    "[packaged-blanc] PASS — F the toolbox frame bounds the surface without collapsing it: viewport 544x421, frame 392x221, video 392x189, legacy player nodes 0",
+    "[packaged-blanc] PASS — G the two pressable video.* rows move the subtitle offset: ; 0 -> -0.1 (want -0.1), ' -0.1 -> 0 (want 0.0), unbound x 0 -> 0 (want unchanged)"
+  ]
+}

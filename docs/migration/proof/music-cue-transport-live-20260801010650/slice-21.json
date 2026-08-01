@@ -1,0 +1,90 @@
+{
+  "slice": 21,
+  "title": "The cue transport, pressed in a running window — and the same slice found in the tree twice, live.",
+  "date": "2026-08-01",
+  "reproduce": "node docs/migration/tools/music-mining-harness.mjs   (needs the Vite dev server on 5173; the built main.js loads http://localhost:5173)",
+  "runRecord": "docs/migration/proof/music-mining-live-20260801010650/music-mining-live.json",
+
+  "whatSliceThisActuallyWas": {
+    "planSaid": "progress.json nextActions[0] (slice 20): 'NEXT: extend music-mining-harness.mjs with a cue-transport phase; it already seeds a synced 3-cue sheet and plays it, so pressing the three buttons and asserting the seek target is one phase.'",
+    "whatHappened": "Another session was writing that exact phase into the same file AT THE SAME TIME. The harness gained ~330 lines (phases K0/K/L/M plus a 4s->20s change to the tone fixture) between this session reading it at 00:58 and editing it at 01:02, and their own passing run is on disk at proof/music-mining-live-20260801010500/ (01:05), five minutes before this one (01:06:50).",
+    "soTheSliceWas": "NOT 'write the transport phase' — that existed by the time it could be written. It was: keep their phases intact, add only the questions they do not ask, and remove the assumption their phases rest on.",
+    "thisIsSliceTwentysLessonAgain": "Slice 20 found the transport itself already implemented and untested in this permanently-dirty tree. Slice 21 found its harness phase already implemented, mid-session, by a live writer. The tree is not the record of what has been done; it is also not stable while you work in it. Re-read a file immediately before editing it, not once at the start."
+  },
+
+  "keptRatherThanRewritten": {
+    "theirs": ["K0 transport rendered", "K previous line", "L next line", "M replay line"],
+    "decision": "Left byte-for-byte. Merging by deletion would have destroyed a passing, coherent, already-proven block to replace it with an equivalent one.",
+    "duplicationAvoided": "The first draft of this slice added its own freeze helper, its own readTransport, its own CUE_STARTS and its own prev/next/replay phases. All of it was deleted once theirs was read. The new phases use THEIR helpers (readTransport, pausePlayback, clickNav, near, CUE_STARTS) — a second set of them would have been exactly the defect slice 20 was about, in the file that documents it.",
+    "oneOverlapDroppedOnPurpose": {
+      "phase": "a planned 'the seek reached the audio ELEMENT, not just state.time'",
+      "why": "Their phase M already discriminates it. `driftedIntoCue` resumes playback for 1.1s and requires the clock to return past 2.65s, which only happens if audio.currentTime really went to 2.5. Adding a second phase for it would have been a second answer to a question already answered."
+    }
+  },
+
+  "whatWasAdded": {
+    "N slot order is the named order": {
+      "problem": "clickNav addresses the row as [0]/[1]/[2] with the comment 'the order they are rendered in'. That is an assumption, and it fails SILENTLY: a reordering (RTL, or next-before-prev) leaves K/L/M passing while pressing the wrong control, because the reading would simply be a different cue and the tolerance is 0.15s, not a cue apart.",
+      "fix": "The three buttons now carry `music-cue-prev` / `-replay` / `-next` classes, carrying no styling (`.music-cue-nav button` styles all of them). Phase N asserts the rendered order IS the named order.",
+      "reading": "rendered order [\"music-cue-prev\",\"music-cue-replay\",\"music-cue-next\"]"
+    },
+    "O prev clamps at the first line": "Three presses from cue 2: 1.5s/cue1, 0.5s/cue0, 0.5s/cue0. The third is the assertion; the first two are recorded so a failure names the press that went wrong.",
+    "P next clamps at the last line": "Symmetric: 1.5s/cue1, 2.5s/cue2, 2.5s/cue2.",
+    "Q replay is disabled when no line is active": "Seek to 0s (before cue 0 at 0.5s) via the seek slider: activeIndex -1, replay disabled=true, and clickNav reports the click REFUSED rather than the refusal being inferred from the attribute. Previous-line from there seeks FORWARD onto 0.5s — adjacentStudyCue's clamp, the video overlay's own rule that slice 20 reused deliberately. Recorded as observed behaviour, not asserted as desirable.",
+    "R transport clicks opened no dictionary popup": "Phase I asks this of the Mine button, which stops propagation EXPLICITLY (onMouseUp/onMouseDown stopPropagation). The transport buttons do NOT, and they sit inside the same `.music-lyrics` element whose mouse-up is a dictionary lookup. Different code, so it is asked again after the transport rather than inherited from I."
+  },
+
+  "unitGuard": {
+    "test": "src/shared/__tests__/musicMining.test.ts — 'names each transport button, and the live harness looks for those names'",
+    "why": "The harness is not run by the suite. If the pane renamed or dropped a class, BOTH the class check and the positional presses would die quietly until someone ran the harness and read a confusing failure. The guard reads the pane and the harness .mjs and requires all three names in both.",
+    "controlRun": "Renamed className=\"music-cue-replay\" to \"music-cue-again\" in the pane -> the guard FAILS. Restored from a copy and verified by sha256 (A78F4D35254BF6FA08CC1AF59946C2A146E8034E7D8488FE66461D33CEDCD666), never `git checkout` — this tree is permanently dirty."
+  },
+
+  "staleCommentsCorrected": {
+    "cause": "The concurrent session lengthened the tone fixture from 4s to 20s (documented at writeToneWav) because the transport phases park the playhead inside the last cue, sample twice to establish whether playback is advancing, pause, and only then measure — several seconds of wall clock, during which a 4s track simply ended, and a run-off-the-end reads exactly like 'the transport did not move the playhead'.",
+    "leftBehind": [
+      "The file header still said 'a generated 4 s 440 Hz tone'. Corrected to 20 s.",
+      "Phase H2's threshold comment said 'the 4 s tone yields ~16 KB'. The byte count is set by the CUE's length (1.0s) and by the fixture being a tone rather than silence — NOT by how long the file is, which is why lengthening the tone left the number unchanged. Rewritten to quote it against the cue, with the measured 16,709 bytes."
+    ],
+    "corroboration": "This run's pre-transport reading was 7.0s (seekMax/duration 20s). The concurrent session's own run 5 minutes earlier read 4.1s. BOTH are past the end of the old 4s fixture, so the lengthening was necessary rather than merely prudent — and the 7.0s reading is what would have been reported as a broken transport."
+  },
+
+  "howThePositionIsRead": {
+    "not": "audio.currentTime — playerBus builds its element with document.createElement('audio') and never appends it, so no selector reaches it and no `seeked` listener can be hung on it. The trick retirement-step3-harness.mjs uses for video does not port.",
+    "instead": ".music-seek (the range input whose value is ps.time) and which .music-line carries .active.",
+    "whyThatIsEnough": "A click reaches those readouts only via player.seek -> audio.currentTime -> timeupdate -> state.time -> React. A wrong seek target, a seek that never happened, and a highlight that failed to follow are separately visible in it — and phase M's resume-and-drift closes the one remaining gap (a write that reached the store but not the element)."
+  },
+
+  "liveResult": {
+    "phases": 21,
+    "allPass": true,
+    "ankiPresent": false,
+    "note": "Anki was not running, so the mine is RECORDED as failed — the designed behaviour, unchanged from slice 17. Only Anki acceptance stays unproven.",
+    "readings": {
+      "K previous line": "cue 2 @ 7s -> cue 1 @ 1.5s",
+      "L next line": "cue 1 @ 1.5s -> cue 2 @ 2.5s",
+      "M replay line": "cue 2 @ 4.3s -> @ 2.5s (drifted-off-start=true)",
+      "N slot order": "[music-cue-prev, music-cue-replay, music-cue-next]",
+      "O prev clamp": "press1=1.5s/cue1 press2=0.5s/cue0 press3=0.5s/cue0",
+      "P next clamp": "press1=1.5s/cue1 press2=2.5s/cue2 press3=2.5s/cue2",
+      "Q replay disabled": "at 0s active=-1 replayDisabled=true clickRefused=true; prev from there landed at 0.5s (cue 0)",
+      "R no popup": "no lookup popup after the full transport sweep"
+    }
+  },
+
+  "gates": {
+    "vitest": "3788 / 331 files (+1 test, +0 files; baseline 3787/331 measured this session, matching slice 20's record exactly)",
+    "tsc": "288 — the baseline exactly. The one error in a changed file (MusicContent.tsx:348, RefObject<HTMLDivElement | null>) is PRE-EXISTING and unmoved; slice 20 recorded the same one.",
+    "i18n": "exit 0, 6348 keys, unchanged — the change adds CSS class names, not UI text.",
+    "architectureAudit": "exit 0, 'Nothing new'.",
+    "eslint": "exit 0, 0 warnings on both changed src files.",
+    "rendererBuild": "clean to a scratch --outDir in 29.45s.",
+    "cssContainment": "6950/6950 scoped, 0 unscoped, 0 Tailwind tokens in the shell — unchanged."
+  },
+
+  "stillNotProvenLive": [
+    "Nobody has pressed R (the video overlay's replay-line shortcut) in a running window — slice 19's item, untouched here.",
+    "Blanc's toolbox player has still never been watched playing a file. The 23:25 attempt in proof/blanc-player-live-20260731232500/ ran with the sidecar stopped, so six of its eight phases are INFO, not PASS.",
+    "Music keyboard navigation still does not exist and must not be added by reusing video.* ids — registerCommandHandler is a last-registrant-wins stack, so a music surface mounting later would silently take them from VideoCoreStudyOverlay. It needs its own music.* catalog rows, rebindable and visible in Settings -> Shortcuts."
+  ]
+}

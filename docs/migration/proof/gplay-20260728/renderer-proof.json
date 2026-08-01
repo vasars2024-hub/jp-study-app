@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "gate": "G-PLAY",
+  "verdict": "cue delivery POSITIVE; live Anki export POSITIVE; asset-to-note reference NEGATIVE",
+  "capturedAt": "2026-07-28T16:03:00Z",
+  "environment": {
+    "electron": "single dev instance, SEANIME_SIDECAR=1",
+    "sidecarPort": 50174,
+    "sidecarPid": 53988,
+    "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728",
+    "fixtureMediaId": 154587,
+    "strictMode": "React.StrictMode ENABLED (the diagnostic removal was reverted)"
+  },
+  "player": {
+    "managerClass": "VideoCoreSubtitleManager",
+    "readyState": 4,
+    "duration": 30.386,
+    "subtitleEvents": 12,
+    "cueChangeCount": 11
+  },
+  "cueChanges": [
+    { "track": 4, "startMs": 2000, "endMs": 5000, "text": "The cat is sleeping by the window." },
+    { "track": 4, "startMs": 6500, "endMs": 9250, "text": "The weather is really nice today." },
+    { "track": 4, "startMs": 11000, "endMs": 14000, "text": "She ran all the way to the station." },
+    { "track": 4, "startMs": 16000, "endMs": 19500, "text": "She quietly said, \"Thank you.\"" },
+    { "track": 4, "startMs": 21000, "endMs": 24000, "text": "I do not know how to read this kanji." },
+    { "track": 4, "startMs": 24000, "endMs": 27000, "text": "Let us eat breakfast together tomorrow morning." },
+    { "track": 3, "startMs": 2148, "endMs": 5148, "text": "猫が窓辺で寝ている。" },
+    { "track": 3, "startMs": 6648, "endMs": 9398, "text": "今日は本当にいい天気ですね。" },
+    {
+      "track": 3,
+      "startMs": 11148,
+      "endMs": 14148,
+      "text": "彼女は駅まで走って行った。",
+      "rawText": "{\\pos(960,900)}彼女は駅まで走って行った。",
+      "note": "raw ASS override tag preserved on the cue, stripped only for display"
+    }
+  ],
+  "mining": {
+    "cue": "track 3, index 0, 2148-5148 ms",
+    "term": "猫が窓辺で寝ている。",
+    "screenshotBytes": 171302,
+    "audioBytes": 48843,
+    "audioFilename": "jp-video-cue-3-0-2148.webm",
+    "requestedDeck": "StudyOS::_MigrationProbe",
+    "actualDeck": "JP Study::Immersion",
+    "actualDeckReason": "a mining rule matched, so routedToRule suppressed the deckName override (src/main/anki/index.ts:310-314)",
+    "noteId": 1785243770143,
+    "modelName": "JP Study App::JA Immersion",
+    "tags": ["cue-3-0", "jp-study-app", "jp-study-app::seed-ja-immersion", "media-154587", "video-core"],
+    "fields": { "Term": "猫が窓辺で寝ている。", "Reading": "", "Sentence": "猫が窓辺で寝ている。" },
+    "assetsStoredInAnkiMedia": {
+      "jp-video-cue-3-0-2148.webm": 48843,
+      "jsa-vn-2b20c77cfa5e.png": "stored, md5-renamed by storeSuppliedImage"
+    },
+    "assetsReferencedByNote": false,
+    "assetGapCause": "the routed model has fields [Term, Reading, Sentence] only — no picture/audio role, so the image is dropped at src/main/anki/index.ts:330 and no [sound:] reference reaches a field"
+  },
+  "cleanup": {
+    "undoPath": "exercised via the panel's Undo button",
+    "noteAfterUndo": "DELETED",
+    "mediaFilesDeleted": ["jp-video-cue-3-0-2148.webm", "jsa-vn-2b20c77cfa5e.png"],
+    "deckCountBefore": 83,
+    "deckCountAfter": 83,
+    "residualVideoCoreNotes": 0
+  }
+}

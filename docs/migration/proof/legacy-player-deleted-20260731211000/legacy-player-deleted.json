@@ -1,0 +1,55 @@
+{
+  "slice": "Phase 6 slice 16 — delete the legacy player",
+  "date": "2026-07-31",
+  "authorisation": "USER DECISION, stated twice: 'lets do the route blanc first then delete it', and then the standing goal 'keep on continuing until the seanime integration is done'. The rollback cost below was raised BEFORE the decision and reaffirmed, so it is a chosen trade, not an oversight.",
+
+  "whatWasDeleted": {
+    "component": "MediaPlayerStage — the legacy <video> element, its convert/error affordance, the subtitle bar, the shadowing and dictation panels, the A/B loop and the player diagnostics.",
+    "sourceLines": 591,
+    "file": "src/renderer/components/media/MediaContent.tsx",
+    "fileSize": "2,983 -> 2,392 lines",
+    "alsoRemoved": [
+      "the `MediaPlayerStage` import and render in src/renderer/views/MediaCenterView.tsx (the hidden `video` tab)",
+      "the `MediaPlayerStage` import and the `legacyStage` fallback prop in src/renderer/components/blanc/BlancMediaPanels.tsx and BlancStudyPlayer.tsx",
+      "two imports the deletion orphaned — `SubtitleCueLine` and `noteLookupPointerDown` — found by ESLint, not by inspection. Both symbols are still used by OTHER files (VideoCoreStudyOverlay and nine reader/lookup surfaces respectively), so nothing became a dead module."
+    ],
+    "deliberatelyNotDeleted": "useMedia (~1,420 lines) and the library / transcription / YouTube / hub exports. MediaCenterView's kept tabs — Home, Study Mode, Settings — are all backed by useMedia, and Blanc's Media tab composes the same chrome. Player-only METHODS still on the MediaState interface are now dead weight and are the obvious follow-up; they are not exported components, so neither ESLint nor the architecture audit can see them."
+  },
+
+  "measuredInTheBUNDLE": {
+    "instrument": "Two production renderer builds to scratch --outDir, before and after, with the Forge dev server left running. dist/ untouched.",
+    "theSurprise": "MediaCenterView-*.js GREW 426,640 -> 427,420 bytes (+780). Deleting 591 lines did not shrink the chunk that renders the component, because MediaContent.tsx is emitted as its OWN shared chunk. The +780 is the new empty-state JSX and its i18n keys.",
+    "whereItActuallyLanded": {
+      "MediaContent chunk": "82,887 -> 50,707 bytes (-32,180, a 39% reduction of that chunk)",
+      "total renderer JS": "18,067,797 -> 18,038,489 bytes (-29,308 net)"
+    },
+    "proofTheCodeIsGONERatherThanMoved": "`media-shadowing-error`, a class name used ONLY by MediaPlayerStage, appears in MediaContent-DhNrVlrO.js in the before build and in NO chunk of the after build. A byte count alone could not distinguish deletion from relocation."
+  },
+
+  "theRollbackCost, PAID DELIBERATELY": {
+    "what": "SEANIME_SIDECAR=0 no longer has any video player. It keeps the library, folder navigation, transcription, YouTube import, hub and study surfaces; it loses playback.",
+    "howItIsSurfaced": "Both fallback sites now STATE this rather than rendering a hole. MediaCenterView's hidden `video` tab shows mediaCenter.video.needsServerTitle/Detail; BlancStudyPlayer's `unavailable` branch shows mediaWorkspace.playerNeedsServer. Three new keys, translated in ja/zh/ru.",
+    "whyThatMatters": "An empty stage reads as a broken build. The difference between a documented trade-off and a regression is whether the app says which one it is.",
+    "pinnedBy": "blancStudyPlayerRouting.test.ts — 'states that playback needs the media server, rather than rendering nothing'."
+  },
+
+  "guards": {
+    "file": "src/renderer/__tests__/blancStudyPlayerRouting.test.ts",
+    "newBlock": "'the legacy player is gone from the repository — slice 16' — one test that MediaContent.tsx no longer defines or exports it, and one that sweeps every .ts/.tsx under src/ for a real reference (import, JSX use, or definition), allowing only prose in comments that narrate the deletion.",
+    "verifiedLoadBearing": "Restoring the pre-deletion MediaContent.tsx fails exactly those 2 tests; the other 9 stay green. The panel-wiring test was also tightened — it allowed exactly one MediaPlayerStage use in slice 15 (the fallback prop) and now allows zero, so it fails on BOTH pre-fix shapes.",
+    "oneVacuousAssertionREMOVED": "'renders the adopted surface and NOT the legacy stage' asserted the absence of a `legacy-stage` test marker. After the deletion nothing can render that marker, so the assertion could no longer fail. Deleted rather than left as decoration — the repository sweep is what replaces it."
+  },
+
+  "gates": {
+    "vitest": { "files": 329, "tests": 3747, "note": "+2 over slice 15" },
+    "tsc": { "errors": 288, "baseline": 288, "inChangedFiles": 0, "note": "briefly 291 — the test still passed the deleted `legacyStage` prop. Isolated by diffing error sets with and without the deletion, which showed the deletion itself contributed ZERO." },
+    "i18n": { "exit": 0, "keys": 6333, "newKeys": 3, "translated": "ja/zh/ru" },
+    "architectureAudit": { "exit": 0, "result": "Nothing new" },
+    "eslint": { "exit": 0, "warnings": 0, "note": "it caught both orphaned imports; the house standard here is 0 warnings, not merely exit 0" },
+    "cssContainment": { "exit": 0, "scoped": "6950/6950", "unscoped": 0, "shellTailwindTokens": 0 }
+  },
+
+  "oneProcessErrorWorthRecording": "A `git checkout -- src/renderer/views/MediaCenterView.tsx` was run to get a typecheck baseline, on a working tree that is permanently dirty with several tracks in flight. That was careless — it could have destroyed another track's uncommitted work. It happened to be harmless because MediaCenterView.tsx is UNTRACKED (not in HEAD at all), so the command was a no-op, and the file was restored from a copy taken moments earlier and verified intact. Do not use git checkout for baselines in this tree; copy the file aside instead.",
+
+  "notProvenLive": "Same gap as slice 15, now larger in consequence: nobody has watched Blanc's toolbox player play a file, and the SEANIME_SIDECAR=0 message has not been seen on screen. The .blanc-study-player geometry at 560x460 and the W/S/R/;/' keymap collision with Blanc's own toolbox shortcuts remain unverified against a running window."
+}

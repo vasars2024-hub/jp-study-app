@@ -1,0 +1,55 @@
+{
+  "slice": 29,
+  "date": "2026-08-01",
+  "status": "BLOCKED — phase H is written but has never run. Phase E, which precedes it, regressed between 04:43 and 09:1x today, and the cause is NOT in this session's changes.",
+
+  "whatWasAttempted": "Close the standing item carried by slices 19, 20, 21 and 22: the remaining video.* rows have never been pressed. Phase G could not close them because its instrument is a `seeked` event and these rows do not seek.",
+
+  "phaseHAsWritten": {
+    "file": "docs/migration/tools/retirement-step3-harness.mjs",
+    "covers": "the only two of the seven remaining rows a user can press today — video.subEarlier (;) and video.subLater (') — plus an unbound-key control, matching phase G's shape",
+    "instrument": "the <output> in the subtitle-offset cluster, matched by TEXT SHAPE rather than by its aria-label, because every label here goes through useT() and this app ships four UI languages — a selector keyed to English would pass on an English machine and fail after a language switch",
+    "instrumentRejected": "data-timing-delay, which looks like the obvious seam and is not: it lives on the drift-tracking section and only exists while `driftTracking && timingDrift`, so a phase built on it would read null in an ordinary run and look like a broken shortcut",
+    "keyDispatchNote": "; and ' are not letters, so phase G's `Key${K}` code and its letter VK table do not describe them. A wrong code/VK pair is dispatched happily and matches nothing, which would read as 'the binding does not fire'. Semicolon/186 and Quote/222 are set explicitly.",
+    "verified": false,
+    "whyNot": "phase E throws before G and H are reached"
+  },
+
+  "theOtherFiveRows": "subEarlierLarge, subLaterLarge, toggleAutoPause, toggleLoop and toggleFurigana ship with defaultKeys: '', so effectiveKeys returns '' and chordMatches is false for every chord. They are unpressable BY DESIGN until a user binds them, which makes 'press them' the wrong test. The untested claim for those is bind-then-press through ShortcutSettings (the main window's Settings -> Shortcuts, which does expose the Video category), and that needs a settings-driving phase no harness currently has. Worth stating plainly so a future session does not go looking for a keypress that cannot exist.",
+
+  "theRegression": {
+    "phase": "E — exact cue seeking through the overlay's replay/previous/next controls",
+    "signature": "replay-cue returns null (disabled, no active cue at the 7.3 park) and next-cue returns cue 0 (2.0) instead of cue 1 (6.5). previous-cue is correct. All three are explained by allCues holding ONLY cue 0, where passing runs had cues 0 and 1.",
+    "deterministic": "yes — reproduced identically on three consecutive runs against three independently prepared datadirs",
+    "lastKnownPass": "proof/retirement-step3-20260801044332 (04:43 today) — replay 6.654, prev 2.138, next 6.630, all ok. Slice 22's run (20260731222019) likewise.",
+    "alreadyDocumented": "the harness's own comment at the track-selector step describes this exact signature — 'stopped cue delivery after cue 0 outright: allCues never grew, next-cue kept returning cue 0, replay-cue sat disabled with no active cue' — as what happens when something makes directstream start a NEW subtitle stream. The harness deliberately does not touch the selector, so something else is now doing it."
+  },
+
+  "whyItIsNotThisSessionsChange": {
+    "experiment": "the identity gate added in slice 27 was bypassed in source, the renderer rebuilt, and the harness re-run",
+    "result": "phase E failed IDENTICALLY with the gate off — same null replay, same next-cue 2.0",
+    "conclusion": "the gate is cleared. It was the only plausible candidate: the other change is main.ts's CSP, which only ADDS sources to the app:// origin, and whose absence would prevent playback entirely rather than reduce cue delivery — and playback works (phase C PASS).",
+    "gateRestored": "yes, and the renderer rebuilt; the rebuilt StudyPlayerSlice chunk hashes identically to the one in the packaged build (CJVhO60x)"
+  },
+
+  "theLikelyCause": {
+    "finding": "this tree is being modified by another session WHILE this one works in it",
+    "evidence": "over a hundred src files that this session never touched share a single bulk mtime of 09:13:04-05 — including renderer/views/MangaReader.tsx, shared/anki.ts and renderer/keyboardShortcuts.ts. That is between this session's two package builds (09:08 and 09:27). A further nine src files changed in the 04:43-09:00 window, among them shared/directstreamOpenRecovery.ts at 07:22.",
+    "consequence": "every .vite build this session made necessarily includes that in-progress work, so any dev-route harness result from now is measuring a tree nobody has a stable picture of",
+    "thisIsTheDocumentedHazard": "slice 21 recorded it: 'the tree is not the record of what has been done, and it is not stable while you work in it'. This is the second occurrence, and the first where it invalidated a harness phase rather than an edit."
+  },
+
+  "notAttempted": "No attempt was made to find or fix the cue-delivery regression itself. It is in another session's in-flight work, three runs deep in a dev-route harness, and touching it while that session is live would repeat exactly the mistake slice 21 warned about.",
+
+  "gates": {
+    "vitest": "332 files / 3,803 tests all passing, re-run after restoring the gate — so the regression is integration behaviour no unit covers",
+    "srcChangedThisSlice": "none (the bypass was applied and reverted)",
+    "changed": ["docs/migration/tools/retirement-step3-harness.mjs (phase H, unverified)"]
+  },
+
+  "forTheNextSession": [
+    "Re-run retirement-step3-harness.mjs once the tree is quiet. If phase E passes again, phase H runs for free and the two pressable rows close.",
+    "If phase E still fails, the question is what started a second subtitle stream — the harness comment names that as the mechanism that produces this exact signature.",
+    "The five unbound rows need a bind-then-press phase through ShortcutSettings, not a keypress phase."
+  ]
+}

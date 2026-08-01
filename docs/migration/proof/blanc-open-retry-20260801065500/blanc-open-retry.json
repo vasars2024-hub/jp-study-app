@@ -1,0 +1,300 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "startedAt": "2026-08-01T03:06:28.974Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nav2-datadir-g\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nav2-datadir-g",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 50620, port 60995, v3.10.2"
+    },
+    {
+      "name": "1 first open (fresh mount, inside the StrictMode double-mount)",
+      "result": "FAIL",
+      "detail": "{\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+      "shot": {
+        "videoPresent": false,
+        "frame": true,
+        "sliceState": "idle",
+        "sliceText": "Opening local file"
+      }
+    },
+    {
+      "name": "2 second open (same mounted session, new requestId)",
+      "result": "PASS",
+      "detail": "{\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":4.003474,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+      "shot": {
+        "videoPresent": true,
+        "readyState": 4,
+        "networkState": 1,
+        "currentTime": 4.003474,
+        "duration": 30.386,
+        "paused": false,
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "sliceState": "active"
+      }
+    },
+    {
+      "name": "3 the clock moves and there are real pixels",
+      "result": "PASS",
+      "detail": "4.012 -> 8.030s, 1920x1080"
+    },
+    {
+      "name": "4 the playing video occupies real space inside the toolbox frame",
+      "result": "PASS",
+      "detail": "frame 392x221 (scrollHeight 221), slice 392x221 relative, video 392x189 at y 191, visible=true"
+    },
+    {
+      "name": "5 Blanc's own nav is still reachable behind the player",
+      "result": "PASS",
+      "detail": "nav rect {\"x\":8,\"y\":60,\"w\":44,\"h\":36}, point {\"x\":30,\"y\":78} inside viewport: true; at that point: svg.[object SVGAnimatedString]; is that the player frame: false"
+    }
+  ],
+  "sidecar": {
+    "pid": 50620,
+    "port": 60995,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "35228903-22ca-4ab6-ad2e-a0faf81e4155",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "settled": {
+    "frame": true,
+    "sliceState": "idle"
+  },
+  "playback": {
+    "startedAt": 4.01162,
+    "videoPresent": true,
+    "readyState": 4,
+    "networkState": 1,
+    "currentTime": 8.029988,
+    "duration": 30.386,
+    "paused": false,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "sliceState": "active"
+  },
+  "geometry": {
+    "viewport": {
+      "w": 544,
+      "h": 421
+    },
+    "frame": {
+      "tag": "div",
+      "cls": "dark blanc-study-player",
+      "x": 101,
+      "y": 175,
+      "w": 392,
+      "h": 221,
+      "position": "relative",
+      "display": "block",
+      "overflow": "hidden auto",
+      "contain": "layout paint",
+      "maxHeight": "221px",
+      "height": "221px",
+      "minHeight": "0px",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 221,
+      "clientHeight": 221
+    },
+    "slice": {
+      "tag": "section",
+      "cls": "study-player-slice",
+      "x": 101,
+      "y": 175,
+      "w": 392,
+      "h": 221,
+      "position": "relative",
+      "display": "grid",
+      "overflow": "hidden",
+      "contain": "none",
+      "maxHeight": "none",
+      "height": "221px",
+      "minHeight": "0px",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 221,
+      "clientHeight": 221
+    },
+    "video": {
+      "tag": "video",
+      "cls": "",
+      "x": 101,
+      "y": 191,
+      "w": 392,
+      "h": 189,
+      "position": "static",
+      "display": "block",
+      "overflow": "clip",
+      "contain": "none",
+      "maxHeight": "189.45px",
+      "height": "189.438px",
+      "minHeight": "auto",
+      "visibility": "visible",
+      "opacity": "1",
+      "scrollHeight": 189,
+      "clientHeight": 189
+    },
+    "chainFromVideoToFrame": [
+      {
+        "tag": "video",
+        "cls": "",
+        "x": 101,
+        "y": 191,
+        "w": 392,
+        "h": 189,
+        "position": "static",
+        "display": "block",
+        "overflow": "clip",
+        "contain": "none",
+        "maxHeight": "189.45px",
+        "height": "189.438px",
+        "minHeight": "auto",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 189,
+        "clientHeight": 189
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full flex items-center justify-center",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "flex",
+        "overflow": "visible",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "auto",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full bg-black overflow-clip flex items-cen",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "flex",
+        "overflow": "clip",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 521,
+        "clientHeight": 221
+      },
+      {
+        "tag": "div",
+        "cls": "relative w-full h-full study-video-core",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "block",
+        "overflow": "visible",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      },
+      {
+        "tag": "section",
+        "cls": "study-player-slice",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "grid",
+        "overflow": "hidden",
+        "contain": "none",
+        "maxHeight": "none",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      },
+      {
+        "tag": "div",
+        "cls": "dark blanc-study-player",
+        "x": 101,
+        "y": 175,
+        "w": 392,
+        "h": 221,
+        "position": "relative",
+        "display": "block",
+        "overflow": "hidden auto",
+        "contain": "layout paint",
+        "maxHeight": "221px",
+        "height": "221px",
+        "minHeight": "0px",
+        "visibility": "visible",
+        "opacity": "1",
+        "scrollHeight": 221,
+        "clientHeight": 221
+      }
+    ],
+    "videoRendersPixels": true,
+    "videoCentre": {
+      "x": 297,
+      "y": 286
+    },
+    "whatIsPaintedThere": "div.study-control-row study-control-primary",
+    "videoIsTheThingPaintedThere": false,
+    "navStillClickable": true,
+    "navDiag": {
+      "navFound": true,
+      "navRect": {
+        "x": 8,
+        "y": 60,
+        "w": 44,
+        "h": 36
+      },
+      "navPoint": {
+        "x": 30,
+        "y": 78
+      },
+      "navPointInsideViewport": true,
+      "whatIsAtNavPoint": "svg.[object SVGAnimatedString]",
+      "navPointIsOverThePlayerFrame": false,
+      "scroll": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "docScrollsSideways": false
+  },
+  "result": "DONE",
+  "finishedAt": "2026-08-01T03:07:41.583Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 50620, port 60995, v3.10.2",
+    "[probe] FAIL — 1 first open (fresh mount, inside the StrictMode double-mount): {\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+    "[probe]   letting the socket settle for 10000 ms",
+    "[probe] PASS — 2 second open (same mounted session, new requestId): {\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":4.003474,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+    "[probe] PASS — 3 the clock moves and there are real pixels: 4.012 -> 8.030s, 1920x1080",
+    "[probe] PASS — 4 the playing video occupies real space inside the toolbox frame: frame 392x221 (scrollHeight 221), slice 392x221 relative, video 392x189 at y 191, visible=true",
+    "[probe] PASS — 5 Blanc's own nav is still reachable behind the player: nav rect {\"x\":8,\"y\":60,\"w\":44,\"h\":36}, point {\"x\":30,\"y\":78} inside viewport: true; at that point: svg.[object SVGAnimatedString]; is that the player frame: false"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "gate": "player-retirement blocker: no-bundled-binary",
+  "date": "2026-07-30",
+  "claim": "A packaged build now contains seanime.exe at exactly the path exePath.ts resolves for a packaged app: <resourcesPath>/seanime/seanime.exe.",
+  "authorization": "The user was asked and chose 'Edit forge.config.ts now', explicitly overriding CLAUDE.md's rule against altering root project configuration. The licensing consequence was stated in the question and is recorded below.",
+  "changed": [
+    "forge.config.ts — SeanimeSidecarStagingPlugin (prePackage) + extraResource: ['public', SIDECAR_STAGING_DIR]",
+    ".gitignore — /build/seanime/ (an 84 MB GPL-3.0 binary, never committed)",
+    "src/main/__tests__/seanimeExePath.test.ts — three tests pinning the config to the resolver's slot"
+  ],
+  "howItWorks": {
+    "staging": "prePackage copies the resolved binary to build/seanime/seanime.exe. electron-packager copies each extraResource entry into the resources root by basename, so build/seanime becomes <resources>/seanime.",
+    "source": "SEANIME_EXE if set, else the pinned ../seanime-upstream/seanime.exe — the same dev rule exePath.ts uses.",
+    "failsLoud": "A missing binary throws and fails the build. The failure this prevents is a package that installs cleanly and has a dead media surface on every screen.",
+    "escapeHatch": "SEANIME_SKIP_SIDECAR_PACKAGING=1 packages without one, with a warning, and removes any stale staged exe.",
+    "nonWindows": "prePackage receives the platform; a non-win32 target gets an empty slot rather than a .exe (the makers include deb/rpm).",
+    "emptyDirIsDeliberate": "The staging directory is always created. extraResource throws ENOENT on a missing path, and an empty slot still yields exePath.ts's actionable 'seanime.exe not found. Tried: …' message."
+  },
+  "beforeState": {
+    "existingPackage": "out/jp-study-app-win32-x64 from 2026-07-28, 3.7 GB",
+    "resources": ["app", "public"],
+    "sidecarSlot": "absent — Test-Path resources/seanime was False",
+    "preserved": "moved to out/jp-study-app-win32-x64.pre-sidecar as a rollback; it is regenerable build output and can be deleted"
+  },
+  "run": {
+    "command": "npm run package (sync-extension-mirror + patch-forge-vite + patch-packager-unzip + electron-forge package)",
+    "exitCode": 0,
+    "stagingLine": "[sidecar] staged C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe -> build\\seanime\\seanime.exe (84408320 bytes); resources slot seanime/seanime.exe",
+    "packagedResources": ["app", "public", "seanime"],
+    "packagedExe": "out/jp-study-app-win32-x64/resources/seanime/seanime.exe, 84,408,320 bytes",
+    "sha256MatchesPinnedCheckout": true,
+    "resolutionCheck": "process.resourcesPath for this artifact is out/jp-study-app-win32-x64/resources, so path.join(resourcesPath, PACKAGED_RESOURCE_DIR, 'seanime.exe') is exactly the file that exists. The packaged branch itself is unit-tested in seanimeExePath.test.ts."
+  },
+  "notProven": {
+    "what": "The packaged app was not launched to watch its sidecar come up ready.",
+    "why": "The debug bridge only exists in dev-server mode, so a packaged run could only be driven by Windows mouse/keyboard control, which is a standing user instruction never to do with this app. What is proven is that the binary sits at the exact resolved path, byte-identical; what is inferred is that app.isPackaged/resourcesPath then behave as the unit tests specify.",
+    "howToClose": "Launch the packaged app manually with SEANIME_SIDECAR=1 and open the Media workspace once."
+  },
+  "licensing": {
+    "sidecarLicense": "GPL-3.0 (seanime-upstream/LICENSE)",
+    "posture": "docs/migration/LICENSING_PLAN.md treats an unmodified pinned binary with a documented HTTP API as the conventional separate-program posture, and GPL obligations attach on distribution — package.json is private: true and the app is not distributed.",
+    "liveConsequence": "Staging honours SEANIME_EXE, which is how the PATCHED sidecar (docs/migration/tools/build-patched-sidecar.mjs — needed for the dual-subtitle fix) would get into a package. That binary is a MODIFIED Go server, so per LICENSING_PLAN.md shipping it obliges publishing that fork's source. Recorded, not decided.",
+    "alsoStillTrue": "LICENSING_PLAN.md's 'never ship the Seanime name or logo' still applies to artwork and trademarks, which do not inherit the code license."
+  },
+  "repoGates": {
+    "tsc": "288 — unchanged baseline, no diagnostics in forge.config.ts",
+    "vitest": "seanimeExePath.test.ts + seanimeDataDir.test.ts: 23 / 23 pass"
+  }
+}

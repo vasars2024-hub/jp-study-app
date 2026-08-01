@@ -1,0 +1,116 @@
+{
+  "harness": "packaged-blanc-harness.mjs",
+  "question": "Does Blanc's player work in a PACKAGED build, and does slice 24's recovery stay unused there? The recovery being NEEDED is a failure here, not a success.",
+  "startedAt": "2026-08-01T06:12:32.927Z",
+  "app": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-d\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-d",
+  "phases": [
+    {
+      "name": "A the packaged app boots and the desktop mounts",
+      "result": "PASS",
+      "detail": "pid 19596, app://bundle/index.html, consent declined: true"
+    },
+    {
+      "name": "B the sidecar is the one inside the package",
+      "result": "PASS",
+      "detail": "pid 18904, port 59797, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe"
+    },
+    {
+      "name": "C Blanc opens as its own packaged window",
+      "result": "PASS",
+      "detail": "app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}"
+    },
+    {
+      "name": "D a file plays in the packaged Blanc, first try",
+      "result": "FAIL",
+      "detail": "never loaded"
+    },
+    {
+      "name": "E the recovery was never needed — one POST, one socket, no terminate",
+      "result": "PASS",
+      "detail": "POSTs 1 (want 1), sockets 1 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at 1514ms"
+    }
+  ],
+  "mainUrl": "app://bundle/index.html",
+  "sidecar": {
+    "pid": 18904,
+    "port": 59797,
+    "version": "3.10.2",
+    "exePath": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "fromPackage": true
+  },
+  "blancUrl": "app://bundle/blanc.html?blanc=1",
+  "libraryItems": [
+    {
+      "id": "b775278d-b399-4200-adb4-924f7d33ab3c",
+      "fileName": "Sousou no Frieren - 01.mkv"
+    }
+  ],
+  "failureDiagnosis": {
+    "dom": {
+      "statusRows": [
+        "1 items\nSousou no Frieren - 01",
+        "1 shown"
+      ],
+      "legends": [
+        "Source",
+        "Transcription",
+        "From YouTube",
+        "Player",
+        "Library"
+      ],
+      "anyMediaWorkspace": 1,
+      "blancFrame": 1,
+      "studyPlayerSlice": "active",
+      "mediaPanelText": "Media\nNo songs in library\nImport audio in Music app\nLanguage\nEnglish\n日本語\n中文\nРусский\nAdvanced\nDark\n09:14 AM\nSource\nAdd files…\nAdd folder…\nLoad subtitles…\nGenerate subtitles\n1 items\nSousou no Frieren - 01\nAuto-add folder…\nTranscription\nBase (fast) · downloads on first use\nSmall · downloads on first use\nKotoba (JA) · downloads on first use\nLarge-v3 turbo · downloads on first use\n日本語\n中文\nFrom YouTube\nN"
+    },
+    "exceptions": [],
+    "failedLoads": [
+      {
+        "error": "net::ERR_ABORTED",
+        "type": "Fetch"
+      }
+    ],
+    "cspViolations": [
+      {
+        "text": "Loading media from  'http://127.0.0.1:59797/api/v1/directstream/stream?id=16f852b8-5969-476d-a97f-cdcf83ef86c1&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2NDc3NiwiZXhwIjoxNzg1NjUxMTc2fQ._QKSfBw7avIj60HJdWzV1ZO9Jcr4UEv9P7JCU4o5Hns' violates the following Content Security Policy directive: \"media-src 'self' app: media: playfile: localfile: blob:\". The action has been blocked.",
+        "url": "app://bundle/blanc.html?blanc=1"
+      }
+    ]
+  },
+  "productionShape": {
+    "directstreamPosts": 1,
+    "socketsOpened": 1,
+    "socketsClosed": 0,
+    "videoTerminatedBeforeWatch": 0,
+    "watchAtMs": 1514,
+    "rows": [
+      {
+        "ms": 407,
+        "kind": "ws-open"
+      },
+      {
+        "ms": 447,
+        "kind": "post"
+      },
+      {
+        "ms": 1514,
+        "kind": "watch"
+      }
+    ]
+  },
+  "result": "FAIL",
+  "finishedAt": "2026-08-01T06:14:26.351Z",
+  "log": [
+    "[packaged-blanc] PASS — A the packaged app boots and the desktop mounts: pid 19596, app://bundle/index.html, consent declined: true",
+    "[packaged-blanc] PASS — B the sidecar is the one inside the package: pid 18904, port 59797, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "[packaged-blanc] PASS — C Blanc opens as its own packaged window: app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}",
+    "[packaged-blanc]   D: the video never loaded",
+    "[packaged-blanc]   D: csp [{\"text\":\"Loading media from  'http://127.0.0.1:59797/api/v1/directstream/stream?id=16f852b8-5969-476d-a97f-cdcf83ef86c1&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2NDc3NiwiZXhwIjoxNzg1NjUxMTc2fQ._QKSfBw7avIj60HJdWzV1ZO9Jcr4UEv9P7JCU4o5Hns' violates the following Content Security Policy directive: \\\"media-src 'self' app: media: playfile: localfile: blob:\\\". The action has been blocked.\",\"url\":\"app://bundle/blanc.html?blanc=1\"}]",
+    "[packaged-blanc]   D: exceptions []",
+    "[packaged-blanc]   D: dom {\"statusRows\":[\"1 items\\nSousou no Frieren - 01\",\"1 shown\"],\"legends\":[\"Source\",\"Transcription\",\"From YouTube\",\"Player\",\"Library\"],\"anyMediaWorkspace\":1,\"blancFrame\":1,\"studyPlayerSlice\":\"active\",\"mediaPanelText\":\"Media\\nNo songs in library\\nImport audio in Music app\\nLanguage\\nEnglish\\n日本語\\n中文\\nРусский\\nAdvanced\\nDark\\n09:14 AM\\nSource\\nAdd files…\\nAdd folder…\\nLoad subtitles…\\nGenerate subtitles\\n1 items\\nSousou no Frieren - 01\\nAuto-add folder…\\nTranscription\\nBase (fast) · downloads on first",
+    "[packaged-blanc] FAIL — D a file plays in the packaged Blanc, first try: never loaded",
+    "[packaged-blanc] PASS — E the recovery was never needed — one POST, one socket, no terminate: POSTs 1 (want 1), sockets 1 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at 1514ms"
+  ]
+}

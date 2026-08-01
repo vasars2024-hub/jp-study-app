@@ -1,0 +1,87 @@
+{
+  "slice": "Phase 6 slice 10 — one shell layer scale",
+  "date": "2026-07-31",
+  "result": "PASS",
+  "what": "The command palette, clipboard history and the global toast host now sit above the full-screen media workspace instead of behind it. NEXT_SESSION.md carried this as 'still open, deliberately not fixed — shell-wide layering is not this track's call'; it is fixed here, as a single documented scale rather than a fourth magic number.",
+  "harness": "src/renderer/__devharness__/shell-layers-harness.html",
+  "reproduce": "npx vite --config vite.renderer.config.ts --port 5174, then open http://localhost:5174/src/renderer/__devharness__/shell-layers-harness.html and read window.__shellLayerProbe (or call window.runShellLayerProbe()).",
+  "engine": "Chromium, Browser pane, viewport 1440x900 read from document.documentElement in the same probe",
+  "instrument": "document.elementFromPoint(). jsdom has no stacking model and no hit testing, so the vitest guard can only pin the numbers and the CSS bindings — it cannot answer 'does a click at the palette reach the palette'.",
+
+  "supersededBy": "This run is still valid, but INCOMPLETE. The same harness, extended two hours later, caught a regression THIS slice introduced: raising the palette from 1201 to 20001 moved it over `.consent` (9000), so one keystroke put a working command surface on top of an unanswered first-launch gate. See proof/consent-gate-20260731180200/. The assertion list below is the seven checks this run had; the harness now runs nine.",
+
+  "assertions": [
+    "PASS  palette is clickable over the workspace (hit: palette)",
+    "PASS  the scrim, not the workspace, is under the palette (hit: palette-backdrop)",
+    "PASS  a toast is visible over the workspace (hit: os-toast-host)",
+    "PASS  tokens resolved: palette 20001, workspace 9999",
+    "PASS  control reproduces the defect — the workspace eats the palette click (hit: seanime-host)",
+    "PASS  raising the palette did not change what covers the taskbar (fix: palette-backdrop, control: palette-backdrop)",
+    "PASS  palette muted text clears AA against a white frame behind the glass (5.58:1; body text 14.43:1)"
+  ],
+
+  "fixed": {
+    "label": "fix",
+    "viewport": "1440x900",
+    "computed": {
+      "seanime-host": "9999",
+      "palette-backdrop": "20000",
+      "palette": "20001",
+      "os-toast-host": "30000",
+      "os-taskbar": "200000"
+    },
+    "hits": {
+      "palette centre": "palette",
+      "backdrop only": "palette-backdrop",
+      "toast centre": "os-toast-host",
+      "taskbar centre": "palette-backdrop",
+      "taskbar, no workspace": "palette-backdrop"
+    },
+    "points": { "palette": [720, 154], "backdrop": [205, 154], "toast": [720, 819], "taskbar": [720, 876] }
+  },
+
+  "control": {
+    "label": "control (pre-fix values put back on :root)",
+    "viewport": "1440x900",
+    "computed": {
+      "seanime-host": "9999",
+      "palette-backdrop": "1200",
+      "palette": "1201",
+      "os-toast-host": "5000",
+      "os-taskbar": "200000"
+    },
+    "hits": {
+      "palette centre": "seanime-host",
+      "backdrop only": "seanime-host",
+      "toast centre": "seanime-host",
+      "taskbar centre": "seanime-host",
+      "taskbar, no workspace": "palette-backdrop"
+    },
+    "points": { "palette": [720, 154], "backdrop": [205, 154], "toast": [720, 819], "taskbar": [720, 876] }
+  },
+
+  "contrast": {
+    "method": "The palette's MEASURED computed background-color composited over pure white — the worst realistic frame behind a backdrop-filter blur, which averages what is behind it — then scored WCAG 2.1.",
+    "at88Percent": { "muted": 4.34, "body": 11.22, "verdict": "below the 4.5 AA floor" },
+    "at96Percent": { "muted": 5.58, "body": 14.43, "verdict": "clears AA" },
+    "conclusion": "The `#root:has(.seanime-host) .palette` rule earns its keep. Scoped to the workspace only: on the desktop the palette floats over the app's own dark chrome and keeps the lighter glass it was designed with."
+  },
+
+  "probeCorrections": [
+    "The first run reported FAIL on every hit test with viewport 0x0. The Browser pane is 0x0 until it is sized, and elementFromPoint returns null for every point in a zero-sized viewport — which reads as 'every layer failed'. The harness now refuses to report below 320x320 and says SKIPPED instead, and re-measures on resize. Same trap this track recorded for resize_window({preset:'desktop'}).",
+    "The report panel is fixed to the bottom of the viewport, which is exactly where the toast host and the taskbar are, so it won its own hit tests and reported `<body>` for both — the instrument occluding its own measurement. Fixed with pointer-events: none, which elementFromPoint honours.",
+    "`.os-toast-host` ships pointer-events: none by design, so hit-testing a toast returns what is BENEATH it and would report a perfectly visible toast as covered. The probe makes it hittable for the length of that one test and restores it; paint order and hit order follow the same stacking order."
+  ],
+
+  "correctedClaim": {
+    "claim": "An early comment said the raise keeps the taskbar 'rendering and staying clickable over the backdrop exactly as before'.",
+    "measurement": "False in the 'clickable' half, and it was false before this change too. `.os-taskbar` declares z-index 200000, but it lives inside `.os-desktop`, which declares `contain: layout paint` and therefore forms a stacking context — that 200000 is local, and the taskbar has always painted below every root-level overlay, including the palette backdrop at its old 1200. The fix and control rounds hit the same element there, which is the real finding: the shell is unchanged.",
+    "action": "Comment rewritten in styles.css to state the measured behaviour."
+  },
+
+  "notes": [
+    "A full-screen view covers the taskbar. That is what full-screen means, and the palette is now the way to reach the rest of the app from inside it.",
+    "The palette's own guards were checked in source rather than assumed: its input autofocuses (CommandPalette.tsx:109), the adopted VideoCore keymap bails on isEditableKeyboardTarget(e.target) and document.activeElement (video-core-preferences.tsx), and VideoCoreStudyOverlay's W/S/R/;/' handler bails on INPUT/TEXTAREA/SELECT/contentEditable. So typing in the palette over a playing episode cannot drive the player.",
+    "ClipboardHistoryPanel's Escape handler did not preventDefault, so once it sat above the workspace an Escape would close both. It now preventDefaults, like the palette already did; MediaWorkspaceHost's window listener already bails on defaultPrevented."
+  ]
+}

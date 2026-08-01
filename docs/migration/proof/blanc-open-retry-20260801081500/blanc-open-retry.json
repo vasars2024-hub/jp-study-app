@@ -1,0 +1,271 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "hypothesisCorrection": "Half right, and the wrong half is the half that names a fix. Step 1b (slice 24) measured the frames: the disconnect is a co-symptom, and the cancel is a `video-terminated` the CLIENT sends ~190ms later from the adopted lifecycle effect. A socket-lifetime fix would have changed nothing. See docs/migration/proof/blanc-player-live-20260801075500/slice-24.json.",
+  "startedAt": "2026-08-01T04:55:18.496Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nostrict-a\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-nostrict-a",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 45884, port 56901, v3.10.2"
+    },
+    {
+      "name": "1 first open (fresh mount, inside the StrictMode double-mount)",
+      "result": "PASS",
+      "detail": "{\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":0.219169,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+      "shot": {
+        "videoPresent": true,
+        "readyState": 4,
+        "networkState": 1,
+        "currentTime": 0.219169,
+        "duration": 30.386,
+        "paused": false,
+        "videoWidth": 1920,
+        "videoHeight": 1080,
+        "sliceState": "active"
+      }
+    },
+    {
+      "name": "1b what the client actually did during the failing open",
+      "result": "MEASURED",
+      "detail": "{\"socketsOpened\":1,\"socketsClosed\":0,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":null,\"firstPostAtMs\":1443,\"firstTerminatedAtMs\":null}",
+      "rows": 41
+    }
+  ],
+  "sidecar": {
+    "pid": 45884,
+    "port": 56901,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "2d5e7d0f-1180-4f81-ace5-e6256a7daa52",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "trace": [
+    {
+      "ms": 1093,
+      "event": "HTTP GET /api/v1/status"
+    },
+    {
+      "ms": 1093,
+      "event": "HTTP OPTIONS /api/v1/status"
+    },
+    {
+      "ms": 1096,
+      "event": "HTTP 204 /api/v1/status"
+    },
+    {
+      "ms": 1167,
+      "event": "HTTP 200 /api/v1/status"
+    },
+    {
+      "ms": 1364,
+      "event": "ws OPEN /events id=c780423d-45e8-4965-acd4-c29c5dd478c3",
+      "requestId": "48024.793"
+    },
+    {
+      "ms": 1440,
+      "event": "ws RECV client-identity",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"client-identity\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"platform\":\"\",\"proof\":\"eyJlbmRwb2ludCI6ImNsaWVudC1pZDpjNzgwNDIzZC00NWU4LTQ5NjUtYWNkNC1jMjljNWRkNDc4YzMiLCJpYXQiOjE3ODU1NjAxMzIsImV4cCI6MTc4NTY0NjUzMn0.8F…"
+    },
+    {
+      "ms": 1441,
+      "event": "HTTP OPTIONS /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1443,
+      "event": "HTTP POST /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1443,
+      "event": "HTTP 204 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1465,
+      "event": "ws RECV native-player",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 6737,
+      "event": "ws RECV native-player",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 6737,
+      "event": "ws RECV native-player",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading metadata...\"}}\n"
+    },
+    {
+      "ms": 6737,
+      "event": "HTTP 200 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 6738,
+      "event": "ws RECV native-player",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"watch\",\"payload\":{\"id\":\"e78fad35-aa0c-4078-8f95-8dfb3e431a30\",\"streamType\":\"localfile\",\"streamPath\":\"C:\\\\Users\\\\Arseniy\\\\AppData\\\\Local\\\\Temp\\\\blanc-nostrict-a\\\\cue-library\\\\Sousou no Frieren - 01.…"
+    },
+    {
+      "ms": 6743,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-loaded\",\"payload\":{\"state\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"playerType\":\"web\",\"playbackInfo\":{\"id\":\"e78fad35-aa0c-4078-8f95-8d…"
+    },
+    {
+      "ms": 6743,
+      "event": "HTTP GET /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 6743,
+      "event": "HTTP GET /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 6743,
+      "event": "HTTP GET /api/v1/directstream/stream?id=e78fad35-aa0c-4078-8f95-8dfb3e431a30&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDEzMywiZXhwIjoxNzg1NjQ2NTMzfQ.skrI7qYPrcJqShVmVIIBMhyKQogVZ44UZgoL2sbJcd4"
+    },
+    {
+      "ms": 6744,
+      "event": "ws RECV videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"type\":\"in-sight-data\",\"payload\":{\"characters\":[{\"mal_id\":188176,\"url\":\"https://myanimelist.net/character/188176/Fern\",\"images\":{\"jpg\":{\"image_url\":\"https://cdn.myanimelist.net/images/characters/12/619183.jpg?…"
+    },
+    {
+      "ms": 6745,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-status\",\"payload\":{\"id\":\"e78fad35-aa0c-4078-8f95-8dfb3e431a30\",\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 6745,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-status\",\"payload\":{\"id\":\"e78fad35-aa0c-4078-8f95-8dfb3e431a30\",\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 6745,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-status\",\"payload\":{\"id\":\"e78fad35-aa0c-4078-8f95-8dfb3e431a30\",\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 6745,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-status\",\"payload\":{\"id\":\"e78fad35-aa0c-4078-8f95-8dfb3e431a30\",\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"currentTime\":0,\"duration\":null,…"
+    },
+    {
+      "ms": 6769,
+      "event": "HTTP OPTIONS /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 6771,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=e78fad35-aa0c-4078-8f95-8dfb3e431a30&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDEzMywiZXhwIjoxNzg1NjQ2NTMzfQ.skrI7qYPrcJqShVmVIIBMhyKQogVZ44UZgoL2sbJcd4"
+    },
+    {
+      "ms": 6772,
+      "event": "HTTP 204 /api/v1/library/anime-entry/154587"
+    },
+    {
+      "ms": 6772,
+      "event": "HTTP OPTIONS /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 6775,
+      "event": "HTTP 204 /api/v1/anime/episode-collection/154587"
+    },
+    {
+      "ms": 6817,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-loaded-metadata\"}}"
+    },
+    {
+      "ms": 6817,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-loaded-metadata\",\"payload\":{\"id\":\"e78fad35-aa0c-4078-8f95-8dfb3e431a30\",\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"currentTime\":0,\"durati…"
+    },
+    {
+      "ms": 6830,
+      "event": "ws RECV native-player",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":4,\"text\":\"The cat is sleeping by the window.\",\"startTime\":2000,\"duration\":3000,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"margi…"
+    },
+    {
+      "ms": 6837,
+      "event": "HTTP GET /api/v1/directstream/stream?id=e78fad35-aa0c-4078-8f95-8dfb3e431a30&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDEzMywiZXhwIjoxNzg1NjQ2NTMzfQ.skrI7qYPrcJqShVmVIIBMhyKQogVZ44UZgoL2sbJcd4&thumbnail=true"
+    },
+    {
+      "ms": 6849,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=e78fad35-aa0c-4078-8f95-8dfb3e431a30&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDEzMywiZXhwIjoxNzg1NjQ2NTMzfQ.skrI7qYPrcJqShVmVIIBMhyKQogVZ44UZgoL2sbJcd4&thumbnail=true"
+    },
+    {
+      "ms": 6861,
+      "event": "HTTP GET /api/v1/directstream/stream?id=e78fad35-aa0c-4078-8f95-8dfb3e431a30&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDEzMywiZXhwIjoxNzg1NjQ2NTMzfQ.skrI7qYPrcJqShVmVIIBMhyKQogVZ44UZgoL2sbJcd4"
+    },
+    {
+      "ms": 6871,
+      "event": "HTTP 206 /api/v1/directstream/stream?id=e78fad35-aa0c-4078-8f95-8dfb3e431a30&token=eyJlbmRwb2ludCI6Ii9hcGkvdjEvZGlyZWN0c3RyZWFtL3N0cmVhbSIsImlhdCI6MTc4NTU2MDEzMywiZXhwIjoxNzg1NjQ2NTMzfQ.skrI7qYPrcJqShVmVIIBMhyKQogVZ44UZgoL2sbJcd4"
+    },
+    {
+      "ms": 6894,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-seeked\",\"payload\":{\"currentTime\":0,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 6895,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-can-play\",\"payload\":{\"currentTime\":0,\"duration\":30.386,\"paused\":false}}}"
+    },
+    {
+      "ms": 6895,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-resumed\",\"payload\":{\"currentTime\":0,\"duration\":30.386}}}"
+    },
+    {
+      "ms": 6906,
+      "event": "ws RECV native-player",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"subtitle-event\",\"payload\":{\"events\":[{\"trackNumber\":3,\"text\":\"猫が窓辺で寝ている。\",\"startTime\":2148,\"duration\":3000,\"codecID\":\"S_TEXT/ASS\",\"extraData\":{\"effect\":\"\",\"layer\":\"0\",\"marginl\":\"0\",\"marginr\":\"0\",\"m…"
+    },
+    {
+      "ms": 6977,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-subtitle-track\",\"payload\":{\"trackNumber\":4,\"kind\":\"event\"}}}"
+    },
+    {
+      "ms": 6998,
+      "event": "ws SEND videocore",
+      "requestId": "48024.793",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"type\":\"video-status\",\"payload\":{\"id\":\"e78fad35-aa0c-4078-8f95-8dfb3e431a30\",\"clientId\":\"c780423d-45e8-4965-acd4-c29c5dd478c3\",\"currentTime\":0.043602,\"duration…"
+    }
+  ],
+  "traceSummary": {
+    "socketsOpened": 1,
+    "socketsClosed": 0,
+    "directstreamPosts": 1,
+    "videoTerminatedFramesSent": 0,
+    "firstCloseAtMs": null,
+    "firstPostAtMs": 1443,
+    "firstTerminatedAtMs": null
+  },
+  "conclusion": "A_ONLY: step 2 deliberately skipped.",
+  "result": "DONE",
+  "finishedAt": "2026-08-01T04:55:38.628Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 45884, port 56901, v3.10.2",
+    "[probe] PASS — 1 first open (fresh mount, inside the StrictMode double-mount): {\"videoPresent\":true,\"readyState\":4,\"networkState\":1,\"currentTime\":0.219169,\"duration\":30.386,\"paused\":false,\"videoWidth\":1920,\"videoHeight\":1080,\"sliceState\":\"active\"}",
+    "[probe] MEASURED — 1b what the client actually did during the failing open: {\"socketsOpened\":1,\"socketsClosed\":0,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":null,\"firstPostAtMs\":1443,\"firstTerminatedAtMs\":null}"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-01_07-55-22.log"
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "preparedAt": "2026-08-01T06:44:46.604Z",
+  "executable": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-large-b",
+  "libraryPath": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-large-b\\cue-library",
+  "mkvPath": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-large-b\\cue-library\\Sousou no Frieren - 01.mkv",
+  "sourceMkv": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\cue-probe-dual.mkv",
+  "secondEpisode": {
+    "path": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-large-b\\cue-library\\Sousou no Frieren - 02.mkv",
+    "source": "C:\\Users\\Arseniy\\Downloads\\The Big O [BDRip 1440x1080 x265 FLAC]\\The Big O - 12 [BDRip 1440x1080 x265 FLAC].mkv",
+    "bytes": 2506415448
+  },
+  "mediaIds": [
+    154587
+  ],
+  "fixture": {
+    "mediaId": 154587,
+    "path": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-large-b\\cue-library\\Sousou no Frieren - 01.mkv"
+  },
+  "serverVersion": "3.10.2",
+  "simulatedUser": true
+}

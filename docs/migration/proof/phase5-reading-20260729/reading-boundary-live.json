@@ -1,0 +1,61 @@
+{
+  "proof": "Phase 5 — the canonical reading boundary, exercised live against the supervised sidecar",
+  "date": "2026-07-29",
+  "tool": "mcp__jp-app app_eval against the running Electron app",
+  "method": "The three reading IPC channels were called through the real preload bridge, against a running sidecar pinned to the isolated test profile via SEANIME_DATADIR. No renderer surface consumes them yet, so this exercises the boundary, not a reader.",
+  "sidecar": {
+    "state": "ready",
+    "dataDir": "%TEMP%/seanime-phase3-gplay-20260728 (isolated test profile, never Study OS userData)",
+    "installedProviders": [
+      "phase4-local-proof:online-stream",
+      "local-manga:manga-source (built-in)",
+      "phase5-local-manga-proof:manga-source (fixture installed for this proof)"
+    ]
+  },
+  "results": {
+    "readingMangaEntry": {
+      "state": "ready",
+      "note": "A real AniList round-trip through the sidecar, not fixture data — mediaId 30002 resolved to Berserk with its native title, MAL id and AniList cover URL.",
+      "work": {
+        "contentType": "manga",
+        "workId": "seanime-manga:30002",
+        "title": "Berserk",
+        "titleNative": "ベルセルク",
+        "aniListId": 30002,
+        "malId": 2
+      },
+      "editionId": "seanime:phase5-local-manga-proof:30002"
+    },
+    "readingMangaChapters": {
+      "state": "ready",
+      "providerReturned": "chapter 2 (index 1) first, then chapter 1 (index 0)",
+      "modelReturned": ["1@index0", "2@index1"],
+      "note": "The newest-first reordering claim, proven live rather than only in a fixture test. Scanlator and language survived the projection.",
+      "scanlator": "Phase5 Group"
+    },
+    "readingMangaChapterPages": {
+      "state": "ready",
+      "providerReturned": "page index 1 first, then index 0",
+      "modelReturned": [0, 1],
+      "headersRetained": { "X-Phase5-Proof": "manga-page-header" },
+      "note": "Request headers survive the boundary, for the same reason stream headers do: many provider CDNs 403 a request without their Referer/User-Agent pair. Dimensions are 0 because doublePage was false — Seanime only measures pages in double-page mode, and the model reports unknown as 0 so a reader measures rather than trusting."
+    },
+    "errorPaths": {
+      "note": "Both failures answer HTTP 500. The boundary returns a state and a message rather than rejecting, and the two are now distinguishable.",
+      "emptyProvider": "/api/v1/manga/chapters -> HTTP 500: no results found for this media",
+      "missingProvider": "/api/v1/manga/chapters -> HTTP 500: manga: Provider not found",
+      "offlineSidecar": "state 'offline' propagated cleanly — observed on the acquisition inventory before the sidecar was started."
+    }
+  },
+  "defectFoundAndFixed": {
+    "what": "seanime/client.ts threw on a non-OK response before reading the body, discarding Seanime's `{ error }` envelope. Every failure reduced to a bare 'HTTP 500', so 'this provider has no chapters' and 'this provider does not exist' were indistinguishable at the boundary.",
+    "fix": "errorDetail() reads the envelope on failure and appends its reason, capped, falling back to the status when the body is empty or is not the envelope. Covered by src/main/__tests__/seanimeClient.test.ts.",
+    "alsoImproves": "Every Phase 4 acquisition and provider-inventory message, which used the same client."
+  },
+  "notProven": [
+    "No real manga provider extension was used — the chapter/page feed came from a deterministic local fixture. Provider-backed reading stays `untested` until a run against a real extension is recorded.",
+    "No page image was fetched; rendering is a later slice.",
+    "No Study OS reader consumes the model yet."
+  ],
+  "sideEffects": "One fixture extension was installed into the isolated test profile. No Study OS userData, Anki collection, or user credential was touched, and no token or signed URL appears in this record."
+}

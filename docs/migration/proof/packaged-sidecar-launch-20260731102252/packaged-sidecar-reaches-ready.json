@@ -1,0 +1,114 @@
+{
+  "title": "The sidecar reaching ready inside a PACKAGED build",
+  "date": "2026-07-31",
+  "why": "The one never-proven step old-player retirement opens with. Both blockers were closed on 2026-07-30 and the binary was verified present in the package, but the packaged app was never launched to watch the sidecar come up — the record assumed that needed mouse control. It does not: --remote-debugging-port works in a packaged build and window.api.seanimeStart() is the same call MediaWorkspaceHost makes.",
+  "package": {
+    "appExe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+    "expectedSidecar": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe"
+  },
+  "isolation": {
+    "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-packaged-20260731102252\\userData",
+    "seanimeDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-packaged-20260731102252\\seanime-datadir",
+    "note": "scratch --user-data-dir keeps %APPDATA%/jp-study-app untouched AND side-steps requestSingleInstanceLock(), so a developer instance may stay open"
+  },
+  "phases": {
+    "A": {
+      "result": "PASS",
+      "statusBeforeStart": {
+        "kind": "stopped",
+        "port": 0,
+        "pid": null,
+        "dataDir": null,
+        "version": null,
+        "simulatedUser": null,
+        "error": null,
+        "logTail": []
+      },
+      "why": "`disabled` here would mean the env flag did not reach the packaged main process."
+    },
+    "B": {
+      "result": "PASS",
+      "msToReady": 1600,
+      "statusKind": "ready",
+      "pid": 40788,
+      "port": 56679,
+      "version": "3.10.2",
+      "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-packaged-20260731102252\\seanime-datadir",
+      "error": null,
+      "logTail": [
+        "2026-07-31 13:22:54 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mlocal manager\u001b[0m\u001b[90m >\u001b[0m Saving simulated manga collection to database",
+        "2026-07-31 13:22:54 DBG\u001b[90m -\u001b[0m \u001b[36mdb\u001b[0m\u001b[90m >\u001b[0m Torrent streaming settings saved",
+        "2026-07-31 13:22:54 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mtorrentstream\u001b[0m\u001b[90m >\u001b[0m Module is disabled",
+        "2026-07-31 13:22:54 DBG\u001b[90m -\u001b[0m \u001b[36mtorrentstream\u001b[0m\u001b[90m >\u001b[0m Shutting down module",
+        "2026-07-31 13:22:54 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=refreshed-anilist-manga-collection",
+        "2026-07-31 13:22:54 DBG\u001b[90m -\u001b[0m \u001b[36mdb\u001b[0m\u001b[90m >\u001b[0m Dummy debrid settings saved",
+        "2026-07-31 13:22:54 DBG\u001b[90m -\u001b[0m \u001b[36mdb\u001b[0m\u001b[90m >\u001b[0m Debrid settings saved",
+        "2026-07-31 13:22:54 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Serving embedded web interface",
+        "2026-07-31 13:22:54 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Web assets path: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-packaged-20260731102252\\seanime-datadir\\assets",
+        "2026-07-31 13:22:54 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Manga downloads path: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-packaged-20260731102252\\seanime-datadir\\manga",
+        "2026-07-31 13:22:54 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Offline assets path: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-packaged-20260731102252\\seanime-datadir\\offline\\assets",
+        "2026-07-31 13:22:54 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Server Address: 127.0.0.1:56679",
+        "2026-07-31 13:22:54 \u001b[1mINF\u001b[0m\u001b[90m -\u001b[0m \u001b[36mapp\u001b[0m\u001b[90m >\u001b[0m Seanime started at http://127.0.0.1:56679",
+        "2026-07-31 13:22:55 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m \u001b[36mws\u001b[0m\u001b[90m >\u001b[0m Sending message type=check-for-announcements",
+        "2026-07-31 13:22:55 \u001b[90mTRC\u001b[0m\u001b[90m -\u001b[0m method=GET status=200 uri=/api/v1/status latency_human=1.5559ms"
+      ]
+    },
+    "C": {
+      "result": "PASS",
+      "runningExecutablePath": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+      "expected": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+      "seanimeExeWasUnset": true,
+      "packagedSha256": "62D6AF1BEEAB426A756D5A7758DBDB2B7B7455D7F81153B8E9CFDD18FEB1B11B",
+      "pinnedSiblingSha256": "62D6AF1BEEAB426A756D5A7758DBDB2B7B7455D7F81153B8E9CFDD18FEB1B11B",
+      "pinnedSiblingPath": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+      "why": "The whole point. The pinned sibling checkout exists on this machine and is byte-identical, so \"it reached ready\" is satisfied just as well by a silent fallback to it — and that fallback is exactly what would ship a dead media surface to every other machine. Only the running process's own path can tell the two apart."
+    },
+    "D": {
+      "result": "PASS",
+      "establishedClientSockets": [
+        {
+          "pid": 45552,
+          "process": "jp-study-app"
+        }
+      ],
+      "socketsOwnedByTheApp": [
+        {
+          "pid": 45552,
+          "process": "jp-study-app"
+        }
+      ],
+      "sidecarLogMentionsKeepalive": false,
+      "sidecarLogMentionsKeepaliveNote": "Corroboration only. This run kills the sidecar ~30s in, and a force-killed process leaves a truncated log — a missing line here is NOT evidence of a missing connection. The socket check above is the claim.",
+      "why": "The keepalive was proven in dev. A packaged main process runs the same code through a different bundle, and a sidecar without it is on the dead-man switch's 10s fuse the moment a workspace closes — so the build that would actually ship gets its own check."
+    },
+    "E": {
+      "result": "PASS",
+      "appExited": true,
+      "sidecarOrphaned": false,
+      "why": "A packaged build is where an orphan matters most: it would sit on the durable datadir's SQLite database while the next launch spawned a second server against the same file."
+    }
+  },
+  "verdict": "PASS",
+  "seanimeExeInEnv": false,
+  "appPid": 45552,
+  "appOutputTail": [
+    "DevTools listening on ws://127.0.0.1:56665/devtools/browser/45e11831-54e5-4e93-9c09-670d1a584bf6",
+    "[readingLens] hotkey \"Ctrl+Shift+Space\" not registered: \"Ctrl+Shift+Space\" is already in use by another application.",
+    "[yomitan] Seeding bundled Kanjium pitch data…",
+    "[extensionServer] Error: listen EADDRINUSE: address already in use 127.0.0.1:18765",
+    "    at Server.setupListenHandle [as _listen2] (node:net:2008:16)",
+    "    at listenInCluster (node:net:2065:12)",
+    "    at node:net:2274:7",
+    "    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {",
+    "  code: 'EADDRINUSE',",
+    "  errno: -4091,",
+    "  syscall: 'listen',",
+    "  address: '127.0.0.1',",
+    "  port: 18765",
+    "}",
+    "[yomitan] Kanjium pitch seeded (107978 entries).",
+    "[yomitan] Downloading JMdict (Japanese–English)…",
+    "[yomitan] JMdict (Japanese–English) ready (305213 terms).",
+    "[yomitan] Downloading JMdict (Japanese–Russian)…"
+  ]
+}

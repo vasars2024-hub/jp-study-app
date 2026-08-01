@@ -1,0 +1,54 @@
+{
+  "slice": 28,
+  "date": "2026-08-01",
+  "status": "REFUTED — a real 2.33 GB episode opens as fast as the 11 MB fixture. The last hypothesised route to a production failure is closed, negatively.",
+  "question": "Slice 26 named one remaining way the A-to-B defect could still bite a packaged user: 'MKV metadata parsing scales with the file, and a real episode is ~100x this fixture. A warm-sidecar open of a real episode may well exceed 45 ms, and 43 ms is all the terminate needed.' Does it?",
+  "answer": "No. The open does not widen. Warm A-to-B on a 2.33 GB real episode is 36 ms and 39 ms across two runs, against ~45 ms for the 11 MB fixture — the large file is, if anything, marginally faster.",
+
+  "measured": {
+    "run1": { "firstPostAtMs": 11, "firstTerminatedAtMs": 29, "firstWatchAtMs": 36, "terminatedInsideTheOpenWindow": true, "recoveryFired": false, "step2": "PASS" },
+    "run2": { "firstPostAtMs": 14, "firstTerminatedAtMs": 32, "firstWatchAtMs": 39, "terminatedInsideTheOpenWindow": true, "recoveryFired": false, "step2": "PASS" },
+    "bSide": {
+      "file": "The Big O - 12 [BDRip 1440x1080 x265 FLAC].mkv",
+      "bytes": 2506415448,
+      "gb": 2.33,
+      "provenToBeTheFileThatPlayed": "step 2 reports duration 1425.525s at 1440x1080 — the real episode. The fixture is 30.386s at 1920x1080, so the two are impossible to confuse.",
+      "vsTarget": "slice 26 asked for ~1.4 GB; this is 1.7x that"
+    },
+    "aSide": "the usual 11 MB / 30 s dual-subtitle fixture"
+  },
+
+  "theFinding": "Open latency is not a function of file size. directstream prepares a stream; it does not parse the container end to end, so a 213x larger file costs nothing measurable at open. The premise slice 26 recorded — that metadata parsing scales with the file — is wrong for this path, and it was the sole basis for believing a real episode could widen the window past the terminate.",
+
+  "theSecondFinding": "In BOTH runs the `video-terminated` landed INSIDE the open window (29 ms and 32 ms, between the POST and the `watch`) and the open survived anyway. Slice 26 saw the same shape (terminate 93 ms, watch 95 ms). So 'the terminate fires into the open window' is demonstrably NOT sufficient to kill an open — it has now been observed landing there four times across two slices without once causing the failure it is supposed to cause.",
+
+  "honestPosition": "Slice 24's attribution of the Phase-3 'intermittent' local open to this branch is now weaker still. Slice 25 refuted one route; slice 26 showed the two halves are anti-correlated; this slice removes the last named condition under which they were supposed to combine. The branch is real and fires into the window, but across every non-StrictMode measurement taken — small file, cold file, large file, packaged build — no instance of it actually killing an open has ever been observed. The recovery remains in place and remains unused.",
+
+  "whatThisDoesNotProve": [
+    "Not that the branch can never kill an open — only that no measurement has produced it outside StrictMode. A negative across four slices is strong, but it is still a negative.",
+    "Not tested on spinning rust or a network share. Both runs are a local SSD; a file whose first read blocks for seconds could still widen the window. That is a storage-latency question, not a file-size one, and it is now the only untested shape left.",
+    "The 2.33 GB file was COPIED into the datadir before the scan, so the OS file cache may have been warm for it. A truly cold read of a large file on a cold cache is not what this measured."
+  ],
+
+  "toolChange": {
+    "file": "docs/migration/tools/prepare-gplay-datadir.mjs",
+    "added": "GPLAY_SECOND_SOURCE=<path> makes episode 02 a different file instead of a second copy of the fixture, and the manifest now records the B side's path, source and byte size so a run record cannot be ambiguous about what was measured. Not defaulted: without it every existing datadir recipe is byte-for-byte unchanged.",
+    "guardThatEarnedItself": "the first invocation passed a bash-style /c/Users/... path, which node resolved to C:\\c\\Users\\... — the existence check caught it immediately instead of silently preparing a datadir whose B side was a second copy of the fixture, which would have produced a confidently wrong 'large files are fine' result"
+  },
+
+  "reproduce": [
+    "GPLAY_SECOND_EPISODE=1 GPLAY_SECOND_SOURCE=<a real episode, Windows path> node docs/migration/tools/prepare-gplay-datadir.mjs <cue-probe-dual.mkv> <empty-dir>",
+    "COLD_SECOND=1 node docs/migration/tools/blanc-player-open-retry-probe.mjs --datadir=<that dir>"
+  ],
+
+  "evidence": {
+    "run1": "docs/migration/proof/blanc-open-retry-20260801101500/blanc-open-retry.json",
+    "run2": "docs/migration/proof/blanc-open-retry-20260801102500/blanc-open-retry.json"
+  },
+
+  "gates": {
+    "srcUnchanged": true,
+    "note": "no src file changed this slice, so slice 27's measured totals stand: vitest 332 files / 3,803 tests, tsc 288",
+    "changed": ["docs/migration/tools/prepare-gplay-datadir.mjs"]
+  }
+}

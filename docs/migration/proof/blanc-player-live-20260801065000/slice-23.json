@@ -1,0 +1,95 @@
+{
+  "slice": 23,
+  "title": "Blanc's toolbox player has been watched playing a file. The two questions slice 15 left open are answered, and one of them was answered 'no' until this slice fixed it.",
+  "date": "2026-08-01",
+  "evidence": "docs/migration/proof/blanc-player-live-20260801065000/blanc-player-live.json",
+  "reproduce": "node docs/migration/tools/prepare-gplay-datadir.mjs <cue-probe-dual.mkv> <empty-dir> && node docs/migration/tools/blanc-player-harness.mjs --datadir=<that dir>   (needs the Vite dev server on 5173; a prepared datadir is SINGLE-USE for playback, so build a fresh one per run)",
+
+  "whatWasClosed": {
+    "standingItem": "Slice 22 recorded it as the oldest untouched item: \"Blanc's toolbox player has still never been watched playing a file. The 23:25 attempt in proof/blanc-player-live-20260731232500/ ran with the sidecar STOPPED, so six of its eight phases are INFO, not PASS.\"",
+    "nowWatched": true,
+    "whyTheOldRunCouldNotHaveSucceeded": "The stopped sidecar was the smaller of two reasons and on its own would only have delayed the answer. The larger one is that the run never looked at Blanc. Blanc's toolbox is a separate BrowserWindow loading blanc.html?blanc=1, opened over IPC by window.api.blancOpen(). The old harness dispatched os:open with detail 'blanc' inside the MAIN window, and filtered CDP targets with `type === 'page' && !url.includes('?')` — which excludes the Blanc window BY CONSTRUCTION, since its URL is the one carrying the query string. Every phase after A therefore asserted against the main window's DOM, and phase C's \"a Blanc surface is present in this window\" came from the loose [class*=blanc] arm of its selector matching a taskbar button (`button.os-task-win.app-blanc.active`). Phase B of the new harness reproduces both moves and records that match, so the correction is evidence rather than assertion.",
+    "noMoreINFO": "The harness no longer has a note()/INFO helper at all. Six INFO rows exiting PASS is what let \"never watched playing a file\" survive two slices without reading as a failure."
+  },
+
+  "theDefectThatStoppedPlayback": {
+    "symptom": "In Blanc's window, with the sidecar ready and #media-workspace.blanc-study-player mounted, the surface sat at data-study-player=\"idle\" with no <video> element at all. Reproduced identically on three independently prepared datadirs before it was understood: proof/blanc-player-live-20260801023530, -20260801054500, and probe -20260801055000 step 1.",
+    "notTheKnownIntermittency": "StudyPlayerSlice.tsx calls the directstream open 'intermittent' in a comment and retirement-step3 absorbs that with retries. This was not that: it failed every time, and the sidecar log says why every time.",
+    "serverLog": [
+      "ws > Client connected     id=c79…        <- socket 1",
+      "ws > Client connected     id=c79…        <- socket 2, SAME client id",
+      "ws > Client disconnection id=c79…        <- socket 1 goes away",
+      "directstream > Signaling native player that a new stream is starting",
+      "ws > Sending \"{open-and-await Loading stream...}\" to=c79…",
+      "directstream > Skipping open step for cancelled preparation clientId=c79…",
+      "POST /api/v1/directstream/play/localfile 200      <- 200, having done nothing"
+    ],
+    "rootCause": "React.StrictMode (blancMain.tsx, as in main.tsx) double-invokes effects ON MOUNT. seanimeSocketPool.ts prevents two CONCURRENT sockets — that is exactly what it was extracted for — but it cannot prevent a release/re-acquire cycle, and the pinned sidecar cancels an in-flight directstream preparation when a socket bearing that client id disconnects. Blanc's playbackRequest is non-null at the FIRST mount of StudyPlayerSession, so its launch effect fires inside that churn.",
+    "whyTheMainWindowEscapesIt": "The main window's workspace is under StrictMode too. There the open arrives as a `seanime:media-workspace-open` EVENT at a session that is already mounted and settled, so the launch effect re-runs on a prop change — once. StrictMode double-invokes on mount, not on every dependency change. That asymmetry is the whole difference, and it is why retirement-step3 phase C has always passed while this path never has.",
+    "isThisDevOnly": "The double-invoke itself is development-only, so a packaged build would not reproduce it by this route. That is NOT a reason to call it a non-defect, and it is not written up as one: the underlying fragility is real in any build — Blanc issues its directstream open in the same burst as the socket it depends on, with no settling, and any socket churn from any cause lands on it. It has simply never been observed in a packaged Blanc, because a packaged Blanc has never been driven here either.",
+    "harnessRecovery": "The retry must NOT be a remount — a remount reproduces the double-mount. It lets the socket settle for 10 s and then changes the REQUEST: hashRequestId derives the id from (item.id, item.positionSec), so writing a resume position through the app's own media:setPosition and re-clicking the card yields a new requestId on the session that is already mounted. Every run since opens on attempt 2 and the attempt count stays in the record."
+  },
+
+  "question1Geometry": {
+    "asked": "Blanc's toolbox is 560x460 here, and the adopted study dock and cue-loop overlay were laid out full-screen. Does #media-workspace.blanc-study-player bound them?",
+    "answerBeforeThisSlice": "No — it collapsed them to nothing.",
+    "measured": "docs/migration/proof/blanc-open-retry-20260801061000/ — frame 392x0, scrollHeight 0, clientHeight 0; .study-player-slice position:fixed 392x0; <video> 392x0 — while that same video was decoding at 1920x1080 with the clock advancing. Nothing was on screen.",
+    "twoCausesBothFixed": [
+      "`max-height` alone left the frame's own height `auto`, and everything below .study-player-slice in the adopted tree is a chain of Tailwind `h-full` (height: 100%) divs. A percentage of an auto height is zero, so the whole subtree resolved to zero. The frame now carries a DEFINITE height: clamp(180px, 60vh, calc(100vh - 200px)).",
+      "The slice is `position: fixed; inset: 0` (mediaWorkspace.css), which is right when it IS the screen. Inside the toolbox a fixed child is out of flow, so it contributed no height to the frame either. `height: auto` was the previous attempt at correcting this and is precisely what the measurement disproved. It is now `position: relative; inset: auto; height: 100%`."
+    ],
+    "answerAfterTheFix": "frame 392x221 (max-height 221px, overflow-y auto, contain \"layout paint\"), video 392x189 at y 191 (45vh cap holding), dock 353x165, all inside the frame; no horizontal page scroll; Blanc's own nav still hit-tests back to itself.",
+    "howTheOldAssertionMissedIt": "This is the finding worth keeping. Phase H PASSED against `frame 392x0` (proof/blanc-player-live-20260801060000) because a ZERO-HEIGHT box satisfies `right <= viewport.w` and `h <= 45vh` trivially. A bounds check alone cannot tell 'bounded' from 'collapsed'. The phase now tests non-degeneracy FIRST, and that test is the one that actually answers slice 15."
+  },
+
+  "question2Keymap": {
+    "asked": "VideoCoreStudyOverlay registers the video.* rows; Blanc boots its own installKeyboardShortcuts() and BlancShell binds keydown in three places. Does a key fire both?",
+    "answer": "No collision, and the overlay's keys work in Blanc's window.",
+    "measurements": {
+      "cueStartsFromFile": [2.0, 6.5, 11.0, 16.0, 21.0, 24.0],
+      "parkedAt": 7.3,
+      "replayKeyR": { "seekedTo": 6.519406, "expected": 6.5, "ok": true },
+      "prevKeyW": { "seekedTo": 2.001982, "expected": 2.0, "ok": true },
+      "nextKeyS": { "seekedTo": 6.514921, "expected": 6.5, "ok": true },
+      "unboundKeyX": { "seekedTo": null, "expected": null, "ok": true },
+      "toolboxTabUnchangedAcrossEveryPress": true,
+      "measuredBy": "capture-phase `seeked` events, not polled currentTime — slice 22's instrument, reused rather than re-invented."
+    },
+    "blancsOwnKeydownHandlers": "All three are conditional and none is live on the Media tab: the shortcut-capture handler only binds while capturing, the lockscreen only when locked, and MonoBlocks (which does swallow w/x/z) only on the blocks tab. The active tab is recorded across every press to prove it, rather than argued from source.",
+    "twoCorrectionsToTheHarnessThatMattered": [
+      "The first cut SELECTED a subtitle track before pressing keys. retirement-step3 already records that switching a track MID-PLAYBACK makes directstream start a new subtitle stream and stops cue delivery after cue 0. The selector is now read, never touched.",
+      "The first cut pressed R immediately after the open. Cues stream in progressively, so allCues held only cue 0 and there was nothing later to address. The timeline is now played in past 22 s first."
+    ]
+  },
+
+  "aFalseFindingWithdrawn": {
+    "what": "An intermediate probe reported \"Blanc's nav is not clickable behind the player\".",
+    "why": "It was wrong, and the tell was in the data: it read the same `false` in the run where the frame was 392x0 and could not have been covering anything. `document.querySelector('.blanc-nav-btn')` returns BlancShell's taskbar toggle, which carries that class but sits OUTSIDE `<nav class=\"blanc-nav\">`, so `closest('.blanc-nav')` was always null. The point over that button hit-tests back to the SVG inside the button itself.",
+    "nowAsserted": "whether the measured point hit-tests back to the same button. PASS — proof/blanc-open-retry-20260801065500."
+  },
+
+  "gates": {
+    "vitest": "331 files / 3788 tests, all passed — unchanged from slice 22",
+    "tsc": "288 — the documented baseline, unchanged",
+    "i18n": "exit 0, all 6348 English keys translated in ja/zh/ru",
+    "architectureAudit": "exit 0, 'Nothing new', 3 known findings still pending",
+    "mediaCssContainment": "exit 0, 6950/6950 scoped selectors, 0 unscoped, 0 shell --tw- tokens",
+    "harnessSyntax": "node --check clean on both tools",
+    "note": "src/renderer/theme/blanc-media.css is the only src/ file this slice changed. The gates are otherwise re-run for confirmation."
+  },
+
+  "fullRunResult": {
+    "phases": "A attach main, B os:open 'blanc' does not open Blanc, C attach Blanc window, D toolbox at default size, E open the file in Blanc, F sidecar ready, G a file PLAYS in Blanc, H the frame bounds the adopted surface, I video.* keys reach the overlay, J legacy player absent in both windows",
+    "allPass": true,
+    "G": "4.028 -> 8.039 s, 1920x1080, duration 30.386, inside the Blanc frame, on open attempt 2",
+    "H": "non-degenerate: true; frame 392x221; video 392x189; dock 353x165",
+    "openAttempts": 2
+  },
+
+  "stillNotProvenLive": [
+    "Blanc's player has been watched playing in a DEV build only. The StrictMode first-open loss is development-only by that route, so a packaged Blanc would take a different path to the same request and has never been driven at all.",
+    "The first open in Blanc still fails and the harness still works around it. The workaround is honest and recorded, but the product behaviour a user sees on a first click is a player that says 'Opening local file' and stops. Fixing that belongs in StudyPlayerSlice/BlancStudyPlayer, not in a harness.",
+    "The other six video.* rows the overlay registers (subEarlier/subLater/large, toggleAutoPause, toggleLoop, toggleFurigana) still have not been pressed anywhere — slice 22's open item, unchanged. Phase I presses the three that seek, because a seek is measurable by a `seeked` event.",
+    "Music keyboard navigation still does not exist, and must not be built by reusing video.* ids — registerCommandHandler is a last-registrant-wins stack."
+  ]
+}

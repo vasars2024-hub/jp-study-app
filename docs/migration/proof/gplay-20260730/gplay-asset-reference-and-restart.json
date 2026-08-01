@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "gate": "G-PLAY — mounted-preview live Anki export with both assets, duplicate rejection, undo, and actual restart persistence",
+  "verdict": "PASS",
+  "capturedAt": "2026-07-30T07:20:00Z",
+  "closes": [
+    "the G-PLAY asset gap: the note now references BOTH the screenshot and the cue audio",
+    "the panel's silent deck override: the mine reports its real destination",
+    "the actual app restart proving resume and mining-history persistence"
+  ],
+  "environment": {
+    "electron": "single dev instance (electron-forge start), SEANIME_SIDECAR=1",
+    "sidecarExe": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-verified.exe",
+    "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728",
+    "sidecarPortsAcrossRuns": [59649, 60771],
+    "fixtureMediaId": 154587,
+    "fixture": "cue-library/Sousou no Frieren - 01.mkv (Japanese ASS track 3 + English ASS track 4)",
+    "strictMode": "React.StrictMode ENABLED",
+    "anki": "live collection, 83 decks before and after; namespaced probe deck only",
+    "driver": "the app's own debug bridge (127.0.0.1:39273) — no Windows mouse/keyboard control"
+  },
+  "howPlaybackWasStarted": {
+    "surface": "MediaWorkspaceHost — Media workspace launcher, then the app's own MEDIA_WORKSPACE_OPEN_EVENT with a localFilePath",
+    "note": "The header's 'Open local video' button calls window.api.pickMedia(), which opens a native file dialog a bridge-driven pass cannot answer. The event the button ultimately raises is the same one dispatched here, so this is the real renderer path minus the OS file picker.",
+    "result": "readyState 4, duration 30.386, real frames, dual cues rendered simultaneously"
+  },
+  "subtitleStreamFinding": {
+    "observed": "Selecting a different primary subtitle track mid-playback starts a NEW subtitle stream from the current position, so cues of the newly selected track that lie BEFORE that position are never delivered. With the clock at ~16 s, track 3's first delivered cue was index 1 (6,648-9,398 ms) and index 0 (2,148-5,148 ms) was absent; 'Previous line' therefore could not reach it and, from a position with no active cue, moved forward to the nearest later cue.",
+    "workaround": "Seek to 0, set the track to Off, then re-select it. Track 3 then delivered index 0 at 2,148-5,148 ms and the whole timeline was addressable.",
+    "classification": "directstream behaviour, not a Study OS overlay defect. Recorded so a later session does not read a missing early cue as a cue-delivery regression."
+  },
+  "mining": {
+    "cue": { "index": 0, "trackNumber": 3, "startMs": 2148, "endMs": 5148, "text": "猫が窓辺で寝ている。" },
+    "secondaryCueRenderedSimultaneously": "The cat is sleeping by the window.",
+    "screenshotBytes": 162806,
+    "audioBytes": 48843,
+    "audioFilename": "jp-video-cue-3-0-2148.webm",
+    "imageFilenameInAnki": "jsa-vn-69a3655b7f3d.png",
+    "panelMessage": "Mined to StudyOS::_Phase3GplayProbe.",
+    "noteId": 1785396692600,
+    "modelName": "JP Study App::JA Immersion",
+    "modelFields": ["Term", "Reading", "Sentence"],
+    "tags": ["cue-3-0", "jp-study-app", "jp-study-app::seed-ja-immersion", "media-154587", "video-core"],
+    "fieldsAsStored": {
+      "Term": "猫が窓辺で寝ている。",
+      "Reading": "",
+      "Sentence": "猫が窓辺で寝ている。<br><img src=\"jsa-vn-69a3655b7f3d.png\"><br>[sound:jp-video-cue-3-0-2148.webm]"
+    },
+    "assetsReferencedByNote": true,
+    "assetsRetrievableFromAnkiMedia": {
+      "jsa-vn-69a3655b7f3d.png": 162806,
+      "jp-video-cue-3-0-2148.webm": 48843
+    },
+    "whyThisIsTheGate": "The routed model has no picture or audio role. appendUnreferencedMediaToFields placed both files into the last field carrying content (Sentence), which is exactly the case the 2026-07-28 run failed."
+  },
+  "deckRouting": {
+    "armedWith": "node docs/migration/tools/phase5-anki-probe.mjs arm, JP_PROBE_DECK=StudyOS::_Phase3GplayProbe",
+    "mechanism": "seed-ja-immersion's deckName redirected; no profile added, so no note type minted",
+    "ruleOwnsDestination": true,
+    "panelReportedDestination": "Mined to StudyOS::_Phase3GplayProbe. — the destination is now stated rather than silently overridden"
+  },
+  "duplicateRejection": {
+    "secondMineAttempt": "Duplicate warning: Anki already contains this note.",
+    "historyEntryAdded": "duplicate",
+    "notesInProbeDeckAfter": 1
+  },
+  "restartProof": {
+    "method": "the main window was closed (WM_CLOSE, a real quit — the supervised sidecar exited with it), then electron-forge start was relaunched",
+    "processesAfterQuit": { "electron": 0, "seanime": 0 },
+    "survivedRestart": {
+      "jp-video-core-mining-history-v1": "both entries, with noteId 1785396692600, mediaFilenames [jsa-vn-69a3655b7f3d.png, jp-video-cue-3-0-2148.webm], destination StudyOS::_Phase3GplayProbe, and full cue/source/asset provenance (cue index 0, track 3, 2148-5148 ms; localfile; mediaId 154587)",
+      "jp-video-core-resume-v1": "positionSec preserved, keyed by the normalized local-file path"
+    },
+    "resumeApplied": {
+      "storedPositionSec": 6,
+      "eventSequenceOnReopen": [
+        "loadstart t=0",
+        "loadedmetadata t=0 rs=1",
+        "seeking t=0",
+        "seeked t=0.012 rs=4",
+        "play t=6",
+        "seeking t=6",
+        "seeked t=6 rs=4",
+        "playing t=6.055"
+      ],
+      "note": "The seek to exactly 6.000 is the persisted position being applied, captured with a document-level capture-phase media-event log so the measurement does not depend on polling latency."
+    },
+    "nearEofClearing": "confirmed — after playback reached 30.386 the resume store was [], as designed"
+  },
+  "undo": {
+    "performedAfterTheRestart": true,
+    "whyThatMatters": "Undo is by exported note ID read back from persisted history, so undoing in a later app run exercises the persistence path rather than in-memory state.",
+    "historyEntryAfter": "undone · StudyOS::_Phase3GplayProbe",
+    "notesInProbeDeckAfter": 0,
+    "mediaFilesAfter": { "jsa-vn-69a3655b7f3d.png": "absent", "jp-video-cue-3-0-2148.webm": "absent" }
+  },
+  "cleanup": {
+    "ankiDeckCount": { "before": 83, "afterProbeDeckCreated": 84, "afterDisarm": 83 },
+    "probeDeckRemoved": true,
+    "noteTypesMinted": 0,
+    "localStorageResidueRemoved": { "miningHistoryEntries": 2, "resumeEntries": 1 },
+    "runtimeFilesVerifiedFromPowerShell": {
+      "method": "SHA-256 of every top-level file in %APPDATA%/jp-study-app compared with a pre-run baseline, read with the PowerShell tool (the Bash tool serves a stale overlay on this machine)",
+      "profiles.json": "MATCH",
+      "profile-rules.json": "MATCH",
+      "library.json": "MATCH",
+      "media.json": "MATCH",
+      "study-orchestrator-v2.json": "MATCH",
+      "incidentalChanges": [
+        "anki-intervals.json — rewritten by the app's normal Anki interval sync on launch; not migration residue",
+        "DIPS / DIPS-wal / SharedStorage-wal — Chromium storage WAL folded into the main DB on clean shutdown"
+      ]
+    }
+  },
+  "notClaimed": [
+    "shadowing microphone hardware capture — still requires explicit permission approval",
+    "qBittorrent and debrid — still unconfigured on this machine"
+  ]
+}

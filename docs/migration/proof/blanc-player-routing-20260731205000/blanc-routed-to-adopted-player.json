@@ -1,0 +1,64 @@
+{
+  "slice": "Phase 6 slice 15 — route Blanc onto the adopted player as a pure capability",
+  "date": "2026-07-31",
+  "decision": "USER DECISION 2026-07-31: route Blanc FIRST, then delete the legacy player. Condition: strip the player of its UI, make it a pure capability, and make it light for the machine.",
+
+  "defectOnRecordBeforeTheFix": {
+    "what": "BlancMediaPanels.tsx:106 rendered MediaPlayerStage whenever a source was loaded, with NO sidecar gate of any kind — no api.seanimeStatus call, no useMediaWorkspaceAvailability, nothing.",
+    "consequence": "'THE LEGACY PLAYER IS NOW UNREACHABLE IN NORMAL USE' (NEXT_SESSION.md heading, CURRENT_STATE.md, progress.json statusNow) was false for a day. Open the toolbox, load a file, get the old player.",
+    "class": "Same as slice 14: a shell nobody enumerated. Retirement swept the desktop sections and MediaCenterView's nav; Blanc is a third shell.",
+    "test": "src/renderer/__tests__/blancStudyPlayerRouting.test.ts — 2 tests FAIL against the pre-fix structure, verified by reverting the panel wiring to a bare <MediaPlayerStage state={state} /> and re-running."
+  },
+
+  "aSecondMeasuredHazard": {
+    "what": "Two StudyWebsocketProviders in one window, which routing Blanc would have made reachable for the first time (Blanc's toolbox player + the host overlay).",
+    "whyItMatters": "lib/server/client-id.ts is a module singleton, so both providers present the SAME client id. Transcribed from the pinned sidecar (seanime-upstream/internal/events/websocket.go): AddConn (line 147) APPENDS rather than replaces; SendEventTo (line 206) iterates every conn with the id and does NOT break, so every targeted event is delivered twice; RemoveConn (line 161) removes the FIRST id match and breaks, so whichever socket closes first can de-register the other — leaving a live socket unaddressable and a closed socket's entry still being written to.",
+    "fix": "shared/seanimeSocketOwnership.ts (pure refcount) + media/seanimeSocketPool.ts (module-owned socket). One socket per (origin, token) per window, however many React subtrees ask for it. The socket is at module scope rather than in an effect closure specifically so that the surface which OPENED it may unmount first without dropping a live directstream.",
+    "test": "src/shared/__tests__/seanimeSocketOwnership.test.ts — 9 tests, including a model of the sidecar's own registry showing the double-delivery and the de-registration, and an exhaustive check that any interleaving of two surfaces opens exactly once."
+  },
+
+  "aPlanPremiseThatMeasurementKILLED": {
+    "claim": "NEXT_SESSION.md and progress.json (blancPlanDecided20260731.theSeamAlreadyExists) both said StudyPlayerSlice reaches 'only video-core/*', so a player-without-library surface would be materially lighter. That came from reading the DIRECT imports of four files.",
+    "measuredTransitively": {
+      "MediaWorkspace": { "modules": 472, "sourceBytes": 5888364 },
+      "MediaPlayerSurface": { "modules": 465, "sourceBytes": 5841516 },
+      "difference": { "modules": 8, "sourceBytes": 49130, "percentOfModules": 1.7, "percentOfBytes": 0.8 }
+    },
+    "why": "video-core.tsx imports three jotai atoms from torrent-search-container/-drawer for a ScopeProvider (lines 120-124) and reaches playlists and debrid through video-core-playlist. Cutting all four of those edges by hand removes ZERO further modules — every one is reachable by another path. The adopted tree is one densely connected unit at import-graph level.",
+    "recordedIn": "src/renderer/__tests__/mediaSurfaceImportGraph.test.ts, which now asserts the property that SURVIVED measurement (the library screens are excluded) and explicitly refuses to assert a weight claim the import graph cannot support."
+  },
+
+  "whatLightForTheMachineACTUALLYMeansHere": {
+    "instrument": "A real production renderer build. The Forge dev server was UP (port 5173, pid 3148) throughout, so `dist/` was untouched — the build went to a scratch --outDir instead, which side-steps the EBUSY that has blocked every previous build attempt on this track. No rebuild of dist/, no interruption to the running app.",
+    "emittedChunks": {
+      "MediaPlayerSurface-CnkjKA4v.js": 756,
+      "MediaWorkspace-Syqbm2Kk.js": 51483,
+      "StudyPlayerSlice-DGaTEA9d.js": 2688628,
+      "StudyPlayerSlice-C7xa-7ZJ.css": 527166,
+      "MediaCenterView-DNrz2NXA.js": 426740
+    },
+    "conclusion": "Rollup hoisted the adopted core into ONE shared chunk that both surfaces reference. So the gain is not a smaller download — it is a chunk that is never duplicated: with the media overlay's chunk already loaded, mounting Blanc's player costs 756 BYTES and no second parse of the 2.69 MB core. Blanc additionally never loads the 51 KB library chunk. Combined with the socket pool, a window running both surfaces holds one chunk, one CSS sheet, one websocket and one client id.",
+    "honestLimit": "The 2.69 MB adopted core is unchanged by this slice and cannot be reduced without cutting video-core's own edges, which means editing vendored upstream source (ADR-004 keeps vendor/ byte-identical to the pinned checkout). That is a separate decision and is NOT claimed here."
+  },
+
+  "gates": {
+    "vitest": { "files": 329, "tests": 3745, "delta": "+26 tests, +3 files, all mine", "baseline": "326 files / 3719 tests" },
+    "tsc": { "errors": 288, "baseline": 288, "inChangedFiles": 0 },
+    "i18n": { "exit": 0, "keys": 6330, "newKeys": 0, "note": "the new surface reuses existing mediaWorkspace.* and common.* keys" },
+    "architectureAudit": { "exit": 0, "result": "Nothing new", "note": "it DID catch a duplicate export (acquireSeanimeSocket in both the pure module and the pool); the pool's is now joinSeanimeSocket" },
+    "eslint": { "exit": 0, "warnings": 0 },
+    "cssContainment": { "exit": 0, "scoped": "6950/6950", "unscoped": 0, "shellTailwindTokens": 0 }
+  },
+
+  "twoToolCorrectionsForcedByThisSlice": [
+    "check-media-css-containment.mjs matched the media stylesheet by the hardcoded chunk name /^MediaWorkspace-.*\\.css$/. Moving `import './mediaWorkspace.css'` into the shared MediaSurfaceShell renamed that chunk to StudyPlayerSlice-*.css, and the gate would have thrown 'missing built CSS chunks' rather than checking anything. It now finds the sheet by CONTENT and prints any other chunk carrying scoped rules instead of silently ignoring it — the three #media-workspace.blanc-study-player frame rules legitimately ride Blanc's own stylesheet.",
+    "retirement-step3-harness.mjs queried document.querySelector('#media-workspace'), which returns the FIRST match. Two surfaces can now carry that id (valid for CSS, which matches every element bearing an id; not for querySelector). All four lookups are now scoped to [data-media-surface=workspace]."
+  ],
+
+  "whatThisSliceDeliberatelyDIDNOTDo": {
+    "deleteMediaPlayerStage": "Still a product decision, and still costs the same thing: with SEANIME_SIDECAR=0, MediaWorkspaceSectionView falls back to MediaCenterView and BlancStudyPlayer falls back to the legacy stage. Delete the stage and both fallbacks are empty. What routing Blanc buys is that the deletion is now a CLEAN choice rather than a trade made under a false 'unreachable' claim.",
+    "touchVendor": "Reducing the 2.69 MB adopted core needs video-core.tsx's own imports changed. ADR-004 keeps vendor/ byte-identical to the pinned checkout so an upstream sync stays a mechanical diff."
+  },
+
+  "notProvenLive": "This slice is proven by unit tests, a production build and the CSS gate — NOT by driving the app. Blanc's toolbox player has not been watched playing a file at 560x460. The geometry rules in blanc-media.css and the W/S/R/;/' keymap-collision question with Blanc's own shortcuts are both unverified against a running window, and are the first thing to check next session."
+}

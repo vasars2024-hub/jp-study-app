@@ -1,0 +1,134 @@
+{
+  "proof": "Phase 5 — provider manga chapter to OCR to a mined Anki card, in the running app",
+  "date": "2026-07-30",
+  "closes": "PHASE_5_READING_CONVERGENCE_STATE.md 'Still open' item 2 — manga OCR then mine a card, previously unproven because the only fixture page was a 1x1 GIF that nothing can read.",
+  "method": "The real app (npm start, SEANIME_SIDECAR=1, SEANIME_DATADIR on the isolated Phase 3/5 profile) driven through its own debug bridge — real clicks at measured element coordinates. No Windows mouse or keyboard control was used on the app UI.",
+  "whatWasNew": "Not the transport (proofs #4 and #5 covered that) but the page: make-manga-fixture-pages.mjs renders real 1200x1700 pages with vertical Japanese dialogue in speech bubbles, and fixture-manga-cdn.mjs now serves them behind the same X-Phase5-Proof header gate.",
+
+  "fixture": {
+    "tool": "docs/migration/tools/make-manga-fixture-pages.mjs",
+    "font": "C:/Windows/Fonts/YuGothM.ttc",
+    "pageSize": [1200, 1700],
+    "deterministic": true,
+    "page1Bytes": 89752,
+    "page2Bytes": 76562,
+    "drawnBubbles": {
+      "page-1": ["猫が窓辺で寝ている。", "とても静かだね。", "本を読もう。"],
+      "page-2": ["今日は本当にいい天気ですね。", "公園へ行きませんか。"]
+    },
+    "calibration": "Three fixture properties were found to decide whether the shipped pipeline reads a bubble or fragments it, and all three were established with docs/migration/tools/manga-ocr-harness.mjs before the app was ever started: column gap under the 14px mergeNearbyRegions threshold, columns top-aligned rather than each centred on its own length, and columns of equal length so a trailing 。 does not sit alone past the end of the block. See manga-ocr-fixture-readability.json."
+  },
+
+  "cdn": {
+    "tool": "docs/migration/tools/fixture-manga-cdn.mjs",
+    "port": 18846,
+    "log": [
+      "200 /manga/x/page-1.jpg (89752 bytes, page-1.png)",
+      "403 /manga/x/page-1.jpg (header: absent)",
+      "200 /manga/phase5-local-manga$chapter-1$ja/page-1.jpg (89752 bytes, page-1.png)",
+      "200 /manga/phase5-local-manga$chapter-1$ja/page-2.jpg (76562 bytes, page-2.png)"
+    ],
+    "note": "The 403 is the negative control, taken deliberately before the run: the same URL without the provider header is refused, so the two 200s prove the header survived renderer -> preload -> main -> CDN."
+  },
+
+  "uiPath": [
+    "Media > Discover > Manga (real AniList manga search, 'Berserk')",
+    "Berserk / ベルセルク inspector > Find sources",
+    "popup aggregated 2 installed providers: 'Local' honestly reported no chapters for this title with technical details behind a disclosure; 'Phase 5 Local Manga Proof' listed 2 chapters, latest first",
+    "Chapter 1 > Download and read",
+    "retained MangaReader opened 'Berserk — Chapter 1 - 第一話' at 1 / 2",
+    "clicked 猫 in the OCR overlay > dictionary popup > + Add to Anki"
+  ],
+
+  "libraryItem": {
+    "id": "03e4665c-6584-4112-9d54-d0e1bdf5323d",
+    "kind": "manga",
+    "pageFiles": ["pages/0001.png 89752 bytes", "pages/0002.png 76562 bytes", "cover.png 89752 bytes"],
+    "readerImageSrc": "media://03e4665c-6584-4112-9d54-d0e1bdf5323d/pages/0001.png",
+    "readerNaturalSize": [1200, 1700],
+    "note": "A normal local library item on the normal media:// path — which is the whole point, because manga OCR resolves itemId + mediaUrl to a file inside the item directory and cannot work from a data: URL."
+  },
+
+  "ocr": {
+    "channel": "window.api.mangaOcrScanPage via the reader's own auto-analyze, models loaded from the real userData models/ directory",
+    "page1": [
+      { "text": "猫が窓辺で寝ている。", "kind": "text", "vertical": true, "confidence": 0.9998154583412897, "box": [826, 252, 935, 518] },
+      { "text": "とても静かだね。", "kind": "text", "vertical": true, "confidence": 0.9999273255055472, "box": [269, 865, 374, 1129] },
+      { "text": "本を読もう。", "kind": "text", "vertical": true, "confidence": 0.9997440532311673, "box": [792, 1407, 894, 1566] }
+    ],
+    "page2": [
+      { "text": "今日は本当にいい天気ですね。", "kind": "text" },
+      { "text": "公園へ行きませんか。", "kind": "text" }
+    ],
+    "verdict": "5 of 5 drawn bubbles read back exactly, every region classified 'text', no junk regions on either page."
+  },
+
+  "dictionary": {
+    "query": "猫",
+    "source": "clicked the OCR overlay glyph in the retained reader; MangaReader routes the hit through lookupWordFromMouseUp with the OCR line as context",
+    "result": "real JMdict senses — ねこ COMMON, 'cat (esp. the domestic cat, Felis catus); feline', plus shamisen / geisha / wheelbarrow / clay bed-warmer"
+  },
+
+  "ankiExport": {
+    "destination": "StudyOS::_Phase5MangaProbe (namespaced probe deck, armed by docs/migration/tools/phase5-anki-probe.mjs)",
+    "noteId": 1785380207727,
+    "fields": {
+      "Term": "猫",
+      "Reading": "ねこ",
+      "Sentence": "猫が窓辺で寝ている。"
+    },
+    "decisiveDetail": "The Sentence field is the OCR text from the provider page. That single value is what ties the whole chain together — provider chapter, header-gated CDN, main, disk, retained reader, manga OCR, dictionary, Anki.",
+    "duplicateRejection": "A second and third Add on the same term were refused and the buttons reported 'Already in Anki'; the deck still held exactly one note.",
+    "cleanup": {
+      "notesDeleted": 1,
+      "deckRemoved": true,
+      "deckCountBefore": 83,
+      "deckCountAfter": 83,
+      "residualNotesMatchingFixtureSentence": 0
+    }
+  },
+
+  "residueLeftBehind": {
+    "noteType": "JP Study App::Custom::Phase 5 manga probe (temporary)",
+    "modelCount": "33 -> 34",
+    "why": "The first version of phase5-anki-probe.mjs added a temporary *custom* profile. A custom profile's note type is always derived from its label (shared/profiles.ts makeCustomProfile builds `JP Study App::Custom::<label>`, and main/profiles.ts mergeAnkiBinding resets any stored modelName that differs from it, treating it as a legacy migration), so the run provisioned a new note type. AnkiConnect exposes no deleteModel action, so it could not be removed programmatically and the collection DB was deliberately not edited by hand.",
+    "userAction": "Remove it in Anki: Tools > Manage Note Types > select 'JP Study App::Custom::Phase 5 manga probe (temporary)' > Delete. It holds 0 notes.",
+    "fixed": "phase5-anki-probe.mjs now redirects seed-ja-immersion's deckName instead of adding a profile, leaving the shipped note type untouched. The arm/disarm round trip was re-verified and both files hash-matched the backup afterwards."
+  },
+
+  "defectsFound": [
+    {
+      "id": "untranslated-page-cached-as-translation",
+      "severity": "real; found by this run, fixed with tests",
+      "symptom": "The reader's Auto-translate wrote _ocr/0001.tr.en.json and 0002.tr.en.json whose lines are the untouched Japanese, and both pages counted as translated.",
+      "firstDiagnosisWasWrong": "It was recorded as 'translateRun echoes the source', on the strength of window.api.translateRun({text:'猫が窓辺で寝ている。',from:'ja',to:'en'}) → {ok:true, text:'猫が窓辺で寝ている。'}. That probe passed from/to where the API takes source/target, so undefined === undefined took a same-language short-circuit. Loading the same GGUF directly from Node with the shipped buildSentencePrompt returns 'A cat is sleeping on the window ledge.' in ~800ms — the model was never the problem. Recorded because this is the project's recurring failure mode, applied to itself.",
+      "realCauses": [
+        "translateText compared the language pair without validating it, so a missing or unknown code returned the source text as a successful translation.",
+        "translateSentence never applied isValidCrossLangTranslation, which the batch path always had — a model echo would have passed as a translation.",
+        "The one that produced these caches: translateMokuroPage returned the page unchanged when no region translated, and analyzeMangaVolume cached it regardless, so refreshMangaOcrMeta counted it as translated. Nothing surfaced because runTranslationBatch reports a failed item as an empty string rather than by throwing."
+      ],
+      "fix": "All three corrected. Covered by src/main/__tests__/translateGuards.test.ts (4 tests) and src/main/__tests__/mangaOcrTranslateCache.test.ts (4 tests). A partly-failed analyze now returns a `warning` that MangaReader displays."
+    },
+    {
+      "id": "reader-stacked-below-desktop",
+      "severity": "cosmetic, observed once",
+      "what": "Immediately after 'Download and read' the .reader element sat in flow below the desktop shell (document height 2114 for a 1057 viewport) rather than over it, so the reader was off-screen until the layout settled.",
+      "context": "It resolved on its own within a few seconds and the reader then occupied the viewport at y=0. Recorded because it was observed, not diagnosed."
+    }
+  ],
+
+  "isolation": {
+    "userDataBackup": "C:/Users/Arseniy/jp-study-app-backups/2026-07-30-phase5-ocr-mine (23 files, 11,359,839 bytes) taken before the app was started",
+    "sidecarDataDir": "C:/Users/Arseniy/AppData/Local/Temp/seanime-phase3-gplay-20260728 (isolated Phase 3/5 profile, SEANIME_DATADIR set so stop() does not delete it)",
+    "restorationVerifiedFrom": "PowerShell, not the Bash tool — the Bash tool reads a copy-on-write overlay here and has previously reported runtime files as restored while they were not",
+    "hashChecksAfterCleanup": {
+      "profiles.json": "matches backup",
+      "profile-rules.json": "matches backup",
+      "library.json": "matches backup"
+    },
+    "processes": "Electron closed with WM_CLOSE (graceful quit, which stopped the sidecar), fixture CDN killed, port 18846 released, debug/bridge.json removed by the app on exit",
+    "libraryItemRemoved": "through window.api.removeItem while the app was still running; the item directory and its library.json record were both confirmed absent"
+  },
+
+  "verdict": "PASS"
+}

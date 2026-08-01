@@ -1,0 +1,117 @@
+{
+  "harness": "packaged-blanc-harness.mjs",
+  "question": "Does Blanc's player work in a PACKAGED build, and does slice 24's recovery stay unused there? The recovery being NEEDED is a failure here, not a success.",
+  "startedAt": "2026-08-01T06:16:45.696Z",
+  "app": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-e\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-e",
+  "phases": [
+    {
+      "name": "A the packaged app boots and the desktop mounts",
+      "result": "PASS",
+      "detail": "pid 29888, app://bundle/index.html, consent declined: true"
+    },
+    {
+      "name": "B the sidecar is the one inside the package",
+      "result": "PASS",
+      "detail": "pid 432, port 53965, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe"
+    },
+    {
+      "name": "C Blanc opens as its own packaged window",
+      "result": "PASS",
+      "detail": "app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}"
+    },
+    {
+      "name": "D a file plays in the packaged Blanc, first try",
+      "result": "PASS",
+      "detail": "0.594 -> 5.248s, 1920x1080, inside the Blanc frame: true"
+    },
+    {
+      "name": "E the recovery was never needed — one POST, one socket, no terminate",
+      "result": "FAIL",
+      "detail": "POSTs 2 (want 1), sockets 1 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at 794ms"
+    },
+    {
+      "name": "F the toolbox frame bounds the surface without collapsing it",
+      "result": "PASS",
+      "detail": "viewport 544x421, frame 392x221, video 392x189, legacy player nodes 0"
+    }
+  ],
+  "mainUrl": "app://bundle/index.html",
+  "sidecar": {
+    "pid": 432,
+    "port": 53965,
+    "version": "3.10.2",
+    "exePath": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "fromPackage": true
+  },
+  "blancUrl": "app://bundle/blanc.html?blanc=1",
+  "libraryItems": [
+    {
+      "id": "fe5ecea5-3984-4f7c-b99f-ebb7b8192499",
+      "fileName": "Sousou no Frieren - 01.mkv"
+    }
+  ],
+  "playback": {
+    "currentTime": 5.247536,
+    "duration": 30.386,
+    "videoWidth": 1920,
+    "videoHeight": 1080,
+    "readyState": 4,
+    "inBlancFrame": true,
+    "windowIsBlanc": true,
+    "startedAt": 0.594478
+  },
+  "productionShape": {
+    "directstreamPosts": 2,
+    "socketsOpened": 1,
+    "socketsClosed": 0,
+    "videoTerminatedBeforeWatch": 0,
+    "watchAtMs": 794,
+    "rows": [
+      {
+        "ms": 370,
+        "kind": "ws-open"
+      },
+      {
+        "ms": 376,
+        "kind": "post"
+      },
+      {
+        "ms": 379,
+        "kind": "post"
+      },
+      {
+        "ms": 794,
+        "kind": "watch"
+      }
+    ]
+  },
+  "geometry": {
+    "viewport": {
+      "w": 544,
+      "h": 421
+    },
+    "frame": {
+      "w": 392,
+      "h": 221,
+      "y": 175
+    },
+    "video": {
+      "w": 392,
+      "h": 189,
+      "y": 191
+    },
+    "legacy": 0
+  },
+  "result": "FAIL",
+  "finishedAt": "2026-08-01T06:17:06.761Z",
+  "log": [
+    "[packaged-blanc] PASS — A the packaged app boots and the desktop mounts: pid 29888, app://bundle/index.html, consent declined: true",
+    "[packaged-blanc] PASS — B the sidecar is the one inside the package: pid 432, port 53965, v3.10.2, exe C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\resources\\seanime\\seanime.exe",
+    "[packaged-blanc] PASS — C Blanc opens as its own packaged window: app://bundle/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"proto\":\"app:\"}",
+    "[packaged-blanc] PASS — D a file plays in the packaged Blanc, first try: 0.594 -> 5.248s, 1920x1080, inside the Blanc frame: true",
+    "[packaged-blanc] FAIL — E the recovery was never needed — one POST, one socket, no terminate: POSTs 2 (want 1), sockets 1 opened / 0 closed (want 1/0), video-terminated before watch 0 (want 0), watch at 794ms",
+    "[packaged-blanc] PASS — F the toolbox frame bounds the surface without collapsing it: viewport 544x421, frame 392x221, video 392x189, legacy player nodes 0"
+  ]
+}

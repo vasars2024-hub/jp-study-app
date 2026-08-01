@@ -1,0 +1,43 @@
+{
+  "tool": "sidecar-keepalive-harness",
+  "exe": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+  "phases": {
+    "A-control-workspace-close-kills-the-sidecar": {
+      "what": "One workspace-shaped client connects and disconnects; nothing else holds a socket.",
+      "diedAfterMs": 14268,
+      "exitCode": 1,
+      "watchdogLog": [
+        "2026-07-31 10:06:34 INF - app > Desktop sidecar mode enabled",
+        "2026-07-31 10:06:34 INF - ws > Monitoring connection as desktop sidecar",
+        "2026-07-31 10:06:39 WRN - ws > No connection detected. Starting countdown...",
+        "2026-07-31 10:06:49 WRN - ws > No connection detected for 10 seconds. Exiting..."
+      ],
+      "summary": "sidecar exited after 14268ms with code 1",
+      "verdict": "PASS"
+    },
+    "B-keepalive-holds-the-sidecar-through-a-workspace-close": {
+      "what": "The supervisor keepalive is held; a workspace client connects on top of it and leaves.",
+      "url": "ws://127.0.0.1:54024/events?id=study-os-supervisor&token=%3Credacted%3E",
+      "clientId": "study-os-supervisor",
+      "survivedMs": 25000,
+      "diedAfterMs": null,
+      "keepaliveStillConnected": true,
+      "clientsTheServerSaw": [
+        "2026-07-31 10:06:51 DBG - ws > Client connected id=study-os-supervisor platform=",
+        "2026-07-31 10:06:51 DBG - ws > Client connected id=harness-workspace platform="
+      ],
+      "keepaliveLog": [
+        "keepalive: holding a websocket client as study-os-supervisor"
+      ],
+      "summary": "sidecar alive after 25000ms with the keepalive still connected",
+      "verdict": "PASS"
+    },
+    "C-releasing-the-keepalive-lets-the-switch-finish": {
+      "what": "keepalive.stop() with no other client connected — the orphan protection path.",
+      "diedAfterMs": 13749,
+      "exitCode": 1,
+      "summary": "sidecar exited 13749ms after release with code 1",
+      "verdict": "PASS"
+    }
+  }
+}

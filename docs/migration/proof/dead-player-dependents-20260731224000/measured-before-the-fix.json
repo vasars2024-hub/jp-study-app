@@ -1,0 +1,140 @@
+{
+  "videoRefAttachSites": [],
+  "videoRefReadsInMediaContent": 25,
+  "registeredVideoCommands": [
+    "video.replayLine",
+    "video.prevLine",
+    "video.nextLine",
+    "video.subEarlier",
+    "video.subLater",
+    "video.subEarlierLarge",
+    "video.subLaterLarge",
+    "video.toggleAutoPause",
+    "video.toggleLoop",
+    "video.toggleFurigana"
+  ],
+  "blancUseMediaMode": "full",
+  "catalogTotal": 157,
+  "catalogWithDefaults": 101,
+  "defaultsNotInNormalForm": [
+    {
+      "id": "nav.nextDesktop",
+      "keys": "Meta+Ctrl+ArrowRight",
+      "normal": "Ctrl+Meta+ArrowRight"
+    },
+    {
+      "id": "nav.prevDesktop",
+      "keys": "Meta+Ctrl+ArrowLeft",
+      "normal": "Ctrl+Meta+ArrowLeft"
+    },
+    {
+      "id": "video.replayLine",
+      "keys": "r",
+      "normal": "R"
+    },
+    {
+      "id": "video.prevLine",
+      "keys": "a",
+      "normal": "A"
+    },
+    {
+      "id": "video.nextLine",
+      "keys": "d",
+      "normal": "D"
+    },
+    {
+      "id": "video.toggleAutoPause",
+      "keys": "p",
+      "normal": "P"
+    },
+    {
+      "id": "video.toggleLoop",
+      "keys": "l",
+      "normal": "L"
+    },
+    {
+      "id": "video.toggleFurigana",
+      "keys": "f",
+      "normal": "F"
+    }
+  ],
+  "defaultsUnproducibleByChordFromEvent": [
+    {
+      "id": "video.subEarlierLarge",
+      "keys": "Shift+["
+    },
+    {
+      "id": "video.subLaterLarge",
+      "keys": "Shift+]"
+    }
+  ],
+  "keypresses": [
+    {
+      "typed": "r",
+      "chord": "R",
+      "matches": []
+    },
+    {
+      "typed": "a",
+      "chord": "A",
+      "matches": []
+    },
+    {
+      "typed": "f",
+      "chord": "F",
+      "matches": []
+    },
+    {
+      "typed": "[",
+      "chord": "[",
+      "matches": [
+        "video.subEarlier"
+      ]
+    },
+    {
+      "typed": "]",
+      "chord": "]",
+      "matches": [
+        "video.subLater"
+      ]
+    },
+    {
+      "typed": "Shift+{",
+      "chord": "{",
+      "matches": []
+    }
+  ],
+  "adoptedKeysTaken": [
+    "KeyD",
+    "KeyA",
+    "ArrowRight",
+    "ArrowLeft",
+    "KeyE",
+    "KeyQ",
+    "ArrowUp",
+    "ArrowDown",
+    "KeyM",
+    "KeyJ",
+    "KeyK",
+    "KeyN",
+    "KeyB",
+    "KeyF",
+    "KeyP",
+    "BracketRight",
+    "BracketLeft",
+    "KeyI",
+    "KeyH",
+    "KeyZ"
+  ],
+  "overlayHardcodedCodes": [
+    "KeyW",
+    "KeyS",
+    "KeyR",
+    "Semicolon",
+    "Quote"
+  ],
+  "studyPanelSeeksNullRef": true,
+  "pendingSeekFiles": [
+    "renderer/components/media/MediaStudyMode.tsx"
+  ]
+}

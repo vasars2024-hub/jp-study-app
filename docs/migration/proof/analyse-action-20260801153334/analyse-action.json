@@ -1,0 +1,179 @@
+{
+  "harness": "analyse-action-measure.mjs",
+  "question": "Does the injected analyse row action render on exactly the rows whose next step is analysis, and does pressing it in a real Chromium state the right outcome for each of its three branches?",
+  "startedAt": "2026-08-01T12:33:46.038Z",
+  "scenarios": [
+    {
+      "state": "populated",
+      "why": "the ordinary outcome — a prepared analysis states how many study words it found",
+      "expected": "Analysed Sousou no Frieren — 137 study words found.",
+      "url": "http://127.0.0.1:5174/src/renderer/__devharness__/study-library-harness.html?state=populated",
+      "observed": {
+        "rows": [
+          {
+            "state": "unanalyzed",
+            "hasAnalyse": true
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "unlinked",
+            "hasAnalyse": false
+          }
+        ],
+        "title": "Sousou no Frieren",
+        "button": {
+          "label": "Analyse",
+          "ariaLabel": "Analyse the Japanese subtitles of Sousou no Frieren",
+          "disabled": false,
+          "visible": true
+        },
+        "statusBefore": "",
+        "statusAfter": "Analysed Sousou no Frieren — 137 study words found.",
+        "busyLabel": {
+          "label": "Analysing…",
+          "disabled": true
+        }
+      },
+      "checks": {
+        "buttonRendered": true,
+        "buttonVisible": true,
+        "buttonNamedByTitle": true,
+        "offeredOnExactlyTheRightRows": true,
+        "busyWhileRunning": true,
+        "saidTheRightThing": true,
+        "releasedTheRow": true
+      },
+      "result": "PASS"
+    },
+    {
+      "state": "analyse-queued",
+      "why": "the branch most likely to be misread as a failure. It must NOT say \"Analysed\"",
+      "expected": "Sousou no Frieren has no Japanese subtitles yet, so transcription was queued instead.",
+      "url": "http://127.0.0.1:5174/src/renderer/__devharness__/study-library-harness.html?state=analyse-queued",
+      "observed": {
+        "rows": [
+          {
+            "state": "unanalyzed",
+            "hasAnalyse": true
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "unlinked",
+            "hasAnalyse": false
+          }
+        ],
+        "title": "Sousou no Frieren",
+        "button": {
+          "label": "Analyse",
+          "ariaLabel": "Analyse the Japanese subtitles of Sousou no Frieren",
+          "disabled": false,
+          "visible": true
+        },
+        "statusBefore": "",
+        "statusAfter": "Sousou no Frieren has no Japanese subtitles yet, so transcription was queued instead.",
+        "busyLabel": {
+          "label": "Analysing…",
+          "disabled": true
+        }
+      },
+      "checks": {
+        "buttonRendered": true,
+        "buttonVisible": true,
+        "buttonNamedByTitle": true,
+        "offeredOnExactlyTheRightRows": true,
+        "busyWhileRunning": true,
+        "saidTheRightThing": true,
+        "releasedTheRow": true
+      },
+      "result": "PASS"
+    },
+    {
+      "state": "analyse-failure",
+      "why": "a rejected action must surface its reason AND release the row, not leave it busy",
+      "expected": "The tokenizer is not available.",
+      "url": "http://127.0.0.1:5174/src/renderer/__devharness__/study-library-harness.html?state=analyse-failure",
+      "observed": {
+        "rows": [
+          {
+            "state": "unanalyzed",
+            "hasAnalyse": true
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "missing-subtitles",
+            "hasAnalyse": false
+          },
+          {
+            "state": "unlinked",
+            "hasAnalyse": false
+          }
+        ],
+        "title": "Sousou no Frieren",
+        "button": {
+          "label": "Analyse",
+          "ariaLabel": "Analyse the Japanese subtitles of Sousou no Frieren",
+          "disabled": false,
+          "visible": true
+        },
+        "statusBefore": "",
+        "statusAfter": "The tokenizer is not available.",
+        "busyLabel": {
+          "label": "Analysing…",
+          "disabled": true
+        }
+      },
+      "checks": {
+        "buttonRendered": true,
+        "buttonVisible": true,
+        "buttonNamedByTitle": true,
+        "offeredOnExactlyTheRightRows": true,
+        "busyWhileRunning": true,
+        "saidTheRightThing": true,
+        "releasedTheRow": true
+      },
+      "result": "PASS"
+    }
+  ],
+  "verdict": "PASS"
+}

@@ -1,0 +1,56 @@
+{
+  "slice": "Phase 6 slice 13 — the consent gate must outrank the shell overlays",
+  "date": "2026-07-31",
+  "result": "PASS",
+  "kind": "regression introduced by slice 10, caught by extending slice 10's own harness",
+
+  "finding": {
+    "what": "Slice 10 raised `.palette` / `.cbh-panel` from 1200/1201 to 20000/20001 and `.os-toast-host` from 5000 to 30000, to put them above the full-screen media workspace. `.consent` — the first-launch telemetry gate — was at 9000. All three therefore went from BELOW that gate to ABOVE it.",
+    "consequence": "On a cold profile, Ctrl+Space put a fully working command palette on top of a gate the user had not answered. Slice 11 then added `video.resumeLast` to that palette, so the app was reachable from behind the gate rather than merely visible.",
+    "preExisting": "`.consent` was already below `.seanime-host` (9999) before any of this. That was latent rather than live: nothing self-opens the workspace at boot since retirement step 3 phase B deleted the mount dispatch. Slice 10 is what made it reachable in one keystroke.",
+    "howItWasFound": "Re-reading slice 10 against its own scale, then measuring. Not from a report.",
+    "measuredBeforeTheFix": {
+      "consent over the palette": "palette",
+      "consent over a toast": "os-toast-host",
+      "note": "Both should be `consent`. Recorded before the fix line was written, so the defect is on record rather than asserted."
+    }
+  },
+
+  "fix": {
+    "token": "--z-shell-blocking: 40000 — a new tier between --z-shell-feedback (30000) and --z-shell-lock (100000).",
+    "rule": "An overlay is something you reach FOR; a blocking gate is the one thing you may not reach PAST. So it outranks every overlay, and only the lock screen outranks it.",
+    "applied": ".consent -> var(--z-shell-blocking, 40000)",
+    "pinned": "shellLayerScale.test.ts gains `keeps a blocking gate above every overlay a user can reach for`, plus `.consent` in the selector->token binding list, so a raw number cannot come back."
+  },
+
+  "measuredAfterTheFix": {
+    "engine": "Chromium, Browser pane, viewport 1440x900",
+    "consentComputedZ": "40000",
+    "hits": {
+      "consent over the palette": "consent",
+      "consent over a toast": "consent",
+      "palette centre (no consent)": "palette",
+      "toast centre (no consent)": "os-toast-host",
+      "taskbar, no workspace": "palette-backdrop"
+    },
+    "allNineAssertions": "PASS"
+  },
+
+  "scaleNow": {
+    "9998": "--z-shell-view-affordance  .seanime-host-launcher",
+    "9999": "--z-shell-view             .seanime-host",
+    "20000": "--z-shell-overlay-backdrop .palette-backdrop / .cbh-backdrop",
+    "20001": "--z-shell-overlay          .palette / .cbh-panel",
+    "30000": "--z-shell-feedback         .os-toast-host",
+    "40000": "--z-shell-blocking         .consent",
+    "100000": "--z-shell-lock            .lockscreen",
+    "200000": "--z-shell-chrome          .os-taskbar",
+    "250000": "--z-window-chrome         .main-window-chrome"
+  },
+
+  "lesson": "A layering change is not done when the thing you were fixing works. Raising a layer moves it past everything between its old and new value, and the ones that matter are the layers you were not thinking about. The scale is what makes that reviewable — before it, `.palette: 1201` and `.consent: 9000` were two unrelated numbers in one 24,000-line file.",
+
+  "gates": "tests 3,706/324 (+1, the new blocking-gate assertion); tsc 288 — the recorded baseline, 0 in any changed file; i18n exit 0 at 6,329 keys, unchanged and correctly so (CSS and tokens, no UI string); architecture audit exit 0 'Nothing new'; ESLint exit 0 on every changed file. Builds not run — dev server up (EBUSY); CSS is in renderer/styles.css and theme/tokens.css, not mediaWorkspace.css, so containment is unaffected.",
+
+  "stillLiterals": ".reading-source-backdrop (12500) and .lib-import (300000/300001) remain numbers chosen by eye. Both are view-scoped and neither was moved past by this scale, so they are next candidates rather than open defects."
+}

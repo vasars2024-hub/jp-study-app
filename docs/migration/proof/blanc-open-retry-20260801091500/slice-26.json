@@ -1,0 +1,62 @@
+{
+  "slice": 26,
+  "title": "The cold A-to-B open does NOT break — because 'cold file' and 'cold sidecar' are different things, and slice 25 conflated them.",
+  "date": "2026-08-01",
+  "evidence": {
+    "coldSecondFile": "docs/migration/proof/blanc-open-retry-20260801091500/blanc-open-retry.json",
+    "theFixtureBlockerRunBeforeIt": "docs/migration/proof/blanc-open-retry-20260801090500/blanc-open-retry.json",
+    "runAForComparison": "docs/migration/proof/blanc-open-retry-20260801081500/blanc-open-retry.json"
+  },
+  "reproduce": "GPLAY_SECOND_EPISODE=1 node docs/migration/tools/prepare-gplay-datadir.mjs <cue-probe-dual.mkv> <empty-dir> && COLD_SECOND=1 node docs/migration/tools/blanc-player-open-retry-probe.mjs --datadir=<that dir>   (dev server on 5173)",
+
+  "theQuestion": "Slice 25 left one item: the A-to-B cancel has never been observed KILLING an open. It fires into the open window in production shape (StrictMode off), but the run that showed it had a warm file whose preparation took 33 ms and beat it by 1 ms. Slice 25 predicted that a COLD second file — run A measured a cold preparation at 5.27 s — would lose that race. This slice built that fixture and ran it.",
+
+  "theAnswer": {
+    "verdict": "The prediction is WRONG, and the reason is the interesting part.",
+    "measured": {
+      "secondOpenPostAtMs": 50,
+      "videoTerminatedAtMs": 93,
+      "watchAtMs": 95,
+      "terminatedInsideTheOpenWindow": true,
+      "recoveryFired": false,
+      "result": "step 2 PASS — the different, never-before-opened file played"
+    },
+    "why": "A second open takes ~45 ms **whatever file it is**, because what took 5.27 s in slice 25's run A was not the file being cold — it was the SIDECAR being cold. That was the first open of a freshly started sidecar process in a fresh datadir. Once the process is warm every subsequent open is fast, including one for a file it has never parsed.",
+    "twoNumbersSideBySide": [
+      "run A  fresh sidecar, first open ever:      POST 1443 -> watch 6738   = 5.27 s",
+      "slice 26  warm sidecar, NEVER-OPENED file:  POST 50   -> watch 95     = 45 ms"
+    ],
+    "soTheTwoHalvesAreANTICORRELATED": "The wide window belongs to the first open of a sidecar session — which is exactly the case where there is no previous playback, so `state.playbackInfo` is already null and the effect's null branch does not re-run. The terminate belongs to the A-to-B transition — which by definition happens when the sidecar is already warm and the open is fast. **The two conditions that would combine into a production failure tend to exclude each other.** That is consistent with this defect only ever having been seen where StrictMode manufactures the terminate at mount."
+  },
+
+  "whatThisDoesNotProve": [
+    "It does not prove production is safe. The fixture is 11 MB / 30 s. A real 1080p episode is ~1.4 GB, and MKV metadata parsing scales with the file — a warm-sidecar open of a real episode may well be slower than 45 ms, and 43 ms is all the terminate needed. Testing that needs a large fixture, not another probe change.",
+    "It does not explain the 'intermittent' local open that StudyPlayerSlice.tsx has described since Phase 3 and that three harnesses carry retries for. Slice 24 attributed it to this branch; slice 25 refuted one route and slice 26 weakens the other. The honest position is now: the branch is real and fires, but no NON-StrictMode instance of it actually killing an open has been observed.",
+    "It does not touch the packaged build."
+  ],
+
+  "theRunBeforeIt_aFixtureBlocker": {
+    "what": "The first attempt copied the second file into the library AFTER the datadir was prepared and seeded it through the app's own `addMediaPaths`. Step 2 failed with `Playback Error — The playback service could not open this file. It is usually a codec or container it cannot read`.",
+    "actually": "`describeLocalOpenFailure`'s 5xx sentence. The sidecar answers HTTP 500 for a path its own scan never registered. Nothing was wrong with the file, the copy or the player.",
+    "fix": "`GPLAY_SECOND_EPISODE=1` in prepare-gplay-datadir.mjs copies the second episode BEFORE the scan, and the tool now ASSERTS the scan registered it — an unregistered second file is exactly the 500 the flag exists to avoid, and it would otherwise surface two steps later wearing the costume of a playback defect. The probe refuses to run COLD_SECOND against a datadir that lacks it, rather than copying the file itself.",
+    "lesson": "Third fixture-shaped false defect in this track's record, after the 1x1 GIF and the 0.4 s silent audio: **ask whether the fixture is capable of showing the thing before believing what it shows.**"
+  },
+
+  "incidentalConfirmation": "Step 1 of both cold runs carried the full dev signature — 2 sockets, 1 close, 2 `video-terminated` — and PASSED anyway, on two more independently prepared datadirs. Slice 24's recovery has now saved the first open on four.",
+
+  "gates": {
+    "srcUnchanged": true,
+    "changedFiles": [
+      "docs/migration/tools/prepare-gplay-datadir.mjs (GPLAY_SECOND_EPISODE, opt-in, plus its scan assertion)",
+      "docs/migration/tools/blanc-player-open-retry-probe.mjs (COLD_SECOND, parametrised clickCard)"
+    ],
+    "note": "No src file changed in this slice, so the suite/tsc/i18n gates are unchanged from slice 25's measured totals (3803/332, tsc 288). The machine crashed shortly after this run; the record was written from the on-disk evidence afterwards, and both proof JSONs were verified to parse."
+  },
+
+  "stillNotProvenLive": [
+    "A packaged Blanc. Unchanged and still the top item.",
+    "A warm-sidecar open of a LARGE file racing the A-to-B terminate — the only remaining way this defect could bite a user in a packaged build, and it needs a real-episode-sized fixture.",
+    "The other six video.* rows the overlay registers still have not been pressed anywhere.",
+    "Music keyboard navigation still does not exist, and must not be built by reusing video.* ids."
+  ]
+}

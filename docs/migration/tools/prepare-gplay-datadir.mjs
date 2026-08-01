@@ -57,6 +57,46 @@ const manifestPath = path.join(DATA_DIR, 'gplay-manifest.json');
 fs.mkdirSync(libraryPath);
 fs.copyFileSync(SOURCE_MKV, mkvPath);
 
+/**
+ * `GPLAY_SECOND_EPISODE=1` copies the fixture a second time, as episode 02, **before** the
+ * scan below — added 2026-08-01 for slice 26.
+ *
+ * The A-to-B defect needs a second file whose metadata the sidecar has never parsed, and
+ * the obvious shortcut (copy it in after the datadir is prepared and seed it through the
+ * app) does NOT work: `play/localfile` answered **HTTP 500** for a path the sidecar's scan
+ * had never seen, and the panel showed the codec/container sentence — a fixture blocker
+ * wearing the costume of a playback defect. Measured in
+ * `docs/migration/proof/blanc-open-retry-20260801090500/`. Anything that must be openable
+ * has to exist before the scan.
+ *
+ * Opt-in, so every existing G-PLAY datadir is byte-for-byte what it was.
+ */
+const secondMkvPath = process.env.GPLAY_SECOND_EPISODE === '1'
+  ? path.join(libraryPath, 'Sousou no Frieren - 02.mkv')
+  : null;
+/**
+ * `GPLAY_SECOND_SOURCE=<path>` makes episode 02 a DIFFERENT file rather than a second copy
+ * of the fixture — added 2026-08-01 for slice 28.
+ *
+ * Slice 26 established that a warm second open takes ~45ms whatever file it is, and that the
+ * terminate needed 43ms, so the two are within a rounding error of each other on an 11 MB
+ * fixture. Its own record names the one thing that could still break a packaged user: MKV
+ * metadata parsing scales with the file, and a real episode is ~100x this fixture. Answering
+ * that needs a real episode as the B side, which is all this variable does.
+ *
+ * Deliberately NOT defaulted to anything: the fixture stays the fixture unless a caller names
+ * a replacement, so every existing datadir recipe is unchanged.
+ */
+const secondSource = process.env.GPLAY_SECOND_SOURCE
+  ? path.resolve(process.env.GPLAY_SECOND_SOURCE)
+  : SOURCE_MKV;
+if (secondMkvPath) {
+  if (!fs.existsSync(secondSource)) {
+    throw new Error(`GPLAY_SECOND_SOURCE does not exist: ${secondSource}`);
+  }
+  fs.copyFileSync(secondSource, secondMkvPath);
+}
+
 const password = crypto.randomBytes(24).toString('hex');
 const token = crypto.createHash('sha256').update(password).digest('hex');
 const port = await reservePort();
@@ -187,6 +227,18 @@ try {
   if (!(fixture.mediaId > 0)) {
     throw new Error(`fixture was registered but not matched: ${JSON.stringify(fixture)}`);
   }
+  if (secondMkvPath) {
+    // Asserted, not assumed: an unregistered second file is exactly the 500 this flag exists
+    // to avoid, and it would surface two steps later as a "playback error".
+    const normalizedSecond = path.normalize(secondMkvPath).toLocaleLowerCase('en-US');
+    const second = localFiles.find(
+      (file) => typeof file?.path === 'string'
+        && path.normalize(file.path).toLocaleLowerCase('en-US') === normalizedSecond,
+    );
+    if (!second) {
+      throw new Error(`scan did not register the second episode; registered ${localFiles.length} file(s)`);
+    }
+  }
 
   const mediaIds = [
     ...new Set(localFiles.map((file) => file?.mediaId ?? 0).filter((mediaId) => mediaId > 0)),
@@ -210,6 +262,15 @@ try {
     libraryPath,
     mkvPath,
     sourceMkv: SOURCE_MKV,
+    // Named and sized, so a run record can never be ambiguous about what the B side actually
+    // was — the whole point of slice 28 is that B's SIZE is the variable.
+    secondEpisode: secondMkvPath
+      ? {
+          path: secondMkvPath,
+          source: secondSource,
+          bytes: fs.statSync(secondMkvPath).size,
+        }
+      : null,
     mediaIds,
     fixture: {
       mediaId: fixture.mediaId,

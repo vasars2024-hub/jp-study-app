@@ -1,0 +1,121 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "startedAt": "2026-08-01T04:14:37.537Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-cause-datadir-a\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-cause-datadir-a",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 48144, port 52602, v3.10.2"
+    },
+    {
+      "name": "1 first open (fresh mount, inside the StrictMode double-mount)",
+      "result": "FAIL",
+      "detail": "{\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+      "shot": {
+        "videoPresent": false,
+        "frame": true,
+        "sliceState": "idle",
+        "sliceText": "Opening local file"
+      }
+    },
+    {
+      "name": "1b what the client actually did during the failing open",
+      "result": "MEASURED",
+      "detail": "{\"socketsOpened\":2,\"socketsClosed\":1,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":1401,\"firstPostAtMs\":1417,\"firstTerminatedAtMs\":null}",
+      "rows": 12
+    }
+  ],
+  "sidecar": {
+    "pid": 48144,
+    "port": 52602,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "8a7299e2-3f2f-4ae3-bdc3-2208260747d0",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "trace": [
+    {
+      "ms": 1400,
+      "event": "ws OPEN /events id=13db8633-d9cc-4dea-a363-e72430821ae2",
+      "requestId": "40784.793"
+    },
+    {
+      "ms": 1400,
+      "event": "ws RECV ",
+      "requestId": "40784.793",
+      "payload": ""
+    },
+    {
+      "ms": 1401,
+      "event": "ws OPEN /events id=13db8633-d9cc-4dea-a363-e72430821ae2",
+      "requestId": "40784.794"
+    },
+    {
+      "ms": 1401,
+      "event": "ws CLOSE",
+      "requestId": "40784.793"
+    },
+    {
+      "ms": 1416,
+      "event": "ws RECV client-identity",
+      "requestId": "40784.794",
+      "payload": "{\"type\":\"client-identity\",\"payload\":{\"clientId\":\"13db8633-d9cc-4dea-a363-e72430821ae2\",\"platform\":\"\",\"proof\":\"eyJlbmRwb2ludCI6ImNsaWVudC1pZDoxM2RiODYzMy1kOWNjLTRkZWEtYTM2My1lNzI0MzA4MjFhZTIiLCJpYXQiOjE3ODU1NTc2OTAsImV4cCI6MTc4NTY0NDA5MH0.ee…"
+    },
+    {
+      "ms": 1417,
+      "event": "HTTP POST /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1418,
+      "event": "HTTP OPTIONS /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1418,
+      "event": "HTTP 204 /api/v1/directstream/play/localfile"
+    },
+    {
+      "ms": 1420,
+      "event": "ws RECV native-player",
+      "requestId": "40784.794",
+      "payload": "{\"type\":\"native-player\",\"payload\":{\"type\":\"open-and-await\",\"payload\":\"Loading stream...\"}}\n"
+    },
+    {
+      "ms": 1522,
+      "event": "ws SEND videocore",
+      "requestId": "40784.794",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":null,\"type\":\"video-terminated\",\"payload\":{\"id\":\"\",\"clientId\":null,\"playerType\":\"web\",\"playbackType\":\"\"}}}"
+    },
+    {
+      "ms": 1522,
+      "event": "ws SEND videocore",
+      "requestId": "40784.794",
+      "payload": "{\"type\":\"videocore\",\"payload\":{\"clientId\":null,\"type\":\"video-terminated\",\"payload\":{\"id\":\"\",\"clientId\":null,\"playerType\":\"web\",\"playbackType\":\"\"}}}"
+    },
+    {
+      "ms": 1871,
+      "event": "HTTP 200 /api/v1/directstream/play/localfile"
+    }
+  ],
+  "traceSummary": {
+    "socketsOpened": 2,
+    "socketsClosed": 1,
+    "directstreamPosts": 1,
+    "videoTerminatedFramesSent": 0,
+    "firstCloseAtMs": 1401,
+    "firstPostAtMs": 1417,
+    "firstTerminatedAtMs": null
+  },
+  "conclusion": "A_ONLY: step 2 deliberately skipped.",
+  "result": "DONE",
+  "finishedAt": "2026-08-01T04:15:35.256Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 48144, port 52602, v3.10.2",
+    "[probe] FAIL — 1 first open (fresh mount, inside the StrictMode double-mount): {\"videoPresent\":false,\"frame\":true,\"sliceState\":\"idle\",\"sliceText\":\"Opening local file\"}",
+    "[probe] MEASURED — 1b what the client actually did during the failing open: {\"socketsOpened\":2,\"socketsClosed\":1,\"directstreamPosts\":1,\"videoTerminatedFramesSent\":0,\"firstCloseAtMs\":1401,\"firstPostAtMs\":1417,\"firstTerminatedAtMs\":null}"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-01_07-14-42.log"
+}

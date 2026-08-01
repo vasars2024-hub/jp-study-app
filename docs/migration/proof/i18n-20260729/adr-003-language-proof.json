@@ -1,0 +1,73 @@
+{
+  "proof": "ADR-003 exit gate — EN/JA/ZH/RU on the adopted Media workspace",
+  "date": "2026-07-29",
+  "phase": 4,
+  "method": "Live, in the running Electron app. The adopted workspace was opened on a real provider stream (phase4-local-proof extension, MP4 played through the sidecar's authenticated /api/v1/proxy, Japanese VTT selected, mining draft cue-backed). The language was then switched with the app's own Settings > Language control — not by calling setUiLang from a console-imported module, which resolves to a second module instance under Vite and proves nothing.",
+  "sidecar": {
+    "state": "ready",
+    "version": "3.10.2",
+    "simulatedUser": true,
+    "installedProviderExtension": "phase4-local-proof"
+  },
+  "probeKeys": [
+    "mediaWorkspace.status",
+    "mediaWorkspace.openLocal",
+    "common.close",
+    "mediaWorkspace.study.abLoop",
+    "mediaWorkspace.study.subtitleTrack",
+    "mediaWorkspace.mining.cardPreview",
+    "mediaWorkspace.mining.mine",
+    "mediaWorkspace.mining.destination"
+  ],
+  "results": {
+    "en": {
+      "htmlLang": "en",
+      "missingRenderedStrings": [],
+      "renderedChars": 1002,
+      "sample": "MEDIA Adopted library · sidecar ready Open local video Close … Waiting fo"
+    },
+    "ja": {
+      "htmlLang": "ja",
+      "missingRenderedStrings": [],
+      "renderedChars": 704,
+      "sample": "MEDIA 統合ライブラリ・サイドカー：ready ローカル動画を開く 閉じる … 字幕を待っています 前のセリフ セリフを再生 次のセリフ"
+    },
+    "ru": {
+      "htmlLang": "ru",
+      "missingRenderedStrings": [],
+      "renderedChars": 1114,
+      "sample": "MEDIA Интегрированная медиатека · sidecar: ready Открыть локальное видео Закрыть"
+    },
+    "zh": {
+      "htmlLang": "zh-Hans",
+      "missingRenderedStrings": [],
+      "renderedChars": 631,
+      "sample": "MEDIA 已集成媒体库 · 边车 ready 打开本地视频 关闭 … 正在等待字幕 上一句 重播本句 下一句 后退一帧 前进一帧"
+    }
+  },
+  "asciiLeakScan": {
+    "scope": "adopted workspace subtree under a non-Latin UI language",
+    "allowedTokens": [
+      "MEDIA",
+      "Anki",
+      "Whisper model ids",
+      "GPU",
+      "CPU",
+      "auto",
+      "ja",
+      "series/episode titles (study content, exempt per CLAUDE.md i18n rule 4)"
+    ],
+    "unexpectedEnglishWords": []
+  },
+  "staticGates": {
+    "ADOPTED_MEDIA_I18N_ALLOWLIST": [],
+    "rawEnglishJsxInAdoptedSurfaces": [],
+    "mediaWorkspaceKeysMissingInJaZhRu": [],
+    "toolsI18nCheck": "exit 0 — all 5261 English keys translated in ja/zh/ru"
+  },
+  "restoredState": {
+    "uiLanguage": "zh",
+    "workspaceClosed": true,
+    "note": "The app was left exactly as found. No Anki write was performed at any point."
+  }
+}

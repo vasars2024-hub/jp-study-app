@@ -1,0 +1,59 @@
+{
+  "harness": "sidecar-default-on-harness.mjs",
+  "question": "With nothing set in the environment, does the app have a media surface?",
+  "startedAt": "2026-07-31T11:41:00.523Z",
+  "repo": "C:\\Users\\Arseniy\\Projects\\jp-study-app",
+  "phases": {
+    "A": {
+      "what": "a run with SEANIME_SIDECAR deleted from the environment",
+      "status": {
+        "kind": "stopped",
+        "port": 0,
+        "pid": null,
+        "dataDir": null,
+        "version": null,
+        "simulatedUser": null,
+        "error": null,
+        "logTail": []
+      },
+      "launcherInDom": true,
+      "result": "PASS"
+    },
+    "B": {
+      "what": "seanimeStart() on a default run",
+      "result": "PASS",
+      "pid": 44704,
+      "port": 54570,
+      "version": "3.10.2",
+      "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-default-on-20260731114100\\default-userdata\\seanime",
+      "simulatedUser": true,
+      "executablePath": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+      "keepaliveLine": null
+    },
+    "C": {
+      "what": "graceful quit of a default run",
+      "result": "PASS",
+      "sidecarPid": 44704,
+      "orphaned": false
+    },
+    "D": {
+      "what": "a run with SEANIME_SIDECAR=0 — the documented rollback",
+      "status": {
+        "kind": "disabled",
+        "port": 0,
+        "pid": null,
+        "dataDir": null,
+        "version": null,
+        "simulatedUser": null,
+        "error": null,
+        "logTail": []
+      },
+      "launcherInDom": false,
+      "shellMarkersPresent": true,
+      "result": "PASS"
+    }
+  },
+  "probeCorrections": [],
+  "verdict": "PASS",
+  "finishedAt": "2026-07-31T11:41:25.827Z"
+}

@@ -1,0 +1,83 @@
+{
+  "slice": 14,
+  "title": "A shell without a MediaWorkspaceHost is not a sidecar that is off",
+  "date": "2026-07-31",
+  "verdict": "PASS — two independent instances of one defect, both measured before either fix line was written",
+  "reproduce": "npx vitest run src/renderer/__tests__/resumeLastShellHandoff.test.ts src/renderer/__tests__/readerResumeHandoff.test.ts src/renderer/__tests__/mediaCenterIntegration.test.ts",
+
+  "theDefect": {
+    "shape": "`video.resumeLast` is a BUILT-IN, so it is offered in every shell that mounts CommandPalette. Only some of those shells mount MediaWorkspaceHost. The only test the app had for 'can I hand a file to the player?' was mediaWorkspaceHostIsMounted() — a DOM query for `.seanime-host-launcher, .seanime-host` — which answers 'is a host mounted AND has a non-disabled status arrived?'. That conflates a SHELL fact with a SIDECAR fact, and reported the sidecar one.",
+    "shellTable": {
+      "reader (NovelReader / MangaReader)": { "palette": true, "host": false },
+      "pop-out music / settings / games / …": { "palette": true, "host": false },
+      "pop-out video": { "palette": true, "host": true },
+      "pop-out player": { "palette": true, "host": false, "note": "the second instance — see below" },
+      "desktop": { "palette": true, "host": true },
+      "blanc": { "palette": false, "host": true }
+    },
+    "measuredPreFix": {
+      "instrument": "src/renderer/__tests__/resumeLastShellHandoff.test.ts, run against the pre-fix tree",
+      "input": { "sidecar": "ready", "hostMounted": false },
+      "output": { "toasts": ["The media server is off, so there is nothing to resume into."] },
+      "reading": "The sidecar is READY and the app says it is off. False by default since the slice-12 flip made the sidecar default-on."
+    }
+  },
+
+  "secondInstance": {
+    "what": "A `player` pop-out window renders MediaWorkspaceSectionView's 'open the workspace' button over a window where nothing listens for the event — a control that does nothing at all.",
+    "howItGotThere": "Retirement step 2 (2026-07-31) added `player` to the routing. Three places encode 'which sections open the workspace': AppSection's switch, MediaWorkspaceHost's os:open listener, and App's pop-out mount. Only the third was left reading `popout === 'video'`.",
+    "measuredPreFix": "mediaCenterIntegration.test.ts > 'mounts the host in every pop-out whose section routes to the workspace' FAILED on the pre-fix source at the `sectionOpensMediaWorkspace(popout)` assertion.",
+    "fix": "MEDIA_WORKSPACE_SECTIONS + sectionOpensMediaWorkspace() in shared/mediaWorkspace.ts, consumed by App and by the host's listener. A pop-out is a separate renderer with its own App tree, so 'the host is mounted' is per-window and cannot be inherited from the desktop that spawned it.",
+    "lesson": "Third time in four slices: a change's blast radius is every place that gates on the VALUE it changed, not every place that mentions the thing. Retirement step 2 changed which sections route to the workspace; it did not grep for the other two encodings of that same list."
+  },
+
+  "theFix": {
+    "presence": "MediaWorkspaceHost now calls registerMediaWorkspaceHost() from inside the effect that adds its window listeners, and releases it in that effect's cleanup — so presence IS the listener's lifetime rather than a picture of it taken from the DOM. It is therefore true one commit before `status` arrives and the launcher renders, which is what makes the reader handoff possible at all.",
+    "diagnosis": "resumeMostRecentWatched() returns `no-host` (renamed from `no-workspace`) for the shell fact only. The command asks main for the sidecar fact, on the failure path only, via a new non-hook mediaWorkspaceIsAvailable() that useMediaWorkspaceAvailability is now written in terms of — one rule, one place, as that file's own header demands. Three true statements replace one guess.",
+    "readerHandoff": "renderer/readerResumeHandoff.ts. While a book is open, App registers a handler that checks availability, closes the book, and lets the effect body run the ordinary built-in against the desktop that just came back.",
+    "whyTheDomMarkerStays": "mediaWorkspaceHostIsMounted() still gates the palette's search-mode Continue-watching group and Statistics' By-show rows. Those decide whether to OFFER a list, in the tick they render, with no room for an await — and with the sidecar disabled those rows would open a player the user never sees. It is the right question there and the wrong one for dispatch."
+  },
+
+  "orderingThatIsLoadBearing": [
+    "Availability is checked BEFORE the book closes. Closing it and then reporting a disabled sidecar spends something the user cannot get back on an action that was never going to work. Pinned by 'keeps the book open when the sidecar is disabled, and says so'.",
+    "The resume runs from the effect BODY, not from the handler, so it lands after React has committed the desktop branch. MediaWorkspaceHost is a child of the component running the hook and a child's effects run before its parent's in the same commit, so the listener exists by then. No sleep and no polling — 'a dispatch before React mounts is silently lost' has cost this track two harnesses.",
+    "It does not wait for the launcher. One commit in, `status` is still null and the host renders nothing, so a DOM check there would report exactly the failure the hook exists to remove.",
+    "The shell answer never asks main. 'No host in this window' is knowable without the sidecar, and asking anyway would let an IPC failure re-word a shell fact as a sidecar fact — the defect returning through the other door. Pinned by asserting statusCalls === 0."
+  ],
+
+  "guardsVerifiedLoadBearing": {
+    "method": "The registration call in MediaWorkspaceHost was replaced with a no-op and the suites re-run.",
+    "result": "4 tests failed across both new files, including 'registers on mount and releases on unmount, before any status arrives' — the one that exists to catch exactly that.",
+    "restored": true
+  },
+
+  "probeCorrections": [
+    "A fifth reader test claimed to prove 'the resume goes through while the host has rendered nothing' by holding the status IPC open. That gate blocks the BUILT-IN's own availability check as well as the host's first render, so it could not distinguish the two and failed against correct code. Deleted rather than kept green: the sibling file settles the same property with a registration and no timing at all. An instrument that cannot see the thing it reports on is this track's most expensive recurring mistake.",
+    "The slice-11 dev harness (resumeLastHarness.tsx) stands in for the open workspace with a bare `.seanime-host` div. Once the command stopped reading the DOM, that fixture stopped being a host and the probe would have measured the command declining rather than the palette reaching it. The fixture now registers as a host too — a stand-in has to stand in for what the thing DOES, not for how it looks. The class name is still what the z-index rules bind to."
+  ],
+
+  "blastRadiusSwept": {
+    "question": "Everything that dispatches MEDIA_WORKSPACE_OPEN_EVENT, and what guarantees a listener.",
+    "sites": {
+      "media/MediaWorkspaceHost.tsx": "the listener itself",
+      "renderer/components/CommandPalette.tsx:198": "search-mode group — gated on the DOM marker, correct (do not offer a list you cannot fulfil)",
+      "renderer/components/reading/SeanimeStudyLibraryPanel.tsx:282": "rendered inside the host — guaranteed",
+      "renderer/components/reading/SeanimeWatchLoopPanel.tsx:179": "rendered inside the host — guaranteed",
+      "renderer/components/stats/StatsContent.tsx:358": "gated on the DOM marker at :343, correct",
+      "renderer/continueWatchingStore.ts:112": "the resume — FIXED, now registry-gated",
+      "renderer/widgets/continueWatching.tsx:109": "desktop widget, gates on sidecar status; the desktop shell mounts a host",
+      "renderer/mediaWorkspaceBridge.ts": "openMediaWorkspace(), called from MediaContent, ResultPanels, MediaCenterView and MediaWorkspaceSectionView — all view-level surfaces inside a shell that mounts a host, EXCEPT the player pop-out, which is the second instance fixed here"
+    },
+    "notFixed": "The scraper's result-panel play button (ResultPanels.tsx:235) reaches openMediaWorkspace() and `scraper` is a pop-out section with no host. It is the same class, but it is a view button rather than the resume command and its honest remedy is the same shell-aware gate applied to a different surface. Recorded as the next candidate, not silently included."
+  },
+
+  "gates": {
+    "tests": "3719/3719 pass; 326/326 files (+13 tests, +2 files, all this slice's, against slice 13's measured 3706/324)",
+    "tsc": "288 — the recorded baseline, 0 in any changed file. The four App.tsx diagnostics are the pre-existing `audioDataUrl` block in the extension-clipboard handler, ~250 lines from anything touched here.",
+    "i18n": "exit 0 at 6330 keys (+1: mediaWorkspace.resumeLast.noWorkspaceHere, translated in ja/zh/ru)",
+    "architectureAudit": "exit 0, 'Nothing new'; 3 known pending; 1266 modules",
+    "eslint": "exit 0 on every changed file; the single warning is the pre-existing non-null assertion in keyboardShortcuts.ts, which moved from 657 to 659",
+    "builds": "NOT RUN — the Forge dev server is up (EBUSY on dist/). No CSS was touched, so the mediaWorkspace.css containment check is unaffected by slice 5's rule either way.",
+    "liveLook": "none — this slice is renderer logic with no geometry, and the user's app is running"
+  }
+}

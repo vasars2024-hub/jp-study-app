@@ -1,0 +1,72 @@
+MediaState: 151 members, searched 1289 files under src/
+  named in another file:                        102
+  named only here, but read as state.X in-file: 9  (ALIVE)
+  never read anywhere:                          40  (dead exposed surface)
+
+  alive only via an in-file component:
+    genMsg
+    genError
+    ytSubLang
+    setYtSubLang
+    setKindFilter
+    categoryFilter
+    setCategoryFilter
+    folderRows
+    clearWatch
+
+  dead:
+    showPlayer
+    videoWrapRef
+    sigBurst
+    fireSigBurst
+    secondarySubName
+    secondaryActive
+    subOffset
+    lineTrans
+    lineBusy
+    revealDictation
+    subtitleSearchQuery
+    setSubtitleSearchQuery
+    subtitleSearchMatches
+    subtitleSearchPosition
+    jumpSubtitleSearch
+    diagnosticsOpen
+    diagnosticsRunning
+    exportPlayerDiagnostics
+    stepFrame
+    toggleFullscreen
+    togglePictureInPicture
+    setSubtitleOverlayBackground
+    learningModeActive
+    studySessionActive
+    handlePlayerPlay
+    handlePlayerPause
+    refreshListeningAvailability
+    refreshAudioTracks
+    selectAudioTrack
+    abStart
+    abEnd
+    markAbStart
+    markAbEnd
+    clearAbRepeat
+    openSecondarySubs
+    convertAndPlay
+    jumpLine
+    exportSubs
+    clearPlayer
+    resumeRef
+
+  candidates — alive only via a comment or a string literal (6), CONFIRM BY EYE:
+    showLibrary
+    converting
+    playerDiagnostics
+    replayLine
+    translateLine
+    nudge
+
+  PROVENANCE vs HEAD (1347 lines):
+    retired surface, safe to delete:      16
+    absent at HEAD — IN-FLIGHT, DO NOT DELETE: 30
+
+    These are unread because they are not wired up yet, not because
+    they were retired. Deleting them destroys uncommitted work.

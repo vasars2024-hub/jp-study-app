@@ -1,0 +1,37 @@
+{
+  "slice": "Phase 6 slice 12 — the default-on flip shipped a debug panel to the desktop",
+  "date": "2026-07-31",
+  "result": "PASS",
+
+  "finding": {
+    "what": "SeanimeDevPanel — a 460px monospace console with Start / Stop / Probe buttons, fixed at the bottom-right of the desktop at z-index 99,999, whose own file header said 'Phase 1 dev-only proof surface. THROWAWAY' and 'a normal build never shows it' — began rendering for every user on 2026-07-31.",
+    "mechanism": "Its gate was `!status || status.kind === 'disabled'`. That meant 'dev-only' only while SEANIME_SIDECAR was off by default. The flip changed the initial status from `disabled` to `stopped` — precisely and only what that flip's own note in shared/seanime.ts says it does — and the panel's condition stopped being false.",
+    "howItHid": "Nothing failed and nothing was mis-implemented. Two correct decisions in two files added up to shipping a debug console, and the claim that would have caught it was a sentence in a comment rather than a check. Established by direct reads on both sides — shared/seanime.ts's flag note and SeanimeDevPanel.tsx's condition — not inferred from behaviour.",
+    "alsoAffected": "`.seanime-host-launcher` carried `bottom: 190px` with the comment 'Clears the Phase-1 dev panel'. Once the panel stops rendering in production that is 190px of empty desktop under a floating pill, for the only people who ever see it."
+  },
+
+  "fix": {
+    "gate": "`devPanelIsVisible(status, isDevServerRuntime())`, both exported so the rule is checkable rather than asserted in prose.",
+    "whyNotImportMetaEnvDev": "This repo has no vite-env.d.ts and its `module` setting rejects `import.meta` outright, so every use adds two permanent tsc diagnostics — the two existing sites already do — and the root tsconfig is off limits per CLAUDE.md. `isDevServerRuntime()` is also the better signal for the question actually being asked, which is how the app is RUNNING rather than how it was compiled: a packaged build here serves app://bundle/index.html from a registered custom protocol, never http, established against the real package in proof/packaged-sidecar-launch-20260731102252/. Anything unrecognised counts as production — a dev tool that fails closed is a dev tool.",
+    "launcher": "`bottom: calc(var(--taskbar-h, 48px) + 12px)`, with the old 190px restored only under `html[data-seanime-dev-panel]`, which the panel sets while mounted. The offset now applies exactly when the thing it avoids exists.",
+    "collapsedByDefault": "`open` now starts false (220px header instead of 460px x up to 72vh). Tolerable while the panel appeared only when someone armed the flag; not now that every dev run has a sidecar. One click still opens it.",
+    "a11y": "Collapsed, the status dot was the only indicator left — colour alone is not a status (WCAG 1.4.1), the rule `.seanime-host-dot` already follows in the shipped launcher. The kind now rides beside it as text, and the toggle carries aria-expanded and a title."
+  },
+
+  "measured": {
+    "engine": "Chromium, Browser pane, viewport 1440x900, real styles.css",
+    "launcherProduction": { "bottomGap": 60, "right": 12, "w": 164, "h": 30, "note": "--taskbar-h 48px + 12px" },
+    "launcherWithDevPanel": { "bottomGap": 190, "right": 12, "w": 164, "h": 30 },
+    "taskbarH": "48px",
+    "whyCalcNotSixty": "--taskbar-h is set on the root by desktopPrefs.ts per taskbar size and overridden by Aero (34 / 30 / 40px) and Wired (52px). The calc follows every shell and size; 190px followed none of them and a literal 60px would follow only one.",
+    "launcherContrast": "Label #f5f4f7 on --surface-2 #272433 ~13.8:1; the muted state text #9d97a6 ~5.25:1. Both clear AA."
+  },
+
+  "guardVerification": "The dev-only half was verified load-bearing: deleting `if (!isDev) return false;` fails the test with 'stopped must not show the panel in production: expected true to be false' — naming the exact status the flag flip introduced.",
+
+  "probeCorrection": "The first cut of the CSS test asserted the launcher block does NOT contain 'bottom: 190px' and failed — on its own explanatory comment, which quotes the old value to explain it. CSS comments are now stripped before declarations are checked. A substring search over a rule reads prose as declarations.",
+
+  "gates": "tests 3,705/324 (+9, +1 file, all this slice's); tsc 288 — the recorded baseline, 0 in any changed file (an earlier cut using import.meta.env.DEV and a plain-boolean predicate took it to 312, all 24 mine; the type predicate and isDevServerRuntime bring it back); i18n exit 0 at 6,329 keys, unchanged and correctly so (ADR-003 scopes the i18n gate to shipped Media-workspace chrome and this panel is not shipped chrome); architecture audit exit 0 'Nothing new'; ESLint exit 0 on every changed file. Builds not run — dev server up (EBUSY); the CSS is in renderer/styles.css, not mediaWorkspace.css, so containment is unaffected.",
+
+  "notDone": "No live look. The user's own app is a dev-server run, so the panel still renders for them — correctly, and now collapsed. The production path is proven by the gate and its tests, not by a packaged screenshot."
+}

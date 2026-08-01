@@ -1,0 +1,69 @@
+{
+  "proof": "Phase 5 — MangaProviderBrowser driven in the running Electron app, end to end",
+  "date": "2026-07-29",
+  "tool": "computer-use against `npm start` (electron-forge)",
+  "method": "The real app was launched with SEANIME_SIDECAR=1 and SEANIME_DATADIR pointed at the isolated Phase 3/5 test profile, plus docs/migration/tools/fixture-manga-cdn.mjs on port 18846. Every call went renderer -> preload -> ipcMain -> main, i.e. the path the harness deliberately bypasses.",
+  "whatThisAddsOverTheHarness": [
+    "The React component executed for the first time.",
+    "registerReadingIpc, the preload bridge and both new window.api methods were exercised.",
+    "The page bytes were rendered by a real <img> in the real renderer."
+  ],
+  "environment": {
+    "app": "jp-study-app dev build, window title 日本語 Study, maximized",
+    "sidecar": "state ready, v3.10.2, pid 37932, port 50572",
+    "dataDir": "C:/Users/Arseniy/AppData/Local/Temp/seanime-phase3-gplay-20260728",
+    "anilistAccount": "none (simulated)",
+    "fixtureCdn": "127.0.0.1:18846, refuses any request without X-Phase5-Proof: manga-page-header"
+  },
+  "results": {
+    "surfaceRendered": {
+      "state": "ready",
+      "where": "Reading Finder, below the site grid, heading 'PROVIDER CHAPTERS'",
+      "note": "Renders in the app's own Fluent dark theme with no decorative emoji. No layout overflow; the shell did not scroll horizontally."
+    },
+    "readingMangaProviders": {
+      "state": "ready",
+      "renderedOptions": ["Local (multi)", "Phase 5 Local Manga Proof (ja)"],
+      "note": "Through the real preload bridge. Display-name order, and the `${name} (${lang})` label, both as specified."
+    },
+    "readingMangaEntry": {
+      "state": "ready",
+      "mediaId": 30002,
+      "rendered": "Berserk ベルセルク",
+      "note": "Real AniList round-trip; the native title rendered beside the preferred title."
+    },
+    "readingMangaChapters": {
+      "state": "ready",
+      "rendered": ["1  Chapter 1 - 第一話", "2  Chapter 2 - 第二話"],
+      "count": "2 chapters",
+      "note": "The provider lists chapter 2 first; the UI showed 1 then 2. The newest-first reordering is visible on screen, not just in a projection."
+    },
+    "readingMangaChapterPages": {
+      "state": "ready",
+      "rendered": "Previous page (disabled) | Page 1 of 2 | Next page",
+      "note": "Selecting a chapter marked it active and revealed the pager."
+    },
+    "readingMangaPageImage": {
+      "state": "ready",
+      "cdnLog": [
+        "200 /manga/phase5-local-manga$chapter-1$ja/page-1.jpg (42 bytes)",
+        "200 /manga/phase5-local-manga$chapter-1$ja/page-2.jpg (42 bytes)"
+      ],
+      "note": "THE DECISIVE LINE. The CDN 403s any request arriving without the provider header, so a 200 proves the Referer-style header survived renderer -> preload -> main -> CDN. Had the renderer loaded the URL directly in an <img src>, this would read 403.",
+      "imageNotVisuallyConfirmable": "The fixture page is a 1x1 GIF, so the rendered <img> occupies one pixel and cannot be seen in a screenshot. The CDN log and the pager state are the evidence; the harness separately proved the returned data URL decodes to byte-identical content."
+    },
+    "pageCache": {
+      "observed": "Next page fetched page-2. Previous page issued NO new request.",
+      "note": "The 6-page bounded cache served the back-navigation, as designed."
+    }
+  },
+  "incidentalFindings": [
+    "Closing the Media workspace killed the sidecar with 'sidecar exited with code 1'. This is the documented no-client watchdog — `--desktop-sidecar` arms Seanime's dead-man switch and the workspace is what holds the websocket. Restarting from the dev panel recovered it. Reading Finder holds no websocket of its own, so a long provider-reading session will need the workspace open or the watchdog disarmed. Worth deciding before Phase 5 closes.",
+    "The first-run 'Put your country on the map?' consent dialog appeared and was declined, so nothing was sent."
+  ],
+  "cleanup": "App closed (exit 0), sidecar gone, fixture CDN stopped, port 18846 released. 0 electron and 0 seanime processes remain. Anki was never involved.",
+  "notProven": [
+    "Still the deterministic fixture provider and the harness's own CDN — no real third-party manga extension has been run.",
+    "No page has been read in MangaReader itself; the browser renders pages on its own, so vertical slice (a) with OCR and mining is still open."
+  ]
+}

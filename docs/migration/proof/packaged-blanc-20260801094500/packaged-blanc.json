@@ -1,0 +1,36 @@
+{
+  "harness": "packaged-blanc-harness.mjs",
+  "question": "Does Blanc's player work in a PACKAGED build, and does slice 24's recovery stay unused there? The recovery being NEEDED is a failure here, not a success.",
+  "startedAt": "2026-08-01T06:29:00.503Z",
+  "app": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-g\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\packaged-blanc-g",
+  "phases": [
+    {
+      "name": "A the packaged app boots and the desktop mounts",
+      "result": "PASS",
+      "detail": "pid 35972, app://bundle/index.html, consent declined: true"
+    },
+    {
+      "name": "B the sidecar is the one inside the package",
+      "result": "FAIL",
+      "detail": "pid 3272, port 53597, v3.10.2, exe null"
+    }
+  ],
+  "mainUrl": "app://bundle/index.html",
+  "sidecar": {
+    "pid": 3272,
+    "port": 53597,
+    "version": "3.10.2",
+    "exePath": null,
+    "fromPackage": false
+  },
+  "error": "Runtime.evaluate timed out",
+  "result": "FAIL",
+  "finishedAt": "2026-08-01T06:29:39.381Z",
+  "log": [
+    "[packaged-blanc] PASS — A the packaged app boots and the desktop mounts: pid 35972, app://bundle/index.html, consent declined: true",
+    "[packaged-blanc] FAIL — B the sidecar is the one inside the package: pid 3272, port 53597, v3.10.2, exe null",
+    "[packaged-blanc] ERROR Runtime.evaluate timed out"
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "proof": "Phase 5 — provider list and page-image fetch, exercised live",
+  "date": "2026-07-29",
+  "tool": "docs/migration/tools/reading-boundary-harness.mjs",
+  "method": "The shipped main-process modules were bundled with only seanime/supervisor stubbed (it imports electron) and run against a real supervised sidecar plus a fake provider CDN that refuses requests missing the provider header.",
+  "sidecar": {
+    "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\seanime-phase3-gplay-20260728",
+    "serverVersion": null,
+    "statusKeys": [
+      "os",
+      "clientDevice",
+      "clientPlatform",
+      "clientUserAgent",
+      "dataDir",
+      "user",
+      "settings",
+      "version",
+      "versionName",
+      "themeSettings",
+      "isOffline",
+      "mediastreamSettings",
+      "torrentstreamSettings",
+      "debridSettings",
+      "anilistClientId",
+      "updating",
+      "isDesktopSidecar",
+      "featureFlags",
+      "disabledFeatures",
+      "serverReady",
+      "serverHasPassword",
+      "showChangelogTour"
+    ],
+    "note": "Isolated Phase 3/5 test profile. Study OS userData untouched."
+  },
+  "readingMangaProviders": {
+    "state": "ready",
+    "count": 2,
+    "providers": [
+      {
+        "id": "local-manga",
+        "name": "Local",
+        "lang": "multi"
+      },
+      {
+        "id": "phase5-local-manga-proof",
+        "name": "Phase 5 Local Manga Proof",
+        "lang": "ja"
+      }
+    ],
+    "sortedByName": [
+      "Local",
+      "Phase 5 Local Manga Proof"
+    ],
+    "fixturePresent": true,
+    "note": "GET /api/v1/extensions/list/manga-provider through the shipped fetchMangaProviders, including its sort-by-display-name rule."
+  },
+  "chapterFeed": {
+    "work": {
+      "title": "Berserk",
+      "titleNative": "ベルセルク",
+      "workId": "seanime-manga:30002"
+    },
+    "chapterOrder": [
+      "1@index0",
+      "2@index1"
+    ],
+    "pageOrder": [
+      0,
+      1
+    ],
+    "firstPageHeaders": [
+      "X-Phase5-Proof"
+    ]
+  },
+  "readingMangaPageImage": {
+    "state": "ready",
+    "url": "http://127.0.0.1:18846/manga/phase5-local-manga$chapter-1$ja/page-1.jpg",
+    "byteLength": 42,
+    "contentType": "image/gif",
+    "dataUrlPrefix": "data:image/gif;base64,R0lGODlhAQ",
+    "decodesToSameBytes": true,
+    "note": "The CDN 403s any request without the provider header, so a 200 here proves the header survived the boundary into main and out to the CDN."
+  },
+  "headerNegativeControl": {
+    "result": "Page request failed: HTTP 403",
+    "note": "Exactly what an <img src> in the renderer would have done. It fails loudly instead of rendering a blank page."
+  },
+  "guards": {
+    "htmlBody": "Page responded with \"text/html\", which is not an image.",
+    "fileUrl": "Page URL protocol \"file:\" is not fetchable."
+  },
+  "cdnRequests": [
+    {
+      "url": "/manga/phase5-local-manga$chapter-1$ja/page-1.jpg",
+      "header": "manga-page-header"
+    },
+    {
+      "url": "/manga/phase5-local-manga$chapter-1$ja/page-1.jpg",
+      "header": null
+    },
+    {
+      "url": "/not-an-image",
+      "header": "manga-page-header"
+    }
+  ],
+  "verdict": "PASS"
+}

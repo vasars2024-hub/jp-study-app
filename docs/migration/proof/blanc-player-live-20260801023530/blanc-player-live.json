@@ -1,0 +1,91 @@
+{
+  "harness": "blanc-player-harness.mjs",
+  "question": "Does Blanc's toolbox player actually play a file, in Blanc's own window, bounded by Blanc's own frame — and do Blanc's keys and the study overlay's keys collide?",
+  "startedAt": "2026-08-01T02:35:30.049Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-gplay-20260801053137\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\blanc-gplay-20260801053137",
+  "phases": [
+    {
+      "name": "A attach main window",
+      "result": "PASS",
+      "detail": "electron pid 34752, http://localhost:5173/, consent declined: true"
+    },
+    {
+      "name": "B os:open 'blanc' does not open Blanc",
+      "result": "PASS",
+      "detail": "{\"blancRoot\":false,\"blancShell\":false,\"blancStudyPlayer\":false,\"looseSelectorMatches\":1,\"looseFirst\":[\"button[os-task-win app-blanc active  ]\"],\"oldSelectorSaysPresent\":true} — the old phase C's PASS came from the loose [class*=blanc] arm"
+    },
+    {
+      "name": "C attach Blanc window",
+      "result": "PASS",
+      "detail": "blancOpen -> {\"ok\":true}; http://localhost:5173/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"isBlancWindow\":true}"
+    },
+    {
+      "name": "D toolbox is at its default size",
+      "result": "PASS",
+      "detail": "outer 560x460 (expected 560x460), viewport 544x421"
+    },
+    {
+      "name": "E open the file in Blanc",
+      "result": "PASS",
+      "detail": "1 item(s) seeded; the Player fieldset mounted; sidecar was 'stopped' before it"
+    },
+    {
+      "name": "F sidecar ready for Blanc",
+      "result": "PASS",
+      "detail": "pid 35976, port 54959, version 3.10.2"
+    },
+    {
+      "name": "G a file plays in Blanc",
+      "result": "FAIL",
+      "detail": "{\"frame\":true,\"videoPresent\":false,\"src\":null,\"readyState\":null,\"networkState\":null,\"errorMessage\":null,\"sliceState\":\"idle\",\"rows\":[\"1 items\\nSousou no Frieren - 01\",\"1 shown\"]}"
+    }
+  ],
+  "mediaBytes": 11873146,
+  "mainWindowAudit": {
+    "blancRoot": false,
+    "blancShell": false,
+    "blancStudyPlayer": false,
+    "looseSelectorMatches": 1,
+    "looseFirst": [
+      "button[os-task-win app-blanc active  ]"
+    ],
+    "oldSelectorSaysPresent": true
+  },
+  "viewport": {
+    "innerWidth": 544,
+    "innerHeight": 421,
+    "outerWidth": 560,
+    "outerHeight": 460,
+    "dpr": 1
+  },
+  "libraryItems": [
+    {
+      "id": "776b959c-13e1-4bf9-9e92-544e3a463fc3",
+      "title": "Sousou no Frieren - 01",
+      "fileName": "Sousou no Frieren - 01.mkv"
+    }
+  ],
+  "sidecarBeforePlayer": "stopped",
+  "sidecar": {
+    "pid": 35976,
+    "port": 54959,
+    "version": "3.10.2"
+  },
+  "openAttempts": null,
+  "result": "FAIL",
+  "error": "G a file plays in Blanc FAILED: {\"frame\":true,\"videoPresent\":false,\"src\":null,\"readyState\":null,\"networkState\":null,\"errorMessage\":null,\"sliceState\":\"idle\",\"rows\":[\"1 items\\nSousou no Frieren - 01\",\"1 shown\"]}",
+  "finishedAt": "2026-08-01T02:38:56.609Z",
+  "log": [
+    "[blanc-player] PASS — A attach main window: electron pid 34752, http://localhost:5173/, consent declined: true",
+    "[blanc-player] PASS — B os:open 'blanc' does not open Blanc: {\"blancRoot\":false,\"blancShell\":false,\"blancStudyPlayer\":false,\"looseSelectorMatches\":1,\"looseFirst\":[\"button[os-task-win app-blanc active  ]\"],\"oldSelectorSaysPresent\":true} — the old phase C's PASS came from the loose [class*=blanc] arm",
+    "[blanc-player] PASS — C attach Blanc window: blancOpen -> {\"ok\":true}; http://localhost:5173/blanc.html?blanc=1; {\"search\":\"?blanc=1\",\"title\":\"Blanc Toolbox\",\"isBlancWindow\":true}",
+    "[blanc-player] PASS — D toolbox is at its default size: outer 560x460 (expected 560x460), viewport 544x421",
+    "[blanc-player] PASS — E open the file in Blanc: 1 item(s) seeded; the Player fieldset mounted; sidecar was 'stopped' before it",
+    "[blanc-player] PASS — F sidecar ready for Blanc: pid 35976, port 54959, version 3.10.2",
+    "[blanc-player]   G: attempt 1/3 stalled at [\"1 items\\nSousou no Frieren - 01\",\"1 shown\",\"Opening local file\"]",
+    "[blanc-player]   G: attempt 2/3 stalled at [\"1 items\\nSousou no Frieren - 01\",\"1 shown\",\"\"]",
+    "[blanc-player]   G: attempt 3/3 stalled at [\"1 items\\nSousou no Frieren - 01\",\"1 shown\",\"\"]",
+    "[blanc-player] FAIL — G a file plays in Blanc: {\"frame\":true,\"videoPresent\":false,\"src\":null,\"readyState\":null,\"networkState\":null,\"errorMessage\":null,\"sliceState\":\"idle\",\"rows\":[\"1 items\\nSousou no Frieren - 01\",\"1 shown\"]}"
+  ]
+}

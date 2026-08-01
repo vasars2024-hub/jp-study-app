@@ -1,0 +1,111 @@
+{
+  "slice": 24,
+  "title": "Blanc's first open works. The cause was not the socket churn every record said it was, and the retry that three harnesses carry now lives in the product.",
+  "date": "2026-08-01",
+  "evidence": {
+    "beforeFix": [
+      "docs/migration/proof/blanc-open-retry-20260801071500/blanc-open-retry.json",
+      "docs/migration/proof/blanc-open-retry-20260801072500/blanc-open-retry.json"
+    ],
+    "afterFix": [
+      "docs/migration/proof/blanc-open-retry-20260801073500/blanc-open-retry.json",
+      "docs/migration/proof/blanc-player-live-20260801075500/blanc-player-live.json"
+    ]
+  },
+  "reproduce": "node docs/migration/tools/prepare-gplay-datadir.mjs <cue-probe-dual.mkv> <empty-dir> && node docs/migration/tools/blanc-player-harness.mjs --datadir=<that dir>   (dev server on 5173; a prepared datadir is SINGLE-USE for playback). The narrow diagnostic is A_ONLY=1 node docs/migration/tools/blanc-player-open-retry-probe.mjs --datadir=<a fresh one>.",
+
+  "theCorrection": {
+    "whatEveryRecordSaid": "Slice 23's write-up, blanc-player-harness.mjs's own header, blanc-player-open-retry-probe.mjs's hypothesis and progress.json's blancToolboxPlayer.openDefect all said the same thing: React.StrictMode's double-mount leaves two sockets on one client id, and 'the pinned sidecar cancels the in-flight preparation when the released socket's disconnect arrives'.",
+    "whyItLookedTrue": "The sidecar log shows `ws Client disconnection` immediately before `Skipping open step for cancelled preparation`, and both are consequences of the same double-mount. Order in a log is not causation.",
+    "whatTheCodeSays": "The pinned sidecar has NO disconnect-cancels-preparation path. `internal/handlers/websocket.go` calls `RemoveConn(id)` on a read error and nothing else. `preparationCanceled` is set only by `cancelPreparationLocked`, reached from `CancelOpen`, `CloseOpen`, or a `player.TerminatedEvent` in `directstream/stream.go`'s `listenToPlayerEvents` — and that event originates in the CLIENT, as `video-terminated` (`video-core-events.ts:324`).",
+    "whatTheClientDid": "Measured with CDP `Network.webSocket*` from before the click that mounts the tree — no page patching, because hooking `WebSocket.prototype.send` would have to happen before the mount under measurement.",
+    "timeline": [
+      "1920  mount  (the DOUBLED `discord/presence/cancel` is the adopted lifecycle effect's null branch running twice)",
+      "1920  ws OPEN socket 1, ws OPEN socket 2 (same client id)",
+      "1922  ws CLOSE socket 1",
+      "2000  POST /api/v1/directstream/play/localfile",
+      "2018  ws RECV native-player {open-and-await, 'Loading stream...'}   <- BeginOpen succeeded",
+      "2112  ws SEND videocore {video-terminated} x2                       <- THE CANCEL, from the client, 190ms after the close",
+      "9177  POST -> 200, having done nothing"
+    ],
+    "soTheFixIsDifferent": "A socket-lifetime fix — a linger in `seanimeSocketPool.ts` so a release/re-acquire never reaches the server — was the obvious next move under the old cause and would have changed nothing. The disconnect is a co-symptom."
+  },
+
+  "theDefect": {
+    "what": "`POST /api/v1/directstream/play/localfile` answers 200 whether or not the preparation it started survives. When a `video-terminated` for that client lands mid-preparation the sidecar skips every later step and sends the client NOTHING — no error, no abort-open. The panel sits on 'Opening local file' forever.",
+    "twoWaysIn": {
+      "deterministicInDev": "React.StrictMode double-invokes effects on mount, so the adopted lifecycle effect (`video-core.tsx`, `useUpdateEffect` on `[state.playbackInfo?.id, waitForWatchHistory, shouldWaitForWatchHistory]`) runs its `if (!state.playbackInfo)` branch once spuriously. Blanc mounts the surface and issues the open in the SAME commit, so it loses this race every time. The main window escapes it because the open arrives there as an event at an already-settled session.",
+      "intermittentInAnyBuild": "REFUTED IN PART by slice 25 — read that before repeating this. The claim was: a `/api/v1/status` that resolves AFTER the open flips `waitForWatchHistory`/`shouldWaitForWatchHistory` (`continuity.hooks.ts:107,125`) and runs the same branch. Held that response for 6s with StrictMode off and the open was not issued until 7968ms, i.e. after the release: the adopted surface WAITS for the same query, so that ordering cannot occur. What IS measured in production shape is a different route to the same branch — a second open while a file is playing, because `open-and-await` sets playbackInfo to null and `state.playbackInfo?.id` therefore changes to undefined. See docs/migration/proof/blanc-open-retry-20260801084500/slice-25.json. The 'intermittent' comment in StudyPlayerSlice.tsx since Phase 3 is still best explained by this branch; which route produced it historically is not established."
+    },
+    "notFixableAtTheSource": "The event comes from adopted code, which ADR-004 keeps unedited — and suppressing it would be wrong anyway: `video-terminated` is correct when a player really goes away, and the sidecar is right to act on it. What was missing is on our side: the open had NO failure detection at all, so a preparation that died silently was indistinguishable from one that was merely slow."
+  },
+
+  "theFix": {
+    "where": "src/shared/directstreamOpenRecovery.ts (pure, new) + the launch effect and a new recovery effect in src/media/StudyPlayerSlice.tsx",
+    "rule": "Measure SILENCE, not elapsed time. The deadline runs from the last sign of life — the POST, then every native-player message. A live preparation reports its steps (`updateOpenStepLocked` -> `openAndAwait`), so a slow metadata parse keeps re-arming the clock while a cancelled one goes quiet at once. 8s of silence -> re-open, once; a second silent window -> a real error (`mediaWorkspace.openStalled`, translated in ja/zh/ru).",
+    "whyASilenceRuleAndNotATotalDeadline": "In the failing run the first POST's own response did not arrive until 5.8s after it was issued, while the preparation had been dead since 2112ms. A total deadline would have to be longer than the slowest legitimate open AND shorter than the user's patience; silence separates the two cases directly.",
+    "whyItsOwnEffect": "Folding the watchdog into the launch effect would tie the deadline to that effect's cleanup — and StrictMode's double-invoke, the very thing that makes this deterministic in Blanc, tears that cleanup down and re-runs it.",
+    "whyPureAndInShared": "`src/media/**` is outside every `vitest.config.ts` include glob, and a timing rule that cannot be tested is a timing rule that drifts.",
+    "theRetryMoved": "`blanc-player-harness.mjs` worked around this with a 10s settle plus a re-request; retirement-step3 absorbs the same thing with retries. That retry belonged in the product. `openAttempts === 1` is now a GATE in phase G, so needing the harness's help is a failure."
+  },
+
+  "measurementOfTheFix": {
+    "probeBefore": "step 1 FAIL on two independently prepared datadirs: {videoPresent:false, sliceState:'idle', sliceText:'Opening local file'}",
+    "probeAfter": "step 1 PASS: {videoPresent:true, readyState:4, 1920x1080, duration 30.386, sliceState:'active'}",
+    "recoveryInTheTrace": [
+      "2165  POST #1",
+      "2204  open-and-await            <- last sign of life",
+      "2269  video-terminated x2       <- the preparation dies here",
+      "7977  POST #1 -> 200 (having done nothing)",
+      "11120 POST #2                   <- the recovery: 8.9s of silence, i.e. the 8s window plus one interval tick",
+      "11122..11135  three open-and-await steps   <- a LIVE preparation this time",
+      "11143 watch                     <- playbackInfo arrives",
+      "11820 HTTP 206 /api/v1/directstream/stream"
+    ],
+    "harness": "10 phases, all PASS, openAttempts 1 (docs/migration/proof/blanc-player-live-20260801075500/blanc-player-live.json)",
+    "control": "Replacing the verdict with the pre-fix behaviour (always 'waiting') fails 3 of the 9 guards. File restored from a copy and verified by sha256 4304F128…E0E168 — never `git checkout`, this tree is permanently dirty."
+  },
+
+  "phaseIWasAskingAQuestionItHadNotEarned": {
+    "what": "The first post-fix harness run FAILED phase I: R -> null, W -> 2.007, S -> 2.0175 (expected 6.5). It reads exactly like a broken keymap.",
+    "actually": "There was no active cue at the 7.3s park, so `video.replayLine` had nothing to replay and doing nothing was CORRECT. Cue delivery is a race: a seek makes directstream start a new subtitle stream from that position and each stream here delivers ONE event before the parser goroutine finishes.",
+    "howItWasSettled": "By comparing the sidecar logs of the failing run (`blanc-fix-datadir-a`) and slice 23's PASSING run (`blanc-final-datadir-h`). They show the SAME per-stream delivery — one subtitle event, then 'Subtitle extraction goroutine finished', a fresh stream on every seek — so the difference between the runs is timing, not behaviour, and not this slice's change. Both logs are copied into this directory as sidecar-cuerace-FAILED-run.log and sidecar-slice23-PASSED-run.log, because a citation to a temp datadir does not survive the datadir.",
+    "fix": "Phase I now reads the precondition it depends on — the overlay publishes the active cue as `data-cue-index`/`-start-ms` on `.study-cue-overlay` — waits for it with small in-cue nudges, and reports 'NO CUE WAS ACTIVE AT THE PARK' as a distinct failure from a key that did not reach the overlay. Re-run: active cue index 1, 6500-9250ms; R -> 6.505514, W -> 2.011799, S -> 6.511372, control x -> null.",
+    "lesson": "Slice 23 learned that a bounds check cannot tell bounded from collapsed. This is the same shape one level up: an assertion about an ACTION must first establish that the action had something to act on, or its failure is unattributable."
+  },
+
+  "aProbeBugWorthRecording": {
+    "what": "`videoTerminatedFramesSent` read 0 in the first probe run while the rows it was summarising held two of them.",
+    "why": "The websocket frame's own `type` is `videocore`; `video-terminated` is the type of the payload INSIDE it. The counter matched the outer type.",
+    "consequence": "The raw rows were kept in the record, so the wrong summary was caught by reading them rather than by trusting it — but a run that only printed the summary would have concluded the client sent nothing and gone looking at the socket again. Same class as slice 18's `bytes > 0` against a silent fixture: a derived assertion that looked right and meant nothing."
+  },
+
+  "gates": {
+    "vitest": "332 files / 3797 tests pass (+9 tests, +1 file, all this slice's; baseline 3788/331). A confirmation run 13 minutes later read 332 / 3803 — this tree is shared with three other tracks and +6 arrived from one of them mid-session. Measured totals, never a delta you did not cause.",
+    "tsc": "288 — the documented baseline, 0 errors in any changed file",
+    "i18n": "exit 0, 6349 keys (+1, translated in ja/zh/ru)",
+    "eslint": "exit 0, 0 warnings on all changed src files",
+    "architectureAudit": "exit 0, 'Nothing new', 3 known findings still pending",
+    "rendererBuild": "clean to a scratch --outDir in 42.8s with the dev server up",
+    "mediaCssContainment": "exit 0, 6950/6950 scoped, 0 unscoped, 0 shell --tw- tokens",
+    "harnessSyntax": "node --check clean on both tools",
+    "mainWindowRegression": "retirement-step3-harness.mjs, all 7 phases PASS — proof/retirement-step3-20260801044332/. The launch effect is shared with the main window's workspace, so a change to it is not verified by Blanc alone: playback 0.194 -> 4.271s, cue transport (replay/prev/next), the R/W/S keys with the X control, no orphan after quitting mid-playback, and resume across a real restart (quit at 11.863, resumed at 14.262).",
+    "concurrentWriter": "Five src files changed under this session by another track (ResultPanels.tsx, scraper/strings.ts, theme/tokens.ts and two renderer tests) — the third time this track has recorded a live writer in the same tree. The gates above ran WITH their work in the tree."
+  },
+
+  "filesChanged": [
+    "src/shared/directstreamOpenRecovery.ts (new)",
+    "src/shared/__tests__/directstreamOpenRecovery.test.ts (new)",
+    "src/media/StudyPlayerSlice.tsx",
+    "src/shared/i18n/catalogs/{en,ja,zh,ru}.ts",
+    "docs/migration/tools/blanc-player-harness.mjs (phase I precondition, phase G gate)",
+    "docs/migration/tools/blanc-player-open-retry-probe.mjs (step 1b, the CDP trace)"
+  ],
+
+  "stillNotProvenLive": [
+    "A packaged Blanc has still never been driven at all. The dev route to this defect is gone, but the recovery itself has only been exercised in a dev build — where StrictMode guarantees it fires. In a packaged build it should never fire, and nothing has confirmed that.",
+    "The intermittent production route (a `/api/v1/status` that resolves after the open) has NOT been reproduced deliberately. It is derived from the dep list of the adopted effect plus the measured dev instance, not observed on its own. Forcing it would mean delaying that query.",
+    "The other six video.* rows the overlay registers (subEarlier/subLater/large, toggleAutoPause, toggleLoop, toggleFurigana) still have not been pressed anywhere — slice 22's item, unchanged.",
+    "Music keyboard navigation still does not exist, and must not be built by reusing video.* ids — registerCommandHandler is a last-registrant-wins stack."
+  ]
+}

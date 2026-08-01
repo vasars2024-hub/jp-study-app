@@ -1,0 +1,75 @@
+diff --git a/seanime-web/src/app/(main)/_features/video-core/video-core-events.ts b/seanime-web/src/app/(main)/_features/video-core/video-core-events.ts
+index 386d10b..d1261e4 100644
+--- a/seanime-web/src/app/(main)/_features/video-core/video-core-events.ts
++++ b/seanime-web/src/app/(main)/_features/video-core/video-core-events.ts
+@@ -121,6 +121,10 @@ export function useVideoCoreSetupEvents(id: string,
+         return activePlayer === id
+     }, [activePlayer, id])
+ 
++    // Last playback id announced to the server via "video-loaded", so the mount-case
++    // dispatch below never duplicates the one the lifecycle effect already sent.
++    const announcedPlaybackRef = React.useRef<string | null>(null)
++
+     // fullscreen events
+     React.useLayoutEffect(() => {
+         if (!isActivePlayer || !fullscreenManager) return
+@@ -313,6 +317,9 @@ export function useVideoCoreSetupEvents(id: string,
+     }, [isActivePlayer, state, videoElement])
+ 
+     function dispatchTerminatedEvent() {
++        // Terminating clears the server's playback state, so the next "video-loaded" for
++        // this same id has to go out again rather than being deduped away.
++        announcedPlaybackRef.current = null
+         log.trace("Video terminated")
+         sendEvent("video-terminated", {
+             id: state.playbackInfo?.id || "",
+@@ -403,6 +410,11 @@ export function useVideoCoreSetupEvents(id: string,
+ 
+     function dispatchVideoLoadedEvent() {
+         if (!state.playbackInfo || !clientId) return
++        // The server keeps one playback state per stream; announcing the same one twice
++        // re-pushes VideoLoadedEvent to every consumer. The ref is cleared on terminate,
++        // so replaying the same id after a terminate still re-announces as it must.
++        if (announcedPlaybackRef.current === state.playbackInfo.id) return
++        announcedPlaybackRef.current = state.playbackInfo.id
+         log.trace("Video loaded")
+         sendEvent<VideoCoreLoadedPayload>("video-loaded", {
+             state: {
+@@ -413,6 +425,17 @@ export function useVideoCoreSetupEvents(id: string,
+         })
+     }
+ 
++    // "video-loaded" is what gives the server a playback state; without it every later
++    // "video-loaded-metadata" is dropped, so the directstream subtitle stream never starts.
++    // VideoCore announces it from an *update* effect, which is skipped on mount, and it can
++    // also run before clientId exists. Both leave the stream unannounced for a host that
++    // mounts VideoCore only once playback info is already set. Cover that here, once.
++    React.useEffect(() => {
++        if (!isActivePlayer || !state.playbackInfo?.id || !clientId) return
++        if (announcedPlaybackRef.current === state.playbackInfo.id) return
++        dispatchVideoLoadedEvent()
++    }, [isActivePlayer, state.playbackInfo?.id, clientId])
++
+     React.useEffect(() => {
+         if (!isActivePlayer || !state.playbackInfo || !videoElement || !clientId) return
+         const player = videoElement
+diff --git a/seanime-web/src/app/(main)/_features/video-core/video-core.tsx b/seanime-web/src/app/(main)/_features/video-core/video-core.tsx
+index 1789cd6..c84f6f6 100644
+--- a/seanime-web/src/app/(main)/_features/video-core/video-core.tsx
++++ b/seanime-web/src/app/(main)/_features/video-core/video-core.tsx
+@@ -1014,8 +1014,14 @@ export function VideoCore(props: VideoCoreProps) {
+     }, [state.playbackInfo?.id, waitForWatchHistory, shouldWaitForWatchHistory])
+ 
+     // Override active player, won't apply to native-player
++    // The only other setter is VideoCoreProvider's mount-only layout effect, which also
++    // nulls the atom on unmount, and useUnmount below nulls it on every terminate. A host
++    // that keeps the provider mounted while mounting/unmounting VideoCore with the stream
++    // would therefore leave activePlayer stuck at null forever, silently disabling every
++    // isActivePlayer-gated listener. Claim the player whenever it is not already ours.
+     React.useEffect(() => {
+-        if (state.playbackInfo?.id && activePlayer === props.id) {
++        if (props.id === "native-player") return
++        if (state.playbackInfo?.id && activePlayer !== props.id) {
+             setActivePlayer(props.id)
+         }
+     }, [state.playbackInfo?.id, activePlayer])

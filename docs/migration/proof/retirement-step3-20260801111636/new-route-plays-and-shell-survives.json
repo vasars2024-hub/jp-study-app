@@ -1,0 +1,274 @@
+{
+  "harness": "retirement-step3-harness.mjs",
+  "question": "Through the new routing path: is the taskbar identity intact, does window dragging survive the workspace closing, and does a real file actually play?",
+  "startedAt": "2026-08-01T11:16:36.104Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-realep\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-realep",
+  "phases": {
+    "A": {
+      "what": "taskbar identity for the two swapped sections and the unswapped one",
+      "labels": {
+        "video": "Video\n×",
+        "player": "Media\n×",
+        "music": "Music\n×"
+      },
+      "distinct": true,
+      "allNamed": true,
+      "result": "PASS"
+    },
+    "B": {
+      "what": "window dragging after the full-screen workspace has opened and closed",
+      "grip": {
+        "x": 121,
+        "y": 46
+      },
+      "posBefore": {
+        "left": "60px",
+        "top": "24px",
+        "x": 67,
+        "y": 29
+      },
+      "posAfter": {
+        "left": "132px",
+        "top": "72px",
+        "x": 132,
+        "y": 72
+      },
+      "moved": true,
+      "result": "PASS"
+    },
+    "C": {
+      "what": "a real local file opened and played through the new routing path",
+      "sidecar": {
+        "pid": 39144,
+        "port": 56453,
+        "version": "3.10.2"
+      },
+      "startedAt": 0.220917,
+      "currentTime": 4.234195,
+      "duration": 1425.525,
+      "readyState": 4,
+      "paused": false,
+      "videoWidth": 1440,
+      "videoHeight": 1080,
+      "textTracks": 0,
+      "advanced": true,
+      "result": "PASS"
+    }
+  },
+  "probeCorrections": [
+    "Phase B first reported \"no draggable point on the title bar\", which reads as the drag-layer defect it was written to catch. It was not: a cold profile shows the consent screen and `.consent` covers the viewport, so `elementFromPoint` over the title bar returned the overlay. Earlier harnesses never noticed because querySelector and .click() do not hit-test. The run now declines consent before any pointer-driven phase. Keep that ordering.",
+    "Phase B then found the workspace REOPENED after being closed, which surfaced a real defect this harness was not looking for: MediaWorkspaceHost already listened for os:open 'video', and MediaWorkspaceSectionView dispatched on mount as well, so video opened twice and the section's dispatch — gated behind an async seanimeStatus() round trip — landed after a fast close and reopened it. Fixed by making the host's listener the single owner (now covering 'player' too) and removing the mount dispatch. Phase B is what caught it."
+  ],
+  "mediaBytes": 2506415448,
+  "consentDismissed": true,
+  "mediaSamples": [
+    {
+      "label": "phase C",
+      "attempt": 1,
+      "samples": [
+        {
+          "atMs": 0,
+          "videoPresent": false
+        },
+        {
+          "atMs": 215,
+          "videoPresent": false
+        },
+        {
+          "atMs": 425,
+          "videoPresent": false
+        },
+        {
+          "atMs": 629,
+          "videoPresent": false
+        },
+        {
+          "atMs": 843,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1049,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1251,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1459,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1669,
+          "videoPresent": false
+        },
+        {
+          "atMs": 1881,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2096,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2304,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2519,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2729,
+          "videoPresent": false
+        },
+        {
+          "atMs": 2939,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3144,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3348,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3562,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3776,
+          "videoPresent": false
+        },
+        {
+          "atMs": 3990,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4203,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4415,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4623,
+          "videoPresent": false
+        },
+        {
+          "atMs": 4836,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5053,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5268,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5482,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5694,
+          "videoPresent": false
+        },
+        {
+          "atMs": 5908,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6110,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6323,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6538,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6750,
+          "videoPresent": false
+        },
+        {
+          "atMs": 6966,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7181,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7394,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7608,
+          "videoPresent": false
+        },
+        {
+          "atMs": 7820,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8034,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8248,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8461,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8677,
+          "videoPresent": false
+        },
+        {
+          "atMs": 8891,
+          "videoPresent": false
+        },
+        {
+          "atMs": 9106,
+          "videoPresent": true,
+          "readyState": 0,
+          "networkState": 2,
+          "bufferedRanges": 0,
+          "currentTime": 0
+        },
+        {
+          "atMs": 9965,
+          "videoPresent": true,
+          "readyState": 1,
+          "networkState": 1,
+          "bufferedRanges": 1,
+          "currentTime": 0
+        },
+        {
+          "atMs": 10245,
+          "videoPresent": true,
+          "readyState": 4,
+          "networkState": 2,
+          "bufferedRanges": 1,
+          "currentTime": 0.017404
+        }
+      ]
+    }
+  ],
+  "openStalls": [],
+  "openAttempts": 1,
+  "verdict": "FAIL",
+  "error": "phase E FAIL — no subtitle track selected by default: {\"value\":\"\",\"text\":\"Off\"}",
+  "finishedAt": "2026-08-01T11:17:16.348Z"
+}

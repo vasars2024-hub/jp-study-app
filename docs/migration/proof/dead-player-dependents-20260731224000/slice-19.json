@@ -1,0 +1,179 @@
+{
+  "slice": 19,
+  "title": "The deleted <video> outlived by its dependents, and a catalog default that could never match",
+  "date": "2026-07-31",
+  "measuredBeforeAnyFixLine": {
+    "videoRefAttachSites": [],
+    "videoRefReadsInMediaContent": 25,
+    "registeredVideoCommands": [
+      "video.replayLine",
+      "video.prevLine",
+      "video.nextLine",
+      "video.subEarlier",
+      "video.subLater",
+      "video.subEarlierLarge",
+      "video.subLaterLarge",
+      "video.toggleAutoPause",
+      "video.toggleLoop",
+      "video.toggleFurigana"
+    ],
+    "blancUseMediaMode": "full",
+    "catalogTotal": 157,
+    "catalogWithDefaults": 101,
+    "defaultsNotInNormalForm": [
+      {
+        "id": "nav.nextDesktop",
+        "keys": "Meta+Ctrl+ArrowRight",
+        "normal": "Ctrl+Meta+ArrowRight"
+      },
+      {
+        "id": "nav.prevDesktop",
+        "keys": "Meta+Ctrl+ArrowLeft",
+        "normal": "Ctrl+Meta+ArrowLeft"
+      },
+      {
+        "id": "video.replayLine",
+        "keys": "r",
+        "normal": "R"
+      },
+      {
+        "id": "video.prevLine",
+        "keys": "a",
+        "normal": "A"
+      },
+      {
+        "id": "video.nextLine",
+        "keys": "d",
+        "normal": "D"
+      },
+      {
+        "id": "video.toggleAutoPause",
+        "keys": "p",
+        "normal": "P"
+      },
+      {
+        "id": "video.toggleLoop",
+        "keys": "l",
+        "normal": "L"
+      },
+      {
+        "id": "video.toggleFurigana",
+        "keys": "f",
+        "normal": "F"
+      }
+    ],
+    "defaultsUnproducibleByChordFromEvent": [
+      {
+        "id": "video.subEarlierLarge",
+        "keys": "Shift+["
+      },
+      {
+        "id": "video.subLaterLarge",
+        "keys": "Shift+]"
+      }
+    ],
+    "keypresses": [
+      {
+        "typed": "r",
+        "chord": "R",
+        "matches": []
+      },
+      {
+        "typed": "a",
+        "chord": "A",
+        "matches": []
+      },
+      {
+        "typed": "f",
+        "chord": "F",
+        "matches": []
+      },
+      {
+        "typed": "[",
+        "chord": "[",
+        "matches": [
+          "video.subEarlier"
+        ]
+      },
+      {
+        "typed": "]",
+        "chord": "]",
+        "matches": [
+          "video.subLater"
+        ]
+      },
+      {
+        "typed": "Shift+{",
+        "chord": "{",
+        "matches": []
+      }
+    ],
+    "adoptedKeysTaken": [
+      "KeyD",
+      "KeyA",
+      "ArrowRight",
+      "ArrowLeft",
+      "KeyE",
+      "KeyQ",
+      "ArrowUp",
+      "ArrowDown",
+      "KeyM",
+      "KeyJ",
+      "KeyK",
+      "KeyN",
+      "KeyB",
+      "KeyF",
+      "KeyP",
+      "BracketRight",
+      "BracketLeft",
+      "KeyI",
+      "KeyH",
+      "KeyZ"
+    ],
+    "overlayHardcodedCodes": [
+      "KeyW",
+      "KeyS",
+      "KeyR",
+      "Semicolon",
+      "Quote"
+    ],
+    "studyPanelSeeksNullRef": true,
+    "pendingSeekFiles": [
+      "renderer/components/media/MediaStudyMode.tsx"
+    ]
+  },
+  "rootCause": "Slice 16 deleted MediaPlayerStage, the only <video ref={videoRef}> in src/. The sweep it ran was for the COMPONENT; what other code depended on was the ELEMENT. videoRef has been null in every window since, and three surfaces kept asking it questions.",
+  "secondIndependentDefect": "effectiveKeys() returned defaultKeys raw while chordMatches() compared it to the always-normalized output of chordFromEvent with ===. Any default not already in normal form matched nothing, silently. 8 of 101 catalog defaults were in that state, plus 2 more (Shift+[ / Shift+]) that normal form allows but chordFromEvent cannot produce.",
+  "fixes": [
+    "effectiveKeys normalizes on the way out; the two nav.*Desktop literals corrected to Ctrl+Meta+Arrow*.",
+    "The ten video.* registrations deleted from MediaContent useMedia and registered by VideoCoreStudyOverlay against the adopted player. Its hardcoded event.code switch removed, so there is exactly one dispatcher.",
+    "video.* defaults re-pointed onto R/W/S/;/' — the codes the overlay already chose from what vc_defaultKeybindings leaves free. Five rows unbound rather than given a colliding default.",
+    "MediaStudyMode opens the adopted workspace via openMediaWorkspace({localFilePath,startAtSec}); isPlayerVisible, onSeek and the jp-pending-study-media-seek sessionStorage handoff are gone.",
+    "reachMediaWorkspace() in mediaWorkspaceBridge owns the host-then-sidecar sequence for its two callers."
+  ],
+  "controlRuns": [
+    {
+      "control": "effectiveKeys returned raw + video.replayLine default back to lowercase r",
+      "result": "2 guards FAIL (normal-form sweep, R-keypress end to end)"
+    },
+    {
+      "control": "one overlay registerCommandHandler id renamed",
+      "result": "1 guard FAIL (the overlay owns all ten)"
+    }
+  ],
+  "gates": {
+    "tests": "3774 / 331 files",
+    "tsc": "288 — the recorded baseline, 0 in any changed file",
+    "i18n": "exit 0 at 6348 keys, +3 mine (media.study.openingInPlayer/noWorkspaceHere/playerUnavailable) translated in ja/zh/ru; the rest of the delta is another track in this shared tree",
+    "architectureAudit": "exit 0, Nothing new",
+    "eslint": "exit 0, 1 warning — the pre-existing non-null assertion in keyboardShortcuts.ts",
+    "rendererBuild": "built to a scratch --outDir while the dev server stayed up",
+    "cssContainment": "exit 0, 6950/6950 scoped, 0 unscoped, 0 Tailwind tokens in the shell"
+  },
+  "chunkMeasurement": {
+    "question": "Did importing keyboardShortcuts into VideoCoreStudyOverlay pull the shortcut catalog into the lazy media chunk?",
+    "method": "grep the built chunks for a catalog-only literal (nav.nextDesktop)",
+    "result": "No. nav.nextDesktop is in localAgentAutomationStore-*.js and the three language chunks; StudyPlayerSlice-*.js carries only the ten command-id strings the overlay registers."
+  },
+  "notProvenLive": "Nobody has pressed R in a running window. The dispatch is proven end to end in a real engine (jsdom KeyboardEvent through installKeyboardShortcuts), and the overlay wiring is proven by source guard, not by watching a cue replay."
+}
