@@ -1,0 +1,67 @@
+{
+ "tool": "verify-open-generation-patch.mjs",
+ "slice": 41,
+ "pin": "9bdd052afdfc2c2f31293fdb21a27ef8e8bbcce9",
+ "patch": "patches\\seanime\\0004-directstream-open-generation.patch",
+ "steps": [
+  {
+   "name": "clone the pin",
+   "ok": true,
+   "exit": 0,
+   "output": ""
+  },
+  {
+   "name": "checkout the pin",
+   "ok": true,
+   "exit": 0,
+   "output": ""
+  },
+  {
+   "name": "git apply --check",
+   "ok": true,
+   "exit": 0,
+   "output": ""
+  },
+  {
+   "name": "git apply",
+   "ok": true,
+   "exit": 0,
+   "output": ""
+  },
+  {
+   "name": "go vet ./internal/directstream",
+   "ok": true,
+   "exit": 0,
+   "output": ""
+  },
+  {
+   "name": "go build ./internal/directstream ./internal/handlers",
+   "ok": true,
+   "exit": 0,
+   "output": ""
+  },
+  {
+   "name": "go test -run TestAcceptOpenGeneration",
+   "ok": true,
+   "exit": 0,
+   "subtests": [
+    "--- PASS: TestAcceptOpenGeneration (0.00s)",
+    "--- PASS: TestAcceptOpenGeneration/unspecified_generations_are_always_accepted (0.00s)",
+    "--- PASS: TestAcceptOpenGeneration/a_newer_generation_is_accepted_and_becomes_the_bar (0.00s)",
+    "--- PASS: TestAcceptOpenGeneration/an_equal_generation_is_accepted,_because_that_is_the_recovery (0.00s)",
+    "--- PASS: TestAcceptOpenGeneration/clients_are_ordered_independently (0.00s)",
+    "--- PASS: TestAcceptOpenGeneration/a_refusal_does_not_move_the_bar (0.00s)"
+   ],
+   "output": "=== RUN   TestAcceptOpenGeneration\n=== RUN   TestAcceptOpenGeneration/unspecified_generations_are_always_accepted\n=== RUN   TestAcceptOpenGeneration/a_newer_generation_is_accepted_and_becomes_the_bar\n=== RUN   TestAcceptOpenGeneration/an_equal_generation_is_accepted,_because_that_is_the_recovery\n=== RUN   TestAcceptOpenGeneration/clients_are_ordered_independently\n=== RUN   TestAcceptOpenGeneration/a_refusal_does_not_move_the_bar\n--- PASS: TestAcceptOpenGeneration (0.00s)\n    --- PASS: TestAcceptOpenGeneration/unspecified_generations_are_always_accepted (0.00s)\n    --- PASS: TestAcceptOpenGeneration/a_newer_generation_is_accepted_and_becomes_the_bar (0.00s)\n    --- PASS: TestAcceptOpenGeneration/an_equal_generation_is_accepted,_because_that_is_the_recovery (0.00s)\n    --- PASS: TestAcceptOpenGeneration/clients_are_ordered_independently (0.00s)\n    --- PASS: TestAcceptOpenGeneration/a_refusal_does_not_move_the_bar (0.00s)\nPASS\nok  \tseanime/internal/directstream\t3.754s"
+  },
+  {
+   "name": "go test ./internal/directstream",
+   "ok": true,
+   "exit": 0,
+   "output": "ok  \tseanime/internal/directstream\t3.692s"
+  }
+ ],
+ "pinnedCheckoutHeadAfter": "9bdd052afdfc2c2f31293fdb21a27ef8e8bbcce9",
+ "pinnedCheckoutUnmoved": true,
+ "result": "PASS"
+}

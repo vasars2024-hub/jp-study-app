@@ -1,0 +1,251 @@
+{
+ "tool": "measure-resume-write.mjs",
+ "slice": 35,
+ "startedAt": "2026-08-01T19:17:21.582Z",
+ "live": false,
+ "liveNote": "Static + replay only. Nothing here observed a real <video>; the live confirmation is the stated next step and was not run — another session was writing src/ throughout (slice 21 hazard).",
+ "wiring": {
+  "observed": {
+   "persistFound": true,
+   "persistCallsTheRule": true,
+   "persistCanSkip": true,
+   "teardownFound": true,
+   "teardownPersists": true,
+   "listeners": [
+    "timeupdate",
+    "pause",
+    "ended"
+   ],
+   "hasMediaFromElement": true
+  },
+  "checks": {
+   "ruleIsInThePersistPath": true,
+   "teardownGoesThroughIt": true,
+   "allFourTriggers": true,
+   "emptinessComesFromTheElement": true
+  },
+  "result": "PASS"
+ },
+ "sequences": [
+  {
+   "id": "open-then-leave",
+   "question": "An episode with a stored position is opened and closed before a frame decodes — the silent-open stall, or a user who changed their mind. Does the stored point survive?",
+   "seededSec": 8.8,
+   "shipped": {
+    "stored": 8.8,
+    "trace": [
+     {
+      "what": "element mounted, stream never decoded",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "skip",
+      "stored": null
+     },
+     {
+      "what": "effect teardown",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "skip",
+      "stored": null
+     }
+    ]
+   },
+   "preSlice": {
+    "stored": 0,
+    "trace": [
+     {
+      "what": "element mounted, stream never decoded",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 0
+     },
+     {
+      "what": "effect teardown",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 0
+     }
+    ]
+   },
+   "expected": 8.8,
+   "changed": true,
+   "result": "PASS"
+  },
+  {
+   "id": "teardown-after-empty",
+   "question": "A teardown lands after video-core.tsx §965-970 emptied the element. Does the reset clock get to speak for the file?",
+   "seededSec": null,
+   "shipped": {
+    "stored": 528,
+    "trace": [
+     {
+      "what": "played to 8:48",
+      "positionSec": 528,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 528
+     },
+     {
+      "what": "element emptied by the lifecycle effect",
+      "positionSec": 0,
+      "hasMedia": false,
+      "action": "skip",
+      "stored": 528
+     },
+     {
+      "what": "effect teardown",
+      "positionSec": 0,
+      "hasMedia": false,
+      "action": "skip",
+      "stored": 528
+     }
+    ]
+   },
+   "preSlice": {
+    "stored": 0,
+    "trace": [
+     {
+      "what": "played to 8:48",
+      "positionSec": 528,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 528
+     },
+     {
+      "what": "element emptied by the lifecycle effect",
+      "positionSec": 0,
+      "hasMedia": false,
+      "action": "save",
+      "stored": 0
+     },
+     {
+      "what": "effect teardown",
+      "positionSec": 0,
+      "hasMedia": false,
+      "action": "save",
+      "stored": 0
+     }
+    ]
+   },
+   "expected": 528,
+   "changed": true,
+   "result": "PASS"
+  },
+  {
+   "id": "deliberate-rewind",
+   "question": "A session that really started goes back to 0:00 and leaves. Is that honoured?",
+   "note": "The one sequence where the two rules AGREE in effect: the pre-slice rule stores 0 and the shipped one removes the entry, and every reader in the app treats those the same (resolveVideoCoreResumePosition returns 0 below 1 s). Reported as changed because the store differs; do not quote it as a behaviour difference.",
+   "seededSec": null,
+   "shipped": {
+    "stored": null,
+    "trace": [
+     {
+      "what": "played to 8:48",
+      "positionSec": 528,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 528
+     },
+     {
+      "what": "rewound to the top",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "clear",
+      "stored": null
+     },
+     {
+      "what": "effect teardown",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "clear",
+      "stored": null
+     }
+    ]
+   },
+   "preSlice": {
+    "stored": 0,
+    "trace": [
+     {
+      "what": "played to 8:48",
+      "positionSec": 528,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 528
+     },
+     {
+      "what": "rewound to the top",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 0
+     },
+     {
+      "what": "effect teardown",
+      "positionSec": 0,
+      "hasMedia": true,
+      "action": "save",
+      "stored": 0
+     }
+    ]
+   },
+   "expected": null,
+   "changed": true,
+   "result": "PASS"
+  },
+  {
+   "id": "watched-to-the-end",
+   "question": "An episode finishes. Is its point still cleared?",
+   "seededSec": null,
+   "shipped": {
+    "stored": null,
+    "trace": [
+     {
+      "what": "played to 23:19",
+      "positionSec": 1399,
+      "hasMedia": true,
+      "action": "clear",
+      "stored": null
+     },
+     {
+      "what": "ended",
+      "positionSec": 1400,
+      "hasMedia": true,
+      "action": "clear",
+      "stored": null
+     }
+    ]
+   },
+   "preSlice": {
+    "stored": null,
+    "trace": [
+     {
+      "what": "played to 23:19",
+      "positionSec": 1399,
+      "hasMedia": true,
+      "action": "clear",
+      "stored": null
+     },
+     {
+      "what": "ended",
+      "positionSec": 1400,
+      "hasMedia": true,
+      "action": "clear",
+      "stored": null
+     }
+    ]
+   },
+   "expected": null,
+   "changed": false,
+   "result": "PASS"
+  }
+ ],
+ "cost": {
+  "question": "What did a zeroed entry cost the user, through the real Continue Watching join?",
+  "rowsAt620Sec": 1,
+  "rowsAt0Sec": 0,
+  "result": "PASS"
+ },
+ "result": "PASS"
+}

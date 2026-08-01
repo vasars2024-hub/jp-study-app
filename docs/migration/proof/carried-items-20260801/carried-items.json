@@ -1,0 +1,96 @@
+{
+ "checkedAt": "2026-08-01T19:26:10.841Z",
+ "rows": [
+  {
+   "id": "analyse-api-absent-from-preload",
+   "claim": "No analyse-shaped API is exposed in preload.ts at all (slice 4).",
+   "where": "progress.json nextActions — two entries, corrected by slice 36",
+   "recordedAs": "expired",
+   "state": "expired",
+   "evidence": "preload.ts:1275 exposes studyPrepare",
+   "diverged": false
+  },
+  {
+   "id": "analyse-handler-untracked",
+   "claim": "The study:prepare HANDLER lives in an untracked main/mediaStudyOrchestrator.ts, so the main side of the bar is unmet (slice 34).",
+   "where": "NEXT_SESSION.md slice 34, progress.json analyseRowActionWired20260801",
+   "recordedAs": "holds",
+   "state": "holds",
+   "evidence": "file exists, untracked",
+   "diverged": false
+  },
+  {
+   "id": "analyse-action-unwired-in-production",
+   "claim": "MediaWorkspaceHost mounts <SeanimeStudyLibraryPanel /> with no props, so the analyse action ships offered-but-unsupplied (slice 34).",
+   "where": "NEXT_SESSION.md slice 34 \"production wiring is one prop\"",
+   "recordedAs": "holds",
+   "state": "holds",
+   "evidence": "mounted with no props",
+   "diverged": false
+  },
+  {
+   "id": "palette-renders-behind-the-workspace",
+   "claim": "The command palette (z 1201) renders behind the media workspace (z 9999) and the layering question is undecided.",
+   "where": "progress.json nextActions — closed by slice 10, corrected by slice 36",
+   "recordedAs": "expired",
+   "state": "expired",
+   "evidence": ".palette sits on --z-shell-overlay (20001), above the workspace's 9999",
+   "diverged": false
+  },
+  {
+   "id": "blanc-routing-not-started",
+   "claim": "Route Blanc's media panel to the adopted player — decided by the user 2026-07-31 and NOT STARTED.",
+   "where": "progress.json nextActions — done in slice 15, corrected by slice 36",
+   "recordedAs": "expired",
+   "state": "expired",
+   "evidence": "BlancStudyPlayer.tsx lazy-imports MediaPlayerSurface",
+   "diverged": false
+  },
+  {
+   "id": "resultpanels-shell-handoff-open",
+   "claim": "ResultPanels.tsx:235 in a scraper pop-out is the next unfixed seam of slice 14’s class.",
+   "where": "progress.json nextActions — fixed already, corrected by slice 36",
+   "recordedAs": "expired",
+   "state": "expired",
+   "evidence": "reachMediaWorkspace is applied here",
+   "diverged": false
+  },
+  {
+   "id": "three-segment-switch-unseen-live",
+   "claim": "The Library / Readiness / Review switch has only been seen in jsdom and the dev harness.",
+   "where": "progress.json nextActions — closed by the 2026-07-31 live pass, corrected by slice 36",
+   "recordedAs": "expired",
+   "state": "expired",
+   "evidence": "phase6-live-pass.json: libraryReadinessReviewSwitch PASS under real clicks",
+   "diverged": false
+  },
+  {
+   "id": "anki-unreachable",
+   "claim": "The per-row mining rollup cannot be run because AnkiConnect does not answer on 127.0.0.1:8765.",
+   "where": "NEXT_SESSION.md slices 32/33 \"still blocked on the user\"",
+   "recordedAs": "holds",
+   "state": "holds",
+   "evidence": "connection refused",
+   "diverged": false
+  },
+  {
+   "id": "mediacontent-uncommitted",
+   "claim": "MediaContent.tsx carries another track’s uncommitted insertions, so its 16 dead MediaState members must not be deleted by a session passing through (slice 33).",
+   "where": "NEXT_SESSION.md slice 33, progress.json mediaStateDeadSurfaceAnswered20260801",
+   "recordedAs": "holds",
+   "state": "holds",
+   "evidence": "1267 insertions / 231 deletions against HEAD (slice 33 measured 1267/231)",
+   "diverged": false
+  },
+  {
+   "id": "media-unreachable-by-vitest",
+   "claim": "src/media/** is outside every vitest include glob, so a rule that lives in the component has no test (slices 24 and 35).",
+   "where": "shared/directstreamOpenRecovery.ts and shared/videoCoreResumeWrite.ts header comments",
+   "recordedAs": "holds",
+   "state": "holds",
+   "evidence": "no src/media glob in vitest.config.ts",
+   "diverged": false
+  }
+ ],
+ "diverged": 0
+}

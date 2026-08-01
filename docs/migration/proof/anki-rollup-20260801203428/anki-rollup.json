@@ -1,0 +1,59 @@
+{
+ "tool": "anki-rollup-gate.mjs",
+ "slice": 42,
+ "startedAt": "2026-08-01T20:34:28.588Z",
+ "steps": {
+  "anki": {
+   "version": 6,
+   "deckCountBefore": 83
+  },
+  "probeNote": {
+   "noteId": 1785616469590,
+   "term": "テスト203428",
+   "deck": "StudyOS::_MigrationProbe"
+  },
+  "snapshot": {
+   "builtBy": "src/main/anki/intervals.ts (shipped, bundled with electron stubbed)",
+   "sourceQueries": [
+    "deck:StudyOS::_MigrationProbe"
+   ],
+   "noteCount": 1,
+   "entryCount": 1,
+   "truncated": false,
+   "probeEntry": {
+    "noteId": 1785616469590,
+    "expression": "テスト203428",
+    "ivlDays": 0,
+    "modelName": "JP Study App::JA Immersion",
+    "leech": false,
+    "suspended": false
+   },
+   "ok": true
+  },
+  "rollup": {
+   "cardsWithAnki": 1,
+   "cardsWithoutAnki": 1,
+   "stageWithAnki": "new",
+   "stageWithoutAnki": "untracked",
+   "intervalDays": null,
+   "pathKey": "c:/media/cue-library/sousou no frieren - 01.mkv",
+   "entryRollup": {
+    "cards": 1,
+    "attention": 0,
+    "known": 0,
+    "lastMinedAt": 1785616470848
+   },
+   "ok": true
+  },
+  "cleanup": {
+   "notes": [
+    1785616469590
+   ],
+   "deckRemoved": true,
+   "residual": [],
+   "deckCountAfter": 83,
+   "ok": true
+  }
+ },
+ "result": "PASS"
+}
