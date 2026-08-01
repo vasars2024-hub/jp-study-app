@@ -14,10 +14,13 @@ import type {
   NativePlayer_SubtitleEventsPayload,
 } from '../../vendor/seanime/generated/types';
 import { useWebsocketMessageListener } from '@/app/(main)/_hooks/handle-websockets';
+import { useServerHMACAuth } from '@/app/(main)/_hooks/use-server-status';
+import { getProxyUrl } from '@/app/(main)/onlinestream/_lib/onlinestream-proxy';
 import {
   clientIdAtom,
   websocketConnectedAtom,
 } from '@/app/websocket-provider';
+import { clientIdentityConfirmedAtom } from './StudyWebsocketProvider';
 import {
   VideoCore,
   VideoCoreProvider,
@@ -35,6 +38,18 @@ import { getClientIdProof } from '@/lib/server/client-id';
 import { WSEvents } from '@/lib/server/ws-events';
 import { __clientPlatform__ } from '@/types/constants';
 import type { SeanimeConnection } from '../shared/seanime';
+import type { MediaWorkspacePlaybackRequest } from '../shared/mediaWorkspace';
+import { describeLocalOpenFailure } from '../shared/playbackFailure';
+import {
+  DIRECTSTREAM_MEDIA_REPORT_ONLY,
+  DIRECTSTREAM_MEDIA_SILENCE_MS,
+  directstreamMediaVerdict,
+  directstreamOpenReopened,
+  directstreamOpenVerdict,
+  type DirectstreamMediaProgress,
+  type DirectstreamOpenProgress,
+} from '../shared/directstreamOpenRecovery';
+import { t as translateUi } from '../renderer/i18n';
 import {
   normalizeVideoCoreResumePositions,
   resolveVideoCoreResumePosition,
@@ -43,6 +58,17 @@ import {
   VIDEO_CORE_RESUME_STORAGE_KEY,
   videoCoreResumeKey,
 } from '../shared/videoCoreStudy';
+import { resumeWriteAction } from '../shared/videoCoreResumeWrite';
+import {
+  createWatchTimeState,
+  watchTimeFlush,
+  watchTimeInterrupt,
+  watchTimeSample,
+  watchTimeShouldFlush,
+  watchTimeStop,
+  type WatchTimeState,
+} from '../shared/seanimeWatchTime';
+import { recordWatching } from '../renderer/stats';
 import VideoCoreStudyOverlay from './VideoCoreStudyOverlay';
 
 type ServerMessage = {
@@ -53,6 +79,11 @@ type ServerMessage = {
 type CueProofConfig = {
   mkvPath: string;
   videoUrl: string;
+  /**
+   * Opt into the production resume path for the restart acceptance proof.
+   * Disposable cue proofs remain non-persistent unless this is explicitly set.
+   */
+  verifyContinuity?: boolean;
 };
 
 type CueProofState = {
@@ -83,6 +114,7 @@ const initialState: VideoCoreLifecycleState = {
   playbackError: null,
   loadingState: null,
 };
+
 
 function proofWindow(): CueProofWindow {
   return window as CueProofWindow;
@@ -125,7 +157,14 @@ function toVideoCorePlaybackInfo(
     // Study OS owns continuity because the supervised sidecar datadir is disposable.
     disableRestoreFromContinuity: true,
     ...(proofConfig
-      ? { initialState: { paused: true } }
+      ? {
+          initialState: {
+            paused: true,
+            ...(proofConfig.verifyContinuity && resumePositionSec > 0
+              ? { currentTime: resumePositionSec }
+              : {}),
+          },
+        }
       : resumePositionSec > 0
         ? { initialState: { currentTime: resumePositionSec } }
         : {}),
@@ -144,7 +183,35 @@ function resumeKeyForPlayback(
   });
 }
 
-function loadResumePosition(playbackInfo: NativePlayer_PlaybackInfo): number {
+/**
+ * Where an explicitly requested open wants to start, or `null` to resume as usual.
+ *
+ * Phase 6's watch-to-review loop is the only producer: a mined card knows the exact cue it
+ * came from, so "replay the line this card came from" is a destination rather than a
+ * resume. It applies **only to the file it was issued for** — the request object outlives
+ * the open that consumed it, so without the key check a later `watch` for a different file
+ * would inherit someone else's timestamp and silently start it minutes in. Both sides go
+ * through `videoCoreResumeKey`, so this reuses the resume store's own normalisation
+ * instead of introducing a second path-comparison rule.
+ */
+function requestedStartSec(
+  playbackRequest: MediaWorkspacePlaybackRequest | null,
+  nativeInfo: NativePlayer_PlaybackInfo,
+): number | null {
+  if (!playbackRequest || playbackRequest.kind !== 'local') return null;
+  const { startAtSec } = playbackRequest;
+  if (typeof startAtSec !== 'number' || !Number.isFinite(startAtSec) || startAtSec < 0) {
+    return null;
+  }
+  const requestedKey = videoCoreResumeKey({ localFilePath: playbackRequest.localFilePath });
+  return requestedKey && requestedKey === resumeKeyForPlayback(nativeInfo)
+    ? startAtSec
+    : null;
+}
+
+function loadResumePosition(
+  playbackInfo: NativePlayer_PlaybackInfo | VideoCore_VideoPlaybackInfo,
+): number {
   const key = resumeKeyForPlayback(playbackInfo);
   if (!key) return 0;
   try {
@@ -155,6 +222,30 @@ function loadResumePosition(playbackInfo: NativePlayer_PlaybackInfo): number {
   } catch {
     return 0;
   }
+}
+
+/**
+ * The one place a local-file open is issued. Both callers — the launch effect and the
+ * recovery below it — go through here, so a header or a body that drifts drifts for both.
+ */
+function postDirectstreamOpen(
+  conn: SeanimeConnection,
+  clientId: string,
+  localFilePath: string,
+  signal: AbortSignal,
+): Promise<Response> {
+  return fetch(`${conn.baseUrl}/api/v1/directstream/play/localfile`, {
+    method: 'POST',
+    signal,
+    headers: {
+      'X-Seanime-Token': conn.token,
+      'X-Seanime-Client-Id': clientId,
+      'X-Seanime-Client-Id-Proof': getClientIdProof(),
+      'X-Seanime-Client-Platform': __clientPlatform__,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ path: localFilePath, clientId }),
+  });
 }
 
 async function consumeParserStream(
@@ -349,6 +440,33 @@ function StudyOverlay({
   );
 }
 
+/**
+ * What this file is called in the study ledger. Never translated — a media title is study
+ * content, per `CLAUDE.md`'s i18n scope rule, and the same order `miningSourceFromPlayback`
+ * uses so one file does not acquire two names across two surfaces. A bare file name is the
+ * last resort because it is always better than an empty row.
+ */
+function ledgerTitleForPlayback(playbackInfo: VideoCore_VideoPlaybackInfo): string {
+  const media = playbackInfo.media?.title;
+  const mediaTitle = media?.userPreferred || media?.romaji || media?.english || media?.native;
+  const episode = playbackInfo.episode?.episodeNumber;
+  if (mediaTitle) {
+    return episode != null ? `${mediaTitle} — ${episode}` : mediaTitle;
+  }
+  const path = playbackInfo.localFile?.path ?? '';
+  return path.split(/[\\/]/).pop() || playbackInfo.episode?.displayTitle || '';
+}
+
+/**
+ * Persists where you stopped, and how long you actually watched.
+ *
+ * The two live together because they need exactly the same four listeners on exactly the
+ * same element, and because they answer the same question from opposite ends: the resume
+ * store is *where* the session got to, the ledger flush is *that it happened at all*.
+ * Before slice 8 the second half went nowhere — a night in this player left the app's own
+ * streak, heat-map and "study time today" reading zero. See `shared/seanimeWatchTime.ts`
+ * for the five rules that decide what counts.
+ */
 function ResumeTracker({
   playbackInfo,
   disabled,
@@ -364,20 +482,45 @@ function ResumeTracker({
     if (!key) return;
     let lastSavedSec = -1;
 
+    const ledgerTitle = ledgerTitleForPlayback(playbackInfo);
+    let watch: WatchTimeState = createWatchTimeState();
+    const flushWatch = (): void => {
+      const flushed = watchTimeFlush(watch);
+      watch = flushed.state;
+      if (flushed.seconds > 0) recordWatching(key, ledgerTitle, flushed.seconds);
+    };
+
+    /**
+     * The furthest this session actually got. `resumeWriteAction` needs it to tell a
+     * deliberate rewind to 0:00 from a session that never started — see
+     * `shared/videoCoreResumeWrite.ts` for why the two must not write the same thing.
+     */
+    let sessionMaxSec = 0;
+    /**
+     * Whether the element has media to speak for. An emptied one — `video-core.tsx`
+     * §965-970 pauses, drops `src` and calls `load()` — reports `currentTime === 0` for a
+     * file that may have been playing a second earlier.
+     */
+    const hasMedia = (): boolean => video.readyState > 0 || video.currentSrc !== '';
+
     const persist = (finished = false): void => {
       const positionSec = video.currentTime;
-      if (!Number.isFinite(positionSec)) return;
+      if (hasMedia() && Number.isFinite(positionSec)) {
+        sessionMaxSec = Math.max(sessionMaxSec, positionSec);
+      }
+      const action = resumeWriteAction({
+        positionSec,
+        hasMedia: hasMedia(),
+        sessionMaxSec,
+        durationSec: video.duration,
+        finished,
+      });
+      if (action === 'skip') return;
       try {
         const current = normalizeVideoCoreResumePositions(
           JSON.parse(localStorage.getItem(VIDEO_CORE_RESUME_STORAGE_KEY) ?? '[]'),
         );
-        const atEnd = finished
-          || (
-            Number.isFinite(video.duration)
-            && video.duration > 0
-            && positionSec >= video.duration - 5
-          );
-        const next = atEnd
+        const next = action === 'clear'
           ? current.filter((position) => position.key !== key)
           : upsertVideoCoreResumePosition(current, {
               key,
@@ -391,10 +534,26 @@ function ResumeTracker({
       }
     };
     const handleTimeUpdate = (): void => {
+      watch = watchTimeSample(watch, {
+        atMs: Date.now(),
+        positionSec: video.currentTime,
+        playing: !video.paused,
+      });
+      if (watchTimeShouldFlush(watch)) flushWatch();
       if (Math.abs(video.currentTime - lastSavedSec) >= 2) persist();
     };
-    const handlePause = (): void => persist();
-    const handleEnded = (): void => persist(true);
+    // `pause` and `ended` are the transition itself, so the interval ending at them was
+    // playing for all of it — `watchTimeStop` says so rather than losing the fragment.
+    const handlePause = (): void => {
+      watch = watchTimeStop(watch, { atMs: Date.now(), positionSec: video.currentTime });
+      flushWatch();
+      persist();
+    };
+    const handleEnded = (): void => {
+      watch = watchTimeStop(watch, { atMs: Date.now(), positionSec: video.currentTime });
+      flushWatch();
+      persist(true);
+    };
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('pause', handlePause);
     video.addEventListener('ended', handleEnded);
@@ -402,6 +561,10 @@ function ResumeTracker({
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('ended', handleEnded);
+      // Teardown is not a transition — the element may still have been playing when the
+      // file changed, so the open interval is closed but not credited past its last tick.
+      watch = watchTimeInterrupt(watch);
+      flushWatch();
       persist();
     };
   }, [disabled, playbackInfo, video]);
@@ -409,13 +572,292 @@ function ResumeTracker({
   return null;
 }
 
-function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactElement {
+function StudyPlayerSession({
+  conn,
+  playbackRequest,
+}: {
+  conn: SeanimeConnection;
+  playbackRequest: MediaWorkspacePlaybackRequest | null;
+}): React.ReactElement {
   const [state, setState] = React.useState<VideoCoreLifecycleState>(initialState);
   const manager = useAtomValue(vc_subtitleManager);
+  const clientId = useAtomValue(clientIdAtom);
+  const connected = useAtomValue(websocketConnectedAtom);
+  const identityConfirmed = useAtomValue(clientIdentityConfirmedAtom);
   const pendingEvents = React.useRef<MKVParser_SubtitleEvent[]>([]);
   const pulledPlaybackIds = React.useRef(new Set<string>());
   const pendingParserInfo = React.useRef<NativePlayer_PlaybackInfo | null>(null);
   const proofConfig = proofWindow().__SEANIME_CUE_PROOF_CONFIG__;
+  const launchedRequestRef = React.useRef<number | null>(null);
+  /**
+   * The open that is outstanding right now, or null. Held in a ref rather than in state
+   * because every write to it comes from a websocket message or a timer, and re-rendering
+   * the player for "the sidecar is still alive" would be a render per step message.
+   */
+  const openProgressRef = React.useRef<
+    { requestId: number; progress: DirectstreamOpenProgress } | null
+  >(null);
+  /**
+   * Stage 2, armed by the `watch` payload — where stage 1 disarms. Separate record because
+   * the two stages measure different things: stage 1 watches the SIDECAR's silence, stage 2
+   * watches the ELEMENT.
+   */
+  const mediaProgressRef = React.useRef<
+    { requestId: number; progress: DirectstreamMediaProgress } | null
+  >(null);
+  /**
+   * `ResumeTracker` reads this same atom in this same subtree and its resume write returns
+   * early without a real element — and phase F of `retirement-step3-harness.mjs` exercises
+   * that write on every run. So this handle is known to resolve, not assumed to.
+   */
+  const video = useAtomValue(vc_videoElement);
+  const { getHMACTokenQueryParam } = useServerHMACAuth();
+
+  /**
+   * `identityConfirmed`, not just `connected`: a local open is addressed BY client id, and
+   * the id is not settled the moment the socket reports open. The status fetch publishes one
+   * from its HTTP response, then the server names its own over the socket ~10ms later. Both
+   * ids are non-empty and both pass `!clientId`, so opening on the first one sent a POST the
+   * server never associated with this socket — the reply went to a client that does not
+   * exist here, and the effect re-ran on the real id and opened a SECOND stream, leaving the
+   * first prepared and orphaned on the sidecar. Measured in a packaged build: two POSTs 2ms
+   * apart, same file, different client ids. See `seanimeSocketPool.ts` for the fallback that
+   * keeps a server which never sends `CLIENT_IDENTITY` from stranding this gate.
+   */
+  React.useEffect(() => {
+    if (
+      proofConfig
+      || !playbackRequest
+      || !connected
+      || !clientId
+      || !identityConfirmed
+      || launchedRequestRef.current === playbackRequest.requestId
+    ) {
+      return;
+    }
+    launchedRequestRef.current = playbackRequest.requestId;
+    const controller = new AbortController();
+
+    if (playbackRequest.kind === 'stream') {
+      const source = playbackRequest.stream;
+      void (async () => {
+        try {
+          const needsProxy = Object.keys(source.playback.headers).length > 0;
+          const tokenQuery = needsProxy
+            ? await getHMACTokenQueryParam('/api/v1/proxy', '&')
+            : '';
+          if (controller.signal.aborted) return;
+          const playableUrl = (url: string): string => needsProxy
+            ? getProxyUrl(conn.baseUrl, url, source.playback.headers, tokenQuery)
+            : url;
+          const playbackInfo: VideoCore_VideoPlaybackInfo = {
+            id: source.streamId,
+            playbackType: 'onlinestream',
+            streamUrl: playableUrl(source.playback.url),
+            streamPath: `${source.seriesTitle} · ${translateUi('mediaWorkspace.episode', {
+              number: source.episodeNumber,
+            })}`,
+            streamType: source.playback.kind === 'hls'
+              ? 'hls'
+              : source.playback.kind === 'mp4'
+                ? 'native'
+                : 'unknown',
+            subtitleTracks: source.playback.subtitles.map((subtitle, index) => ({
+              index,
+              src: playableUrl(subtitle.url),
+              label: subtitle.language,
+              language: subtitle.language,
+              default: subtitle.default,
+            })),
+            disableRestoreFromContinuity: true,
+            ...(source.aniListId == null
+              ? {}
+              : {
+                  onlinestreamParams: {
+                    mediaId: source.aniListId,
+                    episodeNumber: source.episodeNumber,
+                    provider: source.playback.providerId,
+                    server: source.playback.server,
+                    quality: source.resolution,
+                    dubbed: source.playback.dubbed,
+                  },
+                }),
+          };
+          const resumePositionSec = loadResumePosition(playbackInfo);
+          if (resumePositionSec > 0) {
+            playbackInfo.initialState = { currentTime: resumePositionSec };
+          }
+          setState({
+            active: true,
+            playbackInfo,
+            playbackError: null,
+            loadingState: null,
+          });
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          setState({
+            active: true,
+            playbackInfo: null,
+            playbackError: error instanceof Error ? error.message : String(error),
+            loadingState: null,
+          });
+        }
+      })();
+      return () => {
+        controller.abort();
+        if (launchedRequestRef.current === playbackRequest.requestId) {
+          launchedRequestRef.current = null;
+        }
+      };
+    }
+
+    // Armed BEFORE the request, not in its `then`: a 200 is not evidence the preparation
+    // survived (see `shared/directstreamOpenRecovery.ts`), and the sidecar's first message
+    // can land before the fetch promise resolves.
+    openProgressRef.current = {
+      requestId: playbackRequest.requestId,
+      progress: { attempts: 1, lastSignalAt: Date.now(), playbackArrived: false },
+    };
+
+    void postDirectstreamOpen(conn, clientId, playbackRequest.localFilePath, controller.signal)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(describeLocalOpenFailure(response.status, await response.text()));
+        }
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        // A refused open reports itself, so the silence watchdog has nothing left to do.
+        openProgressRef.current = null;
+        setState({
+          active: true,
+          playbackInfo: null,
+          playbackError: error instanceof Error ? error.message : String(error),
+          loadingState: null,
+        });
+      });
+    return () => {
+      controller.abort();
+      if (launchedRequestRef.current === playbackRequest.requestId) {
+        launchedRequestRef.current = null;
+      }
+    };
+  }, [clientId, conn, connected, identityConfirmed, playbackRequest, proofConfig]);
+
+  /**
+   * The recovery. A local open that the sidecar cancelled mid-preparation answers 200 and
+   * then says nothing at all, so silence is the only symptom there is — see
+   * `shared/directstreamOpenRecovery.ts` for the measured sequence and why the cancel comes
+   * from adopted code we do not edit.
+   *
+   * Deliberately its own effect. Folding it into the launch effect would tie the deadline
+   * to that effect's cleanup, and StrictMode's double-invoke — the very thing that makes
+   * this defect deterministic in Blanc — tears that cleanup down and re-runs it.
+   */
+  React.useEffect(() => {
+    if (proofConfig || !playbackRequest || playbackRequest.kind !== 'local' || !clientId) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = window.setInterval(() => {
+      const outstanding = openProgressRef.current;
+      // A request that has moved on is not this effect's business: the launch effect has
+      // already armed a fresh record for the new one.
+      if (!outstanding || outstanding.requestId !== playbackRequest.requestId) return;
+
+      switch (directstreamOpenVerdict(outstanding.progress, Date.now())) {
+        case 'playing':
+          openProgressRef.current = null;
+          break;
+        case 'waiting':
+          break;
+        case 'reopen':
+          // Counted and re-armed together, so the next tick reads `waiting` rather than
+          // firing a second request into the first one's window.
+          outstanding.progress = directstreamOpenReopened(outstanding.progress, Date.now());
+          void postDirectstreamOpen(
+            conn, clientId, playbackRequest.localFilePath, controller.signal,
+          ).catch(() => {
+            // A failed re-open is not reported here: the record stays armed and the next
+            // silence window reaches `failed`, which is the one place this speaks.
+          });
+          break;
+        case 'failed':
+          openProgressRef.current = null;
+          setState({
+            active: true,
+            playbackInfo: null,
+            playbackError: translateUi('mediaWorkspace.openStalled'),
+            loadingState: null,
+          });
+          break;
+      }
+    }, 1_000);
+
+    return () => {
+      window.clearInterval(timer);
+      controller.abort();
+    };
+  }, [clientId, conn, playbackRequest, proofConfig]);
+
+  /**
+   * STAGE 2 — the `watch` arrived and no media followed. REPORT ONLY.
+   *
+   * Stage 1 disarms on the `watch`, correctly: it measures the sidecar's silence, and a
+   * `watch` proves the sidecar is talking. But the payload is a promise of playback, not
+   * playback — measured repeatedly, the whole study dock rendered over a `<video>` at
+   * `readyState 0` / `networkState 0` on an empty MediaSource, forever, with no error.
+   *
+   * **This deliberately does not re-open.** Two attempts to make it re-open were reverted:
+   * a recovery POST calls `BeginOpen` → `beginSubtitleSeek`, which stops every active
+   * subtitle stream, and a POST issued against one attempt can land inside the NEXT
+   * attempt's healthy stream. `DIRECTSTREAM_MEDIA_REPORT_ONLY` makes the verdict skip
+   * `reopen` entirely, so there is no `postDirectstreamOpen` on this path at all and the
+   * destructive mechanism is absent by construction rather than by argument.
+   *
+   * What it buys is the part that never needed a POST: a forever-spinner becomes a stated
+   * error. See `shared/directstreamOpenRecovery.ts` for the full history before changing it.
+   */
+  React.useEffect(() => {
+    if (proofConfig || !playbackRequest || playbackRequest.kind !== 'local' || !clientId) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      const outstanding = mediaProgressRef.current;
+      if (!outstanding || outstanding.requestId !== playbackRequest.requestId) return;
+
+      outstanding.progress = {
+        ...outstanding.progress,
+        elementEverObserved: outstanding.progress.elementEverObserved || video != null,
+        lastObservation: video
+          ? {
+              kind: 'element',
+              readyState: video.readyState,
+              networkState: video.networkState,
+              bufferedRanges: video.buffered ? video.buffered.length : 0,
+            }
+          : { kind: 'unreadable' },
+      };
+
+      const verdict = directstreamMediaVerdict(
+        outstanding.progress,
+        Date.now(),
+        DIRECTSTREAM_MEDIA_SILENCE_MS,
+        DIRECTSTREAM_MEDIA_REPORT_ONLY,
+      );
+      if (verdict !== 'failed') return;
+
+      mediaProgressRef.current = null;
+      setState({
+        active: true,
+        playbackInfo: null,
+        playbackError: translateUi('mediaWorkspace.openStalled'),
+        loadingState: null,
+      });
+    }, 1_000);
+
+    return () => window.clearInterval(timer);
+  }, [clientId, playbackRequest, proofConfig, video]);
 
   React.useEffect(() => {
     if (!manager || !pendingEvents.current.length) return;
@@ -430,21 +872,43 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
 
   const onMessage = React.useCallback(
     (message: ServerMessage) => {
+      // Every native-player message is a sign of life for the open in flight, whatever it
+      // says. The recovery below measures SILENCE, so this has to run for all of them —
+      // including step messages this switch does not otherwise act on.
+      const outstanding = openProgressRef.current;
+      if (outstanding) {
+        outstanding.progress = { ...outstanding.progress, lastSignalAt: Date.now() };
+      }
+
       switch (message.type) {
         case 'open-and-await':
           setState({
             // Do not mount VideoCore until the following "watch" payload supplies real
             // playback info. Mounting it with null info terminates the just-opened
             // directstream preparation and makes the parser pull fail intermittently.
+            //
+            // Slice 24 named that intermittency: the adopted lifecycle effect dispatches
+            // `video-terminated` from its own `if (!state.playbackInfo)` branch, and the
+            // sidecar cancels the in-flight preparation without telling anyone. It is not
+            // avoidable from here — this is one of THREE deps of that effect — so it is
+            // recovered from instead, in the watchdog below.
             active: false,
             playbackInfo: null,
             playbackError: null,
-            loadingState: 'Opening local file',
+            loadingState: translateUi('mediaWorkspace.openingLocal'),
           });
           break;
         case 'watch': {
           const nativeInfo = message.payload as NativePlayer_PlaybackInfo;
-          const resumePositionSec = proofConfig ? 0 : loadResumePosition(nativeInfo);
+          // An explicit destination outranks the stored resume position; nothing else
+          // does. `?? ` and not `||`: a requested 0 is the top of the file, which must
+          // still suppress the resume rather than fall through to it.
+          const requestedSec = requestedStartSec(playbackRequest, nativeInfo);
+          const resumePositionSec = requestedSec ?? (
+            !proofConfig || proofConfig.verifyContinuity
+              ? loadResumePosition(nativeInfo)
+              : 0
+          );
           setState({
             active: true,
             playbackInfo: toVideoCorePlaybackInfo(
@@ -455,6 +919,23 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
             playbackError: null,
             loadingState: null,
           });
+          if (openProgressRef.current) {
+            openProgressRef.current.progress = {
+              ...openProgressRef.current.progress,
+              playbackArrived: true,
+            };
+            // Stage 1 stops here by design; stage 2's window starts here.
+            mediaProgressRef.current = {
+              requestId: openProgressRef.current.requestId,
+              progress: {
+                playbackArrived: true,
+                watchArrivedAt: Date.now(),
+                elementEverObserved: false,
+                lastObservation: null,
+                stageAttempts: 0,
+              },
+            };
+          }
           if (proofConfig) pendingParserInfo.current = nativeInfo;
           break;
         }
@@ -480,19 +961,24 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
           break;
         }
         case 'abort-open':
+          // The sidecar said so out loud, so there is nothing for the watchdog to find.
+          openProgressRef.current = null;
           setState(initialState);
           break;
         case 'error':
+          openProgressRef.current = null;
           setState({
             active: true,
             playbackInfo: null,
-            playbackError: String(message.payload ?? 'Unknown playback error'),
+            playbackError: String(
+              message.payload ?? translateUi('mediaWorkspace.unknownPlaybackError'),
+            ),
             loadingState: null,
           });
           break;
       }
     },
-    [conn, manager, proofConfig],
+    [conn, manager, playbackRequest, proofConfig],
   );
 
   useWebsocketMessageListener<ServerMessage>({
@@ -508,68 +994,79 @@ function StudyPlayerSession({ conn }: { conn: SeanimeConnection }): React.ReactE
       <CueProofDriver conn={conn} />
       <ResumeTracker
         playbackInfo={state.playbackInfo}
-        disabled={Boolean(proofConfig)}
+        disabled={Boolean(proofConfig && !proofConfig.verifyContinuity)}
       />
-      {state.active && (
-        <section
-          className="study-player-slice"
-          data-study-player="active"
-          data-cue-proof-phase={proofWindow().__SEANIME_CUE_PROOF__?.phase ?? 'idle'}
-        >
-          <VideoCore
-            id="study-media"
-            state={state}
-            inline
-            inlineClassName="study-video-core"
-            onTerminateStream={() => setState(initialState)}
-            onLoadedMetadata={(event) => {
-              if (!proofConfig) return;
-              const video = event.currentTarget;
-              video.muted = true;
-              video.playbackRate = 1;
-              video.pause();
-              // Chromium emits one zero-position `seeked` while establishing a new
-              // media resource. In the split-file proof only, suppress that synthetic
-              // bootstrap signal so VideoCore does not ask the sidecar to replace the
-              // MKV subtitle generation that is about to start.
-              video.addEventListener(
-                'seeked',
-                (seekEvent) => {
-                  if (video.currentTime <= 0.05) seekEvent.stopImmediatePropagation();
-                },
-                { capture: true, once: true },
-              );
+      {/*
+        VideoCore is mounted unconditionally, exactly as upstream's own host does
+        (native-player.tsx renders <VideoCore> with no `active` gate and lets the
+        component read state.active/playbackInfo as props). Gating the mount on
+        state.active looks tidier but breaks two invariants: unmounting drops
+        `vc_activePlayerId` to null with nothing to restore it — which silently
+        disables every isActivePlayer-gated DOM listener, so the server never gets
+        the loaded-metadata event that starts subtitle streaming — and the unmount
+        also dispatches `video-terminated`, killing a stream that is about to be
+        replayed. The slice is hidden by CSS while idle instead.
+      */}
+      <section
+        className="study-player-slice"
+        data-study-player={state.active ? 'active' : 'idle'}
+        data-cue-proof-phase={proofWindow().__SEANIME_CUE_PROOF__?.phase ?? 'idle'}
+      >
+        <VideoCore
+          id="study-media"
+          state={state}
+          inline
+          inlineClassName="study-video-core"
+          onTerminateStream={() => setState(initialState)}
+          onLoadedMetadata={(event) => {
+            if (!proofConfig) return;
+            const video = event.currentTarget;
+            video.muted = true;
+            video.playbackRate = 1;
+            video.pause();
+            // Chromium emits one zero-position `seeked` while establishing a new
+            // media resource. In the split-file proof only, suppress that synthetic
+            // bootstrap signal so VideoCore does not ask the sidecar to replace the
+            // MKV subtitle generation that is about to start.
+            video.addEventListener(
+              'seeked',
+              (seekEvent) => {
+                if (video.currentTime <= 0.05) seekEvent.stopImmediatePropagation();
+              },
+              { capture: true, once: true },
+            );
 
-              const nativeInfo = pendingParserInfo.current;
-              if (!nativeInfo || pulledPlaybackIds.current.has(nativeInfo.id)) return;
-              pulledPlaybackIds.current.add(nativeInfo.id);
-              // VideoCore emits an initial seek while it establishes the MP4's media
-              // timeline. Let that settle before opening the MKV parser response or the
-              // sidecar correctly cancels the just-opened subtitle stream.
-              window.setTimeout(() => {
-                void consumeParserStream(conn, nativeInfo).catch((error: unknown) => {
-                  const text = error instanceof Error ? error.message : String(error);
-                  publishProof({ phase: 'failed', error: text });
-                  console.error(`[cue-proof] ${text}`);
-                });
-              }, 250);
-            }}
-          />
-          <StudyOverlay playbackInfo={state.playbackInfo} />
-        </section>
-      )}
+            const nativeInfo = pendingParserInfo.current;
+            if (!nativeInfo || pulledPlaybackIds.current.has(nativeInfo.id)) return;
+            pulledPlaybackIds.current.add(nativeInfo.id);
+            // VideoCore emits an initial seek while it establishes the MP4's media
+            // timeline. Let that settle before opening the MKV parser response or the
+            // sidecar correctly cancels the just-opened subtitle stream.
+            window.setTimeout(() => {
+              void consumeParserStream(conn, nativeInfo).catch((error: unknown) => {
+                const text = error instanceof Error ? error.message : String(error);
+                publishProof({ phase: 'failed', error: text });
+                console.error(`[cue-proof] ${text}`);
+              });
+            }, 250);
+          }}
+        />
+        {state.active && <StudyOverlay playbackInfo={state.playbackInfo} />}
+      </section>
     </>
   );
 }
 
 export default function StudyPlayerSlice({
   conn,
+  playbackRequest,
 }: {
   conn: SeanimeConnection;
+  playbackRequest: MediaWorkspacePlaybackRequest | null;
 }): React.ReactElement {
   return (
     <VideoCoreProvider id="study-media">
-      <StudyPlayerSession conn={conn} />
+      <StudyPlayerSession conn={conn} playbackRequest={playbackRequest} />
     </VideoCoreProvider>
   );
 }
