@@ -1,0 +1,177 @@
+diff --git a/internal/directstream/localfile.go b/internal/directstream/localfile.go
+index 76f4dcd..f34b31b 100644
+--- a/internal/directstream/localfile.go
++++ b/internal/directstream/localfile.go
+@@ -289,10 +289,19 @@ type PlayLocalFileOptions struct {
+ 	ClientId   string
+ 	Path       string
+ 	LocalFiles []*anime.LocalFile
++	// Generation is the client's own monotonically increasing id for this open request.
++	// Zero means unspecified. See [Manager.AcceptOpenGeneration].
++	Generation int64
+ }
+ 
+ // PlayLocalFile is used by a module to load a new torrent stream.
+ func (m *Manager) PlayLocalFile(ctx context.Context, opts PlayLocalFileOptions) (err error) {
++	// Before BeginOpen, never after: BeginOpen replaces the current stream and stops its
++	// subtitle streams, so a request that has been overtaken must be refused while that is
++	// still undone.
++	if !m.AcceptOpenGeneration(opts.ClientId, opts.Generation) {
++		return fmt.Errorf("stale open request: generation %d is older than one already accepted for this client", opts.Generation)
++	}
+ 	if !m.BeginOpen(opts.ClientId, "Loading stream...", nil) {
+ 		return fmt.Errorf("stream opening was cancelled")
+ 	}
+diff --git a/internal/directstream/manager.go b/internal/directstream/manager.go
+index bd720ad..0346d16 100644
+--- a/internal/directstream/manager.go
++++ b/internal/directstream/manager.go
+@@ -74,6 +74,10 @@ type (
+ 		animeCache      *result.Cache[int, *anilist.BaseAnime]
+ 
+ 		parserCache *result.Cache[string, *mkvparser.MetadataParser]
++
++		// Highest open generation accepted per client id. See [Manager.AcceptOpenGeneration].
++		openGenerationMu sync.Mutex
++		openGeneration   map[string]int64
+ 		//playbackStatusSubscribers *result.Map[string, *PlaybackStatusSubscriber]
+ 	}
+ 
+diff --git a/internal/directstream/open_generation_test.go b/internal/directstream/open_generation_test.go
+new file mode 100644
+index 0000000..d968b67
+--- /dev/null
++++ b/internal/directstream/open_generation_test.go
+@@ -0,0 +1,69 @@
++package directstream
++
++import "testing"
++
++// The rule exists because a client cannot recall a request it has already sent; see
++// [Manager.AcceptOpenGeneration].
++func TestAcceptOpenGeneration(t *testing.T) {
++	t.Run("unspecified generations are always accepted", func(t *testing.T) {
++		m := &Manager{}
++		if !m.AcceptOpenGeneration("client", 0) {
++			t.Fatal("a client that sends no generation must behave exactly as before")
++		}
++		if !m.AcceptOpenGeneration("client", -1) {
++			t.Fatal("a negative generation is unspecified, not stale")
++		}
++		if !m.AcceptOpenGeneration("", 5) {
++			t.Fatal("without a client id there is nothing to order against")
++		}
++		// …and none of that may have recorded anything.
++		if !m.AcceptOpenGeneration("client", 1) {
++			t.Fatal("an unspecified generation must not raise the bar for later requests")
++		}
++	})
++
++	t.Run("a newer generation is accepted and becomes the bar", func(t *testing.T) {
++		m := &Manager{}
++		if !m.AcceptOpenGeneration("client", 7) {
++			t.Fatal("the first generation must be accepted")
++		}
++		if !m.AcceptOpenGeneration("client", 8) {
++			t.Fatal("a newer generation must be accepted")
++		}
++		if m.AcceptOpenGeneration("client", 7) {
++			t.Fatal("7 is now older than 8 and must be refused")
++		}
++	})
++
++	t.Run("an equal generation is accepted, because that is the recovery", func(t *testing.T) {
++		m := &Manager{}
++		m.AcceptOpenGeneration("client", 3)
++		if !m.AcceptOpenGeneration("client", 3) {
++			t.Fatal("a re-open of the SAME request is the legitimate recovery, not a stale one")
++		}
++	})
++
++	t.Run("clients are ordered independently", func(t *testing.T) {
++		m := &Manager{}
++		if !m.AcceptOpenGeneration("a", 9) {
++			t.Fatal("first request for a")
++		}
++		if !m.AcceptOpenGeneration("b", 1) {
++			t.Fatal("b's own sequence must not be judged against a's")
++		}
++		if m.AcceptOpenGeneration("a", 8) {
++			t.Fatal("a's older request is still stale")
++		}
++	})
++
++	t.Run("a refusal does not move the bar", func(t *testing.T) {
++		m := &Manager{}
++		m.AcceptOpenGeneration("client", 5)
++		if m.AcceptOpenGeneration("client", 2) {
++			t.Fatal("2 is stale")
++		}
++		if !m.AcceptOpenGeneration("client", 5) {
++			t.Fatal("the current generation must still be accepted after a refusal")
++		}
++	})
++}
+diff --git a/internal/directstream/stream.go b/internal/directstream/stream.go
+index 061c9fe..4e683fc 100644
+--- a/internal/directstream/stream.go
++++ b/internal/directstream/stream.go
+@@ -87,6 +87,36 @@ func (m *Manager) getStreamHandler() http.Handler {
+ 	})
+ }
+ 
++// AcceptOpenGeneration reports whether an open request is still the newest one this client
++// has asked for, and records it when it is.
++//
++// A client cannot recall a request it has already sent. A recovery request issued against one
++// open can arrive after the user has started a newer one, and [Manager.BeginOpen] ->
++// beginSubtitleSeek then stops the subtitle streams of the open the user is actually
++// watching. A client can order its own sends; it cannot order the server's receives. Only the
++// server can refuse a request that has been overtaken, which is what this does — and it must
++// be consulted BEFORE BeginOpen, since BeginOpen is itself the destructive step.
++//
++// A generation of 0 (or a client that sends none) means "unspecified" and is always accepted,
++// so every existing client behaves exactly as before. An EQUAL generation is accepted too: a
++// re-open of the same request is the legitimate recovery this exists to protect, not a stale
++// one. Only a STRICTLY OLDER generation is refused.
++func (m *Manager) AcceptOpenGeneration(clientId string, generation int64) bool {
++	if clientId == "" || generation <= 0 {
++		return true
++	}
++	m.openGenerationMu.Lock()
++	defer m.openGenerationMu.Unlock()
++	if m.openGeneration == nil {
++		m.openGeneration = make(map[string]int64)
++	}
++	if last, ok := m.openGeneration[clientId]; ok && generation < last {
++		return false
++	}
++	m.openGeneration[clientId] = generation
++	return true
++}
++
+ func (m *Manager) BeginOpen(clientId string, step string, onCancel func()) bool {
+ 	return m.BeginOpenWithTarget(clientId, step, onCancel, m.GetPlaybackTarget())
+ }
+diff --git a/internal/handlers/directstream.go b/internal/handlers/directstream.go
+index 091579b..f9ca7f6 100644
+--- a/internal/handlers/directstream.go
++++ b/internal/handlers/directstream.go
+@@ -26,6 +26,9 @@ func (h *Handler) HandleDirectstreamPlayLocalFile(c echo.Context) error {
+ 	type body struct {
+ 		Path     string `json:"path"`     // The path of the file.
+ 		ClientId string `json:"clientId"` // The session id
++		// Generation is the client's own monotonically increasing id for this open request.
++		// Omitted or 0 keeps the previous behaviour: every request is accepted.
++		Generation int64 `json:"generation"`
+ 	}
+ 
+ 	var b body
+@@ -48,6 +51,7 @@ func (h *Handler) HandleDirectstreamPlayLocalFile(c echo.Context) error {
+ 		ClientId:   b.ClientId,
+ 		Path:       b.Path,
+ 		LocalFiles: lfs,
++		Generation: b.Generation,
+ 	})
+ }
+ 

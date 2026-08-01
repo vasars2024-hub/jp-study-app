@@ -196,3 +196,136 @@ The builder takes tracked source from `git archive` at the exact pin, copies onl
 already-generated `web/` embed input, applies the patch in a disposable directory, runs the
 upstream regression, and then builds with `-tags=nosystray`. Its temporary source directory
 is always removed.
+
+## 0003 — VideoCore never re-claims `vc_activePlayerId`, and never announces a stream it was mounted with
+
+Two independent upstream defects in the web `video-core`. Together they make every
+subtitle stream fail silently for any host that mounts `<VideoCore>` only while a stream is
+active, which is what Study OS's Phase-3 seam did. **Shape:** 30 insertions, 1 deletion.
+
+### 3a — the "Override active player" effect is a no-op
+
+`video-core.tsx` §1016-1021:
+
+```ts
+// Override active player, won't apply to native-player
+React.useEffect(() => {
+    if (state.playbackInfo?.id && activePlayer === props.id) {
+        setActivePlayer(props.id)      // only ever runs when it is ALREADY props.id
+    }
+}, [state.playbackInfo?.id, activePlayer])
+```
+
+The comment says *override*; the guard makes it a self-assignment that can never restore a
+nulled value. The only other writer is `VideoCoreProvider`'s mount-only `[]` layout effect
+(§203-212), which **nulls** the atom on unmount, and `useUnmount` (§837-842) nulls it on
+every terminate. So once the player unmounts, `vc_activePlayerId` is stuck `null` forever,
+`isActivePlayer` is permanently false, and the entire DOM-listener block in
+`video-core-events.ts` §253-313 (`play`/`pause`/`loadedmetadata`/`ended`/`seeked`) never
+attaches. Imperative dispatches (`video-loaded`, `video-can-play`, `video-terminated`)
+still fire, so the player *looks* healthy.
+
+Fixed by inverting the guard to `activePlayer !== props.id` and excluding `native-player`
+explicitly (which the original comment already intended but never implemented).
+
+### 3b — a stream present at mount is never announced
+
+`video-core.tsx` §954 is a `useUpdateEffect`, so it is **skipped on mount**. It is the only
+caller of `dispatchVideoLoadedEvent()`. A player mounted with `state.playbackInfo` already
+set therefore never sends `video-loaded` — and `video-loaded` is what establishes the
+server's playback state (`internal/videocore/videocore.go` §897-907). Without it,
+`videocore.go` §916-922 **drops every `video-loaded-metadata`**
+(`ps, ok := vc.GetPlaybackState(); if !ok { continue }`), so
+`internal/directstream/stream.go` §518-529 never reaches `StartSubtitleStream`. The
+observable symptom is `Populating 0 events for track N` with the sidecar logging only
+`mkvparser > Metadata parsing complete`.
+
+Fixed in `video-core-events.ts` with a mount-case dispatch that also waits for `clientId`
+(which `dispatchVideoLoadedEvent` requires and which is not guaranteed at mount), deduped
+through `announcedPlaybackRef` so it never doubles the lifecycle effect's dispatch. The ref
+is cleared in `dispatchTerminatedEvent`, because terminating clears the server's playback
+state and the same id must then be re-announced.
+
+### Verified — live, against the real sidecar
+
+- `git apply --check` against pinned `9bdd052` — **pass**; pinned checkout left pristine.
+- Live G-PLAY run (`docs/migration/proof/gplay-20260728/`): sidecar log goes from
+  metadata-parsing-only to
+
+  ```text
+  directstream > Video loaded metadata
+  directstream > Starting new subtitle stream offset=0
+  mkvparser    > Subtitle event codecId=S_TEXT/ASS duration=3000 startTime=2000 trackNum=4
+  directstream > First subtitle event sent offset=0
+  directstream > Player seeked currentTime=0
+  ```
+
+  Both `Video loaded metadata` (§519) and `Player seeked` (§551) — the two lines that had
+  never once appeared — now log.
+- 12 real `MKVParser_SubtitleEvent`s delivered, 11 `cuechange` activations, both tracks,
+  `readyState 4`, `duration 30.386`.
+
+### Note for whoever submits this upstream
+
+Upstream itself never hits either defect, because its own host
+(`native-player.tsx` §340-348) mounts `<VideoCore>` unconditionally and lets `state.active`
+flow as a prop. Both are latent bugs that only surface for a conditionally-mounted player —
+which is also why the Study OS seam was corrected to match upstream's mounting shape
+(`src/media/StudyPlayerSlice.tsx`). The patch is still worth submitting: the §1016-1021
+guard is unambiguously not what its comment says.
+
+## 0004 — a client-supplied generation the server can refuse, so a stale open cannot cancel a live one
+
+**Shape:** 121 insertions, **0 deletions** — purely additive, and inert for every client that
+does not opt in.
+
+### The defect, measured over five slices
+
+`POST /api/v1/directstream/play/localfile` calls `BeginOpen`, which replaces the current
+stream and — through `beginSubtitleSeek` — **stops every active subtitle stream**. A client
+that issues a recovery request for one open, then starts a newer one, cannot recall the first:
+`fetch`'s `AbortController` abandons the *response*, never the work. `PlayLocalFile` runs to
+completion regardless, so a request the user has already moved past can land inside the open
+they are actually watching and strip its cues.
+
+Study OS measured this twice, from opposite ends: two independently designed client-side
+recovery stages were wired and each cost a run its subtitles
+(`docs/migration/proof/retirement-step3-20260801094543`), against a 7-of-7 pass rate with
+nothing wired. Its own conclusion was that the fire condition was right and the **transport**
+was the problem, and that the fix has exactly two shapes — *a generation the server can
+reject*, or *a client rule that never issues while a newer open is outstanding*. The second is
+in `src/shared/directstreamOpenChannel.ts` and closes everything except the abandoned-fetch
+case. **This patch is the first, and it is the half a client cannot do.**
+
+### The rule
+
+`Manager.AcceptOpenGeneration(clientId, generation)`, consulted **before** `BeginOpen` —
+after it, the damage is already done.
+
+| generation | verdict |
+|---|---|
+| `0`, negative, or no client id | **accepted**, and recorded nothing. Every existing client is unaffected |
+| newer than the last accepted for that client | **accepted**, and becomes the bar |
+| **equal** to it | **accepted** — a re-open of the same request is the legitimate recovery this protects, not a stale one |
+| strictly older | **refused**, with an error, before `BeginOpen` runs |
+
+Clients are ordered independently, and a refusal does not move the bar.
+
+### Verification
+
+`internal/directstream/open_generation_test.go` (new, 5 subtests) covers each row plus
+per-client isolation. Verified against a fresh clone of the pin: `git apply --check` clean,
+`go vet` clean, `go build ./internal/directstream ./internal/handlers` clean, the new tests
+pass, and the **whole `internal/directstream` package's existing tests still pass**. Evidence:
+`docs/migration/proof/open-generation-patch-20260801232841/`.
+
+### Note for whoever submits this upstream, and for whoever wires it here
+
+Nothing sends `generation` yet — not Study OS, not upstream — so applying this patch changes
+no observable behaviour. That is deliberate: the server half can land and be verified on its
+own, and the client half (`generation: requestId` in the open body, plus the same value on
+every recovery for that request) is a separate, live-measured step. It is **not** in
+`build-patched-sidecar.mjs`'s patch list for the same reason.
+
+Upstream's own web client would benefit identically: its `video-terminated` → cancel path has
+the same shape, and any client that retries an open has the same un-recallable request.
