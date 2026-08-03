@@ -19,6 +19,7 @@ const ALL_STREAMS: NotebookStream[] = [
   'audio',
   'clipboard',
   'extension',
+  'transcript',
 ];
 
 describe('notebook view partition', () => {

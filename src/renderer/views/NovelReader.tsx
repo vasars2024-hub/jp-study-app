@@ -7,7 +7,12 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 import type { LibraryItem } from '../../shared/types';
+import {
+  progressFromReadingLocator,
+  readingLocatorFromProgress,
+} from '../../shared/readingLibraryAdapter';
 import ReaderSettingsPanel from '../components/ReaderSettingsPanel';
 import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
@@ -64,6 +69,10 @@ import {
   resolveWikiUrl,
   type WikiNavEntry,
 } from '../wikiArticle';
+import { getActiveProfile } from '../profileState';
+import { useT } from '../i18n';
+import { KNOWN_LANGS } from '../../shared/langs';
+import { recordEpubPageRead } from '../readingGardenProgress';
 
 interface Props {
   item: LibraryItem;
@@ -80,6 +89,73 @@ const GUTTER = 24;
 
 // Stable empty-HTML object for out-of-range parts (see chapterHtml below).
 const EMPTY_HTML = { __html: '' };
+const EPUB_TRANSLATE_AUTO_KEY = 'jp-study-epub-auto-translate';
+const EPUB_TRANSLATE_MODE_KEY = 'jp-study-epub-translate-mode';
+type EpubTranslateMode = 'original' | 'translation' | 'bilingual';
+
+/** Shared app-wide translation target; never equals the study/source language. */
+function readTranslateTarget(sourceLang: string): string {
+  const saved = getTranslateTarget();
+  if (saved === sourceLang) return sourceLang === 'en' ? 'ru' : 'en';
+  return saved;
+}
+
+function writeTranslateTarget(code: string): void {
+  setTranslateTarget(code);
+}
+
+/** Resolve the text language for EPUB translation (script detection beats a wrong library tag). */
+function resolveEpubSourceLang(item: LibraryItem, sampleHtml: string, profileLang: string): string {
+  // Kana is decisive — a Japanese book mistagged as zh must still translate as ja.
+  if (/[\u3040-\u30ff]/u.test(sampleHtml)) return 'ja';
+  if (item.lang === 'ja' || item.lang === 'zh' || item.lang === 'en') return item.lang;
+  if (profileLang) return profileLang;
+  return 'ja';
+}
+
+function sampleEpubHtml(chapters: Array<{ html?: string }> | undefined): string {
+  if (!chapters?.length) return '';
+  // Prefer the current-ish middle of the book over a title-only first spine item.
+  const idxs = [0, Math.min(1, chapters.length - 1), Math.min(9, chapters.length - 1)];
+  return idxs.map((i) => chapters[i]?.html ?? '').join('\n');
+}
+
+async function translateChapterHtml(
+  html: string,
+  sourceLang: string,
+  targetLang: string,
+): Promise<{ html: string; count: number; cancelled?: boolean }> {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const selector = 'h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,td,th';
+  const blocks = Array.from(doc.body.querySelectorAll<HTMLElement>(selector)).filter((element) => {
+    if (element.querySelector(selector)) return false;
+    const text = (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim();
+    return text.length > 0 && /[\u3040-\u30ff\u3400-\u9fff]/u.test(text);
+  });
+  if (!blocks.length) return { html, count: 0 };
+  const target = targetLang === sourceLang ? (sourceLang === 'en' ? 'ru' : 'en') : targetLang;
+  const items = blocks.map((element, index) => ({
+    id: String(index),
+    text: (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim(),
+    source: sourceLang,
+    target,
+  }));
+  const response = await window.api.translateRunBatch({ items });
+  if (response.cancelled) return { html, count: 0, cancelled: true };
+  if (!response.ok) throw new Error(response.error ?? 'Translation failed.');
+  const results = new Map((response.results ?? []).map((result) => [result.id, result.text]));
+  blocks.forEach((element, index) => {
+    const text = results.get(String(index))?.trim();
+    if (!text) return;
+    element.classList.add('novel-original-block');
+    const translation = doc.createElement('div');
+    translation.className = 'novel-translation-block';
+    translation.lang = target;
+    translation.textContent = text;
+    element.insertAdjacentElement('afterend', translation);
+  });
+  return { html: doc.body.innerHTML, count: blocks.length };
+}
 
 // Saved-position format: "p:<partIndex>:<fractionWithinPart>". Older saves were
 // a bare number (fraction of the whole book) — both are handled on restore.
@@ -113,6 +189,50 @@ export default function NovelReader({ item, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<ReaderSettings>(loadSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateMode, setTranslateMode] = useState<EpubTranslateMode>(() => {
+    try {
+      const saved = localStorage.getItem(EPUB_TRANSLATE_MODE_KEY);
+      return saved === 'translation' || saved === 'bilingual' ? saved : 'original';
+    } catch {
+      return 'original';
+    }
+  });
+  const sourceLang = useMemo(
+    () => resolveEpubSourceLang(item, sampleEpubHtml(loaded?.chapters), getActiveProfile().targetLang),
+    [item, loaded],
+  );
+  const [targetLang, setTargetLang] = useState(() =>
+    readTranslateTarget(getActiveProfile().targetLang),
+  );
+  const translateVisibleModeRef = useRef<EpubTranslateMode>(
+    translateMode === 'original' ? 'bilingual' : translateMode,
+  );
+  const [autoTranslate, setAutoTranslate] = useState(() => {
+    try {
+      return localStorage.getItem(EPUB_TRANSLATE_AUTO_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [translatedChapters, setTranslatedChapters] = useState<Record<number, string>>({});
+  const translatedChaptersRef = useRef(translatedChapters);
+  translatedChaptersRef.current = translatedChapters;
+  const [translateBusy, setTranslateBusy] = useState(false);
+  const [translateStatus, setTranslateStatus] = useState('');
+  const [bookTranslateProgress, setBookTranslateProgress] = useState<{
+    done: number;
+    total: number;
+    blockDone?: number;
+    blockTotal?: number;
+  } | null>(null);
+  const cancelBookTranslateRef = useRef(false);
+  const translateTickRef = useRef(0);
+  const [chapterRangeFrom, setChapterRangeFrom] = useState(1);
+  const [chapterRangeTo, setChapterRangeTo] = useState(1);
+  const [pageRangeFrom, setPageRangeFrom] = useState(1);
+  const [pageRangeTo, setPageRangeTo] = useState(1);
+  const { t, lang } = useT();
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => loadBookmarks(item.id));
   const [part, setPart] = useState(0);
@@ -157,6 +277,10 @@ export default function NovelReader({ item, onClose }: Props) {
   // Reload from storage when switching books; flush durable mirror on exit.
   useEffect(() => {
     setAnnotations(loadAnnotations(item.id));
+    setTranslatedChapters({});
+    setTranslateStatus('');
+    setBookTranslateProgress(null);
+    cancelBookTranslateRef.current = true;
     // Clear any in-app web navigation from a previous book.
     linkHistoryRef.current = [];
     setLinkView(null);
@@ -224,6 +348,16 @@ export default function NovelReader({ item, onClose }: Props) {
   const typoKeyRef = useRef('');
   /** Current position within the current part (0..1). */
   const localFracRef = useRef(0);
+  /**
+   * True once the stored position has been restored into `partRef` /
+   * `localFracRef`. Until then those refs hold their initial `0`, which is not a
+   * position — it is "nothing read yet" — and must never be persisted. The
+   * close-handler save below is gated on this: the book load is async, so an
+   * unmount before it resolves would otherwise write `p:0:0.0000` over a real
+   * saved locator. React.StrictMode tears the first mount down every time in
+   * development, so without this guard *opening* a book destroys its position.
+   */
+  const positionRestoredRef = useRef(false);
 
   // stats + progress
   const totalCharsRef = useRef(0);
@@ -232,6 +366,19 @@ export default function NovelReader({ item, onClose }: Props) {
   const pendingCharsRef = useRef(0);
   const readStartRef = useRef(Date.now());
   const activeReadingRef = useRef(true);
+  const sourceIsPdfRef = useRef(false);
+  const gardenPagesRef = useRef(new Set<string>());
+
+  const countGardenPage = useCallback(
+    (partIndex: number, pageIndex: number) => {
+      if (sourceIsPdfRef.current) return;
+      const key = `${partIndex}:${pageIndex}`;
+      if (gardenPagesRef.current.has(key)) return;
+      gardenPagesRef.current.add(key);
+      recordEpubPageRead({ bookId: item.id, partIndex, pageIndex });
+    },
+    [item.id],
+  );
 
   const bumpFont = useCallback((delta: number) => {
     setSettings((s) => ({ ...s, fontSize: clampFontSize(s.fontSize + delta) }));
@@ -257,9 +404,243 @@ export default function NovelReader({ item, onClose }: Props) {
   // A constant reference lets React skip the node, so the highlights survive
   // scrolling, paging, and every other state change.
   const chapterHtml = useMemo(
-    () => (loaded?.chapters ?? []).map((c) => ({ __html: c.html ?? '' })),
-    [loaded],
+    () => (loaded?.chapters ?? []).map((chapter, index) => ({
+      __html: translateMode === 'original'
+        ? chapter.html ?? ''
+        : translatedChapters[index] ?? chapter.html ?? '',
+    })),
+    [loaded, translateMode, translatedChapters],
   );
+
+  const translateChapter = useCallback(async (index: number): Promise<number | 'cancelled'> => {
+    const chapter = loaded?.chapters[index];
+    if (!chapter) return 0;
+    if (translatedChaptersRef.current[index]) return 0;
+    const result = await translateChapterHtml(chapter.html ?? '', sourceLang, targetLang);
+    if (result.cancelled) return 'cancelled';
+    setTranslatedChapters((current) => (
+      current[index] ? current : { ...current, [index]: result.html }
+    ));
+    return result.count;
+  }, [loaded, sourceLang, targetLang]);
+
+  const setTranslateTarget = useCallback((code: string) => {
+    const finalTarget = code === sourceLang ? (sourceLang === 'en' ? 'ru' : 'en') : code;
+    writeTranslateTarget(finalTarget);
+    setTargetLang(finalTarget);
+    // Cached chapter HTML is tied to the previous target — drop it.
+    setTranslatedChapters({});
+    setTranslateStatus(t('epub.translate.targetChanged'));
+  }, [sourceLang, t, lang]);
+
+  // Keep target valid when book source language resolves after load.
+  useEffect(() => {
+    setTargetLang((prev) => (prev === sourceLang ? readTranslateTarget(sourceLang) : prev));
+  }, [sourceLang]);
+
+  const toggleTranslationVisibility = useCallback(() => {
+    setTranslateMode((mode) => {
+      if (mode === 'original') {
+        const restore = translateVisibleModeRef.current;
+        return restore === 'original' ? 'bilingual' : restore;
+      }
+      translateVisibleModeRef.current = mode;
+      return 'original';
+    });
+  }, []);
+
+  const onTranslateModeChange = useCallback((mode: EpubTranslateMode) => {
+    if (mode !== 'original') translateVisibleModeRef.current = mode;
+    setTranslateMode(mode);
+  }, []);
+
+  const stopBookTranslate = useCallback(() => {
+    cancelBookTranslateRef.current = true;
+    void window.api.translateCancelBatch();
+  }, []);
+
+  const translateChapterRange = useCallback(async (from: number, to: number, label: string) => {
+    if (!loaded) return;
+    const last = loaded.chapters.length - 1;
+    if (last < 0) return;
+    const start = Math.min(last, Math.max(0, Math.floor(from)));
+    const end = Math.min(last, Math.max(start, Math.floor(to)));
+    const total = end - start + 1;
+    cancelBookTranslateRef.current = false;
+    setTranslateBusy(true);
+    setBookTranslateProgress({ done: 0, total });
+    setTranslateStatus(label);
+
+    const offModel = window.api.onTranslateModelProgress((p) => {
+      if (p.status === 'ready') return;
+      const pct = typeof p.progress === 'number' ? Math.round(p.progress) : 0;
+      setTranslateStatus(t('epub.translate.status.loadingModelPct', { pct }));
+    });
+
+    try {
+      const status = await window.api.translateStatus();
+      if (!status.modelFound) {
+        setTranslateStatus(t('epub.translate.modelMissing'));
+        return;
+      }
+      if (!status.ready) {
+        setTranslateStatus(t('epub.translate.status.loadingModel'));
+        const ready = await window.api.translateEnsureReady();
+        if (!ready.ok) {
+          setTranslateStatus(ready.error || t('epub.translate.failed'));
+          return;
+        }
+      }
+
+      for (let index = start; index <= end; index += 1) {
+        if (cancelBookTranslateRef.current) break;
+        // Bump immediately so the counter never sits at 0 while the first chapter runs.
+        setBookTranslateProgress({ done: index - start + 1, total, blockDone: 0, blockTotal: 0 });
+        setTranslateStatus(
+          t('epub.translate.status.section', {
+            current: index + 1,
+            total: loaded.chapters.length,
+          }),
+        );
+
+        const chapterPromise = translateChapter(index);
+        // Stall watchdog, not a total-time budget: a long chapter is many
+        // sequential batch prompts, so a fixed wall made big chapters always
+        // time out. Give up only when no batch progress arrives for a while.
+        const STALL_MS = 150_000;
+        translateTickRef.current = Date.now();
+        let timedOut = false;
+        const timer = window.setInterval(() => {
+          if (Date.now() - translateTickRef.current < STALL_MS) return;
+          timedOut = true;
+          void window.api.translateCancelBatch();
+        }, 5_000);
+        const count = await chapterPromise;
+        window.clearInterval(timer);
+
+        if (timedOut) {
+          setTranslateStatus(
+            t('epub.translate.status.sectionTimeout', {
+              current: index + 1,
+              total: loaded.chapters.length,
+            }),
+          );
+          // Continue with later sections instead of freezing the whole job.
+          continue;
+        }
+        if (count === 'cancelled' || cancelBookTranslateRef.current) {
+          cancelBookTranslateRef.current = true;
+          break;
+        }
+      }
+      setTranslateStatus(
+        cancelBookTranslateRef.current
+          ? t('epub.translate.stopped')
+          : t('epub.translate.rangeReady'),
+      );
+      if (!cancelBookTranslateRef.current && translateMode === 'original') setTranslateMode('bilingual');
+    } catch (err) {
+      setTranslateStatus(err instanceof Error ? err.message : t('epub.translate.failed'));
+    } finally {
+      offModel();
+      setTranslateBusy(false);
+      setBookTranslateProgress(null);
+    }
+  }, [loaded, translateChapter, translateMode, t, lang]);
+
+  const translateCurrentChapter = useCallback(async () => {
+    if (!loaded) return;
+    setTranslateBusy(true);
+    setTranslateStatus(t('epub.translate.status.current'));
+    try {
+      const status = await window.api.translateStatus();
+      if (!status.modelFound) {
+        setTranslateStatus(t('epub.translate.modelMissing'));
+        return;
+      }
+      const count = await translateChapter(partRef.current);
+      if (count === 'cancelled') {
+        setTranslateStatus(t('epub.translate.stopped'));
+        return;
+      }
+      setTranslateStatus(
+        count
+          ? t('epub.translate.status.blocks', { count })
+          : t('epub.translate.status.chapterReady'),
+      );
+      if (translateMode === 'original') setTranslateMode('bilingual');
+    } catch (err) {
+      setTranslateStatus(err instanceof Error ? err.message : t('epub.translate.failed'));
+    } finally {
+      setTranslateBusy(false);
+    }
+  }, [loaded, translateChapter, translateMode, t, lang]);
+
+  const translateAhead = useCallback(async () => {
+    if (!loaded) return;
+    const start = Math.min(loaded.chapters.length - 1, partRef.current + 1);
+    if (start >= loaded.chapters.length || partRef.current >= loaded.chapters.length - 1) {
+      setTranslateStatus(t('epub.translate.nothingAhead'));
+      return;
+    }
+    await translateChapterRange(start, loaded.chapters.length - 1, t('epub.translate.status.ahead'));
+  }, [loaded, translateChapterRange, t, lang]);
+
+  const translateSelectedChapters = useCallback(async () => {
+    if (!loaded) return;
+    const toc = loaded.toc;
+    let start: number;
+    let end: number;
+    if (toc.length > 0) {
+      const fromIdx = Math.min(toc.length, Math.max(1, chapterRangeFrom)) - 1;
+      const toIdx = Math.min(toc.length, Math.max(fromIdx + 1, chapterRangeTo)) - 1;
+      start = toc[fromIdx].chapterIndex;
+      end = toc[toIdx].chapterIndex;
+      if (end < start) {
+        const tmp = start;
+        start = end;
+        end = tmp;
+      }
+    } else {
+      start = Math.max(0, chapterRangeFrom - 1);
+      end = Math.max(start, chapterRangeTo - 1);
+    }
+    await translateChapterRange(start, end, t('epub.translate.status.chapterRange'));
+  }, [loaded, chapterRangeFrom, chapterRangeTo, translateChapterRange, t, lang]);
+
+  const translateSelectedPages = useCallback(async () => {
+    if (!loaded) return;
+    const start = Math.max(0, pageRangeFrom - 1);
+    const end = Math.max(start, pageRangeTo - 1);
+    await translateChapterRange(start, end, t('epub.translate.status.pageRange'));
+  }, [loaded, pageRangeFrom, pageRangeTo, translateChapterRange, t, lang]);
+
+  const translateWholeBook = useCallback(async () => {
+    if (!loaded) return;
+    await translateChapterRange(0, loaded.chapters.length - 1, t('epub.translate.status.full'));
+  }, [loaded, translateChapterRange, t, lang]);
+
+  // Live block-level progress while a chapter batch is running.
+  useEffect(() => {
+    if (!translateBusy) return;
+    return window.api.onTranslateBatchProgress(({ done, total }) => {
+      translateTickRef.current = Date.now();
+      setBookTranslateProgress((prev) =>
+        prev ? { ...prev, blockDone: done, blockTotal: total } : prev,
+      );
+    });
+  }, [translateBusy]);
+
+  // Keep range inputs within the loaded book.
+  useEffect(() => {
+    if (!loaded) return;
+    const chapterMax = Math.max(1, loaded.toc.length || loaded.chapters.length);
+    const pageMax = Math.max(1, loaded.chapters.length);
+    setChapterRangeFrom(1);
+    setChapterRangeTo(chapterMax);
+    setPageRangeFrom(1);
+    setPageRangeTo(pageMax);
+  }, [loaded]);
 
   const globalFor = useCallback(
     (p: number, lf: number): number => {
@@ -299,12 +680,21 @@ export default function NovelReader({ item, onClose }: Props) {
 
   const saveNow = useCallback(
     (g: number, lf: number) => {
-      window.api.setProgress(item.id, {
-        location: `p:${partRef.current}:${lf.toFixed(4)}`,
-        percent: g,
-      });
+      // Through the canonical reading model (Phase 5). The projection emits the
+      // exact `p:<part>:<frac>` string this reader has always written, so no
+      // stored position changes shape; what it adds is a format check on the
+      // way out. A fraction is within one part, so it cannot exceed 1 — float
+      // drift past the edge would otherwise be stored as an unreadable save.
+      window.api.setProgress(
+        item.id,
+        progressFromReadingLocator(
+          item,
+          { kind: 'part', part: partRef.current, fraction: Math.min(1, Math.max(0, lf)) },
+          g,
+        ),
+      );
     },
-    [item.id],
+    [item],
   );
 
   // ----- offset helpers (abstract over axis + RTL sign) -----
@@ -401,6 +791,10 @@ export default function NovelReader({ item, onClose }: Props) {
   useEffect(() => {
     let dead = false;
     let handle: LoadedEpub | null = null;
+    gardenPagesRef.current = new Set();
+    // A different book means the refs still describe the previous one; nothing
+    // may be persisted for this id until its own position is restored.
+    positionRestoredRef.current = false;
     setLoading(true);
     setError(null);
     (async () => {
@@ -408,7 +802,8 @@ export default function NovelReader({ item, onClose }: Props) {
         const buf = (await window.api.readBook(item.id)) as ArrayBuffer;
         if (dead) return;
         if (!buf) throw new Error('The book file is missing from the library.');
-        if (isPdf(buf)) {
+        sourceIsPdfRef.current = isPdf(buf);
+        if (sourceIsPdfRef.current) {
           setPdfProgress(0);
           handle = await loadPdf(buf, (f) => {
             if (!dead) setPdfProgress(f);
@@ -426,7 +821,12 @@ export default function NovelReader({ item, onClose }: Props) {
 
         // Restore the reading position: exact part+fraction when available,
         // else map an old global fraction; a ~100% stale save restarts fresh.
-        const savedLoc = parseLoc(item.progress?.location);
+        // Read through the model. It declines a legacy bare-number save (a
+        // fraction of the whole book), and the else-branch below is exactly the
+        // code that can map one, using chapter weights only this reader has.
+        const restored = readingLocatorFromProgress(item, item.progress);
+        const savedLoc =
+          restored?.kind === 'part' ? { part: restored.part, frac: restored.fraction } : null;
         let pi = 0;
         let lf = 0;
         if (savedLoc && savedLoc.part < handle.chapters.length) {
@@ -456,6 +856,7 @@ export default function NovelReader({ item, onClose }: Props) {
         maxGlobalRef.current = null;
         localFracRef.current = lf;
         partRef.current = pi;
+        positionRestoredRef.current = true;
         pendingPosRef.current = lf; // consumed by paged layout
         pendingTargetRef.current = { pi, lf }; // consumed by scroll layout
         setPart(pi);
@@ -471,11 +872,24 @@ export default function NovelReader({ item, onClose }: Props) {
     return () => {
       dead = true;
       handle?.destroy();
-      // Final position save on close.
-      window.api.setProgress(item.id, {
-        location: `p:${partRef.current}:${localFracRef.current.toFixed(4)}`,
-        percent: curGlobalRef.current,
-      });
+      // Final position save on close, through the same projection as saveNow —
+      // but only once there is a position to save. Before the async load
+      // restores it, partRef/localFracRef are still 0, and writing that would
+      // replace a real `p:<part>:<frac>` with `p:0:0.0000` while `percent`
+      // survives (it is seeded from item.progress). See positionRestoredRef.
+      if (!positionRestoredRef.current) return;
+      window.api.setProgress(
+        item.id,
+        progressFromReadingLocator(
+          item,
+          {
+            kind: 'part',
+            part: partRef.current,
+            fraction: Math.min(1, Math.max(0, localFracRef.current)),
+          },
+          curGlobalRef.current,
+        ),
+      );
     };
   }, [item.id]);
 
@@ -496,6 +910,22 @@ export default function NovelReader({ item, onClose }: Props) {
   }, [settings]);
 
   useEffect(() => onReaderSettingsChanged(setSettings), []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(EPUB_TRANSLATE_MODE_KEY, translateMode);
+      localStorage.setItem(EPUB_TRANSLATE_AUTO_KEY, autoTranslate ? '1' : '0');
+    } catch {
+      /* persistence is optional */
+    }
+  }, [autoTranslate, translateMode]);
+
+  useEffect(() => {
+    if (!autoTranslate || !loaded || translatedChapters[part]) return;
+    void translateChapter(part).catch((err) => {
+      setTranslateStatus(err instanceof Error ? err.message : 'Automatic translation failed');
+    });
+  }, [autoTranslate, loaded, part, translateChapter, translatedChapters]);
 
   // ----- word-knowledge highlighting -----
   const [hlTick, setHlTick] = useState(0);
@@ -744,6 +1174,7 @@ export default function NovelReader({ item, onClose }: Props) {
           if (partRef.current < lastPart) {
             pendingPosRef.current = 0;
             const pi = partRef.current + 1;
+            if (dir > 0) countGardenPage(pi, 0);
             partRef.current = pi;
             setPart(pi);
           }
@@ -758,6 +1189,7 @@ export default function NovelReader({ item, onClose }: Props) {
         updateGlobal(g);
         setProgress(g);
         saveNow(g, lf);
+        if (dir > 0) countGardenPage(partRef.current, next);
         return;
       }
 
@@ -766,9 +1198,13 @@ export default function NovelReader({ item, onClose }: Props) {
       const max = axisMax();
       const cur = getOffsetPx();
       const screen = (L.axis === 'y' ? el.clientHeight : el.clientWidth) - 40;
-      setOffsetPx(Math.min(max, Math.max(0, cur + dir * screen)), true);
+      const target = Math.min(max, Math.max(0, cur + dir * screen));
+      setOffsetPx(target, true);
+      if (dir > 0 && target > cur + 1) {
+        countGardenPage(partRef.current, Math.max(0, Math.floor(target / Math.max(1, screen))));
+      }
     },
-    [axisMax, getOffsetPx, setOffsetPx, globalFor, updateGlobal, saveNow],
+    [axisMax, getOffsetPx, setOffsetPx, globalFor, updateGlobal, saveNow, countGardenPage],
   );
   const flipRef = useRef(flip);
   flipRef.current = flip;
@@ -938,7 +1374,17 @@ export default function NovelReader({ item, onClose }: Props) {
         partRef.current = cp;
         localFracRef.current = tf;
         const g = globalFor(cp, tf);
+        const priorMax = maxGlobalRef.current;
         updateGlobal(g);
+        const viewportExtent =
+          layoutRef.current.axis === 'y' ? el.clientHeight : el.clientWidth;
+        if (priorMax !== null && g > priorMax + 0.0001) {
+          const currentPart = partEl(cp);
+          const screensInPart = currentPart
+            ? Math.max(1, Math.ceil(extentOf(currentPart) / Math.max(1, viewportExtent)))
+            : 1;
+          countGardenPage(cp, Math.min(screensInPart - 1, Math.floor(tf * screensInPart)));
+        }
 
         const now = performance.now();
         if (now - lastUi > 200) {
@@ -957,7 +1403,7 @@ export default function NovelReader({ item, onClose }: Props) {
         // except a pinch-grow when the reader is physically stuck at the bottom.
         if (!anchorRef.current && !pendingTargetRef.current) {
           const last = book.chapters.length - 1;
-          const view = layoutRef.current.axis === 'y' ? el.clientHeight : el.clientWidth;
+          const view = viewportExtent;
           const max = axisMax();
           const edge = Math.min(view * 2, max * 0.35);
           const stuckAtBottom = max > 8 && off >= max - 4;
@@ -994,6 +1440,7 @@ export default function NovelReader({ item, onClose }: Props) {
     queueWinMutation,
     flushPendingWin,
     measureWin,
+    countGardenPage,
   ]);
 
   // ----- keyboard (page turns via shortcut manager; Escape local) -----
@@ -1806,6 +2253,7 @@ export default function NovelReader({ item, onClose }: Props) {
       }),
       registerCommandHandler('reader.dictLookup', () => openPopupFromSelection('dict')),
       registerCommandHandler('reader.translateSel', () => openPopupFromSelection('translate')),
+      registerCommandHandler('reader.toggleTranslation', () => toggleTranslationVisibility()),
       registerCommandHandler('reader.fontUp', () => bumpFont(10)),
       registerCommandHandler('reader.fontDown', () => bumpFont(-10)),
       registerCommandHandler('reader.zoomReset', () =>
@@ -1823,6 +2271,7 @@ export default function NovelReader({ item, onClose }: Props) {
     openPopupFromSelection,
     bumpFont,
     readerMetaNow,
+    toggleTranslationVisibility,
   ]);
 
   // Ctrl+H "Return home" → close the reader back to the desktop.
@@ -2118,6 +2567,175 @@ export default function NovelReader({ item, onClose }: Props) {
           </div>
           <div className="settings-anchor">
             <button
+              type="button"
+              className={`btn ${translateOpen ? 'active' : ''}`}
+              title={t('epub.translate.panelTitle')}
+              onClick={() => setTranslateOpen((open) => !open)}
+            >
+              <Icon name="translate" size={14} />
+            </button>
+            <button
+              type="button"
+              className={`btn ${translateMode !== 'original' ? 'active' : ''}`}
+              title={t('epub.translate.toggleVisibility')}
+              onClick={() => toggleTranslationVisibility()}
+            >
+              <Icon name="eye" size={14} />
+            </button>
+            {translateOpen && (
+              <>
+                <div className="panel-backdrop" onClick={() => setTranslateOpen(false)} />
+                <div className="settings-panel epub-translate-panel">
+                  <div className="epub-translate-head">
+                    <strong>{t('epub.translate.title')}</strong>
+                    <span className="muted">{sourceLang.toUpperCase()} → {targetLang.toUpperCase()}</span>
+                  </div>
+                  <label>
+                    {t('epub.translate.target')}
+                    <select
+                      value={targetLang}
+                      onChange={(event) => setTranslateTarget(event.target.value)}
+                    >
+                      {KNOWN_LANGS.filter((l) => l.code !== sourceLang).map((l) => (
+                        <option key={l.code} value={l.code}>
+                          {l.nativeLabel}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t('epub.translate.view')}
+                    <select
+                      value={translateMode}
+                      onChange={(event) => onTranslateModeChange(event.target.value as EpubTranslateMode)}
+                    >
+                      <option value="original">{t('epub.translate.view.original')}</option>
+                      <option value="translation">{t('epub.translate.view.translation')}</option>
+                      <option value="bilingual">{t('epub.translate.view.bilingual')}</option>
+                    </select>
+                  </label>
+                  <button
+                    className="btn small"
+                    type="button"
+                    onClick={() => toggleTranslationVisibility()}
+                  >
+                    {translateMode === 'original'
+                      ? t('epub.translate.show')
+                      : t('epub.translate.hide')}
+                  </button>
+                  <label className="epub-translate-check">
+                    <input
+                      type="checkbox"
+                      checked={autoTranslate}
+                      onChange={(event) => setAutoTranslate(event.target.checked)}
+                    />
+                    {t('epub.translate.auto')}
+                  </label>
+                  <button className="btn small" disabled={translateBusy || !loaded} onClick={() => void translateCurrentChapter()}>
+                    {t('epub.translate.currentChapter')}
+                  </button>
+                  <button
+                    className="btn small"
+                    disabled={translateBusy || !loaded || part >= (loaded?.chapters.length ?? 1) - 1}
+                    onClick={() => void translateAhead()}
+                  >
+                    {t('epub.translate.ahead')}
+                  </button>
+                  {bookTranslateProgress ? (
+                    <button className="btn small" onClick={stopBookTranslate}>
+                      {t('epub.translate.stop', {
+                        done: bookTranslateProgress.done,
+                        total: bookTranslateProgress.total,
+                      })}
+                      {bookTranslateProgress.blockTotal
+                        ? ` · ${bookTranslateProgress.blockDone ?? 0}/${bookTranslateProgress.blockTotal}`
+                        : ''}
+                    </button>
+                  ) : (
+                    <button className="btn small primary" disabled={translateBusy || !loaded} onClick={() => void translateWholeBook()}>
+                      {t('epub.translate.fullBook')}
+                    </button>
+                  )}
+                  <div className="epub-translate-range">
+                    <span className="epub-translate-range-label">{t('epub.translate.chapterRange')}</span>
+                    <div className="epub-translate-range-row">
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1)}
+                        value={chapterRangeFrom}
+                        disabled={translateBusy || !loaded}
+                        onChange={(e) => setChapterRangeFrom(Number(e.target.value) || 1)}
+                        aria-label={t('epub.translate.rangeFrom')}
+                      />
+                      <span className="muted">–</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1)}
+                        value={chapterRangeTo}
+                        disabled={translateBusy || !loaded}
+                        onChange={(e) => setChapterRangeTo(Number(e.target.value) || 1)}
+                        aria-label={t('epub.translate.rangeTo')}
+                      />
+                      <button
+                        className="btn small"
+                        disabled={translateBusy || !loaded}
+                        onClick={() => void translateSelectedChapters()}
+                      >
+                        {t('epub.translate.runRange')}
+                      </button>
+                    </div>
+                    <p className="muted epub-translate-range-hint">
+                      {t('epub.translate.chapterRange.hint', {
+                        max: Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1),
+                      })}
+                    </p>
+                  </div>
+                  <div className="epub-translate-range">
+                    <span className="epub-translate-range-label">{t('epub.translate.pageRange')}</span>
+                    <div className="epub-translate-range-row">
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, loaded?.chapters.length || 1)}
+                        value={pageRangeFrom}
+                        disabled={translateBusy || !loaded}
+                        onChange={(e) => setPageRangeFrom(Number(e.target.value) || 1)}
+                        aria-label={t('epub.translate.rangeFrom')}
+                      />
+                      <span className="muted">–</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, loaded?.chapters.length || 1)}
+                        value={pageRangeTo}
+                        disabled={translateBusy || !loaded}
+                        onChange={(e) => setPageRangeTo(Number(e.target.value) || 1)}
+                        aria-label={t('epub.translate.rangeTo')}
+                      />
+                      <button
+                        className="btn small"
+                        disabled={translateBusy || !loaded}
+                        onClick={() => void translateSelectedPages()}
+                      >
+                        {t('epub.translate.runRange')}
+                      </button>
+                    </div>
+                    <p className="muted epub-translate-range-hint">
+                      {t('epub.translate.pageRange.hint', {
+                        max: Math.max(1, loaded?.chapters.length || 1),
+                        current: part + 1,
+                      })}
+                    </p>
+                  </div>
+                  {translateStatus && <p className="muted epub-translate-status">{translateStatus}</p>}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="settings-anchor">
+            <button
               className={`btn ${settingsOpen ? 'active' : ''}`}
               title="Reading settings"
               onClick={() => setSettingsOpen((o) => !o)}
@@ -2217,7 +2835,7 @@ export default function NovelReader({ item, onClose }: Props) {
               <div
                 key={`p${part}`}
                 ref={contentRef}
-                className={`novel-content ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
                 style={contentStyle}
                 lang="ja"
                 dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
@@ -2226,7 +2844,7 @@ export default function NovelReader({ item, onClose }: Props) {
               <div
                 key="scrollwin"
                 ref={contentRef}
-                className={`novel-content ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
                 style={contentStyle}
                 lang="ja"
               >
@@ -2277,7 +2895,8 @@ export default function NovelReader({ item, onClose }: Props) {
           max={1000}
           value={Math.round((seek ?? progress) * 1000)}
           disabled={!loaded}
-          title="Seek through the book"
+          title={t('novel.seek')}
+          aria-label={t('a11y.slider.readingPosition')}
           onChange={(e) => setSeek(Number(e.target.value) / 1000)}
           onPointerUp={() => {
             if (seek != null) {

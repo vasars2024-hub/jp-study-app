@@ -451,6 +451,16 @@ const COMMANDS = [
     contextMenu: true,
   },
   {
+    id: 'settings.special',
+    label: 'Special modules',
+    shortLabel: 'Special',
+    description: 'Open the hidden Special modules settings page in GrammarX.',
+    category: 'app',
+    contexts: ['page'],
+    wheel: true,
+    contextMenu: false,
+  },
+  {
     id: 'wheel.more',
     label: 'More…',
     shortLabel: 'More',
@@ -616,9 +626,17 @@ function detectSentenceBounds(text, offset) {
   return { start, end };
 }
 
-function sentenceAt(text, offset) {
+/**
+ * Sentence string at offset (trimmed, length-capped).
+ *
+ * The cap matches src/shared/sentenceBounds.ts. Without it a sentence mined in
+ * the browser could be longer than the identical sentence mined on the desktop —
+ * same text, same rules, two different cards — because a page with no sentence
+ * punctuation for a thousand characters returns the whole run.
+ */
+function sentenceAt(text, offset, maxLen = 200) {
   const b = detectSentenceBounds(text, offset);
-  return text.slice(b.start, b.end).trim();
+  return text.slice(b.start, b.end).trim().slice(0, maxLen);
 }
 
 /**
@@ -678,6 +696,369 @@ function detectPageLangHint(opts) {
   return '';
 }
 
+/* -------------------------- AI sentence analysis --------------------------- */
+/*
+ * Rendering for the "AI OCR" panel, kept here rather than in content.js so it
+ * can be exercised under test the same way the capture heuristics are (see
+ * src/shared/__tests__/analysisPanelRender.test.ts). content.js owns the
+ * gestures, the network call and the keyboard; everything below is a pure
+ * string builder over an analysis the app has already parsed and aligned.
+ *
+ * Annotations arrive with `start`/`end` offsets into `result.sentence` — the
+ * app resolves them and drops anything it could not place, so this never
+ * searches for a span itself. That is what keeps the highlight in the browser
+ * identical to the one the desktop panel draws.
+ */
+
+const AI_CATEGORIES = ['grammar', 'vocabulary', 'particle', 'expression', 'idiom', 'name'];
+
+const AI_CATEGORY_LABELS = {
+  grammar: 'Grammar',
+  vocabulary: 'Vocabulary',
+  particle: 'Particle',
+  expression: 'Expression',
+  idiom: 'Idiom',
+  name: 'Name',
+};
+
+/** Letter shortcuts — mirrors src/shared/analysisShortcuts.ts. */
+const AI_KEY_COMMANDS = {
+  c: 'copy',
+  a: 'mine',
+  s: 'snapshot',
+  w: 'saveSentence',
+  l: 'listen',
+  d: 'dictionary',
+  t: 'translations',
+  r: 'reanalyze',
+};
+
+const AI_ACTION_LABELS = {
+  mine: { idle: 'Add to flashcards', busy: 'Adding\u2026', done: 'Added', error: 'Retry add' },
+  snapshot: { idle: 'Snapshot', busy: 'Saving\u2026', done: 'In notebook', error: 'Retry snapshot' },
+};
+
+/**
+ * The command a key press means, or null for "not ours".
+ *
+ * Any modifier other than Shift disqualifies the press: on a web page, stealing
+ * Ctrl+C or Alt+D from the browser would be a bug report, not a feature.
+ */
+function aiCommandForKey(e) {
+  if (!e || e.ctrlKey || e.metaKey || e.altKey) return null;
+  if (e.key === 'Escape') return 'close';
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') return 'next';
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') return 'prev';
+  if (/^[1-9]$/.test(e.key)) return { select: Number(e.key) - 1 };
+  const letter = typeof e.key === 'string' && e.key.length === 1 ? e.key.toLowerCase() : '';
+  return AI_KEY_COMMANDS[letter] || null;
+}
+
+/** Is this element one where a keystroke means "type a character"? */
+function aiIsTextEntry(el) {
+  if (!el || typeof el.tagName !== 'string') return false;
+  const tag = el.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable === true;
+}
+
+function aiEsc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function aiCategory(value) {
+  return AI_CATEGORIES.indexOf(value) === -1 ? 'vocabulary' : value;
+}
+
+/** The sentence with its annotated spans as clickable, colour-coded buttons. */
+function aiSentenceHtml(result, selected) {
+  const sentence = (result && result.sentence) || '';
+  const annotations = result && Array.isArray(result.annotations) ? result.annotations : [];
+  if (!annotations.length) return aiEsc(sentence);
+  let html = '';
+  let at = 0;
+  annotations.forEach((a, i) => {
+    if (a.start > at) html += aiEsc(sentence.slice(at, a.start));
+    html +=
+      '<button type="button" class="ai-seg ai-cat-' +
+      aiCategory(a.category) +
+      (i === selected ? ' active' : '') +
+      '" data-index="' +
+      i +
+      '" title="' +
+      aiEsc(a.meaning || '') +
+      '">' +
+      aiEsc(sentence.slice(a.start, a.end)) +
+      '</button>';
+    at = a.end;
+  });
+  if (at < sentence.length) html += aiEsc(sentence.slice(at));
+  return html;
+}
+
+/**
+ * Pick the translation to lead with, skipping the sentence's own language —
+ * showing a Japanese learner the Japanese paraphrase as the headline answer
+ * tells them nothing they can use. Mirrors primaryTranslation() in the app.
+ */
+function aiPrimaryTranslation(result, uiLang, sourceLang) {
+  const t = (result && result.translations) || {};
+  const order = [uiLang, 'en', 'ja', 'zh'].filter((c) => c && c !== sourceLang);
+  for (const code of order) {
+    if (t[code]) return t[code];
+  }
+  return t.en || t.ja || t.zh || '';
+}
+
+function aiTranslationsHtml(result, state) {
+  const t = (result && result.translations) || {};
+  const primary = aiPrimaryTranslation(result, state.uiLang, state.lang);
+  if (!primary) return '';
+  const others = ['en', 'ja', 'zh'].filter((c) => t[c] && t[c] !== primary);
+  let html = '<div class="ai-card"><p class="ai-translation">' + aiEsc(primary) + '</p>';
+  if (others.length) {
+    html +=
+      '<button type="button" class="ai-link" data-act="translations">' +
+      (state.showTranslations ? 'Hide translations' : 'Show all translations') +
+      '</button>';
+    if (state.showTranslations) {
+      html += '<ul class="ai-translations">';
+      for (const code of others) {
+        html +=
+          '<li><span class="ai-tag">' +
+          code.toUpperCase() +
+          '</span><span lang="' +
+          code +
+          '">' +
+          aiEsc(t[code]) +
+          '</span>' +
+          (code === state.lang ? '<span class="ai-dim">simplified</span>' : '') +
+          '</li>';
+      }
+      html += '</ul>';
+    }
+  }
+  if (result.literal) {
+    html +=
+      '<div class="ai-literal"><span class="ai-label">Literal</span>' + aiEsc(result.literal) + '</div>';
+  }
+  return html + '</div>';
+}
+
+function aiDetailHtml(annotation, state) {
+  if (!annotation) return '';
+  const category = aiCategory(annotation.category);
+  const label = AI_CATEGORY_LABELS[category];
+  const examples = Array.isArray(annotation.examples) ? annotation.examples : [];
+  const vocabulary = Array.isArray(annotation.vocabulary) ? annotation.vocabulary : [];
+  const mineLabel = AI_ACTION_LABELS.mine[state.mine || 'idle'];
+  const snapLabel = AI_ACTION_LABELS.snapshot[state.snapshot || 'idle'];
+
+  let meta =
+    '<div class="ai-field"><span class="ai-label">' +
+    label +
+    ' point</span><span class="ai-headword" lang="' +
+    state.lang +
+    '">' +
+    aiEsc(annotation.headword || annotation.text) +
+    (annotation.reading && !annotation.headword
+      ? '<span class="ai-reading">\uff08' + aiEsc(annotation.reading) + '\uff09</span>'
+      : '') +
+    '</span></div>';
+  if (annotation.level) {
+    meta +=
+      '<div class="ai-field"><span class="ai-label">Level</span><span class="ai-level">' +
+      aiEsc(annotation.level) +
+      '</span></div>';
+  }
+  meta +=
+    '<div class="ai-field"><span class="ai-label">Meaning / function</span><span>' +
+    aiEsc(annotation.meaning || '') +
+    '</span></div>';
+  if (annotation.formality) {
+    meta +=
+      '<div class="ai-field"><span class="ai-label">Formality</span><span class="ai-dim">' +
+      aiEsc(annotation.formality) +
+      '</span></div>';
+  }
+  meta += '<button type="button" class="ai-link" data-act="dictionary">Open in dictionary</button>';
+
+  let main = '';
+  if (annotation.explanation) {
+    main +=
+      '<h5 class="ai-label">In-depth explanation</h5><p class="ai-prose">' +
+      aiEsc(annotation.explanation) +
+      '</p>';
+  }
+  if (examples.length) {
+    main +=
+      '<ul class="ai-examples">' +
+      examples
+        .map(
+          (ex) =>
+            '<li><span lang="' +
+            state.lang +
+            '">' +
+            aiEsc(ex.text) +
+            '</span>' +
+            (ex.translation ? '<span class="ai-dim">' + aiEsc(ex.translation) + '</span>' : '') +
+            '</li>',
+        )
+        .join('') +
+      '</ul>';
+  }
+  if (vocabulary.length) {
+    main +=
+      '<h5 class="ai-label">Vocabulary notes</h5><ul class="ai-vocab">' +
+      vocabulary
+        .map(
+          (v) =>
+            '<li><b lang="' +
+            state.lang +
+            '">' +
+            aiEsc(v.term) +
+            '</b>' +
+            (v.reading ? '<span class="ai-dim">\uff08' + aiEsc(v.reading) + '\uff09</span>' : '') +
+            ' \u2014 ' +
+            aiEsc(v.gloss) +
+            '</li>',
+        )
+        .join('') +
+      '</ul>';
+  }
+
+  return (
+    '<div class="ai-card ai-detail ai-cat-' +
+    category +
+    '"><div class="ai-detail-head"><span class="ai-term" lang="' +
+    state.lang +
+    '">' +
+    aiEsc(annotation.text) +
+    '</span><span class="ai-badge">' +
+    label +
+    '</span></div><div class="ai-detail-body"><div class="ai-detail-meta">' +
+    meta +
+    '</div><div class="ai-detail-main">' +
+    main +
+    '</div></div><div class="ai-actions">' +
+    '<button type="button" data-act="copy" title="C">Copy</button>' +
+    '<button type="button" data-act="mine" title="A"' +
+    (state.mine === 'busy' ? ' disabled' : '') +
+    '>' +
+    mineLabel +
+    '</button>' +
+    '<button type="button" data-act="listen" title="L">Listen</button>' +
+    '<button type="button" data-act="snapshot" title="S"' +
+    (state.snapshot === 'busy' ? ' disabled' : '') +
+    '>' +
+    snapLabel +
+    '</button></div><div class="ai-actions ai-actions-secondary">' +
+    '<button type="button" data-act="saveSentence" title="W">Save whole sentence</button>' +
+    '</div></div>'
+  );
+}
+
+function aiNotesHtml(title, notes, warn) {
+  if (!Array.isArray(notes) || !notes.length) return '';
+  return (
+    '<div class="ai-card"><h5 class="ai-label">' +
+    title +
+    '</h5><ul class="ai-notes' +
+    (warn ? ' warn' : '') +
+    '">' +
+    notes.map((n) => '<li>' + aiEsc(n) + '</li>').join('') +
+    '</ul></div>'
+  );
+}
+
+const AI_SHORTCUT_LEGEND =
+  '<div class="ai-card ai-keys"><h5 class="ai-label">Shortcuts</h5>' +
+  '<span><kbd>1\u20139</kbd> pick</span><span><kbd>\u2190/\u2192</kbd> move</span><span><kbd>C</kbd> copy</span>' +
+  '<span><kbd>A</kbd> card</span><span><kbd>W</kbd> sentence</span><span><kbd>S</kbd> snapshot</span>' +
+  '<span><kbd>L</kbd> listen</span><span><kbd>D</kbd> dictionary</span><span><kbd>T</kbd> translations</span>' +
+  '<span><kbd>R</kbd> re-analyze</span><span><kbd>Esc</kbd> close</span></div>';
+
+/**
+ * The whole panel body for one state.
+ *
+ * `state` is content.js's panel state: { text, lang, uiLang, status, selected,
+ * showTranslations, mine, snapshot, result, error }. Loading and error states
+ * render here too, so the panel is never assembled in two different places.
+ */
+function aiPanelHtml(state) {
+  if (!state) return '';
+  if (state.status === 'loading') {
+    return (
+      '<div class="ai-card"><p class="ai-source" lang="' +
+      state.lang +
+      '">' +
+      aiEsc(state.text) +
+      '</p><p class="ai-loading">Analyzing the sentence\u2026</p></div>'
+    );
+  }
+  if (state.status === 'error') {
+    return (
+      '<div class="ai-card"><p class="ai-source" lang="' +
+      state.lang +
+      '">' +
+      aiEsc(state.text) +
+      '</p><p class="ai-prose">' +
+      aiEsc(state.error) +
+      '</p><div class="ai-actions">' +
+      '<button type="button" data-act="reanalyze">Try again</button>' +
+      '<button type="button" data-act="close">Close</button></div></div>'
+    );
+  }
+  const result = state.result || { sentence: '', annotations: [] };
+  const annotations = Array.isArray(result.annotations) ? result.annotations : [];
+  const active = annotations[state.selected];
+  const legend = [];
+  for (const a of annotations) {
+    const c = aiCategory(a.category);
+    if (legend.indexOf(c) === -1) legend.push(c);
+  }
+  return (
+    '<div class="ai-card"><div class="ai-card-head"><h5 class="ai-label">Recognized sentence</h5>' +
+    (result.difficulty ? '<span class="ai-band">' + aiEsc(result.difficulty) + '</span>' : '') +
+    '</div><p class="ai-sentence" lang="' +
+    state.lang +
+    '">' +
+    aiSentenceHtml(result, state.selected) +
+    '</p><p class="ai-hint">Click any highlighted part to see grammar and vocabulary explained.</p>' +
+    (legend.length > 1
+      ? '<ul class="ai-legend">' +
+        legend
+          .map(
+            (c) => '<li><span class="ai-dot ai-cat-' + c + '"></span>' + AI_CATEGORY_LABELS[c] + '</li>',
+          )
+          .join('') +
+        '</ul>'
+      : '') +
+    '</div>' +
+    aiTranslationsHtml(result, state) +
+    (result.formality
+      ? '<div class="ai-card"><div class="ai-card-head"><h5 class="ai-label">Formality</h5>' +
+        '<span class="ai-band ai-band-plain">' +
+        aiEsc(result.formality.level || '') +
+        '</span></div>' +
+        (result.formality.note ? '<p class="ai-prose">' + aiEsc(result.formality.note) + '</p>' : '') +
+        '</div>'
+      : '') +
+    aiDetailHtml(active, state) +
+    (result.structure
+      ? '<div class="ai-card"><h5 class="ai-label">Structure</h5><p class="ai-prose">' +
+        aiEsc(result.structure) +
+        '</p></div>'
+      : '') +
+    aiNotesHtml('Nuance', result.nuance, false) +
+    aiNotesHtml('Watch out', result.pitfalls, true) +
+    AI_SHORTCUT_LEGEND
+  );
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.jpStudyShared = {
     DEFAULT_PORT,
@@ -708,5 +1089,13 @@ if (typeof globalThis !== 'undefined') {
     langTagToOcrLang,
     detectScriptLang,
     detectPageLangHint,
+    AI_CATEGORIES,
+    AI_CATEGORY_LABELS,
+    AI_KEY_COMMANDS,
+    aiCommandForKey,
+    aiIsTextEntry,
+    aiPrimaryTranslation,
+    aiSentenceHtml,
+    aiPanelHtml,
   };
 }

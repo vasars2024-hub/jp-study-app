@@ -267,7 +267,7 @@ export default function AeroFindingOverlay() {
             </div>
             <footer>
               <span>{t('aero.found.meter.today', { pct: Math.round(readouts.gauge.pct * 100) })}</span>
-              <span>{t('aero.found.meter.streak', { days: readouts.gauge.streak })}</span>
+              <span>{t('aero.found.meter.streak', { count: readouts.gauge.streak })}</span>
             </footer>
           </article>
         )}

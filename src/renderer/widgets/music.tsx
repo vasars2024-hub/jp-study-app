@@ -58,6 +58,7 @@ export function MiniPlayer() {
           max={100}
           value={Math.round(st.volume * 100)}
           onChange={(e) => setVolume(Number(e.target.value) / 100)}
+          aria-label={t('music.controls.volume')}
         />
         <span className="wgt-player-queue">{t('widgets.miniPlayer.inQueue', { count: st.queue.length })}</span>
       </div>

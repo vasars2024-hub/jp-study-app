@@ -156,6 +156,7 @@ export default function AtmospherePage() {
             value={env.lightingIntensity}
             disabled={!env.enabled || !env.dayCycleLighting}
             onChange={(e) => patchEnv({ lightingIntensity: Number(e.target.value) })}
+            aria-label={t('a11y.slider.lightingIntensity')}
           />
           <span className="muted">{Math.round(env.lightingIntensity * 100)}%</span>
         </div>
@@ -227,6 +228,7 @@ export default function AtmospherePage() {
             value={env.particleDensity}
             disabled={!env.enabled || !env.particlesEnabled}
             onChange={(e) => patchEnv({ particleDensity: Number(e.target.value) })}
+            aria-label={t('a11y.slider.particleDensity')}
           />
           <span className="muted">{Math.round(env.particleDensity * 100)}%</span>
         </div>
@@ -240,6 +242,7 @@ export default function AtmospherePage() {
             value={env.particleIntensity ?? 0.8}
             disabled={!env.enabled || !env.particlesEnabled}
             onChange={(e) => patchEnv({ particleIntensity: Number(e.target.value) })}
+            aria-label={t('a11y.slider.particleIntensity')}
           />
           <span className="muted">{Math.round((env.particleIntensity ?? 0.8) * 100)}%</span>
         </div>
@@ -253,6 +256,7 @@ export default function AtmospherePage() {
             value={env.particleSize ?? 0.55}
             disabled={!env.enabled || !env.particlesEnabled}
             onChange={(e) => patchEnv({ particleSize: Number(e.target.value) })}
+            aria-label={t('a11y.slider.particleSize')}
           />
           <span className="muted">{Math.round((env.particleSize ?? 0.55) * 100)}%</span>
         </div>
@@ -304,6 +308,7 @@ export default function AtmospherePage() {
             value={env.weather?.intensity ?? 0.5}
             disabled={!env.enabled || (env.weather?.mode ?? 'off') === 'off'}
             onChange={(e) => patchEnv({ weather: { mode: env.weather?.mode ?? 'off', intensity: Number(e.target.value) } })}
+            aria-label={t('a11y.slider.weatherIntensity')}
           />
           <span className="muted">{Math.round((env.weather?.intensity ?? 0.5) * 100)}%</span>
         </div>
@@ -337,6 +342,7 @@ export default function AtmospherePage() {
             value={env.ambientAudio?.volume ?? 0.5}
             disabled={!env.enabled || !env.ambientAudio?.enabled}
             onChange={(e) => patchEnv({ ambientAudio: { enabled: env.ambientAudio?.enabled ?? false, volume: Number(e.target.value) } })}
+            aria-label={t('a11y.slider.ambientVolume')}
           />
           <span className="muted">{Math.round((env.ambientAudio?.volume ?? 0.5) * 100)}%</span>
         </div>
@@ -358,7 +364,6 @@ export default function AtmospherePage() {
           />
           <span>{t('settings.atmosphere.celebrateStreaks')}</span>
         </label>
-        <p className="muted os-set-hint">{t('settings.atmosphere.noctisNote')}</p>
       </SettingsCard>
     </>
   );

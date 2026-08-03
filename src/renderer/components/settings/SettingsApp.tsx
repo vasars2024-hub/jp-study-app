@@ -61,6 +61,7 @@ import StudyPage from './pages/StudyPage';
 import ProfileRulesPage from './pages/ProfileRulesPage';
 import ReadingPage from './pages/ReadingPage';
 import TranscriptionPage from './pages/TranscriptionPage';
+import ScraperPage from './pages/ScraperPage';
 import StoragePage from './pages/StoragePage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
@@ -81,8 +82,8 @@ import {
   onSettingsAdvancedChanged,
   setSettingsAdvanced,
 } from '../../settingsAdvanced';
+import { getReduceMotion, setReduceMotion } from '../../displayPrefs';
 
-const MOTION_KEY = 'jp-os-reduce-motion';
 
 function applyMotion(reduce: boolean): void {
   document.documentElement.classList.toggle('reduce-motion', reduce);
@@ -100,7 +101,7 @@ export default function SettingsApp(props: SettingsWallProps) {
   const [cssMsg, setCssMsg] = useState<string | null>(null);
   const [theme, setTheme] = useState(loadThemeId);
   const [zoom, setZoomState] = useState(loadZoom);
-  const [reduce, setReduce] = useState(() => localStorage.getItem(MOTION_KEY) === '1');
+  const [reduce, setReduce] = useState(getReduceMotion);
   const [viz, setViz] = useState<VizSettings>(loadVizSettings);
   const [readerSettings, setReaderSettings] = useState(loadReaderSettings);
   const [whisperDevice, setWhisperDeviceState] = useState<WhisperDevice>(loadWhisperDevice);
@@ -190,7 +191,7 @@ export default function SettingsApp(props: SettingsWallProps) {
       toggleMotion: () => {
         const next = !reduce;
         setReduce(next);
-        localStorage.setItem(MOTION_KEY, next ? '1' : '0');
+        setReduceMotion(next);
         applyMotion(next);
       },
       readerSettings,
@@ -466,6 +467,7 @@ export default function SettingsApp(props: SettingsWallProps) {
               {page === 'profile-rules' && <ProfileRulesPage />}
               {page === 'reading' && <ReadingPage />}
               {page === 'transcription' && <TranscriptionPage />}
+              {page === 'scraper' && <ScraperPage />}
               {page === 'visualizer' && <VisualizerPage />}
               {page === 'special' && <SpecialPage />}
               {page === 'display' && <DisplayPage />}

@@ -1,10 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import { SCRAPER_CHANNELS } from './shared/scraperIpc';
+import { READING_CHANNELS } from './shared/readingIpc';
 import {
   SEANIME_CHANNELS,
   type SeanimeConnection,
   type SeanimeProbeResult,
   type SeanimeStatus,
 } from './shared/seanime';
+import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { LensOcrResult, RegionRect } from './main/screenOcr';
 import type {
@@ -31,6 +34,7 @@ import type {
 } from './shared/ytPlaylists';
 import type {
   AnkiLinkStatus,
+  DeleteMinedNotesResult,
   EnsureModelResult,
   IntervalSnapshot,
   MineNoteRequest,
@@ -41,6 +45,7 @@ import type { PitchLookup } from './shared/pitchAccent';
 import type { ApkgImportResult } from './shared/apkgParse';
 import type {
   AiEngineConfig,
+  AiEngineKind,
   AiDeckGenerationRequest,
   AiEnrichmentRequest,
   AiEnrichmentResult,
@@ -56,6 +61,24 @@ import type {
   MiningCandidate,
   TraditionalMiningConfig,
 } from './shared/mining';
+import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from './shared/localAgentRuntime';
+import type { AgentAutomation } from './shared/localAgentAutomation';
+import type {
+  StudyAnalysisRequest,
+  StudyAnkiExportResult,
+  StudyAnkiPreview,
+  StudyAnkiUndoResult,
+  StudyOpportunity,
+  StudyOpportunityStatus,
+  StudyOrchestratorDocument,
+  StudyLookupPackRequest,
+  StudyLookupPackResult,
+  StudyPreparationResult,
+  StudyTranscriptionQueueResult,
+  StudyVocabularyCandidate,
+  StudyVocabularyFilters,
+  StudyVocabularyWorkspace,
+} from './shared/mediaStudyOrchestrator';
 import type { ProfileId, ProfileSnapshot, StudyProfile } from './shared/profiles';
 import type {
   DesktopIndex,
@@ -87,7 +110,6 @@ import type {
   JitenSourceProfile,
   JitenStore,
 } from './shared/jiten';
-import type { CitySessionPacket, CityStateMessage } from './main/city/ipc/channels';
 
 // The single, safe bridge between the sandboxed renderer (React UI) and the
 // Electron main process. The UI can only call exactly these functions.
@@ -102,6 +124,10 @@ const api = {
     ipcRenderer.invoke('toolbox:fileSearch', request),
   listLibrary: (): Promise<LibraryItem[]> => ipcRenderer.invoke('library:list'),
   importFiles: (): Promise<LibraryItem[]> => ipcRenderer.invoke('library:importFiles'),
+  importArchivePath: (
+    filePath: string,
+  ): Promise<{ ok: boolean; item?: LibraryItem; alreadyPresent?: boolean; error?: string }> =>
+    ipcRenderer.invoke('library:importArchivePath', filePath),
   importFolder: (): Promise<LibraryItem[]> => ipcRenderer.invoke('library:importFolder'),
   removeItem: (id: string): Promise<LibraryItem[]> => ipcRenderer.invoke('library:remove', id),
   getLibraryFolders: (): Promise<string[]> => ipcRenderer.invoke('library:getFolders'),
@@ -410,8 +436,11 @@ const api = {
   },
   ankiMineNote: (req: MineNoteRequest): Promise<MineNoteResult> =>
     ipcRenderer.invoke('anki:mineNote', req),
-  ankiDeleteNotes: (noteIds: number[]): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('anki:deleteNotes', noteIds),
+  ankiDeleteNotes: (
+    noteIds: number[],
+    mediaFilenames: string[] = [],
+  ): Promise<DeleteMinedNotesResult> =>
+    ipcRenderer.invoke('anki:deleteNotes', { noteIds, mediaFilenames }),
   ankiEnsureModel: (id?: ProfileId): Promise<EnsureModelResult> =>
     ipcRenderer.invoke('anki:ensureModel', id),
   /** Ordered field names of a note type (for the field-mapping editor). */
@@ -421,6 +450,15 @@ const api = {
     ipcRenderer.invoke('anki:modelFields', modelName),
   ankiGetIntervals: (opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot> =>
     ipcRenderer.invoke('anki:getIntervals', opts),
+  /**
+   * Review state for NAMED notes. Use this, not `ankiGetIntervals`, whenever the caller
+   * already knows which note ids it means: the collection-wide poll walks every profile's
+   * sync query (`deck:*` by default) and does not return inside a minute on a real
+   * collection. It also carries entries the poll's word-only expression filter would drop,
+   * which is what a mined sentence card needs.
+   */
+  ankiGetIntervalsForNotes: (noteIds: readonly number[]): Promise<IntervalSnapshot> =>
+    ipcRenderer.invoke('anki:getIntervalsForNotes', [...noteIds]),
   /** Read-only week-ahead due counts from Anki's own scheduler. */
   ankiDueForecast: (): Promise<DueForecast> => ipcRenderer.invoke('anki:dueForecast'),
   onAnkiIntervalsChanged: (cb: (s: IntervalSnapshot) => void): (() => void) => {
@@ -429,7 +467,7 @@ const api = {
     return () => ipcRenderer.removeListener('anki:intervalsChanged', handler);
   },
 
-  // Dual-desktop layout + Noctis civilization module
+  // Dual-desktop layout
   desktopGetLayout: (): Promise<DesktopLayoutSnapshot> => ipcRenderer.invoke('desktop:getLayout'),
   desktopCommitLayout: (
     desktopIndex: DesktopIndex,
@@ -486,6 +524,72 @@ const api = {
     ipcRenderer.invoke('blanc:setFullScreen', on),
   blancSetGlobalShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('blanc:setGlobalShortcut', chord),
+  appToggle: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:toggle'),
+  appSetToggleShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:setToggleShortcut', chord),
+  appSetRestartShortcut: (chord: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('app:setRestartShortcut', chord),
+  osHotkeyStatus: (): Promise<{
+    supported: boolean;
+    installed: boolean;
+    running: boolean;
+    hotkey: string;
+    restartHotkey?: string;
+    openCount: number;
+    error?: string;
+  }> => ipcRenderer.invoke('osHotkey:status'),
+  osHotkeyInstall: (
+    bindings?:
+      | string
+      | {
+          toggle?: string;
+          restart?: string;
+          opens?: { section: string; chord: string }[];
+        },
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    status: {
+      supported: boolean;
+      installed: boolean;
+      running: boolean;
+      hotkey: string;
+      restartHotkey?: string;
+      openCount: number;
+    };
+  }> => ipcRenderer.invoke('osHotkey:install', bindings),
+  osHotkeySync: (
+    bindings?:
+      | string
+      | {
+          toggle?: string;
+          restart?: string;
+          opens?: { section: string; chord: string }[];
+        },
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    status: {
+      supported: boolean;
+      installed: boolean;
+      running: boolean;
+      hotkey: string;
+      restartHotkey?: string;
+      openCount: number;
+    };
+  }> => ipcRenderer.invoke('osHotkey:sync', bindings),
+  osHotkeyUninstall: (): Promise<{
+    ok: boolean;
+    error?: string;
+    status: {
+      supported: boolean;
+      installed: boolean;
+      running: boolean;
+      hotkey: string;
+      restartHotkey?: string;
+      openCount: number;
+    };
+  }> => ipcRenderer.invoke('osHotkey:uninstall'),
 
   /** Floating lock widget â€” frameless, transparent, no OS shadow. */
   lockscreenOpen: (size?: { width?: number; height?: number }): Promise<{ ok: boolean }> =>
@@ -657,6 +761,26 @@ const api = {
     patch: import('./shared/collectedTools').UpdateToolInput,
   ): Promise<{ ok: boolean; tool?: import('./shared/collectedTools').CollectedTool; error?: string }> =>
     ipcRenderer.invoke('tools:update', id, patch),
+  // Blanc App Drawer — folder CRUD + move, on the same collected-tools store.
+  toolsMoveItem: (
+    id: string,
+    folderId: string | null,
+  ): Promise<{ ok: boolean; tool?: import('./shared/collectedTools').CollectedTool; error?: string }> =>
+    ipcRenderer.invoke('tools:moveItem', id, folderId),
+  toolsAddFolder: (
+    name: string,
+    parentFolderId?: string | null,
+  ): Promise<{ ok: boolean; folder?: import('./shared/collectedTools').CollectedFolder; error?: string }> =>
+    ipcRenderer.invoke('tools:addFolder', name, parentFolderId),
+  toolsRenameFolder: (
+    id: string,
+    name: string,
+  ): Promise<{ ok: boolean; folder?: import('./shared/collectedTools').CollectedFolder; error?: string }> =>
+    ipcRenderer.invoke('tools:renameFolder', id, name),
+  toolsRemoveFolder: (
+    id: string,
+  ): Promise<{ ok: boolean; store?: import('./shared/collectedTools').CollectedToolsStore; error?: string }> =>
+    ipcRenderer.invoke('tools:removeFolder', id),
 
   // Anonymous download heat-map telemetry
   statsPing: (): Promise<{ ok: boolean; sent: boolean }> => ipcRenderer.invoke('stats:ping'),
@@ -673,10 +797,17 @@ const api = {
     ipcRenderer.invoke('translate:run', req),
   translateRunBatch: (req: {
     items: Array<{ id: string; text: string; source: string; target: string }>;
-  }): Promise<{ ok: boolean; results?: Array<{ id: string; text: string }>; error?: string }> =>
-    ipcRenderer.invoke('translate:runBatch', req),
+  }): Promise<{
+    ok: boolean;
+    results?: Array<{ id: string; text: string }>;
+    error?: string;
+    cancelled?: boolean;
+  }> => ipcRenderer.invoke('translate:runBatch', req),
+  translateCancelBatch: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('translate:cancelBatch'),
   translateStatus: (): Promise<{ ready: boolean; modelFound: boolean; modelPath: string | null }> =>
     ipcRenderer.invoke('translate:status'),
+  translateEnsureReady: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('translate:ensureReady'),
   // Cloud-LLM linguistic analysis of a completed translation (needs an API key)
   translateAnalyze: (
     req: import('./shared/translateAnalysisCore').TranslateAnalyzeRequest,
@@ -685,6 +816,40 @@ const api = {
     result?: import('./shared/translateAnalysisCore').TranslateAnalysisResult;
     error?: string;
   }> => ipcRenderer.invoke('translate:analyze', req),
+  // Cloud-LLM whole-sentence annotation — AI OCR mode (needs an API key)
+  sentenceAnalyze: (
+    req: import('./shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
+  ): Promise<import('./main/sentenceAnalysis').SentenceAnalyzeResponse> =>
+    ipcRenderer.invoke('sentence:analyze', req),
+  sentenceGetPrefs: (): Promise<import('./shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs> =>
+    ipcRenderer.invoke('sentence:getPrefs'),
+  sentenceSetPrefs: (
+    prefs: import('./shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs,
+  ): Promise<import('./shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs> =>
+    ipcRenderer.invoke('sentence:setPrefs', prefs),
+  // Preferences live in main, so every window (Settings, Lens overlay) is told.
+  onSentencePrefsChanged: (
+    cb: (prefs: import('./shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      prefs: import('./shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs,
+    ): void => cb(prefs);
+    ipcRenderer.on('sentence:prefsChanged', handler);
+    return () => ipcRenderer.removeListener('sentence:prefsChanged', handler);
+  },
+  // Snapshots raised by the extension: the notebook lives in renderer storage,
+  // so the main window files them on the extension's behalf.
+  onSentenceSnapshot: (
+    cb: (payload: import('./shared/analysisSnapshot').AnalysisSnapshot) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: import('./shared/analysisSnapshot').AnalysisSnapshot,
+    ): void => cb(payload);
+    ipcRenderer.on('sentence:snapshot', handler);
+    return () => ipcRenderer.removeListener('sentence:snapshot', handler);
+  },
   onTranslateModelProgress: (
     cb: (p: { status?: string; file?: string; progress?: number }) => void,
   ): (() => void) => {
@@ -692,6 +857,11 @@ const api = {
       cb(p);
     ipcRenderer.on('translate:progress', handler);
     return () => ipcRenderer.removeListener('translate:progress', handler);
+  },
+  onTranslateBatchProgress: (cb: (p: { done: number; total: number }) => void): (() => void) => {
+    const handler = (_e: unknown, p: { done: number; total: number }): void => cb(p);
+    ipcRenderer.on('translate:batchProgress', handler);
+    return () => ipcRenderer.removeListener('translate:batchProgress', handler);
   },
   onTranslatePartial: (cb: (p: { id: number; progress: number }) => void): (() => void) => {
     const handler = (_e: unknown, p: { id: number; progress: number }): void => cb(p);
@@ -701,12 +871,148 @@ const api = {
 
   // Media player + media library
   listMedia: (): Promise<MediaItem[]> => ipcRenderer.invoke('media:list'),
+  scanMediaStorage: (paths: string[]): Promise<{ totalBytes: number; files: Array<{ path: string; size: number; modifiedAt: number }> }> => ipcRenderer.invoke('media:scanStorage', paths),
+  updateMediaMetadata: (id: string, metadata: Partial<Pick<MediaItem, 'title' | 'artist' | 'genres' | 'actors' | 'year' | 'lang' | 'category' | 'jlptLevel' | 'vocabularyCount' | 'kanjiCount' | 'metadataSource'>>): Promise<MediaItem | null> => ipcRenderer.invoke('media:updateMetadata', id, metadata),
+  previewMediaOrganization: (id: string, root: string): Promise<import('./shared/mediaHub').MediaOrganizationPreview | null> => ipcRenderer.invoke('media:organizationPreview', id, root),
+  organizeMedia: (preview: import('./shared/mediaHub').MediaOrganizationPreview, choice?: import('./shared/mediaHub').MediaDuplicateChoice): Promise<{ ok: boolean; path?: string; error?: string }> => ipcRenderer.invoke('media:organize', preview, choice),
+  backupMedia: (): Promise<import('./shared/mediaHub').MediaBackupContract> => ipcRenderer.invoke('media:backup'),
+  listMediaRelationships: (fromId?: string): Promise<import('./shared/mediaHub').MediaRelationship[]> => ipcRenderer.invoke('media:relationships', fromId),
+  addMediaRelationship: (relationship: Omit<import('./shared/mediaHub').MediaRelationship, 'id' | 'createdAt'>): Promise<import('./shared/mediaHub').MediaRelationship> => ipcRenderer.invoke('media:addRelationship', relationship),
+  mediaPathExists: (filePath: string): Promise<boolean> => ipcRenderer.invoke('media:pathExists', filePath),
   /** Embedded album art of an audio item as a data URL (null = no art). */
   coverArt: (id: string): Promise<string | null> => ipcRenderer.invoke('media:coverArt', id),
-  /** Open a file dialog; the chosen file is saved to the media library. */
+  /**
+   * Library artwork as a `playfile://` URL — embedded cover for audio, a frame
+   * grabbed ~10% in for video. Generated and disk-cached on first ask; null means
+   * the file has no usable image, and that answer is cached too.
+   */
+  mediaArtwork: (id: string, variant?: 'poster' | 'banner' | 'still'): Promise<string | null> =>
+    ipcRenderer.invoke('media:artwork', id, variant),
+  // ---- metadata sweep (Jikan / AniList) ----
+  runMediaMetadata: (
+    request?: import('./shared/mediaMetadataIpc').MediaMetadataRequest,
+  ): Promise<import('./shared/mediaMetadataIpc').MediaMetadataResult> =>
+    ipcRenderer.invoke('mediaMetadata:run', request),
+  cancelMediaMetadata: (seriesKey?: string): Promise<void> =>
+    ipcRenderer.invoke('mediaMetadata:cancel', seriesKey),
+  mediaMetadataStatus: (): Promise<{ running: boolean }> =>
+    ipcRenderer.invoke('mediaMetadata:status'),
+  searchMediaMetadata: (
+    query: string,
+  ): Promise<import('./shared/mediaMetadataIpc').MediaMetadataSearchHit[]> =>
+    ipcRenderer.invoke('mediaMetadata:search', query),
+  clearMediaMetadataCache: (): Promise<void> => ipcRenderer.invoke('mediaMetadata:clearCache'),
+  // ---- discovery (Scraper app: catalogue search + curated feeds) ----
+  searchDiscovery: (
+    query: string,
+  ): Promise<import('./shared/mediaDiscovery').DiscoveryCandidate[]> =>
+    ipcRenderer.invoke('discovery:search', query),
+  browseDiscovery: (
+    feed: import('./shared/mediaDiscovery').DiscoveryFeedId,
+    page?: number,
+  ): Promise<import('./shared/mediaDiscovery').DiscoveryFeedResult> =>
+    ipcRenderer.invoke('discovery:browse', feed, page ?? 1),
+  discoveryDetail: (
+    id: number,
+  ): Promise<import('./shared/mediaDiscovery').DiscoveryCandidate | null> =>
+    ipcRenderer.invoke('discovery:detail', id),
+  // ---- authenticated MyAnimeList sync ----
+  // Note what is NOT here: there is no way to read the access or refresh token
+  // from the renderer, by design. The tokens live in the main process encrypted
+  // with safeStorage; this side learns only whether an account is connected and
+  // whether the store on disk is actually encrypted. Every call below is driven
+  // by an explicit user action — nothing on this bridge runs on a timer.
+  malStatus: (): Promise<
+    import('./main/malSync').MalIpcResult<import('./main/malSync').MalAuthStatus>
+  > => ipcRenderer.invoke('mal:status'),
+  malSetClientId: (
+    clientId: string,
+    redirectUri?: string,
+  ): Promise<import('./main/malSync').MalIpcResult<import('./main/malSync').MalAuthStatus>> =>
+    ipcRenderer.invoke('mal:setClientId', clientId, redirectUri),
+  malBeginAuth: (): Promise<
+    import('./main/malSync').MalIpcResult<import('./main/malSync').MalPendingAuth>
+  > => ipcRenderer.invoke('mal:beginAuth'),
+  malCompleteAuth: (
+    code: string,
+    state: string,
+  ): Promise<import('./main/malSync').MalIpcResult<import('./main/malSync').MalAuthStatus>> =>
+    ipcRenderer.invoke('mal:completeAuth', code, state),
+  malSignOut: (): Promise<
+    import('./main/malSync').MalIpcResult<import('./main/malSync').MalAuthStatus>
+  > => ipcRenderer.invoke('mal:signOut'),
+  malFetchList: (
+    status?: import('./shared/malSync').MalListStatus,
+  ): Promise<import('./main/malSync').MalIpcResult<import('./main/malSync').MalListSyncResult>> =>
+    ipcRenderer.invoke('mal:fetchList', status),
+  malUpdateEntry: (
+    animeId: number,
+    update: import('./shared/malSync').MalListStatusUpdate,
+  ): Promise<
+    import('./main/malSync').MalIpcResult<import('./shared/malSync').MalListStatusUpdate>
+  > => ipcRenderer.invoke('mal:updateEntry', animeId, update),
+  onMediaMetadataProgress: (
+    cb: (p: import('./shared/mediaMetadataIpc').MediaMetadataProgress) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      p: import('./shared/mediaMetadataIpc').MediaMetadataProgress,
+    ): void => cb(p);
+    ipcRenderer.on('mediaMetadata:progress', handler);
+    return () => ipcRenderer.removeListener('mediaMetadata:progress', handler);
+  },
+  // ---- subtitle discovery (embedded / sidecar / Jimaku / OpenSubtitles) ----
+  runSubtitleDiscovery: (
+    request?: import('./shared/subtitleDiscoveryIpc').SubtitleDiscoveryRequest,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleDiscoveryResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:run', request),
+  cancelSubtitleDiscovery: (mediaId?: string): Promise<void> =>
+    ipcRenderer.invoke('subtitleDiscovery:cancel', mediaId),
+  subtitleDiscoveryStatus: (): Promise<{ running: boolean }> =>
+    ipcRenderer.invoke('subtitleDiscovery:status'),
+  getSubtitleDiscoverySettings: (): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings> =>
+    ipcRenderer.invoke('subtitleDiscovery:settings'),
+  saveSubtitleDiscoverySettings: (
+    settings: import('./shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings> =>
+    ipcRenderer.invoke('subtitleDiscovery:saveSettings', settings),
+  /** Which providers need a key and whether one is stored. Never the key itself. */
+  subtitleProviderCredentials: (): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]> =>
+    ipcRenderer.invoke('subtitleDiscovery:credentials'),
+  setSubtitleProviderKey: (
+    id: string,
+    key: string,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]> =>
+    ipcRenderer.invoke('subtitleDiscovery:setKey', id, key),
+  testSubtitleProvider: (
+    id: string,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleProviderTestResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:test', id),
+  /** Cue text for one stored subtitle record. */
+  readSubtitleRecord: (mediaId: string, recordId: string): Promise<SubtitlePick | null> =>
+    ipcRenderer.invoke('subtitleDiscovery:read', mediaId, recordId),
+  onSubtitleDiscoveryProgress: (
+    cb: (p: import('./shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      p: import('./shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress,
+    ): void => cb(p);
+    ipcRenderer.on('subtitleDiscovery:progress', handler);
+    return () => ipcRenderer.removeListener('subtitleDiscovery:progress', handler);
+  },
+  /** Persist per-item user state (favorite / study queue / note / collections). */
+  setMediaItemState: (
+    id: string,
+    patch: Partial<Pick<MediaItem, 'favorite' | 'studyQueue' | 'note' | 'collections'>>,
+  ): Promise<MediaItem | null> => ipcRenderer.invoke('media:setItemState', id, patch),
+  /** Open a file dialog; chosen file(s) are saved to the media library. */
   pickMedia: (): Promise<MediaOpen | null> => ipcRenderer.invoke('media:pick'),
+  /** Open a folder dialog and import every video/audio file under it. */
+  addMediaFolder: (): Promise<{ items: MediaItem[]; added: number }> => ipcRenderer.invoke('media:addFolder'),
   /** Re-open a saved library item by id. */
   openMedia: (id: string): Promise<MediaOpen | null> => ipcRenderer.invoke('media:open', id),
+  handoffMedia: (handoff: import('./shared/externalPlayer').PlaybackHandoff, profile: import('./shared/externalPlayer').ExternalPlayerProfile): Promise<string | null> => ipcRenderer.invoke('media:handoff', handoff, profile),
   removeMedia: (id: string): Promise<MediaItem[]> => ipcRenderer.invoke('media:remove', id),
   /** Drop library entries whose files no longer exist on disk. */
   pruneMedia: (): Promise<{ removed: number; items: MediaItem[] }> =>
@@ -732,6 +1038,11 @@ const api = {
   },
   /** Open a file dialog and return the chosen subtitle file's text. */
   pickSubtitle: (): Promise<SubtitlePick | null> => ipcRenderer.invoke('media:pickSubtitle'),
+  fetchYoutubeSubs: (
+    id: string,
+    preferLang?: string,
+  ): Promise<{ ok: true; name: string; text: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('media:fetchYoutubeSubs', id, preferLang),
   getMediaWatchFolder: (): Promise<string | null> => ipcRenderer.invoke('media:getWatchFolder'),
   setMediaWatchFolder: (): Promise<{ folder: string | null; items: MediaItem[] }> =>
     ipcRenderer.invoke('media:setWatchFolder'),
@@ -745,6 +1056,8 @@ const api = {
 
   // YouTube immersion playlists (metadata sync; download is explicit)
   ytList: (): Promise<YtPlaylistsStore> => ipcRenderer.invoke('yt:list'),
+  ytListChannels: (): Promise<import('./shared/ytPlaylists').YtChannel[]> =>
+    ipcRenderer.invoke('yt:listChannels'),
   ytSaveFolders: (folders: YtPlaylistFolder[]): Promise<YtPlaylistsStore> =>
     ipcRenderer.invoke('yt:saveFolders', folders),
   ytSaveFolder: (folder: YtPlaylistFolder): Promise<YtPlaylistsStore> =>
@@ -770,9 +1083,35 @@ const api = {
       sortDefault: YtPlaylistSort;
       folderId: string | null;
       title: string;
+      channelId: string;
+      channelTitle: string;
+      channelIconUrl: string;
+      subscriptionStatus: import('./shared/ytPlaylists').YtSubscriptionStatus;
+      updateFrequencyHours: number;
     }>,
   ): Promise<YtPlaylistsStore | { error: string }> =>
     ipcRenderer.invoke('yt:setPlaylistPrefs', playlistId, prefs),
+  ytSetChannelPrefs: (
+    channelId: string,
+    prefs: Partial<{
+      title: string;
+      iconUrl: string;
+      subscriptionStatus: import('./shared/ytPlaylists').YtSubscriptionStatus;
+      updateFrequencyHours: number;
+    }>,
+  ): Promise<YtPlaylistsStore | { error: string }> =>
+    ipcRenderer.invoke('yt:setChannelPrefs', channelId, prefs),
+  ytRefreshChannel: (
+    channelId: string,
+  ): Promise<
+    | {
+        store: YtPlaylistsStore;
+        channel: import('./shared/ytPlaylists').YtChannel;
+        refreshedPlaylistIds: string[];
+        errors: string[];
+      }
+    | { error: string }
+  > => ipcRenderer.invoke('yt:refreshChannel', channelId),
   ytDownloadVideos: (
     videoIds: string[],
   ): Promise<{
@@ -796,6 +1135,34 @@ const api = {
     newVideoIds: string[];
     errors: Array<{ playlistId: string; title: string; error: string }>;
   }> => ipcRenderer.invoke('yt:refreshAll'),
+  // YouTube discovery (Phase 8 item 3). Metadata only — every one of these runs
+  // yt-dlp with --skip-download/--flat-playlist and writes nothing to disk.
+  ytDiscoverySearch: (
+    query: string,
+    limit?: number,
+  ): Promise<import('./shared/youtubeDiscovery').YoutubeSearchResult> =>
+    ipcRenderer.invoke('ytDiscovery:search', query, limit),
+  ytDiscoveryChannel: (
+    channel: string,
+    limit?: number,
+  ): Promise<import('./shared/youtubeDiscovery').YoutubeSearchResult> =>
+    ipcRenderer.invoke('ytDiscovery:channel', channel, limit),
+  ytDiscoveryProbe: (
+    videoId: string,
+  ): Promise<import('./shared/youtubeDiscovery').YoutubeProbeResult> =>
+    ipcRenderer.invoke('ytDiscovery:probe', videoId),
+  /** Reads a caption file `ytFetchSubsOnly` already cached. Never fetches. */
+  ytCachedCaptionText: (
+    youtubeId: string,
+  ): Promise<{ text: string | null; file: string | null }> =>
+    ipcRenderer.invoke('yt:cachedCaptionText', youtubeId),
+  /** Hand a discovered video to the playlist manager. Does not download it. */
+  ytAddVideoByUrl: (
+    url: string,
+  ): Promise<
+    | { ok: true; playlistId: string; videoId: string; youtubeId: string; duplicate?: boolean }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('yt:addVideoByUrl', url),
   ytAddToPlanToWatch: (videoIds: string[]): Promise<YtPlaylistsStore> =>
     ipcRenderer.invoke('yt:addToPlanToWatch', videoIds),
   ytRemoveFromPlanToWatch: (videoIds: string[]): Promise<YtPlaylistsStore> =>
@@ -861,9 +1228,9 @@ const api = {
     config?: Partial<TraditionalMiningConfig>,
   ): Promise<MiningCandidate> => ipcRenderer.invoke('mining:enrichCandidate', candidate, config),
   onMiningEnrichProgress: (
-    cb: (p: import('../shared/mining').MiningEnrichProgress) => void,
+    cb: (p: import('./shared/mining').MiningEnrichProgress) => void,
   ): (() => void) => {
-    const handler = (_e: unknown, p: import('../shared/mining').MiningEnrichProgress): void => cb(p);
+    const handler = (_e: unknown, p: import('./shared/mining').MiningEnrichProgress): void => cb(p);
     ipcRenderer.on('mining:enrichProgress', handler);
     return () => ipcRenderer.removeListener('mining:enrichProgress', handler);
   },
@@ -892,6 +1259,18 @@ const api = {
   ): Promise<{ ok: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke('mining:saveEpubDeckFile', content, title, ext),
   aiGetConfig: (): Promise<AiEngineConfig> => ipcRenderer.invoke('ai:getConfig'),
+  localAgentPlan: (request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse> =>
+    ipcRenderer.invoke('localAgent:plan', request),
+  localAgentStatus: (): Promise<LocalAgentRuntimeStatus> => ipcRenderer.invoke('localAgent:status'),
+  localAgentModels: (): Promise<LocalAgentModelInfo[]> => ipcRenderer.invoke('localAgent:models'),
+  localAgentSyncAutomations: (entries: AgentAutomation[]): void => {
+    ipcRenderer.send('localAgent:syncAutomations', entries);
+  },
+  onLocalAgentTrigger: (cb: (entry: AgentAutomation) => void): (() => void) => {
+    const handler = (_event: unknown, entry: AgentAutomation): void => cb(entry);
+    ipcRenderer.on('localAgent:trigger', handler);
+    return () => ipcRenderer.removeListener('localAgent:trigger', handler);
+  },
   aiSetApiKey: (
     payload: string | { provider?: AiProviderKeyBucket; apiKey?: string },
   ): Promise<{
@@ -916,6 +1295,8 @@ const api = {
     apiKeySet: boolean;
     apiKeysSet: { gemini: boolean; deepseek: boolean };
   }> => ipcRenderer.invoke('ai:setProvider', providerId),
+  aiSetEngine: (engine: AiEngineKind): Promise<AiEngineConfig & { ok: boolean }> =>
+    ipcRenderer.invoke('ai:setEngine', engine),
   aiListPresets: (): Promise<AiPromptPreset[]> => ipcRenderer.invoke('ai:listPresets'),
   aiListFormats: (): Promise<AiMiningCardFormat[]> => ipcRenderer.invoke('ai:listFormats'),
   aiSelectPreset: (presetId: string): Promise<{
@@ -948,17 +1329,260 @@ const api = {
   aiGenerateDeck: (req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]> =>
     ipcRenderer.invoke('ai:generateDeck', req),
   onAiGenerateProgress: (
-    cb: (p: import('../shared/mining').AiGenerationProgress) => void,
+    cb: (p: import('./shared/mining').AiGenerationProgress) => void,
   ): (() => void) => {
-    const handler = (_e: unknown, p: import('../shared/mining').AiGenerationProgress): void => cb(p);
+    const handler = (_e: unknown, p: import('./shared/mining').AiGenerationProgress): void => cb(p);
     ipcRenderer.on('ai:generateProgress', handler);
     return () => ipcRenderer.removeListener('ai:generateProgress', handler);
   },
   aiSaveCsv: (csv: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke('ai:saveCsv', csv),
+  mediaStudyAssist: (
+    req: import('./shared/mediaStudyAssistant').MediaStudyAssistantRequest,
+  ): Promise<{
+    ok: boolean;
+    result?: import('./shared/mediaStudyAssistant').MediaStudyAssistantResult;
+    error?: string;
+    cached?: boolean;
+  }> => ipcRenderer.invoke('media-study:assist', req),
+  studyGet: (): Promise<StudyOrchestratorDocument> => ipcRenderer.invoke('study:get'),
+  studyMigrateLegacy: (value: unknown): Promise<StudyOrchestratorDocument> =>
+    ipcRenderer.invoke('study:migrateLegacy', value),
+  studyPrepare: (request: StudyAnalysisRequest): Promise<StudyPreparationResult> =>
+    ipcRenderer.invoke('study:prepare', request),
+  studyCreateLookupPack: (request: StudyLookupPackRequest): Promise<StudyLookupPackResult> =>
+    ipcRenderer.invoke('study:createLookupPack', request),
+  studyQueueTranscription: (mediaId: string): Promise<StudyTranscriptionQueueResult> =>
+    ipcRenderer.invoke('study:queueTranscription', mediaId),
+  studyWorkspacePage: (
+    workspaceId: string,
+    offset?: number,
+    limit?: number,
+  ): Promise<{ items: StudyVocabularyCandidate[]; total: number; selected: number }> =>
+    ipcRenderer.invoke('study:workspacePage', workspaceId, offset, limit),
+  studyApplyFilters: (
+    workspaceId: string,
+    filters: Partial<StudyVocabularyFilters>,
+  ): Promise<StudyVocabularyWorkspace> =>
+    ipcRenderer.invoke('study:applyFilters', workspaceId, filters),
+  studyUndoFilter: (workspaceId: string): Promise<StudyVocabularyWorkspace> =>
+    ipcRenderer.invoke('study:undoFilter', workspaceId),
+  studyUpdateWorkspace: (workspace: StudyVocabularyWorkspace): Promise<StudyVocabularyWorkspace> =>
+    ipcRenderer.invoke('study:updateWorkspace', workspace),
+  studyListOpportunities: (): Promise<StudyOpportunity[]> =>
+    ipcRenderer.invoke('study:listOpportunities'),
+  studySyncOpportunities: (
+    opportunities: StudyOpportunity[],
+    retireMissingActive = false,
+  ): Promise<StudyOrchestratorDocument> =>
+    ipcRenderer.invoke('study:syncOpportunities', opportunities, retireMissingActive),
+  studySetOpportunityStatus: (
+    opportunityId: string,
+    status: StudyOpportunityStatus,
+    snoozedUntil?: number,
+  ): Promise<StudyOrchestratorDocument> =>
+    ipcRenderer.invoke('study:setOpportunityStatus', opportunityId, status, snoozedUntil),
+  studyPreviewAnki: (workspaceId: string): Promise<StudyAnkiPreview> =>
+    ipcRenderer.invoke('study:previewAnki', workspaceId),
+  studyExportAnki: (workspaceId: string): Promise<StudyAnkiExportResult> =>
+    ipcRenderer.invoke('study:exportAnki', workspaceId),
+  studyUndoAnkiExport: (workspaceId: string): Promise<StudyAnkiUndoResult> =>
+    ipcRenderer.invoke('study:undoAnkiExport', workspaceId),
+  onStudyChanged: (cb: (document: StudyOrchestratorDocument) => void): (() => void) => {
+    const handler = (_event: unknown, document: StudyOrchestratorDocument): void => cb(document);
+    ipcRenderer.on('study:changed', handler);
+    return () => ipcRenderer.removeListener('study:changed', handler);
+  },
 
   // Immersion Browser
   immersionListSites: (): Promise<ImmersionSitesStore> => ipcRenderer.invoke('immersion:listSites'),
+  visualNovelList: (): Promise<import('./shared/visualNovel').VisualNovelDatabase> =>
+    ipcRenderer.invoke('visual-novel:list'),
+  visualNovelSearchSource: (
+    query: string,
+  ): Promise<{
+    ok: boolean;
+    results?: import('./shared/visualNovel').VisualNovelSourceResult[];
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:searchSource', query),
+  visualNovelSourceDetails: (
+    providerId: string,
+  ): Promise<{
+    ok: boolean;
+    details?: import('./shared/visualNovel').VisualNovelSourceDetails;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:sourceDetails', providerId),
+  visualNovelPickExecutable: (): Promise<string | null> =>
+    ipcRenderer.invoke('visual-novel:pickExecutable'),
+  visualNovelDiscoverFolder: (): Promise<import('./shared/visualNovel').VisualNovelDiscoveryCandidate[]> =>
+    ipcRenderer.invoke('visual-novel:discoverFolder'),
+  visualNovelExportLibrary: (): Promise<{
+    ok: boolean;
+    path?: string;
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:exportLibrary'),
+  visualNovelImportLibrary: (): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    addedEntries?: number;
+    addedCaptures?: number;
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:importLibrary'),
+  visualNovelExportCommunityBundle: (
+    title: string,
+    content: string,
+  ): Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }> =>
+    ipcRenderer.invoke('visual-novel:exportCommunityBundle', title, content),
+  visualNovelPickCommunityBundle: (): Promise<{
+    ok: boolean;
+    content?: string;
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:pickCommunityBundle'),
+  visualNovelAdd: (
+    input: import('./shared/visualNovel').VisualNovelCreateInput,
+  ): Promise<{ ok: boolean; database?: import('./shared/visualNovel').VisualNovelDatabase; error?: string }> =>
+    ipcRenderer.invoke('visual-novel:add', input),
+  visualNovelImportDiscovered: (
+    candidates: import('./shared/visualNovel').VisualNovelCreateInput[],
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    imported?: number;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:importDiscovered', candidates),
+  visualNovelRemove: (
+    id: string,
+  ): Promise<import('./shared/visualNovel').VisualNovelDatabase> =>
+    ipcRenderer.invoke('visual-novel:remove', id),
+  visualNovelUpdateProgress: (
+    id: string,
+    patch: import('./shared/visualNovel').VisualNovelProgressPatch,
+  ): Promise<import('./shared/visualNovel').VisualNovelDatabase> =>
+    ipcRenderer.invoke('visual-novel:updateProgress', id, patch),
+  visualNovelUpdateMetadata: (
+    id: string,
+    patch: import('./shared/visualNovel').VisualNovelMetadataPatch,
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:updateMetadata', id, patch),
+  visualNovelUpdateRoutes: (
+    id: string,
+    routes: import('./shared/visualNovel').VisualNovelRouteInput[],
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:updateRoutes', id, routes),
+  visualNovelReadClipboard: (): Promise<string> => ipcRenderer.invoke('visual-novel:readClipboard'),
+  visualNovelHookState: (
+    id: string,
+  ): Promise<import('./shared/visualNovelHook').VisualNovelHookState> =>
+    ipcRenderer.invoke('visual-novel:hookState', id),
+  visualNovelStartHook: (
+    id: string,
+  ): Promise<{
+    ok: boolean;
+    state?: import('./shared/visualNovelHook').VisualNovelHookState;
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:startHook', id),
+  visualNovelStopHook: (
+    id: string,
+  ): Promise<import('./shared/visualNovelHook').VisualNovelHookState> =>
+    ipcRenderer.invoke('visual-novel:stopHook', id),
+  onVisualNovelHookChanged: (
+    cb: (state: import('./shared/visualNovelHook').VisualNovelHookState) => void,
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      state: import('./shared/visualNovelHook').VisualNovelHookState,
+    ): void => cb(state);
+    ipcRenderer.on('visual-novel:hookChanged', listener);
+    return () => ipcRenderer.removeListener('visual-novel:hookChanged', listener);
+  },
+  visualNovelPickScripts: (id: string): Promise<{
+    ok: boolean;
+    lines?: import('./shared/visualNovelScriptExtraction').VisualNovelScriptLine[];
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:pickScripts', id),
+  visualNovelImportScriptLines: (
+    id: string,
+    lines: import('./shared/visualNovelScriptExtraction').VisualNovelScriptLine[],
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    imported?: number;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:importScriptLines', id, lines),
+  visualNovelSessionState: (id: string): Promise<{ startedAt: number | null }> =>
+    ipcRenderer.invoke('visual-novel:sessionState', id),
+  visualNovelStopSession: (id: string): Promise<{
+    database: import('./shared/visualNovel').VisualNovelDatabase;
+    stopped: boolean;
+  }> => ipcRenderer.invoke('visual-novel:stopSession', id),
+  visualNovelCaptureText: (
+    input: import('./shared/visualNovel').VisualNovelCaptureInput,
+  ): Promise<{ ok: boolean; database?: import('./shared/visualNovel').VisualNovelDatabase; error?: string }> =>
+    ipcRenderer.invoke('visual-novel:captureText', input),
+  visualNovelCaptureMany: (
+    inputs: import('./shared/visualNovel').VisualNovelCaptureInput[],
+    options?: import('./shared/visualNovel').VisualNovelCaptureBatchOptions,
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    imported?: number;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:captureMany', inputs, options),
+  visualNovelUpdateCapture: (
+    id: string,
+    patch: import('./shared/visualNovel').VisualNovelCapturePatch,
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:updateCapture', id, patch),
+  visualNovelRemoveCapture: (
+    id: string,
+  ): Promise<import('./shared/visualNovel').VisualNovelDatabase> =>
+    ipcRenderer.invoke('visual-novel:removeCapture', id),
+  visualNovelReadCaptureImage: (
+    filePath: string,
+  ): Promise<{ ok: boolean; dataUrl?: string; error?: string }> =>
+    ipcRenderer.invoke('visual-novel:readCaptureImage', filePath),
+  visualNovelAttachCaptureAudio: (
+    id: string,
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    canceled?: boolean;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:attachCaptureAudio', id),
+  visualNovelRemoveCaptureAudio: (
+    id: string,
+  ): Promise<{
+    ok: boolean;
+    database?: import('./shared/visualNovel').VisualNovelDatabase;
+    error?: string;
+  }> => ipcRenderer.invoke('visual-novel:removeCaptureAudio', id),
+  visualNovelReadCaptureAudio: (
+    filePath: string,
+  ): Promise<{ ok: boolean; dataUrl?: string; filename?: string; error?: string }> =>
+    ipcRenderer.invoke('visual-novel:readCaptureAudio', filePath),
+  visualNovelLaunch: (id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }> =>
+    ipcRenderer.invoke('visual-novel:launch', id),
+  onVisualNovelChanged: (
+    cb: (database: import('./shared/visualNovel').VisualNovelDatabase) => void,
+  ): (() => void) => {
+    const handler = (_event: unknown, database: import('./shared/visualNovel').VisualNovelDatabase): void => cb(database);
+    ipcRenderer.on('visual-novel:changed', handler);
+    return () => ipcRenderer.removeListener('visual-novel:changed', handler);
+  },
   immersionSaveSite: (
     input: ImmersionSaveSiteInput,
   ): Promise<{ ok: boolean; site?: ImmersionSite; error?: string }> =>
@@ -1065,7 +1689,7 @@ const api = {
   lensGetInit: (): Promise<LensInit | null> => ipcRenderer.invoke('lens:getInit'),
   /** Capture + OCR a region (window-local DIP coords). */
   lensOcr: (
-    region: RegionRect & { engine?: 'auto' | 'manga' | 'web' },
+    region: RegionRect & { engine?: 'auto' | 'manga' | 'web'; includeScreenshot?: boolean },
   ): Promise<LensOcrResult> => ipcRenderer.invoke('lens:ocr', region),
   /** Toggle pass-through: true = capture the mouse, false = click through to the app below. */
   lensSetInteractive: (interactive: boolean): void => {
@@ -1119,19 +1743,6 @@ const api = {
     void ipcRenderer.invoke('i18n:setLang', lang);
   },
 
-  // Noctis Civilization Module (src/main/city). The renderer holds a
-  // read-only mirror of committed civilization state, refreshed by push.
-  // recordSession carries the already-interpreted learning input (no raw
-  // telemetry, title, or word crosses â€” LEARNING_INTEGRATION.md Section 9).
-  cityGetState: (): Promise<CityStateMessage> => ipcRenderer.invoke('city:getState'),
-  cityRecordSession: (packet: CitySessionPacket): Promise<CityStateMessage> =>
-    ipcRenderer.invoke('city:recordSession', packet),
-  onCityChanged: (cb: (message: CityStateMessage) => void): (() => void) => {
-    const handler = (_e: unknown, message: CityStateMessage): void => cb(message);
-    ipcRenderer.on('city:changed', handler);
-    return () => ipcRenderer.removeListener('city:changed', handler);
-  },
-
   // Chrome extension bridge (Phase 9) — loopback HTTP server status / token.
   extensionStatus: (): Promise<{ running: boolean; port: number; token: string; folderPath: string }> =>
     ipcRenderer.invoke('extension:status'),
@@ -1169,6 +1780,69 @@ const api = {
     ): void => cb(payload);
     ipcRenderer.on('extension:mined', handler);
     return () => ipcRenderer.removeListener('extension:mined', handler);
+  },
+  // ---- transcription queue ----
+  enqueueTranscription: (
+    request: import('./shared/transcriptionIpc').TranscriptionRequest,
+  ): Promise<import('./shared/transcriptionIpc').TranscriptionResult> =>
+    ipcRenderer.invoke('transcription:enqueue', request),
+  /**
+   * Windows Live Captions capture. The source window is lossy (~12 lines, a few
+   * seconds), so this is a background poller in main rather than a pull the
+   * renderer performs — the renderer only toggles it and reads what it caught.
+   */
+  liveCaptionsStatus: (): Promise<import('./main/liveCaptions').LiveCaptionsStatus> =>
+    ipcRenderer.invoke('liveCaptions:status'),
+  liveCaptionsStart: (): Promise<{
+    ok: boolean;
+    error?: string;
+    status: import('./main/liveCaptions').LiveCaptionsStatus;
+  }> => ipcRenderer.invoke('liveCaptions:start'),
+  liveCaptionsStop: (): Promise<{
+    ok: boolean;
+    status: import('./main/liveCaptions').LiveCaptionsStatus;
+  }> => ipcRenderer.invoke('liveCaptions:stop'),
+  liveCaptionsScripts: (): Promise<import('./shared/liveCaptions').CaptionScript[]> =>
+    ipcRenderer.invoke('liveCaptions:scripts'),
+  liveCaptionsClear: (): Promise<{
+    ok: boolean;
+    status: import('./main/liveCaptions').LiveCaptionsStatus;
+  }> => ipcRenderer.invoke('liveCaptions:clear'),
+  onLiveCaptionsChanged: (
+    cb: (status: import('./main/liveCaptions').LiveCaptionsStatus) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      status: import('./main/liveCaptions').LiveCaptionsStatus,
+    ): void => cb(status);
+    ipcRenderer.on('liveCaptions:changed', handler);
+    return () => ipcRenderer.removeListener('liveCaptions:changed', handler);
+  },
+
+  cancelTranscription: (mediaId?: string): Promise<void> =>
+    ipcRenderer.invoke('transcription:cancel', mediaId),
+  transcriptionQueue: (): Promise<import('./shared/transcriptionIpc').TranscriptionJob[]> =>
+    ipcRenderer.invoke('transcription:queue'),
+  onTranscriptionProgress: (
+    cb: (p: import('./shared/transcriptionIpc').TranscriptionProgress) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      p: import('./shared/transcriptionIpc').TranscriptionProgress,
+    ): void => cb(p);
+    ipcRenderer.on('transcription:progress', handler);
+    return () => ipcRenderer.removeListener('transcription:progress', handler);
+  },
+  /** Main asks the renderer to run Whisper on one slice of audio. */
+  onTranscriptionChunkRequest: (
+    cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { id: string; pcmBase64: string; lang: string }): void => cb(payload);
+    ipcRenderer.on('transcription:chunk-request', handler);
+    return () => ipcRenderer.removeListener('transcription:chunk-request', handler);
+  },
+  replyTranscriptionChunk: (payload: { id: string; ok: boolean; text?: string; error?: string }): void => {
+    ipcRenderer.send('transcription:chunk-reply', payload);
   },
   onExtensionTranscribeRequest: (
     cb: (payload: { id: string; pcmBase64: string }) => void,
@@ -1315,14 +1989,198 @@ const api = {
   ): void => {
     ipcRenderer.send('extension:clipboard-list-reply', { id, entries });
   },
-  profileRulesGet: (): Promise<{ schemaVersion: 1; rules: Array<Record<string, unknown>> }> =>
+  profileRulesGet: (): Promise<{ schemaVersion: 2; rules: Array<Record<string, unknown>> }> =>
     ipcRenderer.invoke('profileRules:get'),
   profileRulesSet: (
     store: unknown,
-  ): Promise<{ schemaVersion: 1; rules: Array<Record<string, unknown>> }> =>
+  ): Promise<{ schemaVersion: 2; rules: Array<Record<string, unknown>> }> =>
     ipcRenderer.invoke('profileRules:set', store),
 
-  // ---- Seanime sidecar (Phase 1 dev-only proof; inert unless SEANIME_SIDECAR=1) ----
+  // ---- scraper backend ----
+  // One method per ScraperPort call. `scraperCapabilities` is what the renderer
+  // port checks before using any of the rest; anything not listed there stays
+  // on sample data.
+  scraperCapabilities: (): Promise<import('./shared/scraperIpc').ScraperMethod[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.capabilities),
+  scraperSystemStats: (): Promise<import('./shared/scraperResults').SystemStats> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.systemStats),
+  scraperListDownloads: (
+    input: import('./shared/scraperIpc').ScraperQbitInput,
+  ): Promise<import('./shared/scraperResults').DownloadRow[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.listDownloads, input),
+  scraperListExports: (): Promise<import('./shared/scraperResults').ExportRecord[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.listExports),
+  scraperListPlugins: (
+    enabledIds: string[],
+  ): Promise<import('./shared/scraperIpc').ScraperPluginInfo[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.listPlugins, enabledIds),
+  scraperWriteExport: (
+    request: import('./shared/scraperIpc').ScraperExportInput & {
+      content: string;
+      defaultName: string;
+      recordCount: number;
+      openAfter?: boolean;
+    },
+  ): Promise<import('./shared/scraperResults').ExportRecord | null> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.writeExport, request),
+  scraperStartScrape: (
+    input: import('./shared/scraperIpc').ScraperStartInput,
+  ): Promise<string> => ipcRenderer.invoke(SCRAPER_CHANNELS.startScrape, input),
+  scraperCancelScrape: (jobId: string): Promise<void> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.cancelScrape, jobId),
+  scraperListJobs: (): Promise<import('./shared/scraperResults').ScrapeJobSummary[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.listJobs),
+  scraperGetResult: (
+    jobId: string,
+  ): Promise<import('./shared/scraperResults').ScrapeResult | null> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.getResult, jobId),
+  // One listener per subscriber, filtered by job id here so a page watching one
+  // run is not woken by another.
+  scraperOnJobEvent: (
+    jobId: string,
+    cb: (event: import('./shared/scraperResults').ScrapeJobEvent) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      envelope: import('./shared/scraperIpc').ScraperJobEventEnvelope,
+    ): void => {
+      if (envelope?.jobId === jobId) cb(envelope.event);
+    };
+    ipcRenderer.on(SCRAPER_CHANNELS.jobEvent, handler);
+    return () => ipcRenderer.removeListener(SCRAPER_CHANNELS.jobEvent, handler);
+  },
+  scraperSyncScheduler: (
+    input: import('./shared/scraperIpc').ScraperSchedulerSyncInput,
+  ): Promise<import('./shared/scraperIpc').ScraperSchedulerState> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.schedulerSync, input),
+  scraperRunSchedule: (entryId: string): Promise<string | null> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.schedulerRun, entryId),
+  scraperOnSchedulerState: (
+    cb: (state: import('./shared/scraperIpc').ScraperSchedulerState) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      state: import('./shared/scraperIpc').ScraperSchedulerState,
+    ): void => cb(state);
+    ipcRenderer.on(SCRAPER_CHANNELS.schedulerState, handler);
+    return () => ipcRenderer.removeListener(SCRAPER_CHANNELS.schedulerState, handler);
+  },
+  // Push-only: main raises a notice, nothing asks for one.
+  scraperOnNotice: (
+    cb: (notice: import('./shared/scraperNotices').ScraperNotice) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      notice: import('./shared/scraperNotices').ScraperNotice,
+    ): void => cb(notice);
+    ipcRenderer.on(SCRAPER_CHANNELS.notice, handler);
+    return () => ipcRenderer.removeListener(SCRAPER_CHANNELS.notice, handler);
+  },
+  scraperQbitTest: (
+    input: import('./shared/scraperIpc').ScraperQbitInput,
+  ): Promise<import('./shared/scraperResults').QbitStatusReport> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.qbitTest, input),
+  scraperQbitTransfers: (
+    input: import('./shared/scraperIpc').ScraperQbitInput,
+  ): Promise<import('./shared/scraperResults').QbitTransferRow[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.qbitTransfers, input),
+  scraperQbitSend: (
+    input: import('./shared/scraperIpc').ScraperQbitSendInput,
+  ): Promise<import('./shared/scraperResults').QbitSendReport> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.qbitSend, input),
+  // Write-and-check only: there is deliberately no channel that reads a stored
+  // secret back into the renderer.
+  scraperSetCredential: (
+    ref: string,
+    secret: string,
+  ): Promise<import('./shared/scraperIpc').ScraperCredentialResult> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.credentialSet, ref, secret),
+  scraperHasCredential: (ref: string): Promise<boolean> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.credentialHas, ref),
+  scraperClearCredential: (ref: string): Promise<void> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.credentialClear, ref),
+  scraperSearchTorrents: (
+    input: import('./shared/scraperIpc').ScraperTorrentSearchInput,
+  ): Promise<import('./shared/scraperResults').TorrentRow[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.searchTorrents, input),
+  scraperListSources: (
+    entries: import('./shared/scraperSourceSettings').ScraperSourceEntry[],
+  ): Promise<import('./shared/scraperResults').SourceStatus[]> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.listSources, entries),
+  scraperListAcquisitionProviders: (): Promise<
+    import('./shared/acquisition').AcquisitionProviderInventory
+  > => ipcRenderer.invoke(SCRAPER_CHANNELS.listAcquisitionProviders),
+  scraperGetAcquisitionSnapshot: (): Promise<
+    import('./shared/acquisition').AcquisitionBackendSnapshot
+  > => ipcRenderer.invoke(SCRAPER_CHANNELS.getAcquisitionSnapshot),
+  scraperRunAcquisitionAction: (
+    action: import('./shared/acquisition').AcquisitionAction,
+  ): Promise<import('./shared/acquisition').AcquisitionActionResult> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.runAcquisitionAction, action),
+  scraperProbeSource: (
+    input: import('./shared/scraperIpc').ScraperProbeInput,
+  ): Promise<import('./shared/scraperResults').SourceStatus> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.probeSource, input),
+  scraperMalUnits: (
+    input: import('./shared/malDownload').MalUnitsInput,
+  ): Promise<import('./shared/malDownload').MalUnitsResult> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.malUnits, input),
+  // ---- reading (Phase 5: provider-backed manga over the canonical model) ----
+  readingMangaEntry: (
+    input: import('./shared/readingIpc').ReadingMangaEntryInput,
+  ): Promise<import('./shared/readingIpc').ReadingEntryResponse> =>
+    ipcRenderer.invoke(READING_CHANNELS.mangaEntry, input),
+  readingMangaChapters: (
+    input: import('./shared/readingIpc').ReadingMangaChaptersInput,
+  ): Promise<import('./shared/readingIpc').ReadingChaptersResponse> =>
+    ipcRenderer.invoke(READING_CHANNELS.mangaChapters, input),
+  readingMangaChapterPages: (
+    input: import('./shared/readingIpc').ReadingMangaPagesInput,
+  ): Promise<import('./shared/readingIpc').ReadingPagesResponse> =>
+    ipcRenderer.invoke(READING_CHANNELS.mangaChapterPages, input),
+  readingMangaProviders: (): Promise<
+    import('./shared/readingIpc').ReadingProvidersResponse
+  > => ipcRenderer.invoke(READING_CHANNELS.mangaProviders),
+  readingMangaPageImage: (
+    input: import('./shared/readingIpc').ReadingPageImageInput,
+  ): Promise<import('./shared/readingIpc').ReadingPageImageResponse> =>
+    ipcRenderer.invoke(READING_CHANNELS.mangaPageImage, input),
+  readingMangaSearch: (
+    input: import('./shared/readingIpc').ReadingMangaSearchInput,
+  ): Promise<import('./shared/readingIpc').ReadingMangaSearchResponse> =>
+    ipcRenderer.invoke(READING_CHANNELS.mangaSearch, input),
+  readingMangaDownloadChapter: (
+    input: import('./shared/readingIpc').ReadingMangaDownloadInput,
+  ): Promise<import('./shared/readingIpc').ReadingMangaDownloadResponse> =>
+    ipcRenderer.invoke(READING_CHANNELS.mangaDownloadChapter, input),
+  scraperFetchHttp: (
+    request: import('./shared/scraperIpc').ScraperHttpProbeRequest,
+  ): Promise<import('./shared/scraperIpc').ScraperHttpProbeResult> =>
+    ipcRenderer.invoke(SCRAPER_CHANNELS.fetchHttp, request),
+  scraperTailLogs: (
+    cb: (line: import('./shared/scraperResults').LogLine) => void,
+    backlog = 200,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      line: import('./shared/scraperResults').LogLine,
+    ): void => cb(line);
+    ipcRenderer.on(SCRAPER_CHANNELS.logEvent, handler);
+    // The backlog replays through the same callback, so a caller sees one
+    // ordered stream rather than having to merge history with live lines.
+    void ipcRenderer
+      .invoke(SCRAPER_CHANNELS.logsSubscribe, backlog)
+      .then((lines: import('./shared/scraperResults').LogLine[]) => {
+        for (const line of lines ?? []) cb(line);
+      })
+      .catch(() => undefined);
+    return () => {
+      ipcRenderer.removeListener(SCRAPER_CHANNELS.logEvent, handler);
+      void ipcRenderer.invoke(SCRAPER_CHANNELS.logsUnsubscribe).catch(() => undefined);
+    };
+  },
+
+  // ---- Seanime sidecar (on by default; SEANIME_SIDECAR=0 opts out) ----
   seanimeStatus: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.status),
   seanimeStart: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.start),
   seanimeStop: (): Promise<SeanimeStatus> => ipcRenderer.invoke(SEANIME_CHANNELS.stop),
@@ -1334,6 +2192,13 @@ const api = {
     ipcRenderer.invoke(SEANIME_CHANNELS.connection),
   seanimeExtractAudio: (localFilePath: string): Promise<ArrayBuffer> =>
     ipcRenderer.invoke(SEANIME_CHANNELS.extractAudio, localFilePath),
+  /**
+   * Phase 6: the Seanime library projected for Study Mode. Read-only — the join back onto
+   * Study OS readiness happens in the renderer, against state it already holds.
+   */
+  seanimeStudyLibrary: (): Promise<
+    { ok: true; files: SeanimeLibraryFile[] } | { ok: false; error: string }
+  > => ipcRenderer.invoke(SEANIME_CHANNELS.studyLibrary),
   onSeanimeStatus: (cb: (s: SeanimeStatus) => void): (() => void) => {
     const handler = (_e: unknown, s: SeanimeStatus): void => cb(s);
     ipcRenderer.on(SEANIME_CHANNELS.statusEvent, handler);

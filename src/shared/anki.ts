@@ -96,6 +96,10 @@ export interface MineNoteRequest {
   captureClipboardImage?: boolean;
   /** Prebuilt image markup supplied by the mining engine or AI enrichers. */
   imageHtml?: string;
+  /** Bounded image bytes (base64 without a data: prefix) to store in Anki media. */
+  imageBase64?: string;
+  /** Optional safe media filename hint for imageBase64. */
+  imageFilename?: string;
   /** When set, writes these literal front/back values into the model's first two fields. */
   prebuiltCard?: { front: string; back: string };
   /** Fetch native-speaker audio into the {audio} variable (Phase D). */
@@ -115,6 +119,8 @@ export interface MineNoteRequest {
 export interface MineNoteResult {
   ok: boolean;
   noteId?: number;
+  /** Media files stored by this mine call, for safe note-scoped undo cleanup. */
+  mediaFilenames?: string[];
   /** 'duplicate' | ANKI_UNREACHABLE_MSG | verbatim AnkiConnect API error. */
   error?: string;
   /** Profile the note was actually written to (after mining-rule resolution). */
@@ -125,6 +131,78 @@ export interface MineNoteResult {
   matchedRuleLabel?: string;
   /** True when no rule matched and the active/default profile was used. */
   usedDefault?: boolean;
+  /**
+   * Deck the note was actually written to. A matched mining rule owns its profile's deck,
+   * so a caller-supplied `deckName` is deliberately ignored in that case — callers need
+   * this to report where the card really went instead of echoing what was asked for.
+   */
+  deckName?: string;
+  /** True when a caller-supplied `deckName` was overridden by a matched rule's profile. */
+  deckOverriddenByRule?: boolean;
+}
+
+export interface DeleteMinedNotesResult {
+  ok: boolean;
+  error?: string;
+  warning?: string;
+  deletedMediaFilenames?: string[];
+  retainedMediaFilenames?: string[];
+}
+
+/** Extract safe leaf filenames from Anki image/audio markup produced by this app. */
+export function mediaFilenamesFromAnkiMarkup(...markups: readonly string[]): string[] {
+  const filenames: string[] = [];
+  const add = (value: string | undefined): void => {
+    const filename = value?.trim() ?? '';
+    if (!filename || filename.includes('/') || filename.includes('\\')) return;
+    if (!filenames.includes(filename)) filenames.push(filename);
+  };
+  for (const markup of markups) {
+    const imagePattern = /<img\b[^>]*\bsrc=(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi;
+    const soundPattern = /\[sound:([^\]\r\n]+)\]/gi;
+    for (const match of markup.matchAll(imagePattern)) {
+      add(match[1] ?? match[2] ?? match[3]);
+    }
+    for (const match of markup.matchAll(soundPattern)) add(match[1]);
+  }
+  return filenames;
+}
+
+/**
+ * Ensure uploaded media is referenced by at least one real model field.
+ *
+ * Explicitly named image/audio fields win. Models without those roles fall back to the
+ * last populated field in model order (normally the sentence/back field), then the final
+ * model field. Existing references are preserved without duplication.
+ */
+export function appendUnreferencedMediaToFields(
+  fields: Readonly<Record<string, string>>,
+  fieldNames: readonly string[],
+  media: Readonly<{ image?: string; audio?: string }>,
+): Record<string, string> {
+  const pending = [
+    {
+      markup: media.image?.trim() ?? '',
+      namePattern: /image|picture|screenshot|snapshot|画像|写真/i,
+    },
+    {
+      markup: media.audio?.trim() ?? '',
+      namePattern: /audio|sound|recording|音声/i,
+    },
+  ].filter((entry) => entry.markup);
+  if (!pending.length || !fieldNames.length) return { ...fields };
+
+  const next = { ...fields };
+  for (const { markup, namePattern } of pending) {
+    if (Object.values(next).some((value) => value.includes(markup))) continue;
+    const target =
+      fieldNames.find((name) => namePattern.test(name))
+      ?? fieldNames.filter((name) => next[name]?.trim()).at(-1)
+      ?? fieldNames.at(-1);
+    if (!target) continue;
+    next[target] = next[target]?.trim() ? `${next[target]}<br>${markup}` : markup;
+  }
+  return next;
 }
 
 // ----- Note-type integration ------------------------------------------------
@@ -150,6 +228,15 @@ export interface IntervalEntry {
   ivlDays: number;
   noteId: number;
   modelName: string;
+  /** Anki currently marks at least one matching note with its authoritative leech tag. */
+  leech?: boolean;
+  /** Anki currently has at least one matching card in the suspended queue. */
+  suspended?: boolean;
+  /**
+   * Epoch ms when a poll last observed this expression's interval change.
+   * This is bounded evidence inside the existing snapshot, not a review log.
+   */
+  lastIntervalChangeAt?: number;
 }
 
 export interface IntervalSnapshot {
@@ -158,6 +245,102 @@ export interface IntervalSnapshot {
   entries: IntervalEntry[];
   noteCount: number; // notes scanned before filtering
   truncated: boolean; // true if the 100k safety cap was hit
+}
+
+/**
+ * Preserve one bounded recency timestamp per expression and advance it only
+ * when the authoritative Anki interval changes between snapshots.
+ */
+export function withIntervalChangeEvidence(
+  previous: IntervalSnapshot | null | undefined,
+  entries: readonly IntervalEntry[],
+  now = Date.now(),
+): IntervalEntry[] {
+  const previousByExpression = new Map(
+    (previous?.entries ?? []).map((entry) => [
+      entry.expression.normalize('NFKC').trim(),
+      entry,
+    ]),
+  );
+  return entries.map((entry) => {
+    const key = entry.expression.normalize('NFKC').trim();
+    const prior = previousByExpression.get(key);
+    if (!prior) return entry;
+    if (prior.ivlDays !== entry.ivlDays) {
+      return { ...entry, lastIntervalChangeAt: now };
+    }
+    return typeof prior.lastIntervalChangeAt === 'number'
+      ? { ...entry, lastIntervalChangeAt: prior.lastIntervalChangeAt }
+      : entry;
+  });
+}
+
+/** Anki's scheduler uses queue -1 for a suspended card. */
+export function ankiCardIsSuspended(queue: unknown): boolean {
+  return queue === -1;
+}
+
+/** The leech marker is an Anki-owned note tag and is matched case-insensitively. */
+export function ankiTagsContainLeech(tags: readonly string[] | null | undefined): boolean {
+  return (tags ?? []).some((tag) => tag.trim().toLocaleLowerCase() === 'leech');
+}
+
+/**
+ * Fold another note with the same cleaned expression into the bounded entry.
+ * The strongest interval keeps today's knowledge behavior, while current Anki
+ * problem-state flags are unioned so a sibling note/card cannot be hidden.
+ */
+export function mergeIntervalEntries(
+  previous: IntervalEntry | undefined,
+  candidate: IntervalEntry,
+): IntervalEntry {
+  if (!previous) return candidate;
+  const strongest = candidate.ivlDays > previous.ivlDays ? candidate : previous;
+  const leech = previous.leech === true || candidate.leech === true;
+  const suspended = previous.suspended === true || candidate.suspended === true;
+  return {
+    ...strongest,
+    ...(leech ? { leech: true } : {}),
+    ...(suspended ? { suspended: true } : {}),
+  };
+}
+
+/**
+ * Optimistically fold a note created through this app into the interval
+ * snapshot. This keeps duplicate previews current without rescanning a large
+ * Anki collection after every write.
+ */
+export function withCreatedIntervalEntry(
+  snapshot: IntervalSnapshot,
+  entry: IntervalEntry,
+): IntervalSnapshot {
+  const expression = entry.expression.normalize('NFKC').trim();
+  if (!expression) return snapshot;
+  const existing = snapshot.entries.find((candidate) =>
+    candidate.expression.normalize('NFKC').trim() === expression);
+  return {
+    ...snapshot,
+    entries: existing
+      ? snapshot.entries
+      : snapshot.entries.concat({ ...entry, expression }),
+    noteCount: snapshot.noteCount + 1,
+  };
+}
+
+/** Remove app-deleted notes from a cached interval snapshot immediately. */
+export function withoutDeletedIntervalEntries(
+  snapshot: IntervalSnapshot,
+  noteIds: readonly number[],
+): IntervalSnapshot {
+  const deleted = new Set(noteIds.filter((noteId) => Number.isFinite(noteId) && noteId > 0));
+  if (!deleted.size) return snapshot;
+  const entries = snapshot.entries.filter((entry) => !deleted.has(entry.noteId));
+  if (entries.length === snapshot.entries.length) return snapshot;
+  return {
+    ...snapshot,
+    entries,
+    noteCount: Math.max(0, snapshot.noteCount - (snapshot.entries.length - entries.length)),
+  };
 }
 
 /** Binary rollup consumed by reader-facing features ("known" vs "new"). */

@@ -62,9 +62,85 @@ export interface VideoCoreResumePosition {
   updatedAt: number;
 }
 
+export interface VideoCoreCueReplaySignal {
+  cueKey: string;
+  replayCount: number;
+  firstReplayAt: number;
+  lastReplayAt: number;
+  dismissed: boolean;
+}
+
+export type VideoCoreComprehensionEvent = 'lookup' | 'rewind' | 'pause';
+
+export interface VideoCoreComprehensionSignal {
+  trackNumber: number;
+  anchorCueIndex: number;
+  anchorCueKey: string;
+  lookupCount: number;
+  rewindCount: number;
+  pauseCount: number;
+  firstEventAt: number;
+  lastEventAt: number;
+  dismissed: boolean;
+}
+
+export interface VideoCoreRescueScene {
+  startSec: number;
+  endSec: number;
+  cueCount: number;
+  firstCueIndex: number;
+  lastCueIndex: number;
+}
+
+/** One explicit ±0.1s activation: where playback was, and what the delay became. */
+export interface VideoCoreTimingSample {
+  positionSec: number;
+  delaySec: number;
+  at: number;
+}
+
+export interface VideoCoreTimingSignal {
+  trackNumber: number;
+  changeCount: number;
+  firstChangeAt: number;
+  lastChangeAt: number;
+  samples: VideoCoreTimingSample[];
+  dismissed: boolean;
+}
+
+export interface VideoCoreTimingDrift {
+  /** Signed subtitle-delay change, in milliseconds, per minute of playback. */
+  msPerMinute: number;
+  /** The user's newest manual correction — the point the projection trusts. */
+  anchorPositionSec: number;
+  anchorDelaySec: number;
+  spanSec: number;
+  sampleCount: number;
+  netDelaySec: number;
+}
+
 export const PLAYER_PREFERENCES_STORAGE_KEY = 'jp-media-player-preferences-v1';
 export const VIDEO_CORE_RESUME_STORAGE_KEY = 'jp-video-core-resume-v1';
 export const VIDEO_CORE_RESUME_LIMIT = 100;
+export const VIDEO_CORE_SHADOWING_REPLAY_THRESHOLD = 3;
+export const VIDEO_CORE_SHADOWING_REPLAY_WINDOW_MS = 10 * 60_000;
+export const VIDEO_CORE_COMPREHENSION_WINDOW_MS = 2 * 60_000;
+export const VIDEO_CORE_COMPREHENSION_SCENE_RADIUS = 2;
+export const VIDEO_CORE_COMPREHENSION_LOOKUP_THRESHOLD = 2;
+export const VIDEO_CORE_COMPREHENSION_REWIND_THRESHOLD = 2;
+export const VIDEO_CORE_TIMING_WINDOW_MS = 15 * 60_000;
+export const VIDEO_CORE_TIMING_SAMPLE_LIMIT = 16;
+export const VIDEO_CORE_TIMING_CHANGE_THRESHOLD = 4;
+/** Corrections spread over less playback than this describe one moment, not drift. */
+export const VIDEO_CORE_TIMING_MIN_SPAN_SEC = 120;
+/** Below this rate a constant offset still explains the fault. */
+export const VIDEO_CORE_TIMING_MIN_DRIFT_MS_PER_MIN = 100;
+/** How far off the drift line one manual correction may sit — 1.5 control steps. */
+export const VIDEO_CORE_TIMING_MAX_RESIDUAL_SEC = 0.15;
+/** The manual control's own range; the tracker never exceeds it. */
+export const VIDEO_CORE_TIMING_MAX_DELAY_SEC = 10;
+/** The tracker only rewrites the delay once its projection has moved this far. */
+export const VIDEO_CORE_TIMING_APPLY_STEP_SEC = 0.05;
 
 export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStudyPreferences {
   const raw = value && typeof value === 'object' && !Array.isArray(value)
@@ -110,6 +186,298 @@ export function cuePlaybackEndSec(
   subtitleDelaySec: number,
 ): number {
   return Math.max(0, cue.endMs / 1000 + subtitleDelaySec);
+}
+
+export function videoCoreStudyCueKey(
+  cue: Pick<VideoCoreStudyCue, 'index' | 'trackNumber' | 'startMs' | 'endMs'>,
+): string {
+  return `${cue.trackNumber}:${cue.index}:${cue.startMs}:${cue.endMs}`;
+}
+
+/**
+ * Records only an explicit replay-control activation. Automatic line/A-B loops
+ * do not pass through this helper, so they cannot manufacture a recommendation.
+ * The state holds one cue and one ten-minute window, keeping the signal bounded
+ * to the active player session.
+ */
+export function recordVideoCoreCueReplay(
+  current: VideoCoreCueReplaySignal | null,
+  cue: Pick<VideoCoreStudyCue, 'index' | 'trackNumber' | 'startMs' | 'endMs'>,
+  now = Date.now(),
+): VideoCoreCueReplaySignal {
+  const cueKey = videoCoreStudyCueKey(cue);
+  const timestamp = Number.isFinite(now) ? Math.max(0, Math.round(now)) : Date.now();
+  if (
+    !current
+    || current.cueKey !== cueKey
+    || timestamp - current.firstReplayAt > VIDEO_CORE_SHADOWING_REPLAY_WINDOW_MS
+  ) {
+    return {
+      cueKey,
+      replayCount: 1,
+      firstReplayAt: timestamp,
+      lastReplayAt: timestamp,
+      dismissed: false,
+    };
+  }
+  return {
+    ...current,
+    replayCount: Math.min(99, current.replayCount + 1),
+    lastReplayAt: timestamp,
+  };
+}
+
+export function dismissVideoCoreShadowingSuggestion(
+  current: VideoCoreCueReplaySignal | null,
+): VideoCoreCueReplaySignal | null {
+  return current ? { ...current, dismissed: true } : null;
+}
+
+export function shouldSuggestVideoCoreShadowing(
+  signal: VideoCoreCueReplaySignal | null,
+  cue: Pick<VideoCoreStudyCue, 'index' | 'trackNumber' | 'startMs' | 'endMs'> | null,
+  shadowingMode: boolean,
+): boolean {
+  return Boolean(
+    signal
+    && cue
+    && !shadowingMode
+    && !signal.dismissed
+    && signal.cueKey === videoCoreStudyCueKey(cue)
+    && signal.replayCount >= VIDEO_CORE_SHADOWING_REPLAY_THRESHOLD,
+  );
+}
+
+/**
+ * Keeps only one short, nearby-cue evidence window in the active player.
+ * Callers deliberately route explicit lookup/rewind/pause actions here; automatic
+ * playback loops never call this helper and therefore cannot create a rescue.
+ */
+export function recordVideoCoreComprehensionEvent(
+  current: VideoCoreComprehensionSignal | null,
+  event: VideoCoreComprehensionEvent,
+  cue: Pick<VideoCoreStudyCue, 'index' | 'trackNumber' | 'startMs' | 'endMs'>,
+  now = Date.now(),
+): VideoCoreComprehensionSignal {
+  const timestamp = Number.isFinite(now) ? Math.max(0, Math.round(now)) : Date.now();
+  const nearby = Boolean(
+    current
+    && current.trackNumber === cue.trackNumber
+    && Math.abs(current.anchorCueIndex - cue.index) <= VIDEO_CORE_COMPREHENSION_SCENE_RADIUS
+    && timestamp - current.firstEventAt <= VIDEO_CORE_COMPREHENSION_WINDOW_MS,
+  );
+  const base: VideoCoreComprehensionSignal = nearby && current
+    ? current
+    : {
+      trackNumber: cue.trackNumber,
+      anchorCueIndex: cue.index,
+      anchorCueKey: videoCoreStudyCueKey(cue),
+      lookupCount: 0,
+      rewindCount: 0,
+      pauseCount: 0,
+      firstEventAt: timestamp,
+      lastEventAt: timestamp,
+      dismissed: false,
+    };
+  const anchor = event === 'lookup'
+    ? {
+      trackNumber: cue.trackNumber,
+      anchorCueIndex: cue.index,
+      anchorCueKey: videoCoreStudyCueKey(cue),
+    }
+    : {};
+  return {
+    ...base,
+    ...anchor,
+    lookupCount: Math.min(99, base.lookupCount + (event === 'lookup' ? 1 : 0)),
+    rewindCount: Math.min(99, base.rewindCount + (event === 'rewind' ? 1 : 0)),
+    pauseCount: Math.min(99, base.pauseCount + (event === 'pause' ? 1 : 0)),
+    lastEventAt: timestamp,
+  };
+}
+
+export function dismissVideoCoreComprehensionSuggestion(
+  current: VideoCoreComprehensionSignal | null,
+): VideoCoreComprehensionSignal | null {
+  return current ? { ...current, dismissed: true } : null;
+}
+
+export function shouldSuggestVideoCoreComprehensionRescue(
+  signal: VideoCoreComprehensionSignal | null,
+  cue: Pick<VideoCoreStudyCue, 'index' | 'trackNumber'> | null,
+  paused: boolean,
+  now = Date.now(),
+): boolean {
+  return Boolean(
+    signal
+    && cue
+    && paused
+    && !signal.dismissed
+    && signal.trackNumber === cue.trackNumber
+    && Math.abs(signal.anchorCueIndex - cue.index) <= VIDEO_CORE_COMPREHENSION_SCENE_RADIUS
+    && now - signal.firstEventAt <= VIDEO_CORE_COMPREHENSION_WINDOW_MS
+    && signal.lookupCount >= VIDEO_CORE_COMPREHENSION_LOOKUP_THRESHOLD
+    && signal.rewindCount >= VIDEO_CORE_COMPREHENSION_REWIND_THRESHOLD
+    && signal.pauseCount >= 1,
+  );
+}
+
+export function videoCoreRescueScene(
+  cues: readonly VideoCoreStudyCue[],
+  anchor: Pick<VideoCoreStudyCue, 'index' | 'trackNumber'>,
+  subtitleDelaySec: number,
+): VideoCoreRescueScene | null {
+  const trackCues = cues.filter((cue) => cue.trackNumber === anchor.trackNumber);
+  const position = trackCues.findIndex((cue) => cue.index === anchor.index);
+  if (position < 0) return null;
+  const first = trackCues[Math.max(0, position - 1)];
+  const last = trackCues[Math.min(trackCues.length - 1, position + 1)];
+  if (!first || !last) return null;
+  const startSec = cuePlaybackStartSec(first, subtitleDelaySec);
+  const endSec = cuePlaybackEndSec(last, subtitleDelaySec);
+  if (!(endSec > startSec)) return null;
+  return {
+    startSec,
+    endSec,
+    cueCount: Math.min(trackCues.length - 1, position + 1) - Math.max(0, position - 1) + 1,
+    firstCueIndex: first.index,
+    lastCueIndex: last.index,
+  };
+}
+
+/**
+ * Records one *explicit* subtitle-delay activation — the ±0.1s controls only.
+ * Programmatic writes (loading a track, the drift tracker below) never reach
+ * this helper, so a correction the app applied itself can never be mistaken for
+ * the user fighting the timing.
+ *
+ * The state holds one track and one bounded window of samples, so the evidence
+ * lives and dies with the active player session.
+ */
+export function recordVideoCoreTimingAdjustment(
+  current: VideoCoreTimingSignal | null,
+  trackNumber: number,
+  positionSec: number,
+  delaySec: number,
+  now = Date.now(),
+): VideoCoreTimingSignal | null {
+  if (!Number.isFinite(positionSec) || !Number.isFinite(delaySec) || !Number.isFinite(trackNumber)) {
+    return current;
+  }
+  const timestamp = Number.isFinite(now) ? Math.max(0, Math.round(now)) : Date.now();
+  const sample: VideoCoreTimingSample = {
+    positionSec: Math.max(0, Math.round(positionSec * 1000) / 1000),
+    delaySec: Math.round(delaySec * 1000) / 1000,
+    at: timestamp,
+  };
+  const continues = Boolean(
+    current
+    && current.trackNumber === trackNumber
+    && timestamp - current.firstChangeAt <= VIDEO_CORE_TIMING_WINDOW_MS,
+  );
+  if (!continues || !current) {
+    return {
+      trackNumber,
+      changeCount: 1,
+      firstChangeAt: timestamp,
+      lastChangeAt: timestamp,
+      samples: [sample],
+      dismissed: false,
+    };
+  }
+  const samples = [...current.samples, sample].slice(-VIDEO_CORE_TIMING_SAMPLE_LIMIT);
+  return {
+    ...current,
+    changeCount: Math.min(99, current.changeCount + 1),
+    lastChangeAt: timestamp,
+    samples,
+  };
+}
+
+export function dismissVideoCoreTimingRepair(
+  current: VideoCoreTimingSignal | null,
+): VideoCoreTimingSignal | null {
+  return current ? { ...current, dismissed: true } : null;
+}
+
+/**
+ * Reads progressive drift out of the recorded samples, or returns null.
+ *
+ * Drift is the one timing fault a constant delay cannot fix, so the bar is
+ * deliberately high: enough explicit corrections, all in one direction, made at
+ * strictly advancing playback positions across a real span, implying a rate far
+ * above ordinary fiddling — and every intermediate sample must sit on the same
+ * line. A user hunting back and forth around one value produces no drift here,
+ * because that is a constant offset they have already solved by hand.
+ */
+export function videoCoreTimingDrift(
+  signal: VideoCoreTimingSignal | null,
+  now = Date.now(),
+): VideoCoreTimingDrift | null {
+  if (!signal || signal.samples.length < VIDEO_CORE_TIMING_CHANGE_THRESHOLD) return null;
+  if (now - signal.firstChangeAt > VIDEO_CORE_TIMING_WINDOW_MS) return null;
+  const samples = signal.samples;
+  const first = samples[0];
+  const last = samples[samples.length - 1];
+  const spanSec = last.positionSec - first.positionSec;
+  if (spanSec < VIDEO_CORE_TIMING_MIN_SPAN_SEC) return null;
+
+  const direction = Math.sign(last.delaySec - first.delaySec);
+  if (direction === 0) return null;
+  for (let index = 1; index < samples.length; index += 1) {
+    const step = samples[index];
+    const previous = samples[index - 1];
+    // Playback must advance and the correction must keep pushing the same way.
+    if (step.positionSec < previous.positionSec) return null;
+    if (Math.sign(step.delaySec - previous.delaySec) !== direction) return null;
+  }
+
+  const secPerSec = (last.delaySec - first.delaySec) / spanSec;
+  const msPerMinute = secPerSec * 60_000;
+  if (Math.abs(msPerMinute) < VIDEO_CORE_TIMING_MIN_DRIFT_MS_PER_MIN) return null;
+
+  // Every correction must lie on the same line; a random walk is not drift.
+  for (const step of samples) {
+    const expected = first.delaySec + secPerSec * (step.positionSec - first.positionSec);
+    if (Math.abs(step.delaySec - expected) > VIDEO_CORE_TIMING_MAX_RESIDUAL_SEC) return null;
+  }
+
+  return {
+    msPerMinute: Math.round(msPerMinute),
+    anchorPositionSec: last.positionSec,
+    anchorDelaySec: last.delaySec,
+    spanSec: Math.round(spanSec),
+    sampleCount: samples.length,
+    netDelaySec: Math.round((last.delaySec - first.delaySec) * 1000) / 1000,
+  };
+}
+
+export function shouldSuggestVideoCoreTimingRepair(
+  signal: VideoCoreTimingSignal | null,
+  drift: VideoCoreTimingDrift | null,
+  tracking: boolean,
+): boolean {
+  return Boolean(signal && drift && !signal.dismissed && !tracking);
+}
+
+/**
+ * The delay the measured drift implies at `positionSec`, anchored on the user's
+ * most recent manual correction — their most trusted point. Clamped to the same
+ * ±10s range the manual control uses, so the tracker can never leave the player
+ * somewhere the user could not have reached by hand.
+ */
+export function videoCoreDriftDelaySec(
+  drift: VideoCoreTimingDrift,
+  positionSec: number,
+): number {
+  if (!Number.isFinite(positionSec)) return drift.anchorDelaySec;
+  const projected = drift.anchorDelaySec
+    + ((positionSec - drift.anchorPositionSec) * drift.msPerMinute) / 60_000;
+  const bounded = Math.max(
+    -VIDEO_CORE_TIMING_MAX_DELAY_SEC,
+    Math.min(VIDEO_CORE_TIMING_MAX_DELAY_SEC, projected),
+  );
+  return Math.round(bounded * 1000) / 1000;
 }
 
 export function activeStudyCuesAtTime(

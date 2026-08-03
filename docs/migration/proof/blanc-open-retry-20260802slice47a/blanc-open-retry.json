@@ -1,0 +1,16 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "hypothesisCorrection": "Half right, and the wrong half is the half that names a fix. Step 1b (slice 24) measured the frames: the disconnect is a co-symptom, and the cancel is a `video-terminated` the CLIENT sends ~190ms later from the adopted lifecycle effect. A socket-lifetime fix would have changed nothing. See docs/migration/proof/blanc-player-live-20260801075500/slice-24.json.",
+  "startedAt": "2026-08-02T05:15:21.492Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47a\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47a",
+  "steps": [],
+  "result": "ERROR",
+  "error": "the desktop never mounted",
+  "finishedAt": "2026-08-02T05:17:24.466Z",
+  "log": [
+    "[probe] ERROR the desktop never mounted"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-02_08-15-09.log"
+}

@@ -94,6 +94,42 @@ describe('catalog hygiene', () => {
     }
   });
 
+  /**
+   * Plurals must be the OBJECT form, never a raw ICU string.
+   *
+   * `isPluralForms` (core.ts) only recognises an object carrying `other`. A string entry falls
+   * through to `interpolate`, whose placeholder regex is `/\{(\w+)\}/g` — which cannot match
+   * `{count,` (the comma) or `{# result}` (the `#` and the spaces). So an ICU template is
+   * returned VERBATIM and the user reads `{count, plural, one {# result} other {# results}}`
+   * off the screen.
+   *
+   * 33 entries across the four catalogs were shipping in that state, on live surfaces. Neither
+   * existing gate could see it: `i18n-check.cjs` and the missing-key block below both ask only
+   * whether every language HAS the key and whether its value is a non-empty string — and a
+   * broken ICU template is a perfectly good non-empty string.
+   */
+  it('never writes a plural as a raw ICU string', () => {
+    const offenders: string[] = [];
+    for (const lang of UI_LANGS) {
+      for (const [key, value] of Object.entries(CATALOGS[lang])) {
+        if (typeof value === 'string' && value.includes(', plural,')) offenders.push(`${lang}:${key}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('gives every plural object an `other` arm, which is what makes it a plural at all', () => {
+    // Without `other`, `isPluralForms` returns false and the object falls through to
+    // interpolate() as a non-string — a silent empty render rather than an error.
+    const missing: string[] = [];
+    for (const lang of UI_LANGS) {
+      for (const [key, value] of Object.entries(CATALOGS[lang])) {
+        if (value && typeof value === 'object' && !('other' in value)) missing.push(`${lang}:${key}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
   it('never leaves a translated catalog with keys English does not have', () => {
     // A stray key in ja/zh/ru is dead weight — usually a typo of a real key,
     // which would silently fall back to English forever.

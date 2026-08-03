@@ -3,6 +3,8 @@
  */
 import { getSummary, READING_RECORDED_EVENT } from '../stats';
 import { emitCompanionEvent } from './companionEvents';
+import { STREAK_MILESTONES, unlockTrinketsForStreak } from './companionTrinkets';
+import { t } from '../i18n';
 
 const KEY = 'jp-os-achievements-v1';
 
@@ -34,7 +36,6 @@ function save(s: AchState): void {
   }
 }
 
-const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100];
 const CHAR_BUCKETS = [500, 2000, 5000, 15000, 40000];
 
 export function checkAchievements(): void {
@@ -64,6 +65,15 @@ export function checkAchievements(): void {
   if (bestChars > 0) {
     state.lastDailyCharsBucket = bestChars;
     emitCompanionEvent('achievement', `${bestChars.toLocaleString()} characters today`);
+  }
+
+  // Additive keepsakes — never blocks or alters the streak celebration above.
+  for (const trinket of unlockTrinketsForStreak(summary.streak)) {
+    window.dispatchEvent(
+      new CustomEvent('os:toast', {
+        detail: { message: t('companion.trinket.unlocked', { name: t(trinket.labelKey) }), kind: 'ok' },
+      }),
+    );
   }
 
   save(state);

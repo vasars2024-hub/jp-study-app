@@ -1,0 +1,94 @@
+{
+  "gate": "packaged-offline-gate.mjs",
+  "question": "Does the packaged app boot and stay usable on a FIRST RUN with no internet, while the loopback sidecar is still reachable?",
+  "startedAt": "2026-08-02T07:04:27.963Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "blocked": [],
+  "allowedLoopback": 0,
+  "steps": [
+    {
+      "name": "0 the packaged window exists",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "1 every off-machine request will be failed as InternetDisconnected",
+      "result": "PASS",
+      "detail": "loopback, app:, media:, playfile:, localfile: still pass"
+    },
+    {
+      "name": "2 the desktop shell mounts with no internet",
+      "result": "PASS",
+      "detail": "{\"ready\":\"complete\",\"desktop\":true,\"api\":true}"
+    },
+    {
+      "name": "3 local study machinery answers offline",
+      "result": "MEASURED",
+      "detail": "{\"errors\":[],\"lookupTerm\":3,\"lookupTermOffline\":3,\"dictAvailableLangs\":3}"
+    },
+    {
+      "name": "3b a network-dependent surface degrades instead of hanging",
+      "result": "PASS",
+      "detail": "{\"kind\":\"resolved\",\"count\":0,\"elapsedMs\":1034}"
+    },
+    {
+      "name": "4 the shell is still standing after the failures land",
+      "result": "PASS",
+      "detail": "{\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}"
+    },
+    {
+      "name": "5 the block actually bit something",
+      "result": "PASS",
+      "detail": "renderer: 0 external request(s) failed across 0 host(s) [none], 0 local passed; main process: searchDiscovery {\"kind\":\"resolved\",\"count\":0,\"elapsedMs\":1034}"
+    }
+  ],
+  "exeBuiltAt": "2026-08-01T11:40:01.018Z",
+  "hostResolverRules": "MAP * ~NOTFOUND, EXCLUDE localhost",
+  "mounted": {
+    "ready": "complete",
+    "desktop": true,
+    "api": true
+  },
+  "consentDismissed": 1,
+  "localCapabilities": {
+    "errors": [],
+    "lookupTerm": 3,
+    "lookupTermOffline": 3,
+    "dictAvailableLangs": 3
+  },
+  "networkSurface": {
+    "kind": "resolved",
+    "count": 0,
+    "elapsedMs": 1034
+  },
+  "health": {
+    "stillMounted": true,
+    "visibleErrorText": "",
+    "bodyChildren": 2
+  },
+  "mainProcessLogTail": [
+    "DevTools listening on ws://127.0.0.1:50096/devtools/browser/ced31f19-7a26-4c95-8836-118cfb8808a4",
+    "[yomitan] Seeding bundled Kanjium pitch data…",
+    "[extensionServer] listening on 127.0.0.1:18765",
+    "[yomitan] Kanjium pitch seeded (107978 entries).",
+    "[yomitan] Downloading JMdict (Japanese–English)…",
+    "[yomitan] JMdict (Japanese–English) ready (305233 terms).",
+    "[yomitan] Downloading JMdict (Japanese–Russian)…",
+    "[yomitan] JMdict (Japanese–Russian) ready (93355 terms).",
+    "[yomitan] Downloading Moedict (Chinese monolingual)…",
+    "[yomitan] Moedict (Chinese monolingual) ready (70589 terms)."
+  ],
+  "blockedHosts": [],
+  "verdict": "PASS",
+  "result": "PASS",
+  "finishedAt": "2026-08-02T07:04:52.301Z",
+  "log": [
+    "[offline] PASS — 0 the packaged window exists: app://bundle/index.html",
+    "[offline] PASS — 1 every off-machine request will be failed as InternetDisconnected: loopback, app:, media:, playfile:, localfile: still pass",
+    "[offline] PASS — 2 the desktop shell mounts with no internet: {\"ready\":\"complete\",\"desktop\":true,\"api\":true}",
+    "[offline] MEASURED — 3 local study machinery answers offline: {\"errors\":[],\"lookupTerm\":3,\"lookupTermOffline\":3,\"dictAvailableLangs\":3}",
+    "[offline] PASS — 3b a network-dependent surface degrades instead of hanging: {\"kind\":\"resolved\",\"count\":0,\"elapsedMs\":1034}",
+    "[offline] PASS — 4 the shell is still standing after the failures land: {\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}",
+    "[offline] PASS — 5 the block actually bit something: renderer: 0 external request(s) failed across 0 host(s) [none], 0 local passed; main process: searchDiscovery {\"kind\":\"resolved\",\"count\":0,\"elapsedMs\":1034}"
+  ]
+}

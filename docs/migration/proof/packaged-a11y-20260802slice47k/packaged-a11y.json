@@ -1,0 +1,130 @@
+{
+  "gate": "packaged-a11y-gate.mjs",
+  "question": "What mechanical accessibility faults does the real rendered app have, and are there more of them than last time?",
+  "disclaimer": "A DOM audit is a floor, not a conformance claim. It cannot see contrast, focus order in practice, motion, screen-reader phrasing, or whether a surface is operable.",
+  "startedAt": "2026-08-02T07:09:58.352Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "ceilings": {
+    "unnamedControls": 0,
+    "imagesWithoutAlt": 0,
+    "unlabelledFields": 0,
+    "positiveTabindex": 0,
+    "duplicateIds": 0,
+    "missingLang": 0
+  },
+  "surfaces": [
+    {
+      "name": "first-launch consent gate",
+      "counted": {
+        "controls": 13,
+        "images": 0,
+        "fields": 0,
+        "elements": 102
+      },
+      "unnamedControls": [],
+      "imagesWithoutAlt": [],
+      "unlabelledFields": [],
+      "positiveTabindex": [],
+      "duplicateIds": [],
+      "lang": "en"
+    },
+    {
+      "name": "desktop shell",
+      "counted": {
+        "controls": 11,
+        "images": 0,
+        "fields": 0,
+        "elements": 80
+      },
+      "unnamedControls": [],
+      "imagesWithoutAlt": [],
+      "unlabelledFields": [],
+      "positiveTabindex": [],
+      "duplicateIds": [],
+      "lang": "en"
+    },
+    {
+      "name": "media workspace",
+      "counted": {
+        "controls": 15,
+        "images": 0,
+        "fields": 0,
+        "elements": 91
+      },
+      "unnamedControls": [],
+      "imagesWithoutAlt": [],
+      "unlabelledFields": [],
+      "positiveTabindex": [],
+      "duplicateIds": [],
+      "lang": "en"
+    }
+  ],
+  "steps": [
+    {
+      "name": "0 the packaged desktop is up",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "1 unnamedControls",
+      "result": "PASS",
+      "detail": "0 (ceiling 0)"
+    },
+    {
+      "name": "1 imagesWithoutAlt",
+      "result": "PASS",
+      "detail": "0 (ceiling 0)"
+    },
+    {
+      "name": "1 unlabelledFields",
+      "result": "PASS",
+      "detail": "0 (ceiling 0)"
+    },
+    {
+      "name": "1 positiveTabindex",
+      "result": "PASS",
+      "detail": "0 (ceiling 0)"
+    },
+    {
+      "name": "1 duplicateIds",
+      "result": "PASS",
+      "detail": "0 (ceiling 0)"
+    },
+    {
+      "name": "1 missingLang",
+      "result": "PASS",
+      "detail": "0 (ceiling 0)"
+    }
+  ],
+  "exeBuiltAt": "2026-08-01T11:40:01.018Z",
+  "workspaceOpened": "launcher",
+  "findings": {
+    "unnamedControls": [],
+    "imagesWithoutAlt": [],
+    "unlabelledFields": [],
+    "positiveTabindex": [],
+    "duplicateIds": [],
+    "missingLang": []
+  },
+  "counts": {
+    "unnamedControls": 0,
+    "imagesWithoutAlt": 0,
+    "unlabelledFields": 0,
+    "positiveTabindex": 0,
+    "duplicateIds": 0,
+    "missingLang": 0
+  },
+  "verdict": "PASS",
+  "over": [],
+  "result": "PASS",
+  "finishedAt": "2026-08-02T07:10:08.851Z",
+  "log": [
+    "[a11y] PASS — 0 the packaged desktop is up: app://bundle/index.html",
+    "[a11y] PASS — 1 unnamedControls: 0 (ceiling 0)",
+    "[a11y] PASS — 1 imagesWithoutAlt: 0 (ceiling 0)",
+    "[a11y] PASS — 1 unlabelledFields: 0 (ceiling 0)",
+    "[a11y] PASS — 1 positiveTabindex: 0 (ceiling 0)",
+    "[a11y] PASS — 1 duplicateIds: 0 (ceiling 0)",
+    "[a11y] PASS — 1 missingLang: 0 (ceiling 0)"
+  ]
+}

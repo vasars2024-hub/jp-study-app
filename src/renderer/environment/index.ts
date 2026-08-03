@@ -33,8 +33,6 @@ export {
 export { startAchievementWatcher, checkAchievements } from './achievements';
 export { dayPhaseAt, lightingForTime } from './dayCycleLighting';
 export { pulseCalendarCompanions } from './schedules';
-export { startNoctisLightBridge, NOCTIS_PULSE_EVENT } from './noctisLightBridge';
-export type { NoctisPulse, NoctisPulseKind } from './noctisLightBridge';
 export type {
   EnvironmentSettings,
   PerformanceTier,

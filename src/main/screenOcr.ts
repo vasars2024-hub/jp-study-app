@@ -41,6 +41,8 @@ export interface LensOcrResult {
   hash: string;
   /** Upscale factor applied for accuracy on small text (1 = none). */
   zoom?: number;
+  /** Optional bounded JPEG crop, requested only for study-card attachment. */
+  screenshotDataUrl?: string;
 }
 
 /** Region in the Lens window's local DIP coords (window covers one display at its origin). */
@@ -224,7 +226,7 @@ async function ocrAdaptive(
 export async function ocrRegion(
   region: RegionRect,
   displayId: number,
-  opts: { engine?: OcrEngineChoice } = {},
+  opts: { engine?: OcrEngineChoice; includeScreenshot?: boolean } = {},
 ): Promise<LensOcrResult> {
   let cap: { image: Electron.NativeImage; scaleFactor: number } | null;
   try {
@@ -279,5 +281,33 @@ export async function ocrRegion(
     available: true,
     hash,
     zoom,
+    screenshotDataUrl: opts.includeScreenshot ? boundedScreenshotDataUrl(image) : undefined,
   };
+}
+
+function boundedScreenshotDataUrl(image: Electron.NativeImage): string {
+  const size = image.getSize();
+  const longest = Math.max(size.width, size.height);
+  let resized = longest > 1280
+    ? image.resize({
+      width: Math.max(1, Math.round(size.width * 1280 / longest)),
+      height: Math.max(1, Math.round(size.height * 1280 / longest)),
+      quality: 'best',
+    })
+    : image;
+  let jpeg = resized.toJPEG(72);
+  if (jpeg.length > 900 * 1024) {
+    const current = resized.getSize();
+    const currentLongest = Math.max(current.width, current.height);
+    if (currentLongest > 800) {
+      resized = resized.resize({
+        width: Math.max(1, Math.round(current.width * 800 / currentLongest)),
+        height: Math.max(1, Math.round(current.height * 800 / currentLongest)),
+        quality: 'best',
+      });
+    }
+    jpeg = resized.toJPEG(52);
+    if (jpeg.length > 900 * 1024) jpeg = resized.toJPEG(35);
+  }
+  return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
 }

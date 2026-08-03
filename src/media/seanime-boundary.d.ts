@@ -29,14 +29,43 @@ declare module '@/api/client/server-url' {
 }
 
 declare module '@/app/(main)/_atoms/server-status.atoms' {
+  import type { WritableAtom } from 'jotai';
+
   /** localStorage key holding the `X-Seanime-Token` value. */
   export const SERVER_AUTH_TOKEN_STORAGE_KEY: string;
+  export const serverAuthTokenAtom: WritableAtom<
+    string | undefined,
+    [string | undefined],
+    void
+  >;
+}
+
+declare module '@/app/(main)/_atoms/websocket.atoms' {
+  import type * as React from 'react';
+  import type { WritableAtom } from 'jotai';
+
+  export const WebSocketContext: React.Context<WebSocket | null>;
+  export const websocketAtom: WritableAtom<WebSocket | null, [WebSocket | null], void>;
 }
 
 declare module '@/app/(main)/_hooks/use-server-status' {
   import type { Status } from '../../vendor/seanime/generated/types';
   export function useSetServerStatus(): (status: Status | undefined) => void;
   export function useServerStatus(): Status | undefined;
+  export function useServerHMACAuth(): {
+    password: string | undefined;
+    getHMACTokenQueryParam(endpoint: string, symbol?: string): Promise<string>;
+    generateHMACToken(endpoint: string): Promise<string>;
+  };
+}
+
+declare module '@/app/(main)/onlinestream/_lib/onlinestream-proxy' {
+  export function getProxyUrl(
+    baseUrl: string,
+    url: string,
+    headers: Record<string, string>,
+    tokenQuery: string,
+  ): string;
 }
 
 declare module '@/app/(main)/_features/anime-library/_lib/handle-library-collection' {
@@ -87,10 +116,11 @@ declare module '@/app/(main)/_hooks/handle-websockets' {
 
 declare module '@/app/websocket-provider' {
   import type * as React from 'react';
-  import type { Atom } from 'jotai';
+  import type { WritableAtom } from 'jotai';
 
-  export const clientIdAtom: Atom<string | null>;
-  export const websocketConnectedAtom: Atom<boolean>;
+  export const clientIdAtom: WritableAtom<string | null, [string | null], void>;
+  export const websocketConnectedAtom: WritableAtom<boolean, [boolean], void>;
+  export const websocketConnectionErrorCountAtom: WritableAtom<number, [number], void>;
   export function WebsocketProvider(props: {
     children: React.ReactNode;
   }): React.ReactElement;
@@ -190,9 +220,45 @@ declare module '@/app/(main)/_features/video-core/video-core-audio' {
   }
 }
 
+declare module '@/app/(main)/_features/video-core/video-core-media-captions' {
+  export type MediaCaptionsTrack = {
+    number: number;
+    label: string;
+    language: string;
+    selected: boolean;
+  };
+  export type MediaCaptionsTrackSelectedEvent = CustomEvent<{ trackIndex: number }>;
+  export type MediaCaptionsTrackDeselectedEvent = CustomEvent;
+  export type MediaCaptionsTracksLoadedEvent = CustomEvent<{
+    tracks: MediaCaptionsTrack[];
+  }>;
+  type MediaCaptionsEventMap = {
+    trackselected: MediaCaptionsTrackSelectedEvent;
+    trackdeselected: MediaCaptionsTrackDeselectedEvent;
+    tracksloaded: MediaCaptionsTracksLoadedEvent;
+  };
+
+  export class MediaCaptionsManager extends EventTarget {
+    getTracks(): MediaCaptionsTrack[];
+    getTrackContent(index: number): string | null;
+    getSelectedTrackIndexOrNull(): number | null;
+    selectTrack(index: number): Promise<void>;
+    setNoTrack(): void;
+    addEventListener<K extends keyof MediaCaptionsEventMap>(
+      type: K,
+      listener: (event: MediaCaptionsEventMap[K]) => void,
+    ): void;
+    removeEventListener<K extends keyof MediaCaptionsEventMap>(
+      type: K,
+      listener: (event: MediaCaptionsEventMap[K]) => void,
+    ): void;
+  }
+}
+
 declare module '@/app/(main)/_features/video-core/video-core-atoms' {
   import type { Atom } from 'jotai';
 
+  export const vc_paused: Atom<boolean>;
   export const vc_videoElement: Atom<HTMLVideoElement | null>;
 }
 
@@ -200,10 +266,12 @@ declare module '@/app/(main)/_features/video-core/video-core' {
   import type * as React from 'react';
   import type { Atom } from 'jotai';
   import type { VideoCoreAudioManager } from '@/app/(main)/_features/video-core/video-core-audio';
+  import type { MediaCaptionsManager } from '@/app/(main)/_features/video-core/video-core-media-captions';
   import type { VideoCoreSubtitleManager } from '@/app/(main)/_features/video-core/video-core-subtitles';
   import type { VideoCoreLifecycleState } from '@/app/(main)/_features/video-core/video-core.atoms';
 
   export const vc_subtitleManager: Atom<VideoCoreSubtitleManager | null>;
+  export const vc_mediaCaptionsManager: Atom<MediaCaptionsManager | null>;
   export const vc_audioManager: Atom<VideoCoreAudioManager | null>;
   export function VideoCoreProvider(props: {
     id: string;
@@ -222,11 +290,22 @@ declare module '@/app/(main)/_features/video-core/video-core' {
 }
 
 declare module '@/lib/server/client-id' {
+  export type ClientIdentity = {
+    clientId: string;
+    clientIdProof: string;
+  };
+
+  export function getClientIdentity(): ClientIdentity;
   export function getClientIdProof(): string;
+  export function setClientIdentity(clientId: string, clientIdProof?: string): ClientIdentity;
+  export function subscribeToClientIdentity(
+    callback: (identity: ClientIdentity) => void,
+  ): () => void;
 }
 
 declare module '@/lib/server/ws-events' {
   export enum WSEvents {
+    CLIENT_IDENTITY = 'client-identity',
     NATIVE_PLAYER = 'native-player',
   }
 }

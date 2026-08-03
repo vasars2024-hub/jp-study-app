@@ -11,6 +11,19 @@ import { writeLocalStorageJson } from '../localStorageWrite';
 
 const KEY = 'jp-os-environment-v1';
 const EVENT = 'jp-os-environment-changed';
+const CURRENT_COMPANION_TYPES = new Set([
+  'study-buddy',
+  'critter',
+  'timekeeper',
+  'miko-shimeji',
+  'wired-navi',
+]);
+
+function isCurrentCompanionType(
+  value: unknown,
+): value is EnvironmentSettings['companionTypes'][number] {
+  return typeof value === 'string' && CURRENT_COMPANION_TYPES.has(value);
+}
 
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -88,17 +101,17 @@ function normalize(partial: Partial<EnvironmentSettings>): EnvironmentSettings {
     : DEFAULT_ENVIRONMENT.particlePresets;
 
   const companionTypes = Array.isArray(partial.companionTypes)
-    ? (partial.companionTypes.filter((t) =>
-        t === 'study-buddy' ||
-        t === 'critter' ||
-        t === 'timekeeper' ||
-        t === 'noctis' ||
-        t === 'miko-shimeji' ||
-        t === 'wired-navi',
-      ) as EnvironmentSettings['companionTypes'])
+    ? partial.companionTypes.filter(isCurrentCompanionType)
     : DEFAULT_ENVIRONMENT.companionTypes;
 
-  const companions = Array.isArray(partial.companions) ? partial.companions : DEFAULT_ENVIRONMENT.companions;
+  // Drop retired companion instances while loading older profiles. The Noctis
+  // beta remains preserved on its dedicated branch, but must not leak into the
+  // current Mooncap build through persisted environment state.
+  const companions = Array.isArray(partial.companions)
+    ? partial.companions.filter((companion) =>
+        isCurrentCompanionType((companion as { typeId?: unknown }).typeId),
+      )
+    : DEFAULT_ENVIRONMENT.companions;
   const buddyRoutines = mergeBuddyRoutines(partial.buddyRoutines);
 
   const WEATHER_MODES = ['off', 'auto', 'clear', 'rain', 'snow', 'fog', 'clouds'];

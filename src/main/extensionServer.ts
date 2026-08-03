@@ -163,6 +163,7 @@ const UI_OPEN_TARGETS = new Set([
   'library',
   'inbox',
   'youtube',
+  'special',
 ]);
 
 /** Focus a GrammarX window and tell the renderer to open an in-app surface. */
@@ -685,6 +686,7 @@ async function handleMine(body: {
     typeof body.folder === 'string' && body.folder.trim() ? body.folder.trim().slice(0, 40) : 'Extension';
   const source: MineSource =
     body.source === 'audio' ||
+    body.source === 'subtitle' ||
     body.source === 'epub' ||
     body.source === 'reader' ||
     body.source === 'dictionary' ||
@@ -997,7 +999,12 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
   }
 
   if (req.method === 'GET' && (pathname === '/v1/health' || pathname === '/health')) {
-    json(res, 200, { ok: true, version: 1, port: bridgeState?.port ?? EXTENSION_PORT });
+    json(res, 200, {
+      ok: true,
+      version: 1,
+      port: bridgeState?.port ?? EXTENSION_PORT,
+      features: { sentenceAnalysis: true },
+    });
     return;
   }
 
@@ -1241,6 +1248,8 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       const audioOnly = body.audioOnly === true;
       let kindLabel: 'playlist' | 'video' = 'video';
 
+      let savedPlaylistId: string | null = null;
+
       if (!ids.length && pageUrl) {
         const kind = detectPageKind(pageUrl);
         if (kind === 'youtube-playlist' || body.playlist) {
@@ -1250,6 +1259,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
             json(res, 400, { ok: false, error: out.error });
             return;
           }
+          savedPlaylistId = out.playlistId;
           const store = readStoreForExtension();
           ids = store.videos.filter((v) => v.playlistId === out.playlistId && !v.downloaded).map((v) => v.id);
         } else {
@@ -1265,6 +1275,22 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       }
 
       if (!ids.length) {
+        // The playlist itself was saved and broadcast above; having nothing new
+        // to download (every video already downloaded, or an empty playlist) is
+        // a success for "Save playlist", not a failure. Reporting 400 here made
+        // the extension show an error for a playlist that had in fact saved.
+        if (savedPlaylistId) {
+          json(res, 200, {
+            ok: true,
+            action: 'playlist',
+            kind: 'playlist',
+            playlistId: savedPlaylistId,
+            videoCount: 0,
+            queued: 0,
+            mode: 'saved',
+          });
+          return;
+        }
         json(res, 400, { ok: false, error: 'No videos to download (url or videoIds required).' });
         return;
       }
@@ -1284,6 +1310,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         videoCount: ids.length,
         queued: ids.length,
         audioOnly,
+        action: kindLabel,
         kind: kindLabel,
         mode: 'download',
       });
@@ -1296,8 +1323,17 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
             (ev) => {
               job.percent = ev.percent;
               job.stage = ev.stage;
+              // Mirror playlist-manager downloads onto the same channel so the
+              // Media "In progress" view sees extension downloads too; without
+              // this they only ever updated this local job object.
+              for (const w of BrowserWindow.getAllWindows()) {
+                w.webContents.send('yt:downloadProgress', ev);
+              }
             },
-            { audioOnly },
+            // Extension downloads always take every subtitle track, including
+            // auto-generated captions — the point of saving from the browser is
+            // to get studiable text without a second pass.
+            { audioOnly, allSubs: true },
           );
           job.results = results;
           job.status = 'done';
@@ -1623,6 +1659,135 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
         entries,
         deinflection: local.deinflection,
       });
+    } catch (err) {
+      json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  // Whole-sentence AI annotation — the extension's "AI OCR / Dictionary AI"
+  // mode. Shares analyzeSentence()'s disk cache with the Reading Lens, so the
+  // same sentence read in either place costs one cloud call in total.
+  if (req.method === 'POST' && pathname === '/v1/sentence-analysis') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as {
+        text?: string;
+        lang?: string;
+        explainIn?: string;
+        context?: string;
+        learnerLevel?: string;
+      };
+      const text = String(body.text ?? '').trim();
+      if (!text) {
+        json(res, 400, { ok: false, error: 'text required' });
+        return;
+      }
+      const { analyzeSentence } = await import('./sentenceAnalysis');
+      const result = await analyzeSentence({
+        text,
+        lang: String(body.lang || 'ja').slice(0, 8),
+        explainIn: String(body.explainIn || 'en').slice(0, 8),
+        context: String(body.context || '').slice(0, 1200),
+        learnerLevel: String(body.learnerLevel || '').slice(0, 16) || undefined,
+      });
+      // A missing key or local model is a configuration problem, not a bad
+      // request — 200 with needsKey / needsLocalModel lets the extension render
+      // a "set it up" message instead of a generic error.
+      // The response carries the user's preferences, so the extension renders
+      // the same sections the app does without a second round trip.
+      json(res, 200, result);
+    } catch (err) {
+      json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  // The extension reads (never writes) the analysis preferences, so its popup
+  // can show the current mode and section list. Settings stay app-owned.
+  if (req.method === 'GET' && pathname === '/v1/sentence-analysis/prefs') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const { readAnalysisPrefs } = await import('./sentenceAnalysis');
+      json(res, 200, { ok: true, prefs: readAnalysisPrefs() });
+    } catch (err) {
+      json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  // File an analysis snapshot into the app's notebook. The extension sends the
+  // analysis it already has rather than the sentence, so no second cloud call
+  // is made and the snapshot matches exactly what the user was looking at.
+  if (req.method === 'POST' && pathname === '/v1/sentence-analysis/snapshot') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as {
+        result?: unknown;
+        lang?: string;
+        sourceLabel?: string;
+      };
+      if (!body.result || typeof body.result !== 'object') {
+        json(res, 400, { ok: false, error: 'result required' });
+        return;
+      }
+      const { readAnalysisPrefs, broadcastSnapshot } = await import('./sentenceAnalysis');
+      const { buildAnalysisSnapshot } = await import('../shared/analysisSnapshot');
+      const snapshot = buildAnalysisSnapshot(
+        body.result as import('../shared/sentenceAnalysisCore').SentenceAnalysisResult,
+        readAnalysisPrefs(),
+        {
+          lang: String(body.lang || 'ja').slice(0, 8),
+          source: 'extension',
+          sourceLabel: String(body.sourceLabel || '').slice(0, 200) || undefined,
+        },
+      );
+      broadcastSnapshot(snapshot);
+      json(res, 200, { ok: true, title: snapshot.title, folder: snapshot.folder });
+    } catch (err) {
+      json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  // Mine a card straight out of an analysis, through the same Anki pipeline and
+  // deck override the app uses.
+  if (req.method === 'POST' && pathname === '/v1/sentence-analysis/mine') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as {
+        result?: unknown;
+        annotationIndex?: number;
+        cardKind?: 'word' | 'sentence';
+        lang?: string;
+        uiLang?: string;
+      };
+      if (!body.result || typeof body.result !== 'object') {
+        json(res, 400, { ok: false, error: 'result required' });
+        return;
+      }
+      const result = body.result as import('../shared/sentenceAnalysisCore').SentenceAnalysisResult;
+      const { readAnalysisPrefs } = await import('./sentenceAnalysis');
+      const { buildAnalysisMineRequest, buildSentenceMineRequest } = await import(
+        '../shared/analysisMining'
+      );
+      const prefs = readAnalysisPrefs();
+      const opts = {
+        lang: String(body.lang || 'ja').slice(0, 8),
+        uiLang: String(body.uiLang || 'en').slice(0, 8),
+        cardKind: body.cardKind,
+      };
+      const annotation = Array.isArray(result.annotations)
+        ? result.annotations[Number(body.annotationIndex) || 0]
+        : undefined;
+      const mineReq =
+        annotation && body.cardKind !== 'sentence'
+          ? buildAnalysisMineRequest(annotation, result, prefs, opts)
+          : buildSentenceMineRequest(result, prefs, opts);
+      json(res, 200, await mineNote(mineReq));
     } catch (err) {
       json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
     }

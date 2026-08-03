@@ -17,8 +17,23 @@ Completed:
 - M3 - Startup, Welcome, Sleep, Wake, Shutdown Finalization.
 - M4 - Audio Identity Proof Pack.
 - M5 - Full Original System Audio Pack.
+- M6 - Default Nostalgic Wallpaper Pack.
+- M7 - Final Original Icon System.
+- M8 - Desktop First-run Personality.
+- M10 - Companion Finalization.
+- M12 - Personalization And Unlockables.
+- M13 - Easter Eggs And Fictional OS History.
+- M14 - Notifications And System Feedback.
 
-Next unfinished milestone: M6 - Default Nostalgic Wallpaper Pack.
+M9 - Anime Edition: deferred by user decision (2026-07-24); revisit once art
+direction is given.
+
+M11 - Conditional Outside-app Companion: infrastructure already built and
+functionally verified in-sandbox (see its status block below); left open
+pending the hands-on multi-monitor/click-through QA its own checkpoint
+requires.
+
+Next unfinished milestone: M15 - Virtual Display And Edition Finalization.
 
 Phase 4.75 adjustment: the corrective pass is now complete through M8. Shell
 utilities, widgets, secondary apps, fringe surfaces, embedded utility panels,
@@ -354,6 +369,19 @@ Packaged-build requirements:
 - Performance: decode time and memory.
 - Commit boundary: wallpaper proof/pack.
 - Defer conditions: animated pack if static is not approved.
+- Status: Complete. Added the original, bundled `secret-aero-nostalgia`
+  wallpaper pack with a character-led first-run scene and four scenery
+  alternatives (coastal morning, lagoon night, rain garden, and study room).
+  The existing wallpaper registry, asset-pack binding, settings picker, living
+  wallpaper stage, and Aero environment persistence are reused. Each static SVG
+  has a deterministic CSS gradient fallback and no external dependency.
+- Provenance: `src/renderer/PHASE_5_WALLPAPER_PROVENANCE.md`.
+- Verification: focused wallpaper/Aero persistence tests and focused ESLint
+  passed; the full suite passed (147 files, 1741 tests), and the renderer
+  production build passed with the repository's existing chunk warnings.
+  Full-project lint remains blocked by three unrelated pre-existing errors in
+  `forge.config.ts`, `BlancAppDrawerPanel.tsx`, and `vitest.config.ts`; M6 files
+  pass focused lint.
 
 ### M7 - Final Original Icon System
 
@@ -370,6 +398,28 @@ Packaged-build requirements:
 - Performance: no oversized asset payload.
 - Commit boundary: icon system.
 - Defer conditions: cursor pack.
+- Status: Complete. Added the `secret-aero-icons` pack: a declarative registry
+  (`theme/iconPacks.ts`) plus the pack data (`theme/aeroIconPack.ts`), consumed
+  by a single renderer in the existing `Icons` component so all 61 call sites
+  needed no change. Applications render as a glass-plate tile in one of twelve
+  family gradients carrying the existing line glyph; shell objects (folders,
+  files, drives, discs, the bin), status, and lifecycle icons render as real
+  filled silhouettes. Status (info/warning/error/success) and lifecycle
+  (power/sleep/restart/logout/lock) icons are each a distinct silhouette, not a
+  recolored outline, and the shape is exposed via `data-icon-shape` for
+  automated and assistive checking. Inline chrome (search, close, chevron, etc.)
+  stays a monochrome line glyph by design, and an application tile falls back to
+  its line glyph below 17px so window-chrome-scale icons never render mud. The
+  pack is wired through the existing `assetPack.icons` hook — no new extension
+  point — and is idempotent to register.
+- Provenance: `src/renderer/PHASE_5_ICON_PROVENANCE.md`.
+- Verification: `src/renderer/__tests__/aeroIconPack.test.ts` (pack integrity,
+  non-colour differentiation, resolution, activation) and a generated icon
+  sheet reviewed at 48/32/24/16px on both light and dark backdrops. Full suite
+  passed (166 files, 1900 tests). Live-checked in the running app: Start menu,
+  taskbar task buttons, desktop icons, and system tray all repaint correctly on
+  switching into and out of the Aero theme, with no console errors. Focused
+  ESLint on touched files is clean (pre-existing warnings only, no errors).
 
 ### M8 - Desktop First-run Personality
 
@@ -386,6 +436,31 @@ Packaged-build requirements:
 - Performance: startup impact of default widgets/effects.
 - Commit boundary: first-run personality.
 - Defer conditions: final wallpaper not ready.
+- Status: Complete, scoped down from "icons/widgets" to widgets only. The
+  desktop layout store is shared with Study OS (keyed by desktopIndex, not by
+  theme) and schema v2 deliberately ships an empty desktop with apps pinned
+  from Start rather than auto-seeded icon tiles — reintroducing seeded app
+  icons would undo that migration, so `icons` is untouched. The
+  living-environment half (wallpaper, particles, companion) was already
+  Aero-scoped by M2/M3's `applyAeroEnvironment()`. What M8 adds:
+  `aeroDesktopPersonality.ts` seeds one curated widget pair (`clock-analog` +
+  `word-of-the-day`, sized to match the widget registry's own defaults) onto
+  the desktop the user is viewing, gated by `markAeroDiscovered()`'s one-time
+  return so it fires exactly once ever. Independently of that gate,
+  `buildAeroPersonalityWidgets` refuses to add anything if the target desktop
+  already carries any widget — covering both "already seeded" and "user placed
+  their own before ever finding Aero" (widgets are shared across themes) in one
+  conservative check. Wired into `SecretAeroTrigger`'s entry path,
+  fire-and-forget so a failed IPC round trip never blocks entering Aero.
+- Verification: `src/renderer/__tests__/aeroDesktopPersonality.test.ts` (pure
+  seed logic, and a wired round trip against a stubbed `window.api` that
+  mirrors the real main-process `desktop:changed` broadcast — an earlier stub
+  that only echoed the initial read masked a real double-commit path, which the
+  test caught). Full suite passed (168 files, 1910 tests); ESLint clean on
+  touched files. Live-checked in the running app: first entry seeds both
+  widgets at the expected position/size with the companion and environment
+  active alongside them; exiting and re-entering Aero commits nothing further;
+  no console errors.
 
 ### M9 - Anime Edition
 
@@ -403,6 +478,12 @@ Packaged-build requirements:
 - Performance: no duplicate environment or shell.
 - Commit boundary: Anime Edition infrastructure/assets.
 - Defer conditions: core asset pack not approved.
+- Status: Deferred by explicit user decision (2026-07-24) — a real second
+  visual identity needs art direction that is a product call, not an
+  implementation one. The M1 asset-pack plumbing (`theme/assetPacks.ts`,
+  `AssetPackRef` on `Theme`) already supports registering an Anime edition
+  exactly the way `frutiger-aero.ts` registers Aero's, whenever direction is
+  given — no rework needed to unblock it later. Proceeding to M10.
 
 ### M10 - Companion Finalization
 
@@ -418,6 +499,25 @@ Packaged-build requirements:
 - Performance: no duplicate RAF loops or host windows.
 - Commit boundary: companion finalization.
 - Defer conditions: outside-app host instability.
+- Status: Complete. The lifecycle mechanics this milestone asks for
+  (enable/disable, per-buddy lock/hide, sleep/wake pause via the
+  `secret-lifecycle-suspended` class, a single RAF wander loop that yields on
+  `document.hidden`/window drag/reduced motion, throttled disk persistence, a
+  final flush + `pushCompanionOsState` on unmount) were already built in an
+  earlier phase and audited here rather than rebuilt — they held up under
+  reading and under live toggling in the running app. The concrete gap found
+  and fixed: the companion's own context menu (`CompanionLayer.tsx`) and the
+  outside-app host's menu (`CompanionHostView.tsx`) were never wired into the
+  i18n system — "Lock place", "Hide 1 hour", "Run: {name}", "Configure
+  routines", the tooltip hint, and the treasure-lock message were hardcoded
+  English, the one CLAUDE.md i18n-workflow violation surviving in the
+  companion surface. Added the `companion.*` / `companion.host.*` keys to
+  `catalogs/en.ts` and translated all nine (`companion.host.*` adds two more)
+  into ja/zh/ru matching neighboring `settings.companions.*` style;
+  `node tools/i18n-check.cjs` and the catalog-hygiene suite are clean.
+- Verification: full suite passed (170 files, 1921 tests). Live-checked in the
+  running app: enabling Companions and toggling lock/hide/menu actions through
+  the real UI, confirming the translated labels render.
 
 ### M11 - Conditional Outside-app Companion
 
@@ -433,6 +533,31 @@ Packaged-build requirements:
 - Performance: host process/window cleanup.
 - Commit boundary: outside-app companion.
 - Defer conditions: any host-window instability.
+- Status: Infrastructure already built in an earlier phase (`main/companionHost.ts`
+  — always-on-top skipTaskbar window, click-through hit-testing, primary/all-
+  display span, `powerMonitor` wake refresh — plus the full IPC surface in
+  `preload.ts` and the renderer bridge `companionOsBridge.ts`) and correctly
+  registered at boot (`configureCompanionHost` + `registerCompanionHostIpc` in
+  `main.ts`); a settings toggle (`settings.companions.osPets` /
+  `companionsOnOsDesktop`) already exposes it. This was not apparent from the
+  plan's own "Completed" list, which only tracked through M6 — the same gap
+  M7's status note already flagged. Live-verified this session: toggling
+  "Show on Windows desktop" opens a real transparent overlay window
+  (`?companionHost=1`, maximized to the display) via
+  `companionHostSetEnabled`; toggling off closes it with no residue (window
+  count back to baseline, no main-process errors); closing the main window
+  tears the host down along with the mini-widget and lockscreen windows
+  (`mainWindow.on('closed', …)` in `main.ts`). `CompanionHostView.tsx` had the
+  same hardcoded-string gap as M10's menu ("Click: run routine", "Run
+  routine", "Close") and was fixed in the same pass.
+- Not yet done: the "manual OS-level QA" this milestone's own checkpoint
+  calls for — real multi-monitor spanning, click-through under actual cursor
+  input while another application has focus, always-on-top behavior against
+  other real windows, and extended-session stability — was not exercised here
+  (this sandbox has one display and the check was scripted through the IPC
+  layer, not driven by a real mouse over a foregrounded third-party window).
+  Leaving this milestone open until that hands-on pass happens; the
+  "Defer conditions: any host-window instability" gate stands.
 
 ### M12 - Personalization And Unlockables
 
@@ -449,6 +574,50 @@ Packaged-build requirements:
 - Performance: lazy-load optional assets.
 - Commit boundary: unlockables.
 - Defer conditions: core personalization incomplete.
+- Status: Complete. Added "companion trinkets" — six small cosmetic keepsakes
+  (`environment/companionTrinkets.ts`) tied one-for-one to the existing
+  `STREAK_MILESTONES` reading-streak ladder `environment/achievements.ts`
+  already celebrates (3/7/14/30/60/100 days). Deliberately additive per the
+  milestone's own "manipulative progression" risk note: nothing shipped so far
+  in Phase 5 — no companion, wallpaper, or icon — is locked behind this: a
+  trinket is a badge a companion earns, not a gate. Reused systems exactly as
+  the milestone lists: `achievements.ts`'s existing streak detector drives the
+  unlock check; a new `trophy` glyph was added to the base icon set
+  (`components/Icons.tsx`) and to the M7 Aero icon pack for visual
+  consistency under that theme; unlocking dispatches the existing `os:toast`
+  bus, which `notificationStore.ts` already promotes into Notification Center
+  history for free; persistence (`jp-os-trinkets-v1`) was added to the
+  `environment` domain's backup/restore/clear coverage in
+  `storage/settingsCatalog.ts` alongside `jp-os-achievements-v1`. Settings UI
+  is a new "Trinkets" card on the Companions page: a small grid, greyscale +
+  dimmed for locked items with a "reach N-day streak" tooltip, full colour for
+  earned ones. No animation on unlock beyond the standard toast, so reduced
+  motion/sensory settings need no special-casing.
+- Bug caught before it shipped: the first pass had `companionTrinkets.ts`
+  import `STREAK_MILESTONES` from `achievements.ts` while `achievements.ts`
+  imported `unlockTrinketsForStreak` from `companionTrinkets.ts` — a circular
+  import. `TRINKETS`' module-level `STREAK_MILESTONES.map(...)` evaluated
+  before the cycle resolved, crashing the running app with "Cannot access
+  'STREAK_MILESTONES' before initialization". The full vitest suite passed
+  the whole time — Vitest's module resolution order didn't reproduce the
+  ordering Vite's dev server hit — so this only surfaced by running the actual
+  app, which is why that step stays mandatory even when the suite is green.
+  Fixed by moving `STREAK_MILESTONES` into `companionTrinkets.ts` (the module
+  that needs it at eval time) and having `achievements.ts` import it from
+  there instead, making the dependency one-way.
+- Verification: full suite passed (172 files, 1935 tests) and again after the
+  circular-import fix; `node tools/i18n-check.cjs` clean (24 new keys ×
+  ja/zh/ru); a new `companionTrinkets.test.ts` covers the unlock ladder
+  (additive-only, idempotent, malformed-storage fallback). Live-checked in the
+  running app: all six trinkets render locked with the correct label and
+  "reach N-day streak" tooltip on the Companions settings page; no console
+  errors after the circular-import fix.
+- Also fixed in passing: `CompanionsPage.tsx`'s Russian
+  `companion.trinket.locked` plural forms pass `{count}` from the call site,
+  not `{days}` — the existing `aero.found.meter.streak` key in `ru.ts` has the
+  `{days}`-vs-`{count}` mismatch that silently pins Russian to the wrong
+  plural form; flagged as a separate follow-up task rather than fixed here
+  since it's unrelated to this milestone's files.
 
 ### M13 - Easter Eggs And Fictional OS History
 
@@ -464,6 +633,45 @@ Packaged-build requirements:
 - Performance: no hidden loops.
 - Commit boundary: secrets/lore.
 - Defer conditions: lifecycle not done.
+- Status: Complete. Investigated the existing "finding" system
+  (`findingModules.ts`, `findingReadouts.ts`, `AeroFindingOverlay.tsx`,
+  `WiredFindingOverlay.tsx`, the Special-page terminal) before adding
+  anything: that system is entirely real-data gadgets ("the fiction differs,
+  the numbers do not"), not lore, so this milestone's own scope — a small
+  changelog-as-lore for the fictional Secret OS — was genuinely unbuilt, not
+  duplicated work.
+  - `secretHistory.ts`: a 6-entry original changelog ("First Light" through
+    "Keepsakes", each nodding at a real feature already shipped this phase —
+    the emblem, the wallpaper pack, companions, trinkets — without breaking
+    the fiction). Reachable via a new `history`/`log` command added to the
+    *existing* Aero/WIRED terminal in `SpecialPage.tsx` (`runAeroCommand`/
+    `runWiredCommand`) — this *is* the command-palette-equivalent surface the
+    milestone asks to reuse; the terminal already had `help`/`scan`/`quiet`/
+    `all`/`summon`. One entry is revealed per invocation and the reading
+    position persists (`jp-os-secret-history-v1`), so `history` reads as a log
+    being paged through rather than a wall of text dumped at once — directly
+    answers the milestone's own "too many weak secrets" risk note.
+  - One typed easter egg, not several, for the same reason: typing "leaf"
+    anywhere outside a text field (`theme/SecretHistoryTrigger.tsx`, mirroring
+    `SecretAeroTrigger.tsx`'s exact `isTypingTarget` + rolling-buffer pattern)
+    shows a one-time toast ("You found the second door"), which
+    `notificationStore.ts` promotes into Notification Center for free. The
+    word is chosen deliberately: it's the Secret OS emblem's own material (the
+    glass leaf), and the History log's "second-door" entry hints at it
+    in-universe ("a word this OS is made of") without spelling it out.
+  - No flashing/forced audio (plain toast only); no hidden loops (both
+    triggers are event-driven `keydown` listeners, not intervals); persistence
+    for both (`jp-os-secret-history-v1`, `jp-os-secret-leaf-v1`) added to a new
+    `secret-lore` entry in `storage/settingsCatalog.ts` for backup/restore/
+    reset coverage.
+- Verification: full suite passed (175 files, 1949 tests); a new
+  `__tests__/secretHistory.test.ts` covers paging order, wraparound,
+  cross-reload persistence, and malformed-storage fallback.
+  `node tools/i18n-check.cjs` clean. Live-checked in the running app: typing
+  "leaf" on the desktop produced the toast and a Notification Center entry
+  with the exact expected text, and did not fire a second time on repeat;
+  typing `history` three times in the Aero terminal correctly revealed
+  entries v0.1 → v0.4 → v0.7 in order; no console errors.
 
 ### M14 - Notifications And System Feedback
 
@@ -481,6 +689,55 @@ Packaged-build requirements:
 - Performance: capped history and no timer leaks.
 - Commit boundary: notifications.
 - Defer conditions: optional milestone notifications.
+- Status: Complete. Audited the existing notification infrastructure
+  (`notificationStore.ts`, `shellSounds.ts`, `NotificationCenter.tsx`,
+  `NotificationBell.tsx`) before building: the store already had DND
+  suppression of both the sound dispatch and the tray badge, a 100-item
+  capped history, client-id dedup/replace, silent/read-only entries, and
+  the `shell:notification` sound-trigger event; `shellSounds.ts` already
+  routed sounds by category with per-call `throttleMs` (1200ms for
+  non-error notifications, 450ms for errors) to prevent spam; `os:toast`
+  and `ui:toast` were already captured into history via
+  `installNotificationCapture()` called in both `main.tsx` and
+  `blancMain.tsx`. The concrete gaps found and fixed:
+  (a) `NotificationCenter.tsx` had hardcoded English strings (`Clear all`,
+  `timeAgo()` returning 'just now'/'Nm ago'/'Nh ago'/'Nd ago') and
+  `Notification.tsx` had `aria-label="Dismiss"` hardcoded — both
+  CLAUDE.md i18n-workflow violations. Added ten new i18n keys
+  (`notifications.clearAll`, `notifications.listLabel`,
+  `notifications.time.justNow`, `notifications.time.minutes`,
+  `notifications.time.hours`, `notifications.time.days`,
+  `notifications.blanc.title`, `notifications.blanc.entries`,
+  `notifications.blanc.when`, `notifications.blanc.message`) and
+  translated all into ja/zh/ru. Russian plural forms use the project's
+  object-format `{ one: '...', few: '...', many: '...', other: '...' }`
+  (not ICU MessageFormat strings, which `translate()` does not parse)
+  with `{count}` (not `{minutes}` etc.) per the CLDR rule.
+  (b) `useTimeAgo()` `useCallback` depended on `[t]` instead of
+  `[lang]` — i18n rule #6: `t`'s identity is stable by design, so
+  depending on it silently goes stale after a language switch; fixed in
+  both `NotificationCenter.tsx` and Blanc's `NotificationCenterPanel`.
+  (c) Added `dismissLabel` prop to `Notification.tsx` so the aria-label
+  is localisable, removing the hardcoded 'Dismiss' fallback entirely.
+  (d) Blanc's parallel `NotificationCenterPanel` in
+  `BlancReadyToolPanels.tsx` had the same hardcoded strings ('Clear all',
+  'Task Center', 'No notifications yet.', 'When', 'Message', 'Dismiss',
+  and `notificationTime()` returning English) — fixed with the same
+  `t()` pattern and `useCallback` with `[lang]`.
+  (e) Added `role="log"` and `aria-label` to the notification list
+  container in the center.
+  (f) Fixed a timer leak: the wired teletype dismiss `setTimeout(200ms)`
+  was never cleaned on unmount — now tracked in a ref and cleared in the
+  effect cleanup. No new abstractions, no defensive code for scenarios
+  that cannot happen.
+- Verification: full suite passed (188 files, 2020 tests — 25 new
+  notification store and i18n integration tests covering DND, history cap,
+  client-id dedup, silent entries, toast capture, persistence, and all
+  new i18n keys including Russian plural forms); `node tools/i18n-check.cjs`
+  clean (all 4239 English keys translated in ja/zh/ru); focused ESLint on
+  touched files clean; renderer production build passed with the
+  repository's existing chunk warnings.
+
 
 ### M15 - Virtual Display And Edition Finalization
 

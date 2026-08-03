@@ -5,25 +5,29 @@
 // DictionaryResults.tsx, AnkiSetup.tsx and StatisticsView.tsx run unmodified.
 
 import crypto from 'node:crypto';
+import path from 'node:path';
 import { app, BrowserWindow, clipboard, ipcMain } from 'electron';
-import type {
-  EnsureModelResult,
-  IntervalSnapshot,
-  MineNoteRequest,
-  MineNoteResult,
-
+import {
   ANKI_COLLECTION_UNAVAILABLE_MSG,
   APP_TAG,
+  appendUnreferencedMediaToFields,
   computeCloze,
   extractExamplePairRefs,
   formatExamplePairs,
   hasFieldTemplates,
+  mediaFilenamesFromAnkiMarkup,
   renderFieldTemplate,
   resolveMiningTemplates,
+  type DeleteMinedNotesResult,
+  type EnsureModelResult,
   type ExampleCountLang,
-  type MiningValues} from '../../shared/anki';
+  type IntervalSnapshot,
+  type MineNoteRequest,
+  type MineNoteResult,
+  type MiningValues,
+} from '../../shared/anki';
 
-import type { CardContent, ProfileId, StudyProfile } from '../../shared/profiles';
+import type { CardContent, FieldRole, ProfileId, StudyProfile } from '../../shared/profiles';
 import { buildRouteContext, resolveProfileMatch } from '../../shared/profileRules';
 import type { AnkiAddRequest, AnkiAddResult, AnkiStatus } from '../../shared/types';
 import { fetchJapaneseAudio } from '../dictionary';
@@ -46,13 +50,16 @@ import {
   configureIntervals,
   getCachedSnapshot,
   getSnapshotOrPoll,
+  intervalsForNotes,
   loadPersistedSnapshot,
   onAnkiConnected,
   onAnkiDisconnected,
   onQueriesMaybeChanged,
   onSnapshotChanged,
+  recordCreatedNote,
+  recordDeletedNotes,
 } from './intervals';
-import { ensureDeck, ensureDeckName, ensureModel, invalidateAnkiCaches } from './noteTypes';
+import { ensureDeckName, ensureModel, invalidateAnkiCaches } from './noteTypes';
 
 const KNOWN_WORDS_MAX_AGE_MS = 5 * 60000; // shim refresh threshold (section 6)
 
@@ -95,6 +102,27 @@ async function storeImageFromClipboard(): Promise<string> {
     console.error('[anki] clipboard image capture failed:', err);
     return '';
   }
+}
+
+async function storeSuppliedImage(req: MineNoteRequest): Promise<string> {
+  if (typeof req.imageBase64 === 'string' && req.imageBase64.trim()) {
+    try {
+      const base64 = req.imageBase64.trim();
+      const data = Buffer.from(base64, 'base64');
+      if (!data.length || data.length > 2 * 1024 * 1024) return '';
+      const requestedExtension = path.extname(req.imageFilename ?? '').toLowerCase();
+      const extension = requestedExtension === '.png' || requestedExtension === '.webp'
+        ? requestedExtension
+        : '.jpg';
+      const hash = crypto.createHash('md5').update(data).digest('hex').slice(0, 12);
+      const filename = `jsa-vn-${hash}${extension}`;
+      await invoke('storeMediaFile', { filename, data: base64 });
+      return `<img src="${filename}">`;
+    } catch {
+      return '';
+    }
+  }
+  return req.imageHtml?.trim() ?? '';
 }
 
 async function gatherMiningValues(
@@ -164,8 +192,8 @@ async function gatherMiningValues(
 
   if (req.captureClipboardImage) {
     values.image = await storeImageFromClipboard();
-  } else if (req.imageHtml?.trim()) {
-    values.image = req.imageHtml.trim();
+  } else if (req.imageBase64?.trim() || req.imageHtml?.trim()) {
+    values.image = await storeSuppliedImage(req);
   }
 
   if (req.fetchAudio && term) {
@@ -231,9 +259,11 @@ async function validateSortField(
   if (term.trim()) {
     return { fields: { ...fields, [sortField]: escapeForAnki(term.trim()) } };
   }
-  const donor = names.find((n) => fields[n]?.trim());
-  if (donor) {
-    return { fields: { ...fields, [sortField]: fields[donor]! } };
+  const donorValue = names
+    .map((name) => fields[name])
+    .find((value): value is string => Boolean(value?.trim()));
+  if (donorValue) {
+    return { fields: { ...fields, [sortField]: donorValue } };
   }
   return {
     fields,
@@ -243,9 +273,48 @@ async function validateSortField(
   };
 }
 
+/**
+ * Caller-supplied media is uploaded to Anki before anything decides where it goes, so a
+ * missing placement rule costs the user the asset without telling them: the file sits in
+ * the media folder and no note ever points at it. Three paths could do that — the
+ * field-template path only emits `{image}`/`{audio}` when a template happens to use them,
+ * automatic mode had no image placement at all, and the prebuilt-card path dropped the
+ * image whenever the model had no picture role.
+ *
+ * This places anything the rendered fields do not already reference: a name-matching field
+ * if the model has one, else the last field that already carries content (the sentence, in
+ * practice), else the final field. Fields that already reference the markup are left alone,
+ * so a model with a real picture/audio role keeps its existing layout untouched.
+ */
+async function attachUnreferencedMedia(
+  fields: Record<string, string>,
+  modelName: string,
+  media: { image?: string; audio?: string },
+): Promise<Record<string, string>> {
+  const names = (await invoke('modelFieldNames', { modelName })) ?? [];
+  return appendUnreferencedMediaToFields(fields, names, media);
+}
+
 // ----- Mining gateway (5.6) ------------------------------------------------------
 
-export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
+interface ResolvedMineTarget {
+  profile: StudyProfile;
+  matchedRuleLabel?: string;
+  usedDefault?: boolean;
+  routedToRule: boolean;
+  targetDeck: string;
+  requestedDeck: string;
+}
+
+/**
+ * One resolver for both preview and execution. Keeping this decision at the
+ * Anki boundary prevents a caller from previewing the active profile while a
+ * mining rule sends the real note somewhere else.
+ */
+function resolveMineTarget(req: Pick<
+  MineNoteRequest,
+  'profileId' | 'route' | 'term' | 'sentence' | 'deckName'
+>): ResolvedMineTarget | null {
   const store = getProfileStore();
   const active = store.getActiveProfile();
 
@@ -270,69 +339,110 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
   } else {
     profile = active;
   }
-  if (!profile) return { ok: false, error: `Unknown profile: ${String(req?.profileId)}` };
+  if (!profile) return null;
+  const routedToRule = Boolean(req?.route) && !req?.profileId && usedDefault === false;
+  const requestedDeck = typeof req?.deckName === 'string' ? req.deckName.trim() : '';
+  const targetDeck =
+    !routedToRule && requestedDeck ? requestedDeck : profile.anki.deckName;
+  return {
+    profile,
+    matchedRuleLabel,
+    usedDefault,
+    routedToRule,
+    targetDeck,
+    requestedDeck,
+  };
+}
+
+export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
+  const resolved = resolveMineTarget(req);
+  if (!resolved) {
+    return { ok: false, error: `Unknown profile: ${String(req?.profileId)}` };
+  }
+  const {
+    profile,
+    matchedRuleLabel,
+    usedDefault,
+    routedToRule,
+    targetDeck,
+    requestedDeck,
+  } = resolved;
+  const term = typeof req?.term === 'string' ? req.term.trim() : '';
+  if (!term) return { ok: false, error: 'term is required' };
+  let storedMediaFilenames: string[] = [];
+
   // Stamped onto success results so callers can show where the card actually went.
   const meta = {
     profileId: profile.id,
     profileName: profile.label || profile.id,
     matchedRuleLabel,
     usedDefault,
+    deckName: targetDeck,
+    // The caller asked for a deck and routing took it somewhere else. Silently ignoring
+    // that reads as a bug from the UI side, so it is reported rather than swallowed.
+    deckOverriddenByRule: Boolean(routedToRule && requestedDeck && requestedDeck !== targetDeck),
   };
 
-    const term = typeof req?.term === 'string' ? req.term.trim() : '';
-    if (!term) return { ok: false, error: 'term is required' };
-    // When a mining rule actively matched, the rule's profile owns the whole
-    // destination (its own deck too) — a generic caller deckName must not send a
-    // routed card into the wrong deck. A deckName override still applies when no
-    // rule matched (unchanged behavior for non-routed / default flows).
-    const routedToRule = Boolean(req?.route) && !req?.profileId && usedDefault === false;
-    const targetDeck =
-      !routedToRule && typeof req?.deckName === 'string' && req.deckName.trim()
-        ? req.deckName.trim()
-        : profile.anki.deckName;
+  try {
+    // Lazy + cached; the collection is only mutated inside explicit mine calls (A-1).
+    await ensureDeckName(targetDeck);
+    const model = await ensureModel(profile);
 
-    try {
-      // Lazy + cached; the collection is only mutated inside explicit mine calls (A-1).
-      await ensureDeckName(targetDeck);
-      const model = await ensureModel(profile);
-
-      if (req.prebuiltCard) {
-        const names = (await invoke('modelFieldNames', { modelName: profile.anki.modelName })) ?? [];
-        if (names.length < 2) {
-          return { ok: false, error: `Model "${profile.anki.modelName}" needs at least two fields for AI cards.` };
-        }
-        let fields: Record<string, string> = {
-          [names[0]!]: escapeForAnki(req.prebuiltCard.front),
-          [names[1]!]: escapeForAnki(req.prebuiltCard.back),
-        };
-        if (req.imageHtml?.trim() && model.fieldMap.image) {
-          fields[model.fieldMap.image] = req.imageHtml.trim();
-        }
-        const sortError = await validateSortField(
-          profile.anki.modelName,
-          fields,
-          profile.anki.fieldTemplates ?? {},
-          term,
-        );
-        if (sortError.error) return { ok: false, error: sortError.error };
-        fields = sortError.fields;
-
-        const tags = [APP_TAG, `${APP_TAG}::${profile.id}`]
-          .concat(profile.anki.extraTags ?? [])
-          .concat(req.extraTags ?? []);
-        const noteId = await invoke('addNote', {
-          note: {
-            deckName: targetDeck,
-            modelName: profile.anki.modelName,
-            fields,
-            tags,
-            options: { allowDuplicate: false },
-          },
-        });
-        return { ok: true, noteId, ...meta };
+    if (req.prebuiltCard) {
+      const names = (await invoke('modelFieldNames', { modelName: profile.anki.modelName })) ?? [];
+      if (names.length < 2) {
+        return { ok: false, error: `Model "${profile.anki.modelName}" needs at least two fields for AI cards.` };
       }
+      const [frontField, backField] = names;
+      if (!frontField || !backField) {
+        return { ok: false, error: `Model "${profile.anki.modelName}" needs at least two named fields for AI cards.` };
+      }
+      let fields: Record<string, string> = {
+        [frontField]: escapeForAnki(req.prebuiltCard.front),
+        [backField]: escapeForAnki(req.prebuiltCard.back),
+      };
+      let prebuiltImage = '';
+      if (req.imageBase64?.trim() || req.imageHtml?.trim()) {
+        prebuiltImage = await storeSuppliedImage(req);
+        if (prebuiltImage && model.fieldMap.image) {
+          fields[model.fieldMap.image] = prebuiltImage;
+        }
+      }
+      const sortError = await validateSortField(
+        profile.anki.modelName,
+        fields,
+        profile.anki.fieldTemplates ?? {},
+        term,
+      );
+      if (sortError.error) return { ok: false, error: sortError.error };
+      fields = sortError.fields;
+      fields = await attachUnreferencedMedia(fields, profile.anki.modelName, {
+        image: prebuiltImage,
+      });
 
-      const content: Partial<Record<CardContent, string>> = { term };
+      const tags = [APP_TAG, `${APP_TAG}::${profile.id}`]
+        .concat(profile.anki.extraTags ?? [])
+        .concat(req.extraTags ?? []);
+      const noteId = await invoke('addNote', {
+        note: {
+          deckName: targetDeck,
+          modelName: profile.anki.modelName,
+          fields,
+          tags,
+          options: { allowDuplicate: false },
+        },
+      });
+      recordCreatedNote(term, noteId, profile.anki.modelName);
+      storedMediaFilenames = mediaFilenamesFromAnkiMarkup(prebuiltImage);
+      return {
+        ok: true,
+        noteId,
+        ...meta,
+        ...(storedMediaFilenames.length ? { mediaFilenames: storedMediaFilenames } : {}),
+      };
+    }
+
+    const content: Partial<Record<CardContent, string>> = { term };
     if (req.reading && req.reading.trim()) content.reading = req.reading.trim();
     if (req.meaning && req.meaning.trim()) content.meaning = req.meaning.trim();
     if (req.translation && req.translation.trim()) content.translation = req.translation.trim();
@@ -369,6 +479,13 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       );
       if (sortError.error) return { ok: false, error: sortError.error };
       fields = sortError.fields;
+      // gatherMiningValues already uploaded these; without this they stay orphaned
+      // whenever no saved template happens to reference {image} / {audio}.
+      fields = await attachUnreferencedMedia(fields, profile.anki.modelName, {
+        image: values.image,
+        audio: values.audio,
+      });
+      storedMediaFilenames = mediaFilenamesFromAnkiMarkup(values.image, values.audio);
     } else {
       // Automatic mode (unchanged): role mapper places each blueprint slot.
       // Deduped, order-preserving role list from the blueprint.
@@ -379,7 +496,7 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
 
       fields = {};
       for (const role of roles) {
-        const fieldName = model.fieldMap[role];
+        const fieldName = model.fieldMap[role as FieldRole];
         const value = content[role];
         if (fieldName && value) fields[fieldName] = escapeForAnki(value);
       }
@@ -394,28 +511,36 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
         }
       }
 
+      // Attach a caller-supplied screenshot (VideoCore mining). Automatic mode placed no
+      // image at all, so the upload happened and nothing ever referenced it.
+      let autoImage = '';
+      if (req.captureClipboardImage) {
+        autoImage = await storeImageFromClipboard();
+      } else if (req.imageBase64?.trim() || req.imageHtml?.trim()) {
+        autoImage = await storeSuppliedImage(req);
+      }
+      if (autoImage && model.fieldMap.image) {
+        const imageField = model.fieldMap.image;
+        fields[imageField] = fields[imageField]?.trim()
+          ? `${fields[imageField]}<br>${autoImage}`
+          : autoImage;
+      }
+
       // Attach caller-supplied recording (extension audio mine) to audio roles.
+      let autoAudio = '';
       if (typeof req.audioBase64 === 'string' && req.audioBase64.trim()) {
         const filename =
           (typeof req.audioFilename === 'string' && req.audioFilename.trim()) ||
           `jp-study-audio-${Date.now()}.webm`;
         try {
           await invoke('storeMediaFile', { filename, data: req.audioBase64.trim() });
-          const sound = `[sound:${filename}]`;
+          autoAudio = `[sound:${filename}]`;
           const audioField =
             model.fieldMap.sentenceAudio || model.fieldMap.termAudio || model.fieldMap.notes;
           if (audioField) {
-            fields[audioField] = fields[audioField] ? `${fields[audioField]} ${sound}` : sound;
-          } else {
-            // Fall back: append to the last back-facing field or the second model field.
-            const names = (await invoke('modelFieldNames', { modelName: profile.anki.modelName })) ?? [];
-            const fallback =
-              names.find((n) => /audio|sound|音声/i.test(n)) ||
-              (names.length > 1 ? names[names.length - 1] : names[0]);
-            if (fallback) {
-              fields[fallback] = fields[fallback] ? `${fields[fallback]}<br>${sound}` : sound;
-            }
+            fields[audioField] = fields[audioField] ? `${fields[audioField]} ${autoAudio}` : autoAudio;
           }
+          // No audio role on this model: attachUnreferencedMedia below places it.
         } catch {
           /* Anki media upload failed — note still saves without audio */
         }
@@ -432,6 +557,12 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
       );
       if (sortError.error) return { ok: false, error: sortError.error };
       fields = sortError.fields;
+      // After sort validation, so media can never mask an otherwise-empty card.
+      fields = await attachUnreferencedMedia(fields, profile.anki.modelName, {
+        image: autoImage,
+        audio: autoAudio,
+      });
+      storedMediaFilenames = mediaFilenamesFromAnkiMarkup(autoImage, autoAudio);
     }
 
     // Tagging policy (5.3): applied by the gateway, never by callers.
@@ -448,7 +579,13 @@ export async function mineNote(req: MineNoteRequest): Promise<MineNoteResult> {
         options: { allowDuplicate: false },
       },
     });
-    return { ok: true, noteId, ...meta };
+    recordCreatedNote(term, noteId, profile.anki.modelName);
+    return {
+      ok: true,
+      noteId,
+      ...meta,
+      ...(storedMediaFilenames.length ? { mediaFilenames: storedMediaFilenames } : {}),
+    };
   } catch (err) {
     // duplicate -> 'duplicate' (A-3), transport -> ANKI_UNREACHABLE_MSG (A-2),
     // api -> verbatim message.
@@ -547,6 +684,138 @@ async function ankiKnownWordsShim(): Promise<{
   }
 }
 
+/**
+ * Read-only Study pipeline preview. Destination resolution is shared with
+ * `mineNote`. Successful app-originated adds are folded into the snapshot
+ * synchronously, so the preview stays current without rescanning the entire
+ * collection on every click.
+ */
+export async function previewAnkiExpressions(
+  expressions: readonly string[],
+  options: Pick<MineNoteRequest, 'profileId' | 'route' | 'deckName'> = {},
+): Promise<{
+  connected: boolean;
+  profileId?: ProfileId;
+  profileName?: string;
+  deckName?: string;
+  modelName?: string;
+  matchedRuleLabel?: string;
+  usedDefault?: boolean;
+  duplicates: Record<string, { noteId: number; intervalDays: number }>;
+  error?: string;
+}> {
+  const resolved = resolveMineTarget({
+    ...options,
+    term: expressions.join(' '),
+  });
+  if (!resolved) {
+    return {
+      connected: false,
+      duplicates: {},
+      error: options.profileId
+        ? `Unknown profile: ${String(options.profileId)}`
+        : 'No active Study profile is configured.',
+    };
+  }
+  const { profile, targetDeck, matchedRuleLabel, usedDefault } = resolved;
+  const destination = {
+    profileId: profile.id,
+    profileName: profile.label || profile.id,
+    deckName: targetDeck,
+    modelName: profile.anki.modelName,
+    matchedRuleLabel,
+    usedDefault,
+  };
+  try {
+    const snapshot = await getSnapshotOrPoll();
+    const wanted = new Set(expressions.map((value) => value.normalize('NFKC').trim()).filter(Boolean));
+    const duplicates: Record<string, { noteId: number; intervalDays: number }> = {};
+    for (const entry of snapshot.entries) {
+      const expression = entry.expression.normalize('NFKC').trim();
+      if (!wanted.has(expression)) continue;
+      const previous = duplicates[expression];
+      if (!previous || entry.ivlDays > previous.intervalDays) {
+        duplicates[expression] = { noteId: entry.noteId, intervalDays: entry.ivlDays };
+      }
+    }
+    return {
+      connected: true,
+      ...destination,
+      duplicates,
+    };
+  } catch (error) {
+    return {
+      connected: false,
+      ...destination,
+      duplicates: {},
+      error: toUiError(error),
+    };
+  }
+}
+
+export async function deleteMinedNotes(
+  noteIds: readonly number[],
+  mediaFilenames: readonly string[] = [],
+): Promise<DeleteMinedNotesResult> {
+  const ids = noteIds
+    .map((noteId) => Number(noteId))
+    .filter((noteId) => Number.isFinite(noteId) && noteId > 0);
+  if (!ids.length) return { ok: false, error: 'No note ids.' };
+  const candidates = [...new Set(
+    mediaFilenames
+      .map((filename) => String(filename).trim())
+      .filter((filename) =>
+        /^jsa-vn-[a-f0-9]{12}\.(?:jpe?g|png|webp)$/i.test(filename)
+        || /^jp-video-cue-\d+-\d+-\d+\.webm$/i.test(filename)),
+  )];
+  try {
+    await invoke('deleteNotes', { notes: ids });
+    recordDeletedNotes(ids);
+  } catch (err) {
+    return { ok: false, error: toUiError(err) };
+  }
+
+  if (!candidates.length) return { ok: true };
+  const deletedMediaFilenames: string[] = [];
+  const retainedMediaFilenames: string[] = [];
+  try {
+    // App-created assets can be shared by two cards (same cue or screenshot).
+    // Scan remaining app-originated notes before deleting the physical media.
+    const remainingIds = await invoke('findNotes', { query: `tag:${APP_TAG}` });
+    const referenced = new Set<string>();
+    for (let offset = 0; offset < remainingIds.length; offset += 250) {
+      const notes = await invoke('notesInfo', { notes: remainingIds.slice(offset, offset + 250) });
+      for (const note of notes) {
+        const fieldValues = Object.values(note.fields ?? {}).map((field) => field.value ?? '');
+        for (const filename of candidates) {
+          if (fieldValues.some((value) => value.includes(filename))) referenced.add(filename);
+        }
+      }
+    }
+    for (const filename of candidates) {
+      if (referenced.has(filename)) {
+        retainedMediaFilenames.push(filename);
+        continue;
+      }
+      await invoke('deleteMediaFile', { filename });
+      deletedMediaFilenames.push(filename);
+    }
+    return {
+      ok: true,
+      deletedMediaFilenames,
+      retainedMediaFilenames,
+    };
+  } catch (err) {
+    return {
+      ok: true,
+      warning: `Note deleted, but media cleanup was skipped: ${toUiError(err)}`,
+      deletedMediaFilenames,
+      retainedMediaFilenames: candidates.filter(
+        (filename) => !deletedMediaFilenames.includes(filename)),
+    };
+  }
+}
+
 // ----- Registration ----------------------------------------------------------------------
 
 /**
@@ -614,17 +883,15 @@ export function registerAnkiIpc(): void {
   // New channels (section 6).
   ipcMain.handle('anki:linkState', () => getLinkStatus());
   ipcMain.handle('anki:mineNote', (_e, req: MineNoteRequest) => mineNote(req));
-  ipcMain.handle('anki:deleteNotes', async (_e, noteIds: unknown): Promise<{ ok: boolean; error?: string }> => {
-    try {
-      const ids = Array.isArray(noteIds)
-        ? noteIds.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0)
-        : [];
-      if (!ids.length) return { ok: false, error: 'No note ids.' };
-      await invoke('deleteNotes', { notes: ids });
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: toUiError(err) };
-    }
+  ipcMain.handle('anki:deleteNotes', (_e, input: unknown) => {
+    if (Array.isArray(input)) return deleteMinedNotes(input.map(Number));
+    const request = input && typeof input === 'object'
+      ? input as { noteIds?: unknown; mediaFilenames?: unknown }
+      : {};
+    return deleteMinedNotes(
+      Array.isArray(request.noteIds) ? request.noteIds.map(Number) : [],
+      Array.isArray(request.mediaFilenames) ? request.mediaFilenames.map(String) : [],
+    );
   });
   // Ordered field names of a note type, for the field-mapping UI (5.4).
   ipcMain.handle(
@@ -672,6 +939,23 @@ export function registerAnkiIpc(): void {
       // Data-preferring channel: a failed refresh serves the last good
       // snapshot; link state is reported separately via anki:linkState.
       return getCachedSnapshot() ?? emptySnapshot();
+    }
+  });
+
+  /**
+   * Review state for named notes only — the channel the mining rollups use.
+   *
+   * `anki:getIntervals` above serves the collection-wide expression index, which on a real
+   * collection is 155,377 notes and does not return inside a minute. A rollup looks its cards
+   * up by note id and knows exactly which ids it means, so it asks for those. Same failure
+   * posture as its neighbour: an error yields an EMPTY snapshot rather than throwing, because
+   * a panel that cannot stage its cards must still render them.
+   */
+  ipcMain.handle('anki:getIntervalsForNotes', async (_e, noteIds?: number[]) => {
+    try {
+      return await intervalsForNotes(Array.isArray(noteIds) ? noteIds : []);
+    } catch {
+      return emptySnapshot();
     }
   });
 

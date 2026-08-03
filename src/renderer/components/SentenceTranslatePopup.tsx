@@ -10,17 +10,10 @@ interface Props {
 
 type State = 'loading' | 'translating' | 'done' | 'error';
 
-// Shared with the Translate view and reader collection panel, so the target
-// language chosen anywhere in the app carries over everywhere else.
-const TARGET_LANG_KEY = 'jp-study-translate-target';
-
-function getTargetLang(): string {
-  return localStorage.getItem(TARGET_LANG_KEY) || 'en';
-}
-
-function setTargetLang(code: string): void {
-  localStorage.setItem(TARGET_LANG_KEY, code);
-}
+// Shared with the Translate view and reader collection panel through the one owner
+// of that key, so the target language chosen anywhere carries over everywhere else.
+import { getTranslateTarget as getTargetLang, setTranslateTarget as setTargetLang } from '../translateTarget';
+import { getStudyLang } from '../studyEnvironment';
 
 // Auto-translates a highlighted sentence from the reader — the dictionary
 // popup's sibling, for whole phrases instead of single words. Uses the same
@@ -57,7 +50,7 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
         setMsg(`Loading model… ${Math.round(p.progress)}%`);
       }
     });
-    const lang = (localStorage.getItem('jp-study-dict-lang') as 'ja' | 'zh') || 'ja';
+    const lang = getStudyLang();
     translateTo(text, lang, targetLang, () => {
       if (id === reqRef.current) {
         setState('translating');

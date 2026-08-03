@@ -51,11 +51,13 @@ function normalizeAiEngineConfig(raw?: Partial<AiEngineConfig> | null): AiEngine
   return {
     apiKeySet: Boolean(apiKeysSet[bucket]),
     apiKeysSet,
+    engine: raw?.engine === 'local-qwen' ? 'local-qwen' : 'cloud',
     providerId,
     selectedPresetId: raw?.selectedPresetId ?? AI_PROMPT_PRESETS[0]?.id ?? 'idiom-slang',
     selectedFormatId: raw?.selectedFormatId ?? 'idiom-slang-recognition',
     cardCount: Math.max(1, Math.min(50, Math.round(raw?.cardCount ?? 1))),
     outputFormat: raw?.outputFormat === 'csv' ? 'csv' : 'anki',
+    localModelAvailable: Boolean(raw?.localModelAvailable),
     ...lang,
   };
 }
@@ -162,6 +164,8 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
 
   const selectedProvider = useMemo(() => providerById(aiConfig.providerId), [aiConfig.providerId]);
   const currentProviderKeySaved = Boolean(aiConfig.apiKeysSet?.[selectedProvider.keyBucket]);
+  const engineReady =
+    aiConfig.engine === 'local-qwen' ? Boolean(aiConfig.localModelAvailable) : currentProviderKeySaved;
 
   const allPresets = useMemo(() => (presets.length ? presets : [...AI_PROMPT_PRESETS]), [presets]);
   const corePresets = useMemo(() => allPresets.filter((p) => p.category === 'core'), [allPresets]);
@@ -353,8 +357,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     [batchResults],
   );
   const canGenerate =
-    currentProviderKeySaved &&
-    (generationSource === 'preset' || savedWords.length > 0);
+    engineReady && (generationSource === 'preset' || savedWords.length > 0);
 
   const currentDirectionLabel = useMemo(
     () => directionLabel(aiConfig),
@@ -550,55 +553,86 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       <CollapsibleSection
         title={t('aiStudio.section.provider')}
         summary={
-          currentProviderKeySaved
-            ? t('aiStudio.summary.keySaved', { provider: selectedProvider.label })
-            : t('aiStudio.summary.connect')
+          aiConfig.engine === 'local-qwen'
+            ? aiConfig.localModelAvailable
+              ? t('aiStudio.summary.localReady')
+              : t('aiStudio.summary.localMissing')
+            : currentProviderKeySaved
+              ? t('aiStudio.summary.keySaved', { provider: selectedProvider.label })
+              : t('aiStudio.summary.connect')
         }
-        defaultOpen={!currentProviderKeySaved}
+        defaultOpen={!engineReady}
         className="mining-collapse anki-card"
       >
         <div className="mining-form-grid mining-form-grid-wide">
           <label>
-            {t('aiStudio.label.provider')}
+            {t('aiStudio.label.engine')}
             <select
-              value={aiConfig.providerId}
+              value={aiConfig.engine}
               onChange={(e) => {
-                const providerId = e.target.value as AiEngineConfig['providerId'];
-                void window.api.aiSetProvider(providerId).then((result) =>
-                  applyAiConfigPatch({
-                    providerId: result.providerId,
-                    apiKeysSet: result.apiKeysSet,
-                  }),
+                const engine = e.target.value === 'local-qwen' ? 'local-qwen' : 'cloud';
+                void window.api.aiSetEngine(engine).then((result) =>
+                  applyAiConfigPatch(normalizeAiEngineConfig(result)),
                 );
               }}
             >
-              {AI_PROVIDERS.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.label}
-                </option>
-              ))}
+              <option value="cloud">{t('aiStudio.engine.cloud')}</option>
+              <option value="local-qwen">{t('aiStudio.engine.local')}</option>
             </select>
           </label>
-          <label className="mining-api-key-field">
-            {t('aiStudio.label.apiKey')}
-            <input
-              ref={apiKeyInputRef}
-              type="password"
-              value={apiKeyDraft}
-              onChange={(e) => setApiKeyDraft(e.target.value)}
-              placeholder={
-                currentProviderKeySaved
-                  ? t('aiStudio.placeholder.replaceKey')
-                  : t('aiStudio.placeholder.pasteKey', { provider: selectedProvider.label })
-              }
-            />
-          </label>
+          {aiConfig.engine === 'cloud' ? (
+            <>
+              <label>
+                {t('aiStudio.label.provider')}
+                <select
+                  value={aiConfig.providerId}
+                  onChange={(e) => {
+                    const providerId = e.target.value as AiEngineConfig['providerId'];
+                    void window.api.aiSetProvider(providerId).then((result) =>
+                      applyAiConfigPatch({
+                        providerId: result.providerId,
+                        apiKeysSet: result.apiKeysSet,
+                      }),
+                    );
+                  }}
+                >
+                  {AI_PROVIDERS.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="mining-api-key-field">
+                {t('aiStudio.label.apiKey')}
+                <input
+                  ref={apiKeyInputRef}
+                  type="password"
+                  value={apiKeyDraft}
+                  onChange={(e) => setApiKeyDraft(e.target.value)}
+                  placeholder={
+                    currentProviderKeySaved
+                      ? t('aiStudio.placeholder.replaceKey')
+                      : t('aiStudio.placeholder.pasteKey', { provider: selectedProvider.label })
+                  }
+                />
+              </label>
+            </>
+          ) : (
+            <p className={`muted mining-engine-status${aiConfig.localModelAvailable ? ' ok' : ' warn'}`}>
+              {aiConfig.localModelAvailable
+                ? t('aiStudio.local.ready')
+                : t('aiStudio.local.missing')}
+            </p>
+          )}
         </div>
-        <div className="mining-api-key-actions">
-          <button className="btn primary" type="button" disabled={savingKey} onClick={() => void saveApiKey()}>
-            {savingKey ? t('aiStudio.status.saving') : t('aiStudio.btn.saveKey')}
-          </button>
-        </div>
+        {aiConfig.engine === 'cloud' && (
+          <div className="mining-api-key-actions">
+            <button className="btn primary" type="button" disabled={savingKey} onClick={() => void saveApiKey()}>
+              {savingKey ? t('aiStudio.status.saving') : t('aiStudio.btn.saveKey')}
+            </button>
+          </div>
+        )}
         {keyStatus && keyStatusKind !== 'idle' && (
           <div className={`banner mining-key-status mining-key-status-${keyStatusKind}`}>{keyStatus}</div>
         )}
@@ -910,7 +944,7 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
           <span className="download-deck-result">
             {t('aiStudio.result.approx', { count: batchResults.length ? minedCardCount : estimatedCards })}
             {genProgress?.message && aiBusy && <span className="muted"> · {genProgress.message}</span>}
-            {!canGenerate && currentProviderKeySaved && generationSource === 'dictionary' && savedWords.length === 0 && (
+            {!canGenerate && engineReady && generationSource === 'dictionary' && savedWords.length === 0 && (
               <span className="muted"> · {t('aiStudio.hint.starFirst')}</span>
             )}
           </span>
@@ -981,10 +1015,13 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
         </div>
       )}
 
-      {!currentProviderKeySaved && (
+      {!engineReady && aiConfig.engine === 'cloud' && (
         <p className="muted ai-studio-hint">{t('aiStudio.hint.saveKey')}</p>
       )}
-      {currentProviderKeySaved && generationSource === 'dictionary' && savedWords.length === 0 && (
+      {!engineReady && aiConfig.engine === 'local-qwen' && (
+        <p className="muted ai-studio-hint">{t('aiStudio.hint.localMissing')}</p>
+      )}
+      {engineReady && generationSource === 'dictionary' && savedWords.length === 0 && (
         <p className="muted ai-studio-hint">{t('aiStudio.hint.starOrPreset')}</p>
       )}
     </div>

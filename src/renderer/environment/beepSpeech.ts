@@ -122,8 +122,6 @@ export function voiceForType(typeId: CompanionTypeId): VoiceProfile {
       return { baseHz: 640, wave: 'triangle', stepPerMora: 48 };
     case 'timekeeper':
       return { baseHz: 440, wave: 'sine', stepPerMora: 28 };
-    case 'noctis':
-      return { baseHz: 380, wave: 'sawtooth', stepPerMora: 22 };
     case 'miko-shimeji':
       return { baseHz: 700, wave: 'square', stepPerMora: 55 };
     case 'wired-navi':

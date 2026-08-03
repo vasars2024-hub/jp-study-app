@@ -34,7 +34,7 @@ export const VIEW_STREAMS: Record<Exclude<NotebookViewId, 'overview'>, NotebookS
   translations: ['translations'],
   highlights: ['highlights'],
   // Everything that arrived from outside the app's own reading flow.
-  captures: ['extension', 'audio', 'clipboard'],
+  captures: ['extension', 'audio', 'clipboard', 'transcript'],
 };
 
 /** Streams shown by a view; `overview` returns every stream. */

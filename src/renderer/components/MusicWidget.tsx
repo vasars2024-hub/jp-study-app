@@ -8,6 +8,7 @@ import { guessSongMeta } from '../lyrics';
 import { useLiveLyrics, type LyricsState } from '../liveLyrics';
 import { loadVizSettings, onVizSettingsChanged } from '../visualizerSettings';
 import { loadMusicWidgetSettings, onMusicWidgetSettingsChanged, toggleShowLyrics } from '../musicWidgetSettings';
+import { useT } from '../i18n';
 
 // Mini-player desktop widget: a live little version of the Music app.
 // Responsive — a slim bar when small, a full grid with big album art when
@@ -57,6 +58,7 @@ function LyricsStrip({ lyrics, activeIndex }: { lyrics: LyricsState; activeIndex
 }
 
 export default function MusicWidget() {
+  const { t } = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const [ps, setPs] = useState(player.getState);
   const [big, setBig] = useState(false);
@@ -170,6 +172,7 @@ export default function MusicWidget() {
           step={0.05}
           value={ps.volume}
           onChange={(e) => player.setVolume(Number(e.target.value))}
+          aria-label={t('music.controls.volume')}
         />
       </div>
     </div>
@@ -186,6 +189,7 @@ export default function MusicWidget() {
         value={Math.min(ps.time, ps.duration || 1)}
         onChange={(e) => player.seek(Number(e.target.value))}
         disabled={!ps.current}
+        aria-label={t('a11y.slider.trackPosition')}
       />
       <span className="mwidget-time">{fmt(ps.duration)}</span>
     </div>

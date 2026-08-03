@@ -9,10 +9,11 @@ export interface NotificationProps {
   icon?: ReactNode;
   actions?: ReactNode;
   onClose?: () => void;
+  dismissLabel?: string;
   className?: string;
 }
 
-export function Notification({ title, children, kind = 'default', icon, actions, onClose, className = '' }: NotificationProps) {
+export function Notification({ title, children, kind = 'default', icon, actions, onClose, dismissLabel, className = '' }: NotificationProps) {
   return (
     <div
       className={['ui-notification', kind !== 'default' ? `ui-notification--${kind}` : '', className]
@@ -27,7 +28,7 @@ export function Notification({ title, children, kind = 'default', icon, actions,
         {actions != null && <div className="ui-notification__actions">{actions}</div>}
       </div>
       {onClose && (
-        <button type="button" className="ui-icon-btn ui-icon-btn--sm ui-focusable" aria-label="Dismiss" onClick={onClose}>
+        <button type="button" className="ui-icon-btn ui-icon-btn--sm ui-focusable" aria-label={dismissLabel} onClick={onClose}>
           ✕
         </button>
       )}

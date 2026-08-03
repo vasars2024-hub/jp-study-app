@@ -38,6 +38,7 @@ import {
   type Difficulty,
   type Genre,
 } from '../../data/novels';
+import { setHandoffJson } from '../../pendingHandoff';
 
 type TypeFilter = 'All' | 'Novel' | 'WebNovel' | 'Local';
 type DiffFilter = 'All' | Difficulty | 'Unknown';
@@ -71,8 +72,6 @@ interface NovelCandidate {
 }
 
 const PLAN_KEY = 'jp-novels-planned';
-const EPUB_MINING_PENDING_KEY = 'jp-pending-epub-mining';
-const JITEN_MINING_PENDING_KEY = 'jp-pending-jiten-mining';
 
 export const DIFFICULTY_CLASS: Record<Difficulty | 'Unknown', string> = {
   Beginner: 'd-beginner',
@@ -610,7 +609,7 @@ export function useNovels() {
       setStatus('Import an EPUB first, then the miner can preselect it.');
       return;
     }
-    localStorage.setItem(EPUB_MINING_PENDING_KEY, JSON.stringify({ bookId, ui: 'simple' }));
+    setHandoffJson('epubMining', { bookId, ui: 'simple' });
     await updatePlan(entry.id, { importedLibraryItemId: bookId, acquisitionStatus: 'analyzed' });
     openFlashcardsMining();
   }
@@ -622,10 +621,10 @@ export function useNovels() {
     }
     const entry = await ensurePlanned(selectedCandidate);
     if (!entry) return;
-    localStorage.setItem(
-      JITEN_MINING_PENDING_KEY,
-      JSON.stringify({ deckId: selectedCandidate.jitenDeckId, title: selectedCandidate.titleJp }),
-    );
+    setHandoffJson('jitenMining', {
+      deckId: selectedCandidate.jitenDeckId,
+      title: selectedCandidate.titleJp,
+    });
     openFlashcardsMining();
   }
 

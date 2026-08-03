@@ -411,6 +411,7 @@ export default function MiniModePage() {
           value={mini.wallpaperBlur}
           style={{ width: '100%', accentColor: 'var(--accent)' }}
           onChange={(e) => patchMini({ wallpaperBlur: Number(e.target.value) })}
+          aria-label={t('a11y.slider.miniWallpaperBlur')}
         />
         <p className="muted" style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.4 }}>
           {t('settings.mini.wall.hint')}

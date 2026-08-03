@@ -1,7 +1,15 @@
-// Reading statistics, stored in localStorage. We track, per calendar day, how
-// many seconds were spent reading and (approximately) how many characters were
+// Study-activity statistics, stored in localStorage. We track, per calendar day,
+// how many seconds were spent reading and (approximately) how many characters were
 // read, plus a per-book tally. The Statistics tab turns this into totals, a
 // day-streak, and a simple recent-days chart. Everything is local + offline.
+//
+// Since Phase 6 slice 8 there is a **second channel**: seconds spent *watching* in
+// the adopted media player, with a per-show tally. It is deliberately a separate
+// field rather than more `seconds`, because five existing surfaces label that number
+// "read" — folding watch time into it would silently make every one of them lie.
+// What the two channels *do* share is the definition of an active day: the streak
+// and `daysActive` count a day on which either happened, which is the whole point of
+// recording watch time at all.
 
 import type { ArenaMistake, GameId, SourceLang } from './games/types';
 import type { LevelTier } from '../shared/levelScale';
@@ -33,6 +41,8 @@ function migrateStatsLegacyOnce(): void {
 interface DayEntry {
   seconds: number;
   chars: number;
+  /** Watched seconds. Optional: every day written before slice 8 lacks it. */
+  watchSeconds?: number;
 }
 interface BookEntry {
   title: string;
@@ -40,9 +50,15 @@ interface BookEntry {
   chars: number;
   lastRead: number;
 }
+interface ShowEntry {
+  title: string;
+  seconds: number;
+  lastWatched: number;
+}
 interface StatsData {
   days: Record<string, DayEntry>; // key = YYYY-MM-DD (local)
   books: Record<string, BookEntry>; // key = library item id
+  shows: Record<string, ShowEntry>; // key = videoCoreResumeKey (the Phase 6 join key)
 }
 
 export interface GameHighScore {
@@ -98,6 +114,15 @@ export interface StatsSyncPayload {
 
 /** Fired on window after each recordReading() flush; detail = ReadingDelta. */
 export const READING_RECORDED_EVENT = 'jp-reading-recorded';
+/**
+ * Fired on window after each recordWatching() flush; detail = WatchDelta.
+ *
+ * Deliberately *not* `READING_RECORDED_EVENT` with `chars: 0`. Companions, achievements
+ * and the city bridge all listen to that one and read the delta as reading; a zero-char
+ * reading event is a lie they would each have to learn to disbelieve. Surfaces that want
+ * both activities subscribe to both, which is one line and says what it means.
+ */
+export const WATCH_RECORDED_EVENT = 'jp-watch-recorded';
 export const GAME_PROGRESS_EVENT = 'jp-game-progress-changed';
 
 export interface ReadingDelta {
@@ -107,10 +132,17 @@ export interface ReadingDelta {
   chars: number;
 }
 
+export interface WatchDelta {
+  showId: string;
+  title: string;
+  seconds: number;
+}
+
 export interface DayStat {
   date: string; // YYYY-MM-DD
   seconds: number;
   chars: number;
+  watchSeconds: number;
 }
 export interface BookStat {
   id: string;
@@ -119,15 +151,26 @@ export interface BookStat {
   chars: number;
   lastRead: number;
 }
+export interface ShowStat {
+  id: string;
+  title: string;
+  seconds: number;
+  lastWatched: number;
+}
 export interface StatsSummary {
   totalSeconds: number;
   totalChars: number;
+  /** Watched seconds across every recorded day. Never folded into `totalSeconds`. */
+  totalWatchSeconds: number;
+  /** Days with reading **or** watching — see the file header. */
   daysActive: number;
-  streak: number; // consecutive days ending today (or yesterday)
+  streak: number; // consecutive days ending today (or yesterday), either activity
   todaySeconds: number;
   todayChars: number;
+  todayWatchSeconds: number;
   recent: DayStat[]; // last 14 days, oldest → newest (includes empty days)
   books: BookStat[]; // most-recently-read first
+  shows: ShowStat[]; // most-recently-watched first
 }
 
 /** Local calendar date as YYYY-MM-DD (not UTC, so "today" matches the user). */
@@ -146,11 +189,11 @@ function load(): StatsData {
   migrateStatsLegacyOnce();
   try {
     const raw = localStorage.getItem(statsKey());
-    if (!raw) return { days: {}, books: {} };
+    if (!raw) return { days: {}, books: {}, shows: {} };
     const parsed = JSON.parse(raw) as Partial<StatsData>;
-    return { days: parsed.days ?? {}, books: parsed.books ?? {} };
+    return { days: parsed.days ?? {}, books: parsed.books ?? {}, shows: parsed.shows ?? {} };
   } catch {
-    return { days: {}, books: {} };
+    return { days: {}, books: {}, shows: {} };
   }
 }
 
@@ -331,15 +374,55 @@ export function recordReading(
   }
 }
 
-/** Consecutive days (ending today or yesterday) that have any reading time. */
+/**
+ * Add a chunk of watching to today's totals and the show's tally.
+ *
+ * Called by the media player's watch-time accumulator (`shared/seanimeWatchTime.ts`) on
+ * its flush schedule and once more when playback ends. `showId` is the Phase 6 join key
+ * (`videoCoreResumeKey`), so a show's tally lines up with its continue-watching row, its
+ * readiness row and its mined cards rather than being a fourth identity for the same file.
+ */
+export function recordWatching(showId: string, title: string, seconds: number): void {
+  if (!showId || !(seconds > 0)) return;
+  const data = load();
+  const key = dayKey(new Date());
+
+  const day = data.days[key] ?? { seconds: 0, chars: 0 };
+  day.watchSeconds = (day.watchSeconds ?? 0) + seconds;
+  data.days[key] = day;
+
+  const show = data.shows[showId] ?? { title, seconds: 0, lastWatched: 0 };
+  show.title = title || show.title;
+  show.seconds += seconds;
+  show.lastWatched = Date.now();
+  data.shows[showId] = show;
+
+  save(data);
+
+  try {
+    window.dispatchEvent(
+      new CustomEvent<WatchDelta>(WATCH_RECORDED_EVENT, {
+        detail: { showId, title, seconds },
+      }),
+    );
+  } catch {
+    /* non-browser context (tests) — ignore */
+  }
+}
+
+/** A day counts as active if either channel recorded time on it. */
+function dayIsActive(entry: DayEntry | undefined): boolean {
+  return !!entry && (entry.seconds > 0 || (entry.watchSeconds ?? 0) > 0);
+}
+
+/** Consecutive days (ending today or yesterday) with reading **or** watching time. */
 function computeStreak(days: Record<string, DayEntry>): number {
   let streak = 0;
   const cursor = new Date();
-  // Allow the streak to "end" yesterday if nothing's been read yet today.
-  if (!days[dayKey(cursor)]) cursor.setDate(cursor.getDate() - 1);
+  // Allow the streak to "end" yesterday if nothing's been studied yet today.
+  if (!dayIsActive(days[dayKey(cursor)])) cursor.setDate(cursor.getDate() - 1);
   for (;;) {
-    const e = days[dayKey(cursor)];
-    if (e && e.seconds > 0) {
+    if (dayIsActive(days[dayKey(cursor)])) {
       streak += 1;
       cursor.setDate(cursor.getDate() - 1);
     } else {
@@ -355,9 +438,11 @@ export function getSummary(): StatsSummary {
 
   let totalSeconds = 0;
   let totalChars = 0;
+  let totalWatchSeconds = 0;
   for (const k of dayKeys) {
     totalSeconds += data.days[k].seconds;
     totalChars += data.days[k].chars;
+    totalWatchSeconds += data.days[k].watchSeconds ?? 0;
   }
 
   const todayK = dayKey(new Date());
@@ -369,23 +454,47 @@ export function getSummary(): StatsSummary {
     d.setDate(d.getDate() - i);
     const k = dayKey(d);
     const e = data.days[k] ?? { seconds: 0, chars: 0 };
-    recent.push({ date: k, seconds: e.seconds, chars: e.chars });
+    recent.push({ date: k, seconds: e.seconds, chars: e.chars, watchSeconds: e.watchSeconds ?? 0 });
   }
 
   const books: BookStat[] = Object.entries(data.books)
     .map(([id, b]) => ({ id, title: b.title, seconds: b.seconds, chars: b.chars, lastRead: b.lastRead }))
     .sort((a, b) => b.lastRead - a.lastRead);
 
+  const shows: ShowStat[] = Object.entries(data.shows)
+    .map(([id, s]) => ({ id, title: s.title, seconds: s.seconds, lastWatched: s.lastWatched }))
+    .sort((a, b) => b.lastWatched - a.lastWatched);
+
   return {
     totalSeconds,
     totalChars,
-    daysActive: dayKeys.filter((k) => data.days[k].seconds > 0).length,
+    totalWatchSeconds,
+    daysActive: dayKeys.filter((k) => dayIsActive(data.days[k])).length,
     streak: computeStreak(data.days),
     todaySeconds: today.seconds,
     todayChars: today.chars,
+    todayWatchSeconds: today.watchSeconds ?? 0,
     recent,
     books,
+    shows,
   };
+}
+
+/**
+ * Just the `shows` tally, for surfaces that only need what a file is *called*.
+ *
+ * `getSummary()` would answer this too, but it also walks fourteen days, recomputes the
+ * streak and sorts the book list — and the continue-watching palette group has to build
+ * itself in the single tick the palette opens. This is the same read without that work.
+ *
+ * Sorted most-recently-watched first, matching `getSummary().shows`, so a consumer that
+ * later switches between the two sees the same order.
+ */
+export function getWatchedShowTitles(): ShowStat[] {
+  const data = load();
+  return Object.entries(data.shows)
+    .map(([id, s]) => ({ id, title: s.title, seconds: s.seconds, lastWatched: s.lastWatched }))
+    .sort((a, b) => b.lastWatched - a.lastWatched);
 }
 
 export function getSyncPayload(): StatsSyncPayload {
@@ -399,9 +508,17 @@ export function getSyncPayload(): StatsSyncPayload {
   };
 }
 
+/**
+ * Clear every recorded day, book and show for the **current study language**.
+ *
+ * Was `localStorage.removeItem(KEY)` against a `KEY` that does not exist in this module —
+ * a `ReferenceError` swallowed by the `catch`, so the Statistics tab's Reset button had
+ * been a silent no-op. It also predates the per-language split: the live key is
+ * `statsKey()`, and clearing the legacy one would have missed every language.
+ */
 export function resetStats(): void {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(statsKey());
   } catch {
     /* ignore */
   }

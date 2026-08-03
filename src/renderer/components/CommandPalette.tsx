@@ -15,6 +15,15 @@ import {
   runCommand,
 } from '../keyboardShortcuts';
 import { WIDGETS } from '../widgets/registry';
+import {
+  mediaWorkspaceHostIsMounted,
+  readContinueWatching,
+} from '../continueWatchingStore';
+import {
+  continueWatchingResumeSec,
+  formatContinueWatchingPosition,
+} from '../../shared/seanimeContinueWatching';
+import { MEDIA_WORKSPACE_OPEN_EVENT } from '../../shared/mediaWorkspace';
 import { loadSaved } from '../savedWords';
 import { loadDeck } from '../flashcardDeck';
 import { useT } from '../i18n';
@@ -60,6 +69,7 @@ const SECTIONS: { id: string; labelKey: string; glyph: IconName }[] = [
   { id: 'resources', labelKey: 'palette.section.resources', glyph: 'resources' },
   { id: 'settings', labelKey: 'palette.section.settings', glyph: 'settings' },
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
+  { id: 'scraper', labelKey: 'palette.section.scraper', glyph: 'sparkle' },
   { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
 ];
 
@@ -167,6 +177,33 @@ export default function CommandPalette() {
       }
     }
     if (mode === 'search') {
+      // Phase 6 slice 7. Type part of a title, press Enter, and the file reopens at the
+      // second you stopped — the same handoff the Continue Watching widget makes, from a
+      // surface that costs no screen space. Only offered while `MediaWorkspaceHost` is
+      // actually mounted: with the sidecar flag off nothing listens for the event and this
+      // would be a command that silently does nothing. Synchronous by necessity — the
+      // palette builds its list in the tick it opens, so no `seanimeStatus()` await here.
+      if (mediaWorkspaceHostIsMounted()) {
+        const resumeGroup = t('palette.group.continueWatching');
+        for (const entry of readContinueWatching().slice(0, 40)) {
+          out.push({
+            key: `cw-${entry.pathKey}`,
+            // Study content: the media title, shown verbatim.
+            label: entry.title,
+            sub: t('palette.continueWatchingAt', {
+              time: formatContinueWatchingPosition(entry.positionSec),
+            }),
+            group: resumeGroup,
+            glyph: 'player',
+            run: () => window.dispatchEvent(new CustomEvent(MEDIA_WORKSPACE_OPEN_EVENT, {
+              detail: {
+                localFilePath: entry.localFilePath,
+                startAtSec: continueWatchingResumeSec(entry),
+              },
+            })),
+          });
+        }
+      }
       for (const w of loadSaved().slice(0, 400)) {
         out.push({
           key: `sw-${w.word}`,

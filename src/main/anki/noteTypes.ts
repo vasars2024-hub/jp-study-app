@@ -59,7 +59,7 @@ function langFor(content: CardContent, profile: StudyProfile, face: 'front' | 'b
  * divs, back slots follow {{FrontSide}}<hr id="answer"> inside standard Anki
  * {{#Field}}...{{/Field}} empty-field conditionals.
  */
-export function buildCardTemplates(
+export function buildAnkiCardTemplates(
   profile: StudyProfile,
 ): { Name: string; Front: string; Back: string }[] {
   const front = profile.card.front
@@ -171,7 +171,7 @@ export async function ensureModel(profile: StudyProfile): Promise<EnsureModelRes
       modelName,
       inOrderFields: createFields,
       css: profileCss,
-      cardTemplates: buildCardTemplates(profile),
+      cardTemplates: buildAnkiCardTemplates(profile),
     });
     const fieldMap: Partial<Record<FieldRole, string>> = {};
     for (const preset of KINOMOTO_PRESET) {

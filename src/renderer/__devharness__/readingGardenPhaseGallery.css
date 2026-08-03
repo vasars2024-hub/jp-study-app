@@ -1,0 +1,290 @@
+:root {
+  color: #e9f7f4;
+  background: #03050b;
+  font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 82% 4%, rgba(63, 80, 130, 0.15), transparent 28rem),
+    #03050b;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.phase-gallery {
+  width: min(1500px, 100%);
+  margin: 0 auto;
+  padding: 36px clamp(18px, 4vw, 64px) 80px;
+}
+
+.phase-gallery-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+
+.phase-gallery-header p,
+.phase-inspector-copy p {
+  margin: 0 0 6px;
+  color: #77afa9;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.phase-gallery-header h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(32px, 5vw, 62px);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+}
+
+.phase-gallery-rule {
+  display: grid;
+  justify-items: end;
+  padding-bottom: 7px;
+}
+
+.phase-gallery-rule strong {
+  color: #92f1e7;
+  font-size: 34px;
+  font-weight: 250;
+}
+
+.phase-gallery-rule span {
+  color: #829b98;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.phase-inspector {
+  position: sticky;
+  top: 14px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(180px, 270px) minmax(200px, 1fr);
+  align-items: center;
+  min-height: 245px;
+  margin-bottom: 36px;
+  overflow: hidden;
+  border: 1px solid rgba(120, 223, 214, 0.16);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 18% 55%, rgba(74, 223, 212, 0.12), transparent 34%),
+    rgba(7, 11, 23, 0.92);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.phase-inspector-asset {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 1;
+}
+
+.phase-inspector-copy {
+  display: grid;
+  align-content: center;
+  padding: 24px 30px 24px 10px;
+}
+
+.phase-inspector-copy > strong {
+  font-size: clamp(48px, 7vw, 82px);
+  font-weight: 220;
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+}
+
+.phase-inspector-copy > span {
+  margin-top: 7px;
+  color: #93aaa7;
+  font-size: 13px;
+}
+
+.phase-inspector input {
+  width: min(480px, 100%);
+  margin-top: 22px;
+  accent-color: #68dcd2;
+}
+
+.phase-band {
+  margin-top: 42px;
+}
+
+.phase-band > header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #708a88;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.phase-band > header strong {
+  color: #afc5c2;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.phase-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.phase-card {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(137, 181, 178, 0.11);
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 50% 60%, rgba(47, 173, 167, 0.07), transparent 48%),
+    #070a12;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.phase-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(123, 231, 220, 0.35);
+}
+
+.phase-card.is-selected {
+  border-color: rgba(113, 242, 229, 0.72);
+  background:
+    radial-gradient(circle at 50% 58%, rgba(57, 220, 207, 0.15), transparent 52%),
+    #091019;
+  box-shadow:
+    inset 0 0 0 1px rgba(151, 255, 244, 0.12),
+    0 8px 28px rgba(31, 129, 125, 0.12);
+}
+
+.phase-card-asset {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.phase-card-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px 11px;
+  border-top: 1px solid rgba(139, 186, 181, 0.08);
+}
+
+.phase-card-copy strong {
+  font-size: 18px;
+  font-weight: 350;
+}
+
+.phase-card-copy small {
+  overflow: hidden;
+  color: #657b79;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phase-card .reading-garden-mushroom,
+.phase-inspector .reading-garden-mushroom {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  transform: none;
+  filter: none;
+}
+
+.phase-card .reading-garden-mushroom canvas,
+.phase-inspector .reading-garden-mushroom canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The gallery inspects the sprite itself, so the in-world lighting and the
+   procedural root bed (which is positioned to overhang the scene's terrace) are
+   suppressed here. */
+.phase-card .reading-garden-mushroom-aura,
+.phase-card .reading-garden-root-bed,
+.phase-inspector .reading-garden-mushroom-aura,
+.phase-inspector .reading-garden-root-bed {
+  display: none;
+}
+
+@media (max-width: 840px) {
+  .phase-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .phase-inspector {
+    grid-template-columns: 180px 1fr;
+  }
+}
+
+@media (max-width: 540px) {
+  .phase-gallery {
+    padding-inline: 12px;
+  }
+
+  .phase-gallery-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .phase-gallery-rule {
+    justify-items: start;
+  }
+
+  .phase-inspector {
+    position: relative;
+    top: auto;
+    grid-template-columns: 130px 1fr;
+    min-height: 150px;
+  }
+
+  .phase-inspector-copy {
+    padding: 16px 16px 16px 0;
+  }
+
+  .phase-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phase-card {
+    transition: none;
+  }
+}

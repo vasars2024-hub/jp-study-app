@@ -12,15 +12,17 @@ import type {
 import {
   DEFAULT_TRADITIONAL_MINING_CONFIG,
   DEFAULT_EXCLUDE_NAMES,
-  buildEpubDeckExport,
   BUILTIN_JUNK_EXPRESSIONS,
   computeFillReport,
+  mergeEnrichedCandidates,
+} from '../../shared/mining';
+import {
+  buildEpubDeckExport,
   describeEpubFilterPipeline,
   exportDeckFileContent,
   filterEpubCandidates,
-  mergeEnrichedCandidates,
   migrateEpubCardTemplates,
-} from '../../shared/mining';
+} from '../../shared/epubDeck';
 import { AI_PROVIDERS, providerKeyBucket } from '../../shared/aiProviders';
 import { useT } from '../i18n';
 import CollapsibleSection from './CollapsibleSection';
@@ -774,6 +776,7 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
                           patchExport({ freqRangeMin: Math.min(v, end) });
                         }}
                         className="download-deck-slider download-deck-slider-min"
+                        aria-label={t('a11y.slider.freqRankMin')}
                       />
                       <input
                         type="range"
@@ -787,6 +790,7 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
                           else patchExport({ freqRangeMax: Math.max(v, exp.freqRangeMin) });
                         }}
                         className="download-deck-slider download-deck-slider-max"
+                        aria-label={t('a11y.slider.freqRankMax')}
                       />
                     </div>
                   )}

@@ -2,8 +2,11 @@ import { useMemo, useRef } from 'react';
 import {
   EPUB_CARD_LAYOUT_PRESETS,
   applyEpubCardLayoutPreset,
-  type EpubCardLayoutPreset,
-} from '../../shared/mining';
+} from '../../shared/epubDeck';
+// `epubDeck` imports this type but never re-exported it, so taking it from there was a
+// pre-existing type error. It is defined in the mining data model; type-only, so the
+// barrel costs nothing at runtime.
+import type { EpubCardLayoutPreset } from '../../shared/miningTypes';
 import { useT } from '../i18n';
 import EpubVariablePalette from './EpubVariablePalette';
 

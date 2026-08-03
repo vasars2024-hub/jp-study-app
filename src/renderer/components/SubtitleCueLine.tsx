@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
 import { getTokenizer, tokenizeSync, type JpToken } from '../tokenizer';
+import { hasKanji } from '../../shared/furigana';
 
 interface Props {
   text: string;
   furigana: boolean;
   className?: string;
+  style?: React.CSSProperties;
   onMouseDown?: (e: React.MouseEvent) => void;
   onMouseUp?: (e: React.MouseEvent) => void;
-}
-
-function hasKanji(s: string): boolean {
-  return /[\u4e00-\u9fff々〆ヵヶ]/.test(s);
 }
 
 function katakanaToHiragana(s: string): string {
@@ -40,6 +38,7 @@ export default function SubtitleCueLine({
   text,
   furigana,
   className,
+  style,
   onMouseDown,
   onMouseUp,
 }: Props) {
@@ -62,6 +61,7 @@ export default function SubtitleCueLine({
   return (
     <div
       className={className}
+      style={style}
       lang="ja"
       data-lookup-block=""
       // Owns its own click lookup — keeps GlobalDictionaryOverlay's plain-click

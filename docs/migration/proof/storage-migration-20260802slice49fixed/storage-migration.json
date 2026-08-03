@@ -1,0 +1,566 @@
+{
+  "gate": "storage-migration-gate.mjs",
+  "question": "Does a data migration exist, does it round-trip the data it keeps, and does an interruption mid-write leave a store that survives?",
+  "startedAt": "2026-08-02T10:40:48.061Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "steps": [
+    {
+      "name": "seed",
+      "result": "OK",
+      "detail": "five retained keys + one control written as the app writes them (parse depth 1 each)"
+    },
+    {
+      "name": "round-trip",
+      "result": "PASS",
+      "detail": "every retained key came back byte-identical",
+      "reEncoded": [],
+      "removed": []
+    },
+    {
+      "name": "escalation",
+      "result": "PASS",
+      "detail": "a second run changed nothing further",
+      "reEncoded": []
+    },
+    {
+      "name": "control",
+      "result": "PASS",
+      "detail": "jp-slice48-control (not in LS_KEYS) is byte-identical after two completed runs, so the change belongs to the runner",
+      "control": {
+        "present": true,
+        "depth": 1,
+        "parsed": true,
+        "type": "object",
+        "bytes": 16,
+        "head": "{\"control\":true}"
+      }
+    },
+    {
+      "name": "escalation-third-run",
+      "result": "PASS",
+      "detail": "jp-flashcard-deck 1/1/1/1; jp-study-csv-editor-v1 1/1/1/1; jp-clipboard-history 1/1/1/1; jp-calendar-events 1/1/1/1; jp-media-tracking-v1 1/1/1/1"
+    },
+    {
+      "name": "idb-retention",
+      "result": "OK",
+      "detail": "no seeded IndexedDB key was dropped — every key this build enumerates is also retained",
+      "dropped": [],
+      "rewritten": [
+        "calendar-events",
+        "clipboard-history",
+        "csv-editor",
+        "flashcard-deck",
+        "grammar-curation",
+        "grammar-familiarity",
+        "grammar-session-history",
+        "grammar-session-options",
+        "level-lists",
+        "media-study-database",
+        "reading-annotations",
+        "reading-bookmarks"
+      ],
+      "values": {
+        "calendar-events": "rewritten",
+        "clipboard-history": "rewritten",
+        "csv-editor": "rewritten",
+        "flashcard-deck": "rewritten",
+        "grammar-curation": "rewritten",
+        "grammar-familiarity": "rewritten",
+        "grammar-session-history": "rewritten",
+        "grammar-session-options": "rewritten",
+        "level-lists": "rewritten",
+        "media-study-database": "rewritten",
+        "reading-annotations": "rewritten",
+        "reading-bookmarks": "rewritten",
+        "storage-version": "number:5",
+        "zz-slice48-untouched": "seeded"
+      }
+    },
+    {
+      "name": "interrupt-seed",
+      "result": "OK",
+      "detail": "14 IndexedDB keys seeded, 12 of them ~3 MB each; 0 already rewritten (expected 0)"
+    },
+    {
+      "name": "calibration",
+      "result": "OK",
+      "detail": "a full migration over ~36 MB takes 606 ms; the kill will land at 273 ms",
+      "ms": 606
+    },
+    {
+      "name": "interrupt",
+      "result": "OK",
+      "detail": "process killed 400 ms after reload, against a run that needs 606 ms — the write loop was still running",
+      "killAt": 400,
+      "calibrationMs": 606
+    },
+    {
+      "name": "interrupt-evidence",
+      "result": "INCONCLUSIVE",
+      "detail": "the first read on the next boot already saw storage-version number:5 — the next boot's own migration got there first, so this run cannot say where the kill landed",
+      "firstRead": {
+        "value": "number:5",
+        "atMs": 1785667276223
+      }
+    },
+    {
+      "name": "recovery",
+      "result": "PASS",
+      "detail": "after the kill and a fresh boot: 14 keys present, the next migration completed in 614 ms, storage-version=number:5, lost beyond the key this build deliberately drops: none, control zz-slice48-untouched=seeded",
+      "lost": [],
+      "unexpectedLoss": [],
+      "values": {
+        "calendar-events": "rewritten",
+        "clipboard-history": "rewritten",
+        "csv-editor": "rewritten",
+        "flashcard-deck": "rewritten",
+        "grammar-curation": "rewritten",
+        "grammar-familiarity": "rewritten",
+        "grammar-session-history": "rewritten",
+        "grammar-session-options": "rewritten",
+        "level-lists": "rewritten",
+        "media-study-database": "rewritten",
+        "reading-annotations": "rewritten",
+        "reading-bookmarks": "rewritten",
+        "storage-version": "number:5",
+        "zz-slice48-untouched": "seeded"
+      }
+    },
+    {
+      "name": "recovery-localstorage",
+      "result": "OK",
+      "detail": "localStorage after the kill: jp-flashcard-deck depth 1; jp-study-csv-editor-v1 depth 1; jp-clipboard-history depth 1; jp-calendar-events depth 1; jp-media-tracking-v1 depth 1"
+    },
+    {
+      "name": "tier-durability",
+      "result": "OK",
+      "detail": "localStorage and IndexedDB came back at the same point across the kill",
+      "wentBackwards": [],
+      "after3": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "afterKill": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "run": 0,
+      "phase": "seeded",
+      "localStorage": {
+        "jp-flashcard-deck": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 88,
+          "head": "{\"folders\":[\"slice48\"],\"cards\":[{\"id\":\"f"
+        },
+        "jp-study-csv-editor-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 20,
+          "head": "{\"rows\":[[\"a\",\"b\"]]}"
+        },
+        "jp-clipboard-history": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 37,
+          "head": "[{\"id\":\"cb-slice48\",\"text\":\"seeded\"}]"
+        },
+        "jp-calendar-events": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 38,
+          "head": "[{\"id\":\"ev-slice48\",\"title\":\"seeded\"}]"
+        },
+        "jp-media-tracking-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 26,
+          "head": "{\"version\":1,\"records\":[]}"
+        },
+        "jp-slice48-control": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 16,
+          "head": "{\"control\":true}"
+        }
+      }
+    },
+    {
+      "run": 1,
+      "phase": "after-one-migration",
+      "ms": 607,
+      "localStorage": {
+        "jp-flashcard-deck": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 88,
+          "head": "{\"folders\":[\"slice48\"],\"cards\":[{\"id\":\"f"
+        },
+        "jp-study-csv-editor-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 20,
+          "head": "{\"rows\":[[\"a\",\"b\"]]}"
+        },
+        "jp-clipboard-history": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 37,
+          "head": "[{\"id\":\"cb-slice48\",\"text\":\"seeded\"}]"
+        },
+        "jp-calendar-events": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 38,
+          "head": "[{\"id\":\"ev-slice48\",\"title\":\"seeded\"}]"
+        },
+        "jp-media-tracking-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 26,
+          "head": "{\"version\":1,\"records\":[]}"
+        },
+        "jp-slice48-control": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 16,
+          "head": "{\"control\":true}"
+        }
+      },
+      "idb": {
+        "store": true,
+        "keys": [
+          "calendar-events",
+          "clipboard-history",
+          "csv-editor",
+          "flashcard-deck",
+          "grammar-curation",
+          "grammar-familiarity",
+          "grammar-session-history",
+          "grammar-session-options",
+          "level-lists",
+          "media-study-database",
+          "reading-annotations",
+          "reading-bookmarks",
+          "storage-version"
+        ],
+        "values": {
+          "calendar-events": "undefined",
+          "clipboard-history": "undefined",
+          "csv-editor": "undefined",
+          "flashcard-deck": "undefined",
+          "grammar-curation": "undefined",
+          "grammar-familiarity": "undefined",
+          "grammar-session-history": "undefined",
+          "grammar-session-options": "undefined",
+          "level-lists": "object",
+          "media-study-database": "undefined",
+          "reading-annotations": "undefined",
+          "reading-bookmarks": "undefined",
+          "storage-version": "number:5"
+        },
+        "rewritten": []
+      }
+    },
+    {
+      "run": 2,
+      "phase": "after-two-migrations",
+      "ms": 608,
+      "localStorage": {
+        "jp-flashcard-deck": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 88,
+          "head": "{\"folders\":[\"slice48\"],\"cards\":[{\"id\":\"f"
+        },
+        "jp-study-csv-editor-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 20,
+          "head": "{\"rows\":[[\"a\",\"b\"]]}"
+        },
+        "jp-clipboard-history": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 37,
+          "head": "[{\"id\":\"cb-slice48\",\"text\":\"seeded\"}]"
+        },
+        "jp-calendar-events": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 38,
+          "head": "[{\"id\":\"ev-slice48\",\"title\":\"seeded\"}]"
+        },
+        "jp-media-tracking-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 26,
+          "head": "{\"version\":1,\"records\":[]}"
+        },
+        "jp-slice48-control": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 16,
+          "head": "{\"control\":true}"
+        }
+      }
+    },
+    {
+      "run": 3,
+      "phase": "after-three-migrations",
+      "ms": 602,
+      "localStorage": {
+        "jp-flashcard-deck": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 88,
+          "head": "{\"folders\":[\"slice48\"],\"cards\":[{\"id\":\"f"
+        },
+        "jp-study-csv-editor-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 20,
+          "head": "{\"rows\":[[\"a\",\"b\"]]}"
+        },
+        "jp-clipboard-history": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 37,
+          "head": "[{\"id\":\"cb-slice48\",\"text\":\"seeded\"}]"
+        },
+        "jp-calendar-events": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 38,
+          "head": "[{\"id\":\"ev-slice48\",\"title\":\"seeded\"}]"
+        },
+        "jp-media-tracking-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 26,
+          "head": "{\"version\":1,\"records\":[]}"
+        },
+        "jp-slice48-control": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 16,
+          "head": "{\"control\":true}"
+        }
+      }
+    },
+    {
+      "run": "after-kill",
+      "localStorage": {
+        "jp-flashcard-deck": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 88,
+          "head": "{\"folders\":[\"slice48\"],\"cards\":[{\"id\":\"f"
+        },
+        "jp-study-csv-editor-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 20,
+          "head": "{\"rows\":[[\"a\",\"b\"]]}"
+        },
+        "jp-clipboard-history": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 37,
+          "head": "[{\"id\":\"cb-slice48\",\"text\":\"seeded\"}]"
+        },
+        "jp-calendar-events": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "array",
+          "bytes": 38,
+          "head": "[{\"id\":\"ev-slice48\",\"title\":\"seeded\"}]"
+        },
+        "jp-media-tracking-v1": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 26,
+          "head": "{\"version\":1,\"records\":[]}"
+        },
+        "jp-slice48-control": {
+          "present": true,
+          "depth": 1,
+          "parsed": true,
+          "type": "object",
+          "bytes": 16,
+          "head": "{\"control\":true}"
+        }
+      },
+      "idb": {
+        "store": true,
+        "keys": [
+          "calendar-events",
+          "clipboard-history",
+          "csv-editor",
+          "flashcard-deck",
+          "grammar-curation",
+          "grammar-familiarity",
+          "grammar-session-history",
+          "grammar-session-options",
+          "level-lists",
+          "media-study-database",
+          "reading-annotations",
+          "reading-bookmarks",
+          "storage-version",
+          "zz-slice48-untouched"
+        ],
+        "values": {
+          "calendar-events": "rewritten",
+          "clipboard-history": "rewritten",
+          "csv-editor": "rewritten",
+          "flashcard-deck": "rewritten",
+          "grammar-curation": "rewritten",
+          "grammar-familiarity": "rewritten",
+          "grammar-session-history": "rewritten",
+          "grammar-session-options": "rewritten",
+          "level-lists": "rewritten",
+          "media-study-database": "rewritten",
+          "reading-annotations": "rewritten",
+          "reading-bookmarks": "rewritten",
+          "storage-version": "number:5",
+          "zz-slice48-untouched": "seeded"
+        },
+        "rewritten": [
+          "calendar-events",
+          "clipboard-history",
+          "csv-editor",
+          "flashcard-deck",
+          "grammar-curation",
+          "grammar-familiarity",
+          "grammar-session-history",
+          "grammar-session-options",
+          "level-lists",
+          "media-study-database",
+          "reading-annotations",
+          "reading-bookmarks"
+        ]
+      }
+    }
+  ],
+  "console": [],
+  "exeBuiltAt": "2026-08-02T10:39:12.489Z",
+  "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-storage-migration-20260802slice49fixed-42132",
+  "recovered": {
+    "store": true,
+    "keys": [
+      "calendar-events",
+      "clipboard-history",
+      "csv-editor",
+      "flashcard-deck",
+      "grammar-curation",
+      "grammar-familiarity",
+      "grammar-session-history",
+      "grammar-session-options",
+      "level-lists",
+      "media-study-database",
+      "reading-annotations",
+      "reading-bookmarks",
+      "storage-version",
+      "zz-slice48-untouched"
+    ],
+    "values": {
+      "calendar-events": "rewritten",
+      "clipboard-history": "rewritten",
+      "csv-editor": "rewritten",
+      "flashcard-deck": "rewritten",
+      "grammar-curation": "rewritten",
+      "grammar-familiarity": "rewritten",
+      "grammar-session-history": "rewritten",
+      "grammar-session-options": "rewritten",
+      "level-lists": "rewritten",
+      "media-study-database": "rewritten",
+      "reading-annotations": "rewritten",
+      "reading-bookmarks": "rewritten",
+      "storage-version": "number:5",
+      "zz-slice48-untouched": "seeded"
+    },
+    "rewritten": [
+      "calendar-events",
+      "clipboard-history",
+      "csv-editor",
+      "flashcard-deck",
+      "grammar-curation",
+      "grammar-familiarity",
+      "grammar-session-history",
+      "grammar-session-options",
+      "level-lists",
+      "media-study-database",
+      "reading-annotations",
+      "reading-bookmarks"
+    ]
+  },
+  "finishedAt": "2026-08-02T10:41:17.355Z",
+  "verdict": "PASS"
+}

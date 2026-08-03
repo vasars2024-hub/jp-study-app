@@ -10,6 +10,7 @@ export default function DictionaryView() {
   const [lang, setLang] = useState<DictLang>(() => getStudyLang());
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
+  const [lookupAttempt, setLookupAttempt] = useState(0);
 
   useEffect(() => onStudyLangChanged(setLang), []);
 
@@ -17,6 +18,7 @@ export default function DictionaryView() {
     e.preventDefault();
     const q = input.trim();
     setQuery(q);
+    if (q) setLookupAttempt((attempt) => attempt + 1);
     // §5.3 LEX: db-blip on a fired search (cue exists only in the wired pack).
     if (q && document.documentElement.getAttribute('data-materials') === 'wired') {
       window.dispatchEvent(new CustomEvent('wired:db-blip'));
@@ -96,7 +98,7 @@ export default function DictionaryView() {
             : 'Tip: while reading a book you can highlight any word to look it up instantly. Tap the star icon on a result to save it to Flashcards.'}
         </p>
       ) : (
-        <DictionaryResults query={query} variant="page" lang={lang} />
+        <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} />
       )}
     </div>
     </AppChrome>

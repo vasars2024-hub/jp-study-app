@@ -136,6 +136,12 @@
       "studyOsView": "MusicView",
       "note": "Ported Blanc-native 2026-07-20; composes MusicContent. Shares playerBus with the FocusMusicBar widget."
     },
+    "scraper": {
+      "status": "pending",
+      "studyOsView": "ScraperView",
+      "note": "Pillar 2. ScraperApp is an app of its own (own AppChrome, rail, status bar, 17 pages, mock port) — Blanc will not mirror the acquisition shell. The study-relevant slice is the Discover catalogue console (components/discover/DiscoverContent.tsx), which is already extracted hook-plus-blocks precisely so Blanc can compose it. Port that as a Blanc 'discover' tool."
+    },
+
     "immersion": {
       "status": "covered",
       "blancToolId": "immersion",

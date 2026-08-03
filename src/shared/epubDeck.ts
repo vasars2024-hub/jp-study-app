@@ -1,5 +1,5 @@
 import { renderFieldTemplate, type MiningValues } from './anki';
-import type { DictEntry, DictResult } from './types';
+import type { DictResult } from './types';
 import type {
   EpubCardLayoutPreset,
   EpubCardSideField,
@@ -7,12 +7,14 @@ import type {
   EpubMiningAnalysis,
   MiningCandidate,
   TraditionalMiningConfig,
-} from './mining';
-import { DEFAULT_TRADITIONAL_MINING_CONFIG } from './mining';
+} from './miningTypes';
+import { DEFAULT_TRADITIONAL_MINING_CONFIG } from './miningTypes';
 import {
   buildEpubMiningValues,
   candidateLookupKey as miningCandidateKey,
   collapseEmptySegments,
+  glossFromEntry,
+  pickDictEntry,
   isNameExcluded,
   normalizeEpubTemplateSeparators,
   resolveTraditionalTemplates,
@@ -157,43 +159,13 @@ export function isKanaOnlyExpression(expression: string): boolean {
   return !/[\u4e00-\u9fff\u3400-\u4dbf]/.test(expression);
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-export function pickDictEntry(
-  entries: DictEntry[],
-  expression: string,
-  reading?: string,
-): DictEntry | undefined {
-  if (!entries.length) return undefined;
-  const norm = (s: string) => s.trim();
-  const exact = entries.find(
-    (e) => norm(e.word) === norm(expression) && (!reading || !norm(reading) || norm(e.reading) === norm(reading)),
-  );
-  if (exact) return exact;
-  const wordMatch = entries.find((e) => norm(e.word) === norm(expression));
-  if (wordMatch) return wordMatch;
-  return entries[0];
-}
-
-export function glossFromEntry(entry: DictEntry, lang: 'en' | 'ja' | 'any' = 'en'): string {
-  if (entry.glossaryHtml) {
-    const plain = stripHtml(entry.glossaryHtml);
-    if (plain) return plain;
-  }
-  const defs = entry.senses.flatMap((s) => s.definitions).filter(Boolean);
-  if (!defs.length) return '';
-  if (lang === 'ja') {
-    const ja = defs.filter((d) => /[\u3040-\u30ff\u4e00-\u9fff]/.test(d));
-    return (ja.length ? ja : defs).slice(0, 3).join(' / ');
-  }
-  return defs.slice(0, 3).join(' / ');
-}
-
-export function candidateLookupKey(candidate: MiningCandidate): string {
-  return miningCandidateKey(candidate.expression, candidate.reading);
-}
+// `pickDictEntry`, `glossFromEntry` and a candidate-shaped `candidateLookupKey` used
+// to be redefined here. `pickDictEntry` was byte-identical to the one in
+// `epubEnrichment`; `glossFromEntry` was an older variant that behaves the same for
+// 'en' and 'ja' but does not language-match a mixed-script entry; and the local
+// `candidateLookupKey(candidate)` merely wrapped the two-argument one imported above
+// — while both modules exporting that name meant `mining.ts` re-exported one of them
+// and this file used the other. All three now come from `epubEnrichment`.
 
 export function needsDictionaryLookup(frontTemplate: string, backTemplate: string): boolean {
   const combined = `${frontTemplate}\n${backTemplate}`;
@@ -235,7 +207,7 @@ export async function lookupMeaningsForCandidates(
   const map = new Map<string, CandidateMeanings>();
   const unique = new Map<string, MiningCandidate>();
   for (const c of candidates) {
-    unique.set(candidateLookupKey(c), c);
+    unique.set(miningCandidateKey(c.expression, c.reading), c);
   }
   const list = [...unique.entries()];
   if (!list.length) return map;

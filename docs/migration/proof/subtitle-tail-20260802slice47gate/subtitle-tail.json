@@ -1,0 +1,143 @@
+{
+  "gate": "subtitle-tail-gate.mjs",
+  "question": "Does the deployed sidecar deliver the END of a subtitle track to the real client, and did the binary it replaced fail to?",
+  "discriminator": "subtitlesRun.maxStartTimeMs — the start time of the latest cue the client received anywhere in the run. Counts are not stable; see the header.",
+  "startedAt": "2026-08-02T05:34:52.400Z",
+  "fixture": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice35\\cue-library\\Sousou no Frieren - 01.mkv",
+  "devServerStatus": 200,
+  "binaries": {
+    "subject": {
+      "path": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+      "sha256": "70ecf65d779c39d0b7fb4ff0ec2c4c2abdef9ad6aa1afde3ca7eb2b147372f71",
+      "carries0002": true,
+      "builtAt": "2026-08-02T04:51:30.845Z"
+    },
+    "control": {
+      "path": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe.pre-patches-20260727",
+      "sha256": "62d6af1beeab426a756d5a7758dbdb2b7b7455d7f81153b8e9cfdd18feb1b11b",
+      "carries0002": false,
+      "builtAt": "2026-07-27T17:50:58.073Z"
+    }
+  },
+  "runs": [
+    {
+      "label": "control",
+      "exe": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe.pre-patches-20260727",
+      "recordPath": "docs/migration/proof/blanc-open-retry-20260802slice47gate-control/blanc-open-retry.json",
+      "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\subtitle-tail-20260802slice47gate-control",
+      "result": "DONE",
+      "sidecarExe": {
+        "path": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe.pre-patches-20260727",
+        "overridden": true,
+        "sha256": "62d6af1beeab426a756d5a7758dbdb2b7b7455d7f81153b8e9cfdd18feb1b11b",
+        "builtAt": "2026-07-27T17:50:58.073Z",
+        "carries0002": false,
+        "carries0004": false
+      },
+      "subtitlesRun": {
+        "frames": 5,
+        "events": 5,
+        "unique": 3,
+        "byTrack": {
+          "3": 2,
+          "4": 3
+        },
+        "minStartTimeMs": 2000,
+        "maxStartTimeMs": 6500,
+        "lastText": "The weather is really nice today.",
+        "parseErrors": 0
+      },
+      "subtitlesStep1": {
+        "frames": 2,
+        "events": 2,
+        "unique": 2,
+        "byTrack": {
+          "3": 1,
+          "4": 1
+        },
+        "minStartTimeMs": 2000,
+        "maxStartTimeMs": 2148,
+        "lastText": "猫が窓辺で寝ている。",
+        "parseErrors": 0
+      },
+      "subtitlesStep2": {
+        "frames": 3,
+        "events": 3,
+        "unique": 3,
+        "byTrack": {
+          "3": 1,
+          "4": 2
+        },
+        "minStartTimeMs": 2000,
+        "maxStartTimeMs": 6500,
+        "lastText": "The weather is really nice today.",
+        "parseErrors": 0
+      }
+    },
+    {
+      "label": "subject",
+      "exe": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+      "recordPath": "docs/migration/proof/blanc-open-retry-20260802slice47gate-subject/blanc-open-retry.json",
+      "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\subtitle-tail-20260802slice47gate-subject",
+      "result": "DONE",
+      "sidecarExe": {
+        "path": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+        "overridden": false,
+        "sha256": "70ecf65d779c39d0b7fb4ff0ec2c4c2abdef9ad6aa1afde3ca7eb2b147372f71",
+        "builtAt": "2026-08-02T04:51:30.845Z",
+        "carries0002": true,
+        "carries0004": true
+      },
+      "subtitlesRun": {
+        "frames": 6,
+        "events": 14,
+        "unique": 12,
+        "byTrack": {
+          "3": 7,
+          "4": 7
+        },
+        "minStartTimeMs": 2000,
+        "maxStartTimeMs": 24148,
+        "lastText": "明日の朝、一緒に朝ご飯を食べましょう。",
+        "parseErrors": 0
+      },
+      "subtitlesStep1": {
+        "frames": 2,
+        "events": 2,
+        "unique": 2,
+        "byTrack": {
+          "3": 1,
+          "4": 1
+        },
+        "minStartTimeMs": 2000,
+        "maxStartTimeMs": 2148,
+        "lastText": "猫が窓辺で寝ている。",
+        "parseErrors": 0
+      },
+      "subtitlesStep2": {
+        "frames": 4,
+        "events": 12,
+        "unique": 12,
+        "byTrack": {
+          "3": 6,
+          "4": 6
+        },
+        "minStartTimeMs": 2000,
+        "maxStartTimeMs": 24148,
+        "lastText": "明日の朝、一緒に朝ご飯を食べましょう。",
+        "parseErrors": 0
+      }
+    }
+  ],
+  "verdict": "PASS",
+  "reasons": [],
+  "summary": {
+    "controlLatestCueMs": 6500,
+    "subjectLatestCueMs": 24148,
+    "controlLastText": "The weather is really nice today.",
+    "subjectLastText": "明日の朝、一緒に朝ご飯を食べましょう。",
+    "controlCues": 5,
+    "subjectCues": 14
+  },
+  "finishedAt": "2026-08-02T05:36:24.100Z"
+}

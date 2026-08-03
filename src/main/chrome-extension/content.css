@@ -810,7 +810,8 @@ span.jp-wk-3 { background: transparent !important; }
   inset: 0;
   z-index: 2147483647;
   display: none;
-  cursor: crosshair;
+  /* Bright orange crosshair — system crosshair can't be recolored. */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath stroke='%23FF6A00' stroke-width='2.5' stroke-linecap='square' fill='none' d='M16 2v11M16 19v11M2 16h11M19 16h11'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23FF6A00'/%3E%3C/svg%3E") 16 16, crosshair;
   background: rgba(10, 11, 14, 0.25);
 }
 #jp-study-ocr-select.open { display: block; }
@@ -894,4 +895,450 @@ span.jp-wk-3 { background: transparent !important; }
   }
   #jp-study-popup .rp-tab.active { border-bottom-width: 3px; }
   mark.jp-lookup-active { outline: 1px solid #d98a97; }
+}
+
+/* ---------------------------- AI sentence analysis ------------------------- */
+/* The extension's half of "AI OCR / Dictionary AI". Every property is explicit
+ * and !important-free but fully specified, because host pages restyle
+ * aggressively and a half-inherited panel is unreadable. Category hues match
+ * the desktop app's so the same span is the same colour in both. */
+
+#jp-study-ai {
+  --ai-bg: #14161c;
+  --ai-panel: rgba(255, 255, 255, 0.04);
+  --ai-ink: #e8eaef;
+  --ai-dim: rgba(232, 234, 239, 0.66);
+  --ai-faint: rgba(232, 234, 239, 0.42);
+  --ai-rule: rgba(255, 255, 255, 0.09);
+  --ai-c-grammar: #5b9dff;
+  --ai-c-vocabulary: #4fbf87;
+  --ai-c-particle: #e0a33c;
+  --ai-c-expression: #a98bf5;
+  --ai-c-idiom: #ef7fa8;
+  --ai-c-name: #45c2c2;
+
+  position: fixed;
+  z-index: 2147483646;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid var(--ai-rule);
+  background: var(--ai-bg);
+  color: var(--ai-ink);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+  /* The detail card goes two-column on the panel's own width, not the page's. */
+  container-type: inline-size;
+}
+#jp-study-ai.open {
+  display: flex;
+}
+#jp-study-ai * {
+  box-sizing: border-box;
+}
+
+#jp-study-ai .ai-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 8px;
+  border-bottom: 1px solid var(--ai-rule);
+}
+#jp-study-ai .ai-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ai-faint);
+}
+
+#jp-study-ai .ai-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#jp-study-ai .ai-card {
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: var(--ai-panel);
+  border: 1px solid var(--ai-rule);
+}
+#jp-study-ai .ai-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+#jp-study-ai .ai-label {
+  display: block;
+  margin: 0;
+  flex: 1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--ai-faint);
+}
+#jp-study-ai .ai-prose {
+  margin: 0;
+  color: var(--ai-dim);
+  white-space: pre-wrap;
+}
+#jp-study-ai .ai-dim {
+  color: var(--ai-dim);
+}
+#jp-study-ai .ai-source {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+#jp-study-ai .ai-loading {
+  margin: 8px 0 0;
+  color: var(--ai-faint);
+  animation: jp-ai-pulse 1.4s ease-in-out infinite;
+}
+@keyframes jp-ai-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+#jp-study-ai .ai-band {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(156, 43, 61, 0.6);
+  background: rgba(156, 43, 61, 0.22);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+#jp-study-ai .ai-band-plain {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  letter-spacing: 0;
+}
+
+/* ---- the annotated sentence ---- */
+
+#jp-study-ai .ai-sentence {
+  margin: 0;
+  font-size: 17px;
+  line-height: 2.1;
+  word-break: break-word;
+}
+#jp-study-ai .ai-seg {
+  padding: 1px 3px;
+  margin: 0 -1px;
+  border: 0;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ai-c) 13%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ai-c) 65%, transparent);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+#jp-study-ai .ai-seg:hover {
+  background: color-mix(in srgb, var(--ai-c) 24%, transparent);
+}
+#jp-study-ai .ai-seg.active {
+  background: color-mix(in srgb, var(--ai-c) 34%, transparent);
+  box-shadow: inset 0 -2px 0 var(--ai-c);
+}
+
+#jp-study-ai .ai-cat-grammar {
+  --ai-c: var(--ai-c-grammar);
+}
+#jp-study-ai .ai-cat-vocabulary {
+  --ai-c: var(--ai-c-vocabulary);
+}
+#jp-study-ai .ai-cat-particle {
+  --ai-c: var(--ai-c-particle);
+}
+#jp-study-ai .ai-cat-expression {
+  --ai-c: var(--ai-c-expression);
+}
+#jp-study-ai .ai-cat-idiom {
+  --ai-c: var(--ai-c-idiom);
+}
+#jp-study-ai .ai-cat-name {
+  --ai-c: var(--ai-c-name);
+}
+
+#jp-study-ai .ai-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--ai-faint);
+}
+#jp-study-ai .ai-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 10.5px;
+  color: var(--ai-faint);
+}
+#jp-study-ai .ai-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#jp-study-ai .ai-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ai-c);
+}
+
+/* ---- translations ---- */
+
+#jp-study-ai .ai-translation {
+  margin: 0;
+  font-size: 13.5px;
+}
+#jp-study-ai .ai-translations {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+#jp-study-ai .ai-translations li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--ai-dim);
+}
+#jp-study-ai .ai-tag {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--ai-faint);
+}
+#jp-study-ai .ai-literal {
+  margin-top: 8px;
+  color: var(--ai-dim);
+  font-style: italic;
+}
+#jp-study-ai .ai-link {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #7fb0ff;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+#jp-study-ai .ai-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- detail card ---- */
+
+#jp-study-ai .ai-detail {
+  border-left: 3px solid var(--ai-c);
+}
+#jp-study-ai .ai-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--ai-rule);
+}
+#jp-study-ai .ai-term {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 600;
+  word-break: break-word;
+}
+#jp-study-ai .ai-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ai-c) 45%, transparent);
+  background: color-mix(in srgb, var(--ai-c) 14%, transparent);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+#jp-study-ai .ai-badge::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ai-c);
+}
+
+#jp-study-ai .ai-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding-top: 11px;
+}
+@container (min-width: 480px) {
+  #jp-study-ai .ai-detail-body {
+    grid-template-columns: minmax(140px, 0.8fr) minmax(0, 1.4fr);
+  }
+  #jp-study-ai .ai-detail-main {
+    padding-left: 14px;
+    border-left: 1px solid var(--ai-rule);
+  }
+}
+
+#jp-study-ai .ai-field + .ai-field {
+  margin-top: 9px;
+}
+#jp-study-ai .ai-headword {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+#jp-study-ai .ai-reading {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ai-dim);
+}
+#jp-study-ai .ai-level {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ai-c);
+}
+
+#jp-study-ai .ai-examples,
+#jp-study-ai .ai-vocab,
+#jp-study-ai .ai-notes {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#jp-study-ai .ai-examples li,
+#jp-study-ai .ai-vocab li,
+#jp-study-ai .ai-notes li {
+  position: relative;
+  padding-left: 13px;
+  color: var(--ai-dim);
+}
+#jp-study-ai .ai-examples li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: inherit;
+}
+#jp-study-ai .ai-examples li::before,
+#jp-study-ai .ai-vocab li::before,
+#jp-study-ai .ai-notes li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ai-faint);
+}
+#jp-study-ai .ai-examples li::before {
+  background: color-mix(in srgb, var(--ai-c) 80%, transparent);
+}
+#jp-study-ai .ai-notes.warn li::before {
+  background: var(--ai-c-particle);
+}
+#jp-study-ai .ai-detail-main h5 {
+  margin: 12px 0 0;
+}
+#jp-study-ai .ai-detail-main h5:first-child {
+  margin-top: 0;
+}
+
+/* ---- actions + shortcuts ---- */
+
+#jp-study-ai .ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--ai-rule);
+}
+#jp-study-ai .ai-actions-secondary {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: 0;
+}
+#jp-study-ai .ai-actions button {
+  flex: 1 1 auto;
+  min-width: 96px;
+  padding: 7px 12px;
+  border: 1px solid var(--ai-rule);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ai-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+#jp-study-ai .ai-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.13);
+}
+#jp-study-ai .ai-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+#jp-study-ai .ai-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ai-faint);
+}
+#jp-study-ai .ai-keys h5 {
+  flex: 1 0 100%;
+  margin: 0 0 2px;
+}
+#jp-study-ai .ai-keys span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#jp-study-ai .ai-keys kbd {
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--ai-rule);
+  background: rgba(255, 255, 255, 0.07);
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--ai-dim);
 }

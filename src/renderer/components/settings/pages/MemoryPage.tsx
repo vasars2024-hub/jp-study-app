@@ -7,13 +7,21 @@ import { useT } from '../../../i18n';
 import {
   clearSettingsDomain,
   exportAllData,
-  formatBytes,
   importAllData,
   listSettingsDomains,
   type DomainInventoryItem,
 } from '../../../storage/storage';
+import { formatBytes } from '../../../../shared/assetRegistry';
 import { kvClear } from '../../../storage/db';
 import { DEFAULT_TRADITIONAL_MINING_CONFIG } from '../../../../shared/mining';
+import type { AgentMemoryCategory } from '../../../../shared/localAgentMemory';
+import {
+  loadLocalAgentMemory,
+  onLocalAgentMemoryChanged,
+  removeLocalAgentMemory,
+  resetLocalAgentMemory,
+  saveLocalAgentMemory,
+} from '../../../localAgentMemoryStore';
 
 interface SystemMetrics {
   freemem: number;
@@ -74,6 +82,12 @@ export default function MemoryPage() {
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('');
+  const [agentMemory, setAgentMemory] = useState(() => loadLocalAgentMemory());
+  const [agentMemoryId, setAgentMemoryId] = useState('');
+  const [agentMemoryCategory, setAgentMemoryCategory] =
+    useState<AgentMemoryCategory>('user-preference');
+  const [agentMemoryKey, setAgentMemoryKey] = useState('');
+  const [agentMemoryValue, setAgentMemoryValue] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
 
   const refreshStorage = useCallback(async () => {
@@ -117,6 +131,8 @@ export default function MemoryPage() {
     const id = window.setInterval(() => void refreshSystem(), 3000);
     return () => window.clearInterval(id);
   }, [refreshStorage, refreshSystem]);
+
+  useEffect(() => onLocalAgentMemoryChanged(setAgentMemory), []);
 
   const run = async (fn: () => Promise<void> | void, ok: string) => {
     setBusy(true);
@@ -213,6 +229,61 @@ export default function MemoryPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function clearAgentMemoryEditor(): void {
+    setAgentMemoryId('');
+    setAgentMemoryCategory('user-preference');
+    setAgentMemoryKey('');
+    setAgentMemoryValue('');
+  }
+
+  function handleSaveAgentMemory(): void {
+    const key = agentMemoryKey.trim();
+    const value = agentMemoryValue.trim();
+    if (!key || !value) {
+      setStatus('A memory label and value are required.');
+      return;
+    }
+    const id = agentMemoryId
+      || (typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `memory-${Date.now()}`);
+    setAgentMemory(saveLocalAgentMemory({
+      id,
+      category: agentMemoryCategory,
+      key,
+      value,
+    }));
+    clearAgentMemoryEditor();
+    setStatus(agentMemoryId ? 'Agent memory updated.' : 'Agent memory added.');
+  }
+
+  async function handleDeleteAgentMemory(id: string, label: string): Promise<void> {
+    const ok = await confirmDialog({
+      title: 'Delete agent memory',
+      message: `Delete “${label}” from the local agent's memory?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    setAgentMemory(removeLocalAgentMemory(id));
+    if (agentMemoryId === id) clearAgentMemoryEditor();
+    setStatus('Agent memory deleted.');
+  }
+
+  async function handleClearAgentMemory(): Promise<void> {
+    if (!agentMemory.entries.length) return;
+    const ok = await confirmDialog({
+      title: 'Clear agent memory',
+      message: 'Delete all saved agent preferences, learning notes, and application memories?',
+      confirmLabel: 'Clear memory',
+      danger: true,
+    });
+    if (!ok) return;
+    setAgentMemory(resetLocalAgentMemory());
+    clearAgentMemoryEditor();
+    setStatus('Agent memory cleared.');
   }
 
   const usagePct = usage && usage.quota > 0 ? Math.min(100, (usage.used / usage.quota) * 100) : 0;
@@ -397,6 +468,115 @@ export default function MemoryPage() {
         <p className="muted os-set-hint" style={{ marginTop: 8 }}>
           {t('settings.memory.inventoryHint')}
         </p>
+      </SettingsCard>
+
+      <SettingsCard
+        id="agent-memory"
+        title="Local agent memory"
+        description="Review and control what the offline assistant remembers. Memories stay on this device."
+        highlight={focusSettingId === 'agent-memory'}
+      >
+        <div className="memory-filter-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <select
+            className="os-set-search-input"
+            value={agentMemoryCategory}
+            aria-label="Memory category"
+            onChange={(event) => setAgentMemoryCategory(event.target.value as AgentMemoryCategory)}
+          >
+            <option value="user-preference">User preference</option>
+            <option value="learning">Learning</option>
+            <option value="application">Application</option>
+          </select>
+          <input
+            className="os-set-search-input"
+            value={agentMemoryKey}
+            maxLength={120}
+            placeholder="Memory label"
+            aria-label="Memory label"
+            onChange={(event) => setAgentMemoryKey(event.target.value)}
+          />
+          <input
+            className="os-set-search-input"
+            value={agentMemoryValue}
+            maxLength={2000}
+            placeholder="What should the agent remember?"
+            aria-label="Memory value"
+            onChange={(event) => setAgentMemoryValue(event.target.value)}
+          />
+          <button type="button" className="btn" onClick={handleSaveAgentMemory}>
+            {agentMemoryId ? 'Save changes' : 'Add memory'}
+          </button>
+          {agentMemoryId && (
+            <button type="button" className="btn" onClick={clearAgentMemoryEditor}>
+              Cancel
+            </button>
+          )}
+        </div>
+        <div className="memory-inventory-wrap" style={{ marginTop: 10 }}>
+          <table className="memory-inventory">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Memory</th>
+                <th>Value</th>
+                <th>Updated</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {!agentMemory.entries.length && (
+                <tr>
+                  <td colSpan={5} className="muted">
+                    The local agent has no saved memories.
+                  </td>
+                </tr>
+              )}
+              {agentMemory.entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td className="muted">{entry.category.replace('-', ' ')}</td>
+                  <td><strong>{entry.key}</strong></td>
+                  <td className="memory-detail">{entry.value}</td>
+                  <td className="muted">
+                    {entry.updatedAt ? new Date(entry.updatedAt).toLocaleDateString() : '—'}
+                  </td>
+                  <td>
+                    <div className="memory-actions">
+                      <button
+                        type="button"
+                        className="btn small"
+                        onClick={() => {
+                          setAgentMemoryId(entry.id);
+                          setAgentMemoryCategory(entry.category);
+                          setAgentMemoryKey(entry.key);
+                          setAgentMemoryValue(entry.value);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn small"
+                        onClick={() => void handleDeleteAgentMemory(entry.id, entry.key)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="memory-actions" style={{ marginTop: 10 }}>
+          <button
+            type="button"
+            className="btn danger"
+            disabled={!agentMemory.entries.length}
+            onClick={() => void handleClearAgentMemory()}
+          >
+            Clear agent memory
+          </button>
+        </div>
       </SettingsCard>
 
       <SettingsCard

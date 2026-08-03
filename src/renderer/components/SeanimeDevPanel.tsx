@@ -1,17 +1,71 @@
 /**
- * Seanime sidecar — Phase 1 dev-only proof surface. THROWAWAY.
+ * Seanime sidecar — dev-only proof surface. THROWAWAY.
  *
- * Renders nothing at all unless the main process reports a non-`disabled` sidecar
- * status, so a normal build never shows it. Deliberately self-contained: no shell
- * section, no taskbar entry, no route registration — deleting this file and its one
- * mount in App.tsx removes the whole surface.
+ * Deliberately self-contained: no shell section, no taskbar entry, no route
+ * registration — deleting this file and its one mount in App.tsx removes the whole
+ * surface.
+ *
+ * **The old gate silently stopped working on 2026-07-31.** This header used to say
+ * "renders nothing unless the main process reports a non-`disabled` status, so a
+ * normal build never shows it", and that was true only while `SEANIME_SIDECAR` was
+ * off by default. Flipping it on changed the initial status from `disabled` to
+ * `stopped` — which is exactly and only what that flip's own note says it does —
+ * so this 460px monospace console with Start/Stop/Probe buttons began rendering on
+ * every normal desktop, fixed at bottom-right, at z-index 99,999. Nothing failed;
+ * a debug tool just became part of the product.
+ *
+ * The gate is now the runtime as well, which cannot be undone by a flag, and both
+ * halves are exported so the rule is testable rather than a claim in a comment —
+ * which is exactly how the last one got away with being false for a whole day.
  *
  * Not translated on purpose: ADR-003 scopes the i18n gate to shipped Media-workspace
- * chrome, and this panel is removed at the end of Phase 1.
+ * chrome, and this panel is not shipped chrome.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import type { SeanimeProbeResult, SeanimeStatus } from '../../shared/seanime';
+
+/** Marks `<html>` while the panel is on screen, so the media-workspace launcher can
+ *  step around it instead of hardcoding an offset for something that may not exist. */
+export const DEV_PANEL_ATTR = 'data-seanime-dev-panel';
+
+/**
+ * Whether this renderer is running from the dev server rather than a packaged build.
+ *
+ * Deliberately **not** `import.meta.env.DEV`: this repo has no `vite-env.d.ts` and its
+ * `module` setting rejects `import.meta` outright, so each use of it adds two permanent
+ * `tsc` diagnostics — the two existing sites already do, and the root tsconfig is off
+ * limits (CLAUDE.md). This is also the better signal for the question actually being
+ * asked, which is how the app is *running*, not how it was compiled: a packaged build
+ * here serves `app://bundle/index.html` from a registered custom protocol, never
+ * http — established against the real package in
+ * `docs/migration/proof/packaged-sidecar-launch-20260731102252/`.
+ *
+ * Anything unrecognised counts as production. A dev tool that fails closed is a dev
+ * tool; one that fails open is what this slice is fixing.
+ */
+export function isDevServerRuntime(
+  loc: { protocol: string; hostname: string } = window.location,
+): boolean {
+  if (loc.protocol !== 'http:' && loc.protocol !== 'https:') return false;
+  return loc.hostname === 'localhost' || loc.hostname === '127.0.0.1' || loc.hostname === '[::1]';
+}
+
+/**
+ * Whether the dev panel should render. Both conditions are required: `isDev` because
+ * this is a development tool, and a live sidecar status because there is nothing to
+ * report otherwise.
+ *
+ * A type predicate, so the `status` the panel body then reads is non-null without a
+ * second check — the narrowing and the visibility rule stay the same decision.
+ */
+export function devPanelIsVisible(
+  status: SeanimeStatus | null,
+  isDev: boolean,
+): status is SeanimeStatus {
+  if (!isDev) return false;
+  return status != null && status.kind !== 'disabled';
+}
 
 const STATUS_COLOR: Record<SeanimeStatus['kind'], string> = {
   disabled: '#6b7280',
@@ -27,7 +81,11 @@ export default function SeanimeDevPanel() {
   const [probe, setProbe] = useState<SeanimeProbeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(true);
+  // Collapsed by default. Expanded it is 460px wide and up to 72vh tall, parked over
+  // the bottom-right of the desktop for the whole session — which was tolerable while
+  // it appeared only when someone armed SEANIME_SIDECAR, and is not now that a dev run
+  // always has a sidecar. One click still opens it.
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     // The main-process handlers may legitimately be absent — an older main process
@@ -80,8 +138,18 @@ export default function SeanimeDevPanel() {
     setBusy(false);
   }, []);
 
-  // The flag is a main-process concern; `disabled` is how the renderer learns it is off.
-  if (!status || status.kind === 'disabled') return null;
+  const visible = devPanelIsVisible(status, isDevServerRuntime());
+
+  // Publish presence on <html> rather than leaving `.seanime-host-launcher` to guess.
+  // Its `bottom` used to be a hardcoded 190px "clears the Phase-1 dev panel", which
+  // became 190px of empty desktop the moment this stopped rendering in production.
+  useEffect(() => {
+    if (!visible) return;
+    document.documentElement.setAttribute(DEV_PANEL_ATTR, '');
+    return () => document.documentElement.removeAttribute(DEV_PANEL_ATTR);
+  }, [visible]);
+
+  if (!visible) return null;
 
   return (
     <div
@@ -112,8 +180,19 @@ export default function SeanimeDevPanel() {
             flex: '0 0 auto',
           }}
         />
-        <strong style={{ flex: 1 }}>Seanime sidecar — Phase 1</strong>
-        <button onClick={() => setOpen((v) => !v)} style={btn}>
+        {/* Collapsed, the dot is the only thing left — and colour alone is not a
+            status (WCAG 1.4.1), the same rule `.seanime-host-dot` already follows in
+            the shipped launcher. The kind rides alongside it. */}
+        <strong style={{ flex: 1 }}>
+          Seanime sidecar
+          <span style={{ color: '#9ca3af', fontWeight: 400 }}>{` · ${status.kind}`}</span>
+        </strong>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          style={btn}
+          aria-expanded={open}
+          title={open ? 'Collapse sidecar panel' : 'Expand sidecar panel'}
+        >
           {open ? '–' : '+'}
         </button>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AnkiStatus, DictEntry, DictResult, ExampleSentence } from '../../shared/types';
 import type { StudyProfile } from '../../shared/profiles';
 import {
@@ -28,6 +28,7 @@ import { translateTo, type TransLang } from '../translator';
 import { firstGlossSegment } from '../../shared/epubEnrichment';
 import { glossForLangFromEntries } from '../../shared/fieldRouter';
 import { recordDictionaryEntry } from '../clipboardHistory';
+import { recordLookup } from '../lookupHistory';
 import { useT } from '../i18n';
 
 type TFn = (key: string) => string;
@@ -251,6 +252,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const [exLangs, setExLangs] = useState<TransLang[]>(loadExLangs);
   const [exTrans, setExTrans] = useState<Record<string, Partial<Record<TransLang, string>>>>({});
   const [exTransLoading, setExTransLoading] = useState(false);
+  const recordedLookupRef = useRef('');
 
   // (Re)look up whenever the query changes.
   useEffect(() => {
@@ -268,7 +270,23 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     const lookup =
       lang === 'zh' ? lookupChinese(query) : window.api.lookupTerm(query);
     lookup.then((r) => {
-      if (alive) setResult(r);
+      if (!alive) return;
+      setResult(r);
+      const entry = r.entries[0];
+      if (!entry) return;
+      const lemma = r.deinflection?.term?.trim() || entry.word.trim() || query.trim();
+      const recordKey = `${lang}\u0000${query.trim()}\u0000${lemma}`;
+      if (recordedLookupRef.current === recordKey) return;
+      recordedLookupRef.current = recordKey;
+      recordLookup({
+        query,
+        lemma,
+        reading: entry.reading,
+        meaning: plainMeaning(entry),
+        jlptLevel: entry.jlpt[0],
+        context,
+        lang,
+      });
     });
     return () => {
       alive = false;

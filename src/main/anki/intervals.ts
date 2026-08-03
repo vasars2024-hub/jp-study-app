@@ -7,7 +7,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import type { IntervalEntry, IntervalSnapshot } from '../../shared/anki';
+import {
+  ankiCardIsSuspended,
+  ankiTagsContainLeech,
+  mergeIntervalEntries,
+  withoutDeletedIntervalEntries,
+  withCreatedIntervalEntry,
+  withIntervalChangeEvidence,
+  type IntervalEntry,
+  type IntervalSnapshot,
+} from '../../shared/anki';
 import type { AnkiNoteInfo } from './client';
 import { invoke } from './client';
 import { fnv1a, resolveTermFieldName } from './fieldMapper';
@@ -15,6 +24,7 @@ import { fnv1a, resolveTermFieldName } from './fieldMapper';
 const CHUNK_SIZE = 500; // notes/cards per AnkiConnect bulk call (A-4)
 const ENTRY_CAP = 100000; // safety cap; snapshot.truncated = true when hit
 const PERIODIC_POLL_MS = 5 * 60000; // cadence while connected
+const CREATED_ENTRY_TTL_MS = 10 * 60000;
 
 // ----- Configuration (injected by anki/index.ts; keeps this module free of
 // direct ProfileStore/heartbeat imports) ---------------------------------------
@@ -50,6 +60,10 @@ interface InFlightPoll {
 let inFlight: InFlightPoll | null = null;
 let periodicTimer: NodeJS.Timeout | null = null;
 let writeChain: Promise<void> = Promise.resolve();
+const recentCreatedEntries = new Map<
+  string,
+  { entry: IntervalEntry; recordedAt: number }
+>();
 
 const snapshotListeners = new Set<(snap: IntervalSnapshot) => void>();
 
@@ -62,7 +76,7 @@ class PollAbortedError extends Error {
 
 // ----- Public surface --------------------------------------------------------------
 
-/** Fires only when an expression's interval actually changed (5.5 step 8). */
+/** Fires only when an expression's interval or current Anki state changed. */
 export function onSnapshotChanged(cb: (snap: IntervalSnapshot) => void): () => void {
   snapshotListeners.add(cb);
   return () => snapshotListeners.delete(cb);
@@ -70,6 +84,38 @@ export function onSnapshotChanged(cb: (snap: IntervalSnapshot) => void): () => v
 
 export function getCachedSnapshot(): IntervalSnapshot | null {
   return currentSnapshot;
+}
+
+/**
+ * A successful app-originated add is authoritative. Fold it into the cached
+ * snapshot immediately so the next preview sees the duplicate without forcing
+ * a collection-wide poll (which can take minutes on six-figure collections).
+ */
+export function recordCreatedNote(
+  expression: string,
+  noteId: number,
+  modelName: string,
+): void {
+  const normalized = expression.normalize('NFKC').trim();
+  if (!normalized) return;
+  const entry: IntervalEntry = {
+    expression: normalized,
+    ivlDays: 0,
+    noteId,
+    modelName,
+  };
+  recentCreatedEntries.set(normalized, { entry, recordedAt: Date.now() });
+  if (!currentSnapshot) return;
+  commitSnapshot(withCreatedIntervalEntry(currentSnapshot, entry));
+}
+
+export function recordDeletedNotes(noteIds: readonly number[]): void {
+  const deleted = new Set(noteIds);
+  for (const [expression, pending] of recentCreatedEntries) {
+    if (deleted.has(pending.entry.noteId)) recentCreatedEntries.delete(expression);
+  }
+  if (!currentSnapshot) return;
+  commitSnapshot(withoutDeletedIntervalEntries(currentSnapshot, noteIds));
 }
 
 /**
@@ -106,6 +152,114 @@ export async function getSnapshotOrPoll(maxAgeMs?: number): Promise<IntervalSnap
     return snap;
   }
   return kickPoll();
+}
+
+/**
+ * Review state for a KNOWN SET OF NOTES, rather than for the whole collection.
+ *
+ * `getSnapshotOrPoll` walks every profile's `syncQuery`, and the default profile's is
+ * `deck:*` (`shared/profiles.ts:235`). On a real collection that is 155,377 notes taken in
+ * sequential chunks of 500 — 311 `notesInfo` calls plus at least as many `cardsInfo` — and
+ * it does not finish inside a minute. The Review panel awaits it before it can put a stage
+ * on anything, so until then every card reads `untracked` and the panel sits on its loading
+ * line. Measured 2026-08-02, `proof/mining-rollup-live-20260802slice47mine4/`.
+ *
+ * The rollup does not need the collection. It looks its cards up **by note id**
+ * (`watchLoopIntervalIndex`, `seanimeWatchLoop.ts:143`), and the ids it wants are the ones in
+ * the mining history — one, in that run. This is that request: two bulk calls for the notes
+ * actually asked about.
+ *
+ * ## It also drops the expression filter, and that is the second half of the fix
+ *
+ * The full poll builds an index of *expressions* for word study, so it skips any term that is
+ * empty, longer than 24 characters, or contains whitespace. A mined SENTENCE card — which is
+ * what `VideoCoreMiningPanel` produces by default (`cardKind: 'sentence'`, `term = sentence`)
+ * — fails that test every time. So a completed full snapshot would still have staged the
+ * measured card `untracked`; the stall was hiding a second defect behind it. A by-note lookup
+ * has no reason to filter by shape: the caller already named the notes it means.
+ *
+ * Deliberately does NOT touch the cached snapshot, persist, or notify listeners. It is a
+ * targeted read, and letting it commit would let a one-note answer overwrite the collection
+ * index that other surfaces depend on.
+ */
+export async function intervalsForNotes(
+  noteIds: readonly number[],
+): Promise<IntervalSnapshot> {
+  const cfg = requireConfig();
+  const wanted = Array.from(new Set(
+    noteIds.filter((id) => typeof id === 'number' && Number.isFinite(id) && id > 0),
+  )).slice(0, ENTRY_CAP);
+
+  const now = Date.now();
+  if (!wanted.length) {
+    return { generatedAt: now, sourceQueries: [], entries: [], noteCount: 0, truncated: false };
+  }
+
+  const notes: AnkiNoteInfo[] = [];
+  for (const chunk of chunks(wanted, CHUNK_SIZE)) {
+    const batch = (await invoke('notesInfo', { notes: chunk })) ?? [];
+    // A deleted note comes back as an EMPTY OBJECT rather than being omitted, so filter on
+    // the id instead of on truthiness.
+    for (const n of batch) if (n && typeof n.noteId === 'number') notes.push(n);
+  }
+
+  const cardIdSet = new Set<number>();
+  for (const n of notes) for (const c of n.cards ?? []) cardIdSet.add(c);
+  const stateByCard = new Map<number, { interval: number; suspended: boolean }>();
+  for (const chunk of chunks(Array.from(cardIdSet), CHUNK_SIZE)) {
+    const batch = (await invoke('cardsInfo', { cards: chunk })) ?? [];
+    for (const c of batch) {
+      // Negative intervals are learning steps in seconds — clamp to 0 days, as the poll does.
+      stateByCard.set(c.cardId, {
+        interval: typeof c.interval === 'number' ? Math.max(0, c.interval) : 0,
+        suspended: ankiCardIsSuspended(c.queue),
+      });
+    }
+  }
+
+  const termFieldByModel = new Map<string, string | undefined>();
+  const entries: IntervalEntry[] = [];
+  for (const n of notes) {
+    const fields = n.fields ?? {};
+    const orderedFields = Object.keys(fields).sort((a, b) => fields[a].order - fields[b].order);
+    let termField: string | undefined;
+    if (termFieldByModel.has(n.modelName)) {
+      termField = termFieldByModel.get(n.modelName);
+    } else {
+      termField = resolveTermFieldName(n.modelName, orderedFields, cfg.getTermOverride(n.modelName));
+      termFieldByModel.set(n.modelName, termField);
+    }
+    // The expression is carried for display and for parity with the poll's entries; it is
+    // NOT a filter here, and an unresolvable one costs the caller nothing.
+    const expression = termField && fields[termField]
+      ? cleanAnkiField(fields[termField].value ?? '')
+      : '';
+
+    let maxIvl = 0;
+    let suspended = false;
+    for (const c of n.cards ?? []) {
+      const state = stateByCard.get(c);
+      maxIvl = Math.max(maxIvl, state?.interval ?? 0);
+      if (state?.suspended) suspended = true;
+    }
+    entries.push({
+      expression,
+      ivlDays: maxIvl,
+      noteId: n.noteId,
+      modelName: n.modelName,
+      ...(ankiTagsContainLeech(n.tags) ? { leech: true } : {}),
+      ...(suspended ? { suspended: true } : {}),
+    });
+  }
+
+  return {
+    generatedAt: now,
+    // Named so a reader of the snapshot can tell this apart from a poll's output at a glance.
+    sourceQueries: [`nid:${wanted.length === 1 ? wanted[0] : `${wanted.length} notes`}`],
+    entries,
+    noteCount: entries.length,
+    truncated: noteIds.length > wanted.length,
+  };
 }
 
 /**
@@ -194,8 +348,32 @@ function chunks<T>(items: T[], size: number): T[][] {
 
 /** Data-only fingerprint (order-independent, generatedAt excluded). */
 function hashEntries(entries: IntervalEntry[]): string {
-  const parts = entries.map((e) => `${e.expression}\x1f${e.ivlDays}`).sort();
+  const parts = entries
+    .map((e) => [
+      e.expression,
+      e.ivlDays,
+      e.lastIntervalChangeAt ?? '',
+      e.leech === true ? 1 : 0,
+      e.suspended === true ? 1 : 0,
+    ].join('\x1f'))
+    .sort();
   return fnv1a(parts.join('\x1e'));
+}
+
+function commitSnapshot(snapshot: IntervalSnapshot): void {
+  const hash = hashEntries(snapshot.entries);
+  const changed = hash !== currentHash;
+  currentSnapshot = snapshot;
+  currentHash = hash;
+  persistSnapshot(snapshot);
+  if (!changed) return;
+  for (const cb of Array.from(snapshotListeners)) {
+    try {
+      cb(snapshot);
+    } catch (err) {
+      console.error('[anki] interval snapshot listener threw:', err);
+    }
+  }
 }
 
 // Strip HTML + Anki furigana (`漢字[かんじ]`) from a note field to recover the
@@ -243,13 +421,16 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
   // 5. cardsInfo in sequential chunks of 500.
   const cardIdSet = new Set<number>();
   for (const n of notes) for (const c of n.cards ?? []) cardIdSet.add(c);
-  const ivlByCard = new Map<number, number>();
+  const stateByCard = new Map<number, { interval: number; suspended: boolean }>();
   for (const chunk of chunks(Array.from(cardIdSet), CHUNK_SIZE)) {
     checkEpoch();
     const batch = (await invoke('cardsInfo', { cards: chunk }, { signal })) ?? [];
     for (const c of batch) {
       // Negative intervals are learning steps in seconds — clamp to 0 days.
-      ivlByCard.set(c.cardId, typeof c.interval === 'number' ? Math.max(0, c.interval) : 0);
+      stateByCard.set(c.cardId, {
+        interval: typeof c.interval === 'number' ? Math.max(0, c.interval) : 0,
+        suspended: ankiCardIsSuspended(c.queue),
+      });
     }
   }
 
@@ -280,42 +461,51 @@ async function runPoll(epoch: number, ctrl: AbortController): Promise<IntervalSn
     if (!expression || expression.length > 24 || /\s/.test(expression)) continue;
 
     let maxIvl = 0;
-    for (const c of n.cards ?? []) maxIvl = Math.max(maxIvl, ivlByCard.get(c) ?? 0);
-    const prev = best.get(expression);
-    if (!prev || maxIvl > prev.ivlDays) {
-      best.set(expression, {
-        expression,
-        ivlDays: maxIvl,
-        noteId: n.noteId,
-        modelName: n.modelName,
-      });
+    let suspended = false;
+    for (const c of n.cards ?? []) {
+      const state = stateByCard.get(c);
+      maxIvl = Math.max(maxIvl, state?.interval ?? 0);
+      if (state?.suspended) suspended = true;
     }
+    best.set(expression, mergeIntervalEntries(best.get(expression), {
+      expression,
+      ivlDays: maxIvl,
+      noteId: n.noteId,
+      modelName: n.modelName,
+      ...(ankiTagsContainLeech(n.tags) ? { leech: true } : {}),
+      ...(suspended ? { suspended: true } : {}),
+    }));
   }
   checkEpoch(); // discard everything if a switch landed during the fold
 
+  // A poll may have started just before an app-originated add. Keep that
+  // authoritative write visible until a later poll observes the expression,
+  // rather than letting the older in-flight result roll the snapshot back.
+  let optimisticCount = 0;
+  const now = Date.now();
+  for (const [expression, pending] of recentCreatedEntries) {
+    if (best.has(expression)) {
+      recentCreatedEntries.delete(expression);
+      continue;
+    }
+    if (now - pending.recordedAt > CREATED_ENTRY_TTL_MS) {
+      recentCreatedEntries.delete(expression);
+      continue;
+    }
+    best.set(expression, pending.entry);
+    optimisticCount += 1;
+  }
+
   const snapshot: IntervalSnapshot = {
-    generatedAt: Date.now(),
+    generatedAt: now,
     sourceQueries: queries,
-    entries: Array.from(best.values()),
-    noteCount: notes.length,
+    entries: withIntervalChangeEvidence(currentSnapshot, Array.from(best.values()), now),
+    noteCount: notes.length + optimisticCount,
     truncated,
   };
 
   // 7-8. persist atomically, diff by fingerprint, push only real changes.
-  const hash = hashEntries(snapshot.entries);
-  const changed = hash !== currentHash;
-  currentSnapshot = snapshot;
-  currentHash = hash;
-  persistSnapshot(snapshot);
-  if (changed) {
-    for (const cb of Array.from(snapshotListeners)) {
-      try {
-        cb(snapshot);
-      } catch (err) {
-        console.error('[anki] interval snapshot listener threw:', err);
-      }
-    }
-  }
+  commitSnapshot(snapshot);
   return snapshot;
 }
 

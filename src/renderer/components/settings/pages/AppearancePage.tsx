@@ -1,4 +1,5 @@
 import SettingsCard from '../SettingsCard';
+import ThemeStudioPanel from './ThemeStudioPanel';
 import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { THEMES } from '../../../theme';
@@ -341,6 +342,7 @@ export default function AppearancePage() {
                 setBorderSettings(updated);
               }}
               style={{ flex: 1 }}
+              aria-label={t('a11y.slider.borderBlur')}
             />
             <span className="muted">{borderSettings.blurAmount}px</span>
           </div>
@@ -358,6 +360,7 @@ export default function AppearancePage() {
               setBorderSettings(updated);
             }}
             style={{ flex: 1 }}
+            aria-label={t('settings.appearance.label.borderWidth')}
           />
           <span className="muted">{borderSettings.borderWidth}px</span>
         </div>
@@ -489,6 +492,11 @@ export default function AppearancePage() {
           <span>{t('settings.appearance.css.enable')}</span>
         </label>
       </SettingsCard>
+
+      {/* MASTER_PLAN §20 — theme profiles, the request interpreter, component-level
+          settings, and the guarded stylesheet editor. Appended rather than folded into
+          the cards above so the existing personalization controls are untouched. */}
+      <ThemeStudioPanel />
     </>
   );
 }

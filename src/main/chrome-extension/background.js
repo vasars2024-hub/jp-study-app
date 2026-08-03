@@ -1,11 +1,32 @@
-/* global chrome, importScripts */
-try {
-  importScripts('shared.js', 'settings.js');
-} catch {
-  /* shared may already be loaded in some contexts */
-}
+/* global chrome */
+/*
+ * Static ES-module imports, not importScripts().
+ *
+ * MV3 only permits importScripts() during the service worker's initial
+ * installation. Every later wake-from-idle re-runs this top-level code, and
+ * importing a script the installed worker didn't already have throws
+ * "importScripts() of new scripts after service worker installation is not
+ * allowed" — which then surfaced as "S.resolveCommandId is not a function" on
+ * every command. Static imports are resolved at worker startup, so they are
+ * immune to that. Requires "type": "module" in the manifest background block.
+ *
+ * Both files are side-effect only: they publish onto globalThis
+ * (jpStudyShared / jpStudySettings), so module scoping hides nothing. Import
+ * order matters — settings.js reads globalThis.jpStudyShared.
+ */
+import './shared.js';
+import './settings.js';
 
 const S = globalThis.jpStudyShared || {};
+if (!S.resolveCommandId) {
+  console.error('[GrammarX] shared.js did not publish jpStudyShared in the service worker.');
+}
+
+/** Throw a diagnosable error instead of a bare TypeError when shared.js is missing. */
+function assertSharedLoaded() {
+  if (S.resolveCommandId) return;
+  throw new Error('Extension scripts failed to load — reload GrammarX in chrome://extensions');
+}
 const SETTINGS = globalThis.jpStudySettings || null;
 const DEFAULT_PORT = S.DEFAULT_PORT || 18765;
 const QUEUE_KEY = 'jpStudyRetryQueue';
@@ -34,6 +55,23 @@ async function getSettings() {
   return data.jpStudySettings || {};
 }
 
+/**
+ * Routes that older GrammarX builds lack — a bare 404 means restart/update the app.
+ *
+ * The boundary is load-bearing: unanchored, this also claimed any future
+ * `/v1/sentence-analysis-v2` or `-batch` route, so a 404 from a genuinely missing
+ * NEW endpoint would tell the user their app is out of date when it isn't. Match
+ * the segment, then end / a sub-path / a query string.
+ */
+const APP_UPDATE_PATHS = /^\/v1\/sentence-analysis(?:[/?]|$)/;
+
+const APP_OUTDATED_MSG =
+  'GrammarX is outdated or not fully started — restart the app, then reload this extension.';
+
+/** A reachable app that rejects our token. Waiting never fixes it; re-pairing does. */
+const AUTH_FAILED_MSG =
+  'GrammarX rejected this extension — re-pair it from the app\'s Companions settings.';
+
 async function apiFetch(path, opts = {}) {
   const { token, port } = await getConfig();
   const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
@@ -59,9 +97,21 @@ async function apiFetch(path, opts = {}) {
     /* ignore */
   }
   if (!res.ok) {
-    const err = new Error((json && json.error) || `HTTP ${res.status}`);
+    const raw = (json && json.error) || `HTTP ${res.status}`;
+    const message =
+      res.status === 404 && APP_UPDATE_PATHS.test(path) ? APP_OUTDATED_MSG : raw;
+    const err = new Error(message);
     err.status = res.status;
     err.offline = false;
+    // A reachable app that refuses us is not the same condition as no app at all,
+    // and it is never fixed by waiting — see shouldQueue.
+    err.auth = res.status === 401 || res.status === 403;
+    // "Invalid token" is accurate and tells the user nothing they can act on.
+    // Swap in the instruction, but keep what the app actually said — the
+    // handlers that report a message all read err.message, so this is the only
+    // place the substitution can happen without touching every one of them.
+    err.serverError = raw;
+    if (err.auth) err.message = AUTH_FAILED_MSG;
     err.payload = json;
     throw err;
   }
@@ -70,14 +120,80 @@ async function apiFetch(path, opts = {}) {
 
 /* ------------------------------- retry queue ------------------------------ */
 
+/**
+ * Is this failure one that retrying can actually fix?
+ *
+ * Only an unreachable app is. Everything else — a bad pairing token, a rejected
+ * payload, a route the app doesn't have — fails identically on every retry, so
+ * queueing it means telling the user "saved, will sync" about something that
+ * will never sync and never surfacing the reason. Those are reported instead.
+ */
+function shouldQueue(err) {
+  return !!(err && err.offline);
+}
+
+/**
+ * Is this failure worth ONE MORE try for something already in the queue?
+ *
+ * Deliberately wider than shouldQueue. At the save site the user is watching a
+ * toast, so anything but a closed app is better reported than swallowed. Once an
+ * item is in the queue nobody is watching, and we have already promised it will
+ * sync — so a 5xx, which is the app failing at something it agreed to do (a
+ * locked database, a model still warming up) and which does clear on its own,
+ * buys a retry. A 4xx never clears, and neither does a rejected token.
+ */
+function shouldRetryQueued(err) {
+  if (!err) return false;
+  if (err.offline) return true;
+  return !err.auth && Number(err.status) >= 500;
+}
+
+/**
+ * Retries are bounded on two axes, because the two failure shapes differ:
+ * an app left closed over a weekend is age, a payload the app keeps refusing is
+ * attempts. Either bound alone lets the other run forever.
+ *
+ * The axes must not be crossed. `attempts` counts only the failures where the
+ * app ANSWERED — the flush alarm runs once a minute, so counting offline retries
+ * against a bound of 10 would empty the whole queue after ten minutes of a shut
+ * app, which is the exact case the queue exists for. Age is that case's bound.
+ */
+const MAX_QUEUE_ATTEMPTS = 10;
+const MAX_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 async function enqueue(kind, payload) {
   const data = await chrome.storage.local.get(QUEUE_KEY);
   const queue = Array.isArray(data[QUEUE_KEY]) ? data[QUEUE_KEY] : [];
-  queue.push({ kind, payload, at: Date.now() });
+  queue.push({ kind, payload, at: Date.now(), attempts: 0 });
   while (queue.length > MAX_QUEUE) queue.shift();
-  await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  // chrome.storage.local is 10 MB and this manifest does not request
+  // unlimitedStorage. A queued audio save carries a base64 data URL, so the
+  // quota is reachable in normal use — and an unhandled rejection here loses
+  // the save silently, which is the one outcome the queue exists to prevent.
+  try {
+    await chrome.storage.local.set({ [QUEUE_KEY]: queue });
+  } catch (err) {
+    const quota = new Error(
+      'Local storage is full — open GrammarX to sync the queued items, then retry.',
+    );
+    quota.quota = true;
+    quota.cause = err;
+    throw quota;
+  }
   await updateBadge(queue.length);
   await ensureFlushAlarm();
+}
+
+/**
+ * Queue on a genuinely offline app; report anything else.
+ *
+ * Returns true when the item was queued, so callers can pick their success or
+ * failure shape without re-testing the error themselves.
+ */
+async function enqueueIfRetryable(kind, payload, err) {
+  if (!shouldQueue(err)) return false;
+  await enqueue(kind, payload);
+  return true;
 }
 
 async function updateBadge(count) {
@@ -110,22 +226,63 @@ const QUEUE_ENDPOINTS = {
 async function flushQueue() {
   const data = await chrome.storage.local.get(QUEUE_KEY);
   const queue = Array.isArray(data[QUEUE_KEY]) ? data[QUEUE_KEY] : [];
-  if (!queue.length) return { flushed: 0, left: 0 };
+  if (!queue.length) return { flushed: 0, left: 0, dropped: 0 };
   const left = [];
+  const dropped = [];
   let flushed = 0;
+  const now = Date.now();
   for (const item of queue) {
     const endpoint = QUEUE_ENDPOINTS[item.kind];
-    if (!endpoint) continue; // unknown legacy kind — drop
+    if (!endpoint) {
+      // Unknown legacy kind — there is no endpoint left to replay it to. Counted
+      // as a drop rather than skipped silently, so flushed + left + dropped adds
+      // up to what went in and the popup can say so.
+      dropped.push({ ...item, reason: 'unknown-kind' });
+      continue;
+    }
+    // `at` has been written on every item since the queue existed and read by
+    // nothing. An item older than the age bound is past the point where silently
+    // retrying it is doing the user any favours. Backfill it for the items an
+    // older build stored without one, so the bound covers those too.
+    const at = typeof item.at === 'number' ? item.at : now;
+    if (now - at > MAX_QUEUE_AGE_MS) {
+      dropped.push({ ...item, reason: 'expired' });
+      continue;
+    }
     try {
       await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(item.payload) });
       flushed += 1;
-    } catch {
-      left.push(item);
+    } catch (err) {
+      // Only an answered failure counts against the attempt bound — see the
+      // comment on MAX_QUEUE_ATTEMPTS.
+      const attempts = (typeof item.attempts === 'number' ? item.attempts : 0) + (err.offline ? 0 : 1);
+      if (!shouldRetryQueued(err)) {
+        // The app answered and refused. Retrying is not going to change its mind.
+        dropped.push({ ...item, attempts, reason: err.auth ? 'auth' : 'rejected' });
+        continue;
+      }
+      if (attempts >= MAX_QUEUE_ATTEMPTS) {
+        dropped.push({ ...item, attempts, reason: 'attempts' });
+        continue;
+      }
+      left.push({ ...item, at, attempts });
     }
   }
   await chrome.storage.local.set({ [QUEUE_KEY]: left });
+  // A drop is the queue failing at its one job, so it goes in the activity list
+  // the popup shows rather than vanishing into a console nobody has open.
+  for (const item of dropped) {
+    await recordActivity({ kind: item.kind, label: queueItemLabel(item), dropped: item.reason });
+  }
   await updateBadge(left.length);
-  return { flushed, left: left.length };
+  return { flushed, left: left.length, dropped: dropped.length };
+}
+
+/** Best-effort human label for a queued item, for the activity list. */
+function queueItemLabel(item) {
+  const p = item && item.payload ? item.payload : {};
+  const raw = p.text || p.title || p.url || item.kind || '';
+  return String(raw).slice(0, 48);
 }
 
 async function queueCount() {
@@ -180,7 +337,7 @@ async function smartCapture(tab) {
     await recordActivity({ kind: 'page', label: page.title || page.url, action: out.action || action });
     return { ...out, kind, action: out.action || action, openTarget };
   } catch (err) {
-    await enqueue('capture', payload);
+    if (!(await enqueueIfRetryable('capture', payload, err))) throw err;
     await recordActivity({ kind: 'page', label: page.title || page.url, queued: true });
     return { ok: true, queued: true, kind, action, openTarget };
   }
@@ -203,7 +360,7 @@ async function downloadCurrent(tab) {
     await recordActivity({ kind: 'download', label: tab.title || tab.url });
     return { ...out, kind, openTarget: 'youtube' };
   } catch (err) {
-    await enqueue('download', payload);
+    await enqueueIfRetryable('download', payload, err);
     throw err;
   }
 }
@@ -270,7 +427,7 @@ async function saveText(tab, text, mode, opts = {}) {
     });
     return out;
   } catch (err) {
-    await enqueue('mine', payload);
+    if (!(await enqueueIfRetryable('mine', payload, err))) throw err;
     await recordActivity({
       kind: forceAnki ? 'card' : resolved === 'sentence' ? 'sentence' : 'word',
       label: trimmed.slice(0, 48),
@@ -312,7 +469,7 @@ async function clipboardText(tab, text, entryType) {
     const out = await apiFetch('/v1/clipboard', { method: 'POST', body: JSON.stringify(payload) });
     return { ...out };
   } catch (err) {
-    await enqueue('clipboard', payload);
+    if (!(await enqueueIfRetryable('clipboard', payload, err))) throw err;
     return { ok: true, queued: true };
   }
 }
@@ -332,7 +489,7 @@ async function saveAudioClipboard(tab) {
   try {
     return await apiFetch('/v1/audio/save', { method: 'POST', body: JSON.stringify(payload) });
   } catch (err) {
-    await enqueue('audio-save', payload);
+    await enqueueIfRetryable('audio-save', payload, err);
     throw err;
   }
 }
@@ -576,7 +733,7 @@ async function scanLongStrip(tab) {
       scanned: result.scanned,
     };
   } catch (err) {
-    await enqueue('manga-import', payload);
+    await enqueueIfRetryable('manga-import', payload, err);
     throw err;
   }
 }
@@ -613,12 +770,18 @@ async function cropDataUrlToRegion(dataUrl, region) {
     let scaleY = bitmap.height / vh;
     const dpr = Number(region?.devicePixelRatio) || 0;
     if (dpr > 0) {
-      const ratioX = scaleX / dpr;
-      const ratioY = scaleY / dpr;
-      if (ratioX < 0.5 || ratioX > 2.5 || ratioY < 0.5 || ratioY > 2.5) {
-        scaleX = dpr;
-        scaleY = dpr;
-      }
+      // Per axis. The guard band is deliberate — the capture size and the CSS
+      // viewport genuinely disagree on some machines — but applying it to BOTH
+      // axes when only one is out of band throws away a measurement that was
+      // fine. On Windows at 200% scaling a stale visualViewport.height alone
+      // used to drag scaleX down with it, landing the crop at half the offset
+      // and half the size.
+      const inBand = (scale) => {
+        const ratio = scale / dpr;
+        return ratio >= 0.5 && ratio <= 2.5;
+      };
+      if (!inBand(scaleX)) scaleX = dpr;
+      if (!inBand(scaleY)) scaleY = dpr;
     }
     let sx = Math.round(left * scaleX);
     let sy = Math.round(top * scaleY);
@@ -674,12 +837,32 @@ async function ocrVisibleTab(tab, region, opts = {}) {
     /* content may not be ready */
   }
   await new Promise((r) => setTimeout(r, 40));
-  let dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+  // prepare-capture hides our own FAB so it stays out of the screenshot. If the
+  // capture then throws — captureVisibleTab does exactly that on a protected page —
+  // the restore below is skipped and the FAB is invisible until the user reloads
+  // the tab. Restore on every exit path, but keep it idempotent so the success
+  // path still sends restore-capture in its original position, before the crop
+  // and before jp-show-ocr.
+  let restored = false;
+  const restoreOnce = async () => {
+    if (restored) return;
+    restored = true;
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'jp-ocr-restore-capture' });
+    } catch {
+      /* ignore */
+    }
+  };
+  let dataUrl;
   try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'jp-ocr-restore-capture' });
-  } catch {
-    /* ignore */
+    dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+  } catch (err) {
+    await restoreOnce();
+    const result = { ok: false, error: String(err.message || err), available: true };
+    await chrome.tabs.sendMessage(tab.id, { type: 'jp-show-ocr', result });
+    return result;
   }
+  await restoreOnce();
   try {
     dataUrl = await cropDataUrlToRegion(dataUrl, region);
   } catch (err) {
@@ -848,6 +1031,7 @@ const PAGE_SIDE_MESSAGES = {
 };
 
 async function runCommand(commandId, tab, opts = {}) {
+  assertSharedLoaded();
   const id = S.resolveCommandId(commandId);
   if (!id) throw new Error(`Unknown command: ${commandId}`);
   if (PAGE_SIDE_COMMANDS.has(id)) {
@@ -882,6 +1066,11 @@ async function runCommand(commandId, tab, opts = {}) {
         method: 'POST',
         body: JSON.stringify({ target: opts.target || 'inbox' }),
       });
+    case 'settings.special':
+      return apiFetch('/v1/ui/open', {
+        method: 'POST',
+        body: JSON.stringify({ target: 'special' }),
+      });
     default:
       throw new Error(`Unhandled command: ${id}`);
   }
@@ -891,6 +1080,7 @@ async function runCommand(commandId, tab, opts = {}) {
 
 const CONTEXT_MENU_ITEMS = [
   { id: 'lookup.selection', title: 'Look up selection', contexts: ['selection'] },
+  { id: 'analyze.selection', title: 'AI analysis of selection', contexts: ['selection'] },
   { id: 'save.word', title: 'Save word', contexts: ['selection'] },
   { id: 'save.sentence', title: 'Save sentence', contexts: ['selection'] },
   { id: 'card.create', title: 'Create flashcard', contexts: ['selection'] },
@@ -936,6 +1126,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       });
       return;
     }
+    if (info.menuItemId === 'analyze.selection' && tab?.id) {
+      await ensureContentScript(tab.id);
+      await chrome.tabs.sendMessage(tab.id, {
+        type: 'jp-analyze-selection',
+        text: info.selectionText || '',
+      });
+      return;
+    }
     if (String(info.menuItemId).startsWith('sep-')) return;
     const res = await runCommand(String(info.menuItemId), tab);
     const msg =
@@ -955,7 +1153,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.commands.onCommand.addListener(async (command) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   try {
-    if (command === 'save-page' || command === 'send-to-reader') {
+    // 'send-to-reader' used to be accepted here too. onCommand only ever fires
+    // with an id declared in manifest.commands, and it is declared neither there
+    // nor in COMMAND_ALIASES, so the branch was unreachable. Declaring it would
+    // have spent a second keybinding slot on a duplicate of save-page.
+    if (command === 'save-page') {
       const res = await saveCurrent(tab);
       await toastOnTab(tab, S.formatCaptureResultMessage(res), res?.ok || res?.queued ? 'ok' : 'err');
     } else if (command === 'mine-selection') {
@@ -972,6 +1174,10 @@ chrome.commands.onCommand.addListener(async (command) => {
       await chrome.tabs.sendMessage(tab.id, { type: 'jp-action-wheel' });
     } else if (command === 'bulk-tabs') {
       await openTabPicker();
+    } else if (command === 'analyze-selection') {
+      if (!tab?.id) return;
+      await ensureContentScript(tab.id);
+      await chrome.tabs.sendMessage(tab.id, { type: 'jp-analyze-selection' });
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -989,12 +1195,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const { port } = await getConfig();
         const res = await fetch(`${baseUrl(port)}/v1/health`);
         if (!res.ok) {
-          sendResponse({ ok: false, error: 'GrammarX is not running.' });
+          // An app that answers and refuses us is running. Reporting that as
+          // "not running" sends the user to relaunch an app already in front of
+          // them, instead of to the pairing screen that would fix it.
+          const auth = res.status === 401 || res.status === 403;
+          sendResponse({
+            ok: false,
+            running: true,
+            paired: auth ? false : undefined,
+            status: res.status,
+            error: auth ? AUTH_FAILED_MSG : `GrammarX answered HTTP ${res.status}.`,
+          });
           return;
         }
-        sendResponse({ ok: true, data: await res.json() });
+        sendResponse({ ok: true, running: true, paired: true, data: await res.json() });
       } catch {
-        sendResponse({ ok: false, error: 'GrammarX is not running.' });
+        // Nothing answered on the port — this is the genuine not-running case.
+        sendResponse({ ok: false, running: false, error: 'GrammarX is not running.' });
       }
       return;
     }
@@ -1132,7 +1349,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       try {
         sendResponse(await apiFetch('/v1/ocr/status'));
       } catch (err) {
-        sendResponse({ ok: false, available: false, error: String(err.message || err) });
+        // `available` is what the OCR button reads to decide whether to send the
+        // user to the model-download screen. Only a reachable app that actually
+        // answered about its models can say they are missing; a closed app or a
+        // rejected token says nothing about them, so leave it undetermined
+        // rather than sending the user to download models they may already have.
+        const answered = !err.offline && !err.auth;
+        sendResponse({
+          ok: false,
+          available: answered ? false : undefined,
+          offline: !!err.offline,
+          error: String(err.message || err),
+        });
       }
       return;
     }
@@ -1152,7 +1380,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({
           ok: false,
           tracked: false,
-          offline: true,
+          // Was hardcoded true, which made a 401, a 500 and a closed app
+          // indistinguishable to the caller — and this flag is what the caller
+          // uses to decide whether waiting will help.
+          offline: !!err.offline,
           error: err instanceof Error ? err.message : String(err),
         });
       }
@@ -1219,6 +1450,63 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         );
       } catch (err) {
         sendResponse({ ok: false, entries: [], offline: !!err.offline, error: String(err.message || err) });
+      }
+      return;
+    }
+    // Whole-sentence AI annotation. The app owns the preferences and the cache,
+    // so this is a straight pass-through — the extension never decides what the
+    // analysis contains.
+    if (msg?.type === 'sentence-analysis') {
+      try {
+        sendResponse(
+          await apiFetch('/v1/sentence-analysis', {
+            method: 'POST',
+            body: JSON.stringify({
+              text: msg.text || '',
+              lang: msg.lang || 'ja',
+              explainIn: msg.explainIn || 'en',
+              context: msg.context || '',
+            }),
+          }),
+        );
+      } catch (err) {
+        sendResponse({ ok: false, offline: !!err.offline, error: String(err.message || err) });
+      }
+      return;
+    }
+    if (msg?.type === 'sentence-analysis-snapshot') {
+      try {
+        sendResponse(
+          await apiFetch('/v1/sentence-analysis/snapshot', {
+            method: 'POST',
+            body: JSON.stringify({
+              result: msg.result,
+              lang: msg.lang || 'ja',
+              sourceLabel: msg.sourceLabel || '',
+            }),
+          }),
+        );
+      } catch (err) {
+        sendResponse({ ok: false, offline: !!err.offline, error: String(err.message || err) });
+      }
+      return;
+    }
+    if (msg?.type === 'sentence-analysis-mine') {
+      try {
+        sendResponse(
+          await apiFetch('/v1/sentence-analysis/mine', {
+            method: 'POST',
+            body: JSON.stringify({
+              result: msg.result,
+              annotationIndex: msg.annotationIndex || 0,
+              cardKind: msg.cardKind,
+              lang: msg.lang || 'ja',
+              uiLang: msg.uiLang || 'en',
+            }),
+          }),
+        );
+      } catch (err) {
+        sendResponse({ ok: false, offline: !!err.offline, error: String(err.message || err) });
       }
       return;
     }
@@ -1368,13 +1656,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           }),
         );
       } catch (err) {
-        if (err.offline) {
-          await enqueue('immersion', {
+        const queued = await enqueueIfRetryable(
+          'immersion',
+          {
             url: msg.url || '',
             title: msg.title || '',
             seconds: msg.seconds,
             chars: msg.chars,
-          });
+          },
+          err,
+        );
+        if (queued) {
           sendResponse({ ok: true, queued: true });
           return;
         }

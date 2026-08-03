@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import LensReaderPanel from './LensReaderPanel';
+import LensAnalysisPanel from './LensAnalysisPanel';
 import { useT } from '../../i18n';
 import { getTokenizer, tokenizeSync, tokenizerReady, type JpToken } from '../../tokenizer';
 import type { LensInit } from '../../../main/readingLens';
 import type { LensOcrResult } from '../../../main/screenOcr';
+import {
+  parseVisualNovelOcrTarget,
+  VISUAL_NOVEL_OCR_TARGET_KEY,
+  type VisualNovelOcrTarget,
+} from '../../../shared/visualNovelOcrTarget';
 import './readingLens.css';
 
 /**
@@ -39,12 +45,45 @@ interface LensLine {
 type LensState =
   | { kind: 'idle' }
   | { kind: 'selecting' }
-  | { kind: 'scanning'; region: Rect; engine: 'auto' | 'manga' | 'web' }
-  | { kind: 'reading'; region: Rect; lines: LensLine[]; engine: string }
+  | {
+    kind: 'scanning';
+    region: Rect;
+    engine: 'auto' | 'manga' | 'web';
+    includeScreenshot: boolean;
+  }
+  | {
+    kind: 'reading';
+    region: Rect;
+    lines: LensLine[];
+    engine: string;
+    screenshotDataUrl?: string;
+  }
   | { kind: 'empty'; region: Rect }
   | { kind: 'error'; region: Rect | null; message: string; canRetry: boolean };
 
 const MIN_REGION = 12;
+
+/**
+ * What a scan resolves to.
+ *
+ * `dictionary` is the original behaviour: the OCR'd words become hotspots and
+ * clicking one opens a dictionary entry. `ai` sends the whole read to the cloud
+ * for a sentence-level annotation the moment the scan lands — the reader wanted
+ * "what is this sentence saying", not "what is this word", and asking them to
+ * click again after they already framed the sentence is a wasted step. The two
+ * are not exclusive in practice: a word inside the AI panel still opens the
+ * dictionary, so AI mode is a superset reached by one toggle.
+ */
+type LensMode = 'dictionary' | 'ai';
+const MODE_KEY = 'jp-study-lens-mode';
+
+function loadMode(): LensMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'ai' ? 'ai' : 'dictionary';
+  } catch {
+    return 'dictionary';
+  }
+}
 
 function isJapaneseWord(s: string): boolean {
   return /[぀-ヿ㐀-鿿々ー]/.test(s);
@@ -60,9 +99,32 @@ function buildLines(res: LensOcrResult): LensLine[] {
   }));
 }
 
+/**
+ * The scan as one passage for the AI.
+ *
+ * OCR line boxes are a layout artifact, not sentence boundaries — a subtitle or
+ * a bubble is routinely split across two or three of them. Joining without a
+ * separator is right for CJK (which has no inter-word space and would otherwise
+ * gain a spurious one mid-word); a space is inserted only where the join would
+ * weld two Latin/Cyrillic words together.
+ */
+function joinLines(lines: LensLine[]): string {
+  return lines.reduce((acc, line) => {
+    const next = line.text.trim();
+    if (!next) return acc;
+    if (!acc) return next;
+    const needsSpace = /[\p{Letter}\p{Number}]$/u.test(acc) && /^[\p{Letter}\p{Number}]/u.test(next);
+    return needsSpace && !isJapaneseWord(acc.slice(-1)) && !isJapaneseWord(next[0])
+      ? `${acc} ${next}`
+      : acc + next;
+  }, '');
+}
+
 export default function ReadingLensOverlay() {
   const { t } = useT();
   const [state, setState] = useState<LensState>({ kind: 'idle' });
+  const [visualNovelTarget, setVisualNovelTarget] = useState<VisualNovelOcrTarget | null>(null);
+  const [visualNovelSaveState, setVisualNovelSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [popup, setPopup] = useState<{
     query: string;
     context: string;
@@ -70,6 +132,9 @@ export default function ReadingLensOverlay() {
     x: number;
     y: number;
   } | null>(null);
+  const [mode, setModeState] = useState<LensMode>(loadMode);
+  /** The sentence the AI panel is currently explaining; null when it is closed. */
+  const [analysisText, setAnalysisText] = useState<string | null>(null);
 
   // Drag selection scratch state.
   const dragStart = useRef<{ x: number; y: number } | null>(null);
@@ -87,10 +152,23 @@ export default function ReadingLensOverlay() {
 
   const close = useCallback(() => {
     setPopup(null);
+    setAnalysisText(null);
     setState({ kind: 'idle' });
     setInteractive(true);
     void window.api.lensClose();
   }, [setInteractive]);
+
+  const setMode = useCallback((next: LensMode) => {
+    setModeState(next);
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      /* a blocked storage area only costs the preference, not the mode switch */
+    }
+    // Leaving AI mode closes the panel; entering it lets the effect below open
+    // one for whatever is currently on screen.
+    if (next !== 'ai') setAnalysisText(null);
+  }, []);
 
   // Warm the tokenizer so the first scan can split words synchronously.
   useEffect(() => {
@@ -100,14 +178,25 @@ export default function ReadingLensOverlay() {
   // Begin (or restart) a selection / auto-read when the window is (re)opened.
   const begin = useCallback((init: LensInit) => {
     setPopup(null);
+    setAnalysisText(null);
     setDragRect(null);
     dragStart.current = null;
+    setVisualNovelSaveState('idle');
+    let target: VisualNovelOcrTarget | null = null;
+    try {
+      target = parseVisualNovelOcrTarget(localStorage.getItem(VISUAL_NOVEL_OCR_TARGET_KEY));
+      if (!target) localStorage.removeItem(VISUAL_NOVEL_OCR_TARGET_KEY);
+    } catch {
+      // A blocked storage area should not stop ordinary Reading Lens use.
+    }
+    setVisualNovelTarget(target);
     interactiveRef.current = true; // main re-enabled the mouse on open
     if (init.mode === 'auto') {
       setState({
         kind: 'scanning',
         region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
         engine: 'auto',
+        includeScreenshot: !!target,
       });
     } else {
       setState({ kind: 'selecting' });
@@ -145,11 +234,11 @@ export default function ReadingLensOverlay() {
   // previous overlay has actually painted out before the screenshot is taken.
   useEffect(() => {
     if (state.kind !== 'scanning') return;
-    const { region, engine } = state;
+    const { region, engine, includeScreenshot } = state;
     let alive = true;
     const run = () => {
       window.api
-        .lensOcr({ ...region, engine })
+        .lensOcr({ ...region, engine, includeScreenshot })
         .then((res) => {
           if (!alive) return;
           if (!res.available) {
@@ -171,7 +260,13 @@ export default function ReadingLensOverlay() {
           if (!lines.length) {
             setState({ kind: 'empty', region });
           } else {
-            setState({ kind: 'reading', region, lines, engine: res.engine });
+            setState({
+              kind: 'reading',
+              region,
+              lines,
+              engine: res.engine,
+              screenshotDataUrl: res.screenshotDataUrl,
+            });
           }
         })
         .catch(() => {
@@ -184,6 +279,16 @@ export default function ReadingLensOverlay() {
       cancelAnimationFrame(raf1);
     };
   }, [state, t]);
+
+  // AI mode analyses the scan as soon as it lands, without a second click. The
+  // panel keeps whatever line the reader later picked, so this only fires on a
+  // *new* read — hence the dependency on the lines themselves, not on `state`.
+  const readingLines = state.kind === 'reading' ? state.lines : null;
+  useEffect(() => {
+    if (mode !== 'ai' || !readingLines) return;
+    const joined = joinLines(readingLines);
+    if (joined) setAnalysisText(joined);
+  }, [mode, readingLines]);
 
   // Pass-through: once we're reading (or showing a message), let clicks fall
   // through to the app below except over interactive elements.
@@ -213,7 +318,7 @@ export default function ReadingLensOverlay() {
   // you actually reading — never makes it vanish, and an open reader panel
   // suspends it entirely.
   useEffect(() => {
-    if (state.kind !== 'reading' || popup) {
+    if (state.kind !== 'reading' || popup || analysisText) {
       setDimmed(false);
       return;
     }
@@ -258,7 +363,7 @@ export default function ReadingLensOverlay() {
       window.removeEventListener('mousemove', onMove);
       clear();
     };
-  }, [state, popup, close]);
+  }, [state, popup, analysisText, close]);
 
   // Escape always dismisses.
   useEffect(() => {
@@ -270,13 +375,18 @@ export default function ReadingLensOverlay() {
         // Auto-read the whole screen.
         e.preventDefault();
         void window.api.lensGetInit().then((init) => {
-          if (init) setState({ kind: 'scanning', region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height }, engine: 'auto' });
+          if (init) setState({
+            kind: 'scanning',
+            region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
+            engine: 'auto',
+            includeScreenshot: !!visualNovelTarget,
+          });
         });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [close, state.kind]);
+  }, [close, state.kind, visualNovelTarget]);
 
   // ---- Selection drag ----------------------------------------------------
 
@@ -301,7 +411,12 @@ export default function ReadingLensOverlay() {
     dragStart.current = null;
     setDragRect(null);
     if (r.width < MIN_REGION || r.height < MIN_REGION) return; // ignore stray clicks
-    setState({ kind: 'scanning', region: r, engine: 'auto' });
+    setState({
+      kind: 'scanning',
+      region: r,
+      engine: 'auto',
+      includeScreenshot: !!visualNovelTarget,
+    });
   };
 
   const rescan = (engine: 'auto' | 'manga' | 'web') => {
@@ -309,7 +424,12 @@ export default function ReadingLensOverlay() {
       state.kind === 'reading' || state.kind === 'empty' || (state.kind === 'error' && state.region)
         ? (state as { region: Rect }).region
         : null;
-    if (region) setState({ kind: 'scanning', region, engine });
+    if (region) setState({
+      kind: 'scanning',
+      region,
+      engine,
+      includeScreenshot: !!visualNovelTarget,
+    });
   };
 
   const onWordClick = (
@@ -319,7 +439,42 @@ export default function ReadingLensOverlay() {
     tokens: JpToken[],
   ) => {
     e.stopPropagation();
+    // In AI mode a click means "explain this line", not "define this word" — the
+    // word itself is still one click away inside the analysis.
+    if (mode === 'ai') {
+      const line = context.trim();
+      if (line) {
+        setAnalysisText(line);
+        return;
+      }
+    }
     setPopup({ query: surface, context, tokens, x: e.clientX, y: e.clientY });
+  };
+
+  const saveToVisualNovel = async (): Promise<void> => {
+    if (state.kind !== 'reading' || !visualNovelTarget || visualNovelSaveState === 'saving') return;
+    const lines = state.lines
+      .map((line) => line.text.trim())
+      .filter((text) => text && /[\u3040-\u30ff\u3400-\u9fff]/u.test(text));
+    if (!lines.length) return;
+    setVisualNovelSaveState('saving');
+    try {
+      const response = await window.api.visualNovelCaptureMany(
+        lines.map((japanese) => ({
+          visualNovelId: visualNovelTarget.visualNovelId,
+          kind: 'narration',
+          japanese,
+          routeId: visualNovelTarget.routeId,
+          chapter: visualNovelTarget.chapter,
+          scene: visualNovelTarget.scene,
+          source: 'ocr',
+        })),
+        { screenshotDataUrl: state.screenshotDataUrl },
+      );
+      setVisualNovelSaveState(response.ok ? 'saved' : 'error');
+    } catch {
+      setVisualNovelSaveState('error');
+    }
   };
 
   if (state.kind === 'idle') return <div className="lens-root lens-idle" />;
@@ -401,9 +556,14 @@ export default function ReadingLensOverlay() {
           <LensChrome
             t={t}
             engine={state.engine}
+            mode={mode}
+            onModeChange={setMode}
             onRescan={rescan}
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
+            visualNovelTitle={visualNovelTarget?.title}
+            visualNovelSaveState={visualNovelSaveState}
+            onSaveToVisualNovel={() => void saveToVisualNovel()}
           />
         </>
       )}
@@ -443,6 +603,25 @@ export default function ReadingLensOverlay() {
         </div>
       )}
 
+      {analysisText && state.kind === 'reading' && (
+        <LensAnalysisPanel
+          text={analysisText}
+          region={state.region}
+          onLookup={(surface, context) =>
+            setPopup({
+              query: surface,
+              context,
+              tokens: tokenizerReady() ? tokenizeSync(context) : [],
+              // Anchor beside the panel rather than at a stale cursor position:
+              // the click came from inside the docked panel, not from the page.
+              x: Math.max(16, window.innerWidth / 2 - 180),
+              y: Math.min(window.innerHeight - 200, 140),
+            })
+          }
+          onClose={() => setAnalysisText(null)}
+        />
+      )}
+
       {popup && (
         <LensReaderPanel
           query={popup.query}
@@ -460,19 +639,61 @@ export default function ReadingLensOverlay() {
 function LensChrome({
   t,
   engine,
+  mode,
+  onModeChange,
   onRescan,
   onNewRegion,
   onClose,
+  visualNovelTitle,
+  visualNovelSaveState,
+  onSaveToVisualNovel,
 }: {
   t: (k: string, v?: Record<string, unknown>) => string;
   engine: string;
+  mode: LensMode;
+  onModeChange: (mode: LensMode) => void;
   onRescan: (engine: 'auto' | 'manga' | 'web') => void;
   onNewRegion: () => void;
   onClose: () => void;
+  visualNovelTitle?: string;
+  visualNovelSaveState: 'idle' | 'saving' | 'saved' | 'error';
+  onSaveToVisualNovel: () => void;
 }) {
   return (
     <div className="lens-chrome lens-interactive">
       <span className="lens-source-badge">{t('lens.badge.source.screen')}</span>
+      <div className="lens-mode" role="radiogroup" aria-label={t('lens.mode.label')}>
+        {(['dictionary', 'ai'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={mode === m}
+            className={`lens-mode-btn ${mode === m ? 'active' : ''}`}
+            title={t(`lens.mode.${m}.hint`)}
+            onClick={() => onModeChange(m)}
+          >
+            {t(`lens.mode.${m}`)}
+          </button>
+        ))}
+      </div>
+      {visualNovelTitle && (
+        <button
+          type="button"
+          className={`lens-vn-save ${visualNovelSaveState}`}
+          onClick={onSaveToVisualNovel}
+          disabled={visualNovelSaveState === 'saving'}
+          title={visualNovelTitle}
+        >
+          {visualNovelSaveState === 'saving'
+            ? t('lens.action.savingToVn')
+            : visualNovelSaveState === 'saved'
+              ? t('lens.action.savedToVn')
+              : visualNovelSaveState === 'error'
+                ? t('lens.action.saveToVnFailed')
+                : t('lens.action.saveToVn', { title: visualNovelTitle })}
+        </button>
+      )}
       <button type="button" onClick={() => onRescan('auto')} title={t('lens.action.rescan')}>
         {t('lens.action.rescan')}
       </button>

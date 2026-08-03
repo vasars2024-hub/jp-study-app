@@ -41,9 +41,9 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     id: 'environment',
     label: 'Living layer (particles, companions, lighting)',
     description:
-      'Master living desktop: particles, density/intensity/size, snow, companions, buddy routines, day-cycle lighting, achievements.',
+      'Master living desktop: particles, density/intensity/size, snow, companions, buddy routines, day-cycle lighting, achievements, companion trinkets.',
     category: 'Personalization',
-    lsKeys: ['jp-os-environment-v1', 'jp-os-achievements-v1'],
+    lsKeys: ['jp-os-environment-v1', 'jp-os-achievements-v1', 'jp-os-trinkets-v1'],
     clearable: true,
     clearConfirm:
       'Reset living layer settings (particles, companions, playlists, lighting) to defaults?',
@@ -70,6 +70,16 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     ],
     clearable: true,
     clearConfirm: 'Reset theme, accent, personalization, and custom CSS?',
+  },
+  {
+    id: 'secret-lore',
+    label: 'Secret OS history & easter eggs',
+    description:
+      'Progress through the Aero/WIRED terminal "history" log, and whether the small typed easter egg has been found.',
+    category: 'Personalization',
+    lsKeys: ['jp-os-secret-history-v1', 'jp-os-secret-leaf-v1'],
+    clearable: true,
+    clearConfirm: 'Reset the secret history log and easter egg back to undiscovered?',
   },
   {
     id: 'display',
@@ -162,6 +172,16 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     clearConfirm: 'Reset transcription device settings?',
   },
   {
+    id: 'media-study',
+    label: 'Media language profiles and study history',
+    description: 'Subtitle language profiles, mined vocabulary summaries, and media study sessions.',
+    category: 'Study',
+    lsKeys: ['jp-media-study-database-v1'],
+    idbKeys: ['media-study-database'],
+    clearable: true,
+    clearConfirm: 'Delete all media language profiles and media study history?',
+  },
+  {
     id: 'dictionary',
     label: 'Dictionary prefs',
     description: 'Dictionary language, example display, translate source/target.',
@@ -194,6 +214,7 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
       'jp-study-stats-v1-zh',
       'jp-novels-planned',
     ],
+    idbKeys: ['level-lists'],
     clearable: true,
     clearConfirm: 'Delete known words, levels, saved words, and study stats?',
   },

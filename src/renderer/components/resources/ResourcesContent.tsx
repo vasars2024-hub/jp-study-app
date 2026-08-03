@@ -113,7 +113,10 @@ export function useResources() {
   const reloadTools = useCallback(async () => {
     try {
       const store = await window.api.toolsList();
-      setTools(store.tools);
+      // The store also backs Blanc's App Drawer (app/file/tool shortcuts),
+      // which are not web links — "My tools" only ever opens via
+      // `openLink()`/`openExternal`, so non-link kinds are excluded here.
+      setTools(store.tools.filter((t) => (t.kind ?? 'link') === 'link'));
     } catch {
       /* ignore */
     }

@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import type { LlamaChatSession } from 'node-llama-cpp';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
+import { langSpec } from '../shared/langs';
 import {
   buildBatchPrompt,
   buildSentencePrompt,
@@ -30,13 +31,18 @@ const USER_MODEL = 'Qwen3-1.7B.gguf';
 let session: LlamaChatSession | null = null;
 let loadPromise: Promise<void> | null = null;
 let translateChain: Promise<unknown> = Promise.resolve();
+/** Set by `cancelTranslationBatch` so long EPUB/manga runs can stop between chunks. */
+let batchCancelled = false;
+let lastBatchWasCancelled = false;
+let activeBatchAbort: AbortController | null = null;
 
-const BATCH_SIZE = 40;
-const BATCH_CONCURRENCY = 3;
+const BATCH_SIZE = 8;
+const BATCH_CONCURRENCY = 1;
 /** Per-prompt inference budgets — a hung generation must not stall analyze. */
-const BATCH_PROMPT_TIMEOUT_MS = 120_000;
+const BATCH_PROMPT_TIMEOUT_MS = 90_000;
 const STRICT_PROMPT_TIMEOUT_MS = 45_000;
 const SENTENCE_PROMPT_TIMEOUT_MS = 60_000;
+const MODEL_LOAD_TIMEOUT_MS = 180_000;
 
 interface TranslationCacheFile {
   entries: Record<string, string>;
@@ -111,7 +117,7 @@ export interface RunTranslationBatchOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
-/** Run one prompt with an abort-on-timeout guard so generation can never hang. */
+/** Run one prompt with an abort-on-timeout (and batch-cancel) guard so generation can never hang. */
 async function promptWithTimeout(
   s: LlamaChatSession,
   prompt: string,
@@ -119,22 +125,50 @@ async function promptWithTimeout(
   timeoutMs: number,
 ): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  activeBatchAbort = controller;
+  if (batchCancelled) {
+    throw new Error('Translation cancelled');
+  }
+  const cancelPoll = setInterval(() => {
+    if (batchCancelled) controller.abort();
+  }, 250);
+
+  const promptPromise = s.prompt(prompt, {
+    maxTokens,
+    signal: controller.signal,
+    stopOnAbortSignal: true,
+  });
+
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`Translation prompt timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+  });
+
   try {
-    return await s.prompt(prompt, {
-      maxTokens,
-      signal: controller.signal,
-      stopOnAbortSignal: true,
-    });
+    return await Promise.race([promptPromise, timeoutPromise]);
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
+    clearInterval(cancelPoll);
+    if (activeBatchAbort === controller) activeBatchAbort = null;
+    // Best-effort: don't leave a late prompt resolution touching session state.
+    void promptPromise.catch(() => undefined);
     resetSessionHistory(s);
   }
 }
 
+export function cancelTranslationBatch(): void {
+  batchCancelled = true;
+  activeBatchAbort?.abort();
+}
+
 async function translateBatchPrompt(items: TranslateBatchItem[]): Promise<Map<string, string>> {
   const s = await ensureSession();
-  const raw = await promptWithTimeout(s, buildBatchPrompt(items), 2048, BATCH_PROMPT_TIMEOUT_MS);
+  // Long literary lines need more tokens than glossary terms.
+  const maxTokens = Math.min(4096, Math.max(512, items.length * 256));
+  const raw = await promptWithTimeout(s, buildBatchPrompt(items), maxTokens, BATCH_PROMPT_TIMEOUT_MS);
   const expected = new Set(items.map((i) => i.id));
   return parseBatchJson(raw, expected);
 }
@@ -233,22 +267,49 @@ export async function runTranslationBatch(
     chunks.push(list.slice(i, i + BATCH_SIZE));
   }
 
+  batchCancelled = false;
+  lastBatchWasCancelled = false;
   const results: { id: string; text: string }[] = [];
   let ptr = 0;
   let done = 0;
+  const isCancelled = (): boolean => batchCancelled || !!options?.shouldCancel?.();
+
   async function worker(): Promise<void> {
     while (ptr < chunks.length) {
-      if (options?.shouldCancel?.()) return;
+      if (isCancelled()) {
+        lastBatchWasCancelled = true;
+        return;
+      }
       const i = ptr++;
+      if (i >= chunks.length) return;
+      // Emit before the LLM call so the UI is not stuck at 0 while the first chunk runs.
+      options?.onProgress?.(done, list.length);
       const chunkResults = await translateBatchChunk(chunks[i]);
+      if (isCancelled()) {
+        lastBatchWasCancelled = true;
+        results.push(...chunkResults);
+        done += chunks[i].length;
+        options?.onProgress?.(done, list.length);
+        return;
+      }
       results.push(...chunkResults);
       done += chunks[i].length;
       options?.onProgress?.(done, list.length);
     }
   }
-  await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, chunks.length) }, () => worker()));
-  flushTranslationCache();
+  try {
+    await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, chunks.length) }, () => worker()));
+  } finally {
+    if (batchCancelled) lastBatchWasCancelled = true;
+    batchCancelled = false;
+    flushTranslationCache();
+  }
   return results;
+}
+
+/** True if the most recent `runTranslationBatch` stopped early due to cancel. */
+export function didLastTranslationBatchCancel(): boolean {
+  return lastBatchWasCancelled;
 }
 
 function broadcast(channel: string, payload: unknown): void {
@@ -331,8 +392,38 @@ async function ensureSession(): Promise<LlamaChatSession> {
       loadPromise = null;
     });
   }
-  await loadPromise;
+
+  let loadTimer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    await Promise.race([
+      loadPromise,
+      new Promise<never>((_, reject) => {
+        loadTimer = setTimeout(() => {
+          reject(new Error(`Translation model load timed out after ${Math.round(MODEL_LOAD_TIMEOUT_MS / 1000)}s`));
+        }, MODEL_LOAD_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (err) {
+    loadPromise = null;
+    session = null;
+    throw err;
+  } finally {
+    if (loadTimer) clearTimeout(loadTimer);
+  }
   return session!;
+}
+
+/** Force-load the model so EPUB range jobs can show load progress before the first chapter. */
+export async function ensureTranslateReady(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (!isTranslateAvailable()) {
+      return { ok: false, error: friendlyError(new Error('Qwen3 model not found')) };
+    }
+    await ensureSession();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
 }
 
 async function translateSentence(text: string, source: TransLang, target: TransLang): Promise<string> {
@@ -343,7 +434,21 @@ async function translateSentence(text: string, source: TransLang, target: TransL
     400,
     SENTENCE_PROMPT_TIMEOUT_MS,
   );
-  return cleanLlmOutput(raw);
+  const first = cleanLlmOutput(raw);
+  if (isValidCrossLangTranslation(source, target, text, first)) return first;
+
+  // The batch path has always validated its output and retried once with the
+  // stricter prompt; this path did not, so a model that echoed its input — or
+  // leaked kana into an English line — was returned as a finished translation
+  // and was indistinguishable from a real one. Same treatment here.
+  const strictRaw = await promptWithTimeout(
+    s,
+    buildStrictPrompt({ id: 's0', text, source, target }),
+    200,
+    STRICT_PROMPT_TIMEOUT_MS,
+  );
+  const strict = cleanLlmOutput(strictRaw).replace(/^["'«]|["'»]$/g, '').trim();
+  return isValidCrossLangTranslation(source, target, text, strict) ? strict : '';
 }
 
 function enqueue<T>(fn: () => Promise<T>): Promise<T> {
@@ -355,22 +460,98 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/**
+ * Generic local-Qwen completion for Card Studio / sentence analysis.
+ * Shares the Translate session so we never load two GGUFs at once.
+ */
+export async function runLocalQwenPrompt(
+  prompt: string,
+  options?: { maxTokens?: number; timeoutMs?: number },
+): Promise<string> {
+  if (!isTranslateAvailable()) {
+    throw new Error(friendlyError(new Error('Qwen3 model not found')));
+  }
+  const maxTokens = Math.max(64, Math.min(8192, options?.maxTokens ?? 2048));
+  const timeoutMs = Math.max(5_000, options?.timeoutMs ?? 90_000);
+  return enqueue(async () => {
+    const s = await ensureSession();
+    // Independent of EPUB batch cancel — analysis/enrichment must not abort mid-flight
+    // just because a translation batch was cancelled elsewhere.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const raw = await s.prompt(prompt, {
+        maxTokens,
+        signal: controller.signal,
+        stopOnAbortSignal: true,
+      });
+      return extractJsonish(cleanLlmOutput(raw));
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error(`Local Qwen timed out after ${Math.round(timeoutMs / 1000)}s.`);
+      }
+      throw err instanceof Error ? new Error(friendlyError(err)) : err;
+    } finally {
+      clearTimeout(timer);
+      resetSessionHistory(s);
+    }
+  });
+}
+
+/** Prefer a JSON object/array if the model wrapped it in prose or fences. */
+function extractJsonish(cleaned: string): string {
+  const fence = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence?.[1]) return fence[1].trim();
+  const objStart = cleaned.indexOf('{');
+  const objEnd = cleaned.lastIndexOf('}');
+  if (objStart >= 0 && objEnd > objStart) return cleaned.slice(objStart, objEnd + 1);
+  const arrStart = cleaned.indexOf('[');
+  const arrEnd = cleaned.lastIndexOf(']');
+  if (arrStart >= 0 && arrEnd > arrStart) return cleaned.slice(arrStart, arrEnd + 1);
+  return cleaned;
+}
+
 async function translateText(
   text: string,
   source: TransLang,
   target: TransLang,
   onPartial?: (progress: number) => void,
 ): Promise<string> {
-  if (source === target || !text.trim()) return text;
+  if (!text.trim()) return text;
+  // A missing or unrecognized code used to fall into the `source === target`
+  // branch below — `undefined === undefined` — and the source text came back as
+  // a successful translation. A caller that misnames these fields (`from`/`to`
+  // instead of `source`/`target`) has to hear about it, not receive its own
+  // input with `ok: true`.
+  // `langSpec` calls `.toLowerCase()`, so a non-string has to be rejected here
+  // rather than handed to it — the missing-field case is exactly the one this
+  // guard exists for.
+  const known = (code: unknown): boolean => typeof code === 'string' && !!langSpec(code);
+  if (!known(source) || !known(target)) {
+    throw new Error(
+      `Translation needs a known source and target language; got source="${source}" target="${target}".`,
+    );
+  }
+  if (source === target) return text;
 
   const parts = sentences(text);
   if (parts.length === 0) return '';
 
   const out: string[] = [];
+  let translatedCount = 0;
   for (let i = 0; i < parts.length; i++) {
     const translated = await enqueue(() => translateSentence(parts[i], source, target));
-    out.push(translated);
+    // An untranslatable sentence is dropped rather than back-filled with its
+    // own source text: a Japanese clause sitting inside an English paragraph
+    // reads as part of the translation.
+    if (translated) {
+      out.push(translated);
+      translatedCount += 1;
+    }
     onPartial?.((i + 1) / parts.length);
+  }
+  if (translatedCount === 0) {
+    throw new Error('The translation model returned no usable output for this text.');
   }
   return out.join(' ');
 }
@@ -400,6 +581,8 @@ export function registerTranslateIpc(): void {
     };
   });
 
+  ipcMain.handle('translate:ensureReady', async () => ensureTranslateReady());
+
   ipcMain.handle(
     'translate:run',
     async (
@@ -421,11 +604,23 @@ export function registerTranslateIpc(): void {
   ipcMain.handle(
     'translate:runBatch',
     async (
-      _e,
+      e,
       req: { items: TranslateBatchItem[] },
-    ): Promise<{ ok: boolean; results?: { id: string; text: string }[]; error?: string }> => {
+    ): Promise<{
+      ok: boolean;
+      results?: { id: string; text: string }[];
+      error?: string;
+      cancelled?: boolean;
+    }> => {
       try {
-        const results = await runTranslationBatch(req.items ?? []);
+        const results = await runTranslationBatch(req.items ?? [], {
+          onProgress: (done, total) => {
+            e.sender.send('translate:batchProgress', { done, total });
+          },
+        });
+        if (didLastTranslationBatchCancel()) {
+          return { ok: false, cancelled: true, results };
+        }
         return { ok: true, results };
       } catch (err) {
         console.error('[translate:runBatch]', err);
@@ -433,4 +628,9 @@ export function registerTranslateIpc(): void {
       }
     },
   );
+
+  ipcMain.handle('translate:cancelBatch', () => {
+    cancelTranslationBatch();
+    return { ok: true };
+  });
 }

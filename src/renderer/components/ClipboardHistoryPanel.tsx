@@ -250,7 +250,15 @@ export default function ClipboardHistoryPanel() {
             placeholder={t('clipboard.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+            // preventDefault, like the palette does: now that this panel sits
+            // above the full-screen media workspace, an unmarked Escape bubbles
+            // to MediaWorkspaceHost's window listener and closes the workspace
+            // underneath as well. That listener already bails on defaultPrevented.
+            onKeyDown={(e) => {
+              if (e.key !== 'Escape') return;
+              e.preventDefault();
+              setOpen(false);
+            }}
           />
           <button type="button" className="cbh-icon-btn" title={t('clipboard.settings')} onClick={() => setSettingsOpen((v) => !v)}>
             <Icon name="settings" size={15} />

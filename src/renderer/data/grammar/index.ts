@@ -6,15 +6,15 @@ import {
 } from './normalize';
 import { N5 } from './n5';
 import { N4 } from './n4';
-import { N4_MAZII } from './n4-mazii';
+import { N4_SUPPLEMENT } from './n4-supplement';
 import { N3 } from './n3';
-import { N3_MAZII } from './n3-mazii';
+import { N3_SUPPLEMENT } from './n3-supplement';
 import { N2 } from './n2';
 import { N2_EXTRA } from './n2-extra';
-import { N2_MAZII } from './n2-mazii';
+import { N2_SUPPLEMENT } from './n2-supplement';
 import { N1 } from './n1';
 import { N1_EXTRA } from './n1-extra';
-import { N1_MAZII } from './n1-mazii';
+import { N1_SUPPLEMENT } from './n1-supplement';
 import { HSK } from './hsk';
 import { HSK_EXTRA } from './hsk-extra';
 import { HSK_IMPORT } from './hsk-import';
@@ -43,12 +43,12 @@ export type { NormalizedGrammarPoint, ModuleProvenance } from './normalize';
 
 /*
  * Provenance is a property of the source module, not of the individual record —
- * which is the only reason it is recoverable at all. The Mazii dumps arrived
- * with `functions` and `register` already populated, so a record cannot be told
- * apart from authored data by inspecting it. But the *distribution* gives it
- * away: 288 of 627 n3-mazii records are tagged `['other']`, and 1814 of 1820
- * are 'neutral'. That is frozen regex output, so the whole module is marked
- * heuristic and the filter layer treats it accordingly.
+ * which is the only reason it is recoverable at all. The supplemental dumps
+ * arrived with `functions` and `register` already populated, so a record cannot
+ * be told apart from authored data by inspecting it. But the *distribution*
+ * gives it away: 288 of 627 n3-supplement records are tagged `['other']`, and
+ * 1814 of 1820 are 'neutral'. That is frozen regex output, so the whole module
+ * is marked heuristic and the filter layer treats it accordingly.
  *
  * The hand-written core modules carry real examples and explanations but no
  * tags at all, so their categories come from the same inference — also
@@ -80,9 +80,9 @@ function withImportedExamples(list: GrammarPoint[]): GrammarPoint[] {
   });
 }
 
-function mazii(level: string): ModuleProvenance {
+function supplement(level: string): ModuleProvenance {
   return {
-    source: `mazii-${level}-dump`,
+    source: `supplement-${level}`,
     tagSource: 'heuristic',
     verification: 'imported-unreviewed',
   };
@@ -130,15 +130,15 @@ const HSK_IMPORTED: ModuleProvenance = {
 export const GRAMMAR: NormalizedGrammarPoint[] = [
   ...normalizeGrammarList(N5, CORE),
   ...normalizeGrammarList(N4, CORE),
-  ...normalizeGrammarList(withImportedExamples(N4_MAZII), mazii('n4')),
+  ...normalizeGrammarList(withImportedExamples(N4_SUPPLEMENT), supplement('n4')),
   ...normalizeGrammarList(N3, CORE),
-  ...normalizeGrammarList(withImportedExamples(N3_MAZII), mazii('n3')),
+  ...normalizeGrammarList(withImportedExamples(N3_SUPPLEMENT), supplement('n3')),
   ...normalizeGrammarList(N2, CORE),
   ...normalizeGrammarList(N2_EXTRA, CORE),
-  ...normalizeGrammarList(withImportedExamples(N2_MAZII), mazii('n2')),
+  ...normalizeGrammarList(withImportedExamples(N2_SUPPLEMENT), supplement('n2')),
   ...normalizeGrammarList(N1, CORE),
   ...normalizeGrammarList(N1_EXTRA, CORE),
-  ...normalizeGrammarList(withImportedExamples(N1_MAZII), mazii('n1')),
+  ...normalizeGrammarList(withImportedExamples(N1_SUPPLEMENT), supplement('n1')),
   ...normalizeGrammarList(HSK, HSK_SEED),
   ...normalizeGrammarList(HSK_EXTRA, HSK_AUTHORED),
   ...normalizeGrammarList(HSK_IMPORT, HSK_IMPORTED),
@@ -148,15 +148,15 @@ export const GRAMMAR: NormalizedGrammarPoint[] = [
 export const GRAMMAR_MODULES: Record<string, GrammarPoint[]> = {
   n5: N5,
   n4: N4,
-  'n4-mazii': N4_MAZII,
+  'n4-supplement': N4_SUPPLEMENT,
   n3: N3,
-  'n3-mazii': N3_MAZII,
+  'n3-supplement': N3_SUPPLEMENT,
   n2: N2,
   'n2-extra': N2_EXTRA,
-  'n2-mazii': N2_MAZII,
+  'n2-supplement': N2_SUPPLEMENT,
   n1: N1,
   'n1-extra': N1_EXTRA,
-  'n1-mazii': N1_MAZII,
+  'n1-supplement': N1_SUPPLEMENT,
   hsk: HSK,
   'hsk-extra': HSK_EXTRA,
   'hsk-import': HSK_IMPORT,

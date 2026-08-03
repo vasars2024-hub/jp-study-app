@@ -43,7 +43,7 @@ This document is intentionally stored under `src/` so it follows the project rul
 | `toolbox.openSystemMonitor` | Open System Monitor | Open the compact system metrics surface. | system-monitor | Alt+8 | toolbox | Yes |
 | `toolbox.openFileSearch` | Open File Search | Open capped local filename search. | file-search | Alt+9 | toolbox | Yes |
 | `toolbox.openAutomationBuilder` | Open Automation Builder | Launch the existing PowerShell automation builder. | automation-builder | Unbound | toolbox | Yes |
-| `toolbox.openWorkspaceLauncher` | Open Workspace Launcher | Open saved workspaces and launch their targets in order. | workspace-launcher | Unbound | toolbox | Yes |
+| `toolbox.openAppDrawer` | Open App Drawer | Open folders of app, file, link, and tool shortcuts. | app-drawer | Unbound | toolbox | Yes |
 | `toolbox.openDictionary` | Open Dictionary | Open shared dictionary lookup. | dictionary | Unbound | toolbox | Yes |
 | `toolbox.openGrammar` | Open Grammar | Open grammar reference tools. | grammar | Unbound | toolbox | Yes |
 | `toolbox.openResources` | Open Resources | Open shared language learning resources. | resources | Unbound | toolbox | Yes |

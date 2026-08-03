@@ -48,8 +48,8 @@
 .ui-btn--danger {
   /* Base uses --red so Aero/Wired (which restyle .ui-btn in-scope) stay at
      baseline; study-os + named themes get the deeper --danger via the guarded
-     rule below. */
-  --_bg: linear-gradient(to bottom, color-mix(in srgb, var(--red) 88%, #fff 12%), var(--red));
+     rule below. Solid fill — no gradient sheen. */
+  --_bg: var(--red);
   color: #fff;
   border-color: color-mix(in srgb, var(--red) 60%, #000 12%);
 }
@@ -57,7 +57,7 @@
    Aero/Wired/Blanc (protected) keep the --red base above. :where() = 0
    specificity so this only wins by source order, not over in-scope skin rules. */
 :where(html:not([data-materials='aero']):not([data-materials='wired'])) .ui-btn--danger:where(:not(.blanc-root *)) {
-  --_bg: linear-gradient(to bottom, color-mix(in srgb, var(--danger) 88%, #fff 12%), var(--danger));
+  --_bg: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 60%, #000 12%);
 }
 .ui-btn--ghost { --_bg: transparent; box-shadow: none; border-color: transparent; }

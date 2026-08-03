@@ -37,6 +37,7 @@ import {
   stopSeanime,
 } from './supervisor';
 import { extractAudioPcm } from '../media';
+import { readSeanimeStudyLibrary } from './studyLibrary';
 
 async function api<T>(route: string): Promise<T> {
   const base = seanimeBaseUrl();
@@ -128,6 +129,16 @@ export function registerSeanimeIpc(): void {
   ipcMain.handle(SEANIME_CHANNELS.probe, async () => {
     try {
       return { ok: true as const, result: await probeSeanime() };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  // Phase 6. Returns the projection, never throws across IPC: a stopped sidecar has to
+  // reach the renderer as an explicit reason, because an empty list is indistinguishable
+  // from an empty library (the Phase-1 lifecycle rule).
+  ipcMain.handle(SEANIME_CHANNELS.studyLibrary, async () => {
+    try {
+      return { ok: true as const, files: await readSeanimeStudyLibrary() };
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
     }

@@ -699,12 +699,6 @@ async function ensureBundledTermDict(spec: BundledTermDictSpec): Promise<boolean
   }
 }
 
-function broadcastDictUpdated(): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('dict:updated');
-  }
-}
-
 // ----- Public lookup API -----------------------------------------------------
 
 /**
@@ -964,10 +958,11 @@ export function initYomitan(): Promise<void> {
       for (const spec of BUNDLED_TERM_DICTS) {
         if (await ensureBundledTermDict(spec)) changed = true;
       }
-      if (changed) {
-        loadAllIndices();
-        broadcastDictUpdated();
-      }
+      // Reload in place when a bundled dictionary was just provisioned. There is no
+      // renderer notification: every consumer awaits initYomitan() before looking a
+      // word up, so it sees the reloaded indices without being told. A `dict:updated`
+      // broadcast used to fire here with nothing listening on the other end.
+      if (changed) loadAllIndices();
     })();
   }
   return initPromise;

@@ -34,6 +34,7 @@ import {
   setBlancModeEnabled,
   type BlancModeSettings,
 } from '../../../blancMode';
+import { nextHistoryEntry } from '../../../secretHistory';
 
 type ArcadeGameId = 'star-invaders' | 'comet-courier' | 'capsule-sorter' | 'signal-simon';
 
@@ -270,6 +271,11 @@ export default function SpecialPage() {
       summonWiredShimeji();
       return;
     }
+    if (input === 'history' || input === 'log') {
+      const entry = nextHistoryEntry();
+      pushWiredTerminal(`> [${entry.version}] ${t(entry.titleKey)} — ${t(entry.bodyKey)}`);
+      return;
+    }
     const token = input.replace(/^(toggle|enable|disable)\s+/, '');
     const match = WIRED_TERMINAL_FEATURES.find((feature) =>
       feature.command === token ||
@@ -313,6 +319,11 @@ export default function SpecialPage() {
     }
     if (input === 'summon' || input === 'buddy') {
       summonAeroBuddy();
+      return;
+    }
+    if (input === 'history' || input === 'log') {
+      const entry = nextHistoryEntry();
+      pushAeroTerminal(`> [${entry.version}] ${t(entry.titleKey)} — ${t(entry.bodyKey)}`);
       return;
     }
     const token = input.replace(/^(toggle|enable|disable)\s+/, '');

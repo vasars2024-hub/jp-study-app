@@ -154,28 +154,6 @@ export function getDefaultBuddyRoutines(): BuddyRoutine[] {
       ],
     },
     {
-      id: 'br-noctis-city',
-      name: 'Visit Noctis',
-      forType: 'noctis',
-      builtin: true,
-      steps: [
-        { type: 'openApp', appId: 'city' },
-        { type: 'setMood', mood: 'curious', status: 'City lights' },
-        { type: 'dispatch', event: 'noctis:pulse', detail: 'buddy' },
-      ],
-    },
-    {
-      id: 'br-noctis-study',
-      name: 'Study light',
-      forType: 'noctis',
-      builtin: true,
-      steps: [
-        { type: 'openApp', appId: 'dictionary' },
-        { type: 'setMood', mood: 'curious', status: 'Crystal warmed' },
-        { type: 'notify', title: 'Noctis', body: 'Dictionary open' },
-      ],
-    },
-    {
       id: 'br-miko-climb',
       name: 'Climb show',
       forType: 'miko-shimeji',
@@ -258,8 +236,6 @@ export function defaultRoutineIdsForType(typeId: CompanionTypeId): {
       return { primary: 'br-critter-weather', secondary: 'br-critter-dance', menu: ['br-critter-weather', 'br-critter-dance'] };
     case 'timekeeper':
       return { primary: 'br-time-calendar', secondary: 'br-time-stats', menu: ['br-time-calendar', 'br-time-stats'] };
-    case 'noctis':
-      return { primary: 'br-noctis-city', secondary: 'br-noctis-study', menu: ['br-noctis-city', 'br-noctis-study'] };
     case 'miko-shimeji':
       return { primary: 'br-miko-climb', secondary: 'br-miko-cheer', menu: ['br-miko-climb', 'br-miko-cheer'] };
     default:
@@ -351,7 +327,6 @@ export function sanitizeRoutine(raw: unknown): BuddyRoutine | null {
     r.forType === 'study-buddy' ||
     r.forType === 'critter' ||
     r.forType === 'timekeeper' ||
-    r.forType === 'noctis' ||
     r.forType === 'miko-shimeji' ||
     r.forType === 'wired-navi'
       ? r.forType

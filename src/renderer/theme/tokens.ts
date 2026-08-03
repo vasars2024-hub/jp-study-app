@@ -105,6 +105,43 @@ export const zIndex = {
   max: 2147483000,
 } as const;
 
+/**
+ * The SHELL layer scale — app-global surfaces, which never compare against the
+ * `zIndex` component tier above. Declaration order here is the stacking order,
+ * and `shellLayerScale.test.ts` asserts both that and the tokens.css values.
+ *
+ * A full-screen view (the adopted media workspace) sorts below the shell on
+ * purpose: it is a view, not chrome, and an opaque one hides — rather than
+ * merely covers — anything numbered under it.
+ */
+/**
+ * View-scoped overlays — a modal that belongs to ONE view rather than to the app.
+ *
+ * Deliberately its own object: it is not part of the shell scale and must not be
+ * compared with it by declaration order. It occupies the gap the shell scale
+ * reserves between `--z-shell-view` and `--z-shell-overlay-backdrop`, which is the
+ * whole ordering claim — above everything a view can raise (the ui/* tier tops out
+ * at 1700), below every shell-global surface, so the palette, a toast, the taskbar
+ * and this window's title bar stay reachable while a view's dialog is open.
+ */
+export const viewOverlayZIndex = {
+  backdrop: 12500,
+  dialog: 12501,
+} as const;
+
+export const shellZIndex = {
+  viewAffordance: 9998,
+  view: 9999,
+  overlayBackdrop: 20000,
+  overlay: 20001,
+  feedback: 30000,
+  blocking: 40000,
+  lock: 100000,
+  chrome: 200000,
+  chromeRaised: 200001,
+  windowChrome: 250000,
+} as const;
+
 /* ------------------------------------------------------------------ *
  * Documentation catalog — the tiers ADDED by this platform layer.
  * (Existing tokens declared in styles.css :root are cataloged separately
@@ -228,6 +265,84 @@ export const TOKEN_GROUPS: readonly TokenGroup[] = [
       { name: '--z-popover', value: '1500', description: 'Popovers/context menus.' },
       { name: '--z-toast', value: '1600', description: 'Toasts.' },
       { name: '--z-tooltip', value: '1700', description: 'Tooltips.' },
+    ],
+  },
+  {
+    tier: 'Shell layers',
+    description:
+      'App-global stacking, far above the ui/* tier so the two never compare: '
+      + 'view content < a full-screen view < shell-global overlays < OS chrome.',
+    tokens: [
+      {
+        name: '--z-shell-view-affordance',
+        value: '9998',
+        description: 'The control that opens a full-screen view, just beneath it.',
+      },
+      {
+        name: '--z-shell-view',
+        value: '9999',
+        description:
+          'An opaque full-screen view (the adopted media workspace). Below the shell '
+          + 'on purpose — it is a view, not chrome.',
+      },
+      {
+        name: '--z-view-overlay-backdrop',
+        value: '12500',
+        description:
+          'Scrim under a modal owned by ONE view. Not a shell token: it sits in the gap '
+          + 'this scale reserves, above everything the ui/* tier can raise and below every '
+          + 'shell-global surface.',
+      },
+      {
+        name: '--z-view-overlay',
+        value: '12501',
+        description:
+          'The view-scoped modal itself (manga source picker, library import). A dialog '
+          + 'a view owns is not a gate on the app, so it never reaches --z-shell-blocking.',
+      },
+      {
+        name: '--z-shell-overlay-backdrop',
+        value: '20000',
+        description: 'Click-catching scrim beneath a shell-global overlay.',
+      },
+      {
+        name: '--z-shell-overlay',
+        value: '20001',
+        description: 'Command palette and clipboard history — reachable over any view.',
+      },
+      {
+        name: '--z-shell-feedback',
+        value: '30000',
+        description: 'Toasts, which must be readable above the overlay that caused them.',
+      },
+      {
+        name: '--z-shell-blocking',
+        value: '40000',
+        description:
+          'A gate that must be answered before the app is usable (first-launch consent). '
+          + 'Outranks every overlay, because those are things you reach for and this is the '
+          + 'one thing you may not reach past.',
+      },
+      {
+        name: '--z-shell-lock',
+        value: '100000',
+        description: 'Lock screen — covers everything a normal session can raise.',
+      },
+      {
+        name: '--z-shell-chrome',
+        value: '200000',
+        description: 'Taskbar and the shell flyout backdrop.',
+      },
+      {
+        name: '--z-shell-chrome-raised',
+        value: '200001',
+        description: 'Start menu and flyouts, above the taskbar.',
+      },
+      {
+        name: '--z-window-chrome',
+        value: '250000',
+        description: "This OS window's own title bar.",
+      },
     ],
   },
   {

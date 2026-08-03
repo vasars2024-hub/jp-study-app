@@ -338,6 +338,31 @@ async function handle(
       return { code: 200, body: { ok: true, key, modifiers } };
     }
 
+    /**
+     * Brings a window genuinely to the front. Chromium throttles
+     * `requestAnimationFrame` in a window that is not foreground, so an effect
+     * that reveals a panel on the next frame simply never runs while a QA pass
+     * drives an unfocused window — the pass then cannot tell a real defect from
+     * the harness. This is the app focusing itself; no mouse or keyboard input
+     * is synthesized, and like the rest of the bridge it never ships.
+     */
+    case '/focus': {
+      const win = resolveWindow(body.window);
+      if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.moveTop();
+      win.focus();
+      // Windows will not hand foreground to a background process on request
+      // alone; `steal` is what makes the focus above actually take effect.
+      app.focus({ steal: true });
+      writeStateSnapshot();
+      return {
+        code: 200,
+        body: { ok: true, id: win.id, focused: win.isFocused(), visible: win.isVisible() },
+      };
+    }
+
     case '/reload': {
       const win = resolveWindow(body.window);
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };

@@ -3,6 +3,7 @@
  */
 
 import { setBlancAdvanced, isBlancWindow } from './blancMode';
+import { setHandoff } from './pendingHandoff';
 
 export function openAppSection(section: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: section }));
@@ -37,6 +38,18 @@ export function openClipboardHistory(): void {
   window.dispatchEvent(new CustomEvent('clipboard:open'));
 }
 
+/** Settings → System → Special modules (the hidden modules page). */
+export function openSpecialSettings(): void {
+  openAppSection('settings');
+  window.setTimeout(() => {
+    window.dispatchEvent(
+      new CustomEvent('settings:navigate', {
+        detail: { page: 'special', settingId: 'special-modules' },
+      }),
+    );
+  }, 80);
+}
+
 /** Settings → Study → Mining rules (Anki profile routing). */
 export function openMiningRulesSettings(): void {
   openAppSection('settings');
@@ -62,6 +75,7 @@ export type ExtensionUiRoute =
   | { kind: 'os-anki' }
   | { kind: 'os-mining-rules' }
   | { kind: 'os-extension-settings' }
+  | { kind: 'os-special-settings' }
   | { kind: 'os-section'; section: string }
   | { kind: 'os-inbox' }
   | { kind: 'os-youtube' }
@@ -101,7 +115,8 @@ export function resolveExtensionUiOpen(target: string, inBlanc: boolean): Extens
       t === 'translate-history' ||
       t === 'library' ||
       t === 'inbox' ||
-      t === 'youtube'
+      t === 'youtube' ||
+      t === 'special'
     ) {
       return { kind: 'forward-main' };
     }
@@ -111,6 +126,7 @@ export function resolveExtensionUiOpen(target: string, inBlanc: boolean): Extens
   if (t === 'anki' || t === 'anki-mapping') return { kind: 'os-anki' };
   if (t === 'profile-rules' || t === 'mining-rules') return { kind: 'os-mining-rules' };
   if (t === 'extension-bridge' || t === 'extension-settings') return { kind: 'os-extension-settings' };
+  if (t === 'special') return { kind: 'os-special-settings' };
   if (t === 'flashcards') return { kind: 'os-section', section: 'flashcards' };
   if (t === 'statistics' || t === 'stats') return { kind: 'os-section', section: 'stats' };
   if (t === 'grammar-practice') return { kind: 'grammar-practice' };
@@ -153,6 +169,9 @@ export function handleExtensionUiOpen(
     case 'os-extension-settings':
       openExtensionSettings();
       return;
+    case 'os-special-settings':
+      openSpecialSettings();
+      return;
     case 'grammar-practice':
       openGrammarPractice(detail);
       return;
@@ -177,7 +196,7 @@ export function handleExtensionUiOpen(
 
 export function openLibraryInbox(): void {
   try {
-    sessionStorage.setItem('jp-library-focus-folder', 'Inbox');
+    setHandoff('libraryFocusFolder', 'Inbox');
   } catch {
     /* ignore */
   }

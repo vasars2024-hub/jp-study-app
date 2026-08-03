@@ -31,6 +31,9 @@ import { AERO_THEME_ID } from '../../../theme/frutiger-aero';
 import { WIRED_ARCHIVE_THEME_ID } from '../../../theme/wired-archive';
 import { loadThemeId, onThemeChanged } from '../../../theme';
 import { requestWiredArchiveShutdown } from '../../../wiredArchiveLifecycle';
+import { TRINKETS, loadTrinketState, isTrinketUnlocked } from '../../../environment/companionTrinkets';
+import { READING_RECORDED_EVENT } from '../../../stats';
+import Icon from '../../Icons';
 
 function blankStep(type: BuddyStep['type']): BuddyStep {
   switch (type) {
@@ -55,7 +58,7 @@ function blankStep(type: BuddyStep['type']): BuddyStep {
     case 'speak':
       return { type, text: 'こんにちは' };
     case 'dispatch':
-      return { type, event: 'noctis:pulse', detail: '' };
+      return { type, event: 'companion:custom', detail: '' };
     case 'routine':
       return { type, routineId: 'br-buddy-review' };
   }
@@ -67,9 +70,18 @@ export default function CompanionsPage() {
   const [aeroDiscovered, setAeroDiscovered] = useState(hasDiscoveredAero);
   const [wiredDiscovered, setWiredDiscovered] = useState(hasDiscoveredWired);
   const [activeThemeId, setActiveThemeId] = useState(loadThemeId);
+  const [trinketState, setTrinketState] = useState(loadTrinketState);
   useEffect(() => onAeroDiscoveryChanged(setAeroDiscovered), []);
   useEffect(() => onWiredDiscoveryChanged(setWiredDiscovered), []);
   useEffect(() => onThemeChanged(setActiveThemeId), []);
+  // A trinket can unlock while this page is open (reading in another window
+  // drives the same profile) — re-read on the event achievements.ts already
+  // fires, rather than polling.
+  useEffect(() => {
+    const onRead = () => setTrinketState(loadTrinketState());
+    window.addEventListener(READING_RECORDED_EVENT, onRead);
+    return () => window.removeEventListener(READING_RECORDED_EVENT, onRead);
+  }, []);
   const companionDefs = useMemo(() => COMPANION_DEFS(), [aeroDiscovered, wiredDiscovered]);
   const routines = env.buddyRoutines?.length ? env.buddyRoutines : getDefaultBuddyRoutines();
   const [editId, setEditId] = useState<string>(routines[0]?.id ?? '');
@@ -720,6 +732,31 @@ export default function CompanionsPage() {
           >
             {t('settings.companions.allDisplays')}
           </button>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        id="trinkets"
+        title={t('companion.trinket.section.title')}
+        description={t('companion.trinket.section.desc')}
+        highlight={focusSettingId === 'trinkets'}
+      >
+        <div className="os-trinket-grid">
+          {TRINKETS.map((trinket) => {
+            const unlocked = isTrinketUnlocked(trinket.id, trinketState);
+            return (
+              <div
+                key={trinket.id}
+                className={`os-trinket${unlocked ? '' : ' is-locked'}`}
+                title={unlocked ? t(trinket.descKey) : t('companion.trinket.locked', { count: trinket.streakDays })}
+              >
+                <span className="os-trinket-icon">
+                  <Icon name={trinket.icon} size={22} flat={!unlocked} />
+                </span>
+                <span className="os-trinket-label">{t(trinket.labelKey)}</span>
+              </div>
+            );
+          })}
         </div>
       </SettingsCard>
     </>

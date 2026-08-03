@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Romance Dawn placeholder artwork">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffb25b"/>
+      <stop offset=".46" stop-color="#e86b71"/>
+      <stop offset="1" stop-color="#44357d"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#357e9d"/>
+      <stop offset="1" stop-color="#102538"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#sky)"/>
+  <circle cx="251" cy="48" r="31" fill="#fff1bd" opacity=".9"/>
+  <path d="M0 106c44-13 87-12 130 1s86 14 129 1 61-11 61-11v83H0z" fill="url(#sea)"/>
+  <path d="M0 130c46-13 91-12 136 2s90 14 135 1 49-7 49-7" fill="none" stroke="#82d6da" stroke-width="5" opacity=".65"/>
+  <path d="M155 43l8 34 27 26-20 4-10 33-12-32-20-6 24-24z" fill="#151b2b"/>
+  <path d="M130 101h64l-14 24h-39z" fill="#181727"/>
+  <path d="M139 98l21-28 20 28" fill="none" stroke="#f4dfbc" stroke-width="3"/>
+  <text x="18" y="28" fill="#fff" font-family="Segoe UI, sans-serif" font-size="17" font-weight="700">ROMANCE DAWN</text>
+  <text x="19" y="47" fill="#ffe9d1" font-family="sans-serif" font-size="10" letter-spacing="2">EPISODE 01</text>
+</svg>

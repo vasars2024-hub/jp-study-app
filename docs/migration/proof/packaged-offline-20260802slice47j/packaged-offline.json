@@ -1,0 +1,78 @@
+{
+  "gate": "packaged-offline-gate.mjs",
+  "question": "Does the packaged app boot and stay usable on a FIRST RUN with no internet, while the loopback sidecar is still reachable?",
+  "startedAt": "2026-08-02T06:59:50.336Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "blocked": [],
+  "allowedLoopback": 34,
+  "steps": [
+    {
+      "name": "0 the packaged window exists",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "1 every off-machine request will be failed as InternetDisconnected",
+      "result": "PASS",
+      "detail": "loopback, app:, media:, playfile:, localfile: still pass"
+    },
+    {
+      "name": "2 the desktop shell mounts with no internet",
+      "result": "PASS",
+      "detail": "{\"ready\":\"complete\",\"desktop\":true,\"api\":true}"
+    },
+    {
+      "name": "3 local study machinery answers offline",
+      "result": "MEASURED",
+      "detail": "{\"tokenizer\":\"no-api\",\"dictionary\":\"no-api\",\"errors\":[]}"
+    },
+    {
+      "name": "4 the shell is still standing after the failures land",
+      "result": "PASS",
+      "detail": "{\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}"
+    },
+    {
+      "name": "5 the block actually bit something",
+      "result": "INCONCLUSIVE",
+      "detail": "0 external request(s) failed across 0 host(s): none; 34 local request(s) passed"
+    }
+  ],
+  "exeBuiltAt": "2026-08-01T11:40:01.018Z",
+  "mounted": {
+    "ready": "complete",
+    "desktop": true,
+    "api": true
+  },
+  "consentDismissed": 1,
+  "localCapabilities": {
+    "tokenizer": "no-api",
+    "dictionary": "no-api",
+    "errors": []
+  },
+  "health": {
+    "stillMounted": true,
+    "visibleErrorText": "",
+    "bodyChildren": 2
+  },
+  "mainProcessLogTail": [
+    "DevTools listening on ws://127.0.0.1:57191/devtools/browser/a936516a-9268-4170-948e-cbb8e49672cc",
+    "[yomitan] Seeding bundled Kanjium pitch data…",
+    "[extensionServer] listening on 127.0.0.1:18765",
+    "[yomitan] Kanjium pitch seeded (107978 entries).",
+    "[yomitan] Downloading JMdict (Japanese–English)…",
+    "[yomitan] JMdict (Japanese–English) ready (305233 terms).",
+    "[yomitan] Downloading JMdict (Japanese–Russian)…"
+  ],
+  "blockedHosts": [],
+  "verdict": "INCONCLUSIVE",
+  "result": "INCONCLUSIVE",
+  "finishedAt": "2026-08-02T07:00:01.114Z",
+  "log": [
+    "[offline] PASS — 0 the packaged window exists: app://bundle/index.html",
+    "[offline] PASS — 1 every off-machine request will be failed as InternetDisconnected: loopback, app:, media:, playfile:, localfile: still pass",
+    "[offline] PASS — 2 the desktop shell mounts with no internet: {\"ready\":\"complete\",\"desktop\":true,\"api\":true}",
+    "[offline] MEASURED — 3 local study machinery answers offline: {\"tokenizer\":\"no-api\",\"dictionary\":\"no-api\",\"errors\":[]}",
+    "[offline] PASS — 4 the shell is still standing after the failures land: {\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}",
+    "[offline] INCONCLUSIVE — 5 the block actually bit something: 0 external request(s) failed across 0 host(s): none; 34 local request(s) passed"
+  ]
+}

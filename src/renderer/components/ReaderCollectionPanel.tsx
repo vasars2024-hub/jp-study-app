@@ -14,9 +14,12 @@ import {
 } from '../flashcardDeck';
 import { translateTo, onModelProgress, type TransLang } from '../translator';
 import { pushUndo } from '../actionHistory';
+import type { VisualNovelStudyCardKind } from '../../shared/visualNovelStudyCards';
+import { getLevel } from '../knownWords';
 import Icon from './Icons';
+import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 
-type SortMode = 'newest' | 'oldest' | 'word';
+type SortMode = 'newest' | 'oldest' | 'word' | 'frequency';
 type TargetLang = 'en' | 'ru' | 'zh';
 type TxStatus = 'idle' | 'loading' | 'translating' | 'done' | 'error';
 
@@ -37,12 +40,17 @@ interface Props {
 }
 
 const PREFS_KEY = 'jp-reader-collection-prefs-v1';
-const TARGET_KEY = 'jp-study-translate-target';
 const TARGETS: { id: TargetLang; label: string }[] = [
   { id: 'en', label: 'EN' },
   { id: 'ru', label: 'RU' },
   { id: 'zh', label: 'ZH' },
 ];
+const STUDY_KIND_LABELS: Record<VisualNovelStudyCardKind, string> = {
+  vocabulary: 'Vocabulary',
+  sentence: 'Sentence',
+  kanji: 'Kanji',
+  grammar: 'Grammar',
+};
 
 interface CollectionPrefs {
   targetLang: TargetLang;
@@ -55,7 +63,7 @@ interface CollectionPrefs {
 
 function loadPrefs(): CollectionPrefs {
   let targetLang: TargetLang = 'en';
-  const t = localStorage.getItem(TARGET_KEY);
+  const t = getTranslateTarget();
   if (t === 'en' || t === 'ru' || t === 'zh') targetLang = t;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
@@ -81,7 +89,7 @@ function loadPrefs(): CollectionPrefs {
 function savePrefs(prefs: CollectionPrefs): void {
   try {
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-    localStorage.setItem(TARGET_KEY, prefs.targetLang);
+    setTranslateTarget(prefs.targetLang);
   } catch {
     /* ignore */
   }
@@ -117,6 +125,7 @@ export default function ReaderCollectionPanel({
   const [ankiConnected, setAnkiConnected] = useState(false);
 
   const [edit, setEdit] = useState<EditDraft | null>(null);
+  const [editImageDataUrl, setEditImageDataUrl] = useState('');
   const [txStatus, setTxStatus] = useState<TxStatus>('idle');
   const [txMsg, setTxMsg] = useState('');
   const txReqRef = useRef(0);
@@ -195,18 +204,68 @@ export default function ReaderCollectionPanel({
         reading?: string;
         meaning?: string;
         sentence?: string;
+        imagePath?: string;
+        audioPath?: string;
+        audioDataUrl?: string;
+        studyKind?: VisualNovelStudyCardKind;
+        frequency?: number;
+        jlptLevel?: string;
+        sceneReference?: string;
       },
       deckOverride?: string,
     ): Promise<{ ok: boolean; noteId?: number; error?: string; deck?: string }> => {
       const deck = (deckOverride ?? prefsRef.current.ankiDeck).trim() || undefined;
       try {
+        let imageBase64: string | undefined;
+        let imageFilename: string | undefined;
+        if (c.imagePath) {
+          const image = await window.api.visualNovelReadCaptureImage(c.imagePath);
+          const match = image.dataUrl?.match(/^data:image\/(jpeg|png);base64,(.+)$/);
+          if (image.ok && match) {
+            imageBase64 = match[2];
+            imageFilename = `visual-novel-context.${match[1] === 'png' ? 'png' : 'jpg'}`;
+          }
+        }
+        let audioBase64: string | undefined;
+        let audioFilename: string | undefined;
+        if (c.audioPath) {
+          const audio = await window.api.visualNovelReadCaptureAudio(c.audioPath);
+          const match = audio.dataUrl?.match(/^data:audio\/[^;]+;base64,(.+)$/);
+          if (audio.ok && match) {
+            audioBase64 = match[1];
+            audioFilename = audio.filename;
+          }
+        } else if (c.audioDataUrl) {
+          const match = c.audioDataUrl.match(/^data:audio\/[^;]+;base64,(.+)$/);
+          if (match) {
+            audioBase64 = match[1];
+            audioFilename = 'reader-recording.webm';
+          }
+        }
         const res = await window.api.ankiMineNote({
-          route: { source: 'reader', cardKind: c.sentence ? 'sentence' : 'word' },
+          route: {
+            source: 'reader',
+            cardKind: c.studyKind
+              ? (c.studyKind === 'sentence' ? 'sentence' : 'word')
+              : (c.sentence ? 'sentence' : 'word'),
+          },
           term: c.word,
           reading: c.reading || undefined,
           meaning: c.meaning || undefined,
           sentence: c.sentence || undefined,
+          imageBase64,
+          imageFilename,
+          audioBase64,
+          audioFilename,
           deckName: deck,
+          frequencies: c.frequency ? { 'Visual Novel': c.frequency } : undefined,
+          extraTags: c.studyKind
+            ? [
+                'JapaneseStudyOS::VisualNovel',
+                `JapaneseStudyOS::VisualNovel::${c.studyKind}`,
+                ...(c.jlptLevel ? [`JLPT::${c.jlptLevel.toUpperCase()}`] : []),
+              ]
+            : undefined,
         });
         const ok = res.ok || res.error === 'duplicate';
         if (c.id) {
@@ -339,8 +398,9 @@ export default function ReaderCollectionPanel({
       if (autoAnki) parts.push(ankiOk ? `Anki${ankiDeck ? ` (${ankiDeck})` : ''}` : 'Anki failed');
       setStatusMsg(parts.length ? `Saved → ${parts.join(' · ')}` : 'Saved');
       if (card) {
-        setFlashId(card.id);
-        window.setTimeout(() => setFlashId((id) => (id === card!.id ? null : id)), 1600);
+        const cardId = card.id;
+        setFlashId(cardId);
+        window.setTimeout(() => setFlashId((id) => (id === cardId ? null : id)), 1600);
         listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       }
     })();
@@ -355,15 +415,49 @@ export default function ReaderCollectionPanel({
           c.word.toLowerCase().includes(needle) ||
           (c.sentence ?? '').toLowerCase().includes(needle) ||
           (c.meaning ?? '').toLowerCase().includes(needle) ||
-          (c.back ?? '').toLowerCase().includes(needle),
+          (c.back ?? '').toLowerCase().includes(needle) ||
+          (c.studyKind ?? '').toLowerCase().includes(needle) ||
+          (c.jlptLevel ?? '').toLowerCase().includes(needle) ||
+          (c.sceneReference ?? '').toLowerCase().includes(needle),
       );
     }
     const sorted = [...list];
     if (sort === 'newest') sorted.sort((a, b) => b.addedAt - a.addedAt);
     else if (sort === 'oldest') sorted.sort((a, b) => a.addedAt - b.addedAt);
+    else if (sort === 'frequency') {
+      sorted.sort((a, b) => (b.frequency ?? 0) - (a.frequency ?? 0) || b.addedAt - a.addedAt);
+    }
     else sorted.sort((a, b) => a.word.localeCompare(b.word, 'ja'));
     return sorted;
   }, [cards, bookId, bookTitle, q, sort]);
+  const studyKindCounts = useMemo(() => {
+    const counts: Record<VisualNovelStudyCardKind, number> = {
+      vocabulary: 0,
+      sentence: 0,
+      kanji: 0,
+      grammar: 0,
+    };
+    for (const card of mine) {
+      if (card.studyKind) counts[card.studyKind] += 1;
+    }
+    return counts;
+  }, [mine]);
+
+  const editImagePath = edit
+    ? cards.find((card) => card.id === edit.id)?.imagePath ?? ''
+    : '';
+  useEffect(() => {
+    let active = true;
+    setEditImageDataUrl('');
+    if (editImagePath) {
+      void window.api.visualNovelReadCaptureImage(editImagePath).then((result) => {
+        if (active && result.ok && result.dataUrl) setEditImageDataUrl(result.dataUrl);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [editImagePath]);
 
   const openEdit = useCallback((c: DeckFlashcard) => {
     setEdit({
@@ -439,6 +533,27 @@ export default function ReaderCollectionPanel({
   const selectUnexported = () =>
     setSelected(new Set(mine.filter((c) => !c.ankiExported).map((c) => c.id)));
   const clearSel = () => setSelected(new Set());
+  const removeKnownVocabulary = () => {
+    const known = cards.filter(
+      (card) =>
+        (card.bookId === bookId || (!card.bookId && card.bookTitle === bookTitle)) &&
+        card.studyKind === 'vocabulary' &&
+        getLevel(card.word) >= 2,
+    );
+    for (const card of known) removeDeckCard(card.id);
+    setCards(loadDeck());
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const card of known) next.delete(card.id);
+      return next;
+    });
+    setStatusKind('ok');
+    setStatusMsg(
+      known.length
+        ? `Removed ${known.length} familiar or known vocabulary card${known.length === 1 ? '' : 's'}.`
+        : 'No familiar or known vocabulary cards found.',
+    );
+  };
 
   const exportAnki = async () => {
     const targets = mine.filter((c) => selected.has(c.id));
@@ -459,6 +574,13 @@ export default function ReaderCollectionPanel({
           reading: c.reading,
           meaning: c.meaning || c.back,
           sentence: c.sentence,
+          imagePath: c.imagePath,
+          audioPath: c.audioPath,
+          audioDataUrl: c.audioDataUrl,
+          studyKind: c.studyKind,
+          frequency: c.frequency,
+          jlptLevel: c.jlptLevel,
+          sceneReference: c.sceneReference,
         },
         prefs.ankiDeck,
       );
@@ -566,6 +688,13 @@ export default function ReaderCollectionPanel({
             </button>
           </div>
 
+          {editImageDataUrl && (
+            <figure className="reader-collection-context-image">
+              <img src={editImageDataUrl} alt="Visual novel scene context" />
+              <figcaption>Captured scene context · included with Anki export</figcaption>
+            </figure>
+          )}
+
           <label className="reader-collection-field">
             <span className="reader-collection-field-label">{frontLabel}</span>
             <textarea
@@ -642,6 +771,15 @@ export default function ReaderCollectionPanel({
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        {Object.values(studyKindCounts).some(Boolean) && (
+          <div className="reader-collection-kind-counts" aria-label="Visual novel card counts">
+            {(Object.keys(STUDY_KIND_LABELS) as VisualNovelStudyCardKind[]).map((kind) => (
+              <span key={kind}>
+                {STUDY_KIND_LABELS[kind]} <strong>{studyKindCounts[kind]}</strong>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="reader-collection-actions">
           <div className="reader-collection-actions-left">
             <button type="button" className="btn small" onClick={selectAll}>
@@ -653,6 +791,16 @@ export default function ReaderCollectionPanel({
             <button type="button" className="btn small" onClick={clearSel}>
               Clear
             </button>
+            {studyKindCounts.vocabulary > 0 && (
+              <button
+                type="button"
+                className="btn small"
+                title="Remove vocabulary already marked Familiar or Known"
+                onClick={removeKnownVocabulary}
+              >
+                Remove known
+              </button>
+            )}
             <select
               className="reader-collection-sort"
               title="Sort"
@@ -662,6 +810,7 @@ export default function ReaderCollectionPanel({
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
               <option value="word">Word A–Z</option>
+              <option value="frequency">Most repeated</option>
             </select>
           </div>
           <div className="reader-collection-actions-right">
@@ -742,6 +891,16 @@ export default function ReaderCollectionPanel({
                 title="Open to edit"
                 onClick={() => openEdit(c)}
               >
+                {c.studyKind && (
+                  <span className="reader-collection-card-meta">
+                    <span className={`reader-collection-kind-badge kind-${c.studyKind}`}>
+                      {STUDY_KIND_LABELS[c.studyKind]}
+                    </span>
+                    {c.frequency != null && <span>Frequency {c.frequency}</span>}
+                    {c.jlptLevel && <span>{c.jlptLevel.toUpperCase()}</span>}
+                    {c.sceneReference && <span>{c.sceneReference}</span>}
+                  </span>
+                )}
                 <span className="reader-collection-word" lang="ja">
                   {c.word}
                 </span>
@@ -754,18 +913,28 @@ export default function ReaderCollectionPanel({
                   </span>
                 )}
               </button>
-              {c.audioDataUrl && (
+              {(c.audioDataUrl || c.audioPath) && (
                 <button
                   type="button"
                   className="btn small icon-btn"
-                  title="Play recorded audio"
-                  onClick={(e) => {
+                  title="Play attached audio"
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    new Audio(c.audioDataUrl).play().catch(() => undefined);
+                    let dataUrl = c.audioDataUrl;
+                    if (!dataUrl && c.audioPath) {
+                      const result = await window.api.visualNovelReadCaptureAudio(c.audioPath);
+                      if (result.ok) dataUrl = result.dataUrl;
+                    }
+                    if (dataUrl) await new Audio(dataUrl).play().catch(() => undefined);
                   }}
                 >
                   <Icon name="player" size={12} />
                 </button>
+              )}
+              {c.imagePath && (
+                <span className="reader-collection-media-badge" title="Includes captured scene context">
+                  <Icon name="image" size={12} />
+                </span>
               )}
               <button
                 type="button"

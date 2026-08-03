@@ -1,0 +1,268 @@
+{
+  "harness": "mining-rollup-live-harness.mjs",
+  "question": "Can the per-row mining rollup be seen non-zero in the real Review panel, against a card the app itself mined through its own button?",
+  "startedAt": "2026-08-02T05:54:53.049Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47mine4\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47mine4",
+  "probeDeck": "StudyOS::_MigrationProbe",
+  "steps": [
+    {
+      "name": "0a Anki answers and the deck list is recorded",
+      "result": "PASS",
+      "detail": "AnkiConnect v6, 84 decks"
+    },
+    {
+      "name": "0b the mining history before anything is driven",
+      "result": "MEASURED",
+      "detail": "0 entries — this is the state the OPEN row described"
+    },
+    {
+      "name": "0c sidecar ready",
+      "result": "PASS",
+      "detail": "pid 29212, port 55943, v3.10.2"
+    },
+    {
+      "name": "1 the fixture is playing in Blanc",
+      "result": "PASS",
+      "detail": "{\"readyState\":4,\"duration\":30.386} after 1 open attempt(s)"
+    },
+    {
+      "name": "2 the mining panel has a real cue to mine",
+      "result": "PASS",
+      "detail": "button enabled, term \"The cat is sleeping by the window.\""
+    },
+    {
+      "name": "3 the destination is set through the real input",
+      "result": "PASS",
+      "detail": "StudyOS::_MigrationProbe (read back: 1)"
+    },
+    {
+      "name": "4 the app mined a real card through its own button",
+      "result": "PASS",
+      "detail": "status exported, noteId 1785650130128, destination StudyOS::_MigrationProbe"
+    },
+    {
+      "name": "4b Anki confirms the note by id",
+      "result": "PASS",
+      "detail": "noteId 1785650130128, model JP Study App::JA-EN Classic, deck StudyOS::_MigrationProbe"
+    },
+    {
+      "name": "5 the Review segment is open in the real workspace",
+      "result": "PASS",
+      "detail": "host launcher, review clicked"
+    },
+    {
+      "name": "5b the panel finished loading its Anki snapshot",
+      "result": "MEASURED",
+      "detail": "NOT settled in 90 s: {\"hostPresent\":true,\"refreshPresent\":true,\"refreshDisabled\":true,\"statusText\":\"Reading your mining history…\"}; bridge {\"error\":\"Runtime.evaluate timed out\"}"
+    },
+    {
+      "name": "6 the rollup shows the mined card in the app",
+      "result": "PASS",
+      "detail": "1 card(s), stages [\"untracked\"], stats [{\"label\":\"Cards\",\"value\":\"1\"},{\"label\":\"Need a look\",\"value\":\"0\"},{\"label\":\"Known\",\"value\":\"0\"},{\"label\":\"New\",\"value\":\"0\"},{\"label\":\"Not tracked\",\"value\":\"1\"}]"
+    }
+  ],
+  "decksBeforeList": [
+    "5y56454w54",
+    "book",
+    "Chinese",
+    "Custom Study Session",
+    "Default",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::0. Kana",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::0. Kana::Hiragana",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::0. Kana::Hiragana extended",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::0. Kana::Katakana",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::0. Kana::Katakana extended",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Kanji",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Kanji::N1",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Kanji::N2",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Kanji::N3",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Kanji::N4",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Kanji::N5",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Vocab",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Vocab::N1",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Vocab::N2",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Vocab::N3",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Vocab::N4",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::1. JLPT::Vocab::N5",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::2. Grammar",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::2. Grammar::Additional",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::2. Grammar::N2",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::2. Grammar::N2::N1",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::2. Grammar::N3",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::2. Grammar::N4",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::2. Grammar::N5",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::3. Kanji radicals (reference)",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::4. Vocab with no kanji (mining/reference)",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::5. Extra kanji (mining/reference)",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::5. Extra kanji (mining/reference)::Kanji",
+    "Full Japanese Study Deck [JLPT N5~N1 vocab/kanji + common vocab and kanji + grammar]::5. Extra kanji (mining/reference)::Vocab",
+    "HSK",
+    "HSK::Level 1",
+    "HSK::Level 2",
+    "HSK::Level 2::Level 3",
+    "HSK::Level 4",
+    "HSK::Level 5",
+    "HSK::Level 6",
+    "HSK::Level 7-9",
+    "HSK 3.0 Vocabulary",
+    "HSK 3.0 Vocabulary::Bands 1-3: Elementary",
+    "HSK 3.0 Vocabulary::Bands 4-6: Intermediate",
+    "HSK 3.0 Vocabulary::Bands 7-9: Advanced",
+    "I LOVE ME",
+    "jp  hsk",
+    "JP Study",
+    "JP Study::EN to JP",
+    "JP Study::Immersion",
+    "JP Study::N2 Vocab",
+    "JP Study::RU to JP",
+    "lol",
+    "N1 Vocab",
+    "N1 Vocab::Mandarin Chinese: New HSK 3.0 Vocabulary and Characters",
+    "N1 Vocab::Mandarin Chinese: New HSK 3.0 Vocabulary and Characters::Characters",
+    "N1 Vocab::Mandarin Chinese: New HSK 3.0 Vocabulary and Characters::Vocabulary",
+    "N1 Vocab 2",
+    "N1 Vocab 3",
+    "NEW-JLPT",
+    "NEW-JLPT::eggrolls-JLPT10k-v3",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::1-N4+N5",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::2-N3",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::2-N3::1-高频",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::2-N3::2-中低频",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::3-N2",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::3-N2::1-高频",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::3-N2::2-中低频",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::4-N1",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::4-N1::1-高频",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::4-N1::2-中频",
+    "NEW-JLPT::eggrolls-JLPT10k-v3::4-N1::3-低频",
+    "NEW-JLPT::sentence",
+    "Re:ゼロから始める異世界生活",
+    "Seentence SOS",
+    "Sentence 3",
+    "Sentence 4",
+    "StudyOS",
+    "X Chinese",
+    "実験",
+    "銀河英雄伝説"
+  ],
+  "anki": {
+    "version": 6,
+    "decksBefore": 84
+  },
+  "historyBefore": null,
+  "historyBeforeCount": 0,
+  "sidecar": {
+    "pid": 29212,
+    "port": 55943,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "4af8a2cd-f848-4ed7-9456-5c19d06aa3f3",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "openAttempts": 1,
+  "draft": {
+    "fields": 6,
+    "firstText": "The cat is sleeping by the window."
+  },
+  "entry": {
+    "id": "video-core-mine-msbdzefs-4-0",
+    "status": "exported",
+    "noteId": 1785650130128,
+    "destination": "StudyOS::_MigrationProbe",
+    "term": "The cat is sleeping by the window.",
+    "sentence": "The cat is sleeping by the window.",
+    "localFilePath": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47mine4\\cue-library\\Sousou no Frieren - 01.mkv"
+  },
+  "panelMessage": "Mined to StudyOS::_MigrationProbe.",
+  "ankiNote": {
+    "noteId": 1785650130128,
+    "modelName": "JP Study App::JA-EN Classic",
+    "tags": [
+      "cue-4-0",
+      "jp-study-app",
+      "jp-study-app::p1-ja-focus",
+      "media-154587",
+      "video-core"
+    ],
+    "fields": [
+      "Term",
+      "Reading",
+      "Meaning",
+      "Sentence"
+    ]
+  },
+  "ankiDeckOfNote": "StudyOS::_MigrationProbe",
+  "snapshotSettleMs": null,
+  "settleDiag": {
+    "hostPresent": true,
+    "refreshPresent": true,
+    "refreshDisabled": true,
+    "statusText": "Reading your mining history…"
+  },
+  "bridgeTimings": {
+    "error": "Runtime.evaluate timed out"
+  },
+  "rollup": {
+    "empty": false,
+    "cards": 1,
+    "stages": [
+      "untracked"
+    ],
+    "terms": [
+      "The cat is sleeping by the window."
+    ],
+    "stats": [
+      {
+        "label": "Cards",
+        "value": "1"
+      },
+      {
+        "label": "Need a look",
+        "value": "0"
+      },
+      {
+        "label": "Known",
+        "value": "0"
+      },
+      {
+        "label": "New",
+        "value": "0"
+      },
+      {
+        "label": "Not tracked",
+        "value": "1"
+      }
+    ],
+    "note": "1 card sits outside your profile’s sync query, so Anki was never asked about it."
+  },
+  "verdict": "PASS",
+  "result": "PASS",
+  "cleanup": {
+    "noteDeleted": "{\"ok\":true}",
+    "residualNotes": 0,
+    "probeDeckRemoved": true,
+    "decksAfter": 84,
+    "deckCountUnchanged": true,
+    "decksCreatedAndLeftBehind": [],
+    "historyRestored": true
+  },
+  "finishedAt": "2026-08-02T05:58:02.334Z",
+  "log": [
+    "[mining] PASS — 0a Anki answers and the deck list is recorded: AnkiConnect v6, 84 decks",
+    "[mining] MEASURED — 0b the mining history before anything is driven: 0 entries — this is the state the OPEN row described",
+    "[mining] PASS — 0c sidecar ready: pid 29212, port 55943, v3.10.2",
+    "[mining] PASS — 1 the fixture is playing in Blanc: {\"readyState\":4,\"duration\":30.386} after 1 open attempt(s)",
+    "[mining] PASS — 2 the mining panel has a real cue to mine: button enabled, term \"The cat is sleeping by the window.\"",
+    "[mining] PASS — 3 the destination is set through the real input: StudyOS::_MigrationProbe (read back: 1)",
+    "[mining] PASS — 4 the app mined a real card through its own button: status exported, noteId 1785650130128, destination StudyOS::_MigrationProbe",
+    "[mining] PASS — 4b Anki confirms the note by id: noteId 1785650130128, model JP Study App::JA-EN Classic, deck StudyOS::_MigrationProbe",
+    "[mining] PASS — 5 the Review segment is open in the real workspace: host launcher, review clicked",
+    "[mining] MEASURED — 5b the panel finished loading its Anki snapshot: NOT settled in 90 s: {\"hostPresent\":true,\"refreshPresent\":true,\"refreshDisabled\":true,\"statusText\":\"Reading your mining history…\"}; bridge {\"error\":\"Runtime.evaluate timed out\"}",
+    "[mining] PASS — 6 the rollup shows the mined card in the app: 1 card(s), stages [\"untracked\"], stats [{\"label\":\"Cards\",\"value\":\"1\"},{\"label\":\"Need a look\",\"value\":\"0\"},{\"label\":\"Known\",\"value\":\"0\"},{\"label\":\"New\",\"value\":\"0\"},{\"label\":\"Not tracked\",\"value\":\"1\"}]"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-02_08-54-58.log"
+}

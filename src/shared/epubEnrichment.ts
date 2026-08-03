@@ -4,8 +4,8 @@ import type {
   ExcludeNamesOptions,
   MiningCandidate,
   TraditionalMiningConfig,
-} from './mining';
-import { DEFAULT_TRADITIONAL_MINING_CONFIG } from './mining';
+} from './miningTypes';
+import { DEFAULT_TRADITIONAL_MINING_CONFIG } from './miningTypes';
 import {
   matchesChineseNameHeuristic,
   matchesRussianNameHeuristic,

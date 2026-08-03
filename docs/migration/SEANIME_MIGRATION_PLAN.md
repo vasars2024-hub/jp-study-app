@@ -631,9 +631,25 @@ Typed capability registry over the same services; preview/confirm/cancel/audit; 
 computed outside the model; no prompt-granted capability.
 
 ### Phase 8 — Deferred, in this order
-Authenticated MAL sync → secure browser/overlay host → YouTube & Avant-Garde discovery →
+Authenticated MAL sync → secure browser/overlay host → YouTube ~~& Avant-Garde~~ discovery →
 Chrome-extension parity → (only if ever justified) mpv-prism/native player as an *external
 player profile*.
+
+> **"& Avant-Garde" struck 2026-08-03 — it was never a feature.** Investigated by slice 71 and
+> verified independently:
+> - **"Avant Garde" is a MyAnimeList genre** (MAL's 2022 rename of "Dementia"), and this repo
+>   *already implements it as data*: `src/shared/mediaDiscovery.ts:164` scores it `'avant garde': 3.2`
+>   in `GENRE_DIFFICULTY`, sitting among `romance`, `school`, `sports`, `gourmet`, `kids`,
+>   `adventure`, `action`, `fantasy`. It arrives as a `genres[]` string from Jikan and votes in
+>   `estimateDifficulty`.
+> - It appears **nowhere in the pinned Seanime upstream** (`9bdd052`) — grepped directly.
+> - Of its five occurrences in this repo, **four are this one sentence quoting itself**; the fifth
+>   is the genre weight above.
+> - `FEATURE_PARITY_LEDGER.md:106-110` is the authoritative deferred list, and every other Phase 8
+>   item traces to a ledger row. **This one traces to nothing.**
+>
+> Phase 8 item 3 is therefore **YouTube discovery**, full stop. Left struck rather than deleted so
+> the next reader sees the question was asked and answered instead of asking it again.
 
 ### Phase 9 — Hardening and retirement
 CSP, dependency+license audit, accessibility, interrupted-migration and interrupted-download

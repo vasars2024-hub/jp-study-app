@@ -18,6 +18,7 @@ import type { Database, SqlJsStatic } from 'sql.js';
 import {
   extractExpressions,
   looksLikeUpgradeStub,
+  modelsFromNormalizedRows,
   parseModels,
   type ApkgImportResult,
 } from '../../shared/apkgParse';
@@ -101,8 +102,24 @@ function readCollectionBytes(zip: AdmZip): Uint8Array {
 /** Read (mid, flds) note rows and the models blob out of an open collection. */
 function readNotes(db: Database): ApkgImportResult {
   const modelsRes = db.exec('SELECT models FROM col LIMIT 1');
-  const modelsJson = (modelsRes[0]?.values?.[0]?.[0] as string | undefined) ?? '{}';
-  const models = parseModels(modelsJson);
+  const modelsJson = (modelsRes[0]?.values?.[0]?.[0] as string | undefined) ?? '';
+  const models = modelsJson.trim()
+    ? parseModels(modelsJson)
+    : (() => {
+      const normalized = db.exec(`
+        SELECT n.id, n.name, f.ord, f.name
+        FROM notetypes n
+        JOIN fields f ON f.ntid = n.id
+        ORDER BY n.id, f.ord
+      `);
+      const rows = normalized[0]?.values ?? [];
+      return modelsFromNormalizedRows(rows.map((row) => ({
+        mid: String(row[0]),
+        modelName: String(row[1] ?? ''),
+        ord: Number(row[2] ?? 0),
+        fieldName: String(row[3] ?? ''),
+      })));
+    })();
 
   const notesRes = db.exec('SELECT mid, flds FROM notes');
   const rows = notesRes[0]?.values ?? [];

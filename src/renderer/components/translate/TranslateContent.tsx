@@ -25,12 +25,12 @@ import {
 import { appendNotebookEvent } from '../../notebookTimeline';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import { getTranslateTarget, setTranslateTarget } from '../../translateTarget';
 
 export type TranslateState = 'idle' | 'loading' | 'translating' | 'done' | 'error';
 export type TranslateTab = 'translate' | 'history';
 
 const SOURCE_KEY = 'jp-study-translate-source';
-const TARGET_KEY = 'jp-study-translate-target';
 
 export const LANG_LABELS: Record<TransLang, string> = {
   ja: '日本語',
@@ -79,7 +79,7 @@ export function useTranslate(): TranslateController {
     return saved ?? getStudyLang();
   });
   const [target, setTarget] = useState<TransLang>(
-    () => (localStorage.getItem(TARGET_KEY) as TransLang) || 'en',
+    () => getTranslateTarget() as TransLang,
   );
   const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
@@ -109,14 +109,14 @@ export function useTranslate(): TranslateController {
   function pickTarget(l: TransLang) {
     const next = l === source ? target : l;
     setTarget(next);
-    localStorage.setItem(TARGET_KEY, next);
+    setTranslateTarget(next);
   }
 
   function swap() {
     setSource(target);
     setTarget(source);
     localStorage.setItem(SOURCE_KEY, target);
-    localStorage.setItem(TARGET_KEY, source);
+    setTranslateTarget(source);
     if (target === 'ja' || target === 'zh') setStudyLang(target);
     setInput(output);
     setOutput(input);

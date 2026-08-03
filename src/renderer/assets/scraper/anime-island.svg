@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Sky island placeholder artwork">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#5c9fe3"/>
+      <stop offset=".55" stop-color="#b8e3f1"/>
+      <stop offset="1" stop-color="#e9d6b4"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#bg)"/>
+  <g fill="#fff" opacity=".72">
+    <ellipse cx="56" cy="66" rx="46" ry="15"/>
+    <ellipse cx="91" cy="51" rx="35" ry="18"/>
+    <ellipse cx="258" cy="82" rx="59" ry="17"/>
+  </g>
+  <path d="M77 119c39-26 87-33 142-17l-19 35H98z" fill="#477b57"/>
+  <path d="M98 137h102l-31 32h-42z" fill="#8a6d57"/>
+  <path d="M156 45l9 38 28 18h-62l25-18z" fill="#eff8ff" stroke="#31536c" stroke-width="2"/>
+  <text x="18" y="28" fill="#102b49" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700">ISLAND ABOVE</text>
+  <text x="19" y="47" fill="#204b70" font-family="sans-serif" font-size="10" letter-spacing="2">EPISODE 05</text>
+</svg>

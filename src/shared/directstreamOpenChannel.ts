@@ -1,9 +1,12 @@
 /**
  * One directstream open at a time, and never an old one after a new one — Phase 6 slice 37.
  *
- * **This is the blocker slice 32 named, and nothing here is wired.** Read
- * `directstreamOpenRecovery.ts`'s stage-2 block first; this module is only the transport half
- * it says is missing.
+ * **Wired by slice 44** (2026-08-02) into `src/media/StudyPlayerSlice.tsx`: the launch
+ * supersedes, the stage-1 recovery asks before posting, every POST carries a generation, and
+ * the RESPONSE settles the channel. Read `directstreamOpenRecovery.ts`'s stage-2 block first;
+ * this module is the transport half it says is missing. What is wired is argued and tested,
+ * not measured — no live run has been taken against it, and slice 44's entry in
+ * `docs/migration/NEXT_SESSION.md` says exactly which one is owed.
  *
  * ## The problem, in the words of the run that produced it
  *
@@ -47,10 +50,16 @@
  *
  * The residual hole this cannot close: an open the client abandons and the sidecar processes
  * anyway, where the client never learns when it finished. **Only a generation the sidecar can
- * reject closes that**, i.e. a patch alongside
- * `patches/seanime/0003-video-core-active-player-and-loaded-announce.patch`. Until then, hold
- * the channel across the abort (the state is module-scoped for exactly that reason, the way
- * `seanimeSocketPool` is) and let the response settle it.
+ * reject closes that**, and slice 41 wrote it:
+ * `patches/seanime/0004-directstream-open-generation.patch`, verified against a fresh clone of
+ * the pin (`docs/migration/tools/verify-open-generation-patch.mjs`). Slice 44 sends the
+ * client's side of it — see {@link DirectstreamOpenGenerations} for why the number cannot be
+ * the request id. **That patch is not applied to any sidecar this app runs**: it is absent
+ * from `build-patched-sidecar.mjs`'s list, so today the field is accepted and ignored, and
+ * the client rules below are the whole of the live protection.
+ *
+ * Either way, hold the channel across the abort (the state is module-scoped for exactly that
+ * reason, the way `seanimeSocketPool` is) and let the response settle it.
  *
  * Pure, and in `shared/` for `directstreamOpenRecovery.ts`'s reason: `src/media/**` is outside
  * every `vitest.config.ts` include glob.
@@ -242,4 +251,72 @@ export function directstreamOpenReset(
   channel: DirectstreamOpenChannel,
 ): DirectstreamOpenChannel {
   return { ...channel, currentRequestId: null, queued: null, queuedAt: null };
+}
+
+/* ------------------------------------------------------------------------------------- *
+ * THE GENERATION — what goes on the wire, and why it is NOT the request id.
+ * ------------------------------------------------------------------------------------- */
+
+/**
+ * The client's own monotonically increasing id for an open, paired with the request that
+ * minted it. Sent as `generation` on the open body and read by `Manager.AcceptOpenGeneration`
+ * (`patches/seanime/0004-directstream-open-generation.patch`), whose rule is: **strictly older
+ * is refused, equal is accepted because equal is the legitimate recovery, newer becomes the
+ * bar, and `<= 0` means unspecified and is always accepted.**
+ *
+ * ## The record asked for `generation: requestId`, and that would have been wrong
+ *
+ * The sidecar's rule is an ORDER. `requestId` is not one, because it has two producers:
+ *
+ *  - `normalizeMediaWorkspaceOpenRequest`'s default — `Date.now()`, monotonic, ~1.75e12.
+ *  - `BlancStudyPlayer`'s `hashRequestId` — an FNV-1a hash `>>> 0`, deliberately derived from
+ *    the item and its resume point rather than from a clock, so that a re-render is not read
+ *    as a new request (slice 23 depends on this). It lands anywhere in [0, 2^32) in **no
+ *    order at all**, and a hash of 0 would read as "unspecified".
+ *
+ * So `generation: requestId` would have refused a perfectly good Blanc open every time the
+ * next file's hash came out smaller than the last one's, silently and for the life of that
+ * client id; and a single `Date.now()` open would have refused every Blanc open after it. The
+ * failure mode is a play button that stops working and an error message that blames the file.
+ *
+ * The order therefore comes from a counter this module keeps. The request id is used only to
+ * decide whether an open is the SAME one — a recovery, which must send the SAME generation —
+ * or a new one.
+ *
+ * Scope: one counter per renderer realm, which is also one per open channel and one per
+ * `clientId`, since `AcceptOpenGeneration` orders each client id independently. Blanc's
+ * toolbox is a separate `BrowserWindow` and therefore a separate module instance, so its
+ * counter and the main window's never have to agree.
+ */
+export interface DirectstreamOpenGenerations {
+  /** The request the current generation belongs to. `null` before the first open. */
+  readonly requestId: number | null;
+  /** What goes on the wire. 0 before the first open, which the sidecar reads as unspecified. */
+  readonly generation: number;
+}
+
+export const directstreamOpenGenerationsIdle: DirectstreamOpenGenerations = {
+  requestId: null,
+  generation: 0,
+};
+
+/**
+ * The generation for `requestId`: the one already in use if this is the same open, otherwise
+ * the next one up.
+ *
+ * **For a LAUNCH only.** A recovery must reuse the generation its launch minted — that is the
+ * equal case the sidecar accepts — and calling this with a superseded request id would mint a
+ * *newer* generation for an *older* open, which is the exact inversion this whole module
+ * exists to prevent. Nothing here can enforce that, so the caller's structure does:
+ * {@link directstreamOpenRequest} drops a superseded recovery before any body is built, and
+ * the recovery path reads {@link DirectstreamOpenGenerations.generation} rather than calling
+ * this.
+ */
+export function directstreamOpenGenerationFor(
+  state: DirectstreamOpenGenerations,
+  requestId: number,
+): DirectstreamOpenGenerations {
+  return state.requestId === requestId
+    ? state
+    : { requestId, generation: state.generation + 1 };
 }

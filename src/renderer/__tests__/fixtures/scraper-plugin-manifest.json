@@ -1,0 +1,13 @@
+{
+  "id": "local-anime-audit",
+  "name": "Local Anime Audit Adapter",
+  "version": "1.0.0",
+  "publisher": "Local Tools",
+  "enabled": true,
+  "compatible": true,
+  "permissions": [
+    "network:local.example",
+    "storage:cache"
+  ],
+  "description": "Local manifest used to verify plugin installation."
+}

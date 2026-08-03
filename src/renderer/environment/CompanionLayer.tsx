@@ -52,6 +52,7 @@ import {
 import { BUDDY_SPEECH_EVENT, speakBeepLine, voiceForType, type BuddySpeechDetail } from './beepSpeech';
 import { pickDialogueLine, type DialogueContext } from './dialoguePools';
 import { getUserLevel, onLevelChange } from '../levelService';
+import { useT } from '../i18n';
 
 const SIZE = 52;
 const SHIMEJI_SIZE = 96;
@@ -112,8 +113,6 @@ function secretLifecycleSuspended(): boolean {
   return document.documentElement.classList.contains('secret-lifecycle-suspended');
 }
 
-const TREASURE_MSG = 'You have to first find my treasure.';
-
 function isTreasureLockedBonzi(c: CompanionInstance): boolean {
   return c.typeId === 'miko-shimeji' && !hasDiscoveredAero();
 }
@@ -159,6 +158,7 @@ function seedOrLoad(env: EnvironmentSettings, w: number, h: number): CompanionIn
 }
 
 export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
+  const { t, lang } = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const [list, setList] = useState<CompanionInstance[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -586,41 +586,38 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
         let mood: CompanionMood = c.mood;
         let status = c.status;
         if (kind === 'study' || kind === 'flashcard') {
-          if (c.typeId === 'study-buddy' || c.typeId === 'noctis' || Math.random() < 0.5) {
+          if (c.typeId === 'study-buddy' || Math.random() < 0.5) {
             mood = envRef.current.companionCelebrate !== false ? 'celebrate' : 'happy';
-            if (c.typeId === 'noctis') {
-              status = kind === 'flashcard' ? 'Crystal warmed' : note ? `Light from · ${note}` : 'City grows';
-            } else {
-              status = kind === 'flashcard' ? 'Card cleared!' : note ? `Reading · ${note}` : 'Nice focus';
-            }
+            status =
+              kind === 'flashcard'
+                ? 'Card cleared!'
+                : note
+                  ? `Reading · ${note}`
+                  : 'Nice focus';
           }
         } else if (kind === 'streak' || kind === 'achievement') {
           if (
             envRef.current.achievementCelebrations !== false &&
-            (c.typeId === 'study-buddy' || c.typeId === 'noctis' || Math.random() < 0.6)
+            (c.typeId === 'study-buddy' || Math.random() < 0.6)
           ) {
             mood = 'celebrate';
             status = note ?? (kind === 'streak' ? 'Streak!' : 'Milestone');
           }
         } else if (kind === 'calendar') {
-          if (c.typeId === 'noctis' || c.typeId === 'timekeeper' || c.typeId === 'study-buddy') {
+          if (c.typeId === 'timekeeper' || c.typeId === 'study-buddy') {
             mood = note?.toLowerCase().includes('exam') ? 'curious' : 'happy';
             status = note ?? 'Calendar note';
           }
         } else if (kind === 'music-play') {
-          mood = c.typeId === 'critter' || c.typeId === 'noctis' ? 'curious' : 'happy';
-          status = c.typeId === 'noctis' ? 'Resonating' : 'Feeling the music';
+          mood = c.typeId === 'critter' ? 'curious' : 'happy';
+          status = 'Feeling the music';
         } else if (kind === 'music-stop') {
           mood = 'calm';
-          status =
-            c.typeId === 'timekeeper' ? 'Quiet hours' : c.typeId === 'noctis' ? 'Still listening' : status;
+          status = c.typeId === 'timekeeper' ? 'Quiet hours' : status;
         } else if (kind === 'morning') {
           if (c.typeId === 'timekeeper') {
             mood = 'curious';
             status = 'Good morning';
-          } else if (c.typeId === 'noctis') {
-            mood = 'calm';
-            status = 'Dawn under the canopy';
           }
         } else if (kind === 'night') {
           if (c.typeId === 'timekeeper') {
@@ -629,9 +626,6 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
           } else if (c.typeId === 'critter') {
             mood = 'sleepy';
             status = 'Curling up';
-          } else if (c.typeId === 'noctis') {
-            mood = 'curious';
-            status = 'Night ecology awake';
           }
         } else if (kind === 'environment') {
           // The world shifted (preset / weather change) — a gentle acknowledgement.
@@ -751,12 +745,12 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     (c: CompanionInstance) => {
       setShakeId(c.id);
       window.setTimeout(() => setShakeId((id) => (id === c.id ? null : id)), 420);
-      patchCompanion(c.id, { mood: 'curious', status: 'Find my treasure…' });
+      patchCompanion(c.id, { mood: 'curious', status: t('companion.treasure.seeking') });
       window.dispatchEvent(
-        new CustomEvent('os:toast', { detail: { message: TREASURE_MSG, kind: 'warn' } }),
+        new CustomEvent('os:toast', { detail: { message: t('companion.treasure.locked'), kind: 'warn' } }),
       );
     },
-    [patchCompanion],
+    [patchCompanion, lang],
   );
 
   const onPointerDown = (c: CompanionInstance) => (e: RPointerEvent<HTMLDivElement>) => {
@@ -909,8 +903,8 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
             }}
             title={
               lockedTreasure
-                ? `${def.label} — ${TREASURE_MSG}`
-                : `${def.label}${c.status ? ` — ${c.status}` : ''} · Click: run · Right-click: menu`
+                ? `${def.label} — ${t('companion.treasure.locked')}`
+                : `${def.label}${c.status ? ` — ${c.status}` : ''} · ${t('companion.tooltip.hint')}`
             }
             onPointerDown={onPointerDown(c)}
             onClick={onBuddyClick(c)}
@@ -947,7 +941,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
               type="button"
               className="os-companion-menu-btn"
               style={{ transform: companionChromeCounterScale(c.facing, c.edge) }}
-              title="Buddy menu"
+              title={t('companion.menu.button')}
               aria-label={`${def.label} menu`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -979,7 +973,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                       setMenuId(null);
                     }}
                   >
-                    Run: {r.name}
+                    {t('companion.menu.run', { name: r.name })}
                   </button>
                 ))}
                 <button
@@ -991,7 +985,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                     );
                   }}
                 >
-                  {c.locked ? 'Unlock' : 'Lock place'}
+                  {c.locked ? t('companion.menu.unlock') : t('companion.menu.lock')}
                 </button>
                 <button
                   type="button"
@@ -1004,7 +998,7 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                     setMenuId(null);
                   }}
                 >
-                  Hide 1 hour
+                  {t('companion.menu.hideHour')}
                 </button>
                 <button
                   type="button"
@@ -1019,10 +1013,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                     setMenuId(null);
                   }}
                 >
-                  Configure routines
+                  {t('companion.menu.configureRoutines')}
                 </button>
                 <button type="button" className="btn small" onClick={() => setMenuId(null)}>
-                  Close
+                  {t('common.close')}
                 </button>
               </div>
             )}

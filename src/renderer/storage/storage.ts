@@ -45,6 +45,10 @@ export const IDB_KEYS = {
   grammarSessionOptions: 'grammar-session-options',
   /** Versioned envelope of completed practice sessions, newest first. */
   grammarSessionHistory: 'grammar-session-history',
+  /** Versioned media language profiles and study-session history. */
+  mediaStudy: 'media-study-database',
+  /** Potentially large imported JLPT/HSK/custom vocabulary lists. */
+  levelLists: 'level-lists',
 } as const;
 
 /** localStorage keys that hold the matching hot-path caches. */
@@ -53,6 +57,8 @@ export const LS_KEYS = {
   csvEditor: 'jp-study-csv-editor-v1',
   clipboardHistory: 'jp-clipboard-history',
   calendarEvents: 'jp-calendar-events',
+  mediaTracking: 'jp-media-tracking-v1',
+  mediaStudy: 'jp-media-study-database-v1',
 } as const;
 
 /** localStorage keys that are pure UI state (kept out of IndexedDB). */
@@ -116,13 +122,8 @@ function estimateBytes(value: unknown): number {
   }
 }
 
-export function formatBytes(bytes: number): string {
-  const n = Math.max(0, Number(bytes) || 0);
-  if (n < 1024) return `${Math.round(n)} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
+// `formatBytes` lives in shared/assetRegistry (tested, handles TB, used in ~40
+// places). A second copy here formatted the same numbers differently.
 
 async function collectIdbSnapshot(): Promise<Record<string, unknown>> {
   const idb: Record<string, unknown> = {};

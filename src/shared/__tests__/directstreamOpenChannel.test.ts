@@ -10,12 +10,15 @@ import { describe, expect, it } from 'vitest';
 import {
   DIRECTSTREAM_OPEN_QUEUE_DEADLINE_MS,
   directstreamOpenChannelIdle,
+  directstreamOpenGenerationFor,
+  directstreamOpenGenerationsIdle,
   directstreamOpenOverdue,
   directstreamOpenRequest,
   directstreamOpenReset,
   directstreamOpenSettled,
   directstreamOpenSupersede,
   type DirectstreamOpenChannel,
+  type DirectstreamOpenGenerations,
   type DirectstreamOpenTicket,
 } from '../directstreamOpenChannel';
 
@@ -332,5 +335,168 @@ describe('the sequence that failed retirement-step3-20260801094543', () => {
     client.settle();
     expect(client.issued).toEqual([launch(1), recovery(1), launch(2)]);
     // Server order is launch(1), recovery(1), launch(2) — the newest intent last, always.
+  });
+});
+
+/* ------------------------------------------------------------------------------------- *
+ * THE GENERATION — the number slice 44 puts on the wire.
+ * ------------------------------------------------------------------------------------- */
+
+/**
+ * `Manager.AcceptOpenGeneration`, transcribed line for line from
+ * `patches/seanime/0004-directstream-open-generation.patch` (slice 41). Modelled rather than
+ * described because the client half is only correct RELATIVE to this rule, and a paragraph
+ * cannot be run against it.
+ *
+ * Verified against a fresh clone of the pin by
+ * `docs/migration/tools/verify-open-generation-patch.mjs`, whose five Go subtests assert
+ * exactly these branches. This is a model of a verified patch; it is NOT evidence that any
+ * sidecar this app launches runs it — none does, since 0004 is absent from
+ * `build-patched-sidecar.mjs`.
+ */
+class SidecarGenerationModel {
+  private readonly bar = new Map<string, number>();
+  /** Every open the sidecar would have let through to `BeginOpen`. */
+  accepted: number[] = [];
+  refused: number[] = [];
+
+  accept(clientId: string, generation: number): boolean {
+    if (clientId === '' || generation <= 0) {
+      this.accepted.push(generation);
+      return true;
+    }
+    const last = this.bar.get(clientId);
+    if (last !== undefined && generation < last) {
+      this.refused.push(generation);
+      return false;
+    }
+    this.bar.set(clientId, generation);
+    this.accepted.push(generation);
+    return true;
+  }
+}
+
+/** The caller's rule: mint on a launch, re-read on a recovery. Slice 44's wiring, in miniature. */
+class GenerationClient {
+  state: DirectstreamOpenGenerations = directstreamOpenGenerationsIdle;
+
+  launch(requestId: number): number {
+    this.state = directstreamOpenGenerationFor(this.state, requestId);
+    return this.state.generation;
+  }
+
+  /** Never mints — see `directstreamOpenGenerationFor`'s header for why that is structural. */
+  recovery(): number {
+    return this.state.generation;
+  }
+}
+
+describe('the generation, and why it is not the request id', () => {
+  it('mints the next number for a new request and keeps it for the same one', () => {
+    const client = new GenerationClient();
+    expect(client.launch(1_000)).toBe(1);
+    expect(client.launch(1_000)).toBe(1);   // the StrictMode double-invoke, not a new open
+    expect(client.recovery()).toBe(1);      // …and neither is a recovery
+    expect(client.launch(2_000)).toBe(2);
+    expect(client.recovery()).toBe(2);
+  });
+
+  it('starts above zero, because zero is what the sidecar reads as "unspecified"', () => {
+    expect(directstreamOpenGenerationsIdle.generation).toBe(0);
+    expect(new GenerationClient().launch(7)).toBeGreaterThan(0);
+  });
+
+  it('returns the identical object when nothing changed, so a re-render writes nothing', () => {
+    const first = directstreamOpenGenerationFor(directstreamOpenGenerationsIdle, 42);
+    expect(directstreamOpenGenerationFor(first, 42)).toBe(first);
+  });
+
+  /**
+   * THE REASON THIS EXISTS. `BlancStudyPlayer.hashRequestId` is an FNV-1a hash `>>> 0` of
+   * `${item.id}@${positionSec}` — deliberately not a clock, so a re-render is not read as a
+   * new request. These four are the real function's output for four plausible items, and
+   * they are not in order: `generation: requestId` would have had the sidecar refuse the
+   * user's 2nd, 3rd and 4th file and answer "stale open request" forever after.
+   */
+  it('orders opens that hashRequestId does not', () => {
+    const hashRequestId = (id: string, positionSec: number | undefined): number => {
+      let hash = 2166136261;
+      for (const char of `${id}@${positionSec ?? 0}`) {
+        hash ^= char.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    };
+    const requestIds = [
+      hashRequestId('media-frieren-01', 0),
+      hashRequestId('media-frieren-02', 0),
+      hashRequestId('media-frieren-03', 12.5),
+      hashRequestId('media-bocchi-01', 300),
+    ];
+    // Not sorted — that is the whole hazard, stated as a measurement rather than a worry.
+    expect(requestIds).not.toEqual([...requestIds].sort((a, b) => a - b));
+
+    const sidecar = new SidecarGenerationModel();
+    const client = new GenerationClient();
+    for (const requestId of requestIds) sidecar.accept('client-a', client.launch(requestId));
+    expect(sidecar.accepted).toEqual([1, 2, 3, 4]);
+    expect(sidecar.refused).toEqual([]);
+
+    // …and the naive wiring the record asked for, run through the same sidecar.
+    const naive = new SidecarGenerationModel();
+    for (const requestId of requestIds) naive.accept('client-a', requestId);
+    expect(naive.refused.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The other half of the same hazard: `normalizeMediaWorkspaceOpenRequest` defaults the
+   * request id to `Date.now()` (~1.75e12) while a hash is under 2^32, so one event-driven
+   * open would have raised the bar past every Blanc open that could ever follow it.
+   */
+  it('is unaffected by two producers on one client id', () => {
+    const client = new GenerationClient();
+    const sidecar = new SidecarGenerationModel();
+    sidecar.accept('client-a', client.launch(1_754_000_000_000));  // Date.now()
+    sidecar.accept('client-a', client.launch(3_120_546_881));      // a Blanc hash
+    expect(sidecar.refused).toEqual([]);
+
+    const naive = new SidecarGenerationModel();
+    naive.accept('client-a', 1_754_000_000_000);
+    naive.accept('client-a', 3_120_546_881);
+    expect(naive.refused).toEqual([3_120_546_881]);
+  });
+
+  /**
+   * The property the whole thing is for, told as the failing run's timeline: the stale
+   * recovery the CLIENT could not recall is refused by the SERVER, and the launch that
+   * overtook it is not.
+   */
+  it('refuses a recovery for the open the user moved off, and accepts the one for the current', () => {
+    const client = new GenerationClient();
+    const sidecar = new SidecarGenerationModel();
+
+    const forN = client.launch(1);
+    sidecar.accept('client-a', forN);           // launch N
+    const staleRecovery = client.recovery();    // stage 2 fires for N at 10 724 ms
+    sidecar.accept('client-a', client.launch(2));  // launch N+1 at ~20.9 s
+    // The abandoned POST lands AFTER N+1's stream is live — the sequence that failed
+    // retirement-step3-20260801094543.
+    expect(sidecar.accept('client-a', staleRecovery)).toBe(false);
+
+    expect(sidecar.accepted).toEqual([1, 2]);
+    expect(sidecar.refused).toEqual([1]);
+    // A recovery for the CURRENT request is the equal case, and must still get through.
+    expect(sidecar.accept('client-a', client.recovery())).toBe(true);
+  });
+
+  it('orders each client id independently, so two windows never refuse each other', () => {
+    const sidecar = new SidecarGenerationModel();
+    const blanc = new GenerationClient();
+    const main = new GenerationClient();
+    expect(sidecar.accept('blanc', blanc.launch(11))).toBe(true);
+    expect(sidecar.accept('blanc', blanc.launch(12))).toBe(true);
+    // A second realm has its own counter and starts back at 1; a shared bar would refuse it.
+    expect(sidecar.accept('main-window', main.launch(99))).toBe(true);
+    expect(sidecar.refused).toEqual([]);
   });
 });

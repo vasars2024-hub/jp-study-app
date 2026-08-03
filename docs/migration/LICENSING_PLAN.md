@@ -4,12 +4,46 @@ Governed by **ADR-001** — the combined work becomes GPL-3.0, flipped at the st
 **This is engineering analysis, not legal advice.** If the app is ever distributed publicly,
 get a specialist review first.
 
-## Current declaration
+## Current declaration — UPDATED 2026-08-02
 
-`package.json`: `"license": "MIT"`, `"private": true`.
-**This is already inaccurate** — see the `ffmpeg-static` row below.
+`package.json`: **`"license": "GPL-3.0-or-later"`**, `"private": true`. The ADR-001 flip has
+happened. *(This section previously read `"license": "MIT"` and called it inaccurate; that was
+true when written and had not been revisited.)*
 
-## Runtime dependency audit — 2026-07-27
+## Transitive audit — 2026-08-02 (slice 47i), re-runnable
+
+```
+node docs/migration/tools/license-audit-gate.mjs          # exit 0 = posture unchanged
+```
+
+The 2026-07-27 table below covers **17** declared runtime dependencies. `package.json` now
+declares **81**, and the lockfile resolves **623 non-dev packages**. The checklist item
+"`npx license-checker --production` over the transitive tree" is now done — by a gate that
+reads the *installed* tree rather than a registry, because what ships is what is on disk, and
+because installing `license-checker` to answer a question about what is installed is circular.
+
+| Class | Count | Notes |
+|---|---:|---|
+| permissive | 600 | MIT/ISC/BSD/Apache-2.0 |
+| dual, permissive branch available | 4 | `jszip (MIT OR GPL-3.0-or-later)`, `rc`, `type-fest` ×2 — an `OR` is the licensee's choice |
+| weak copyleft | 15 | `@img/sharp-libvips-*` (LGPL-3.0) and **`jassub`** |
+| **strong copyleft** | **2** | `ffmpeg-static` (GPL-3.0-or-later) and **`rvfc-polyfill` (GPL-3.0)** |
+| AGPL | **0** | the one family that would change the answer rather than the paperwork |
+| no declared license | 2 | `fast-shallow-equal`, `react-universal-interface` |
+
+**`rvfc-polyfill` was not in any record.** A GPL-3.0 `requestVideoFrameCallback` polyfill in the
+shipped tree. It is *fine* for a GPL-3.0-or-later work — the point is that it arrived without a
+decision, which is exactly what an unchecked box hides. It is now on the gate's acknowledged
+list, so a *third* one appearing fails the gate.
+
+`jassub` (LGPL) is the subtitle renderer this migration adopted; LGPL→GPL-3.0 is permitted.
+
+> A gate correctness note, kept because it nearly became a false finding: the first run
+> reported `jszip` as unrecorded strong copyleft. `(MIT OR GPL-3.0-or-later)` is a **choice**,
+> and taking MIT is permitted. Only an expression whose every branch is copyleft constrains
+> anything.
+
+## Runtime dependency audit — 2026-07-27 (superseded by the table above, kept for its reasoning)
 
 All 17 declared runtime dependencies, read from installed `node_modules/*/package.json`:
 
@@ -79,8 +113,23 @@ subtitles, personal mined sentences, media files. Verified absent from `git ls-f
 
 ## Seanime-specific obligations
 
-- **Sidecar (Phases 0–1):** unmodified pinned binary, documented HTTP API. Conventional
-  separate-program posture. Point at upstream `9bdd052…` for source.
+- ~~**Sidecar (Phases 0–1):** unmodified pinned binary, documented HTTP API. Conventional
+  separate-program posture. Point at upstream `9bdd052…` for source.~~
+  **NO LONGER TRUE as of 2026-08-02 (slice 46).** The sidecar this app launches — and the one
+  `SeanimeSidecarStagingPlugin` stages, because it stages the *resolved* binary — is a
+  **modified** build carrying `0002` (dual-subtitle terminal flush) and `0004` (open
+  generation). "Unmodified pinned binary" describes the file preserved beside it as
+  `seanime.exe.pre-patches-20260727`, not the one in use.
+
+  The rule immediately below therefore applies now rather than hypothetically: **the fork's
+  source must be published on distribution.** In practice that source is
+  `patches/seanime/*.patch` (4 files) plus the pinned upstream commit `9bdd052…`, which
+  together reproduce the binary exactly — `build-patched-sidecar.mjs` does so from a clean
+  clone. `license-audit-gate.mjs` fails if the staged sidecar carries patch markers while
+  `patches/seanime/` holds no patch files.
+
+  Nothing is distributed today (`private: true`), so no obligation has attached. **A package
+  built from here on ships the modified server**, and that is the trigger.
 - **UI source adoption (Phase 2+):** preserve upstream copyright headers and `LICENSE`; record
   every adopted file in a provenance manifest with its upstream path and commit; state
   modifications.
@@ -102,8 +151,15 @@ the dangling commits include real parked work.
 
 - [ ] Resolve or remove every **High**/**Unknown** row above
 - [ ] Add the Tatoeba CC BY 2.0 FR attribution notice
-- [ ] `npx license-checker --production` over the transitive tree
-- [ ] Replace `LICENSE`, set `package.json` `"license": "GPL-3.0"`
+- [x] ~~`npx license-checker --production` over the transitive tree~~ — **done 2026-08-02** by
+      `docs/migration/tools/license-audit-gate.mjs`, which reads the installed tree and is
+      re-runnable. 623 shipped packages, 0 AGPL, 2 strong copyleft (both now acknowledged).
+- [x] ~~Replace `LICENSE`, set `package.json` `"license": "GPL-3.0"`~~ — **both done.**
+      `package.json` declares `GPL-3.0-or-later` and `LICENSE` is the GPLv3 text. The gate
+      checks **both**, because they are two separate claims that have disagreed before: the
+      manifest said MIT while the tree already bundled GPL FFmpeg.
+- [ ] **Publish the sidecar fork's source alongside any distributed package** — see the
+      Seanime section above. `patches/seanime/*.patch` + upstream `9bdd052…` is that source.
 - [ ] Start the adopted-file provenance manifest
 - [ ] Extend `.gitignore` for dictionaries, decks, subtitles, media
 - [ ] Decide publish vs stay-private (GPL obligations attach on distribution)

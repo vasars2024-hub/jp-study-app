@@ -1,3 +1,5 @@
+import { NOSTALGIC_WALL_PRESETS } from './nostalgicWallpaperPack';
+
 /** Shared wallpaper presets for the desktop shell and living-layer rotation. */
 
 export interface WallPreset {
@@ -7,9 +9,11 @@ export interface WallPreset {
   animated?: boolean;
   /** Tags used by rotation / particle suggestions. */
   tags?: string[];
+  /** Owning framework pack. Presets without one belong to the core pack. */
+  packId?: string;
 }
 
-export const WALL_PRESETS: WallPreset[] = [
+const CORE_WALL_PRESETS: WallPreset[] = [
   {
     id: 'crimsonveil',
     label: 'Crimson Veil',
@@ -68,6 +72,8 @@ export const WALL_PRESETS: WallPreset[] = [
   },
 ];
 
+export const WALL_PRESETS: WallPreset[] = [...CORE_WALL_PRESETS, ...NOSTALGIC_WALL_PRESETS];
+
 export function getWallPreset(id: string | undefined): WallPreset {
-  return WALL_PRESETS.find((p) => p.id === id) ?? WALL_PRESETS[0];
+  return WALL_PRESETS.find((p) => p.id === id) ?? CORE_WALL_PRESETS[0];
 }

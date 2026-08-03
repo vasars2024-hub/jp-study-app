@@ -144,6 +144,14 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
             ))}
           </ul>
         )}
+        {(point.examples.some((ex) => ex.source === 'tatoeba') ||
+          (exState === 'done' && examples.length > 0)) && (
+          <p className="gram-ex-credit muted">
+            <a href="https://tatoeba.org" target="_blank" rel="noreferrer">
+              {t('grammar.examples.tatoebaCredit')}
+            </a>
+          </p>
+        )}
       </div>
     </article>
   );
@@ -292,5 +300,6 @@ export function parsePracticeDeepLink(detail: unknown): Partial<PracticeFilters>
   if (Array.isArray(d.levels)) out.levels = d.levels as GrammarLevel[];
   if (typeof d.functions === 'string') out.functions = [d.functions as GrammarFunctionId];
   if (Array.isArray(d.functions)) out.functions = d.functions as GrammarFunctionId[];
+  if (typeof d.query === 'string') out.query = d.query;
   return out;
 }

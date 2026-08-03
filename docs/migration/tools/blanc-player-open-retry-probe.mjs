@@ -81,6 +81,7 @@
  * that Blanc's window is the one target whose URL DOES carry a query string.
  */
 import { spawn, spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -145,6 +146,21 @@ const stamp = process.env.RUN_STAMP
   ?? new Date().toISOString().slice(0, 19).replace(/[:T-]/g, '');
 const workRoot = path.join(REPO, 'docs/migration/proof', `blanc-open-retry-${stamp}`);
 fs.mkdirSync(workRoot, { recursive: true });
+/**
+ * CONTROL ONLY — slice 47. With no `--exe`, `SEANIME_EXE` is deleted from the child's
+ * environment and the app resolves its own sidecar, which is the point of this probe and
+ * must stay the default: what ships is what is under test.
+ *
+ * The one legitimate reason to override it is to run the SAME probe against a DIFFERENT
+ * binary as the control half of a differential — `seanime.exe.pre-patches-20260727`, the
+ * bare pin slice 46 replaced. Every use of this flag is a claim about two runs, never one,
+ * and the run records which binary it used so a reader can tell them apart.
+ */
+const EXE_OVERRIDE = flag('exe', '') ? path.resolve(flag('exe', '')) : null;
+if (EXE_OVERRIDE && !fs.existsSync(EXE_OVERRIDE)) {
+  throw new Error(`--exe does not exist: ${EXE_OVERRIDE}`);
+}
+
 /** NEVER inside the repo. */
 const scratchRoot = path.join(os.tmpdir(), `jp-blanc-probe-${stamp}`);
 fs.mkdirSync(scratchRoot, { recursive: true });
@@ -264,6 +280,88 @@ const TRACED_METHODS = new Set([
   'Network.responseReceived',
 ]);
 
+/**
+ * What patch `0002` is measured by — slice 47.
+ *
+ * `summariseTrace` truncates every frame payload to 240 characters so the record stays
+ * readable, and a `subtitle-event` frame carries an ARRAY of cues, so a count of rows says
+ * nothing about how many cues arrived. This reads the RAW trace instead, before that
+ * truncation, and must therefore be called BEFORE `blanc.trace.length = 0`.
+ *
+ * `0002` reorders the terminal branch of `startSubtitleStreamP`: upstream calls
+ * `subtitleStream.Stop(true)` and only then `flushBatch(false)`, and `Stop` cancels the
+ * stream context (`cleanupFunc = subtitleCtxCancel`, `subtitles.go:424`) which makes
+ * `sendSubtitleEvents` return false at its first line (`subtitles.go:151`). So the LAST
+ * batch is dropped. For a local file at offset 0 the flush interval is 300 ms and the batch
+ * cap is 50 (`subtitleFlushConfigFor`), and a 30 s fixture parses in well under one tick —
+ * so the terminal batch is nearly the whole track, and `maxStartTimeMs` is the discriminator
+ * that says so rather than the raw total.
+ */
+function collectSubtitleFrames(trace) {
+  const frames = [];
+  for (const { at, method, params } of trace) {
+    if (method !== 'Network.webSocketFrameReceived') continue;
+    const raw = params?.response?.payloadData ?? '';
+    if (!raw.includes('"subtitle-event"')) continue;
+    let events = null;
+    try {
+      const outer = JSON.parse(raw);
+      // native-player -> subtitle-event -> { events: [...] }. `SubtitleEvents` (no gen) sends
+      // the bare array instead of the payload struct, so accept both shapes.
+      const inner = outer?.payload?.payload;
+      events = Array.isArray(inner) ? inner : inner?.events;
+    } catch { frames.push({ at, parseError: true }); continue; }
+    if (!Array.isArray(events)) { frames.push({ at, parseError: true }); continue; }
+    frames.push({ at, events });
+  }
+  return frames;
+}
+
+function tallySubtitleFrames(frames) {
+  const tally = {
+    frames: 0, events: 0, unique: 0, byTrack: {},
+    minStartTimeMs: null, maxStartTimeMs: null, lastText: null, parseErrors: 0,
+  };
+  const seen = new Set();
+  for (const frame of frames) {
+    if (frame.parseError) { tally.parseErrors += 1; continue; }
+    tally.frames += 1;
+    for (const ev of frame.events) {
+      tally.events += 1;
+      const track = String(ev?.trackNumber ?? '?');
+      tally.byTrack[track] = (tally.byTrack[track] ?? 0) + 1;
+      const start = Number(ev?.startTime);
+      if (Number.isFinite(start)) {
+        if (tally.minStartTimeMs === null || start < tally.minStartTimeMs) tally.minStartTimeMs = start;
+        if (tally.maxStartTimeMs === null || start > tally.maxStartTimeMs) {
+          tally.maxStartTimeMs = start;
+          tally.lastText = String(ev?.text ?? '').slice(0, 80);
+        }
+      }
+      seen.add(`${track}:${start}:${String(ev?.text ?? '').slice(0, 40)}`);
+    }
+  }
+  tally.unique = seen.size;
+  return tally;
+}
+
+/**
+ * WHY THE VERDICT IS RUN-LEVEL AND NOT PER STEP — read this before comparing two records.
+ *
+ * The patch only changes the branch where `errCh` yields a terminal `nil`, i.e. the
+ * "Subtitle streaming completed by parser." path. The goroutine's other two exits —
+ * `ctx.Done()`, and both channels closing — behave identically in both builds: the first
+ * drops the batch in either build, the second flushes in either build. Step 1's open is
+ * routinely cancelled mid-parse by the StrictMode churn, so WHICH of the two opens reaches
+ * the terminal branch varies between runs, and it moved between the two subject runs of
+ * slice 47 (step 1 got the whole track in one, step 2 in the other).
+ *
+ * So a per-step count is not a stable quantity and must not be read as one. What is stable
+ * is the LATEST cue the client ever saw across the run: on a patched sidecar some open
+ * always reaches the end of the track, and on an unpatched one none ever does.
+ */
+const subtitleRunFrames = [];
+
 /** One line per traced event, small enough to read in the record. */
 function summariseTrace(trace, t0) {
   const rows = [];
@@ -381,6 +479,7 @@ async function main() {
   delete env.SEANIME_EXE;
   delete env.SEANIME_SIDECAR;   // the shipped default is what is under test
   delete env.SEANIME_DATADIR;
+  if (EXE_OVERRIDE) env.SEANIME_EXE = EXE_OVERRIDE;   // control half only — see EXE_OVERRIDE
   if (DATA_DIR) env.SEANIME_DATADIR = DATA_DIR;
 
   electron = spawn(
@@ -414,6 +513,24 @@ async function main() {
   }
   if (!ready) throw new Error('sidecar never reached ready');
   out.sidecar = { pid: ready.pid, port: ready.port, version: ready.version };
+  // WHICH binary answered. `--exe` names it outright; otherwise the app resolved it and the
+  // sibling checkout is where `exePath.ts` falls through to. The sha256 is what makes two
+  // runs comparable — a version string does not change when a patch is applied.
+  {
+    const resolved = EXE_OVERRIDE
+      ?? path.resolve(REPO, '..', 'seanime-upstream', 'seanime.exe');
+    out.sidecarExe = { path: resolved, overridden: !!EXE_OVERRIDE };
+    try {
+      const bytes = fs.readFileSync(resolved);
+      out.sidecarExe.sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+      out.sidecarExe.builtAt = fs.statSync(resolved).mtime.toISOString();
+      // `0002` ships no string literal — it only reorders two calls. Go keeps function names
+      // in pclntab for stack traces and `-ldflags=-s -w` strips the symbol table, not that,
+      // so the function the patch introduces is the probe. (Slice 46.)
+      out.sidecarExe.carries0002 = bytes.includes(Buffer.from('flushTerminalSubtitleBatch'));
+      out.sidecarExe.carries0004 = bytes.includes(Buffer.from('stale open request: generation'));
+    } catch (err) { out.sidecarExe.error = String(err?.message ?? err); }
+  }
   step('0 sidecar ready before anything is driven', 'PASS',
     `${kindBefore} -> ready, pid ${ready.pid}, port ${ready.port}, v${ready.version}`);
 
@@ -469,7 +586,56 @@ async function main() {
   );
 
   await selectMedia();
-  await waitFor(blanc, "!!document.querySelector('.media-card')", 30_000, 'no library card');
+
+  /**
+   * Why the card is missing, when it is missing.
+   *
+   * `no library card` was a single message covering three unrelated failures, and on
+   * 2026-08-02 it cost a run to tell them apart by hand. `.media-card` comes out of a
+   * *virtualised* grid (`MediaGrid` → `VirtualGrid` in `components/media/MediaContent.tsx`),
+   * so an absent card means one of:
+   *
+   *   noItems      — `items.length === 0`: the panel never saw what `addMediaPaths` wrote,
+   *                  i.e. a store/refresh problem, not a rendering one.
+   *   allFiltered  — items exist but `displayedItems` is empty: a kind filter, a folder
+   *                  filter or the search box is excluding the fixture.
+   *   zeroHeight   — both non-empty and the grid still renders no rows, because the
+   *                  virtualiser measured its container at zero height. Blanc's toolbox is
+   *                  a small floating window; this is the failure a bigger wait never fixes.
+   *
+   * Reported as structured state rather than a thrown string, because the next reader needs
+   * to know which one it was without re-running anything.
+   */
+  const libraryState = async () => JSON.parse(await blanc.evaluate(`(() => {
+    const grid = document.querySelector('.media-lib-grid-wrap');
+    const rect = grid ? grid.getBoundingClientRect() : null;
+    const shown = document.querySelector('.blanc-status-row span');
+    return JSON.stringify({
+      tab: !!document.querySelector('.blanc-media-grid'),
+      cards: document.querySelectorAll('.media-card').length,
+      emptyLibrary: !!document.querySelector('.media-empty:not(.media-empty-filtered)'),
+      emptyFiltered: !!document.querySelector('.media-empty-filtered'),
+      gridPresent: !!grid,
+      gridRect: rect ? { w: Math.round(rect.width), h: Math.round(rect.height) } : null,
+      statusText: shown ? shown.textContent : null,
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+    });
+  })()`));
+
+  try {
+    await waitFor(blanc, "!!document.querySelector('.media-card')", 30_000, 'no library card');
+  } catch (err) {
+    const state = await libraryState();
+    out.libraryState = state;
+    const cause = state.emptyLibrary ? 'noItems'
+      : state.emptyFiltered ? 'allFiltered'
+        : state.gridPresent && state.gridRect && state.gridRect.h === 0 ? 'zeroHeight'
+          : !state.tab ? 'mediaTabNeverOpened'
+            : 'unknown';
+    out.libraryState.cause = cause;
+    step('library card', 'ERROR', `${cause} — ${JSON.stringify(state)}`);
+    throw new Error(`no library card (${cause})`);
+  }
 
   // ── Step 1: the first open — the one that has never worked ──────────────────────
   // Recording starts BEFORE the click, because the sockets under suspicion are opened by
@@ -515,9 +681,19 @@ async function main() {
   // two hypotheses as the expected one.
   step('1b what the client actually did during the failing open', 'MEASURED',
     JSON.stringify(out.traceSummary), { rows: rows.length });
+  // Before the raw trace is dropped — `summariseTrace` truncates payloads and a
+  // `subtitle-event` frame carries an array. Also MEASURED, for the same reason as 1b: what
+  // the number means only becomes a verdict next to the other binary's number.
+  const subtitleFrames1 = collectSubtitleFrames(blanc.trace);
+  subtitleRunFrames.push(...subtitleFrames1);
+  out.subtitlesStep1 = tallySubtitleFrames(subtitleFrames1);
+  step('1c how many subtitle cues actually reached the client', 'MEASURED',
+    JSON.stringify(out.subtitlesStep1), {});
   blanc.trace.length = 0;
 
   if (A_ONLY) {
+    // Always present, so a reader never has to know whether a run took step 2 to find it.
+    out.subtitlesRun = tallySubtitleFrames(subtitleRunFrames);
     out.conclusion = 'A_ONLY: step 2 deliberately skipped.';
     return { blanc, main };
   }
@@ -628,6 +804,16 @@ async function main() {
   };
   step('2b was the A-to-B open cancelled the same way', 'MEASURED',
     JSON.stringify(out.traceStep2Summary), { rows: rows2.length });
+  const subtitleFrames2 = collectSubtitleFrames(blanc.trace);
+  subtitleRunFrames.push(...subtitleFrames2);
+  out.subtitlesStep2 = tallySubtitleFrames(subtitleFrames2);
+  step('2c how many subtitle cues reached the client on the second open', 'MEASURED',
+    JSON.stringify(out.subtitlesStep2), {});
+  // The quantity a second record is compared against. Per-step counts are not stable; see
+  // the comment on `subtitleRunFrames`.
+  out.subtitlesRun = tallySubtitleFrames(subtitleRunFrames);
+  step('2d the latest cue the client saw anywhere in this run', 'MEASURED',
+    JSON.stringify(out.subtitlesRun), {});
   await blanc.send('Network.disable', {}).catch(() => undefined);
 
   // ── Step 3: does it actually PLAY? ──────────────────────────────────────────────

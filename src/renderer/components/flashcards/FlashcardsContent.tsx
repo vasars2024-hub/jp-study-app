@@ -36,6 +36,7 @@ import {
 } from 'react';
 import { confirmDialog, promptDialog } from '../ui/dialogService';
 import Icon from '../Icons';
+import VirtualList from '../VirtualList';
 import EpubMiningPanel from '../EpubMiningPanel';
 import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
 import JitenMiningPanel from '../JitenMiningPanel';
@@ -80,6 +81,7 @@ import {
   getCachedDeckLevel,
   onDeckLevelInputsChanged,
 } from '../../deckLevelEstimate';
+import { takeHandoffJson } from '../../pendingHandoff';
 
 export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 export type OverviewTab = 'dictionary' | 'epub';
@@ -124,20 +126,6 @@ export function BookCoverThumb({
   );
 }
 
-const EPUB_MINING_PENDING_KEY = 'jp-pending-epub-mining';
-const JITEN_MINING_PENDING_KEY = 'jp-pending-jiten-mining';
-
-function takePendingJson<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    localStorage.removeItem(key);
-    return JSON.parse(raw) as T;
-  } catch {
-    localStorage.removeItem(key);
-    return null;
-  }
-}
 
 export interface FlashcardsState {
   hideAiStudio: boolean;
@@ -570,9 +558,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   useEffect(() => {
     function consumeMiningHandoff(): void {
-      const epub = takePendingJson<{ bookId?: string; ui?: 'simple' | 'advanced' }>(
-        EPUB_MINING_PENDING_KEY,
-      );
+      const epub = takeHandoffJson<{ bookId?: string; ui?: 'simple' | 'advanced' }>('epubMining');
       if (epub?.bookId) {
         setInitialMiningBookId(epub.bookId);
         setEpubMiningUi(epub.ui === 'advanced' ? 'advanced' : 'simple');
@@ -580,7 +566,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
         setMode('epub-mining');
       }
 
-      const jiten = takePendingJson<{ deckId?: number; title?: string }>(JITEN_MINING_PENDING_KEY);
+      const jiten = takeHandoffJson<{ deckId?: number; title?: string }>('jitenMining');
       if (typeof jiten?.deckId === 'number') {
         setInitialJitenDeckId(jiten.deckId);
         setEpubMiningUi('jiten');
@@ -1161,6 +1147,18 @@ export function FlashcardAiMode({ state }: { state: FlashcardsState }) {
   );
 }
 
+// Fixed row heights for the two VirtualList-backed rows below (Pillar 1 item
+// 4 — decks were observed at 3,000+ cards, all rendered unvirtualized).
+// `.flash-row-sentence` is line-clamped to 2 lines specifically so this row's
+// height has a real ceiling; CARD_ROW_HEIGHT is that ceiling plus the 8px gap
+// `.flash-group-body`/`.flash-list` used to provide via flex `gap` (VirtualList
+// renders each row in its own fixed-height slot, not a flex child, so the gap
+// has to be baked into the slot instead).
+const CARD_ROW_HEIGHT = 108;
+const CARD_LIST_MAX_HEIGHT = 420;
+const SAVED_ROW_HEIGHT = 64;
+const SAVED_LIST_MAX_HEIGHT = 560;
+
 /**
  * The default (non-aero) deck overview: import panel, mining promo, review
  * setup, recent strip, and the deck explorer with folders and book groups.
@@ -1549,10 +1547,14 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                         </div>
                       </div>
                       {!collapsed && (
-                        <div className="flash-group-body">
-                          {group.cards.map((card) => (
+                        <VirtualList
+                          items={group.cards}
+                          itemHeight={CARD_ROW_HEIGHT}
+                          getKey={(card) => card.id}
+                          className="flash-group-body flash-group-body-vlist"
+                          style={{ height: Math.min(group.cards.length * CARD_ROW_HEIGHT, CARD_LIST_MAX_HEIGHT) }}
+                          renderItem={(card) => (
                             <div
-                              key={card.id}
                               className="flash-row flash-row-draggable"
                               draggable
                               onDragStart={(e) => state.onCardDragStart(e, card.id)}
@@ -1606,8 +1608,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                 </button>
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          )}
+                        />
                       )}
                     </div>
                   );
@@ -1627,9 +1629,14 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       ) : filteredSaved.length === 0 ? (
         <p className="muted">{t('flash.search.noMatches', { query: search })}</p>
       ) : (
-        <div className="flash-list">
-          {filteredSaved.map((w) => (
-            <div className="flash-row" key={w.word}>
+        <VirtualList
+          items={filteredSaved}
+          itemHeight={SAVED_ROW_HEIGHT}
+          getKey={(w) => w.word}
+          className="flash-list flash-list-vlist"
+          style={{ height: Math.min(filteredSaved.length * SAVED_ROW_HEIGHT, SAVED_LIST_MAX_HEIGHT) }}
+          renderItem={(w) => (
+            <div className="flash-row">
               <div className="flash-row-main">
                 <span className="flash-row-word" lang="ja">
                   {w.word}
@@ -1645,8 +1652,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 ×
               </button>
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
       {deckMenuGroup && (
         <DeckActionMenu

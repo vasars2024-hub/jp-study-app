@@ -1,4 +1,4 @@
-import type { AiLanguageOptions, AiMiningCardFormat, AiMiningLanguage, AiPromptPreset } from './mining';
+import type { AiLanguageOptions, AiMiningCardFormat, AiMiningLanguage, AiPromptPreset } from './miningTypes';
 import { SEED_PROFILES, type SeedProfileId } from './seedProfiles';
 import type { StudyProfile } from './profiles';
 

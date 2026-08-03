@@ -11,7 +11,7 @@ import type { GrammarPoint } from './types';
  *
  *  - Records carry canonical `categories` ids directly rather than legacy
  *    `functions` ids. The seed's tags route through LEGACY_ALIASES, which was
- *    built to rescue scraped Mazii labels; there is no reason to launder new
+ *    built to rescue scraped legacy labels; there is no reason to launder new
  *    hand-written tags through a compatibility shim and inherit its guesses.
  *  - Coverage targets the official bands (HSK1-6). HSK7-9 is published as one
  *    combined band and HSK10 is this app's own invention, so adding volume

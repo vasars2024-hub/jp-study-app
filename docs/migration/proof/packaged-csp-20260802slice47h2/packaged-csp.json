@@ -1,0 +1,36 @@
+{
+  "gate": "packaged-csp-gate.mjs",
+  "question": "Does a PACKAGED build actually receive the Content-Security-Policy, and does it actually constrain the renderer?",
+  "startedAt": "2026-08-02T06:47:08.879Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "steps": [
+    {
+      "name": "0 the packaged window is on the app: origin",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "1 the document answers with a Content-Security-Policy header",
+      "result": "FAIL",
+      "detail": "no header (FETCH-FAILED: TypeError: Failed to fetch)"
+    },
+    {
+      "name": "2 script-src is self only, with no unsafe-eval anywhere",
+      "result": "FAIL",
+      "detail": "script-src []; unsafe-eval present: false"
+    }
+  ],
+  "exeBuiltAt": "2026-08-01T11:40:01.018Z",
+  "documentUrl": "app://bundle/index.html",
+  "header": "FETCH-FAILED: TypeError: Failed to fetch",
+  "directives": {},
+  "result": "ERROR",
+  "error": "TypeError: Cannot read properties of null (reading 'appendChild')\n    at <anonymous>:8:21\n    at new Promise (<anonymous>)\n    at <anonymous>:1:1",
+  "finishedAt": "2026-08-02T06:47:09.975Z",
+  "log": [
+    "[packaged-csp] PASS — 0 the packaged window is on the app: origin: app://bundle/index.html",
+    "[packaged-csp] FAIL — 1 the document answers with a Content-Security-Policy header: no header (FETCH-FAILED: TypeError: Failed to fetch)",
+    "[packaged-csp] FAIL — 2 script-src is self only, with no unsafe-eval anywhere: script-src []; unsafe-eval present: false",
+    "[packaged-csp] ERROR TypeError: Cannot read properties of null (reading 'appendChild')\n    at <anonymous>:8:21\n    at new Promise (<anonymous>)\n    at <anonymous>:1:1"
+  ]
+}

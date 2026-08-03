@@ -14,7 +14,7 @@
  *
  * Nothing here may import `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Icon from '../Icons';
 import VirtualList from '../VirtualList';
 import type { MediaItem } from '../../../shared/types';
@@ -37,7 +37,16 @@ import {
   type MusicRow,
 } from '../../musicLibrary';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../../wordLookup';
+import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
+import { useMusicMining } from './useMusicMining';
+import {
+  musicCueReplaySec,
+  musicCueStepSec,
+  musicTransportCues,
+  type MusicLyricsKind,
+  type MusicMiningLine,
+} from '../../../shared/musicMining';
 
 const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|opus)$/i;
 const ROW_HEIGHT = 32;
@@ -474,6 +483,117 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
   const { t } = useT();
   const { ps, liveLyrics, activeIndex } = state;
   const lyrics = liveLyrics.lyrics;
+  // Slice 17: music joins the study loop video already had. The card goes through the same
+  // draft/request/history path, so a mined lyric appears in Review with no extra wiring.
+  const mining = useMusicMining(ps.current ?? null);
+
+  /**
+   * Slice 20 — cue navigation, in the shape video already uses.
+   *
+   * Only synced lyrics can be navigated: a plain sheet has no timestamps to seek to. The
+   * conversion, the stepping and the replay target all live in `shared/musicMining.ts`
+   * next to `musicStudyCue`, which the Mine button already goes through — so a line the
+   * transport will move to and a line the user can mine are decided by the same code, and
+   * the rule for "which line am I on" stays `adjacentStudyCue`'s, the video overlay's own.
+   * These were three inline closures here; they were untestable in that form, which is why
+   * this feature sat in the tree with no gate on it.
+   */
+  const studyCues = useMemo(
+    () => (lyrics.kind === 'synced'
+      ? musicTransportCues(lyrics.cues.map((c, i) => ({
+        index: i, text: c.text, startSec: c.start, endSec: c.end,
+      })))
+      : []),
+    [lyrics],
+  );
+
+  const stepCue = (direction: -1 | 1): void => {
+    const target = musicCueStepSec(studyCues, ps.time ?? 0, direction);
+    if (target != null) player.seek(target);
+  };
+
+  /** Restart the line being sung, which is the one thing stepping cannot express. */
+  const replayCue = (): void => {
+    const target = musicCueReplaySec(studyCues, activeIndex);
+    if (target != null) player.seek(target);
+  };
+
+  /**
+   * The same three gestures from the keyboard, on `music.*` ids of their own.
+   *
+   * Slice 20 left this as the deliberate decision to take, and named the trap: these must
+   * NOT reuse `video.replayLine`/`prevLine`/`nextLine`. `registerCommandHandler` keeps a
+   * stack per id and the last registrant wins, and `MediaWorkspaceHost` mounts at App
+   * level — so the lyrics pane and the video overlay are mounted together whenever the
+   * media workspace is open over Music, and sharing an id would hand one surface both
+   * gestures according to mount order.
+   *
+   * Registered once, reading through refs. The three handlers close over the cue sheet and
+   * the playhead, both of which change on every tick; re-registering on each change would
+   * churn the stack many times a second and, because the stack is last-wins, would keep
+   * re-taking the id from whatever else is mounted.
+   *
+   * Registering unconditionally — including while the sheet is empty — is deliberate. A
+   * plain (unsynced) sheet has nothing to seek to, so the handler does nothing, which is
+   * the same answer the buttons give by not rendering. Gating the registration instead
+   * would mean the id is unowned for unsynced tracks and some other stack entry would
+   * answer for it.
+   */
+  const cueNavRef = useRef({ studyCues, activeIndex, time: ps.time ?? 0 });
+  cueNavRef.current = { studyCues, activeIndex, time: ps.time ?? 0 };
+  useEffect(() => {
+    const step = (direction: -1 | 1) => (): void => {
+      const { studyCues: cues, time } = cueNavRef.current;
+      const target = musicCueStepSec(cues, time, direction);
+      if (target != null) player.seek(target);
+    };
+    const offs = [
+      registerCommandHandler('music.prevLine', step(-1)),
+      registerCommandHandler('music.nextLine', step(1)),
+      registerCommandHandler('music.replayLine', () => {
+        const { studyCues: cues, activeIndex: index } = cueNavRef.current;
+        const target = musicCueReplaySec(cues, index);
+        if (target != null) player.seek(target);
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
+
+  const mineLabel = (index: number): string => {
+    const { outcome } = mining;
+    // `idle` carries no index, so the narrowing has to happen before the comparison —
+    // reading `outcome.index` first would be a type error and, worse, would label every
+    // line with whatever the last outcome was.
+    if (outcome.kind === 'idle' || outcome.index !== index) return t('music.mine');
+    // Recording plays the line through in real time, so it must say so — otherwise the
+    // player appears to jump and stutter for no stated reason.
+    if (outcome.kind === 'recording') return t('music.mineRecording');
+    if (outcome.kind === 'busy') return t('music.mining');
+    if (outcome.kind === 'done') {
+      return outcome.withAudio ? t('music.minedWithAudio') : t('music.mined');
+    }
+    if (outcome.kind === 'duplicate') return t('music.mineDuplicate');
+    return t('music.mineFailed');
+  };
+
+  /** The button is per-line so the user mines what they are reading, not what is playing. */
+  const mineButton = (line: MusicMiningLine, kind: MusicLyricsKind): ReactElement => (
+    <button
+      type="button"
+      className="music-line-mine"
+      // The lyrics pane turns a mouse-up into a dictionary lookup; without this a click on
+      // the button would also open the popup over the card the user just made.
+      onMouseUp={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={() => void mining.mine(line, kind, ps.time ?? 0)}
+      disabled={mining.outcome.kind === 'busy' || mining.outcome.kind === 'recording'}
+      title={t('music.mineHint')}
+      aria-label={t('music.mineHint')}
+    >
+      <Icon name="sparkle" size={12} />
+      <span className="music-line-mine-label">{mineLabel(line.index)}</span>
+    </button>
+  );
 
   return (
     <div
@@ -515,6 +635,66 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
           </div>
         </div>
       )}
+      {/* Cue transport. Synced only — a plain sheet has nothing to seek to.
+
+          Buttons rather than key bindings, and the reason has CHANGED. It used to be that
+          the video overlay bound W/S/R on `document` without capture, so a second
+          uncaptured set here would fire both. Slice 19 deleted that switch: the overlay
+          registers the catalog's own `video.replayLine`/`prevLine`/`nextLine` ids now, and
+          there is one dispatcher. The reason buttons are still right is a different one.
+          `registerCommandHandler` keeps a STACK per id and `runCommand` takes
+          `stack[stack.length - 1]` — the LAST registrant wins. A music surface registering
+          those same ids would therefore silently take them away from the video overlay
+          whenever it happened to mount later, which is mount-order-dependent ownership:
+          exactly the invisible second owner slice 19 collapsed. Music keyboard nav needs
+          its OWN catalog rows (`music.*`, rebindable, listed in Settings → Shortcuts), and
+          that is a decision to take deliberately rather than smuggle in here. */}
+      {lyrics.kind === 'synced' && studyCues.length > 0 && (
+        <div className="music-cue-nav" role="group" aria-label={t('music.cueNav')}>
+          {/* The three per-button classes carry no styling — `.music-cue-nav button` styles
+              all of them. They exist so `music-mining-harness.mjs` can click a NAMED button
+              instead of `querySelectorAll(...)[0]`, which would keep passing while pressing
+              the wrong control if this row were ever reordered (RTL, or next-before-prev).
+              `musicMining.test.ts` fails if the two files stop agreeing on the names. */}
+          <button
+            type="button"
+            className="music-cue-prev"
+            onClick={() => stepCue(-1)}
+            title={t('music.prevLine')}
+          >
+            <Icon name="skip-back" size={13} />
+            <span>{t('music.prevLine')}</span>
+          </button>
+          <button
+            type="button"
+            className="music-cue-replay"
+            onClick={replayCue}
+            disabled={activeIndex < 0}
+            title={t('music.replayLine')}
+          >
+            <Icon name="refresh" size={13} />
+            <span>{t('music.replayLine')}</span>
+          </button>
+          <button
+            type="button"
+            className="music-cue-next"
+            onClick={() => stepCue(1)}
+            title={t('music.nextLine')}
+          >
+            <span>{t('music.nextLine')}</span>
+            <Icon name="skip-forward" size={13} />
+          </button>
+        </div>
+      )}
+      {(lyrics.kind === 'synced' || lyrics.kind === 'plain') && lyrics.source && (
+        <p className="muted music-lyrics-source">
+          {t(`music.lyricsSource.${lyrics.source}`)}
+          {' · '}
+          <button type="button" className="music-lyrics-fix" onClick={() => void state.pickLrcFile()}>
+            {t('music.lyricsCorrect')}
+          </button>
+        </p>
+      )}
       {lyrics.kind === 'synced' &&
         lyrics.cues.map((c, i) => (
           <div
@@ -524,7 +704,8 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
             onDoubleClick={() => player.seek(c.start)}
             title={t('music.doubleClickJump')}
           >
-            {c.text}
+            <span className="music-line-text">{c.text}</span>
+            {mineButton({ index: i, text: c.text, startSec: c.start, endSec: c.end }, 'synced')}
           </div>
         ))}
       {lyrics.kind === 'plain' && (
@@ -532,7 +713,10 @@ export function MusicLyricsPane({ state }: { state: MusicState }) {
           <p className="muted music-plain-note">{t('music.notSynced')}</p>
           {lyrics.lines.map((l, i) => (
             <div key={i} className="music-line plain">
-              {l}
+              <span className="music-line-text">{l}</span>
+              {/* No timestamp exists for a plain line, so provenance records the listening
+                  position instead — see shared/musicMining.ts. */}
+              {mineButton({ index: i, text: l }, 'plain')}
             </div>
           ))}
         </>
@@ -606,6 +790,7 @@ export function MusicControls({
         value={Math.min(ps.time, ps.duration || 1)}
         onChange={(e) => player.seek(Number(e.target.value))}
         disabled={!ps.current}
+        aria-label={t('a11y.slider.trackPosition')}
       />
       <span className="music-time muted">{fmt(ps.duration)}</span>
       <Icon name="volume" size={15} style={{ flexShrink: 0 }} />
@@ -618,6 +803,7 @@ export function MusicControls({
         value={ps.volume}
         onChange={(e) => player.setVolume(Number(e.target.value))}
         title={t('music.controls.volume')}
+        aria-label={t('music.controls.volume')}
       />
       {onOpenWidget && (
         <button className="btn small" onClick={onOpenWidget} title={t('music.controls.openWidget')}>

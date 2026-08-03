@@ -1,5 +1,5 @@
 /**
- * Mazii-style grammar function taxonomy for GrammarX Practice filters.
+ * Grammar-function taxonomy for GrammarX Practice filters.
  * IDs are stable slugs; labels are English catalog seeds (resolved via i18n where needed).
  */
 
@@ -193,7 +193,7 @@ export const GRAMMAR_FUNCTION_IDS = [
 
 export type GrammarFunctionId = (typeof GRAMMAR_FUNCTION_IDS)[number];
 
-/** Display labels matching Mazii Function List wording (English seed). */
+/** Display labels for the function list (English seed). */
 export const GRAMMAR_FUNCTION_LABELS: Record<GrammarFunctionId, string> = {
   described: 'Described',
   surprise: 'Surprise',

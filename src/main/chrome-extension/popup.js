@@ -292,22 +292,70 @@ document.getElementById('nav-settings').addEventListener('click', () => {
 document.getElementById('retry-queue').addEventListener('click', async () => {
   feedback('Retrying queued items…', 'pending');
   const res = await send({ type: 'flush' });
+  // A drop is the queue giving up on a save the user was told would sync, so it
+  // has to be said out loud here. Without it a flush that discarded everything
+  // reads as "Nothing to retry." — the queue's worst outcome reported as its
+  // most boring one. Details of each drop go to the recent-activity list.
+  const dropped = res?.dropped
+    ? ` ${res.dropped} item${res.dropped === 1 ? '' : 's'} could not be saved and ${res.dropped === 1 ? 'was' : 'were'} discarded — see recent activity.`
+    : '';
   if (res?.flushed) {
     feedback(
-      `Sent ${res.flushed} queued item${res.flushed === 1 ? '' : 's'}${res.left ? ` — ${res.left} still pending` : ''}.`,
-      res.left ? 'err' : 'ok',
+      `Sent ${res.flushed} queued item${res.flushed === 1 ? '' : 's'}${res.left ? ` — ${res.left} still pending` : ''}.${dropped}`,
+      res.left || res.dropped ? 'err' : 'ok',
     );
+  } else if (res?.left) {
+    feedback(`App still unreachable — ${res.left} item(s) queued.${dropped}`, 'err');
   } else {
-    feedback(
-      res?.left ? `App still unreachable — ${res.left} item(s) queued.` : 'Nothing to retry.',
-      res?.left ? 'err' : 'ok',
-    );
+    feedback(dropped ? dropped.trim() : 'Nothing to retry.', dropped ? 'err' : 'ok');
   }
   void refreshStatus();
 });
 
+/* ------------------------------- AI OCR mode ------------------------------- */
+//
+// Highlight and OCR are switched independently: highlighting is a constant,
+// low-intent gesture while an OCR is deliberate, so wanting a full AI read of
+// one but not the other is the normal case. Writing through jpStudySettings
+// keeps the popup, the options page and the content script on one normalized
+// shape rather than three views of the same keys.
+
+const SETTINGS = globalThis.jpStudySettings || null;
+
+function paintModeSeg(el, isAi) {
+  el.querySelectorAll('button').forEach((btn) => {
+    const on = (btn.dataset.mode === 'ai') === isAi;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+}
+
+async function refreshModes() {
+  if (!SETTINGS) return;
+  const s = await SETTINGS.load();
+  paintModeSeg(document.getElementById('mode-highlight'), !!s.aiOnHighlight);
+  paintModeSeg(document.getElementById('mode-ocr'), !!s.aiOnOcr);
+}
+
+function bindModeSeg(id, key) {
+  const el = document.getElementById(id);
+  if (!el || !SETTINGS) return;
+  el.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const isAi = btn.dataset.mode === 'ai';
+    // Paint first: the write is a round trip through storage and the segment
+    // feeling laggy is the whole reason this control exists in the popup.
+    paintModeSeg(el, isAi);
+    await SETTINGS.save({ [key]: isAi });
+  });
+}
+
+bindModeSeg('mode-highlight', 'aiOnHighlight');
+bindModeSeg('mode-ocr', 'aiOnOcr');
+
 /* ---------------------------------- init ----------------------------------- */
 
 void (async () => {
-  await Promise.all([refreshStatus(), refreshPage(), refreshRecent()]);
+  await Promise.all([refreshStatus(), refreshPage(), refreshRecent(), refreshModes()]);
 })();

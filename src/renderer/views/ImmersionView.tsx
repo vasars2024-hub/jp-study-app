@@ -30,6 +30,7 @@ import {
   createWebview,
   useImmersion,
 } from '../components/immersion/ImmersionContent';
+import VisualNovelPanel from '../components/immersion/VisualNovelPanel';
 
 export default function ImmersionView() {
   const aero = useAeroMaterials();
@@ -43,6 +44,7 @@ export default function ImmersionView() {
   // settle once it stops. Driven off `loading` so no extra webview listeners.
   const wired = useWiredMaterials();
   const [stageFx, setStageFx] = useState<'tuning' | 'settle' | null>(null);
+  const [visualNovelsOpen, setVisualNovelsOpen] = useState(false);
   const stageFxRef = useRef(stageFx);
   stageFxRef.current = stageFx;
   const stageFxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,6 +73,7 @@ export default function ImmersionView() {
         { id: 'save-site', label: 'Save site', disabled: !currentUrl, onSelect: () => void state.saveCurrentSite() },
         { id: 'export-library', label: 'Export reader page', disabled: !currentUrl, onSelect: () => void state.exportToLibrary() },
         { id: 'capture-video', label: 'Capture video', disabled: captureBusy || !currentUrl, onSelect: () => void state.captureVideo() },
+        { id: 'visual-novels', label: 'Visual Novel Library', onSelect: () => setVisualNovelsOpen(true) },
         { id: 'sep-file', separator: true, label: '' },
         { id: 'open-external', label: 'Open in system browser', disabled: !currentUrl, onSelect: state.openExternal },
       ],
@@ -83,6 +86,11 @@ export default function ImmersionView() {
         { id: 'mode-reader', label: `${mode === 'reader' ? '[x] ' : ''}Live Reader`, onSelect: () => state.applyMode('reader') },
         { id: 'mode-focus', label: `${mode === 'focus' ? '[x] ' : ''}Focus`, onSelect: () => state.applyMode('focus') },
         { id: 'sep-view', separator: true, label: '' },
+        {
+          id: 'live-lookup',
+          label: `${state.liveLookup ? '[x] ' : ''}${state.t('immersion.liveLookupMenu')}`,
+          onSelect: () => state.setLiveLookup((v) => !v),
+        },
         { id: 'reload', label: 'Reload', disabled: !currentUrl, onSelect: state.reload },
         { id: 'toggle-sites', label: showRail ? 'Hide Sites rail' : 'Show Sites rail', onSelect: () => state.setRailOpen((v) => !v) },
       ],
@@ -114,6 +122,18 @@ export default function ImmersionView() {
       {currentUrl && <StatusBarField live>{currentUrl}</StatusBarField>}
     </>
   );
+
+  if (visualNovelsOpen) {
+    const panel = <VisualNovelPanel onClose={() => setVisualNovelsOpen(false)} />;
+    if (aero && showChrome) {
+      return (
+        <AppChrome menus={immersionMenus} status={immersionStatus} className="aero-immersion-chrome">
+          {panel}
+        </AppChrome>
+      );
+    }
+    return <div className="immersion-root">{panel}</div>;
+  }
 
   if (aero && showChrome) {
     return (
@@ -166,6 +186,18 @@ export default function ImmersionView() {
               ))}
             </div>
             <ToolbarSpacer />
+            {/* Slice 70: study lookup on the live guest page. This aero toolbar
+                does not render `ImmersionToolbar`, so the toggle has to exist
+                here too or Study OS's primary immersion surface cannot reach it. */}
+            <Button
+              size="sm"
+              className={`aero-immersion-icon-btn ${state.liveLookup ? 'active' : ''}`}
+              aria-pressed={state.liveLookup}
+              title={state.liveLookup ? state.t('immersion.liveLookupOn') : state.t('immersion.liveLookupOff')}
+              onClick={() => state.setLiveLookup((v) => !v)}
+            >
+              <Icon name="dictionary" size={14} />
+            </Button>
             <Button size="sm" className="aero-immersion-icon-btn" title="Save site" onClick={() => void state.saveCurrentSite()}>
               <Icon name="bookmark" size={14} />
             </Button>
@@ -310,6 +342,11 @@ export default function ImmersionView() {
   return (
     <div className={`immersion-root immersion-mode-${mode}`} data-mode={mode}>
       {showChrome && <ImmersionToolbar state={state} />}
+      {showChrome && (
+        <button type="button" className="btn small visual-novel-open" onClick={() => setVisualNovelsOpen(true)}>
+          Visual Novel Library
+        </button>
+      )}
 
       {mode === 'focus' && (
         <button type="button" className="immersion-focus-exit btn small" onClick={() => state.applyMode('reader')}>

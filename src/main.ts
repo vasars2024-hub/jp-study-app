@@ -13,13 +13,20 @@ import { registerAnkiIpc } from './main/anki';
 import { registerProfileRulesIpc } from './main/profileRules';
 import { registerApkgIpc } from './main/anki/apkgImport';
 import { registerDesktopIpc } from './main/desktop';
-import { registerCityIpc } from './main/city';
 import { registerTranslateIpc } from './main/translate';
 import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
+import { registerSentenceAnalysisIpc } from './main/sentenceAnalysis';
+import { registerMediaStudyAssistantIpc } from './main/mediaStudyAssistant';
+import { registerMediaStudyOrchestratorIpc } from './main/mediaStudyOrchestrator';
+import { registerLocalAgentIpc, stopLocalAgentRuntime } from './main/localAgent';
+import { registerLocalAgentSchedulerIpc, stopLocalAgentScheduler } from './main/localAgentScheduler';
 import { registerMiningIpc } from './main/mining';
 import { registerImmersionIpc } from './main/immersion';
 import { registerSystemMetricsIpc } from './main/systemMetrics';
+import { registerScraperIpc } from './main/scraper';
+import { registerReadingIpc } from './main/reading';
 import { registerSeanimeIpc, stopSeanime } from './main/seanime';
+import { registerMalSyncIpc } from './main/malSync';
 import { registerReleaseIpc } from './main/release';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
@@ -40,6 +47,8 @@ import {
   mainWindowOptions,
   registerWindowChromeIpc,
 } from './main/windowChrome';
+import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
+import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
 import type { AutomationBuilderLaunchResult } from './shared/automationBuilder';
 import {
@@ -66,11 +75,81 @@ import {
   startReadingLens,
   stopReadingLens,
 } from './main/readingLens';
+import {
+  isOsHotkeyHelperInstalled,
+  registerOsHotkeyHelperIpc,
+} from './main/osHotkeyHelper';
+import { registerLiveCaptionsIpc } from './main/liveCaptions';
 import { logDiagnostic, errorDetail } from './main/errorLog';
 
 if (started) {
   app.quit();
 }
+
+// Single instance so a Startup hotkey can launch with `--toggle` / `--open=` /
+// `--restart` and route into the already-running copy.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+/** Set once window wiring is ready — second-instance / IPC call these. */
+let toggleAppVisibilityHandler: (() => void) | null = null;
+let focusAppHandler: (() => void) | null = null;
+let openSectionHandler: ((section: string) => void) | null = null;
+let pendingOpenSection: string | null = null;
+
+/** Pop-out sections allowed on `--open=` / `--popout=` (mirrors createPopoutWindow). */
+const ARGV_OPEN_SECTIONS = new Set([
+  'library', 'novels', 'reading', 'dictionary', 'grammar', 'notebook', 'translate', 'player', 'video', 'music',
+  'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
+  'calendar', 'settings', 'youtube', 'scraper',
+]);
+
+export function argvWantsToggle(argv: string[] = process.argv): boolean {
+  return argv.some((a) => a === '--toggle' || a === '--grammarx-toggle');
+}
+
+export function argvWantsRestart(argv: string[] = process.argv): boolean {
+  return argv.some((a) => a === '--restart' || a === '--grammarx-restart');
+}
+
+export function argvOpenSection(argv: string[] = process.argv): string | null {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    let raw: string | null = null;
+    if (a.startsWith('--open=')) raw = a.slice('--open='.length);
+    else if (a.startsWith('--popout=')) raw = a.slice('--popout='.length);
+    else if ((a === '--open' || a === '--popout') && argv[i + 1]) raw = argv[++i]!;
+    if (raw == null) continue;
+    const section = raw.trim().toLowerCase();
+    if (ARGV_OPEN_SECTIONS.has(section)) return section;
+  }
+  return null;
+}
+
+function queueOrOpenSection(section: string): void {
+  if (openSectionHandler) openSectionHandler(section);
+  else pendingOpenSection = section;
+}
+
+app.on('second-instance', (_event, argv) => {
+  if (argvWantsRestart(argv)) {
+    app.relaunch();
+    app.exit(0);
+    return;
+  }
+  if (argvWantsToggle(argv)) {
+    toggleAppVisibilityHandler?.();
+    return;
+  }
+  const section = argvOpenSection(argv);
+  if (section) {
+    queueOrOpenSection(section);
+    return;
+  }
+  focusAppHandler?.();
+});
 
 function isEpipe(err: unknown): boolean {
   return Boolean(err && typeof err === 'object' && 'code' in err && (err as { code?: unknown }).code === 'EPIPE');
@@ -188,25 +267,10 @@ function registerMediaProtocol(): void {
 // job is blocking a compromised renderer from loading/exfiltrating to an
 // arbitrary https:// host (PHASE_6_5_AUDIT.md §3, chained High finding).
 function registerContentSecurityPolicy(): void {
-  const csp = [
-    "default-src 'self' app: media: playfile: localfile:",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' app: media: playfile: localfile: data: blob:",
-    "media-src 'self' app: media: playfile: localfile: blob:",
-    "font-src 'self' app: data:",
-    // HuggingFace hosts are the one exception to "self only": the on-device
-    // Whisper transcription (Transformers.js) streams its ONNX model weights
-    // from HuggingFace on first use, then caches them for offline reuse. Scoped
-    // to HF's domains — this is deliberately NOT a blanket https: allowance, so
-    // a compromised renderer still can't exfiltrate to an arbitrary host
-    // (PHASE_6_5_AUDIT.md §3). The onnxruntime engine itself is served locally
-    // from app://bundle/ort (see whisperWorker.ts), so it needs no host here.
-    "connect-src 'self' app: media: playfile: localfile: https://huggingface.co https://*.huggingface.co https://*.hf.co",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'none'",
-  ].join('; ');
+  // The policy itself lives in `shared/contentSecurityPolicy.ts` so it can be read by a test.
+  // It is a load-bearing control (PHASE_6_5_AUDIT.md §3) and was previously an inline string
+  // inside this function, which no test could reach.
+  const csp = contentSecurityPolicyHeader();
 
   session.defaultSession.webRequest.onHeadersReceived(
     { urls: ['app://*/*'] },
@@ -474,7 +538,68 @@ const MINI_MIN_H = 320;
 const MINI_MAX_W = 560;
 const MINI_MAX_H = 720;
 
+/**
+ * Immersion Browser guest preload (slice 70) — materialised to userData.
+ *
+ * The guest study bridge has to exist as a standalone file on disk, because
+ * that is the only thing a `<webview>` preload can be. Adding a build entry for
+ * it would mean editing `forge.config.ts` / `vite.*.config.ts`, which are
+ * off-limits; instead the source is generated from the type-checked, tested
+ * `immersionGuestBody` in `src/shared/immersionGuestBridge.ts` and written once
+ * per launch. Rewriting every launch is deliberate: an app update must not
+ * leave a stale bridge behind.
+ */
+let immersionGuestPreloadPath: string | null = null;
+function ensureImmersionGuestPreload(): string | null {
+  if (immersionGuestPreloadPath) return immersionGuestPreloadPath;
+  try {
+    const file = path.join(app.getPath('userData'), 'immersion-guest-preload.js');
+    fs.writeFileSync(file, buildImmersionGuestPreload(), 'utf8');
+    immersionGuestPreloadPath = file;
+    return file;
+  } catch (err) {
+    logDiagnostic('error', 'immersion', 'guest-preload-write-failed', String(err));
+    return null;
+  }
+}
+
 function attachNavGuards(win: BrowserWindow): void {
+  // Immersion Browser <webview> guests are arbitrary untrusted web content.
+  // The renderer builds the tag (`ImmersionContent.createWebview`), but the
+  // privilege decision is made HERE, in main, where a compromised renderer
+  // cannot reach it. Every unsafe preference is forced off on every attach, and
+  // the only preload a guest can ever receive is our study bridge — which can
+  // talk to the embedder element and to nothing else (no ipcMain, so no
+  // dictionary IPC). Before this, nothing enforced the defaults `main.ts:596`
+  // relies on: any future edit adding `nodeintegration` or
+  // `webpreferences="contextIsolation=no"` to the tag would have been honoured.
+  win.webContents.on('will-attach-webview', (_event, webPreferences, params) => {
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.nodeIntegrationInWorker = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+    webPreferences.experimentalFeatures = false;
+
+    // Renderer-supplied privilege attributes are dropped, not merged.
+    delete params.nodeintegration;
+    delete params.nodeintegrationinsubframes;
+    delete params.disablewebsecurity;
+    delete params.webpreferences;
+
+    const bridge = ensureImmersionGuestPreload();
+    const prefs = webPreferences as { preload?: string; preloadURL?: string };
+    if (bridge) {
+      prefs.preload = bridge;
+      prefs.preloadURL = pathToFileURL(bridge).toString();
+    } else {
+      delete prefs.preload;
+      delete prefs.preloadURL;
+    }
+  });
+
   // Accidental <a href="https://…"> clicks must never replace the SPA shell.
   const allowAppNav = (url: string): boolean => {
     if (!url || url === 'about:blank') return true;
@@ -745,6 +870,122 @@ function registerBlancIpc(): void {
   app.on('will-quit', () => {
     globalShortcut.unregisterAll();
   });
+
+  // Hide / show GrammarX. When the Windows Startup helper is installed it owns
+  // the OS accelerators (so hotkeys work even after a full quit) and we must
+  // not also RegisterHotKey here — two owners fight over the same chord.
+  let appToggleAccelerator: string | null = null;
+  let appRestartAccelerator: string | null = null;
+  function toggleAppVisibility(): void {
+    const mainAlive = Boolean(mainWindow && !mainWindow.isDestroyed());
+    const mainShowing =
+      mainAlive && mainWindow!.isVisible() && !mainWindow!.isMinimized();
+    if (mainShowing) {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed() && win.isVisible()) win.hide();
+      }
+      return;
+    }
+    if (!mainAlive) recreateMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  function focusApp(): void {
+    if (!mainWindow || mainWindow.isDestroyed()) recreateMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  function fullyRestartApp(): void {
+    app.relaunch();
+    app.exit(0);
+  }
+  toggleAppVisibilityHandler = toggleAppVisibility;
+  focusAppHandler = focusApp;
+
+  function parseGlobalAccelerator(chord: unknown): { ok: true; accelerator: string } | { ok: false; error: string } {
+    if (typeof chord !== 'string' || !chord.trim()) {
+      return { ok: true, accelerator: '' };
+    }
+    const accelerator = chord.split('|')[0]!.trim().replace(/\bMeta\b/g, 'Super');
+    if (!/^([\w]+\+)+[\w,.;'[\]/\\`=-]+$/.test(accelerator)) {
+      return { ok: false, error: 'This shortcut cannot be registered system-wide.' };
+    }
+    if (!/(Ctrl|Alt|Shift|Super|CmdOrCtrl)\+/i.test(accelerator)) {
+      return { ok: false, error: 'Global shortcuts need at least one modifier key.' };
+    }
+    return { ok: true, accelerator };
+  }
+
+  ipcMain.handle('app:toggle', (): { ok: boolean } => {
+    toggleAppVisibility();
+    return { ok: true };
+  });
+  ipcMain.handle('app:setToggleShortcut', (_event, chord: unknown): { ok: boolean; error?: string } => {
+    if (appToggleAccelerator) {
+      try {
+        globalShortcut.unregister(appToggleAccelerator);
+      } catch {
+        /* already gone */
+      }
+      appToggleAccelerator = null;
+    }
+    const parsed = parseGlobalAccelerator(chord);
+    if (!parsed.ok) return parsed;
+    if (!parsed.accelerator) return { ok: true };
+    // Startup helper owns OS registration when installed — renderer syncs chords there.
+    if (isOsHotkeyHelperInstalled()) return { ok: true };
+    try {
+      const registered = globalShortcut.register(parsed.accelerator, () => toggleAppVisibility());
+      if (!registered) {
+        return { ok: false, error: `"${parsed.accelerator}" is already in use by another application.` };
+      }
+      appToggleAccelerator = parsed.accelerator;
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Could not register the global shortcut.',
+      };
+    }
+  });
+  ipcMain.handle('app:setRestartShortcut', (_event, chord: unknown): { ok: boolean; error?: string } => {
+    if (appRestartAccelerator) {
+      try {
+        globalShortcut.unregister(appRestartAccelerator);
+      } catch {
+        /* already gone */
+      }
+      appRestartAccelerator = null;
+    }
+    const parsed = parseGlobalAccelerator(chord);
+    if (!parsed.ok) return parsed;
+    if (!parsed.accelerator) return { ok: true };
+    if (isOsHotkeyHelperInstalled()) return { ok: true };
+    try {
+      const registered = globalShortcut.register(parsed.accelerator, () => fullyRestartApp());
+      if (!registered) {
+        return { ok: false, error: `"${parsed.accelerator}" is already in use by another application.` };
+      }
+      appRestartAccelerator = parsed.accelerator;
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Could not register the global shortcut.',
+      };
+    }
+  });
+
+  registerOsHotkeyHelperIpc();
+
+  // Live Captions capture resumes itself here when the user left it enabled —
+  // the source window is lossy, so capture has to be running before the user
+  // thinks to open the notebook.
+  registerLiveCaptionsIpc(() => mainWindow);
 
   // Blanc cannot serve Settings-only extension deep-links; focus the main Study
   // OS window and forward the original target there (not broadcast to all
@@ -1041,7 +1282,7 @@ function registerLockscreenIpc(): void {
 const POPOUT_SECTIONS = new Set([
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'notebook', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
-  'calendar', 'settings', 'youtube',
+  'calendar', 'settings', 'youtube', 'scraper',
 ]);
 
 // One real OS window per section, max. Keyed here (not just left to the
@@ -1060,7 +1301,7 @@ function broadcastPopoutState(): void {
 
 // Open one app in a genuine, borderless second window. It's the same renderer
 // loaded with `?popout=<section>`; the React app sees that flag and renders just
-// that app full-window. `frame: false` gives the clean Noctis-style look — the
+// that app full-window. `frame: false` gives each pop-out a clean widget frame — the
 // window's own drag strip + min/max/close (see PopoutChrome) drive it via the
 // popout:control IPC below.
 function createPopoutWindow(section: string): void {
@@ -1072,19 +1313,26 @@ function createPopoutWindow(section: string): void {
     existing.focus();
     return;
   }
+  const mediaCenter = section === 'player' || section === 'video' || section === 'music';
+  const mooncapWidget = section === 'city';
   const win = new BrowserWindow({
-    width: section === 'musicwidget' ? 480 : 900,
-    height: section === 'musicwidget' ? 220 : 640,
-    minWidth: section === 'musicwidget' ? 320 : 360,
-    minHeight: section === 'musicwidget' ? 140 : 240,
+    width: section === 'musicwidget' ? 480 : mooncapWidget ? 640 : mediaCenter ? 1100 : 900,
+    height: section === 'musicwidget' ? 220 : mooncapWidget ? 800 : mediaCenter ? 720 : 640,
+    minWidth: section === 'musicwidget' ? 320 : mooncapWidget ? 480 : 360,
+    minHeight: section === 'musicwidget' ? 140 : mooncapWidget ? 600 : 240,
+    maxWidth: mooncapWidget ? 720 : undefined,
+    maxHeight: mooncapWidget ? 900 : undefined,
+    maximizable: !mooncapWidget,
+    fullscreenable: !mooncapWidget,
     frame: false,
-    backgroundColor: '#14131a',
+    backgroundColor: mooncapWidget ? '#050711' : '#14131a',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       webviewTag: true,
     },
   });
+  if (mooncapWidget) win.setAspectRatio(4 / 5);
   // Same guard as main window: never let EPUB / content links hijack the SPA.
   win.webContents.on('will-navigate', (e, url) => {
     const ok =
@@ -1113,6 +1361,11 @@ function createPopoutWindow(section: string): void {
 }
 
 function registerPopoutIpc(): void {
+  openSectionHandler = (section: string) => createPopoutWindow(section);
+  if (pendingOpenSection) {
+    createPopoutWindow(pendingOpenSection);
+    pendingOpenSection = null;
+  }
   ipcMain.handle('popout:open', (_e, section: unknown): void => {
     if (typeof section === 'string') createPopoutWindow(section);
   });
@@ -1123,7 +1376,7 @@ function registerPopoutIpc(): void {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return;
     if (action === 'minimize') win.minimize();
-    else if (action === 'maximize') win.isMaximized() ? win.unmaximize() : win.maximize();
+    else if (action === 'maximize' && win.isMaximizable()) win.isMaximized() ? win.unmaximize() : win.maximize();
     else if (action === 'close') win.close();
   });
 }
@@ -1162,6 +1415,7 @@ function registerPlayerSyncIpc(): void {
 // "in sync". Do not reintroduce a blanket clearStorageData() call.
 
 app.whenReady().then(async () => {
+  if (!gotSingleInstanceLock) return;
   if (isDevServer()) startDebugBridge();
   ensureLibrary();
   if (typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'undefined' || !MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -1183,14 +1437,29 @@ app.whenReady().then(async () => {
   registerProfileRulesIpc();
   registerApkgIpc();
   registerDesktopIpc();
-  registerCityIpc();
   registerTranslateIpc();
   registerTranslateAnalysisIpc();
+  registerSentenceAnalysisIpc();
+  registerMediaStudyAssistantIpc();
+  registerMediaStudyOrchestratorIpc();
+  registerLocalAgentIpc();
+  registerLocalAgentSchedulerIpc();
   registerMiningIpc();
   registerImmersionIpc();
   registerSystemMetricsIpc();
-  // Phase-1 Seanime sidecar proof. Inert unless SEANIME_SIDECAR=1.
+  registerScraperIpc();
+  // Phase-5 reading boundary. Read-only over the sidecar; every handler answers
+  // with a state instead of rejecting when the sidecar is down.
+  registerReadingIpc();
+  // Seanime sidecar. On by default; SEANIME_SIDECAR=0 opts out. Registering the IPC
+  // does not spawn anything — the sidecar starts when a renderer asks it to.
   registerSeanimeIpc();
+  // Phase-8 authenticated MyAnimeList sync. Registering the handlers starts
+  // nothing: there is no background loop and no sync-on-launch, because every
+  // write here mutates a real MAL list irreversibly. Each handler answers a
+  // user-initiated action, and answers "not configured" until the user supplies
+  // a client id of their own — none is shipped.
+  registerMalSyncIpc();
   registerReleaseIpc();
   registerResourcesCatalogIpc();
   registerCollectedToolsIpc();
@@ -1229,6 +1498,9 @@ app.whenReady().then(async () => {
   });
   registerReadingLensIpc();
   createWindow();
+  // Cold-start `--open=library` (etc.): main boots for services, then open the pop-out.
+  const coldOpen = argvOpenSection(process.argv);
+  if (coldOpen) createPopoutWindow(coldOpen);
   startExtensionServer();
   // System-wide popup dictionary: registers its global hotkey + tray if enabled.
   startSystemDictionary();
@@ -1236,7 +1508,8 @@ app.whenReady().then(async () => {
   startReadingLens();
   // Provision + load offline dictionaries in the background so the window paints
   // immediately. Consumers that need glosses (mining, the pop-up) await
-  // initYomitan() themselves, and a dict:updated event refreshes the UI.
+  // initYomitan() themselves, so they observe the loaded indices without any
+  // notification from here.
   void initYomitan();
   // Reconcile downloaded models against disk (and refresh the asset registry)
   // in the background — consumers ask isInstalled() before touching a model, so
@@ -1262,6 +1535,8 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   stopSeanime();
+  stopLocalAgentRuntime();
+  stopLocalAgentScheduler();
   stopBuddyScheduler();
   stopExtensionServer();
   stopSystemDictionary();

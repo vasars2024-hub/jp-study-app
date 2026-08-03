@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../../i18n';
 import { useAppMaterialSet } from '../ui';
 import * as player from '../../playerBus';
@@ -17,6 +17,9 @@ import {
   type WiredFindingFeature,
 } from '../../terminalModeSettings';
 import wiredFaceUrl from '../../assets/wired-lain-reference.jpg';
+import WiredLyricStream from './WiredLyricStream';
+import WiredLyricPreview from './WiredLyricPreview';
+import { SYSTEM_METADATA } from '../../lyricTransmission';
 
 function cleanLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
@@ -98,6 +101,10 @@ const MAGI_UNIT_CODES = {
   casper: 'CASPER-3',
 } as const;
 
+/** Synthetic per-line window for untimed (plain) lyrics, so the transmission
+ *  still travels continuously instead of sitting frozen mid-screen. */
+const LYRIC_BUCKET_SECONDS = 6.4;
+
 export default function WiredFindingOverlay() {
   const { t, lang } = useT();
   const material = useAppMaterialSet();
@@ -111,6 +118,9 @@ export default function WiredFindingOverlay() {
   const [summoned, setSummoned] = useState(false);
   const [vkPick, setVkPick] = useState<number | null>(null);
   const [ghostOpen, setGhostOpen] = useState(false);
+  const [railEntries, setRailEntries] = useState<{ id: number; text: string; kind: 'semantic' | 'metadata' }[]>([]);
+  const railIdRef = useRef(0);
+  const metaCursorRef = useRef(0);
 
   useEffect(() => onWiredDiscoveryChanged(setDiscovered), []);
   useEffect(() => onWiredArchiveSettingsChanged(setWiredSettings), []);
@@ -152,6 +162,83 @@ export default function WiredFindingOverlay() {
     return { current: '', all: [] as string[] };
   }, [live.activeIndex, live.lyrics]);
 
+  const reducedMotion = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+    [],
+  );
+
+  // The line currently being transmitted. Synced lyrics use their real cue
+  // window; plain (untimed) lyrics get a synthetic clock (see
+  // LYRIC_BUCKET_SECONDS) so the stream still travels continuously instead
+  // of sitting frozen mid-screen.
+  const lyricLine = useMemo(() => {
+    if (live.lyrics.kind === 'synced' && live.activeIndex >= 0) {
+      const cue = live.lyrics.cues[live.activeIndex];
+      const text = cleanLine(cue.text);
+      if (!text) return null;
+      const end = Math.max(cue.start + 1.2, Math.min(cue.end, cue.start + 11));
+      return { key: `synced:${live.activeIndex}`, text, start: cue.start, end };
+    }
+    const pool =
+      live.lyrics.kind === 'plain'
+        ? live.lyrics.lines
+        : live.lyrics.kind === 'synced'
+          ? live.lyrics.cues.slice(0, 3).map((c) => c.text).filter(Boolean)
+          : [];
+    if (!pool.length) return null;
+    const bucket = Math.floor(state.time / LYRIC_BUCKET_SECONDS);
+    const text = cleanLine(pool[((bucket % pool.length) + pool.length) % pool.length]);
+    if (!text) return null;
+    return {
+      key: `plain:${bucket}`,
+      text,
+      start: bucket * LYRIC_BUCKET_SECONDS,
+      end: (bucket + 1) * LYRIC_BUCKET_SECONDS,
+    };
+  }, [live.lyrics, live.activeIndex, state.time]);
+
+  // The "back lane" conveyor: the line arriving NEXT, mirrored and small,
+  // bound to the exact same time window as the current front line. It always
+  // reaches the far edge right as the front line finishes exiting — what was
+  // small and backwards back here is what shows up big and readable next.
+  const nextLyricLine = useMemo(() => {
+    if (!lyricLine) return null;
+    if (live.lyrics.kind === 'synced' && live.activeIndex >= 0) {
+      const cue = live.lyrics.cues[live.activeIndex + 1];
+      const text = cue ? cleanLine(cue.text) : '';
+      return text ? { text, start: lyricLine.start, end: lyricLine.end } : null;
+    }
+    const pool =
+      live.lyrics.kind === 'plain'
+        ? live.lyrics.lines
+        : live.lyrics.kind === 'synced'
+          ? live.lyrics.cues.slice(0, 3).map((c) => c.text).filter(Boolean)
+          : [];
+    if (!pool.length) return null;
+    const bucket = Math.floor(state.time / LYRIC_BUCKET_SECONDS) + 1;
+    const text = cleanLine(pool[((bucket % pool.length) + pool.length) % pool.length]);
+    return text ? { text, start: lyricLine.start, end: lyricLine.end } : null;
+  }, [lyricLine, live.lyrics, live.activeIndex, state.time]);
+
+  // Rail entries self-expire — the analysis rail should read as a live feed,
+  // not an ever-growing log.
+  const pushRail = useCallback((text: string, kind: 'semantic' | 'metadata') => {
+    railIdRef.current += 1;
+    const id = railIdRef.current;
+    setRailEntries((prev) => [...prev.slice(-5), { id, text, kind }]);
+    window.setTimeout(() => {
+      setRailEntries((prev) => prev.filter((e) => e.id !== id));
+    }, 9000);
+  }, []);
+  const handleLyricArchive = useCallback((fragment: string) => pushRail(fragment, 'semantic'), [pushRail]);
+  const handleLyricMetadata = useCallback(() => {
+    const label = SYSTEM_METADATA[metaCursorRef.current % SYSTEM_METADATA.length];
+    metaCursorRef.current += 1;
+    pushRail(label, 'metadata');
+  }, [pushRail]);
+
   const pushTerminal = useCallback((line: string) => {
     setTerminal((prev) => [...prev.slice(-12), line]);
   }, []);
@@ -173,15 +260,6 @@ export default function WiredFindingOverlay() {
 
   const guideText = lines.current ? maskLine(lines.current) : t('wired.found.guideFallback');
   const sourceLine = lines.current || lines.all[0] || '';
-
-  const currentCue = live.lyrics.kind === 'synced' && live.activeIndex >= 0 ? live.lyrics.cues[live.activeIndex] ?? null : null;
-  const nextCue = live.lyrics.kind === 'synced' && live.activeIndex >= 0 ? live.lyrics.cues[live.activeIndex + 1] ?? null : null;
-  const lineText = cleanLine(currentCue?.text ?? sourceLine);
-  const lineDuration = currentCue
-    ? Math.max(0.9, (nextCue?.start ?? state.duration) - currentCue.start)
-    : Math.max(4, Math.min(10, Math.max(4, lineText.length * 0.18)));
-  const lineProgress = currentCue ? Math.min(1, Math.max(0, (state.time - currentCue.start) / lineDuration)) : 0.5;
-  const lineX = currentCue ? `${120 - lineProgress * 240}vw` : '0vw';
 
   const submitGuess = useCallback(() => {
     const target = cleanLine(lines.current || lines.all[0] || '');
@@ -248,16 +326,45 @@ export default function WiredFindingOverlay() {
         </div>
       )}
 
-      {featureOn('lyricRibbon') && hasLyrics && (
-        <div className="wired-found-lyric-stage" aria-hidden="true">
-          <div
-            className="wired-found-lyric-line"
-            style={{ transform: `translate3d(${lineX}, 0, 0)`, animationDuration: `${Math.max(3.2, lineDuration)}s` }}
-          >
-            <span className="wired-found-lyric-line-inner">{glitchText(lineText, glitchSeed + 29)}</span>
-            <span className="wired-found-lyric-line-glow" />
-          </div>
+      {featureOn('lyricRibbon') && hasLyrics && lyricLine && (
+        <div className="wlyric-stage" aria-hidden="true">
+          {nextLyricLine && (
+            <WiredLyricPreview
+              key={lyricLine.key}
+              text={nextLyricLine.text}
+              cueStart={nextLyricLine.start}
+              cueEnd={nextLyricLine.end}
+              motionLevel={wiredSettings.motionLevel}
+              reducedMotion={reducedMotion}
+            />
+          )}
+          <WiredLyricStream
+            key={lyricLine.key}
+            text={lyricLine.text}
+            cueStart={lyricLine.start}
+            cueEnd={lyricLine.end}
+            motionLevel={wiredSettings.motionLevel}
+            reducedMotion={reducedMotion}
+            onArchive={handleLyricArchive}
+            onMetadata={handleLyricMetadata}
+          />
         </div>
+      )}
+
+      {featureOn('lyricRibbon') && hasLyrics && (
+        <aside
+          className="wired-found-lyric-rail wired-found-panel"
+          aria-label={t('wired.found.ariaLyricRail')}
+        >
+          <header>{t('wired.found.lyricRail.title')}</header>
+          <ul>
+            {railEntries.map((entry) => (
+              <li key={entry.id} className={`is-${entry.kind}`} lang={entry.kind === 'semantic' ? 'ja' : undefined}>
+                {entry.text}
+              </li>
+            ))}
+          </ul>
+        </aside>
       )}
 
       {featureOn('hackerTerminal') && (
@@ -465,7 +572,7 @@ export default function WiredFindingOverlay() {
               </div>
               <footer>
                 <span>{t(`wired.found.capsule.band.${readouts.gauge.band}`)}</span>
-                <span>{t('wired.found.capsule.streak', { days: readouts.gauge.streak })}</span>
+                <span>{t('wired.found.capsule.streak', { count: readouts.gauge.streak })}</span>
               </footer>
             </article>
           )}

@@ -7,6 +7,7 @@ import StudyLanguageSection from './StudyLanguageSection';
 import ExtensionBridgeSection from './ExtensionBridgeSection';
 import SystemDictionarySection from './SystemDictionarySection';
 import ReadingLensSection from './ReadingLensSection';
+import AiAnalysisSection from './AiAnalysisSection';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import {
@@ -197,6 +198,14 @@ export default function StudyPage() {
         highlight={focusSettingId === 'system-dictionary'}
       >
         <SystemDictionarySection />
+      </SettingsCard>
+      <SettingsCard
+        id="ai-analysis"
+        title={t('settings.analysis.title')}
+        description={t('settings.analysis.desc')}
+        highlight={focusSettingId === 'ai-analysis'}
+      >
+        <AiAnalysisSection />
       </SettingsCard>
       <SettingsCard
         id="reading-lens"

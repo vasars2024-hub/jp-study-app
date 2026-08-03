@@ -61,3 +61,46 @@
 .blanc-flashcards-embed .flash-view.review {
   min-height: 0;
 }
+
+/* Study player embed (slice 15): the adopted surface is laid out for a full-screen
+   overlay, and Blanc's toolbox window is 560x460 by default. Bound it the same way
+   .blanc-flashcards-embed bounds the flashcard modes.
+
+   The selector carries #media-workspace because MediaSurfaceShell puts that id on the
+   surface root and slice 5 scoped all 6,950 adopted selectors under it — an unscoped
+   rule here would lose to them on specificity. */
+#media-workspace.blanc-study-player {
+  /* A DEFINITE height, not only a max. Measured 2026-08-01 with a file really playing
+     (docs/migration/proof/blanc-open-retry-20260801061000/): the frame was 392x0 and the
+     video, though decoding at 1920x1080 with the clock advancing, was 392x0 and painted
+     nothing. Two things caused it and both are fixed here.
+
+     First, `max-height` alone leaves the frame's own height `auto`, and everything below
+     `.study-player-slice` in the adopted tree is a chain of Tailwind `h-full`
+     (height: 100%) divs. A percentage of an auto height is zero, so the whole subtree
+     resolved to zero. */
+  height: clamp(180px, 60vh, calc(100vh - 200px));
+  max-height: calc(100vh - 200px);
+  min-height: 0;
+  overflow: hidden auto;
+  /* The dock and cue-loop overlay position against this, not the viewport. */
+  position: relative;
+  contain: layout paint;
+}
+
+/* The player slice is `position: fixed; inset: 0` (mediaWorkspace.css) — which is right
+   when it IS the screen. Inside the toolbox that is the second half of the collapse: a
+   fixed child is out of flow, so it contributed no height to the frame above, and its own
+   `height: auto` then had nothing to resolve against either. It must be IN FLOW here and
+   fill the frame. `height: auto` was the previous attempt at this and is what the
+   measurement above disproved. */
+#media-workspace.blanc-study-player .study-player-slice {
+  position: relative;
+  inset: auto;
+  min-height: 0;
+  height: 100%;
+}
+
+#media-workspace.blanc-study-player video {
+  max-height: 45vh;
+}

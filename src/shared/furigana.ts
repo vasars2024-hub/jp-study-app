@@ -26,8 +26,12 @@ export interface FuriganaSegment {
   reading?: string;
 }
 
-const KANJI_RE = /[一-龯㐀-䶿々]/;
-const KANJI_RUN_RE = /[一-龯㐀-䶿々]/u;
+// The union of the three ranges this app had drifted into: the full CJK block
+// (U+4E00–U+9FFF, wider than the old U+4E00–U+9FAF), extension A, the 々 repeater,
+// and the 〆ヵヶ marks that behave like kanji for reading purposes. `findingModules`
+// and `SubtitleCueLine` each carried their own near-copy; both now import this one.
+const KANJI_RE = /[一-鿿㐀-䶿々〆ヵヶ]/;
+const KANJI_RUN_RE = /[一-鿿㐀-䶿々〆ヵヶ]/u;
 
 /** True when the text contains at least one kanji (or the 々 repeater). */
 export function hasKanji(text: string): boolean {

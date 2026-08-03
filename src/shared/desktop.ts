@@ -28,7 +28,8 @@ export type DesktopWinSection =
   | 'immersion'
   | 'calendar'
   | 'reading'
-  | 'youtube';
+  | 'youtube'
+  | 'scraper';
 
 export interface WindowSnapshot {
   id: string;

@@ -1,7 +1,7 @@
 import type { GrammarPoint } from './types';
 
-// Additional N1 grammar drawn from the Mazii N1 pattern list, deduped against
-// the core set in n1.ts. Each point carries two example sentences.
+// Additional N1 grammar drawn from the supplemental N1 pattern list, deduped
+// against the core set in n1.ts. Each point carries two example sentences.
 export const N1_EXTRA: GrammarPoint[] = [
   {
     id: 'n1x-tomiete',

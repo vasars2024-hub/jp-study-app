@@ -8,31 +8,24 @@ import type { EnvironmentSettings, WallpaperPlaylist } from './environment/types
 import { writeLocalStorage, writeLocalStorageJson } from './localStorageWrite';
 import { AERO_THEME_ID } from './theme/frutiger-aero';
 import { DEFAULT_THEME_ID, loadThemeId, onThemeChanged } from './theme/engine';
+import {
+  buildNostalgicDefaultRule,
+  buildNostalgicWallpaperPlaylist,
+  SECRET_AERO_PLAYLIST_ID,
+} from './environment/nostalgicWallpaperPack';
 
 const AERO_ENV_KEY = 'jp-aero-environment-v1';
 const STUDY_ENV_BACKUP_KEY = 'jp-study-environment-backup-v1';
 const AERO_RESTORE_THEME_KEY = 'jp-aero-restore-theme-v1';
 
-export const SECRET_AERO_PLAYLIST_ID = 'secret-aero-default-wallpaper';
-export const SECRET_WALLPAPER_URL = new URL('./assets/secret-aero-network-wallpaper.jpg', import.meta.url).href;
+const SECRET_AERO_DEFAULT_RULE_ID = 'secret-aero-default';
+
+function buildSecretAeroDefaultRule(): EnvironmentSettings['rules'][number] {
+  return buildNostalgicDefaultRule();
+}
 
 export function buildSecretAeroWallpaperPlaylist(): WallpaperPlaylist {
-  return {
-    id: SECRET_AERO_PLAYLIST_ID,
-    name: 'Secret OS Default',
-    transition: 'crossfade',
-    transitionMs: 900,
-    items: [
-      {
-        id: 'secret-aero-first-discovery',
-        kind: 'image',
-        ref: SECRET_WALLPAPER_URL,
-        label: 'Secret Aero Network',
-        tags: ['secret', 'aero', 'network', 'night'],
-        durationSec: 0,
-      },
-    ],
-  };
+  return buildNostalgicWallpaperPlaylist();
 }
 
 export const SECRET_AERO_WALLPAPER_PLAYLIST = buildSecretAeroWallpaperPlaylist();
@@ -44,7 +37,14 @@ export function refreshSecretWallpaperRefs(env: EnvironmentSettings): Environmen
   const idx = playlists.findIndex((p) => p.id === SECRET_AERO_PLAYLIST_ID);
   if (idx >= 0) playlists[idx] = fresh;
   else playlists.push(fresh);
-  return { ...env, playlists };
+  return {
+    ...env,
+    playlists,
+    rules: [
+      buildSecretAeroDefaultRule(),
+      ...env.rules.filter((rule) => rule.id !== SECRET_AERO_DEFAULT_RULE_ID),
+    ],
+  };
 }
 
 export function secretAeroEnvironmentPatch(): Partial<EnvironmentSettings> {
@@ -58,6 +58,7 @@ export function secretAeroEnvironmentPatch(): Partial<EnvironmentSettings> {
     rotationEnabled: true,
     activePlaylistId: SECRET_AERO_PLAYLIST_ID,
     playlists: [buildSecretAeroWallpaperPlaylist()],
+    rules: [buildSecretAeroDefaultRule()],
     calendarWallsEnabled: false,
   };
 }

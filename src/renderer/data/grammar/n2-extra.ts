@@ -1,7 +1,7 @@
 import type { GrammarPoint } from './types';
 
-// Additional N2 grammar drawn from the Mazii N2 pattern list, deduped against
-// the core set in n2.ts. Each point carries two example sentences.
+// Additional N2 grammar drawn from the supplemental N2 pattern list, deduped
+// against the core set in n2.ts. Each point carries two example sentences.
 export const N2_EXTRA: GrammarPoint[] = [
   {
     id: 'n2x-karatoitte',

@@ -4,8 +4,8 @@
 // injected IO so both the EPUB miner (main process) and tests share one
 // implementation.
 
-import type { CandidateGlosses, MiningCandidate, TraditionalMiningConfig } from './mining';
-import { DEFAULT_TRADITIONAL_MINING_CONFIG } from './mining';
+import type { CandidateGlosses, MiningCandidate, TraditionalMiningConfig } from './miningTypes';
+import { DEFAULT_TRADITIONAL_MINING_CONFIG } from './miningTypes';
 import type { DictEntry } from './types';
 import { textMatchesLang } from './langs';
 import {

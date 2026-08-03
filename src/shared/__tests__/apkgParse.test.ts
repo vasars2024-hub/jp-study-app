@@ -3,6 +3,7 @@ import {
   FIELD_SEP,
   extractExpressions,
   looksLikeUpgradeStub,
+  modelsFromNormalizedRows,
   parseModels,
   pickExpressionOrd,
   splitFields,
@@ -93,6 +94,21 @@ describe('models + field selection', () => {
   it('parses models', () => {
     expect(Object.keys(models)).toEqual(['1', '2', '3']);
     expect(models['1'].flds[1].name).toBe('Term');
+  });
+
+  it('rebuilds models from modern normalized notetype fields', () => {
+    const normalized = modelsFromNormalizedRows([
+      { mid: '42', modelName: 'Word', ord: 1, fieldName: 'Reading' },
+      { mid: '42', modelName: 'Word', ord: 0, fieldName: 'Expression' },
+    ]);
+    expect(normalized['42']).toEqual({
+      name: 'Word',
+      flds: [
+        { name: 'Expression', ord: 0 },
+        { name: 'Reading', ord: 1 },
+      ],
+    });
+    expect(pickExpressionOrd(normalized['42'])).toBe(0);
   });
 
   it('picks the Term/Expression field even when it is not first', () => {

@@ -868,8 +868,39 @@ body {
   background: var(--blanc-panel-soft);
 }
 
-.blanc-file-search-table {
+.blanc-file-search-results {
   min-width: 720px;
+  border: 1px solid var(--blanc-border);
+}
+
+.blanc-file-search-vlist {
+  overflow-x: hidden;
+}
+
+.blanc-file-search-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px 150px 190px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--blanc-border);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.blanc-file-search-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--blanc-panel-soft);
+  font-size: 11px;
+  color: var(--blanc-muted);
+}
+
+.blanc-file-search-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .blanc-status {

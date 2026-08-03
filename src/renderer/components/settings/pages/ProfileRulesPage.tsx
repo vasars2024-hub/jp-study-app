@@ -4,6 +4,7 @@ import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
 import { getActiveProfile, getProfiles, onProfileChanged } from '../../../profileState';
 import type { StudyProfile } from '../../../../shared/profiles';
+import Icon from '../../Icons';
 import {
   EMPTY_PROFILE_RULES,
   MINE_CATEGORIES,
@@ -25,14 +26,31 @@ type CardKindOpt = MineCardKind | 'any';
 type LanguageOpt = MineLanguage | 'any';
 type CategoryOpt = MineCategory | 'any';
 
-const SOURCES: SourceOpt[] = ['any', 'extension', 'epub', 'audio', 'reader', 'dictionary', 'other'];
+const SOURCES: SourceOpt[] = [
+  'any',
+  'extension',
+  'epub',
+  'subtitle',
+  'audio',
+  'reader',
+  'dictionary',
+  'other',
+];
 const CARD_KINDS: CardKindOpt[] = ['any', 'word', 'sentence'];
 const LANGUAGES: LanguageOpt[] = ['any', 'ja', 'zh', 'ru', 'unknown'];
 const CATEGORIES: CategoryOpt[] = ['any', ...MINE_CATEGORIES];
 
 // Concrete option sets for the "Test a card" simulator (no wildcards — a real
 // mined card always has a specific source / kind / language).
-const TEST_SOURCES: MineSource[] = ['extension', 'epub', 'audio', 'reader', 'dictionary', 'other'];
+const TEST_SOURCES: MineSource[] = [
+  'extension',
+  'epub',
+  'subtitle',
+  'audio',
+  'reader',
+  'dictionary',
+  'other',
+];
 const TEST_CARD_KINDS: MineCardKind[] = ['word', 'sentence'];
 const TEST_LANGUAGES: MineLanguage[] = ['ja', 'zh', 'ru', 'unknown'];
 type TestCategory = MineCategory | 'none';
@@ -56,9 +74,11 @@ function moveRule(rules: ProfileRule[], index: number, dir: -1 | 1): ProfileRule
   const j = index + dir;
   if (j < 0 || j >= rules.length) return rules;
   const next = rules.slice();
-  const tmp = next[index]!;
-  next[index] = next[j]!;
-  next[j] = tmp;
+  const current = next[index];
+  const target = next[j];
+  if (!current || !target) return rules;
+  next[index] = target;
+  next[j] = current;
   return next;
 }
 
@@ -141,7 +161,7 @@ export default function ProfileRulesPage() {
   );
 
   const patchRules = (rules: ProfileRule[]) => {
-    void persist({ schemaVersion: 1, rules });
+    void persist({ schemaVersion: 2, rules });
   };
 
   const updateRule = (index: number, patch: Partial<ProfileRule>) => {
@@ -199,8 +219,9 @@ export default function ProfileRulesPage() {
     category: test.category === 'none' ? undefined : test.category,
   };
   const testResolved = resolveProfileMatch(store.rules, testCtx, active?.id || '');
-  const testRuleIndex = testResolved.matchedRule
-    ? store.rules.findIndex((r) => r.id === testResolved.matchedRule!.id)
+  const matchedRule = testResolved.matchedRule;
+  const testRuleIndex = matchedRule
+    ? store.rules.findIndex((r) => r.id === matchedRule.id)
     : -1;
   const testDestProfile = profileById.get(testResolved.profileId) || active;
 
@@ -229,7 +250,7 @@ export default function ProfileRulesPage() {
         {/* A. Default destination — the anchor for the whole mental model. */}
         <div className="pr-banner" role="note">
           <span className="pr-banner-icon" aria-hidden="true">
-            ★
+            <Icon name="star" size={18} />
           </span>
           <div className="pr-banner-text">
             <div className="pr-banner-head">
@@ -400,7 +421,7 @@ export default function ProfileRulesPage() {
                         const rules = storeRef.current.rules.map((r, i) =>
                           i === index ? { ...r, label } : r,
                         );
-                        const next = { schemaVersion: 1 as const, rules };
+                        const next = { schemaVersion: 2 as const, rules };
                         storeRef.current = next;
                         setStore(next);
                       }}

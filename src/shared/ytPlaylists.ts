@@ -5,6 +5,7 @@
 export type YtStudyLang = 'ja' | 'zh' | 'en';
 export type YtSubLang = 'ja' | 'zh' | 'en' | 'ru';
 export type YtPlaylistSort = 'playlist' | 'views' | 'date' | 'title' | 'unlogged';
+export type YtSubscriptionStatus = 'subscribed' | 'watching' | 'custom' | 'unsubscribed';
 
 /** Pseudo playlist id used for extension one-off video captures. */
 export const EXTENSION_YT_PLAYLIST_ID = '__extension__';
@@ -15,17 +16,35 @@ export interface YtPlaylistFolder {
   parentId?: string;
 }
 
+export interface YtChannel {
+  id: string;
+  channelId: string;
+  title: string;
+  iconUrl?: string;
+  subscriptionStatus: YtSubscriptionStatus;
+  lastCheckedAt?: number;
+  updateFrequencyHours: number;
+  playlistIds: string[];
+  videoCount: number;
+  createdAt: number;
+}
+
 export interface YtPlaylist {
   id: string;
   title: string;
   url: string;
-  youtubePlaylistId: string;
+  channelId?: string;
   channelTitle?: string;
+  channelIconUrl?: string;
+  youtubePlaylistId: string;
+  subscriptionStatus: YtSubscriptionStatus;
   folderId?: string;
   lang: YtStudyLang;
   preferSubs: YtSubLang[];
   autoUpdate: boolean;
   lastSyncedAt?: number;
+  lastCheckedAt?: number;
+  updateFrequencyHours: number;
   sortDefault: YtPlaylistSort;
   createdAt: number;
 }
@@ -56,6 +75,7 @@ export interface YtVideo {
 export interface YtPlaylistsStore {
   version: 1;
   folders: YtPlaylistFolder[];
+  channels: YtChannel[];
   playlists: YtPlaylist[];
   videos: YtVideo[];
   /** Unix ms of last News check completion. */
@@ -65,7 +85,7 @@ export interface YtPlaylistsStore {
 }
 
 export function emptyYtStore(): YtPlaylistsStore {
-  return { version: 1, folders: [], playlists: [], videos: [], planToWatchIds: [] };
+  return { version: 1, folders: [], channels: [], playlists: [], videos: [], planToWatchIds: [] };
 }
 
 function normalizePreferSubs(raw: unknown): YtSubLang[] {
@@ -95,8 +115,17 @@ function normalizePlaylist(raw: unknown): YtPlaylist | null {
     id: p.id,
     title: typeof p.title === 'string' && p.title ? p.title : p.youtubePlaylistId,
     url: typeof p.url === 'string' ? p.url : '',
+    channelId: typeof p.channelId === 'string' && p.channelId ? p.channelId : undefined,
     youtubePlaylistId: p.youtubePlaylistId,
     channelTitle: typeof p.channelTitle === 'string' ? p.channelTitle : undefined,
+    channelIconUrl: typeof p.channelIconUrl === 'string' ? p.channelIconUrl : undefined,
+    subscriptionStatus:
+      p.subscriptionStatus === 'subscribed' ||
+      p.subscriptionStatus === 'watching' ||
+      p.subscriptionStatus === 'custom' ||
+      p.subscriptionStatus === 'unsubscribed'
+        ? p.subscriptionStatus
+        : 'subscribed',
     folderId: typeof p.folderId === 'string' ? p.folderId : undefined,
     lang,
     preferSubs: normalizePreferSubs(p.preferSubs),
@@ -105,9 +134,58 @@ function normalizePlaylist(raw: unknown): YtPlaylist | null {
       typeof p.lastSyncedAt === 'number' && Number.isFinite(p.lastSyncedAt)
         ? p.lastSyncedAt
         : undefined,
+    lastCheckedAt:
+      typeof p.lastCheckedAt === 'number' && Number.isFinite(p.lastCheckedAt)
+        ? p.lastCheckedAt
+        : undefined,
+    updateFrequencyHours:
+      typeof p.updateFrequencyHours === 'number' &&
+      Number.isFinite(p.updateFrequencyHours) &&
+      p.updateFrequencyHours > 0
+        ? p.updateFrequencyHours
+        : 12,
     sortDefault,
     createdAt:
       typeof p.createdAt === 'number' && Number.isFinite(p.createdAt) ? p.createdAt : Date.now(),
+  };
+}
+
+function normalizeChannel(raw: unknown): YtChannel | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const c = raw as Partial<YtChannel>;
+  const channelId = typeof c.channelId === 'string' && c.channelId ? c.channelId : '';
+  if (!channelId) return null;
+  return {
+    id: typeof c.id === 'string' && c.id ? c.id : `ytc-${channelId}`,
+    channelId,
+    title: typeof c.title === 'string' && c.title ? c.title : channelId,
+    iconUrl: typeof c.iconUrl === 'string' ? c.iconUrl : undefined,
+    subscriptionStatus:
+      c.subscriptionStatus === 'subscribed' ||
+      c.subscriptionStatus === 'watching' ||
+      c.subscriptionStatus === 'custom' ||
+      c.subscriptionStatus === 'unsubscribed'
+        ? c.subscriptionStatus
+        : 'subscribed',
+    lastCheckedAt:
+      typeof c.lastCheckedAt === 'number' && Number.isFinite(c.lastCheckedAt)
+        ? c.lastCheckedAt
+        : undefined,
+    updateFrequencyHours:
+      typeof c.updateFrequencyHours === 'number' &&
+      Number.isFinite(c.updateFrequencyHours) &&
+      c.updateFrequencyHours > 0
+        ? c.updateFrequencyHours
+        : 24,
+    playlistIds: Array.isArray(c.playlistIds)
+      ? c.playlistIds.filter((id): id is string => typeof id === 'string' && !!id)
+      : [],
+    videoCount:
+      typeof c.videoCount === 'number' && Number.isFinite(c.videoCount) && c.videoCount >= 0
+        ? c.videoCount
+        : 0,
+    createdAt:
+      typeof c.createdAt === 'number' && Number.isFinite(c.createdAt) ? c.createdAt : Date.now(),
   };
 }
 
@@ -118,13 +196,50 @@ export function normalizeYtStore(raw: unknown): YtPlaylistsStore {
   const playlists = Array.isArray(parsed.playlists)
     ? parsed.playlists.map(normalizePlaylist).filter((p): p is YtPlaylist => !!p)
     : null;
+  const channels = Array.isArray(parsed.channels)
+    ? parsed.channels.map(normalizeChannel).filter((c): c is YtChannel => !!c)
+    : [];
   const videos = Array.isArray(parsed.videos) ? parsed.videos : null;
   if (parsed.version !== 1 || !playlists || !videos) {
     return emptyYtStore();
   }
+  const byChannelId = new Map(channels.map((c) => [c.channelId, c]));
+  for (const pl of playlists) {
+    if (!pl.channelId) continue;
+    const existing = byChannelId.get(pl.channelId);
+    if (existing) {
+      existing.title = pl.channelTitle ?? existing.title;
+      existing.iconUrl = pl.channelIconUrl ?? existing.iconUrl;
+      existing.subscriptionStatus = pl.subscriptionStatus ?? existing.subscriptionStatus;
+      existing.lastCheckedAt = pl.lastCheckedAt ?? existing.lastCheckedAt;
+      existing.updateFrequencyHours = pl.updateFrequencyHours ?? existing.updateFrequencyHours;
+      if (!existing.playlistIds.includes(pl.id)) existing.playlistIds.push(pl.id);
+      continue;
+    }
+    const next: YtChannel = {
+      id: `ytc-${pl.channelId}`,
+      channelId: pl.channelId,
+      title: pl.channelTitle ?? pl.channelId,
+      iconUrl: pl.channelIconUrl,
+      subscriptionStatus: pl.subscriptionStatus,
+      lastCheckedAt: pl.lastCheckedAt,
+      updateFrequencyHours: pl.updateFrequencyHours,
+      playlistIds: [pl.id],
+      videoCount: 0,
+      createdAt: pl.createdAt,
+    };
+    channels.push(next);
+    byChannelId.set(pl.channelId, next);
+  }
+  const byPlaylistId = new Map(playlists.map((p) => [p.id, p]));
+  for (const c of channels) {
+    c.playlistIds = [...new Set(c.playlistIds.filter((id) => byPlaylistId.has(id)))];
+    c.videoCount = videos.filter((v) => c.playlistIds.includes(v.playlistId)).length;
+  }
   return {
     version: 1,
     folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+    channels,
     playlists,
     videos,
     lastNewsCheckedAt:
@@ -222,6 +337,46 @@ export function mergePlaylistVideos(
     };
   });
   return [...others, ...merged];
+}
+
+export function ensureTrackedChannel(
+  store: YtPlaylistsStore,
+  playlist: YtPlaylist,
+): YtPlaylistsStore {
+  if (!playlist.channelId) return store;
+  const channels = [...(store.channels ?? [])];
+  const idx = channels.findIndex((c) => c.channelId === playlist.channelId);
+  const videoCount = (store.videos ?? []).filter((v) => v.playlistId === playlist.id).length;
+  if (idx >= 0) {
+    channels[idx] = {
+      ...channels[idx],
+      title: playlist.channelTitle ?? channels[idx].title,
+      iconUrl: playlist.channelIconUrl ?? channels[idx].iconUrl,
+      subscriptionStatus: playlist.subscriptionStatus,
+      lastCheckedAt: playlist.lastCheckedAt ?? channels[idx].lastCheckedAt,
+      updateFrequencyHours: playlist.updateFrequencyHours,
+      playlistIds: Array.from(new Set([...channels[idx].playlistIds, playlist.id])),
+      videoCount,
+    };
+  } else {
+    channels.push({
+      id: `ytc-${playlist.channelId}`,
+      channelId: playlist.channelId,
+      title: playlist.channelTitle ?? playlist.channelId,
+      iconUrl: playlist.channelIconUrl,
+      subscriptionStatus: playlist.subscriptionStatus,
+      lastCheckedAt: playlist.lastCheckedAt,
+      updateFrequencyHours: playlist.updateFrequencyHours,
+      playlistIds: [playlist.id],
+      videoCount,
+      createdAt: playlist.createdAt,
+    });
+  }
+  return { ...store, channels };
+}
+
+export function trackedChannels(store: YtPlaylistsStore): YtChannel[] {
+  return [...(store.channels ?? [])].sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export function sortYtVideos(videos: YtVideo[], sort: YtPlaylistSort): YtVideo[] {

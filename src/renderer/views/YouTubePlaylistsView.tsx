@@ -19,18 +19,22 @@ import {
   planToWatchVideos,
   sortYtVideos,
   type YtPlaylist,
+  type YtChannel,
   type YtPlaylistFolder,
   type YtPlaylistSort,
   type YtPlaylistsStore,
   type YtStudyLang,
   type YtSubLang,
+  type YtSubscriptionStatus,
   type YtVideo,
 } from '../../shared/ytPlaylists';
+import { setHandoff } from '../pendingHandoff';
 
 const ROW_H = 64;
 const SUB_OPTS: YtSubLang[] = ['ja', 'zh', 'en', 'ru'];
 const LANG_OPTS: YtStudyLang[] = ['ja', 'zh', 'en'];
 const SORT_OPTS: YtPlaylistSort[] = ['playlist', 'views', 'date', 'title', 'unlogged'];
+const SUB_STATUS_OPTS: YtSubscriptionStatus[] = ['subscribed', 'watching', 'custom', 'unsubscribed'];
 
 type MainTab = 'news' | 'playlist';
 type SideSelection = { kind: 'playlist'; id: string } | { kind: 'plan' };
@@ -57,7 +61,7 @@ function openInVideoPlayer(mediaItemId: string, whisperLang?: YtStudyLang): void
     setStudyLang(whisperLang);
   }
   try {
-    sessionStorage.setItem('jp-pending-media-id', mediaItemId);
+    setHandoff('mediaId', mediaItemId);
   } catch {
     /* ignore */
   }
@@ -99,6 +103,7 @@ export default function YouTubePlaylistsView() {
   }, []);
 
   const folders = store.folders ?? [];
+  const channels = store.channels ?? [];
   const playlists = store.playlists ?? [];
   const videos = store.videos ?? [];
   const planToWatchIds = store.planToWatchIds ?? [];
@@ -323,6 +328,13 @@ export default function YouTubePlaylistsView() {
     else applyStore(r);
   };
 
+  const setPlaylistField = async (patch: Parameters<typeof window.api.ytSetPlaylistPrefs>[1]): Promise<void> => {
+    if (!playlist) return;
+    const r = await window.api.ytSetPlaylistPrefs(playlist.id, patch);
+    if ('error' in r) setError(r.error);
+    else applyStore(r);
+  };
+
   const setSortPref = async (sortDefault: YtPlaylistSort): Promise<void> => {
     setSort(sortDefault);
     if (!playlist) return;
@@ -353,6 +365,19 @@ export default function YouTubePlaylistsView() {
     applyStore(r);
     const first = r.playlists.find(isImmersionPlaylist);
     setSide(first ? { kind: 'playlist', id: first.id } : null);
+  };
+
+  const refreshChannel = async (): Promise<void> => {
+    if (!playlist?.channelId) return;
+    setBusy(t('yt.status.syncing'));
+    setError('');
+    const r = await window.api.ytRefreshChannel(playlist.channelId);
+    setBusy('');
+    if ('error' in r) {
+      setError(r.error);
+      return;
+    }
+    applyStore(r.store);
   };
 
   const toggleSelect = (id: string, multi: boolean): void => {
@@ -420,6 +445,12 @@ export default function YouTubePlaylistsView() {
       {p.channelTitle ? <span className="yt-pl-item-meta">{p.channelTitle}</span> : null}
     </button>
   );
+
+  const channelById = useMemo(() => {
+    const m = new Map<string, YtChannel>();
+    for (const c of channels) m.set(c.channelId, c);
+    return m;
+  }, [channels]);
 
   const renderVideoRow = (v: YtVideo, opts?: { showPlaylist?: boolean; planMode?: boolean }) => {
     const selected = selectedVideoIds.has(v.id);
@@ -715,7 +746,7 @@ export default function YouTubePlaylistsView() {
                 <div className="yt-header-top">
                   <div className="yt-header-titles">
                     <div className="yt-header-title">
-                      {side?.kind === 'plan' ? t('yt.plan.title') : playlist!.title}
+                      {side?.kind === 'plan' ? t('yt.plan.title') : playlist?.title ?? ''}
                     </div>
                     {side?.kind === 'playlist' && playlist?.channelTitle ? (
                       <div className="yt-header-channel">{playlist.channelTitle}</div>
@@ -732,6 +763,16 @@ export default function YouTubePlaylistsView() {
                         onClick={() => void refresh()}
                       >
                         <Icon name="refresh" size={14} /> {t('yt.action.refresh')}
+                      </button>
+                    ) : null}
+                    {side?.kind === 'playlist' && playlist?.channelId ? (
+                      <button
+                        type="button"
+                        className="btn small"
+                        disabled={!!busy}
+                        onClick={() => void refreshChannel()}
+                      >
+                        <Icon name="refresh" size={14} /> Channel
                       </button>
                     ) : null}
                     <button
@@ -769,6 +810,16 @@ export default function YouTubePlaylistsView() {
 
                 {side?.kind === 'playlist' && playlist ? (
                   <div className="yt-prefs">
+                    {playlist.channelId ? (
+                      <div className="yt-pref yt-channel-card">
+                        <span>Channel tracking</span>
+                        <div className="yt-channel-card-body">
+                          <div>{channelById.get(playlist.channelId)?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
+                          <div>{playlist.subscriptionStatus}</div>
+                          <div>{channelById.get(playlist.channelId)?.videoCount ?? 0} videos tracked</div>
+                        </div>
+                      </div>
+                    ) : null}
                     <label className="yt-pref">
                       <span>{t('yt.pref.lang')}</span>
                       <select
@@ -804,6 +855,59 @@ export default function YouTubePlaylistsView() {
                         onChange={(e) => void setAutoUpdate(e.target.checked)}
                       />
                       {t('yt.pref.autoUpdate')}
+                    </label>
+                    <label className="yt-pref">
+                      <span>Channel id</span>
+                      <input
+                        value={playlist.channelId ?? ''}
+                        onChange={(e) => void setPlaylistField({ channelId: e.currentTarget.value })}
+                        placeholder="UC..."
+                      />
+                    </label>
+                    <label className="yt-pref">
+                      <span>Channel title</span>
+                      <input
+                        value={playlist.channelTitle ?? ''}
+                        onChange={(e) => void setPlaylistField({ channelTitle: e.currentTarget.value })}
+                        placeholder="Channel name"
+                      />
+                    </label>
+                    <label className="yt-pref">
+                      <span>Channel icon URL</span>
+                      <input
+                        value={playlist.channelIconUrl ?? ''}
+                        onChange={(e) => void setPlaylistField({ channelIconUrl: e.currentTarget.value })}
+                        placeholder="https://..."
+                      />
+                    </label>
+                    <label className="yt-pref">
+                      <span>Subscription status</span>
+                      <select
+                        value={playlist.subscriptionStatus}
+                        onChange={(e) =>
+                          void setPlaylistField({
+                            subscriptionStatus: e.currentTarget.value as YtSubscriptionStatus,
+                          })
+                        }
+                      >
+                        {SUB_STATUS_OPTS.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="yt-pref">
+                      <span>Update frequency (hours)</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={playlist.updateFrequencyHours}
+                        onChange={(e) =>
+                          void setPlaylistField({ updateFrequencyHours: Number(e.currentTarget.value) })
+                        }
+                      />
                     </label>
                     <label className="yt-pref">
                       <span>{t('yt.pref.folder')}</span>

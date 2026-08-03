@@ -57,7 +57,7 @@ export interface PracticeFilters {
   /** Canonical ids to subtract from the result, applied after inclusion. */
   excludeCategories: string[];
   /**
-   * Mazii function ids — the finer second level beneath a category. Narrows
+   * Legacy function ids — the finer second level beneath a category. Narrows
    * within the selected categories rather than replacing them, so picking
    * "Condition" then "Condition (requirement)" reads as one drill-down.
    */
@@ -106,7 +106,7 @@ export interface LegacyPracticeFilters {
 }
 
 /**
- * v1 stored raw Mazii function ids and two register booleans. Map both forward
+ * v1 stored raw function ids and two register booleans. Map both forward
  * so a user who had filters set does not silently get a different result set.
  */
 export function migrateLegacyFilters(legacy: LegacyPracticeFilters): PracticeFilters {
@@ -412,10 +412,11 @@ export function familiarityFilterCounts(
  * Identity key for a grammar pattern, independent of notation.
  *
  * The two Japanese sources write the same pattern differently — the authored
- * files use `〜前に`, the Mazii dump uses `... 前に` — so a whitespace-only key
- * (what this module used to do) matched **zero** of them. 189 Mazii records
- * duplicate 159 of the 325 authored points, and every pair was being shown as
- * two separate entries: one with examples and a real explanation, one hollow.
+ * files use `〜前に`, the supplement dump uses `... 前に` — so a whitespace-only
+ * key (what this module used to do) matched **zero** of them. 189 supplement
+ * records duplicate 159 of the 325 authored points, and every pair was being
+ * shown as two separate entries: one with examples and a real explanation, one
+ * hollow.
  *
  * Stripping the ellipsis/tilde placeholders collapses them. Verified not to
  * over-merge: it causes no collisions among the 325 authored titles and leaves
@@ -425,18 +426,18 @@ export function familiarityFilterCounts(
  * Three notation gaps remained, all mechanical rather than editorial:
  *
  *  - **ASCII `~`.** The set covered `〜` (wave dash) and `～` (fullwidth) but
- *    not plain `~`, and the Mazii dump mixes all three — `ほど~ない` and
+ *    not plain `~`, and the supplement dump mixes all three — `ほど~ない` and
  *    `ほど～ない` were two rows.
  *  - **Parenthesis characters**, stripped while keeping what is inside them.
- *    Mazii marks optional trailing particles as `ため(に)` / `場合(は)`, which
+ *    The dump marks optional trailing particles as `ため(に)` / `場合(は)`, which
  *    is the same pattern the authored files write as `〜ために` / `〜場合は`.
  *    Only the brackets are removed; the content still distinguishes patterns.
  *  - **Both slashes.** `〜なりに / 〜なりの` vs `～なりに／～なりの`.
  *
  * That collapses 26 further groups, 14 of which pair an authored record with a
- * hollow Mazii shadow, so `contentRank` recovers the authored copy. Re-verified
- * against the same two invariants, plus: no authored record is displaced by a
- * hollow twin. `practiceFilters.test.ts` pins all three.
+ * hollow supplement shadow, so `contentRank` recovers the authored copy.
+ * Re-verified against the same two invariants, plus: no authored record is
+ * displaced by a hollow twin. `practiceFilters.test.ts` pins all three.
  */
 export function grammarTitleKey(lang: GrammarLang, title: string): string {
   const normalized = String(title || '')
@@ -450,8 +451,8 @@ export function grammarTitleKey(lang: GrammarLang, title: string): string {
 function contentRank(p: NormalizedGrammarPoint): number {
   let n = 0;
   if (p.examples?.length) n += 4;
-  // Mazii records copy title into structure and meaning into explanation, so a
-  // field only counts when it actually says something the other fields don't.
+  // Supplement records copy title into structure and meaning into explanation,
+  // so a field only counts when it actually says something the other fields don't.
   if ((p.explanation || '').trim() && p.explanation.trim() !== (p.meaning || '').trim()) n += 2;
   if ((p.structure || '').trim() && p.structure.trim() !== (p.title || '').trim()) n += 1;
   if (p.provenance.tagSource !== 'heuristic') n += 1;
@@ -462,11 +463,11 @@ function contentRank(p: NormalizedGrammarPoint): number {
  * Collapse duplicate patterns, keeping the record with the most content.
  *
  * Order cannot be relied on to favour the authored copy — `index.ts` emits
- * N4_MAZII before N3, so a Mazii N4 record can precede its authored N3 twin.
- * The survivor is chosen by content, and a level disagreement between sources
- * is preserved on `alternateLevels` rather than silently resolved: 53 of the
- * 189 pairs disagree (〜前に is N5 authored, N4 in Mazii), and dropping that
- * quietly would present one source's guess as settled fact.
+ * N4_SUPPLEMENT before N3, so a supplement N4 record can precede its authored
+ * N3 twin. The survivor is chosen by content, and a level disagreement between
+ * sources is preserved on `alternateLevels` rather than silently resolved: 53
+ * of the 189 pairs disagree (〜前に is N5 authored, N4 in the supplement), and
+ * dropping that quietly would present one source's guess as settled fact.
  */
 export function dedupeGrammarByTitle(
   points: readonly NormalizedGrammarPoint[],

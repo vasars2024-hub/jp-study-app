@@ -21,6 +21,7 @@ import type { MasteredMode, QuestionType, SessionDirection } from './grammarSess
 
 export const HISTORY_LS_KEY = 'jp-grammarx-session-history-v1';
 export const HISTORY_VERSION = 1;
+const HISTORY_CHANGED_EVENT = 'grammar-session-history-changed';
 /** Newest-first cap. Old sessions are dropped, never silently rewritten. */
 export const MAX_SESSION_RECORDS = 100;
 
@@ -150,4 +151,18 @@ export function saveSessionHistory(history: SessionHistory): void {
   } catch {
     /* storage full or unavailable — the in-memory history still stands */
   }
+  window.dispatchEvent(new CustomEvent(HISTORY_CHANGED_EVENT));
+}
+
+/** Keep Study recommendations current when a Grammar session finishes. */
+export function onSessionHistoryChanged(callback: () => void): () => void {
+  window.addEventListener(HISTORY_CHANGED_EVENT, callback);
+  const onStorage = (event: StorageEvent): void => {
+    if (event.key === HISTORY_LS_KEY) callback();
+  };
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(HISTORY_CHANGED_EVENT, callback);
+    window.removeEventListener('storage', onStorage);
+  };
 }

@@ -23,6 +23,7 @@ import {
   loadAeroRestoreTheme,
   rememberAeroRestoreTheme,
 } from '../aeroEnvironment';
+import { seedAeroDesktopPersonality } from '../aeroDesktopPersonality';
 import { armLockscreenOnSecretEntry, AERO_ENTRY_LOCKED_EVENT } from '../lockscreenSettings';
 
 const SEQUENCE = 'aero';
@@ -138,6 +139,13 @@ export default function SecretAeroTrigger() {
       rememberAeroRestoreTheme(current !== AERO_THEME_ID ? current : DEFAULT_THEME_ID);
       const firstDiscovery = markAeroDiscovered();
       applyAeroEnvironment(firstDiscovery);
+      // Desktop-widget half of first-run personality (M8). Fire-and-forget: a
+      // failed IPC round trip should never block entering Aero itself.
+      if (firstDiscovery) {
+        seedAeroDesktopPersonality().catch((err) => {
+          console.error('[aeroDesktopPersonality] seed failed:', err);
+        });
+      }
       const needsLock = armLockscreenOnSecretEntry();
       if (needsLock) {
         setTheme(AERO_THEME_ID);

@@ -309,14 +309,20 @@ export function registerReadingLensIpc(): void {
   ipcMain.handle('lens:getInit', (): LensInit | null => pendingInit);
 
   ipcMain.handle('lens:ocr', async (_e, region: unknown): Promise<LensOcrResult> => {
-    const r = (region ?? {}) as Partial<RegionRect> & { engine?: 'auto' | 'manga' | 'web' };
+    const r = (region ?? {}) as Partial<RegionRect> & {
+      engine?: 'auto' | 'manga' | 'web';
+      includeScreenshot?: boolean;
+    };
     const rect: RegionRect = {
       x: Number(r.x) || 0,
       y: Number(r.y) || 0,
       width: Number(r.width) || 0,
       height: Number(r.height) || 0,
     };
-    return ocrRegion(rect, lensDisplayId, { engine: r.engine ?? 'auto' });
+    return ocrRegion(rect, lensDisplayId, {
+      engine: r.engine ?? 'auto',
+      includeScreenshot: r.includeScreenshot === true,
+    });
   });
 
   // Renderer toggles pass-through: interactive over hotspots/chrome, click-through

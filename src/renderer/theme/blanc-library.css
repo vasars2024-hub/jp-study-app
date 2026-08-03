@@ -37,6 +37,33 @@
   }
 }
 
+/* ── Discover ───────────────────────────────────────────────────────────── */
+/* `disc-view` is `height: 100%` and `disc-body` is a two-column grid that flexes
+ * to fill it — Study OS gives both a bounded page. Inside `blanc-tool-detail`
+ * (an auto-height grid) that collapses, so the workbench gets an explicit height
+ * the same way the novels one does. */
+.blanc-disc-workbench {
+  height: 520px;
+  max-height: 68vh;
+}
+.blanc-discover .disc-inspector {
+  border-color: var(--blanc-border);
+  background: var(--blanc-bg);
+}
+@media (max-width: 900px) {
+  .blanc-disc-workbench {
+    height: auto;
+    max-height: none;
+  }
+  .blanc-discover .disc-body {
+    display: flex;
+    flex-direction: column;
+  }
+  .blanc-discover .disc-main {
+    min-height: 300px;
+  }
+}
+
 /* ── Games & Immersion ──────────────────────────────────────────────────── */
 /* Both `.game-arena` and `.immersion-root` are `height: 100%` layouts. The
  * default `blanc-tool-detail` is an auto-height grid, which collapses a

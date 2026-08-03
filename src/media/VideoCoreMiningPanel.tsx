@@ -17,6 +17,16 @@ import {
   cuePlaybackStartSec,
   type VideoCoreStudyCue,
 } from '../shared/videoCoreStudy';
+import { findMinedCueEntry } from '../shared/seanimeWatchLoop';
+import { MINING_HISTORY_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
+import { t as translateUi, useT } from '../renderer/i18n';
+// Moved to a module of their own in slice 18, typed on HTMLMediaElement, so the music
+// lyrics pane records a cue with this exact implementation rather than a copy of it.
+import {
+  blobToBase64,
+  recordCueAudio,
+  type CapturedAsset,
+} from './cueAudioCapture';
 
 interface Props {
   cue: VideoCoreStudyCue | null;
@@ -25,18 +35,6 @@ interface Props {
   video: HTMLVideoElement | null;
   subtitleDelaySec: number;
 }
-
-interface CapturedAsset {
-  base64: string;
-  filename: string;
-  mimeType: string;
-  bytes: number;
-}
-
-type CapturableVideo = HTMLVideoElement & {
-  captureStream?: () => MediaStream;
-  mozCaptureStream?: () => MediaStream;
-};
 
 function loadHistory(): VideoCoreMiningHistoryEntry[] {
   try {
@@ -48,23 +46,11 @@ function loadHistory(): VideoCoreMiningHistoryEntry[] {
   }
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = typeof reader.result === 'string' ? reader.result : '';
-      resolve(value.split(',', 2)[1] ?? '');
-    };
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read captured asset.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 function canvasBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
-      else reject(new Error('The browser could not encode the captured frame.'));
+      else reject(new Error(translateUi('mediaWorkspace.capture.encodeFailed')));
     }, type);
   });
 }
@@ -115,13 +101,13 @@ async function captureFrame(
   cue: VideoCoreStudyCue,
 ): Promise<CapturedAsset> {
   if (!video.videoWidth || !video.videoHeight) {
-    throw new Error('The video frame is not ready yet.');
+    throw new Error(translateUi('mediaWorkspace.capture.frameNotReady'));
   }
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('Canvas capture is unavailable.');
+  if (!context) throw new Error(translateUi('mediaWorkspace.capture.canvasUnavailable'));
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
   drawWrappedCue(context, cueText, canvas.width, canvas.height);
   const blob = await canvasBlob(canvas, 'image/png');
@@ -134,113 +120,12 @@ async function captureFrame(
   };
 }
 
-function waitForSeek(video: HTMLVideoElement, target: number): Promise<void> {
-  if (Math.abs(video.currentTime - target) < 0.02) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
-      cleanup();
-      reject(new Error('Timed out while seeking to the cue.'));
-    }, 5000);
-    const onSeeked = (): void => {
-      cleanup();
-      resolve();
-    };
-    const cleanup = (): void => {
-      window.clearTimeout(timeout);
-      video.removeEventListener('seeked', onSeeked);
-    };
-    video.addEventListener('seeked', onSeeked);
-    video.currentTime = target;
-  });
-}
-
-function chooseAudioMimeType(): string {
-  if (typeof MediaRecorder === 'undefined') return '';
-  return [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/ogg;codecs=opus',
-  ].find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? '';
-}
-
-async function recordCueAudio(
-  video: HTMLVideoElement,
-  cue: VideoCoreStudyCue,
-  subtitleDelaySec: number,
-): Promise<CapturedAsset> {
-  if (typeof MediaRecorder === 'undefined') {
-    throw new Error('Audio capture is unavailable in this browser.');
-  }
-  const capturable = video as CapturableVideo;
-  const capture = capturable.captureStream?.bind(video)
-    ?? capturable.mozCaptureStream?.bind(video);
-  if (!capture) throw new Error('This browser cannot capture the VideoCore audio stream.');
-
-  const startSec = cuePlaybackStartSec(cue, subtitleDelaySec);
-  const endSec = cuePlaybackEndSec(cue, subtitleDelaySec);
-  const durationMs = Math.round((endSec - startSec) * 1000);
-  if (durationMs < 100 || durationMs > 30_000) {
-    throw new Error('The selected cue has an unsupported audio duration.');
-  }
-
-  const wasPaused = video.paused;
-  const restoreTime = video.currentTime;
-  const restoreRate = video.playbackRate;
-  let recorder: MediaRecorder | null = null;
-  let capturedStream: MediaStream | null = null;
-  let timer = 0;
-  try {
-    video.pause();
-    video.playbackRate = 1;
-    await waitForSeek(video, startSec);
-    const stream = capture();
-    capturedStream = stream;
-    const audioTracks = stream.getAudioTracks();
-    if (!audioTracks.length) throw new Error('The selected VideoCore source has no capturable audio track.');
-    const audioStream = new MediaStream(audioTracks);
-    const mimeType = chooseAudioMimeType();
-    recorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
-    const chunks: BlobPart[] = [];
-    recorder.addEventListener('dataavailable', (event) => {
-      if (event.data.size) chunks.push(event.data);
-    });
-    const stopped = new Promise<void>((resolve) => {
-      recorder?.addEventListener('stop', () => resolve(), { once: true });
-    });
-    recorder.start(100);
-    await video.play();
-    await new Promise<void>((resolve) => {
-      timer = window.setTimeout(resolve, durationMs);
-    });
-    video.pause();
-    video.currentTime = endSec;
-    recorder.stop();
-    await stopped;
-    const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' });
-    if (!blob.size) throw new Error('The captured cue audio was empty.');
-    const extension = blob.type.includes('ogg') ? 'ogg' : 'webm';
-    return {
-      base64: await blobToBase64(blob),
-      filename: `jp-video-cue-${cue.trackNumber}-${cue.index}-${cue.startMs}.${extension}`,
-      mimeType: blob.type || `audio/${extension}`,
-      bytes: blob.size,
-    };
-  } finally {
-    window.clearTimeout(timer);
-    if (recorder?.state === 'recording') recorder.stop();
-    capturedStream?.getTracks().forEach((track) => track.stop());
-    video.pause();
-    video.playbackRate = restoreRate;
-    video.currentTime = restoreTime;
-    if (!wasPaused) void video.play().catch(() => undefined);
-  }
-}
-
 function sourceKey(source: VideoCoreMiningSource | null): string {
   return source
     ? `${source.playbackId}:${source.mediaId ?? 'local'}:${source.episodeNumber ?? ''}`
     : 'none';
 }
+
 
 export default function VideoCoreMiningPanel({
   cue,
@@ -249,12 +134,17 @@ export default function VideoCoreMiningPanel({
   video,
   subtitleDelaySec,
 }: Props): React.ReactElement {
+  const { t } = useT();
   const [draft, setDraft] = React.useState<VideoCoreMiningDraft | null>(null);
   const [selectedCue, setSelectedCue] = React.useState<VideoCoreStudyCue | null>(null);
   const [history, setHistory] = React.useState<VideoCoreMiningHistoryEntry[]>(loadHistory);
   const [decks, setDecks] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState<'screenshot' | 'audio' | 'mine' | 'undo' | null>(null);
   const [message, setMessage] = React.useState('');
+  // The panel is an absolute overlay on the video. It has always been open, always this
+  // tall, and always in the way; collapsing it is the difference between a study player
+  // and a form sitting on top of one.
+  const [expanded, setExpanded] = React.useState(true);
 
   React.useEffect(() => {
     if (!source) {
@@ -311,9 +201,13 @@ export default function VideoCoreMiningPanel({
             asset: captured,
           })
         : current);
-      setMessage(`Screenshot attached · ${Math.round(captured.bytes / 1024)} KB`);
+      setMessage(t('mediaWorkspace.mining.screenshotAttached', {
+        size: Math.round(captured.bytes / 1024),
+      }));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Screenshot capture failed.');
+      setMessage(
+        error instanceof Error ? error.message : t('mediaWorkspace.capture.screenshotFailed'),
+      );
     } finally {
       setBusy(null);
     }
@@ -322,18 +216,29 @@ export default function VideoCoreMiningPanel({
   const onAudio = async (): Promise<void> => {
     if (!draft || !selectedCue || !video) return;
     setBusy('audio');
-    setMessage('Recording the exact cue range…');
+    setMessage(t('mediaWorkspace.capture.recordingCue'));
     try {
-      const captured = await recordCueAudio(video, selectedCue, subtitleDelaySec);
+      // The cue -> playback-range conversion stays HERE, because the subtitle delay is a
+      // video concern. The shared recorder takes a plain range and knows nothing about cues.
+      const captured = await recordCueAudio(video, {
+        startSec: cuePlaybackStartSec(selectedCue, subtitleDelaySec),
+        endSec: cuePlaybackEndSec(selectedCue, subtitleDelaySec),
+        filenameStem:
+          `jp-video-cue-${selectedCue.trackNumber}-${selectedCue.index}-${selectedCue.startMs}`,
+      });
       setDraft((current) => current
         ? withVideoCoreMiningAsset(current, 'audio', {
             base64: captured.base64,
             asset: captured,
           })
         : current);
-      setMessage(`Audio attached · ${Math.round(captured.bytes / 1024)} KB`);
+      setMessage(t('mediaWorkspace.mining.audioAttached', {
+        size: Math.round(captured.bytes / 1024),
+      }));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Cue audio capture failed.');
+      setMessage(
+        error instanceof Error ? error.message : t('mediaWorkspace.capture.cueAudioFailed'),
+      );
     } finally {
       setBusy(null);
     }
@@ -341,11 +246,11 @@ export default function VideoCoreMiningPanel({
 
   const onMine = async (): Promise<void> => {
     if (!draft || !draft.term.trim()) {
-      setMessage('Add a term or sentence before mining.');
+      setMessage(t('mediaWorkspace.mining.missingText'));
       return;
     }
     if (typeof window.api?.ankiMineNote !== 'function') {
-      setMessage('Mining is available inside the Study OS desktop app.');
+      setMessage(t('mediaWorkspace.mining.desktopOnly'));
       return;
     }
     setBusy('mine');
@@ -355,16 +260,28 @@ export default function VideoCoreMiningPanel({
       const entry = createVideoCoreMiningHistoryEntry(draft, result);
       setHistory((current) => appendVideoCoreMiningHistory(current, entry));
       if (result.ok) {
-        setMessage(
-          `Mined to ${result.profileName ?? (draft.deckName || 'the active Anki destination')}.`,
-        );
+        const destination = result.deckName
+          ?? draft.deckName
+          ?? result.profileName
+          ?? t('mediaWorkspace.mining.activeDestination');
+        // A matched mining rule owns its profile's deck, so a typed destination is
+        // deliberately ignored. Saying so beats letting the card appear somewhere else.
+        setMessage(result.deckOverriddenByRule
+          ? t('mediaWorkspace.mining.minedRule', {
+              destination,
+              rule: result.matchedRuleLabel || '—',
+              requested: draft.deckName || '—',
+            })
+          : t('mediaWorkspace.mining.minedTo', { destination }));
       } else if (result.error === 'duplicate') {
-        setMessage('Duplicate warning: Anki already contains this note.');
+        setMessage(t('mediaWorkspace.mining.duplicate'));
       } else {
-        setMessage(result.error || 'Anki export failed.');
+        setMessage(result.error || t('mediaWorkspace.mining.exportFailed'));
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Anki export failed.');
+      setMessage(
+        error instanceof Error ? error.message : t('mediaWorkspace.mining.exportFailed'),
+      );
     } finally {
       setBusy(null);
     }
@@ -376,12 +293,25 @@ export default function VideoCoreMiningPanel({
     setBusy('undo');
     setMessage('');
     try {
-      const result = await window.api.ankiDeleteNotes([noteId]);
-      if (!result.ok) throw new Error(result.error || 'Could not undo the Anki export.');
+      const result = await window.api.ankiDeleteNotes(
+        [noteId],
+        entry.mediaFilenames ?? [],
+      );
+      if (!result.ok) {
+        throw new Error(result.error || t('mediaWorkspace.mining.undoFailed'));
+      }
       setHistory((current) => markVideoCoreMiningHistoryUndone(current, noteId));
-      setMessage(`Undid note ${noteId}.`);
+      const deletedAssets = result.deletedMediaFilenames?.length ?? 0;
+      const retainedAssets = result.retainedMediaFilenames?.length ?? 0;
+      setMessage(result.warning ?? t('mediaWorkspace.mining.undoSummary', {
+        noteId,
+        deleted: deletedAssets,
+        retained: retainedAssets,
+      }));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not undo the Anki export.');
+      setMessage(
+        error instanceof Error ? error.message : t('mediaWorkspace.mining.undoFailed'),
+      );
     } finally {
       setBusy(null);
     }
@@ -390,62 +320,121 @@ export default function VideoCoreMiningPanel({
   const recent = history.slice(-5).reverse();
   if (!draft || !selectedCue || !source) {
     return (
-      <section className="study-mining-panel" data-study-mining="waiting">
-        <p>Select a real subtitle cue to prepare a card.</p>
+      <section
+        className="study-mining-panel"
+        data-study-mining="waiting"
+        aria-label={t('mediaWorkspace.mining.cardPreview')}
+      >
+        <p>{t('mediaWorkspace.mining.waiting')}</p>
       </section>
     );
   }
+
+  /**
+   * Have I already mined this exact line — in this session or any earlier one?
+   *
+   * Pure lookup over history already in state: no Anki call, no I/O, nothing that could
+   * stutter playback. Deliberately computed from `selectedCue` rather than the live `cue`
+   * so it tracks the card actually being previewed.
+   */
+  const alreadyMined = findMinedCueEntry(history, source, selectedCue);
+
+  const cueMeta = t('mediaWorkspace.mining.cueMeta', {
+    cue: selectedCue.index + 1,
+    track: selectedCue.trackNumber,
+    start: selectedCue.startMs,
+    end: selectedCue.endMs,
+  });
+  const missingTerm = !draft.term.trim();
 
   return (
     <section
       className="study-mining-panel"
       data-study-mining="ready"
+      data-study-mining-expanded={expanded ? 'true' : 'false'}
       data-screenshot-bytes={draft.screenshot?.bytes}
       data-audio-bytes={draft.audio?.bytes}
+      aria-label={t('mediaWorkspace.mining.cardPreview')}
     >
-      <div className="study-mining-heading">
-        <span>Card preview</span>
-        <small>
-          Cue {selectedCue.index + 1} · track {selectedCue.trackNumber} · {selectedCue.startMs}–{selectedCue.endMs} ms
-        </small>
-      </div>
+      <h2 className="study-mining-heading">
+        <button
+          type="button"
+          className="study-mining-toggle"
+          data-study-action="toggle-mining-panel"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <span className="study-mining-chevron" aria-hidden="true" />
+          <span>{t('mediaWorkspace.mining.cardPreview')}</span>
+        </button>
+        {/* Collapsed, the attachment dots are the only way to see what is armed. */}
+        <span className="study-mining-armed" aria-hidden="true">
+          <span data-armed={draft.screenshot ? 'true' : 'false'} />
+          <span data-armed={draft.audio ? 'true' : 'false'} />
+        </span>
+        <small>{cueMeta}</small>
+      </h2>
+
+      {/* Outside the collapsible body and outside the scroll container: the mine result
+          is the one thing that must never be scrolled or collapsed out of sight. */}
+      <output className="study-mining-message" role="status" aria-live="polite">
+        {message}
+      </output>
+
+      {/* Same rule, and the reason it sits beside the result rather than inside the form:
+          finding out from Anki's duplicate warning means the framing, the screenshot and
+          the audio clip were all captured first. Say it before that work is done. */}
+      {alreadyMined ? (
+        <p className="study-mining-mined" role="status">
+          {t('mediaWorkspace.mining.alreadyMined', {
+            term: alreadyMined.term || draft.term,
+            destination: alreadyMined.destination
+              || t('mediaWorkspace.mining.unknownDeck'),
+          })}
+        </p>
+      ) : null}
+
+      {!expanded ? null : (
+      // Own scroll container, so the heading and the result message stay pinned instead
+      // of scrolling away with the form.
+      <div className="study-mining-body">
       <div className="study-mining-grid">
         <label>
-          Card kind
+          {t('mediaWorkspace.mining.cardKind')}
           <select
             value={draft.cardKind}
             onChange={(event) => update('cardKind', event.currentTarget.value as VideoCoreMiningDraft['cardKind'])}
           >
-            <option value="sentence">Sentence</option>
-            <option value="word">Word</option>
+            <option value="sentence">{t('mediaWorkspace.mining.sentence')}</option>
+            <option value="word">{t('mediaWorkspace.mining.word')}</option>
           </select>
         </label>
         <label>
-          Term
+          {t('mediaWorkspace.mining.term')}
           <input value={draft.term} onChange={(event) => update('term', event.currentTarget.value)} />
         </label>
         <label>
-          Reading
+          {t('mediaWorkspace.mining.reading')}
           <input value={draft.reading} onChange={(event) => update('reading', event.currentTarget.value)} />
         </label>
         <label>
-          Meaning
+          {t('mediaWorkspace.mining.meaning')}
           <input value={draft.meaning} onChange={(event) => update('meaning', event.currentTarget.value)} />
         </label>
         <label className="study-mining-wide">
-          Sentence
+          {t('mediaWorkspace.mining.sentence')}
           <textarea value={draft.sentence} onChange={(event) => update('sentence', event.currentTarget.value)} />
         </label>
         <label className="study-mining-wide">
-          Translation
+          {t('mediaWorkspace.mining.translation')}
           <textarea value={draft.translation} onChange={(event) => update('translation', event.currentTarget.value)} />
         </label>
         <label className="study-mining-wide">
-          Anki destination
+          {t('mediaWorkspace.mining.destination')}
           <input
             list="video-core-anki-decks"
             value={draft.deckName}
-            placeholder="Mining rules / active profile"
+            placeholder={t('mediaWorkspace.mining.destinationPlaceholder')}
             onChange={(event) => update('deckName', event.currentTarget.value)}
           />
           <datalist id="video-core-anki-decks">
@@ -460,7 +449,11 @@ export default function VideoCoreMiningPanel({
           disabled={busy != null}
           onClick={() => void onScreenshot()}
         >
-          {busy === 'screenshot' ? 'Capturing…' : draft.screenshot ? 'Replace screenshot' : 'Attach screenshot'}
+          {busy === 'screenshot'
+            ? t('mediaWorkspace.mining.capturing')
+            : draft.screenshot
+              ? t('mediaWorkspace.mining.replaceScreenshot')
+              : t('mediaWorkspace.mining.attachScreenshot')}
         </button>
         <button
           type="button"
@@ -468,55 +461,120 @@ export default function VideoCoreMiningPanel({
           disabled={busy != null}
           onClick={() => void onAudio()}
         >
-          {busy === 'audio' ? 'Recording…' : draft.audio ? 'Replace cue audio' : 'Attach cue audio'}
+          {busy === 'audio'
+            ? t('mediaWorkspace.mining.recording')
+            : draft.audio
+              ? t('mediaWorkspace.mining.replaceAudio')
+              : t('mediaWorkspace.mining.attachAudio')}
         </button>
         <span>
           {draft.screenshot
-            ? `Screenshot ready · ${Math.round(draft.screenshot.bytes / 1024)} KB`
-            : 'No screenshot'}
+            ? t('mediaWorkspace.mining.screenshotReady', {
+                size: Math.round(draft.screenshot.bytes / 1024),
+              })
+            : t('mediaWorkspace.mining.noScreenshot')}
         </span>
         <span>
           {draft.audio
-            ? `Audio ready · ${Math.round(draft.audio.bytes / 1024)} KB`
-            : 'No audio'}
+            ? t('mediaWorkspace.mining.audioReady', {
+                size: Math.round(draft.audio.bytes / 1024),
+              })
+            : t('mediaWorkspace.mining.noAudio')}
         </span>
       </div>
+
+      {/* A byte count is not a preview. Both assets go straight to Anki, so what is
+          actually attached has to be inspectable before Mine, not after Undo. */}
+      {(draft.screenshotBase64 || draft.audioBase64) && (
+        <div className="study-mining-preview">
+          {draft.screenshotBase64 && (
+            <img
+              src={`data:${draft.screenshot?.mimeType || 'image/png'};base64,${draft.screenshotBase64}`}
+              alt={t('mediaWorkspace.mining.screenshotPreview')}
+            />
+          )}
+          {draft.audioBase64 && (
+            <audio
+              controls
+              preload="metadata"
+              aria-label={t('mediaWorkspace.mining.audioPreview')}
+              src={`data:${draft.audio?.mimeType || 'audio/webm'};base64,${draft.audioBase64}`}
+            />
+          )}
+        </div>
+      )}
+
       <div className="study-mining-actions">
         <button
           type="button"
           data-study-action="mine-card"
-          disabled={busy != null || !draft.term.trim()}
+          disabled={busy != null || missingTerm}
+          title={missingTerm ? t('mediaWorkspace.mining.missingText') : undefined}
           onClick={() => void onMine()}
         >
-          {busy === 'mine' ? 'Mining…' : 'Mine card'}
+          {busy === 'mine'
+            ? t('mediaWorkspace.mining.mining')
+            : t('mediaWorkspace.mining.mine')}
         </button>
-        {message && <output>{message}</output>}
+        {missingTerm && (
+          <small className="study-mining-hint">{t('mediaWorkspace.mining.missingText')}</small>
+        )}
       </div>
       <details className="study-mining-provenance">
-        <summary>Provenance</summary>
+        <summary>{t('mediaWorkspace.mining.provenance')}</summary>
         <dl>
-          <dt>Media</dt><dd>{source.mediaTitle || source.localFilePath || source.playbackId}</dd>
-          <dt>Episode</dt><dd>{source.episodeTitle || source.episodeNumber || 'Local file'}</dd>
-          <dt>Cue</dt><dd>{selectedCue.trackNumber}:{selectedCue.index} · {selectedCue.startMs}–{selectedCue.endMs} ms</dd>
-          <dt>Raw text</dt><dd>{selectedCue.text}</dd>
-          <dt>Assets</dt><dd>{draft.screenshot?.filename || 'none'} · {draft.audio?.filename || 'none'}</dd>
+          <dt>{t('mediaWorkspace.mining.media')}</dt>
+          <dd>{source.mediaTitle || source.localFilePath || source.playbackId}</dd>
+          <dt>{t('mediaWorkspace.mining.episodeLabel')}</dt>
+          <dd>{source.episodeTitle || source.episodeNumber || t('mediaWorkspace.mining.localFile')}</dd>
+          <dt>{t('mediaWorkspace.mining.cue')}</dt>
+          <dd>
+            {t('mediaWorkspace.mining.cueMeta', {
+              cue: selectedCue.index,
+              track: selectedCue.trackNumber,
+              start: selectedCue.startMs,
+              end: selectedCue.endMs,
+            })}
+          </dd>
+          <dt>{t('mediaWorkspace.mining.rawText')}</dt><dd>{selectedCue.text}</dd>
+          <dt>{t('mediaWorkspace.mining.assets')}</dt>
+          <dd>
+            {draft.screenshot?.filename || t('mediaWorkspace.mining.none')}
+            {' · '}
+            {draft.audio?.filename || t('mediaWorkspace.mining.none')}
+          </dd>
         </dl>
       </details>
       {recent.length > 0 && (
         <div className="study-mining-history">
-          <span>Mining history</span>
-          {recent.map((entry) => (
-            <div key={entry.id}>
-              <span>{entry.term || entry.sentence}</span>
-              <small>{entry.status}{entry.destination ? ` · ${entry.destination}` : ''}</small>
-              {entry.status === 'exported' && entry.noteId && (
-                <button type="button" disabled={busy != null} onClick={() => void onUndo(entry)}>
-                  Undo
-                </button>
-              )}
-            </div>
-          ))}
+          <span>{t('mediaWorkspace.mining.history')}</span>
+          {recent.map((entry) => {
+            const label = entry.term || entry.sentence;
+            return (
+              <div key={entry.id} data-history-status={entry.status}>
+                <span title={label}>{label}</span>
+                <small>
+                  {t(MINING_HISTORY_STATUS_KEY[entry.status])}
+                  {entry.destination ? ` · ${entry.destination}` : ''}
+                </small>
+                {entry.status === 'exported' && entry.noteId && (
+                  <button
+                    type="button"
+                    disabled={busy != null}
+                    // "Undo" repeated down a list gives a screen reader nothing to
+                    // choose between; name each one by the card it removes.
+                    aria-label={t('mediaWorkspace.mining.undoNote', { term: label })}
+                    onClick={() => void onUndo(entry)}
+                  >
+                    {t('mediaWorkspace.mining.undo')}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
+      )}
+      </div>
       )}
     </section>
   );

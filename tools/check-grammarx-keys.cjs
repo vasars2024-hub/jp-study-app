@@ -8,6 +8,6 @@ const keys = [
 ];
 for (const k of keys) console.log(s.includes(k) ? 'ok' : 'MISSING', k);
 console.log(
-  'mazii',
-  fs.readdirSync('src/renderer/data/grammar').filter((f) => /mazii|hsk/.test(f)),
+  'supplement',
+  fs.readdirSync('src/renderer/data/grammar').filter((f) => /supplement|hsk/.test(f)),
 );

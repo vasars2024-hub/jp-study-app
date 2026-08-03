@@ -11,19 +11,149 @@ import {
   saveGlobalLookupSettings,
   type GlobalLookupSettings,
 } from '../../../globalLookupSettings';
+import {
+  collectOsHotkeyBindings,
+  effectiveKeys,
+  onShortcutsChanged,
+  setOsHotkeyInstalledCache,
+} from '../../../keyboardShortcuts';
+
+type OsHotkeyStatus = {
+  supported: boolean;
+  installed: boolean;
+  running: boolean;
+  hotkey: string;
+  restartHotkey?: string;
+  openCount: number;
+};
 
 export default function ShortcutsPage() {
   const { t } = useT();
   const { focusSettingId } = useSettings();
   const [lookup, setLookup] = useState<GlobalLookupSettings>(loadGlobalLookupSettings);
+  const [osHotkey, setOsHotkey] = useState<OsHotkeyStatus | null>(null);
+  const [osBusy, setOsBusy] = useState(false);
+  const [osError, setOsError] = useState('');
 
   // The toggle shortcut can flip this while the page is open.
   useEffect(() => onGlobalLookupChanged(setLookup), []);
 
+  useEffect(() => {
+    let alive = true;
+    void window.api.osHotkeyStatus?.().then((s) => {
+      if (alive) {
+        setOsHotkey(s);
+        setOsHotkeyInstalledCache(Boolean(s?.installed));
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Rebinds in ShortcutSettings sync the helper; refresh the status line.
+  useEffect(() => {
+    return onShortcutsChanged(() => {
+      void window.api.osHotkeyStatus?.().then((s) => {
+        setOsHotkey(s);
+        setOsHotkeyInstalledCache(Boolean(s?.installed));
+      });
+    });
+  }, []);
+
   const update = (next: Partial<GlobalLookupSettings>) => setLookup(saveGlobalLookupSettings(next));
+
+  const installOsHelper = async () => {
+    setOsBusy(true);
+    setOsError('');
+    try {
+      const bindings = collectOsHotkeyBindings();
+      // Release Electron's RegisterHotKey first so the Startup helper can own them.
+      await window.api.appSetToggleShortcut('');
+      await window.api.appSetRestartShortcut?.('');
+      const res = await window.api.osHotkeyInstall(bindings);
+      setOsHotkey(res.status);
+      setOsHotkeyInstalledCache(Boolean(res.status?.installed && res.ok));
+      if (!res.ok) {
+        setOsError(res.error || t('settings.osHotkey.failed'));
+        // Fall back to in-process global shortcuts if the helper failed.
+        await window.api.appSetToggleShortcut(bindings.toggle);
+        await window.api.appSetRestartShortcut?.(bindings.restart);
+      } else {
+        // Keep Electron unregistered for these chords while the helper owns them.
+        await window.api.appSetToggleShortcut(bindings.toggle);
+        await window.api.appSetRestartShortcut?.(bindings.restart);
+      }
+    } catch (err) {
+      setOsError(err instanceof Error ? err.message : t('settings.osHotkey.failed'));
+    } finally {
+      setOsBusy(false);
+    }
+  };
+
+  const uninstallOsHelper = async () => {
+    setOsBusy(true);
+    setOsError('');
+    try {
+      const res = await window.api.osHotkeyUninstall();
+      setOsHotkey(res.status);
+      setOsHotkeyInstalledCache(false);
+      const toggle = effectiveKeys('app.toggle') || 'Ctrl+Alt+Shift+G';
+      const restart = effectiveKeys('app.restart') || 'Ctrl+Alt+Shift+R';
+      // Reclaim in-process global shortcuts now that the helper is gone.
+      await window.api.appSetToggleShortcut(toggle);
+      await window.api.appSetRestartShortcut?.(restart);
+    } catch (err) {
+      setOsError(err instanceof Error ? err.message : t('settings.osHotkey.failed'));
+    } finally {
+      setOsBusy(false);
+    }
+  };
 
   return (
     <>
+      <SettingsCard
+        id="os-hotkey"
+        title={t('settings.osHotkey.title')}
+        description={t('settings.osHotkey.desc')}
+        highlight={focusSettingId === 'os-hotkey'}
+      >
+        {osHotkey && !osHotkey.supported ? (
+          <p className="muted os-set-hint">{t('settings.osHotkey.windowsOnly')}</p>
+        ) : (
+          <>
+            <p className="muted os-set-hint">
+              {osHotkey?.installed
+                ? t('settings.osHotkey.statusOn', {
+                    hotkey: osHotkey.hotkey,
+                    state: osHotkey.running
+                      ? t('settings.osHotkey.running')
+                      : t('settings.osHotkey.stopped'),
+                    openCount: osHotkey.openCount ?? 0,
+                    restart: osHotkey.restartHotkey || t('settings.osHotkey.restartNone'),
+                  })
+                : t('settings.osHotkey.statusOff')}
+            </p>
+            <div className="os-set-row" style={{ gap: 8, display: 'flex', flexWrap: 'wrap' }}>
+              {!osHotkey?.installed ? (
+                <button type="button" className="btn primary" disabled={osBusy} onClick={() => void installOsHelper()}>
+                  {osBusy ? t('common.loading') : t('settings.osHotkey.install')}
+                </button>
+              ) : (
+                <button type="button" className="btn" disabled={osBusy} onClick={() => void uninstallOsHelper()}>
+                  {osBusy ? t('common.loading') : t('settings.osHotkey.uninstall')}
+                </button>
+              )}
+            </div>
+            {osError ? (
+              <p className="muted" style={{ color: 'var(--danger, #c44)' }}>
+                {osError}
+              </p>
+            ) : null}
+          </>
+        )}
+      </SettingsCard>
+
       <SettingsCard
         id="global-lookup"
         title={t('settings.dict.globalLookup')}

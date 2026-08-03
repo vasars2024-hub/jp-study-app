@@ -5,15 +5,22 @@ import {
   clampStudyPlaybackRate,
   cuePlaybackEndSec,
   cuePlaybackStartSec,
+  dismissVideoCoreComprehensionSuggestion,
+  dismissVideoCoreShadowingSuggestion,
   evaluateVideoCoreDictation,
   isCueEndTransition,
   normalizeVideoCoreStudyPreferences,
   normalizeVideoCoreResumePositions,
   nextVideoCoreWhisperTrackNumber,
+  recordVideoCoreComprehensionEvent,
+  recordVideoCoreCueReplay,
   resolveVideoCoreResumePosition,
   resolveStudyLoopSeekSec,
+  shouldSuggestVideoCoreComprehensionRescue,
+  shouldSuggestVideoCoreShadowing,
   stripAssCueText,
   upsertVideoCoreResumePosition,
+  videoCoreRescueScene,
   videoCoreResumeKey,
   whisperCuesToVideoCoreEvents,
   type VideoCoreStudyCue,
@@ -74,6 +81,92 @@ describe('videoCoreStudy', () => {
     expect(isCueEndTransition(5.2, cues[1], 0)).toBe(false);
     expect(clampStudyPlaybackRate(8)).toBe(3);
     expect(clampStudyPlaybackRate(Number.NaN)).toBe(1);
+  });
+
+  it('offers shadowing after three explicit replays of one cue in a bounded window', () => {
+    const first = recordVideoCoreCueReplay(null, cues[1], 1_000);
+    const second = recordVideoCoreCueReplay(first, cues[1], 2_000);
+    const third = recordVideoCoreCueReplay(second, cues[1], 3_000);
+
+    expect(first.replayCount).toBe(1);
+    expect(shouldSuggestVideoCoreShadowing(second, cues[1], false)).toBe(false);
+    expect(shouldSuggestVideoCoreShadowing(third, cues[1], false)).toBe(true);
+    expect(shouldSuggestVideoCoreShadowing(third, cues[1], true)).toBe(false);
+  });
+
+  it('resets replay evidence for another cue or an expired window and honors dismissal', () => {
+    const first = recordVideoCoreCueReplay(null, cues[1], 1_000);
+    const dismissed = dismissVideoCoreShadowingSuggestion(
+      recordVideoCoreCueReplay(
+        recordVideoCoreCueReplay(first, cues[1], 2_000),
+        cues[1],
+        3_000,
+      ),
+    );
+
+    expect(shouldSuggestVideoCoreShadowing(dismissed, cues[1], false)).toBe(false);
+    expect(recordVideoCoreCueReplay(dismissed, cues[2], 4_000)).toMatchObject({
+      replayCount: 1,
+      dismissed: false,
+    });
+    expect(recordVideoCoreCueReplay(first, cues[1], 601_001)).toMatchObject({
+      replayCount: 1,
+      firstReplayAt: 601_001,
+    });
+  });
+
+  it('offers a paused same-scene rescue only after dense lookup and rewind evidence', () => {
+    const lookup1 = recordVideoCoreComprehensionEvent(null, 'lookup', cues[1], 1_000);
+    const rewind1 = recordVideoCoreComprehensionEvent(lookup1, 'rewind', cues[1], 2_000);
+    const lookup2 = recordVideoCoreComprehensionEvent(rewind1, 'lookup', cues[1], 3_000);
+    const rewind2 = recordVideoCoreComprehensionEvent(lookup2, 'rewind', cues[0], 4_000);
+    const paused = recordVideoCoreComprehensionEvent(rewind2, 'pause', cues[1], 5_000);
+
+    expect(shouldSuggestVideoCoreComprehensionRescue(rewind2, cues[1], true, 5_000))
+      .toBe(false);
+    expect(shouldSuggestVideoCoreComprehensionRescue(paused, cues[1], false, 5_000))
+      .toBe(false);
+    expect(shouldSuggestVideoCoreComprehensionRescue(paused, cues[1], true, 5_000))
+      .toBe(true);
+    expect(shouldSuggestVideoCoreComprehensionRescue(
+      dismissVideoCoreComprehensionSuggestion(paused),
+      cues[1],
+      true,
+      5_000,
+    )).toBe(false);
+  });
+
+  it('bounds comprehension evidence by time and nearby cues', () => {
+    const first = recordVideoCoreComprehensionEvent(null, 'lookup', cues[0], 1_000);
+    expect(recordVideoCoreComprehensionEvent(first, 'rewind', cues[0], 121_001))
+      .toMatchObject({ lookupCount: 0, rewindCount: 1, firstEventAt: 121_001 });
+    expect(recordVideoCoreComprehensionEvent(first, 'lookup', {
+      index: 8,
+      trackNumber: 3,
+      startMs: 9_000,
+      endMs: 10_000,
+    }, 2_000)).toMatchObject({
+      anchorCueIndex: 8,
+      lookupCount: 1,
+      firstEventAt: 2_000,
+    });
+  });
+
+  it('builds an exact three-cue rescue loop around the difficult line', () => {
+    expect(videoCoreRescueScene(cues, cues[1], 0.25)).toEqual({
+      startSec: 1.25,
+      endSec: 7.25,
+      cueCount: 3,
+      firstCueIndex: 0,
+      lastCueIndex: 2,
+    });
+    expect(videoCoreRescueScene(cues, cues[0], 0)).toMatchObject({
+      startSec: 1,
+      endSec: 4.5,
+      cueCount: 2,
+      firstCueIndex: 0,
+      lastCueIndex: 1,
+    });
   });
 
   it('retains unrelated player preferences while normalizing study controls', () => {

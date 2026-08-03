@@ -1,7 +1,13 @@
 // Minimal line-glyph icons for the Study OS desktop — no emoji. Each is a
 // 24×24 stroke icon that inherits `currentColor`, so the red/white theme drives
 // their colour. `name` maps to a desktop section or a UI action.
-import type { CSSProperties } from 'react';
+//
+// Phase 5 · M7: a theme may also install an icon pack (theme/iconPacks.ts). When
+// one is active, any name it covers renders as that pack's dimensional icon
+// instead; everything else still falls through to the line glyph below. The
+// registry import is type-light on purpose — this module is on every boot path.
+import { useId, useSyncExternalStore, type CSSProperties } from 'react';
+import { getActiveIconPackId, resolveIcon, subscribeIconPack } from '../theme/iconPacks';
 
 export type IconName =
   | 'player'
@@ -64,9 +70,36 @@ export type IconName =
   | 'plus'
   | 'lock'
   | 'city'
-  | 'widgets';
+  | 'widgets'
+  // ---- Shell objects, status and lifecycle (Phase 5 · M7) ----
+  | 'folder-open'
+  | 'file'
+  | 'file-text'
+  | 'file-audio'
+  | 'file-video'
+  | 'file-image'
+  | 'drive'
+  | 'disc'
+  | 'trash'
+  | 'sleep'
+  | 'restart'
+  | 'logout'
+  | 'shield'
+  | 'info'
+  | 'warning'
+  | 'error'
+  | 'success'
+  | 'network'
+  | 'battery'
+  | 'help'
+  | 'trophy';
 
-const P: Record<IconName, string> = {
+/**
+ * The monochrome line glyphs. Exported so an icon pack's coverage can be
+ * checked against the full name list, and so the M7 icon sheet draws from the
+ * shipped data rather than a copy of it.
+ */
+export const BASE_PATHS: Record<IconName, string> = {
   player: 'M8 5v14l11-7z',
   music: 'M9 18V6l10-2v12 M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z M19 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
   dictionary: 'M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z M8 3v18 M12 8h5 M12 12h5',
@@ -82,7 +115,7 @@ const P: Record<IconName, string> = {
   settings:
     'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.5H9.5L9 4.5a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.5 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6c.1-.3.1-.7.1-1z',
   app: 'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z',
-  city: 'M3 20h18 M5 20V11l3-2v11 M10 20V6l4-2 3 2v14 M17 20v-7h3v7 M12 10h2 M12 13h2',
+  city: 'M3 19h18 M6 12c0-4 2.7-7 6-7s6 3 6 7c0 1.2-.9 2-2 2h-2v5h-4v-5H8c-1.1 0-2-.8-2-2Z M9 10h.01 M13 8h.01 M16 11h.01',
   widgets: 'M4 4h7v7H4z M13 4h7v4h-7z M13 10h7v10h-7z M4 13h7v7H4z',
   logo: 'M12 3l7 4v10l-7 4-7-4V7z M12 8v8 M8.5 10l3.5 2 3.5-2',
   pause: 'M8 5h3v14H8z M13 5h3v14h-3z',
@@ -136,7 +169,35 @@ const P: Record<IconName, string> = {
   pin: 'M12 2v6 M8 8h8l1 4H7z M12 12v10 M9 12h6',
   plus: 'M12 5v14 M5 12h14',
   lock: 'M7 11V8a5 5 0 0 1 10 0v3 M6 11h12v10H6z',
+  // ---- Shell objects, status and lifecycle (Phase 5 · M7) ----
+  // These are the monochrome fallbacks. Under the Secret Aero icon pack they
+  // are replaced by dimensional silhouettes — see theme/aeroIconPack.ts.
+  'folder-open': 'M3 8a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1 M3 8v11h14.5l3.5-8H6.5z',
+  file: 'M6 3h8l5 5v13H6z M14 3v5h5',
+  'file-text': 'M6 3h8l5 5v13H6z M14 3v5h5 M9 12h7 M9 15h7 M9 18h4',
+  'file-audio': 'M6 3h8l5 5v13H6z M14 3v5h5 M11 18v-5l4-1v5 M11 18a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0z',
+  'file-video': 'M6 3h8l5 5v13H6z M14 3v5h5 M10 13v5l5-2.5z',
+  'file-image': 'M6 3h8l5 5v13H6z M14 3v5h5 M9 19l3-3.5 2 2.2 1.8-2L18 19z M10.4 12.6a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z',
+  drive: 'M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M3 13h18 M6 16.5h5',
+  disc: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
+  trash: 'M5 6h14 M9 6V3.5h6V6 M7 6l1 14.5h8L17 6 M10.5 10v7 M13.5 10v7',
+  sleep: 'M20.5 15.5A9 9 0 0 1 8.5 3.5 9 9 0 1 0 20.5 15.5z',
+  restart: 'M12 4a8 8 0 1 1-7.8 6.2 M12 1.5 15.5 4 12 6.5z',
+  logout: 'M13 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-3 M10 12h11 M17.5 8.5 21 12l-3.5 3.5',
+  shield: 'M12 3l8 3v6c0 4.8-3.4 8-8 9.5C7.4 20 4 16.8 4 12V6z M8.6 12l2.6 2.6L15.8 9.5',
+  info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 11v6 M12 7.6h.01',
+  warning: 'M12 3.6 21.6 20a1 1 0 0 1-.9 1.5H3.3a1 1 0 0 1-.9-1.5z M12 9.5v5 M12 18h.01',
+  error: 'M8.6 3h6.8L20.5 8.6v6.8L15.4 21H8.6L3.5 15.4V8.6z M9.4 9.4l5.2 5.2 M14.6 9.4l-5.2 5.2',
+  success: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M8 12.2l2.8 2.8L16 9.6',
+  network: 'M3 20.5h3V17H3z M8.5 20.5h3v-6.8h-3z M14 20.5h3v-10h-3z M19.5 20.5h3V7h-3z',
+  battery: 'M2.5 8.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5z M20 10.5h1.7v3H20 M5 9.5h8v5H5z',
+  help: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M9.4 9.6a2.7 2.7 0 1 1 3.4 2.6v1.6 M12.8 17.2h.01',
+  trophy:
+    'M7 4h10v5a5 5 0 0 1-10 0z M7 5H4v2a3 3 0 0 0 3 3 M17 5h3v2a3 3 0 0 1-3 3 M12 14v3 M9 21h6 M9 21v-2.4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V21',
 };
+
+/** Stroke weight the line glyph should end up at once a tile has scaled it. */
+const TILE_GLYPH_WEIGHT = 1.75;
 
 export default function Icon({
   name,
@@ -144,29 +205,132 @@ export default function Icon({
   style,
   className,
   fill = false,
+  flat = false,
 }: {
   name: IconName;
   size?: number;
   style?: CSSProperties;
   className?: string;
   fill?: boolean;
+  /** Force the monochrome line glyph even when an icon pack covers `name`. */
+  flat?: boolean;
 }) {
   const filled = fill || name === 'player' || name === 'pause' || name === 'skip-back' || name === 'skip-forward';
+  // Subscribing per instance is what lets a theme switch repaint every icon
+  // without any consumer having to know icon packs exist. The snapshot is the
+  // pack id, so a re-render only happens when the pack actually changes.
+  useSyncExternalStore(subscribeIconPack, getActiveIconPackId, () => null);
+  const uid = useId().replace(/:/g, '');
+
+  const resolved = resolveIcon(name, size, flat);
+
+  if (!resolved) {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={filled ? 0 : 1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={style}
+        className={className}
+        aria-hidden="true"
+      >
+        <path d={BASE_PATHS[name]} />
+      </svg>
+    );
+  }
+
+  const { glyph, family } = resolved;
+  const bodyId = `ip-${uid}-b`;
+  const glossId = `ip-${uid}-g`;
+  const ink = family.detail ?? '#ffffff';
+  const scale = glyph.glyphScale ?? 0.62;
+
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth={filled ? 0 : 1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill="none"
       style={style}
       className={className}
+      // Non-colour differentiation cue: the shape family is readable by
+      // assistive tooling and assertable by tests, not just visible.
+      data-icon-shape={glyph.shape}
       aria-hidden="true"
     >
-      <path d={P[name]} />
+      <defs>
+        <linearGradient id={bodyId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={family.top} />
+          <stop offset="1" stopColor={family.bottom} />
+        </linearGradient>
+        {/* A whisper of top light — kept faint so the icons read flat and matte
+            rather than glossy. */}
+        <linearGradient id={glossId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.12" />
+          <stop offset="0.46" stopColor="#ffffff" stopOpacity="0.04" />
+          <stop offset="0.5" stopColor="#ffffff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {glyph.form === 'tile' ? (
+        <>
+          <rect
+            x="2.25"
+            y="2.25"
+            width="19.5"
+            height="19.5"
+            rx="5"
+            fill={`url(#${bodyId})`}
+            stroke={family.edge}
+            strokeWidth="1"
+          />
+          <rect x="2.25" y="2.25" width="19.5" height="19.5" rx="5" fill={`url(#${glossId})`} />
+          <g transform={`translate(12 12) scale(${scale}) translate(-12 -12)`}>
+            <path
+              d={BASE_PATHS[name]}
+              fill={filled ? ink : 'none'}
+              stroke={filled ? 'none' : ink}
+              strokeWidth={filled ? 0 : TILE_GLYPH_WEIGHT / scale}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
+        </>
+      ) : (
+        <>
+          <path
+            d={glyph.body}
+            fill={`url(#${bodyId})`}
+            stroke={family.edge}
+            strokeWidth="0.9"
+            strokeLinejoin="round"
+          />
+          {glyph.accent ? (
+            <path
+              d={glyph.accent}
+              fill={family.accent}
+              stroke={family.edge}
+              strokeWidth="0.9"
+              strokeLinejoin="round"
+            />
+          ) : null}
+          <path d={glyph.gloss ?? glyph.body} fill={`url(#${glossId})`} />
+          {glyph.detail ? (
+            <path
+              d={glyph.detail}
+              fill="none"
+              stroke={ink}
+              strokeWidth={glyph.detailWidth ?? 1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : null}
+        </>
+      )}
     </svg>
   );
 }

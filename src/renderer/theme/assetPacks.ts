@@ -17,6 +17,7 @@ import { getTheme, loadThemeId, onThemeChanged } from './engine';
 import { soundEngine } from '../audio/soundEngine';
 import { SILENT_PACK } from '../audio/soundPack';
 import { listWallpaperPacks } from '../environment/wallpaperFramework';
+import { getIconPack, setActiveIconPack } from './iconPacks';
 
 /** The currently-resolved icon/wallpaper pack ids (for systems that read them). */
 let activeIconPack: string | null = null;
@@ -41,9 +42,10 @@ export function applyAssetPack(themeId: string): void {
     soundEngine.setActivePack(SILENT_PACK.id);
   }
 
-  // --- Icons (hook) --- Icons.tsx gains pack support in a later phase; store
-  // the selection so it can read it.
-  activeIconPack = pack?.icons ?? null;
+  // --- Icons (wired, Phase 5 · M7) --- point the renderer at the pack. An
+  // unknown id resolves to null there, i.e. base line glyphs.
+  activeIconPack = pack?.icons && getIconPack(pack.icons) ? pack.icons : null;
+  setActiveIconPack(activeIconPack);
 
   // --- Wallpapers (hook) --- validate against the wallpaper framework packs so
   // a pack swap points the picker at the edition's wallpapers later.

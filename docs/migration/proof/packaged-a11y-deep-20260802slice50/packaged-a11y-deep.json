@@ -1,0 +1,3978 @@
+{
+  "gate": "packaged-a11y-deep-gate.mjs",
+  "question": "Keyboard walk, contrast, artwork surfaces and the player overlay — the four accessibility items slice 47k recorded as NOT covered.",
+  "startedAt": "2026-08-02T11:17:57.047Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "viewportRequested": {
+    "width": 1600,
+    "height": 1000
+  },
+  "steps": [
+    {
+      "name": "P0 every page-side probe compiles",
+      "result": "PASS",
+      "detail": "6 expressions parsed"
+    },
+    {
+      "name": "0 the packaged desktop is up",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "0b the viewport is the one that was asked for",
+      "result": "PASS",
+      "detail": "requested 1600x1000, measured 1600x1000"
+    },
+    {
+      "name": "A0 the Tab keys ACTUALLY ARRIVED (the walk is not measuring a dead input path)",
+      "result": "PASS",
+      "detail": "focus moved across 10/43/55/56 distinct stops per surface"
+    },
+    {
+      "name": "A1 keyboard walk measured",
+      "result": "MEASURED",
+      "detail": "{\"distinctStops\":164,\"noIndicator\":0,\"outline\":238,\"boxShadow\":0,\"leftDocument\":2,\"offscreen\":0,\"zeroSize\":0,\"unnamed\":0,\"verifiedNoVisibleFocusChange\":0,\"verifiedSampleSize\":0}"
+    },
+    {
+      "name": "B0 the contrast measurer gets known answers right before it is believed",
+      "result": "PASS",
+      "detail": "#000 on #fff -> 21 (expect 21.00); #777 on #888 -> 1.26 (expect ~1.24); text over a gradient -> UNMEASURABLE as designed"
+    },
+    {
+      "name": "B1 contrast measured over the real painted text",
+      "result": "MEASURED",
+      "detail": "1486 text samples, 0 below WCAG AA (0%), 30 unmeasurable, 0 distinct failing colour pairs"
+    },
+    {
+      "name": "C0 the artwork check met its subject",
+      "result": "PASS",
+      "detail": "22 visible <img> across 7 surfaces, 22 decoded"
+    },
+    {
+      "name": "C1 artwork text alternatives",
+      "result": "MEASURED",
+      "detail": "0 with NO alt attribute, 1 marked decorative (alt=\"\"), of which 1 sit in a card carrying no text at all; 21 carry a description"
+    },
+    {
+      "name": "D0 the player STUDY OVERLAY is reachable on this profile",
+      "result": "NOT-REACHABLE",
+      "detail": "no .study-cue-overlay mounted on player/video/music with an empty library, no sidecar and no media — its accessibility is NOT measured by this run, and saying otherwise would be a claim about a surface that was never on screen (video elements: false)"
+    },
+    {
+      "name": "D1 what the player routes DO put on screen",
+      "result": "MEASURED",
+      "detail": "player: 543 controls, video=0, overlay=false | video: 550 controls, video=0, overlay=false | music: 550 controls, video=0, overlay=false"
+    }
+  ],
+  "keyboard": [
+    {
+      "surface": "desktop shell",
+      "tabPresses": 60,
+      "stopsRecorded": 60,
+      "distinctStops": 10,
+      "focusableVisible": 11,
+      "instrumentMovedFocus": true,
+      "consecutiveRepeats": 0,
+      "leftDocumentCount": 0,
+      "offscreenStops": [],
+      "zeroSizeStops": [],
+      "unnamedStops": [],
+      "indicatorCounts": {
+        "outline": 60
+      },
+      "noIndicatorVerified": [],
+      "order": [
+        {
+          "i": 0,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 1,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 2,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 3,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 4,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 5,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 6,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 7,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 8,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 9,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 10,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 11,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 12,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 13,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 14,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 15,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 16,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 17,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 18,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 19,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 20,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 21,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 22,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 23,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 24,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 25,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 26,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 27,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 28,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 29,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 30,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 31,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 32,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 33,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 34,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 35,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 36,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 37,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 38,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 39,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 40,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 41,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 42,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 43,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 44,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 45,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 46,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 47,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 48,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 49,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 50,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 51,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 52,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 53,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 54,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 55,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 56,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 57,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 58,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 59,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        }
+      ]
+    },
+    {
+      "surface": "section:settings",
+      "tabPresses": 60,
+      "stopsRecorded": 60,
+      "distinctStops": 43,
+      "focusableVisible": 44,
+      "instrumentMovedFocus": true,
+      "consecutiveRepeats": 0,
+      "leftDocumentCount": 2,
+      "offscreenStops": [],
+      "zeroSizeStops": [],
+      "unnamedStops": [],
+      "indicatorCounts": {
+        "outline": 58
+      },
+      "noIndicatorVerified": [],
+      "order": [
+        {
+          "i": 0,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 1,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 2,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 3,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 4,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 5,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 6,
+          "el": "button.fwin-b",
+          "name": "Pop out into its own window",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 7,
+          "el": "button.fwin-b",
+          "name": "Minimize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 8,
+          "el": "button.fwin-b",
+          "name": "Maximize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 9,
+          "el": "button.fwin-b.fwin-close",
+          "name": "Close",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 10,
+          "el": "input.os-set-search-input",
+          "name": "Search settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 11,
+          "el": "body",
+          "leftDocument": true
+        },
+        {
+          "i": 12,
+          "el": "button.os-set-nav-item.active",
+          "name": "Home",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 13,
+          "el": "button.os-set-nav-item",
+          "name": "Themes, colors, fonts",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 14,
+          "el": "button.os-set-nav-item",
+          "name": "Desktop background",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 15,
+          "el": "button.os-set-nav-item",
+          "name": "Desktop pets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 16,
+          "el": "button.os-set-nav-item",
+          "name": "Icons, taskbar, session",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 17,
+          "el": "button.os-set-nav-item",
+          "name": "Keyboard and mouse bindings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 18,
+          "el": "button.os-set-nav-item",
+          "name": "Reduced launcher with pop-out apps",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 19,
+          "el": "button.os-set-nav-item",
+          "name": "PIN gate on app launch",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 20,
+          "el": "button.os-set-nav-item",
+          "name": "Profiles and dictionaries",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 21,
+          "el": "button.os-set-nav-item",
+          "name": "Route mines to Anki profiles",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 22,
+          "el": "button.os-set-nav-item",
+          "name": "Reader typography",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 23,
+          "el": "button.os-set-nav-item",
+          "name": "WIRED and Aero secret modules",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 24,
+          "el": "button.os-set-nav-item",
+          "name": "Zoom and motion",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 25,
+          "el": "button.os-set-nav-item",
+          "name": "Animation speed and effects",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 26,
+          "el": "button.os-set-nav-item",
+          "name": "Download, update, and remove models",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 27,
+          "el": "button.os-set-nav-item",
+          "name": "Usage, inventory, backups, and clear too",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 28,
+          "el": "button.os-set-advanced-btn",
+          "name": "Advanced mode off — extra settings hidde",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 29,
+          "el": "button.os-set-quick-card",
+          "name": "Customize theme",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 30,
+          "el": "button.os-set-quick-card",
+          "name": "Change language",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 31,
+          "el": "button.os-set-quick-card",
+          "name": "Chrome extension",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 32,
+          "el": "button.os-set-quick-card",
+          "name": "Blanc Mode",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 33,
+          "el": "button.os-set-quick-card",
+          "name": "Change wallpaper",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 34,
+          "el": "button.os-set-quick-card",
+          "name": "Companion settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 35,
+          "el": "button.os-set-quick-card",
+          "name": "Particles & atmosphere",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 36,
+          "el": "button.os-set-quick-card",
+          "name": "Manage shortcuts",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 37,
+          "el": "button.os-set-quick-card",
+          "name": "Lockscreen & PIN",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 38,
+          "el": "button.os-set-quick-card",
+          "name": "Memory & storage",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 39,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 40,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 41,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 42,
+          "el": "button.os-task-win.app-settings",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 43,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 44,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 45,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 46,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 47,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 48,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 49,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 50,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 51,
+          "el": "button.fwin-b",
+          "name": "Pop out into its own window",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 52,
+          "el": "button.fwin-b",
+          "name": "Minimize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 53,
+          "el": "button.fwin-b",
+          "name": "Maximize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 54,
+          "el": "button.fwin-b.fwin-close",
+          "name": "Close",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 55,
+          "el": "input.os-set-search-input",
+          "name": "Search settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 56,
+          "el": "body",
+          "leftDocument": true
+        },
+        {
+          "i": 57,
+          "el": "button.os-set-nav-item.active",
+          "name": "Home",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 58,
+          "el": "button.os-set-nav-item",
+          "name": "Themes, colors, fonts",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 59,
+          "el": "button.os-set-nav-item",
+          "name": "Desktop background",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        }
+      ]
+    },
+    {
+      "surface": "section:library",
+      "tabPresses": 60,
+      "stopsRecorded": 60,
+      "distinctStops": 55,
+      "focusableVisible": 74,
+      "instrumentMovedFocus": true,
+      "consecutiveRepeats": 0,
+      "leftDocumentCount": 0,
+      "offscreenStops": [],
+      "zeroSizeStops": [],
+      "unnamedStops": [],
+      "indicatorCounts": {
+        "outline": 60
+      },
+      "noIndicatorVerified": [],
+      "order": [
+        {
+          "i": 0,
+          "el": "button.os-set-nav-item",
+          "name": "Desktop pets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 1,
+          "el": "button.os-set-nav-item",
+          "name": "Icons, taskbar, session",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 2,
+          "el": "button.os-set-nav-item",
+          "name": "Keyboard and mouse bindings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 3,
+          "el": "button.os-set-nav-item",
+          "name": "Reduced launcher with pop-out apps",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 4,
+          "el": "button.os-set-nav-item",
+          "name": "PIN gate on app launch",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 5,
+          "el": "button.os-set-nav-item",
+          "name": "Profiles and dictionaries",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 6,
+          "el": "button.os-set-nav-item",
+          "name": "Route mines to Anki profiles",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 7,
+          "el": "button.os-set-nav-item",
+          "name": "Reader typography",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 8,
+          "el": "button.os-set-nav-item",
+          "name": "WIRED and Aero secret modules",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 9,
+          "el": "button.os-set-nav-item",
+          "name": "Zoom and motion",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 10,
+          "el": "button.os-set-nav-item",
+          "name": "Animation speed and effects",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 11,
+          "el": "button.os-set-nav-item",
+          "name": "Download, update, and remove models",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 12,
+          "el": "button.os-set-nav-item",
+          "name": "Usage, inventory, backups, and clear too",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 13,
+          "el": "button.os-set-advanced-btn",
+          "name": "Advanced mode off — extra settings hidde",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 14,
+          "el": "button.os-set-quick-card",
+          "name": "Customize theme",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 15,
+          "el": "button.os-set-quick-card",
+          "name": "Change language",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 16,
+          "el": "button.os-set-quick-card",
+          "name": "Chrome extension",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 17,
+          "el": "button.os-set-quick-card",
+          "name": "Blanc Mode",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 18,
+          "el": "button.os-set-quick-card",
+          "name": "Change wallpaper",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 19,
+          "el": "button.os-set-quick-card",
+          "name": "Companion settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 20,
+          "el": "button.os-set-quick-card",
+          "name": "Particles & atmosphere",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 21,
+          "el": "button.os-set-quick-card",
+          "name": "Manage shortcuts",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 22,
+          "el": "button.os-set-quick-card",
+          "name": "Lockscreen & PIN",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 23,
+          "el": "button.os-set-quick-card",
+          "name": "Memory & storage",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 24,
+          "el": "button.fwin-b",
+          "name": "Pop out into its own window",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 25,
+          "el": "button.fwin-b",
+          "name": "Minimize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 26,
+          "el": "button.fwin-b",
+          "name": "Maximize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 27,
+          "el": "button.fwin-b.fwin-close",
+          "name": "Close",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 28,
+          "el": "button.btn.primary",
+          "name": "+ Import file(s)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 29,
+          "el": "button.btn",
+          "name": "Import image folder",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 30,
+          "el": "button.btn",
+          "name": "Web / paste",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 31,
+          "el": "button.btn",
+          "name": "Random Wikipedia",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 32,
+          "el": "button.btn.small",
+          "name": "Set auto-import folder…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 33,
+          "el": "button.lib-folder-chip.active",
+          "name": "Everything (drop a book here to take it ",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 34,
+          "el": "button.lib-folder-chip",
+          "name": "Inbox — drop books here to file them; dr",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 35,
+          "el": "button.lib-folder-chip.lib-folder-new",
+          "name": "+ New folder",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 36,
+          "el": "select#lib-sort.media-model-select",
+          "name": "Sort",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 37,
+          "el": "select#lib-group.media-model-select",
+          "name": "Group",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 38,
+          "el": "button.btn.small",
+          "name": "Inbox",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 39,
+          "el": "button.btn.small",
+          "name": "Chrome extension",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 40,
+          "el": "button.btn.small",
+          "name": "YouTube",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 41,
+          "el": "button.btn.primary",
+          "name": "Import your first file",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 42,
+          "el": "button.os-start-btn",
+          "name": "Start",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 43,
+          "el": "button.os-desktop-switch.active",
+          "name": "Desktop 1",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 44,
+          "el": "button.os-desktop-switch",
+          "name": "Desktop 2",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 45,
+          "el": "button.os-task-win.app-settings",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 46,
+          "el": "button.os-task-win.app-library",
+          "name": "Library",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 47,
+          "el": "button.os-tray-btn",
+          "name": "Search everything…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 48,
+          "el": "button.os-tray-btn",
+          "name": "Widgets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 49,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 50,
+          "el": "button.os-tray-btn",
+          "name": "Clipboard history (Ctrl+Shift+V)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 51,
+          "el": "button.os-tray-btn",
+          "name": "Settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 52,
+          "el": "button.os-tray-btn",
+          "name": "Quick settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 53,
+          "el": "button.os-tray-btn.os-tray-btn-bell",
+          "name": "Notifications",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 54,
+          "el": "button.seanime-host-launcher",
+          "name": "Media workspacestopped",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 55,
+          "el": "button.fwin-b",
+          "name": "Pop out into its own window",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 56,
+          "el": "button.fwin-b",
+          "name": "Minimize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 57,
+          "el": "button.fwin-b",
+          "name": "Maximize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 58,
+          "el": "button.fwin-b.fwin-close",
+          "name": "Close",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 59,
+          "el": "input.os-set-search-input",
+          "name": "Search settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        }
+      ]
+    },
+    {
+      "surface": "section:notebook",
+      "tabPresses": 60,
+      "stopsRecorded": 60,
+      "distinctStops": 56,
+      "focusableVisible": 92,
+      "instrumentMovedFocus": true,
+      "consecutiveRepeats": 0,
+      "leftDocumentCount": 0,
+      "offscreenStops": [],
+      "zeroSizeStops": [],
+      "unnamedStops": [],
+      "indicatorCounts": {
+        "outline": 60
+      },
+      "noIndicatorVerified": [],
+      "order": [
+        {
+          "i": 0,
+          "el": "button.os-set-nav-item.active",
+          "name": "Home",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 1,
+          "el": "button.os-set-nav-item",
+          "name": "Themes, colors, fonts",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 2,
+          "el": "button.os-set-nav-item",
+          "name": "Desktop background",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 3,
+          "el": "button.os-set-nav-item",
+          "name": "Desktop pets",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 4,
+          "el": "button.os-set-nav-item",
+          "name": "Icons, taskbar, session",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 5,
+          "el": "button.os-set-nav-item",
+          "name": "Keyboard and mouse bindings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 6,
+          "el": "button.os-set-nav-item",
+          "name": "Reduced launcher with pop-out apps",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 7,
+          "el": "button.os-set-nav-item",
+          "name": "PIN gate on app launch",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 8,
+          "el": "button.os-set-nav-item",
+          "name": "Profiles and dictionaries",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 9,
+          "el": "button.os-set-nav-item",
+          "name": "Route mines to Anki profiles",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 10,
+          "el": "button.os-set-nav-item",
+          "name": "Reader typography",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 11,
+          "el": "button.os-set-nav-item",
+          "name": "WIRED and Aero secret modules",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 12,
+          "el": "button.os-set-nav-item",
+          "name": "Zoom and motion",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 13,
+          "el": "button.os-set-nav-item",
+          "name": "Animation speed and effects",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 14,
+          "el": "button.os-set-nav-item",
+          "name": "Download, update, and remove models",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 15,
+          "el": "button.os-set-nav-item",
+          "name": "Usage, inventory, backups, and clear too",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 16,
+          "el": "button.os-set-advanced-btn",
+          "name": "Advanced mode off — extra settings hidde",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 17,
+          "el": "button.os-set-quick-card",
+          "name": "Customize theme",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 18,
+          "el": "button.os-set-quick-card",
+          "name": "Change language",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 19,
+          "el": "button.os-set-quick-card",
+          "name": "Chrome extension",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 20,
+          "el": "button.os-set-quick-card",
+          "name": "Blanc Mode",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 21,
+          "el": "button.os-set-quick-card",
+          "name": "Change wallpaper",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 22,
+          "el": "button.os-set-quick-card",
+          "name": "Companion settings",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 23,
+          "el": "button.os-set-quick-card",
+          "name": "Particles & atmosphere",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 24,
+          "el": "button.os-set-quick-card",
+          "name": "Manage shortcuts",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 25,
+          "el": "button.os-set-quick-card",
+          "name": "Lockscreen & PIN",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 26,
+          "el": "button.os-set-quick-card",
+          "name": "Memory & storage",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 27,
+          "el": "button.fwin-b",
+          "name": "Pop out into its own window",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 28,
+          "el": "button.fwin-b",
+          "name": "Minimize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 29,
+          "el": "button.fwin-b",
+          "name": "Maximize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 30,
+          "el": "button.fwin-b.fwin-close",
+          "name": "Close",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 31,
+          "el": "button.btn.primary",
+          "name": "+ Import file(s)",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 32,
+          "el": "button.btn",
+          "name": "Import image folder",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 33,
+          "el": "button.btn",
+          "name": "Web / paste",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 34,
+          "el": "button.btn",
+          "name": "Random Wikipedia",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 35,
+          "el": "button.btn.small",
+          "name": "Set auto-import folder…",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 36,
+          "el": "button.lib-folder-chip.active",
+          "name": "Everything (drop a book here to take it ",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 37,
+          "el": "button.lib-folder-chip",
+          "name": "Inbox — drop books here to file them; dr",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 38,
+          "el": "button.lib-folder-chip.lib-folder-new",
+          "name": "+ New folder",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 39,
+          "el": "select#lib-sort.media-model-select",
+          "name": "Sort",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 40,
+          "el": "select#lib-group.media-model-select",
+          "name": "Group",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 41,
+          "el": "button.btn.small",
+          "name": "Inbox",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 42,
+          "el": "button.btn.small",
+          "name": "Chrome extension",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 43,
+          "el": "button.btn.small",
+          "name": "YouTube",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 44,
+          "el": "button.btn.primary",
+          "name": "Import your first file",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 45,
+          "el": "button.fwin-b",
+          "name": "Pop out into its own window",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 46,
+          "el": "button.fwin-b",
+          "name": "Minimize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 47,
+          "el": "button.fwin-b",
+          "name": "Maximize",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 48,
+          "el": "button.fwin-b.fwin-close",
+          "name": "Close",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 49,
+          "el": "button.gx-notebook-view.active",
+          "name": "Overview",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 50,
+          "el": "button.gx-notebook-view",
+          "name": "Library",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 51,
+          "el": "button.gx-notebook-view",
+          "name": "Words",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 52,
+          "el": "button.gx-notebook-view",
+          "name": "Translations",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 53,
+          "el": "button.gx-notebook-view",
+          "name": "Highlights",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 54,
+          "el": "button.gx-notebook-view",
+          "name": "Captures",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 55,
+          "el": "button.gx-notebook-count",
+          "name": "0Saved words",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 56,
+          "el": "button.gx-notebook-count",
+          "name": "0Lookups",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 57,
+          "el": "button.gx-notebook-count",
+          "name": "0Flashcards",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 58,
+          "el": "button.gx-notebook-count",
+          "name": "0Anki",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        },
+        {
+          "i": 59,
+          "el": "button.gx-notebook-count",
+          "name": "0Mining",
+          "indicator": "outline",
+          "focusVisible": true,
+          "inViewport": true
+        }
+      ]
+    }
+  ],
+  "contrast": {
+    "surfacesSwept": [
+      "settings",
+      "dictionary",
+      "anki",
+      "library",
+      "reading",
+      "notebook",
+      "stats"
+    ],
+    "totalMeasured": 1486,
+    "totalFailing": 0,
+    "failingPct": 0,
+    "totalUnmeasurable": 30,
+    "unmeasurableReasons": [
+      "background-image on aside.card-preview"
+    ],
+    "distinctFailingPairs": [],
+    "worstOverall": [
+      {
+        "el": "span.lib-chip-count",
+        "text": "0",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Saved words",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Lookups",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Flashcards",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Anki",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Mining",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Known levels",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Translations",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Plan to read",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Highlights",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "OCR",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Audio",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Clipboard",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Extension",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      },
+      {
+        "el": "span.gx-notebook-count-l",
+        "text": "Live captions",
+        "color": "rgb(157, 151, 166)",
+        "fontSize": 11,
+        "fontWeight": 400,
+        "large": false,
+        "background": "rgb(39, 36, 51)",
+        "ratio": 5.35,
+        "required": 4.5,
+        "passes": true,
+        "opacityBelow1": false,
+        "surface": "settings"
+      }
+    ],
+    "bySurface": [
+      {
+        "surface": "settings",
+        "measured": 138,
+        "failing": 0,
+        "unmeasurable": 0,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          }
+        ]
+      },
+      {
+        "surface": "dictionary",
+        "measured": 150,
+        "failing": 0,
+        "unmeasurable": 0,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          }
+        ]
+      },
+      {
+        "surface": "anki",
+        "measured": 196,
+        "failing": 0,
+        "unmeasurable": 6,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          }
+        ]
+      },
+      {
+        "surface": "library",
+        "measured": 196,
+        "failing": 0,
+        "unmeasurable": 6,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          }
+        ]
+      },
+      {
+        "surface": "reading",
+        "measured": 260,
+        "failing": 0,
+        "unmeasurable": 6,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          }
+        ]
+      },
+      {
+        "surface": "notebook",
+        "measured": 260,
+        "failing": 0,
+        "unmeasurable": 6,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          }
+        ]
+      },
+      {
+        "surface": "stats",
+        "measured": 286,
+        "failing": 0,
+        "unmeasurable": 6,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "ratio": 5.35,
+            "required": 4.5,
+            "color": "rgb(157, 151, 166)",
+            "background": "rgb(39, 36, 51)"
+          }
+        ]
+      }
+    ]
+  },
+  "artwork": {
+    "surfacesOpened": [
+      {
+        "surface": "scraper",
+        "images": 3,
+        "cssBackgroundArt": 0
+      },
+      {
+        "surface": "reading",
+        "images": 3,
+        "cssBackgroundArt": 0
+      },
+      {
+        "surface": "music",
+        "images": 3,
+        "cssBackgroundArt": 0
+      },
+      {
+        "surface": "immersion",
+        "images": 3,
+        "cssBackgroundArt": 0
+      },
+      {
+        "surface": "novels",
+        "images": 3,
+        "cssBackgroundArt": 0
+      },
+      {
+        "surface": "library",
+        "images": 3,
+        "cssBackgroundArt": 0
+      },
+      {
+        "surface": "city",
+        "images": 4,
+        "cssBackgroundArt": 0
+      }
+    ],
+    "totalImages": 22,
+    "imagesActuallyLoaded": 22,
+    "missingAltAttribute": 0,
+    "missingAltExamples": [],
+    "decorativeEmptyAlt": 1,
+    "decorativeInsideTextlessCard": 1,
+    "decorativeInsideTextlessCardExamples": [
+      {
+        "el": "img.reading-garden-foreground-mask",
+        "src": "app://bundle/assets/mooncap-background-master-v2-CryhNdJw.png",
+        "hasAltAttr": true,
+        "alt": "",
+        "naturalWidth": 1122,
+        "complete": true,
+        "cardEl": null,
+        "cardTextLength": 0,
+        "cardText": "",
+        "surface": "city"
+      }
+    ],
+    "describedAlt": 21,
+    "cssBackgroundArtTotal": 0,
+    "perSurface": [
+      {
+        "surface": "scraper",
+        "imageCount": 3,
+        "images": [
+          {
+            "el": "img.is-poster",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Grand Line Archives placeholder poster",
+            "naturalWidth": 106,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "The Swordsman placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Moonlit Harbor placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          }
+        ],
+        "cssBackgroundArtCount": 0,
+        "cssBackgroundArt": []
+      },
+      {
+        "surface": "reading",
+        "imageCount": 3,
+        "images": [
+          {
+            "el": "img.is-poster",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Grand Line Archives placeholder poster",
+            "naturalWidth": 106,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "The Swordsman placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Moonlit Harbor placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          }
+        ],
+        "cssBackgroundArtCount": 0,
+        "cssBackgroundArt": []
+      },
+      {
+        "surface": "music",
+        "imageCount": 3,
+        "images": [
+          {
+            "el": "img.is-poster",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Grand Line Archives placeholder poster",
+            "naturalWidth": 106,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "The Swordsman placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Moonlit Harbor placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          }
+        ],
+        "cssBackgroundArtCount": 0,
+        "cssBackgroundArt": []
+      },
+      {
+        "surface": "immersion",
+        "imageCount": 3,
+        "images": [
+          {
+            "el": "img.is-poster",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Grand Line Archives placeholder poster",
+            "naturalWidth": 106,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "The Swordsman placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Moonlit Harbor placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          }
+        ],
+        "cssBackgroundArtCount": 0,
+        "cssBackgroundArt": []
+      },
+      {
+        "surface": "novels",
+        "imageCount": 3,
+        "images": [
+          {
+            "el": "img.is-poster",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Grand Line Archives placeholder poster",
+            "naturalWidth": 106,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "The Swordsman placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Moonlit Harbor placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          }
+        ],
+        "cssBackgroundArtCount": 0,
+        "cssBackgroundArt": []
+      },
+      {
+        "surface": "library",
+        "imageCount": 3,
+        "images": [
+          {
+            "el": "img.is-poster",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Grand Line Archives placeholder poster",
+            "naturalWidth": 106,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "The Swordsman placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Moonlit Harbor placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          }
+        ],
+        "cssBackgroundArtCount": 0,
+        "cssBackgroundArt": []
+      },
+      {
+        "surface": "city",
+        "imageCount": 4,
+        "images": [
+          {
+            "el": "img.is-poster",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Grand Line Archives placeholder poster",
+            "naturalWidth": 106,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "The Swordsman placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img",
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIH",
+            "hasAltAttr": true,
+            "alt": "Moonlit Harbor placeholder thumbnail",
+            "naturalWidth": 267,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          },
+          {
+            "el": "img.reading-garden-foreground-mask",
+            "src": "app://bundle/assets/mooncap-background-master-v2-CryhNdJw.png",
+            "hasAltAttr": true,
+            "alt": "",
+            "naturalWidth": 1122,
+            "complete": true,
+            "cardEl": null,
+            "cardTextLength": 0,
+            "cardText": ""
+          }
+        ],
+        "cssBackgroundArtCount": 0,
+        "cssBackgroundArt": []
+      }
+    ]
+  },
+  "player": [
+    {
+      "surface": "player",
+      "studyCueOverlay": false,
+      "studyCueOverlayVisible": false,
+      "videoElements": 0,
+      "videoVisible": false,
+      "videoReadyState": null,
+      "videoSrc": null,
+      "blancStudyPlayer": false,
+      "mediaWorkspace": true,
+      "seanimeHost": true,
+      "playerLikeSurfaces": [
+        "footer.mc-playerbar",
+        "button.mc-player-info",
+        "span.mc-player-thumb",
+        "div.mc-player-transport",
+        "button.mc-player-play",
+        "div.mc-player-progress",
+        "div.mc-player-volume",
+        "button.os-task-win.app-player"
+      ],
+      "visibleControls": 543,
+      "keyboardWalk": {
+        "distinctStops": 51,
+        "focusableVisible": 510,
+        "indicatorCounts": {
+          "outline": 59
+        },
+        "unnamedStops": [],
+        "order": [
+          {
+            "i": 0,
+            "el": "button.fwin-b",
+            "name": "Pop out into its own window",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 1,
+            "el": "button.fwin-b",
+            "name": "Minimize",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 2,
+            "el": "button.fwin-b",
+            "name": "Maximize",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 3,
+            "el": "button.fwin-b.fwin-close",
+            "name": "Close",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 4,
+            "el": "input.os-set-search-input",
+            "name": "Search settings",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 5,
+            "el": "body",
+            "leftDocument": true
+          },
+          {
+            "i": 6,
+            "el": "button.os-set-nav-item.active",
+            "name": "Home",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 7,
+            "el": "button.os-set-nav-item",
+            "name": "Themes, colors, fonts",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 8,
+            "el": "button.os-set-nav-item",
+            "name": "Desktop background",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 9,
+            "el": "button.os-set-nav-item",
+            "name": "Desktop pets",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 10,
+            "el": "button.os-set-nav-item",
+            "name": "Icons, taskbar, session",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 11,
+            "el": "button.os-set-nav-item",
+            "name": "Keyboard and mouse bindings",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 12,
+            "el": "button.os-set-nav-item",
+            "name": "Reduced launcher with pop-out apps",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 13,
+            "el": "button.os-set-nav-item",
+            "name": "PIN gate on app launch",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 14,
+            "el": "button.os-set-nav-item",
+            "name": "Profiles and dictionaries",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 15,
+            "el": "button.os-set-nav-item",
+            "name": "Route mines to Anki profiles",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 16,
+            "el": "button.os-set-nav-item",
+            "name": "Reader typography",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 17,
+            "el": "button.os-set-nav-item",
+            "name": "WIRED and Aero secret modules",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 18,
+            "el": "button.os-set-nav-item",
+            "name": "Zoom and motion",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 19,
+            "el": "button.os-set-nav-item",
+            "name": "Animation speed and effects",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 20,
+            "el": "button.os-set-nav-item",
+            "name": "Download, update, and remove models",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 21,
+            "el": "button.os-set-nav-item",
+            "name": "Usage, inventory, backups, and clear too",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 22,
+            "el": "button.os-set-advanced-btn",
+            "name": "Advanced mode off — extra settings hidde",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 23,
+            "el": "button.os-set-quick-card",
+            "name": "Customize theme",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 24,
+            "el": "button.os-set-quick-card",
+            "name": "Change language",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          }
+        ]
+      },
+      "contrast": {
+        "measured": 1868,
+        "failing": 0,
+        "unmeasurable": 64,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          }
+        ]
+      }
+    },
+    {
+      "surface": "video",
+      "studyCueOverlay": false,
+      "studyCueOverlayVisible": false,
+      "videoElements": 0,
+      "videoVisible": false,
+      "videoReadyState": null,
+      "videoSrc": null,
+      "blancStudyPlayer": false,
+      "mediaWorkspace": true,
+      "seanimeHost": true,
+      "playerLikeSurfaces": [
+        "footer.mc-playerbar",
+        "button.mc-player-info",
+        "span.mc-player-thumb",
+        "div.mc-player-transport",
+        "button.mc-player-play",
+        "div.mc-player-progress",
+        "div.mc-player-volume",
+        "button.os-task-win.app-player"
+      ],
+      "visibleControls": 550,
+      "keyboardWalk": {
+        "distinctStops": 48,
+        "focusableVisible": 516,
+        "indicatorCounts": {
+          "outline": 58,
+          "none-detected": 2
+        },
+        "unnamedStops": [
+          "input",
+          "input.fm-input",
+          "input.fm-input",
+          "input.fm-input",
+          "input.fm-input",
+          "input",
+          "input.gram-search"
+        ],
+        "order": [
+          {
+            "i": 0,
+            "el": "button.gx-notebook-view",
+            "name": "Captures",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 1,
+            "el": "button.gx-notebook-count",
+            "name": "0Saved words",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 2,
+            "el": "button.gx-notebook-count",
+            "name": "0Lookups",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 3,
+            "el": "button.gx-notebook-count",
+            "name": "0Flashcards",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 4,
+            "el": "button.gx-notebook-count",
+            "name": "0Anki",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 5,
+            "el": "button.gx-notebook-count",
+            "name": "0Mining",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 6,
+            "el": "button.gx-notebook-count",
+            "name": "0Known levels",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 7,
+            "el": "button.gx-notebook-count",
+            "name": "0Translations",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 8,
+            "el": "button.gx-notebook-count",
+            "name": "0Plan to read",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 9,
+            "el": "button.gx-notebook-count",
+            "name": "0Highlights",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 10,
+            "el": "button.gx-notebook-count",
+            "name": "0OCR",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 11,
+            "el": "button.gx-notebook-count",
+            "name": "0Audio",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 12,
+            "el": "button.gx-notebook-count",
+            "name": "0Clipboard",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 13,
+            "el": "button.gx-notebook-count",
+            "name": "0Extension",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 14,
+            "el": "button.gx-notebook-count",
+            "name": "0Live captions",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 15,
+            "el": "button.btn.primary",
+            "name": "Review Notebook",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 16,
+            "el": "button.btn.ghost",
+            "name": "Refresh",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 17,
+            "el": "button.gx-notebook-folder.active",
+            "name": "All (0)",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 18,
+            "el": "button.btn.primary",
+            "name": "Start capture",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 19,
+            "el": "button.fwin-b",
+            "name": "Pop out into its own window",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 20,
+            "el": "button.fwin-b",
+            "name": "Minimize",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 21,
+            "el": "button.fwin-b",
+            "name": "Maximize",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 22,
+            "el": "button.fwin-b.fwin-close",
+            "name": "Close",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 23,
+            "el": "button.gram-level-btn.active",
+            "name": "日本語",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 24,
+            "el": "button.gram-level-btn",
+            "name": "中文",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          }
+        ]
+      },
+      "contrast": {
+        "measured": 1877,
+        "failing": 0,
+        "unmeasurable": 64,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          }
+        ]
+      }
+    },
+    {
+      "surface": "music",
+      "studyCueOverlay": false,
+      "studyCueOverlayVisible": false,
+      "videoElements": 0,
+      "videoVisible": false,
+      "videoReadyState": null,
+      "videoSrc": null,
+      "blancStudyPlayer": false,
+      "mediaWorkspace": true,
+      "seanimeHost": true,
+      "playerLikeSurfaces": [
+        "footer.mc-playerbar",
+        "button.mc-player-info",
+        "span.mc-player-thumb",
+        "div.mc-player-transport",
+        "button.mc-player-play",
+        "div.mc-player-progress",
+        "div.mc-player-volume",
+        "button.os-task-win.app-player"
+      ],
+      "visibleControls": 550,
+      "keyboardWalk": {
+        "distinctStops": 49,
+        "focusableVisible": 520,
+        "indicatorCounts": {
+          "outline": 60
+        },
+        "unnamedStops": [
+          "input.fm-input",
+          "input.fm-input",
+          "input.fm-input",
+          "input.fm-input",
+          "input",
+          "input.gram-search"
+        ],
+        "order": [
+          {
+            "i": 0,
+            "el": "button.btn.small",
+            "name": "Create in Anki",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 1,
+            "el": "summary",
+            "name": "Recommended dictionaries & data",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 2,
+            "el": "button.collapse-header",
+            "name": "Field templates",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 3,
+            "el": "input.fm-input",
+            "name": "",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 4,
+            "el": "input.fm-input",
+            "name": "",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 5,
+            "el": "input.fm-input",
+            "name": "",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 6,
+            "el": "input.fm-input",
+            "name": "",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 7,
+            "el": "button.btn",
+            "name": "Reset to automatic",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 8,
+            "el": "button.collapse-header",
+            "name": "Variable paletteInsert {placeholders} in",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 9,
+            "el": "button.collapse-header",
+            "name": "Examples & fallbackAuto-fetch Tatoeba + ",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 10,
+            "el": "button.collapse-header",
+            "name": "Card styling (CSS)Customize how mined ca",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 11,
+            "el": "button.collapse-header",
+            "name": "Add a card by handManual test without mi",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 12,
+            "el": "input",
+            "name": "",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 13,
+            "el": "button.fwin-b",
+            "name": "Pop out into its own window",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 14,
+            "el": "button.fwin-b",
+            "name": "Minimize",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 15,
+            "el": "button.fwin-b",
+            "name": "Maximize",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 16,
+            "el": "button.fwin-b.fwin-close",
+            "name": "Close",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 17,
+            "el": "button.gram-level-btn.active",
+            "name": "Beginner",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 18,
+            "el": "button.gram-level-btn.active",
+            "name": "N5",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 19,
+            "el": "button.gram-level-btn",
+            "name": "N4",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 20,
+            "el": "button.gram-level-btn",
+            "name": "N3",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 21,
+            "el": "button.gram-level-btn",
+            "name": "N2",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 22,
+            "el": "button.gram-level-btn",
+            "name": "N1",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 23,
+            "el": "button.gram-level-btn",
+            "name": "Advanced",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          },
+          {
+            "i": 24,
+            "el": "button.rf-surprise-btn",
+            "name": "Surprise me",
+            "indicator": "outline",
+            "focusVisible": true,
+            "inViewport": true
+          }
+        ]
+      },
+      "contrast": {
+        "measured": 1883,
+        "failing": 0,
+        "unmeasurable": 64,
+        "worst": [
+          {
+            "el": "span.lib-chip-count",
+            "text": "0",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Saved words",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Lookups",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Flashcards",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          },
+          {
+            "el": "span.gx-notebook-count-l",
+            "text": "Anki",
+            "color": "rgb(157, 151, 166)",
+            "fontSize": 11,
+            "fontWeight": 400,
+            "large": false,
+            "background": "rgb(39, 36, 51)",
+            "ratio": 5.35,
+            "required": 4.5,
+            "passes": true,
+            "opacityBelow1": false
+          }
+        ]
+      }
+    }
+  ],
+  "pageExpressionsCompiled": true,
+  "exeBuiltAt": "2026-08-02T10:39:12.489Z",
+  "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-a11y-deep-20260802slice50-42232",
+  "viewportMeasured": {
+    "clientWidth": 1600,
+    "clientHeight": 1000,
+    "innerWidth": 1600,
+    "innerHeight": 1000
+  },
+  "keyboardTotals": {
+    "distinctStops": 164,
+    "noIndicator": 0,
+    "outline": 238,
+    "boxShadow": 0,
+    "leftDocument": 2,
+    "offscreen": 0,
+    "zeroSize": 0,
+    "unnamed": 0,
+    "verifiedNoVisibleFocusChange": 0,
+    "verifiedSampleSize": 0
+  },
+  "contrastSelfTest": {
+    "blackOnWhite": {
+      "ratio": 21
+    },
+    "greyOnGrey": {
+      "ratio": 1.26
+    },
+    "overImage": {
+      "unmeasurable": "background-image on div"
+    }
+  },
+  "verdict": "MEASURED",
+  "trustworthy": {
+    "tabKeysArrived": true,
+    "contrastSelfTestPassed": true,
+    "viewportPinned": true,
+    "artworkMetItsSubject": true,
+    "playerOverlayReached": false
+  },
+  "result": "MEASURED",
+  "finishedAt": "2026-08-02T11:21:49.553Z",
+  "log": [
+    "[a11y-deep] PASS — P0 every page-side probe compiles: 6 expressions parsed",
+    "[a11y-deep] PASS — 0 the packaged desktop is up: app://bundle/index.html",
+    "[a11y-deep] PASS — 0b the viewport is the one that was asked for: requested 1600x1000, measured 1600x1000",
+    "[a11y-deep]   walk desktop shell: 10 distinct stops / 11 focusable, indicators {\"outline\":60}",
+    "[a11y-deep]   walk section:settings: 43 distinct stops / 44 focusable, indicators {\"outline\":58}",
+    "[a11y-deep]   walk section:library: 55 distinct stops / 74 focusable, indicators {\"outline\":60}",
+    "[a11y-deep]   walk section:notebook: 56 distinct stops / 92 focusable, indicators {\"outline\":60}",
+    "[a11y-deep] PASS — A0 the Tab keys ACTUALLY ARRIVED (the walk is not measuring a dead input path): focus moved across 10/43/55/56 distinct stops per surface",
+    "[a11y-deep] MEASURED — A1 keyboard walk measured: {\"distinctStops\":164,\"noIndicator\":0,\"outline\":238,\"boxShadow\":0,\"leftDocument\":2,\"offscreen\":0,\"zeroSize\":0,\"unnamed\":0,\"verifiedNoVisibleFocusChange\":0,\"verifiedSampleSize\":0}",
+    "[a11y-deep] PASS — B0 the contrast measurer gets known answers right before it is believed: #000 on #fff -> 21 (expect 21.00); #777 on #888 -> 1.26 (expect ~1.24); text over a gradient -> UNMEASURABLE as designed",
+    "[a11y-deep] MEASURED — B1 contrast measured over the real painted text: 1486 text samples, 0 below WCAG AA (0%), 30 unmeasurable, 0 distinct failing colour pairs",
+    "[a11y-deep] PASS — C0 the artwork check met its subject: 22 visible <img> across 7 surfaces, 22 decoded",
+    "[a11y-deep] MEASURED — C1 artwork text alternatives: 0 with NO alt attribute, 1 marked decorative (alt=\"\"), of which 1 sit in a card carrying no text at all; 21 carry a description",
+    "[a11y-deep] NOT-REACHABLE — D0 the player STUDY OVERLAY is reachable on this profile: no .study-cue-overlay mounted on player/video/music with an empty library, no sidecar and no media — its accessibility is NOT measured by this run, and saying otherwise would be a claim about a surface that was never on screen (video elements: false)",
+    "[a11y-deep] MEASURED — D1 what the player routes DO put on screen: player: 543 controls, video=0, overlay=false | video: 550 controls, video=0, overlay=false | music: 550 controls, video=0, overlay=false"
+  ]
+}

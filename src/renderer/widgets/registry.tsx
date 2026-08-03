@@ -20,6 +20,7 @@ import {
   WordOfTheDay,
 } from './study';
 import { MiniPlayer } from './music';
+import { ContinueWatchingWidget } from './continueWatching';
 import { Calculator } from './utility';
 import { LevelProgressWidget } from './levels';
 import { WorldClock, DailyGoals, HabitTracker, LearningHeatmap, LearnerMapWidget } from './more';
@@ -52,6 +53,11 @@ export const WIDGETS: WidgetDef[] = [
   { type: 'vocab-progress', titleKey: 'widgets.title.vocab-progress', category: 'Study', descKey: 'widgets.desc.vocab-progress', defaultSize: { w: 260, h: 200 }, minSize: { w: 200, h: 170 }, component: VocabularyProgress },
   { type: 'level-progress', titleKey: 'widgets.title.level-progress', category: 'Study', descKey: 'widgets.desc.level-progress', defaultSize: { w: 300, h: 260 }, minSize: { w: 240, h: 180 }, component: LevelProgressWidget },
   { type: 'word-of-the-day', titleKey: 'widgets.title.word-of-the-day', category: 'Study', descKey: 'widgets.desc.word-of-the-day', defaultSize: { w: 260, h: 160 }, minSize: { w: 190, h: 130 }, component: WordOfTheDay },
+  // Phase 6 slice 7. Both heights are derived, not chosen by eye — the widget's measured
+  // 55px row, its 6px gaps, the truncation line, `.widget-body`'s 20px padding and the
+  // 30px title bar: 250 fits three rows and the "N more" line, 130 fits one and that line.
+  // Eyeballing them is what clipped the first cut's last row in half.
+  { type: 'continue-watching', titleKey: 'widgets.title.continue-watching', category: 'Study', descKey: 'widgets.desc.continue-watching', defaultSize: { w: 320, h: 250 }, minSize: { w: 240, h: 130 }, component: ContinueWatchingWidget },
 
   // ---- Statistics ----
   { type: 'learning-heatmap', titleKey: 'widgets.title.learning-heatmap', category: 'Statistics', descKey: 'widgets.desc.learning-heatmap', defaultSize: { w: 300, h: 150 }, minSize: { w: 220, h: 120 }, component: LearningHeatmap },

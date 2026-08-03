@@ -3,7 +3,6 @@ import DictionaryResults, { type DictLang } from './DictionaryResults';
 import { getLevel, setLevel, WK_LEVELS, type WkLevel } from '../knownWords';
 import { lemmaOf } from '../tokenizer';
 import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../tts';
-import { recordLookup } from '../lookupHistory';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { getZoomFactor } from '../appZoom';
 import { getStudyLang } from '../studyEnvironment';
@@ -51,7 +50,6 @@ export default function DictionaryPopup({ query, x, y, context, onClose }: Props
   const [level, setLvl] = useState<WkLevel>(0);
   useEffect(() => {
     let dead = false;
-    recordLookup(query);
     if (lang !== 'ja') {
       setLemma(query);
       setLvl(getLevel(query));

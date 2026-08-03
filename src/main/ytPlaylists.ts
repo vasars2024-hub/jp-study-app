@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import {
   emptyYtStore,
+  ensureTrackedChannel,
   mergePlaylistVideos,
   normalizeYtStore,
   parseYoutubePlaylistId,
@@ -19,9 +20,11 @@ import {
   isImmersionPlaylist,
   youtubeThumbUrl,
   youtubeWatchUrl,
+  trackedChannels,
   type YtPlaylist,
   type YtPlaylistFolder,
   type YtPlaylistSort,
+  type YtChannel,
   type YtPlaylistsStore,
   type YtStudyLang,
   type YtSubLang,
@@ -33,12 +36,14 @@ import {
   findYtDlp,
   ytDlpJson,
   ytDlpSubtitleLangs,
+  withYtDlpJsRuntime,
 } from './media';
+import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
 
 const STORE_FILE = 'yt-playlists.json';
 const TRANSCRIPTS_DIR = 'yt-transcripts';
 const SUBS_CACHE_DIR = 'yt-subs';
-const AUTO_UPDATE_MS = 12 * 60 * 60 * 1000;
+const DEFAULT_AUTO_UPDATE_HOURS = 12;
 
 function storePath(): string {
   return path.join(app.getPath('userData'), STORE_FILE);
@@ -116,6 +121,10 @@ function saveAndBroadcast(store: YtPlaylistsStore): YtPlaylistsStore {
   writeStore(normalized);
   broadcastStore(normalized);
   return normalized;
+}
+
+function touchChannelFromPlaylist(store: YtPlaylistsStore, playlist: YtPlaylist): YtPlaylistsStore {
+  return ensureTrackedChannel(store, playlist);
 }
 
 interface FlatEntry {
@@ -219,6 +228,7 @@ async function syncPlaylistFromUrl(
         youtubePlaylistId: mapped.youtubePlaylistId || listId,
         channelTitle: mapped.channelTitle ?? existing.channelTitle,
         lastSyncedAt: Date.now(),
+        lastCheckedAt: Date.now(),
       }
     : {
         id: playlistId,
@@ -226,15 +236,18 @@ async function syncPlaylistFromUrl(
         url: url.trim(),
         youtubePlaylistId: mapped.youtubePlaylistId || listId,
         channelTitle: mapped.channelTitle,
+        subscriptionStatus: 'subscribed',
         lang: 'ja',
         preferSubs: ['ja'],
         autoUpdate: true,
         lastSyncedAt: Date.now(),
+        lastCheckedAt: Date.now(),
+        updateFrequencyHours: DEFAULT_AUTO_UPDATE_HOURS,
         sortDefault: 'playlist',
         createdAt: Date.now(),
       };
 
-  store.videos = mergePlaylistVideos(playlistId, store.videos, mapped.entries);
+    store.videos = mergePlaylistVideos(playlistId, store.videos, mapped.entries);
   // Re-check transcribed markers from disk
   for (const v of store.videos) {
     if (v.playlistId !== playlistId) continue;
@@ -251,7 +264,7 @@ async function syncPlaylistFromUrl(
     }
     store.playlists.unshift(playlist);
   }
-  return { store, playlist };
+  return { store: touchChannelFromPlaylist(store, playlist), playlist };
 }
 
 function preferSubsToDownloadOptions(preferSubs: YtSubLang[]): YouTubeDownloadOptions {
@@ -275,7 +288,7 @@ export async function downloadVideosByIds(
     stage: string;
     percent: number;
   }) => void,
-  downloadOpts?: { audioOnly?: boolean },
+  downloadOpts?: { audioOnly?: boolean; allSubs?: boolean },
 ): Promise<{
   store: YtPlaylistsStore;
   results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
@@ -293,6 +306,7 @@ export async function downloadVideosByIds(
     const pl = store.playlists.find((p) => p.id === video.playlistId);
     const opts = preferSubsToDownloadOptions(pl?.preferSubs ?? ['ja']);
     if (downloadOpts?.audioOnly === true) opts.audioOnly = true;
+    if (downloadOpts?.allSubs === true) opts.allSubs = true;
     onProgress?.({
       videoId,
       index: i,
@@ -335,7 +349,7 @@ async function fetchSubsOnly(
   const subLangArgs = langs.flatMap((l) => ytDlpSubtitleLangs(l));
   const outDir = path.join(subsCacheDir(), youtubeId);
   fs.mkdirSync(outDir, { recursive: true });
-  const args = [
+  const args = await withYtDlpJsRuntime([
     url,
     '--skip-download',
     '--write-subs',
@@ -346,7 +360,7 @@ async function fetchSubsOnly(
     '--no-playlist',
     '-o',
     path.join(outDir, '%(id)s'),
-  ];
+  ]);
   return new Promise((resolve) => {
     const proc = spawn(bin, args);
     let err = '';
@@ -389,7 +403,7 @@ export async function addVideoByUrl(
   const youtubeId = parseYoutubeVideoId(trimmed);
   if (!youtubeId) return { ok: false, error: 'Not a valid YouTube video URL.' };
 
-  const store = readStore();
+  let store = readStore();
   let pl = store.playlists.find((p) => p.youtubePlaylistId === EXTENSION_PLAYLIST_KEY);
   if (!pl) {
     pl = {
@@ -398,20 +412,24 @@ export async function addVideoByUrl(
       url: 'extension://captures',
       youtubePlaylistId: EXTENSION_PLAYLIST_KEY,
       channelTitle: 'Chrome extension',
+      subscriptionStatus: 'custom',
       lang: 'ja',
       preferSubs: ['ja', 'en'],
       autoUpdate: false,
       lastSyncedAt: Date.now(),
+      lastCheckedAt: Date.now(),
+      updateFrequencyHours: DEFAULT_AUTO_UPDATE_HOURS,
       sortDefault: 'date',
       createdAt: Date.now(),
     };
     store.playlists.unshift(pl);
   }
 
-  const existing = store.videos.find((v) => v.playlistId === pl!.id && v.youtubeId === youtubeId);
+  const playlistIdResolved = pl.id;
+  const existing = store.videos.find((v) => v.playlistId === playlistIdResolved && v.youtubeId === youtubeId);
   if (existing) {
     saveAndBroadcast(store);
-    return { ok: true, playlistId: pl.id, videoId: existing.id, youtubeId, duplicate: true };
+    return { ok: true, playlistId: playlistIdResolved, videoId: existing.id, youtubeId, duplicate: true };
   }
 
   let title = youtubeId;
@@ -425,6 +443,9 @@ export async function addVideoByUrl(
   if (meta.ok && meta.data && typeof meta.data === 'object') {
     const root = meta.data as Record<string, unknown>;
     if (typeof root.title === 'string' && root.title) title = root.title;
+    if (typeof root.channel_id === 'string' && root.channel_id) {
+      pl.channelId = root.channel_id;
+    }
     channelTitle =
       (typeof root.channel === 'string' && root.channel) ||
       (typeof root.uploader === 'string' && root.uploader) ||
@@ -440,8 +461,8 @@ export async function addVideoByUrl(
   }
 
   const video: YtVideo = {
-    id: `ytv-${pl.id}-${youtubeId}`,
-    playlistId: pl.id,
+    id: `ytv-${playlistIdResolved}-${youtubeId}`,
+    playlistId: playlistIdResolved,
     youtubeId,
     title,
     url: youtubeWatchUrl(youtubeId),
@@ -449,7 +470,7 @@ export async function addVideoByUrl(
     durationSec,
     viewCount,
     channelTitle,
-    position: store.videos.filter((v) => v.playlistId === pl!.id).length,
+    position: store.videos.filter((v) => v.playlistId === playlistIdResolved).length,
     publishedAt,
     downloaded: false,
     hasOfficialSubs: null,
@@ -457,13 +478,22 @@ export async function addVideoByUrl(
   };
   store.videos.push(video);
   pl.lastSyncedAt = Date.now();
+  pl.lastCheckedAt = Date.now();
   if (channelTitle) pl.channelTitle = channelTitle;
+  store = touchChannelFromPlaylist(store, pl);
   saveAndBroadcast(store);
-  return { ok: true, playlistId: pl.id, videoId: video.id, youtubeId };
+  return { ok: true, playlistId: playlistIdResolved, videoId: video.id, youtubeId };
 }
 
 export function registerYtPlaylistsIpc(): void {
+  // Discovery is the finding half of the same feature and reuses this module's
+  // yt-dlp plumbing, so it is wired here rather than adding a second call site
+  // in `main.ts` — which slice 70 owns this hour anyway.
+  registerYoutubeDiscoveryIpc();
+
   ipcMain.handle('yt:list', (): YtPlaylistsStore => readStore());
+
+  ipcMain.handle('yt:listChannels', (): YtChannel[] => trackedChannels(readStore()));
 
   ipcMain.handle('yt:saveFolders', (_e, folders: YtPlaylistFolder[]): YtPlaylistsStore => {
     const store = readStore();
@@ -495,8 +525,35 @@ export function registerYtPlaylistsIpc(): void {
     const store = readStore();
     const result = await syncPlaylistFromUrl(store, typeof url === 'string' ? url : '');
     if ('error' in result) return { error: result.error };
+    result.store = touchChannelFromPlaylist(result.store, result.playlist);
     saveAndBroadcast(result.store);
     return { store: result.store, playlist: result.playlist };
+  });
+
+  // The discovery → playlist-manager hand-off. Metadata only: `addVideoByUrl`
+  // records the video in the Extension captures playlist and fetches nothing but
+  // its title card. Downloading stays the explicit `yt:downloadVideos` action.
+  ipcMain.handle('yt:addVideoByUrl', async (_e, url: unknown) =>
+    addVideoByUrl(typeof url === 'string' ? url : ''));
+
+  // Reads back a caption file `yt:fetchSubsOnly` already cached, so the renderer
+  // can measure speech pace with the cue parser it already owns
+  // (`renderer/subtitles.ts`) instead of a second one living here. Reads only —
+  // it never fetches, so a video whose subs were never fetched answers null.
+  ipcMain.handle('yt:cachedCaptionText', (_e, youtubeId: unknown): { text: string | null; file: string | null } => {
+    if (typeof youtubeId !== 'string' || !/^[\w-]{6,}$/.test(youtubeId)) return { text: null, file: null };
+    const dir = path.join(subsCacheDir(), youtubeId);
+    try {
+      const files = fs.readdirSync(dir).filter((f) => /\.(vtt|srt|ass|ssa)$/i.test(f));
+      // Prefer a Japanese track when several languages were cached: pace is a
+      // property of the spoken language, and measuring it off the English track
+      // would report the translator's rate, not the speaker's.
+      const chosen = files.find((f) => /\.ja[.-]/i.test(f) || /\.ja\./i.test(f)) ?? files[0];
+      if (!chosen) return { text: null, file: null };
+      return { text: fs.readFileSync(path.join(dir, chosen), 'utf-8'), file: chosen };
+    } catch {
+      return { text: null, file: null };
+    }
   });
 
   ipcMain.handle('yt:refreshPlaylist', async (_e, playlistId: string) => {
@@ -505,6 +562,7 @@ export function registerYtPlaylistsIpc(): void {
     if (!pl) return { error: 'Playlist not found.' };
     const result = await syncPlaylistFromUrl(store, pl.url, pl);
     if ('error' in result) return { error: result.error };
+    result.store = touchChannelFromPlaylist(result.store, result.playlist);
     saveAndBroadcast(result.store);
     return { store: result.store, playlist: result.playlist };
   });
@@ -532,6 +590,11 @@ export function registerYtPlaylistsIpc(): void {
         sortDefault: YtPlaylistSort;
         folderId: string | null;
         title: string;
+        channelId: string;
+        channelTitle: string;
+        channelIconUrl: string;
+        subscriptionStatus: YtPlaylist['subscriptionStatus'];
+        updateFrequencyHours: number;
       }>,
     ): YtPlaylistsStore | { error: string } => {
       const store = readStore();
@@ -556,7 +619,96 @@ export function registerYtPlaylistsIpc(): void {
       if (prefs.folderId === null) delete pl.folderId;
       else if (typeof prefs.folderId === 'string') pl.folderId = prefs.folderId;
       if (typeof prefs.title === 'string' && prefs.title.trim()) pl.title = prefs.title.trim();
+      if (typeof prefs.channelId === 'string') pl.channelId = prefs.channelId.trim() || undefined;
+      if (typeof prefs.channelTitle === 'string') pl.channelTitle = prefs.channelTitle.trim() || undefined;
+      if (typeof prefs.channelIconUrl === 'string') pl.channelIconUrl = prefs.channelIconUrl.trim() || undefined;
+      if (
+        prefs.subscriptionStatus === 'subscribed' ||
+        prefs.subscriptionStatus === 'watching' ||
+        prefs.subscriptionStatus === 'custom' ||
+        prefs.subscriptionStatus === 'unsubscribed'
+      ) {
+        pl.subscriptionStatus = prefs.subscriptionStatus;
+      }
+      if (typeof prefs.updateFrequencyHours === 'number' && Number.isFinite(prefs.updateFrequencyHours)) {
+        pl.updateFrequencyHours = Math.max(1, Math.round(prefs.updateFrequencyHours));
+      }
       return saveAndBroadcast(store);
+    },
+  );
+
+  ipcMain.handle(
+    'yt:setChannelPrefs',
+    (
+      _e,
+      channelId: string,
+      prefs: Partial<{
+        title: string;
+        iconUrl: string;
+        subscriptionStatus: YtChannel['subscriptionStatus'];
+        updateFrequencyHours: number;
+      }>,
+    ): YtPlaylistsStore | { error: string } => {
+      const store = readStore();
+      const channel = store.channels.find((c) => c.channelId === channelId);
+      if (!channel) return { error: 'Channel not found.' };
+      if (typeof prefs.title === 'string' && prefs.title.trim()) channel.title = prefs.title.trim();
+      if (typeof prefs.iconUrl === 'string') channel.iconUrl = prefs.iconUrl.trim() || undefined;
+      if (
+        prefs.subscriptionStatus === 'subscribed' ||
+        prefs.subscriptionStatus === 'watching' ||
+        prefs.subscriptionStatus === 'custom' ||
+        prefs.subscriptionStatus === 'unsubscribed'
+      ) {
+        channel.subscriptionStatus = prefs.subscriptionStatus;
+      }
+      if (typeof prefs.updateFrequencyHours === 'number' && Number.isFinite(prefs.updateFrequencyHours)) {
+        channel.updateFrequencyHours = Math.max(1, Math.round(prefs.updateFrequencyHours));
+      }
+      for (const pl of store.playlists) {
+        if (pl.channelId !== channelId) continue;
+        pl.channelTitle = channel.title;
+        pl.channelIconUrl = channel.iconUrl;
+        pl.subscriptionStatus = channel.subscriptionStatus;
+        pl.updateFrequencyHours = channel.updateFrequencyHours;
+      }
+      return saveAndBroadcast(store);
+    },
+  );
+
+  ipcMain.handle(
+    'yt:refreshChannel',
+    async (
+      _e,
+      channelId: string,
+    ): Promise<
+      | { store: YtPlaylistsStore; channel: YtChannel; refreshedPlaylistIds: string[]; errors: string[] }
+      | { error: string }
+    > => {
+      let store = readStore();
+      const channel = store.channels.find((c) => c.channelId === channelId);
+      if (!channel) return { error: 'Channel not found.' };
+      const targets = store.playlists.filter((p) => p.channelId === channelId);
+      const refreshedPlaylistIds: string[] = [];
+      const errors: string[] = [];
+      for (const pl of targets) {
+        const result = await syncPlaylistFromUrl(store, pl.url, pl);
+        if ('error' in result) {
+          errors.push(result.error);
+          continue;
+        }
+        store = result.store;
+        refreshedPlaylistIds.push(pl.id);
+      }
+      const now = Date.now();
+      const nextChannel = store.channels.find((c) => c.channelId === channelId);
+      if (nextChannel) nextChannel.lastCheckedAt = now;
+      for (const pl of store.playlists) {
+        if (pl.channelId !== channelId) continue;
+        pl.lastCheckedAt = now;
+      }
+      saveAndBroadcast(store);
+      return { store, channel: nextChannel ?? channel, refreshedPlaylistIds, errors };
     },
   );
 
@@ -633,11 +785,17 @@ export function registerYtPlaylistsIpc(): void {
   ipcMain.handle('yt:autoUpdateDue', async (): Promise<YtPlaylistsStore> => {
     let store = readStore();
     const now = Date.now();
+    const dueChannels = new Set(
+      store.channels
+        .filter((c) => !c.lastCheckedAt || now - c.lastCheckedAt >= c.updateFrequencyHours * 60 * 60 * 1000)
+        .map((c) => c.channelId),
+    );
     const due = store.playlists.filter(
       (p) =>
         isImmersionPlaylist(p) &&
         p.autoUpdate &&
-        (!p.lastSyncedAt || now - p.lastSyncedAt >= AUTO_UPDATE_MS),
+        !dueChannels.has(p.channelId ?? '') &&
+        (!p.lastCheckedAt || now - p.lastCheckedAt >= p.updateFrequencyHours * 60 * 60 * 1000),
     );
     for (const pl of due) {
       const result = await syncPlaylistFromUrl(store, pl.url, pl);

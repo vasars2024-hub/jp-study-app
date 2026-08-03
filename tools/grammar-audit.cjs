@@ -238,7 +238,7 @@ function audit(corpus, filters) {
    *
    * Watch the ceiling here: the deleted gloss-regex tagger stopped at three
    * hits (`if (hits.length >= 3) break;`) and its output was frozen into the
-   * Mazii files, so no imported record can exceed 3 no matter how many
+   * supplement files, so no imported record can exceed 3 no matter how many
    * functions it really serves. A max of 3 is evidence of that cap, not of the
    * language.
    */
@@ -246,7 +246,7 @@ function audit(corpus, filters) {
    * Field presence is not field content.
    *
    * The first version of this audit reported meaning/structure/explanation as
-   * "0% missing" — technically true, and badly misleading: in every Mazii
+   * "0% missing" — technically true, and badly misleading: in every supplement
    * record `structure` is a verbatim copy of `title` and `explanation` is a
    * verbatim copy of `meaning`. The fields are populated with nothing. That is
    * the same failure mode as the `['other']` tag the rest of this work exists

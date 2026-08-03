@@ -121,6 +121,10 @@ export function useVideoCoreSetupEvents(id: string,
         return activePlayer === id
     }, [activePlayer, id])
 
+    // Last playback id announced to the server via "video-loaded", so the mount-case
+    // dispatch below never duplicates the one the lifecycle effect already sent.
+    const announcedPlaybackRef = React.useRef<string | null>(null)
+
     // fullscreen events
     React.useLayoutEffect(() => {
         if (!isActivePlayer || !fullscreenManager) return
@@ -313,6 +317,9 @@ export function useVideoCoreSetupEvents(id: string,
     }, [isActivePlayer, state, videoElement])
 
     function dispatchTerminatedEvent() {
+        // Terminating clears the server's playback state, so the next "video-loaded" for
+        // this same id has to go out again rather than being deduped away.
+        announcedPlaybackRef.current = null
         log.trace("Video terminated")
         sendEvent("video-terminated", {
             id: state.playbackInfo?.id || "",
@@ -403,6 +410,11 @@ export function useVideoCoreSetupEvents(id: string,
 
     function dispatchVideoLoadedEvent() {
         if (!state.playbackInfo || !clientId) return
+        // The server keeps one playback state per stream; announcing the same one twice
+        // re-pushes VideoLoadedEvent to every consumer. The ref is cleared on terminate,
+        // so replaying the same id after a terminate still re-announces as it must.
+        if (announcedPlaybackRef.current === state.playbackInfo.id) return
+        announcedPlaybackRef.current = state.playbackInfo.id
         log.trace("Video loaded")
         sendEvent<VideoCoreLoadedPayload>("video-loaded", {
             state: {
@@ -412,6 +424,17 @@ export function useVideoCoreSetupEvents(id: string,
             },
         })
     }
+
+    // "video-loaded" is what gives the server a playback state; without it every later
+    // "video-loaded-metadata" is dropped, so the directstream subtitle stream never starts.
+    // VideoCore announces it from an *update* effect, which is skipped on mount, and it can
+    // also run before clientId exists. Both leave the stream unannounced for a host that
+    // mounts VideoCore only once playback info is already set. Cover that here, once.
+    React.useEffect(() => {
+        if (!isActivePlayer || !state.playbackInfo?.id || !clientId) return
+        if (announcedPlaybackRef.current === state.playbackInfo.id) return
+        dispatchVideoLoadedEvent()
+    }, [isActivePlayer, state.playbackInfo?.id, clientId])
 
     React.useEffect(() => {
         if (!isActivePlayer || !state.playbackInfo || !videoElement || !clientId) return

@@ -13,6 +13,7 @@ import {
   StatusBarSpacer,
   useAeroMaterials,
 } from '../components/ui';
+import LiveCaptionsPanel from '../components/notebook/LiveCaptionsPanel';
 
 export default function NotebookView() {
   const { t } = useT();
@@ -54,6 +55,7 @@ export default function NotebookView() {
           </aside>
 
           <section className="gx-notebook-timeline">
+            <LiveCaptionsPanel />
             <NotebookTimeline state={state} onOpen={studyOsOpenHref} />
           </section>
         </div>

@@ -233,6 +233,7 @@
         <input id="search" type="search" placeholder="Search settings…" aria-label="Search settings" />
         <div class="search-empty" id="search-empty">No settings match.</div>
         <button data-pane="lookup" data-keywords="hover shift key delay scan dictionary popup activation hold editable click">Hover lookup</button>
+        <button data-pane="ai" data-keywords="ai ocr dictionary ai analysis annotate grammar explanation formality translation snapshot notebook flashcard highlight sentence">AI OCR</button>
         <button data-pane="popup" data-keywords="reader popup width font compact pin size appearance">Reader popup</button>
         <button data-pane="saving" data-keywords="save mine card anki flashcard destination preview folder library confirm">Saving &amp; cards</button>
         <button data-pane="wheel" data-keywords="wheel radial slot actions gesture positions">Radial wheel</button>
@@ -278,6 +279,30 @@
               <span>Key + click / key + select also look up<span class="sub">Plain clicks always pass through to the page.</span></span></label>
             <label class="check"><input type="checkbox" id="lookup-editable" />
               <span>Allow lookup inside text fields<span class="sub">Off by default so typing is never interrupted.</span></span></label>
+          </div>
+        </section>
+
+        <!-- AI OCR / Dictionary AI -->
+        <section class="pane" id="pane-ai">
+          <h1>AI OCR / Dictionary AI</h1>
+          <p class="lead">Choose what a highlight and an OCR each resolve to. AI OCR annotates the
+            whole sentence &mdash; grammar, vocabulary, level, formality and nuance &mdash; and lets
+            you card it or snapshot it into the notebook. Dictionary AI keeps the instant offline
+            lookup. The two gestures are set separately.</p>
+          <div class="group">
+            <label class="check"><input type="checkbox" id="ai-on-highlight" />
+              <span>AI OCR when I highlight text<span class="sub">Off: highlighting opens the dictionary popup as before.</span></span></label>
+            <label class="check"><input type="checkbox" id="ai-on-ocr" />
+              <span>AI OCR after a screenshot OCR<span class="sub">Off: the OCR result opens with an &ldquo;AI analysis&rdquo; button instead.</span></span></label>
+            <div class="field">
+              <label class="name" for="ai-min-chars">Minimum selection</label>
+              <p class="desc">Shorter selections stay on the offline dictionary &mdash; a one-word cloud call is slower and costs money for an answer the dictionary already has.</p>
+              <input type="range" id="ai-min-chars" min="2" max="60" step="1" />
+              <span class="range-val" id="ai-min-chars-val"></span>
+            </div>
+            <p class="desc">What the analysis contains, which deck cards go to, and automatic
+              notebook snapshots are set in GrammarX &rarr; Settings &rarr; Study &rarr; AI analysis.
+              An API key is required (Flashcards &rarr; AI Card Studio).</p>
           </div>
         </section>
 

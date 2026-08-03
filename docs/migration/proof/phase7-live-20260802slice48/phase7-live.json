@@ -1,0 +1,517 @@
+{
+  "gate": "phase7-live-gate.mjs",
+  "question": "Which Phase 7 surfaces are reachable and observable in the real app with NO local model installed, and which genuinely require one?",
+  "startedAt": "2026-08-02T09:53:07.220Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "steps": [
+    {
+      "name": "precondition",
+      "result": "OK",
+      "detail": "~/Downloads already holds 1 .gguf file(s), which resolveModelPath searches: Qwen_Qwen3-1.7B-Q4_K_M.gguf — so the \"multi-GB download\" this record calls a blocker has already happened on this machine",
+      "ggufInDownloads": [
+        "Qwen_Qwen3-1.7B-Q4_K_M.gguf"
+      ]
+    },
+    {
+      "name": "seed-queue",
+      "result": "OK",
+      "detail": "two tasks persisted into jp-study-local-agent-task-queue-v1 (one queued, one paused) — the model was never involved"
+    },
+    {
+      "name": "navigate",
+      "result": "OK",
+      "detail": "Toolbox -> Local AI Agent after 1 click(s): clicked"
+    },
+    {
+      "name": "queue-renders",
+      "result": "PASS",
+      "detail": "the Task queue table rendered 2 persisted task(s) with no model: [paused] Resume/Cancel  [queued] Pause/Cancel/Prioritize",
+      "rows": [
+        {
+          "objective": "Rebuild the grammar drill list",
+          "status": "paused",
+          "priority": "0",
+          "buttons": [
+            "Resume",
+            "Cancel"
+          ]
+        },
+        {
+          "objective": "Summarise today's vocabulary review",
+          "status": "queued",
+          "priority": "0",
+          "buttons": [
+            "Pause",
+            "Cancel",
+            "Prioritize"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cancel-resume-prioritize",
+      "result": "PASS",
+      "detail": "after real clicks, persisted state is: queued task -> cancelled (priority 100 after Prioritize), paused task -> queued. Before: [{\"id\":\"slice48-queued\",\"status\":\"queued\",\"priority\":0},{\"id\":\"slice48-paused\",\"status\":\"paused\",\"priority\":0}]",
+      "before": [
+        {
+          "id": "slice48-queued",
+          "status": "queued",
+          "priority": 0
+        },
+        {
+          "id": "slice48-paused",
+          "status": "paused",
+          "priority": 0
+        }
+      ],
+      "after": [
+        {
+          "id": "slice48-queued",
+          "status": "cancelled",
+          "priority": 100
+        },
+        {
+          "id": "slice48-paused",
+          "status": "queued",
+          "priority": 0
+        }
+      ]
+    },
+    {
+      "name": "cancel-is-terminal",
+      "result": "PASS",
+      "detail": "the cancelled row now offers [] — cancel is terminal in the UI, not a toggle"
+    },
+    {
+      "name": "queue-does-not-feed-the-runner",
+      "result": "PASS",
+      "detail": "with two tasks in the persisted queue, the step controls read \"Run next approved step\" disabled=true, \"Confirm sensitive step\" disabled=true — they are gated on the in-memory `task`, which only `plan()` ever sets, so a queued task cannot be run, previewed step-by-step, confirmed, or audited.",
+      "runners": [
+        {
+          "label": "Run next approved step",
+          "disabled": true
+        },
+        {
+          "label": "Confirm sensitive step",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "name": "model-gate",
+      "result": "PASS",
+      "detail": "agent disabled -> \"The local agent is disabled in Settings.\" (0 ms); enabled but pointed at a model that does not exist -> \"No local GGUF model was found. Place a supported Qwen3 model in the app models folder or Downloads.\" (1 ms). Two DIFFERENT refusals from the same call is what makes the second one the model gate rather than a generic failure — a refusal on its own has no positive observable.",
+      "disabled": {
+        "ok": false,
+        "error": "The local agent is disabled in Settings.",
+        "elapsedMs": 0
+      },
+      "noModel": {
+        "ok": false,
+        "error": "No local GGUF model was found. Place a supported Qwen3 model in the app models folder or Downloads.",
+        "elapsedMs": 1
+      }
+    },
+    {
+      "name": "model-present",
+      "result": "OK",
+      "detail": "the app itself finds 1 local model(s): Qwen_Qwen3-1.7B-Q4_K_M.gguf (1.28 GB, downloads)",
+      "models": [
+        {
+          "fileName": "Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+          "sizeBytes": 1282439584,
+          "location": "downloads"
+        }
+      ]
+    },
+    {
+      "name": "plan-clicked",
+      "result": "OK",
+      "detail": "objective typed, \"Create local plan\" clicked — the panel's own button, not an IPC call"
+    },
+    {
+      "name": "preview",
+      "result": "PASS",
+      "detail": "the Task plan table rendered 1 step(s) BEFORE anything ran: study.preview-cards=Queued; summary \"Preview five study cards from my deck\"",
+      "steps": [
+        [
+          "Preview five study cards",
+          "study.preview-cards",
+          "Queued",
+          "—"
+        ]
+      ],
+      "status": [
+        "Model: Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+        "Runtime: loaded · working · context 2048",
+        "Models found: Qwen_Qwen3-1.7B-Q4_K_M.gguf (1.2 GB, Downloads)",
+        "Plan ready. Review it before running."
+      ]
+    },
+    {
+      "name": "audit",
+      "result": "PASS",
+      "detail": "the Execution log rendered 2 audit event(s): tool-started · study.preview-cards | tool-failed · study.preview-cards · No active Study vocabulary workspace is available. · 4ms",
+      "events": [
+        "tool-started · study.preview-cards",
+        "tool-failed · study.preview-cards · No active Study vocabulary workspace is available. · 4ms"
+      ],
+      "steps": [
+        [
+          "Preview five study cards",
+          "study.preview-cards",
+          "Failed",
+          "No active Study vocabulary workspace is available."
+        ]
+      ]
+    },
+    {
+      "name": "confirm-first-attempt",
+      "result": "NOT-REACHED",
+      "detail": "the plan this model produced contained no step whose operation carries a confirmation reason. Every confirming operation in AGENT_TOOL_OPERATIONS needs full-automation, and evaluateAgentToolAccess checks the permission level BEFORE the confirmation reason — so under limited-actions such a step is DENIED, never held for confirmation.",
+      "confirmButton": {
+        "label": "Confirm sensitive step",
+        "disabled": true
+      }
+    },
+    {
+      "name": "profile-and-permission",
+      "result": "OK",
+      "detail": "active profile -> set:Automation Assistant, permission -> set:Full automation; the authorization inputs are themselves a live Phase 7 surface"
+    },
+    {
+      "name": "confirm",
+      "result": "PASS",
+      "detail": "a step was held for confirmation and the confirmed run produced: confirmation-required · settings.apply-theme | tool-started · settings.apply-theme | tool-completed · settings.apply-theme · 2ms",
+      "steps": [
+        [
+          "Apply dark theme to the app",
+          "settings.apply-theme",
+          "Completed",
+          "{\"applied\":true,\"preset\":\"default\",\"overrides\":{}}"
+        ]
+      ],
+      "events": [
+        "confirmation-required · settings.apply-theme",
+        "tool-started · settings.apply-theme",
+        "tool-completed · settings.apply-theme · 2ms"
+      ]
+    }
+  ],
+  "exeBuiltAt": "2026-08-01T11:40:01.018Z",
+  "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-phase7-20260802slice48-41544",
+  "panelAtOpen": {
+    "panel": true,
+    "rows": [
+      {
+        "objective": "Rebuild the grammar drill list",
+        "status": "paused",
+        "priority": "0",
+        "buttons": [
+          "Resume",
+          "Cancel"
+        ]
+      },
+      {
+        "objective": "Summarise today's vocabulary review",
+        "status": "queued",
+        "priority": "0",
+        "buttons": [
+          "Pause",
+          "Cancel",
+          "Prioritize"
+        ]
+      }
+    ],
+    "runners": [
+      {
+        "label": "Run next approved step",
+        "disabled": true
+      },
+      {
+        "label": "Confirm sensitive step",
+        "disabled": true
+      }
+    ],
+    "stepRows": []
+  },
+  "clicks": [
+    {
+      "fragment": "Summarise today",
+      "label": "Prioritize",
+      "result": "clicked",
+      "storage": {
+        "present": true,
+        "items": [
+          {
+            "id": "slice48-queued",
+            "status": "queued",
+            "priority": 100
+          },
+          {
+            "id": "slice48-paused",
+            "status": "paused",
+            "priority": 0
+          }
+        ]
+      }
+    },
+    {
+      "fragment": "Rebuild the grammar",
+      "label": "Resume",
+      "result": "clicked",
+      "storage": {
+        "present": true,
+        "items": [
+          {
+            "id": "slice48-queued",
+            "status": "queued",
+            "priority": 100
+          },
+          {
+            "id": "slice48-paused",
+            "status": "queued",
+            "priority": 0
+          }
+        ]
+      }
+    },
+    {
+      "fragment": "Summarise today",
+      "label": "Cancel",
+      "result": "clicked",
+      "storage": {
+        "present": true,
+        "items": [
+          {
+            "id": "slice48-queued",
+            "status": "cancelled",
+            "priority": 100
+          },
+          {
+            "id": "slice48-paused",
+            "status": "queued",
+            "priority": 0
+          }
+        ]
+      }
+    }
+  ],
+  "panelAfterClicks": {
+    "panel": true,
+    "rows": [
+      {
+        "objective": "Rebuild the grammar drill list",
+        "status": "queued",
+        "priority": "0",
+        "buttons": [
+          "Pause",
+          "Cancel",
+          "Prioritize"
+        ]
+      },
+      {
+        "objective": "Summarise today's vocabulary review",
+        "status": "cancelled",
+        "priority": "100",
+        "buttons": []
+      }
+    ],
+    "runners": [
+      {
+        "label": "Run next approved step",
+        "disabled": true
+      },
+      {
+        "label": "Confirm sensitive step",
+        "disabled": true
+      }
+    ],
+    "stepRows": []
+  },
+  "planCalls": {
+    "disabled": {
+      "ok": false,
+      "error": "The local agent is disabled in Settings.",
+      "elapsedMs": 0
+    },
+    "noModel": {
+      "ok": false,
+      "error": "No local GGUF model was found. Place a supported Qwen3 model in the app models folder or Downloads.",
+      "elapsedMs": 1
+    }
+  },
+  "planSurface": {
+    "hasPlan": true,
+    "steps": [
+      [
+        "Preview five study cards",
+        "study.preview-cards",
+        "Queued",
+        "—"
+      ]
+    ],
+    "events": [],
+    "buttons": [
+      {
+        "label": "Create local plan",
+        "disabled": false
+      },
+      {
+        "label": "Run next approved step",
+        "disabled": false
+      },
+      {
+        "label": "Confirm sensitive step",
+        "disabled": true
+      }
+    ],
+    "status": [
+      "Model: Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+      "Runtime: loaded · working · context 2048",
+      "Models found: Qwen_Qwen3-1.7B-Q4_K_M.gguf (1.2 GB, Downloads)",
+      "Plan ready. Review it before running."
+    ],
+    "summary": "Preview five study cards from my deck"
+  },
+  "afterRun": {
+    "hasPlan": true,
+    "steps": [
+      [
+        "Preview five study cards",
+        "study.preview-cards",
+        "Failed",
+        "No active Study vocabulary workspace is available."
+      ]
+    ],
+    "events": [
+      "tool-started · study.preview-cards",
+      "tool-failed · study.preview-cards · No active Study vocabulary workspace is available. · 4ms"
+    ],
+    "buttons": [
+      {
+        "label": "Create local plan",
+        "disabled": false
+      },
+      {
+        "label": "Run next approved step",
+        "disabled": true
+      },
+      {
+        "label": "Confirm sensitive step",
+        "disabled": true
+      }
+    ],
+    "status": [
+      "Model: Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+      "Runtime: loaded · context 2048",
+      "Models found: Qwen_Qwen3-1.7B-Q4_K_M.gguf (1.2 GB, Downloads)"
+    ],
+    "summary": "Preview five study cards from my deck"
+  },
+  "secondPlan": {
+    "hasPlan": true,
+    "steps": [
+      [
+        "Apply dark theme to the app",
+        "settings.apply-theme",
+        "Queued",
+        "—"
+      ]
+    ],
+    "events": [],
+    "buttons": [
+      {
+        "label": "Create local plan",
+        "disabled": false
+      },
+      {
+        "label": "Run next approved step",
+        "disabled": false
+      },
+      {
+        "label": "Confirm sensitive step",
+        "disabled": true
+      }
+    ],
+    "status": [
+      "Model: Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+      "Runtime: loaded · working · context 2048",
+      "Models found: Qwen_Qwen3-1.7B-Q4_K_M.gguf (1.2 GB, Downloads)",
+      "Plan ready. Review it before running."
+    ],
+    "summary": "Apply dark theme to the app"
+  },
+  "afterSecondRun": {
+    "hasPlan": true,
+    "steps": [
+      [
+        "Apply dark theme to the app",
+        "settings.apply-theme",
+        "Waiting for confirmation",
+        "—"
+      ]
+    ],
+    "events": [
+      "confirmation-required · settings.apply-theme"
+    ],
+    "buttons": [
+      {
+        "label": "Create local plan",
+        "disabled": false
+      },
+      {
+        "label": "Run next approved step",
+        "disabled": false
+      },
+      {
+        "label": "Confirm sensitive step",
+        "disabled": false
+      }
+    ],
+    "status": [
+      "Model: Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+      "Runtime: loaded · context 2048",
+      "Models found: Qwen_Qwen3-1.7B-Q4_K_M.gguf (1.2 GB, Downloads)"
+    ],
+    "summary": "Apply dark theme to the app"
+  },
+  "afterConfirm": {
+    "hasPlan": true,
+    "steps": [
+      [
+        "Apply dark theme to the app",
+        "settings.apply-theme",
+        "Completed",
+        "{\"applied\":true,\"preset\":\"default\",\"overrides\":{}}"
+      ]
+    ],
+    "events": [
+      "confirmation-required · settings.apply-theme",
+      "tool-started · settings.apply-theme",
+      "tool-completed · settings.apply-theme · 2ms"
+    ],
+    "buttons": [
+      {
+        "label": "Create local plan",
+        "disabled": false
+      },
+      {
+        "label": "Run next approved step",
+        "disabled": true
+      },
+      {
+        "label": "Confirm sensitive step",
+        "disabled": true
+      }
+    ],
+    "status": [
+      "Model: Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+      "Runtime: loaded · context 2048",
+      "Models found: Qwen_Qwen3-1.7B-Q4_K_M.gguf (1.2 GB, Downloads)"
+    ],
+    "summary": "Apply dark theme to the app"
+  },
+  "finishedAt": "2026-08-02T09:53:57.329Z",
+  "verdict": "PASS"
+}

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Sunlit hillside study companion">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#43bdec"/><stop offset=".56" stop-color="#d9f7ff"/><stop offset="1" stop-color="#fff4bd"/></linearGradient>
+    <linearGradient id="water" x2="0" y2="1"><stop stop-color="#37c7dc"/><stop offset="1" stop-color="#087fae"/></linearGradient>
+    <linearGradient id="grass" x2="0" y2="1"><stop stop-color="#a5e85d"/><stop offset="1" stop-color="#2a9a45"/></linearGradient>
+    <radialGradient id="orb"><stop stop-color="#fff" stop-opacity=".95"/><stop offset=".45" stop-color="#aef7ff" stop-opacity=".55"/><stop offset="1" stop-color="#36b8db" stop-opacity=".08"/></radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="13"/></filter>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <circle cx="1290" cy="155" r="86" fill="#fff9c9" opacity=".92"/><circle cx="1290" cy="155" r="135" fill="#fff" opacity=".18" filter="url(#soft)"/>
+  <g fill="#fff" opacity=".9"><ellipse cx="260" cy="160" rx="165" ry="48"/><ellipse cx="420" cy="200" rx="210" ry="58"/><ellipse cx="720" cy="115" rx="135" ry="38"/></g>
+  <path d="M0 555Q245 390 475 520T900 475T1260 500T1600 390V735H0Z" fill="#7fc65c"/>
+  <path d="M0 625Q280 475 540 590T1060 555T1600 510V790H0Z" fill="url(#grass)"/>
+  <path d="M0 720Q380 625 720 700T1210 665T1600 650V1000H0Z" fill="url(#water)"/>
+  <path d="M0 812Q330 750 650 805T1130 770T1600 750V1000H0Z" fill="#d8f3be" opacity=".5"/>
+  <g opacity=".55" fill="url(#orb)" stroke="#fff" stroke-width="3"><circle cx="930" cy="265" r="36"/><circle cx="1030" cy="330" r="18"/><circle cx="1120" cy="225" r="25"/></g>
+  <g transform="translate(1180 370)">
+    <path d="M125 105Q80 35 20 75Q68 90 86 142Z" fill="#184f69"/>
+    <circle cx="145" cy="100" r="72" fill="#f1c7a8"/>
+    <path d="M76 105Q70 15 150 12Q244 18 223 142Q198 80 112 77Q95 118 76 150Z" fill="#245f79"/>
+    <path d="M110 101q14 12 30 0M174 101q14 12 30 0" fill="none" stroke="#17394c" stroke-width="7" stroke-linecap="round"/>
+    <path d="M142 137q18 15 36 0" fill="none" stroke="#b45d67" stroke-width="6" stroke-linecap="round"/>
+    <path d="M79 181Q142 148 215 184L256 430H25Z" fill="#f5fbff"/>
+    <path d="M93 174L145 255L197 173" fill="#53bed0"/><path d="M145 255V427" stroke="#2085a1" stroke-width="15"/>
+    <path d="M37 250Q-25 314 32 367M235 250Q300 307 248 367" fill="none" stroke="#f1c7a8" stroke-width="35" stroke-linecap="round"/>
+    <rect x="42" y="332" width="205" height="128" rx="14" fill="#dff6ef" stroke="#2a8194" stroke-width="7"/>
+    <path d="M145 342V448" stroke="#86bdab" stroke-width="4"/>
+  </g>
+  <g fill="#fff" opacity=".36"><path d="M0 0H500L0 720Z"/><path d="M0 0H190L0 385Z"/></g>
+</svg>

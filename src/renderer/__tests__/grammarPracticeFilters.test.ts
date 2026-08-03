@@ -181,8 +181,8 @@ describe('filterGrammarPoints', () => {
        * Regression, found by driving the panel in a browser: register and
        * category provenance were collapsed into one weakest-link field, so
        * every Japanese record whose register was derived from 敬語 morphology
-       * — but whose categories came from the Mazii regex — failed the verified
-       * gate. Filtering by Formal returned Chinese records exclusively.
+       * — but whose categories came from the supplement regex — failed the
+       * verified gate. Filtering by Formal returned Chinese records exclusively.
        */
       const japaneseHonorific = point({
         id: 'ja-honorific',
@@ -346,17 +346,17 @@ describe('filterGrammarPoints', () => {
 
     it('matches across the two sources’ notations', () => {
       /*
-       * The authored files write 〜前に, the Mazii dump writes "... 前に". A
+       * The authored files write 〜前に, the supplement dump writes "... 前に". A
        * whitespace-only key matched zero of the 189 such pairs, so every one
        * was displayed twice.
        */
       const authored = point({ id: 'core', title: '〜前に', examples: [{ jp: 'x', en: 'y' }] });
-      const scraped = point({ id: 'mazii', title: '... 前に', examples: [] });
+      const scraped = point({ id: 'supp', title: '... 前に', examples: [] });
       expect(dedupeGrammarByTitle([authored, scraped]).map((p) => p.id)).toEqual(['core']);
     });
 
     it('keeps the record with real content regardless of order', () => {
-      // index.ts emits N4_MAZII before N3, so the hollow copy can come first.
+      // index.ts emits N4_SUPPLEMENT before N3, so the hollow copy can come first.
       const hollow = point({
         id: 'hollow',
         title: 'てもかまわない',
@@ -384,7 +384,7 @@ describe('filterGrammarPoints', () => {
         level: 'N5',
         examples: [{ jp: 'x', en: 'y' }],
       });
-      const n4 = point({ id: 'mazii', title: '...前に', level: 'N4', examples: [] });
+      const n4 = point({ id: 'supp', title: '...前に', level: 'N4', examples: [] });
       const [merged] = dedupeGrammarByTitle([n5, n4]);
       expect(merged.id).toBe('core');
       expect(merged.level).toBe('N5');
@@ -406,8 +406,8 @@ describe('filterGrammarPoints', () => {
     describe('Phase 1.5 notation gaps', () => {
       /*
        * Each of these surfaced as a visible double entry after the Phase 1
-       * dedupe shipped. They are notation differences inside the Mazii dump,
-       * not distinct patterns.
+       * dedupe shipped. They are notation differences inside the supplement
+       * dump, not distinct patterns.
        */
       it('treats all three tilde characters as the same placeholder', () => {
         // 〜 wave dash, ～ fullwidth, ~ ASCII — the dump mixes all three.
@@ -418,11 +418,11 @@ describe('filterGrammarPoints', () => {
       });
 
       it('ignores brackets around an optional trailing particle', () => {
-        // Mazii writes ため(に); the authored files write 〜ために. The scraped
+        // The dump writes ため(に); the authored files write 〜ために. The scraped
         // record carries the real dump's shape: no examples, explanation a copy
         // of meaning, structure a copy of title.
         const scraped = point({
-          id: 'mazii',
+          id: 'supp',
           title: 'ため(に)',
           meaning: 'in order to',
           explanation: 'in order to',

@@ -1,28 +1,23 @@
 /**
  * Storage migration runner — runs once per boot, before React renders.
  *
- * Guarantees for users upgrading from older builds:
- *   1. Decks / CSV drafts that only exist in localStorage are copied into
- *      IndexedDB (the new durable home). The localStorage copy is kept as
- *      the hot-path cache, NOT deleted — an interrupted migration can never
- *      lose data because nothing is removed.
- *   2. If localStorage was cleared (the old main-process wipe bug, a crash,
- *      or quota eviction) but IndexedDB survived, the cache is restored from
- *      IndexedDB so the app boots with the user's data intact.
- *
- * Versioning: STORAGE_VERSION is stored in IndexedDB itself. Future shape
- * changes add a numbered step below; steps must stay idempotent (safe to
- * re-run) because a crash between "migrate" and "record version" replays
- * them.
+ * The runner delegates all decision-making to a pure migration boundary. The
+ * boundary computes an inert retention plan, removes corrupted values, and
+ * keeps the remaining localStorage/IndexedDB data in deterministic order.
  */
 
 import { kvGet, kvSet } from './db';
 import { IDB_KEYS, LS_KEYS } from './storage';
 import { restoreAnnotationsFromIdb } from '../annotations';
 import { restoreBookmarksFromIdb } from '../bookmarks';
+import { restoreLevelListsFromIdb } from '../levelLists';
+import {
+  applyStorageMigration,
+  type StorageMigrationAdapter,
+  type StorageMigrationSnapshot,
+} from '../../shared/storageMigrationBoundary';
 
 const VERSION_KEY = 'storage-version';
-export const STORAGE_VERSION = 2;
 
 function readLocal(key: string): string | null {
   try {
@@ -32,71 +27,83 @@ function readLocal(key: string): string | null {
   }
 }
 
-function writeLocal(key: string, value: string): void {
+function writeLocal(key: string, value: unknown): void {
   try {
-    localStorage.setItem(key, value);
+    // `collectSnapshot` stores what `getItem` returned, which is already
+    // serialized text. Stringifying it again would add one escaping layer per
+    // boot, and readers that parse once would then see a string instead of the
+    // object they expect. Non-string values can only reach here from a caller
+    // that built the snapshot itself, so they still need serializing.
+    localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
   } catch {
     /* quota — IndexedDB copy is authoritative anyway */
   }
 }
 
-/** Two-way reconcile for one localStorage-cache / IndexedDB pair. */
-async function reconcilePair(lsKey: string, idbKey: string): Promise<void> {
-  const local = readLocal(lsKey);
-  const stored = await kvGet<unknown>(idbKey);
+function collectSnapshot(): StorageMigrationSnapshot {
+  const localStorageSnapshot: Record<string, unknown> = {};
+  const indexedDbSnapshot: Record<string, unknown> = {};
 
-  if (local != null) {
-    // localStorage present → make sure IndexedDB has (at least) this data.
-    // localStorage is the copy the user most recently wrote through, so it
-    // wins when both exist.
-    try {
-      await kvSet(idbKey, JSON.parse(local));
-    } catch {
-      /* corrupt JSON in the cache — leave the IndexedDB copy alone */
-    }
-    return;
+  for (const key of Object.values(LS_KEYS)) {
+    const value = readLocal(key);
+    if (value != null) localStorageSnapshot[key] = value;
   }
 
-  if (stored != null) {
-    // Cache lost but durable copy exists → restore the cache so synchronous
-    // readers (flashcardDeck.ts, csvEditorStorage.ts) see the data this boot.
-    writeLocal(lsKey, JSON.stringify(stored));
-  }
+  return { localStorage: localStorageSnapshot, indexedDb: indexedDbSnapshot };
+}
+
+function createAdapter(): StorageMigrationAdapter {
+  return {
+    async readSnapshot() {
+      const snapshot = collectSnapshot();
+      const entries = await Promise.all(Object.values(IDB_KEYS).map(async (key) => [key, await kvGet<unknown>(key)] as const));
+      for (const [key, value] of entries) {
+        if (value !== undefined) snapshot.indexedDb[key] = value;
+      }
+      return snapshot;
+    },
+    async replaceAtomic(next) {
+      const idbKeys = new Set(Object.values(IDB_KEYS));
+      for (const key of idbKeys) {
+        try {
+          await kvSet(key, next.indexedDb[key]);
+        } catch {
+          /* ignore */
+        }
+      }
+      for (const key of Object.values(LS_KEYS)) {
+        if (next.localStorage[key] === undefined) {
+          try {
+            localStorage.removeItem(key);
+          } catch {
+            /* ignore */
+          }
+          continue;
+        }
+        writeLocal(key, next.localStorage[key]);
+      }
+    },
+  };
 }
 
 export async function runStorageMigrations(): Promise<void> {
   try {
     const current = (await kvGet<number>(VERSION_KEY)) ?? 0;
+    const plan = await applyStorageMigration(createAdapter(), current);
 
-    if (current < 1) {
-      // v1: adopt IndexedDB as the durable store for heavy data.
-      await reconcilePair(LS_KEYS.flashcardDeck, IDB_KEYS.flashcardDeck);
-      await reconcilePair(LS_KEYS.csvEditor, IDB_KEYS.csvEditor);
-      await kvSet(VERSION_KEY, 1);
-    } else {
-      // Already migrated — still reconcile so a wiped cache is restored.
-      await reconcilePair(LS_KEYS.flashcardDeck, IDB_KEYS.flashcardDeck);
-      await reconcilePair(LS_KEYS.csvEditor, IDB_KEYS.csvEditor);
+    if (plan.issues.length) {
+      console.warn('[storage] migration recovery:', plan.issues.join(' '));
     }
 
-    // v2: personal reading highlights + bookmarks (LS ↔ IDB).
-    if (current < 2) {
-      await restoreAnnotationsFromIdb();
-      await restoreBookmarksFromIdb();
-      // Push any LS-only data into IDB by triggering a re-mirror via import of collectors
-      try {
-        const { collectAllAnnotationsMap } = await import('../annotations');
-        const { collectAllBookmarksMap } = await import('../bookmarks');
-        await kvSet(IDB_KEYS.annotations, collectAllAnnotationsMap());
-        await kvSet(IDB_KEYS.bookmarks, collectAllBookmarksMap());
-      } catch {
-        /* ignore */
-      }
-      await kvSet(VERSION_KEY, 2);
-    } else {
-      await restoreAnnotationsFromIdb();
-      await restoreBookmarksFromIdb();
+    if (current < plan.toVersion) {
+      await kvSet(VERSION_KEY, plan.toVersion);
     }
+
+    // Rehydrate durable book-level caches after the atomic replacement has
+    // finished so the hot path sees the repaired IndexedDB state.
+    await restoreAnnotationsFromIdb();
+    await restoreBookmarksFromIdb();
+    await restoreLevelListsFromIdb();
   } catch (err) {
     // IndexedDB can throw DOMException (private mode, blocked upgrade, closed DB).
     // localStorage caches still work; do not fail boot.

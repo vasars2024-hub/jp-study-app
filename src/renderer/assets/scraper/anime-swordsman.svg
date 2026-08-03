@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Great Swordsman placeholder artwork">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#173b3d"/>
+      <stop offset=".55" stop-color="#236c60"/>
+      <stop offset="1" stop-color="#0b171f"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#bg)"/>
+  <circle cx="254" cy="39" r="44" fill="#b9f0c5" opacity=".18"/>
+  <path d="M0 153L67 83l41 42 54-89 44 75 39-48 75 90v27H0z" fill="#102729" opacity=".72"/>
+  <path d="M147 26l11 52-30 75" stroke="#d9eef0" stroke-width="6"/>
+  <path d="M181 38l-22 43 19 71" stroke="#d9eef0" stroke-width="6"/>
+  <path d="M103 143c17-35 39-52 58-52 23 0 42 18 57 52z" fill="#101922"/>
+  <path d="M136 94l25-15 23 16-7 28h-34z" fill="#d7a16f"/>
+  <text x="18" y="28" fill="#fff" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700">THE SWORDSMAN</text>
+  <text x="19" y="47" fill="#bce9d7" font-family="sans-serif" font-size="10" letter-spacing="2">EPISODE 02</text>
+</svg>

@@ -15,7 +15,10 @@ export type NotebookStream =
   | 'ocr'
   | 'audio'
   | 'clipboard'
-  | 'extension';
+  | 'extension'
+  | 'media'
+  /** Captured Windows Live Captions sessions, one entry per dated script. */
+  | 'transcript';
 
 export interface NotebookTimelineEntry {
   id: string;

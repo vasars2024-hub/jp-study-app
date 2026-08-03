@@ -100,6 +100,30 @@ describe('profileRules', () => {
     ).toBe('default');
   });
 
+  it('treats subtitle and recorded audio as separate rule sources', () => {
+    const subtitleRule: ProfileRule = {
+      id: 'subtitle',
+      enabled: true,
+      label: 'Subtitle cards',
+      profileId: 'p-subtitle',
+      match: { source: 'subtitle', cardKind: 'any', language: 'any' },
+    };
+    expect(
+      ruleMatches(subtitleRule, {
+        source: 'subtitle',
+        cardKind: 'sentence',
+        language: 'ja',
+      }),
+    ).toBe(true);
+    expect(
+      ruleMatches(subtitleRule, {
+        source: 'audio',
+        cardKind: 'sentence',
+        language: 'ja',
+      }),
+    ).toBe(false);
+  });
+
   it('resolveProfileMatch returns rule label metadata', () => {
     const rules: ProfileRule[] = [
       {
@@ -208,10 +232,77 @@ describe('profileRules', () => {
         },
       ],
     });
+    expect(store.schemaVersion).toBe(2);
     expect(store.rules).toHaveLength(2);
     expect(store.rules[0].match.source).toBe('any'); // invalid 'chrome' → any
     expect(store.rules[1].profileId).toBe('p2');
     expect(store.rules[1].match.source).toBe('extension');
     expect(store.rules[1].match.category).toBe('manga');
+  });
+
+  it('migrates a v1 audio rule to audio and subtitle rules in place', () => {
+    const store = normalizeProfileRulesStore({
+      schemaVersion: 1,
+      rules: [
+        {
+          id: 'video',
+          enabled: true,
+          label: 'Video mining',
+          profileId: 'p-video',
+          match: { source: 'audio', cardKind: 'sentence', language: 'ja' },
+        },
+        {
+          id: 'fallback',
+          enabled: true,
+          label: 'Fallback',
+          profileId: 'p-default',
+          match: { source: 'any', cardKind: 'any', language: 'any' },
+        },
+      ],
+    });
+
+    expect(store.schemaVersion).toBe(2);
+    expect(store.rules.map((rule) => rule.match.source)).toEqual([
+      'audio',
+      'subtitle',
+      'any',
+    ]);
+    expect(store.rules[1]).toMatchObject({
+      id: 'video-subtitle',
+      label: 'Video mining — subtitles',
+      profileId: 'p-video',
+      match: { source: 'subtitle', cardKind: 'sentence', language: 'ja' },
+    });
+    expect(
+      resolveProfileId(
+        store.rules,
+        { source: 'subtitle', cardKind: 'sentence', language: 'ja' },
+        'default',
+      ),
+    ).toBe('p-video');
+  });
+
+  it('keeps a v2 audio rule audio-only', () => {
+    const store = normalizeProfileRulesStore({
+      schemaVersion: 2,
+      rules: [
+        {
+          id: 'recording',
+          enabled: true,
+          label: 'Recorded audio',
+          profileId: 'p-audio',
+          match: { source: 'audio', cardKind: 'any', language: 'any' },
+        },
+      ],
+    });
+
+    expect(store.rules).toHaveLength(1);
+    expect(
+      resolveProfileId(
+        store.rules,
+        { source: 'subtitle', cardKind: 'sentence', language: 'ja' },
+        'default',
+      ),
+    ).toBe('default');
   });
 });

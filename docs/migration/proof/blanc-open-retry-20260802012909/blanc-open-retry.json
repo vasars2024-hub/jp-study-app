@@ -1,0 +1,32 @@
+{
+  "probe": "blanc-player-open-retry-probe.mjs",
+  "hypothesis": "Blanc's player loses its first directstream open to React.StrictMode's double-mount (two sockets on one client id; the sidecar cancels the preparation when the released one disconnects). A SECOND request on the already-mounted session should succeed, because a playbackRequest change is a dependency change rather than a remount.",
+  "hypothesisCorrection": "Half right, and the wrong half is the half that names a fix. Step 1b (slice 24) measured the frames: the disconnect is a co-symptom, and the cancel is a `video-terminated` the CLIENT sends ~190ms later from the adopted lifecycle effect. A socket-lifetime fix would have changed nothing. See docs/migration/proof/blanc-player-live-20260801075500/slice-24.json.",
+  "startedAt": "2026-08-02T01:29:09.185Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-openchannel-b\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-openchannel-b",
+  "steps": [
+    {
+      "name": "0 sidecar ready before anything is driven",
+      "result": "PASS",
+      "detail": "stopped -> ready, pid 10768, port 49697, v3.10.2"
+    }
+  ],
+  "sidecar": {
+    "pid": 10768,
+    "port": 49697,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "07e53bf6-c667-4afc-9cd0-2cd1c12971cd",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "result": "ERROR",
+  "error": "no library card",
+  "finishedAt": "2026-08-02T01:29:53.609Z",
+  "log": [
+    "[probe] PASS — 0 sidecar ready before anything is driven: stopped -> ready, pid 10768, port 49697, v3.10.2",
+    "[probe] ERROR no library card"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-02_04-29-18.log"
+}

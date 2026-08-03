@@ -5,7 +5,14 @@
 
 import type { ExtensionContentCategory } from './extensionCapture';
 
-export type MineSource = 'extension' | 'epub' | 'audio' | 'reader' | 'dictionary' | 'other';
+export type MineSource =
+  | 'extension'
+  | 'epub'
+  | 'subtitle'
+  | 'audio'
+  | 'reader'
+  | 'dictionary'
+  | 'other';
 export type MineCardKind = 'word' | 'sentence';
 export type MineLanguage = 'ja' | 'zh' | 'ru' | 'unknown';
 /** Page content category for extension mines (optional rule dimension). */
@@ -38,12 +45,12 @@ export interface ProfileRuleContext {
 }
 
 export interface ProfileRulesStore {
-  schemaVersion: 1;
+  schemaVersion: 2;
   rules: ProfileRule[];
 }
 
 export const EMPTY_PROFILE_RULES: ProfileRulesStore = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   rules: [],
 };
 
@@ -114,7 +121,8 @@ export interface MineRoute {
   cardKind?: MineCardKind;
   /** Omit to auto-detect from text; 'unknown' is treated as "please detect". */
   language?: MineLanguage;
-  category?: MineCategory;
+  /** 'any' is accepted at untyped IPC boundaries and normalizes to no constraint. */
+  category?: MineCategory | 'any';
 }
 
 export interface BuildRouteContextOpts {
@@ -209,9 +217,10 @@ function normalizeCategory(raw: unknown): MineCategory | 'any' {
 }
 
 export function normalizeProfileRulesStore(raw: unknown): ProfileRulesStore {
-  const base: ProfileRulesStore = { schemaVersion: 1, rules: [] };
+  const base: ProfileRulesStore = { schemaVersion: 2, rules: [] };
   if (!raw || typeof raw !== 'object') return base;
-  const obj = raw as Partial<ProfileRulesStore>;
+  const obj = raw as { schemaVersion?: unknown; rules?: unknown };
+  const migrateLegacyAudio = obj.schemaVersion === 1 || obj.schemaVersion == null;
   const rulesIn = Array.isArray(obj.rules) ? obj.rules : [];
   const rules: ProfileRule[] = [];
   for (const r of rulesIn) {
@@ -228,6 +237,7 @@ export function normalizeProfileRulesStore(raw: unknown): ProfileRulesStore {
         source:
           r.match?.source === 'extension' ||
           r.match?.source === 'epub' ||
+          r.match?.source === 'subtitle' ||
           r.match?.source === 'audio' ||
           r.match?.source === 'reader' ||
           r.match?.source === 'dictionary' ||
@@ -251,5 +261,33 @@ export function normalizeProfileRulesStore(raw: unknown): ProfileRulesStore {
       },
     });
   }
-  return { schemaVersion: 1, rules };
+
+  if (migrateLegacyAudio) {
+    // Subtitle cards historically identified themselves as `audio`, so a v1
+    // audio rule implicitly covered both recorded audio and subtitle mining.
+    // Preserve that behavior without keeping the two sources conflated.
+    const usedIds = new Set(rules.map((rule) => rule.id));
+    const expanded: ProfileRule[] = [];
+    for (const rule of rules) {
+      expanded.push(rule);
+      if (rule.match.source !== 'audio') continue;
+      const baseId = `${rule.id}-subtitle`;
+      let id = baseId;
+      let suffix = 2;
+      while (usedIds.has(id)) {
+        id = `${baseId}-${suffix}`;
+        suffix += 1;
+      }
+      usedIds.add(id);
+      expanded.push({
+        ...rule,
+        id,
+        label: `${rule.label} — subtitles`,
+        match: { ...rule.match, source: 'subtitle' },
+      });
+    }
+    return { schemaVersion: 2, rules: expanded };
+  }
+
+  return { schemaVersion: 2, rules };
 }

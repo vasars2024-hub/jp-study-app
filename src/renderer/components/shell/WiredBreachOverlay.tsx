@@ -155,8 +155,8 @@ export default function WiredBreachOverlay() {
         {step >= 2 && (
           <div className="wired-breach-facts">
             {/* The turn: it stops narrating and starts citing. */}
-            <p>{line(t('wired.breach.seen', { days: facts.days }))}</p>
-            <p>{line(t('wired.breach.held', { words: facts.words }))}</p>
+            <p>{line(t('wired.breach.seen', { count: facts.days }))}</p>
+            <p>{line(t('wired.breach.held', { count: facts.words }))}</p>
             <p className="wired-breach-address">{line(t('wired.breach.address'))}</p>
           </div>
         )}

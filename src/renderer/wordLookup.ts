@@ -75,7 +75,12 @@ function nearestBlock(node: Node): Element | null {
 }
 
 function sentenceAround(block: Element | null, needle: string): string {
-  const text = (block?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  return sentenceAroundText(block?.textContent ?? '', needle);
+}
+
+/** `sentenceAround` for callers that have the block text but not the block. */
+function sentenceAroundText(raw: string, needle: string): string {
+  const text = raw.replace(/\s+/g, ' ').trim();
   if (!text || !needle) return text.slice(0, 140);
   const at = text.indexOf(needle);
   if (at === -1) return text.slice(0, 140);
@@ -205,10 +210,40 @@ function tokenSpanAt(block: Element, globalOffset: number): { start: number; end
   const text = (block.textContent ?? '').replace(/\r/g, '');
   if (!text) return null;
 
+  let tokens: JpToken[] | undefined;
   if (tokenizerReady() && /[぀-ヿ㐀-鿿]/.test(text)) {
     const cached = tokenCache.get(block);
-    const tokens = cached && cached.text === text ? cached.tokens : tokenizeSync(text);
+    tokens = cached && cached.text === text ? cached.tokens : tokenizeSync(text);
     if (!cached || cached.text !== text) tokenCache.set(block, { text, tokens });
+  }
+  return resolveWordSpanInText(text, globalOffset, tokens);
+}
+
+/**
+ * The word/expression span at `globalOffset` in a plain string.
+ *
+ * Extracted from `tokenSpanAt` unchanged so that surfaces with no DOM of their
+ * own — the Immersion Browser's `<webview>` guest, which can only hand the host
+ * text across the process boundary — resolve a word with *this* logic rather
+ * than a second copy of it. `tokenSpanAt` is now a thin caching wrapper; the
+ * token walk, the particle-neighbor rule and the kana-fragment glue below are
+ * the originals and are the only implementation.
+ *
+ * `tokens` is the caller's cache, when it has one. Omit it and the tokenizer
+ * runs here.
+ */
+export function resolveWordSpanInText(
+  text: string,
+  globalOffset: number,
+  cachedTokens?: JpToken[],
+): { start: number; end: number; query: string } | null {
+  if (!text) return null;
+
+  const tokens =
+    cachedTokens ??
+    (tokenizerReady() && /[぀-ヿ㐀-鿿]/.test(text) ? tokenizeSync(text) : undefined);
+
+  if (tokens) {
     let pos = 0;
     for (let i = 0; i < tokens.length; i++) {
       const tk = tokens[i];
@@ -490,6 +525,65 @@ export function lookupWordFromMouseUp(
 
   sel?.removeAllRanges();
   return lookupWordAtPoint(e.clientX, e.clientY, doc);
+}
+
+/**
+ * Off-DOM lookup: resolve a hit from text the host does not own.
+ *
+ * The Immersion Browser's `<webview>` guest is a separate, untrusted process.
+ * The host cannot reach into its DOM to run `lookupWordFromMouseUp`, and the
+ * guest cannot be given the tokenizer or the dictionary. So the guest sends
+ * *text plus an offset* and this resolves it here, on the host, through the
+ * same three branches `lookupWordFromMouseUp` uses:
+ *
+ *   selection → `selectionHit`'s sentence-vs-word split
+ *   punctuation → `punctuationSentenceHit`'s whole-sentence translate
+ *   otherwise → `resolveWordSpanInText`, i.e. `tokenSpanAt`'s own token walk
+ *
+ * The one thing it cannot do is highlight, because the text is not in this
+ * document. `x`/`y` are supplied by the caller (already translated into host
+ * coordinates) instead of being read off a client rect.
+ */
+export function lookupHitFromText(input: {
+  text: string;
+  offset?: number;
+  selection?: string;
+  x: number;
+  y: number;
+}): WordLookupHit | null {
+  const { text, x, y } = input;
+  if (!text) return null;
+
+  const selection = (input.selection ?? '').trim();
+  if (selection) {
+    if (isLikelySentence(selection)) {
+      return { query: selection.slice(0, 240), x, y, translate: true };
+    }
+    return {
+      query: selection.slice(0, 40),
+      x,
+      y,
+      context: sentenceAroundText(text, selection.slice(0, 8)),
+    };
+  }
+
+  const offset = Math.min(Math.max(input.offset ?? 0, 0), text.length - 1);
+
+  const ch = text[offset];
+  if (ch && isSentencePunct(ch)) {
+    const { start, end } = detectSentenceBounds(text, offset);
+    const sentence = text.slice(start, end).trim();
+    if (sentence) return { query: sentence.slice(0, 240), x, y, translate: true };
+  }
+
+  const span = resolveWordSpanInText(text, offset);
+  if (!span) return null;
+  return {
+    query: span.query.slice(0, 40),
+    x,
+    y,
+    context: sentenceAroundText(text, span.query.slice(0, 8)),
+  };
 }
 
 /** Epub / iframe: refine a browser selection down to one word when possible. */

@@ -23,13 +23,13 @@ import {
   MediaKindFilter,
   MediaLibraryActions,
   MediaLookupPopup,
-  MediaPlayerStage,
   MediaSearchBox,
   MediaTranscriptionControls,
   MediaWatchFolder,
   MediaYoutubeBar,
   useMedia,
 } from '../media/MediaContent';
+import BlancStudyPlayer from './BlancStudyPlayer';
 import {
   FlashcardAiMode,
   FlashcardCsvMode,
@@ -63,7 +63,10 @@ export function BlancMediaPanel() {
         <legend>Source</legend>
         <div className="blanc-command-row">
           <button type="button" onClick={() => void state.openFile()}>
-            Open file…
+            Add files…
+          </button>
+          <button type="button" onClick={() => void state.openFolder()}>
+            Add folder…
           </button>
           <button type="button" onClick={() => void state.openSubs()} disabled={!src}>
             {subName && genState !== 'done' ? `Subs: ${subName}` : 'Load subtitles…'}
@@ -97,10 +100,19 @@ export function BlancMediaPanel() {
         <MediaYoutubeBar state={state} />
       </fieldset>
 
-      {src && (
+      {/*
+        Slice 15 routed this onto the adopted study player; slice 16 deleted the legacy
+        `MediaPlayerStage` it used to render directly, ungated. `BlancStudyPlayer` now has
+        no fallback to hand back to — a disabled sidecar means no player here, which is the
+        stated cost of the deletion rather than a surprise.
+
+        `current` rather than `src` guards it: the adopted surface needs the item's real
+        path and resume position, not the object URL the legacy stage used to play.
+      */}
+      {src && current && (
         <fieldset>
           <legend>Player</legend>
-          <MediaPlayerStage state={state} />
+          <BlancStudyPlayer item={current} />
         </fieldset>
       )}
 

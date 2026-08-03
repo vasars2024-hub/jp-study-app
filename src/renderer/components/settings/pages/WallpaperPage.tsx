@@ -204,6 +204,7 @@ export default function WallpaperPage() {
           step={0.05}
           value={look.wallpaperDim}
           onChange={(e) => patchLook({ wallpaperDim: Number(e.target.value) })}
+          aria-label={t('a11y.slider.wallpaperDim')}
         />
         <span className="muted">{Math.round(look.wallpaperDim * 100)}%</span>
       </div>

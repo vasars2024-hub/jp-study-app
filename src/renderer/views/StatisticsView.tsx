@@ -13,8 +13,9 @@ import {
   StatsBooks,
   StatsCards,
   StatsChart,
+  StatsShows,
   WordKnowledge,
-  dayLabel,
+  weekdayInitial,
   useStats,
 } from '../components/stats/StatsContent';
 import { useT } from '../i18n';
@@ -104,7 +105,7 @@ export default function StatisticsView() {
                     {s.recent.map((d) => (
                       <div key={d.date} className="aero-stats-bar" title={`${d.date}: ${formatDuration(d.seconds)}, ${formatNumber(d.chars)} chars`}>
                         <span style={{ height: `${Math.round((d.seconds / peak) * 100)}%` }} />
-                        <b>{dayLabel(d.date)}</b>
+                        <b>{weekdayInitial(d.date)}</b>
                       </div>
                     ))}
                   </div>
@@ -151,7 +152,7 @@ export default function StatisticsView() {
       <StatusBarField>{formatDuration(s.totalSeconds)}</StatusBarField>
       <StatusBarField>{formatNumber(s.totalChars)}</StatusBarField>
       <StatusBarSpacer />
-      <StatusBarField>{t('stats.card.daysRead')}: {s.daysActive}</StatusBarField>
+      <StatusBarField>{t('stats.card.daysActive')}: {s.daysActive}</StatusBarField>
     </>
   );
 
@@ -195,6 +196,13 @@ export default function StatisticsView() {
             <section className="stats-section">
               <h2>{t('stats.byBook')}</h2>
               <StatsBooks state={state} />
+            </section>
+          )}
+
+          {s.shows.length > 0 && (
+            <section className="stats-section">
+              <h2>{t('stats.byShow')}</h2>
+              <StatsShows state={state} />
             </section>
           )}
         </>

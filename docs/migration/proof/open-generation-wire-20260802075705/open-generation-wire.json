@@ -1,0 +1,295 @@
+{
+ "tool": "open-generation-wire-gate.mjs",
+ "slice": 46,
+ "patch": "patches/seanime/0004-directstream-open-generation.patch",
+ "build": [
+  "reusing C:\\Users\\Arseniy\\AppData\\Local\\Temp\\studyos-sidecar-0004\\seanime.exe"
+ ],
+ "runs": {
+  "patched": {
+   "label": "patched",
+   "exe": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\studyos-sidecar-0004\\seanime.exe",
+   "exeBuilt": "2026-08-02T04:51:30.845Z",
+   "exeCarriesPatchString": true,
+   "port": 50411,
+   "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\studyos-opengen-patched-Fj6xug",
+   "steps": [
+    {
+     "name": "first open sets the bar",
+     "clientId": "alpha",
+     "generation": 2,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 3,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:56:55\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": [
+      "{\"type\":\"client-identity\",\"payload\":{\"clientId\":\"aa9b2f32-7011-4eeb-99d1-9a30329ee00f\",\"platform\":\"\",\"proof\":\"eyJlbmRwb2ludCI6ImNsaWVudC1pZDphYTliMmYzMi03MDExLTRlZWItOTlkMS05YTMwMzI5ZWUwMGYiLCJpYXQiOjE3ODU2NDY2MTUsImV4cCI6MTc4NTczMzAxNX0.OElaeDuHuqGGesEoTuz_rEKy6cKWTR4tFyyPxdgbzP8\"}}\n"
+     ]
+    },
+    {
+     "name": "an older generation is refused",
+     "clientId": "alpha",
+     "generation": 1,
+     "expected": "refused",
+     "observed": "refused",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 4044,
+     "abortMarkers": [],
+     "framesAfter": [
+      "{\"type\":\"check-for-announcements\",\"payload\":null}\n"
+     ]
+    },
+    {
+     "name": "the equal generation is the recovery",
+     "clientId": "alpha",
+     "generation": 2,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 2,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:56:59\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "another client is ordered independently",
+     "clientId": "beta",
+     "generation": 1,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 2,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:56:59\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "no generation field behaves as before",
+     "clientId": "alpha",
+     "generation": null,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 1,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:56:59\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "a newer generation moves the bar",
+     "clientId": "alpha",
+     "generation": 3,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 1,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:56:59\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "the moved bar refuses what it used to accept",
+     "clientId": "alpha",
+     "generation": 2,
+     "expected": "refused",
+     "observed": "refused",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 4010,
+     "abortMarkers": [],
+     "framesAfter": []
+    }
+   ],
+   "status": {
+    "version": "3.10.2",
+    "isDesktopSidecar": true
+   },
+   "websocketOpen": true,
+   "dataDirRemoved": true,
+   "logLines": 107
+  },
+  "control": {
+   "label": "control",
+   "exe": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+   "exeBuilt": "2026-07-27T17:50:58.073Z",
+   "exeCarriesPatchString": false,
+   "port": 58255,
+   "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\studyos-opengen-control-oPLusC",
+   "steps": [
+    {
+     "name": "first open sets the bar",
+     "clientId": "alpha",
+     "generation": 2,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 1,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:57:04\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": [
+      "{\"type\":\"client-identity\",\"payload\":{\"clientId\":\"0752686a-5a69-420d-897c-2d05ee3604c4\",\"platform\":\"\",\"proof\":\"eyJlbmRwb2ludCI6ImNsaWVudC1pZDowNzUyNjg2YS01YTY5LTQyMGQtODk3Yy0yZDA1ZWUzNjA0YzQiLCJpYXQiOjE3ODU2NDY2MjQsImV4cCI6MTc4NTczMzAyNH0.yEZK7MbhF1wcj4W8e11alrNQS-Vq30w1lniFKRCAHJs\"}}\n"
+     ]
+    },
+    {
+     "name": "an older generation is refused",
+     "clientId": "alpha",
+     "generation": 1,
+     "expected": "refused",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 2,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:57:04\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "the equal generation is the recovery",
+     "clientId": "alpha",
+     "generation": 2,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 1,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:57:04\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "another client is ordered independently",
+     "clientId": "beta",
+     "generation": 1,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 1,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:57:04\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "no generation field behaves as before",
+     "clientId": "alpha",
+     "generation": null,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 1,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:57:04\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "a newer generation moves the bar",
+     "clientId": "alpha",
+     "generation": 3,
+     "expected": "accepted",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 1,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:57:04\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    },
+    {
+     "name": "the moved bar refuses what it used to accept",
+     "clientId": "alpha",
+     "generation": 2,
+     "expected": "refused",
+     "observed": "accepted",
+     "http": {
+      "status": 500,
+      "body": "{\"message\":\"Internal Server Error\"}\n"
+     },
+     "elapsedMs": 0,
+     "abortMarkers": [
+      "\u001b[90m2026-08-02 07:57:04\u001b[0m DBG\u001b[90m -\u001b[0m \u001b[36mdirectstream\u001b[0m\u001b[90m >\u001b[0m Signaling native player to abort stream preparation, reason: cannot play local file, could not find local file: C:\\studyos-open-generation-probe\\not-a-real-file.mkv"
+     ],
+     "framesAfter": []
+    }
+   ],
+   "status": {
+    "version": "3.10.2",
+    "isDesktopSidecar": true
+   },
+   "websocketOpen": true,
+   "dataDirRemoved": true,
+   "logLines": 111
+  }
+ },
+ "differingSteps": [
+  {
+   "name": "an older generation is refused",
+   "patched": "refused",
+   "control": "accepted"
+  },
+  {
+   "name": "the moved bar refuses what it used to accept",
+   "patched": "refused",
+   "control": "accepted"
+  }
+ ],
+ "deployedSidecar": {
+  "path": "C:\\Users\\Arseniy\\Projects\\seanime-upstream\\seanime.exe",
+  "built": "2026-07-27T17:50:58.073Z",
+  "carriesPatch": false
+ },
+ "httpResponsesAreIdentical": {
+  "distinctResponses": [
+   "500 {\"message\":\"Internal Server Error\"}\n"
+  ],
+  "indistinguishable": true
+ },
+ "problems": [],
+ "result": "PASS"
+}

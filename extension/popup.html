@@ -133,6 +133,40 @@
         transition: background 0.12s ease;
       }
       .actions button:hover { background: var(--panel-2); }
+      .mode-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .mode-label {
+        flex: 1;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .mode-seg {
+        display: inline-flex;
+        gap: 2px;
+        padding: 2px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--panel);
+      }
+      .mode-seg button {
+        border: 0;
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+      .mode-seg button:hover { color: var(--text); }
+      .mode-seg button.active {
+        background: var(--accent, #9c2b3d);
+        color: #fff;
+      }
       .actions button.primary {
         background: var(--accent-soft);
         border-color: rgba(156, 43, 61, 0.45);
@@ -238,6 +272,23 @@
 
       <div class="actions" id="actions"></div>
 
+      <!-- Mode is the one setting worth switching mid-session, so it lives here
+           rather than only on the options page. -->
+      <div class="mode-row">
+        <span class="mode-label">Highlight</span>
+        <div class="mode-seg" id="mode-highlight" role="radiogroup" aria-label="What a highlight opens">
+          <button type="button" role="radio" data-mode="dictionary">Dictionary AI</button>
+          <button type="button" role="radio" data-mode="ai">AI OCR</button>
+        </div>
+      </div>
+      <div class="mode-row">
+        <span class="mode-label">Screenshot OCR</span>
+        <div class="mode-seg" id="mode-ocr" role="radiogroup" aria-label="What an OCR opens">
+          <button type="button" role="radio" data-mode="dictionary">Dictionary AI</button>
+          <button type="button" role="radio" data-mode="ai">AI OCR</button>
+        </div>
+      </div>
+
       <div id="recent-wrap" hidden>
         <h2>Recent</h2>
         <div id="recent"></div>
@@ -257,6 +308,7 @@
       <button type="button" id="nav-settings">Settings</button>
     </footer>
 
+    <script src="settings.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

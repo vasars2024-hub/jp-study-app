@@ -1,0 +1,117 @@
+{
+  "gate": "phase7-queue-refusal-live-gate.mjs",
+  "question": "47e's original story, driven live for the first time: does narrowing a profile take effect on work that was already planned, queued and survived a process restart?",
+  "startedAt": "2026-08-02T12:23:26.736Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "preferredOperation": "flashcard.list-decks",
+  "chosenOperation": null,
+  "objective": "List every flashcard deck folder I have.",
+  "steps": [
+    {
+      "name": "P0 every page-side probe compiles",
+      "result": "PASS",
+      "detail": "7 expressions parsed"
+    },
+    {
+      "name": "0 the model precondition",
+      "result": "OK",
+      "detail": "~/Downloads holds Qwen_Qwen3-1.7B-Q4_K_M.gguf — resolveModelPath searches there",
+      "gguf": [
+        "Qwen_Qwen3-1.7B-Q4_K_M.gguf"
+      ]
+    },
+    {
+      "name": "1 the agent panel rendered",
+      "result": "PASS",
+      "detail": "found by shape (a full-automation option), 4 action buttons, 2 objective textarea(s) — no UI prose was matched"
+    },
+    {
+      "name": "2 the profile store is ON DISK, so there is something to narrow",
+      "result": "PASS",
+      "detail": "persisted:study-tutor via media-assistant (4 profiles); active profile study-tutor carries 19 operations. The operation under test is chosen from the plan the model produces, not asserted here.",
+      "activeProfileOps": [
+        "dictionary.lookup",
+        "dictionary.explain-grammar",
+        "dictionary.analyze-sentence",
+        "dictionary.search-knowledge",
+        "flashcard.list-decks",
+        "flashcard.add-cards",
+        "flashcard.create-deck",
+        "calendar.list",
+        "calendar.schedule-session",
+        "study.get-context",
+        "study.list-opportunities",
+        "study.filter-vocabulary",
+        "study.undo-filter",
+        "study.preview-cards",
+        "study.create-cards",
+        "study.preview-anki",
+        "study.export-anki",
+        "study.resume-session",
+        "study.open-context"
+      ]
+    },
+    {
+      "name": "3 a LIVE plan was produced by the real local model",
+      "result": "FAIL",
+      "detail": "no queue item after the plan click (clicked); status line: [\"Local model step 1 needs an arguments object.\"]",
+      "item": null,
+      "status": [
+        "Local model step 1 needs an arguments object."
+      ]
+    },
+    {
+      "name": "gate",
+      "result": "ERROR",
+      "detail": "no live plan; nothing below can be measured"
+    }
+  ],
+  "arms": {},
+  "exeBuiltAt": "2026-08-02T12:05:28.551Z",
+  "scratchRoot": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53-17736",
+  "planClick": "clicked",
+  "panelAfterPlan": {
+    "panel": true,
+    "actions": [
+      {
+        "i": 0,
+        "text": "Create local plan",
+        "disabled": false
+      },
+      {
+        "i": 1,
+        "text": "Run next approved step",
+        "disabled": true
+      },
+      {
+        "i": 2,
+        "text": "Confirm sensitive step",
+        "disabled": true
+      },
+      {
+        "i": 3,
+        "text": "Run next queued plan",
+        "disabled": true
+      }
+    ],
+    "queueRows": [],
+    "planRows": [],
+    "status": [
+      "Local model step 1 needs an arguments object."
+    ],
+    "events": [],
+    "textareas": 2
+  },
+  "result": "ERROR",
+  "error": "Error: no live plan; nothing below can be measured\n    at main (file:///C:/Users/Arseniy/Projects/jp-study-app/docs/migration/tools/phase7-queue-refusal-live-gate.mjs:569:27)",
+  "finishedAt": "2026-08-02T12:33:41.939Z",
+  "log": [
+    "[phase7-refusal] PASS — P0 every page-side probe compiles: 7 expressions parsed",
+    "[phase7-refusal] OK — 0 the model precondition: ~/Downloads holds Qwen_Qwen3-1.7B-Q4_K_M.gguf — resolveModelPath searches there",
+    "[phase7-refusal] PASS — 1 the agent panel rendered: found by shape (a full-automation option), 4 action buttons, 2 objective textarea(s) — no UI prose was matched",
+    "[phase7-refusal] PASS — 2 the profile store is ON DISK, so there is something to narrow: persisted:study-tutor via media-assistant (4 profiles); active profile study-tutor carries 19 operations. The operation under test is chosen from the plan the model produces, not asserted here.",
+    "[phase7-refusal] plan click -> clicked",
+    "[phase7-refusal] FAIL — 3 a LIVE plan was produced by the real local model: no queue item after the plan click (clicked); status line: [\"Local model step 1 needs an arguments object.\"]",
+    "[phase7-refusal] ERROR — gate: no live plan; nothing below can be measured"
+  ]
+}

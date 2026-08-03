@@ -1014,8 +1014,14 @@ export function VideoCore(props: VideoCoreProps) {
     }, [state.playbackInfo?.id, waitForWatchHistory, shouldWaitForWatchHistory])
 
     // Override active player, won't apply to native-player
+    // The only other setter is VideoCoreProvider's mount-only layout effect, which also
+    // nulls the atom on unmount, and useUnmount below nulls it on every terminate. A host
+    // that keeps the provider mounted while mounting/unmounting VideoCore with the stream
+    // would therefore leave activePlayer stuck at null forever, silently disabling every
+    // isActivePlayer-gated listener. Claim the player whenever it is not already ours.
     React.useEffect(() => {
-        if (state.playbackInfo?.id && activePlayer === props.id) {
+        if (props.id === "native-player") return
+        if (state.playbackInfo?.id && activePlayer !== props.id) {
             setActivePlayer(props.id)
         }
     }, [state.playbackInfo?.id, activePlayer])

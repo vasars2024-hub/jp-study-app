@@ -14,6 +14,18 @@ so its profile is already in the OS temp dir. The claim was repeated in the harn
 comment too, which is where it probably came from; both are fixed. It **did** have the CDP trap
 below, and that is now fixed for real.
 
+**A packaged run can make the NEXT `npm run package` fail — and it fails leaving a STALE exe.**
+Electron holds `out/…/dxcompiler.dll` while it tears down, so a package started soon after a gate
+run dies with `EPERM: operation not permitted, unlink …dxcompiler.dll`. Forge reports it as an
+unhandled rejection **after** it has already logged "Built target main_window" and "Building
+production Vite bundles" with green ticks, so the tail of the log looks like a successful build.
+`out/` is then a mix: new Vite assets may be absent and **the old exe is still there**. Measuring
+that binary and reporting the result is the single worst failure mode in this track — it attributes
+a stale artifact's behaviour to code that never shipped. **Always check `PACKAGE_EXIT`, and confirm
+no `src` file is newer than the exe, before believing any packaged measurement.** Slice 62 hit this
+and caught it only because it diffed the exe timestamp against `src`; retrying once the tree was
+clear succeeded. Do not read the log tail as the verdict.
+
 Two more things that cost time in the same session, both now fixed in that harness:
 
 - A CDP target filter of `type === 'page' && !url.includes('?')` matches the `about:blank`
@@ -22,6 +34,2665 @@ Two more things that cost time in the same session, both now fixed in that harne
   an attached-to-the-wrong-document problem. Require the scheme too.
 - Reading `getComputedStyle(el).opacity` right after `el.focus()` returns the value
   **mid-transition**. A 150 ms reveal measures as `0`, i.e. as a CSS bug that isn't there.
+
+> **Ordering note.** Newest slice first, except **slice 45, which was appended to the BOTTOM
+> of this file** (search `SLICE 45`). Do not read the top as the latest state without checking
+> there. Also: **slices 51/52 and 54/55/56 ran CONCURRENTLY** on separate accounts, so near the
+> top the numbers interleave (57, 55, 56, 53…) rather than descending strictly. Each section
+> states what it owned; none of them overlap.
+
+> **A harness rule, learned twice now (slices 46 and 47).** A patch existing, applying,
+> compiling and passing its tests says nothing about which bytes are running — and a tool that
+> names its own output directory must not also trust what it finds there. Slice 47's gate read
+> a stale record from an identically-named directory and reported `n/a` about a run that had
+> just measured the answer.
+
+## SLICE 71 — PHASE 8 ITEM 3: YOUTUBE DISCOVERY, AND "AVANT-GARDE" WAS NEVER A FEATURE
+
+**Full write-up: `SLICE_71_YOUTUBE_DISCOVERY.md`.** Gates measured by the coordinator (its own were
+refused): **374 files / 4815 tests pass** — slice 71 contributes **3 files / 72 tests** — i18n
+**exit 0**, architecture **"Nothing new"**.
+
+**"& Avant-Garde" is struck from the plan** — see the annotated `SEANIME_MIGRATION_PLAN.md:633`.
+It is a **MyAnimeList genre** this repo already implements as data (`mediaDiscovery.ts:164`,
+`'avant garde': 3.2` in `GENRE_DIFFICULTY`, among `romance`/`school`/`sports`/`kids`). I verified
+the half the agent was blocked from: it appears **nowhere in the pinned upstream** `9bdd052`.
+
+**Item 3 therefore reduces to MASTER_PLAN §12's two unimplemented subsections** — Search and Smart
+Recommendations. The app could *manage playlists you already know about* and could not *find*
+anything.
+
+> **The API choice was made on a technical ground, not a convenience one, and it is the best
+> reasoning in the slice.** Whether a caption track is **author-written or ASR** is the single most
+> valuable study signal — and YouTube Data API `captions.list` **requires OAuth as the video's
+> owner**, so a third party cannot read it *at all*. `yt-dlp` returns `subtitles` vs
+> `automatic_captions` in one `-J` extraction, with no key. So: no key required, none committed,
+> and the feature never asks for one.
+
+**Flagged honestly by the agent:** it edited `src/preload.ts` and `src/renderer/window.d.ts` —
+outside its ownership list though not on the do-not-touch list — because a renderer feature cannot
+be wired without them; both edits additive.
+
+> **The one thing it could not check, checked — and it holds.** The agent could not run a live
+> `yt-dlp -J`, so the emitted shape was unverified. I ran one against a real search:
+> ```
+> ytsearch1:日本語 会話
+>   title             : 自然な日本語ってなに？ Japanese Listening Practice N3・N2向け
+>   subtitles         : { ja }              <- author-written
+>   automatic_captions: { ab, aa, af, ak, … } <- ASR
+>   language          : ja
+> ```
+> Both keys exist and are **distinct**, the search route works with no key, and the very first hit
+> is a Japanese video with genuine author subtitles. The signal the whole feature is built on is
+> real and obtainable.
+
+## SLICE 70 — PHASE 8 ITEM 2: THE LIVE GUEST PAGE HAS STUDY LOOKUP, AND A LATENT WEBVIEW HOLE IS CLOSED
+
+**Full write-up: `SLICE_70_BROWSER_OVERLAY.md`.** Gates measured by the coordinator (the agent's
+were all refused): **374 files / 4815 tests pass**, i18n **exit 0 / 6685 keys**, architecture
+**"Nothing new"** with **no new orphan** — the lesson from slice 69's unreachable panel held.
+
+**It verified the gap before building, as asked.** No live-mode overlay existed: a repo-wide grep
+for `ipc-message` and `sendToHost` returned **zero** hits in `src/`, and study lookup was wired only
+to the Reader Mode DOM. The Chrome extension had in-page lookup on any site while the app's own
+browser had none.
+
+### The security boundary, verified independently rather than taken on the agent's word
+
+> **It also closed a pre-existing latent hole, which is worth more than the feature.** The
+> `<webview>` relied on Electron's *defaults*; **nothing enforced them**. Any future edit adding
+> `nodeintegration` or `webpreferences="contextIsolation=no"` to the tag **would have been
+> honoured**. Now `attachNavGuards`' `will-attach-webview` handler (`main.ts:576`) forces
+> `nodeIntegration=false`, `contextIsolation=true`, `sandbox=true`, `webSecurity=true`, and
+> **deletes** renderer-supplied privilege attributes rather than merging them.
+
+The privilege decision is made in **main**, where a compromised renderer cannot reach it — not on
+the tag. I initially grepped the renderer, found only a comment saying `webpreferences` was
+"deliberately absent", and thought the claim was wrong. **It was my check that was in the wrong
+layer**, not the implementation.
+
+Confirmed by reading the code: **no new `ipcMain` channel exists at all.** The guest gets
+`ipcRenderer.sendToHost` only, which reaches the embedder element in the host renderer and *not*
+`ipcMain` — so the guest cannot touch the dictionary IPC. The lookup runs in host code on host data.
+
+Contract: two channels, one direction each, **allow-list not deny-list** (an unrecognised field is
+rejected), `text` ≤ 400 chars windowed *around* the offset so one huge text node cannot push a
+megabyte, and an offset that doesn't index its own text is a rejection rather than a clamp. Both
+handlers check `event.isTrusted`, so page script cannot forge a gesture.
+
+> **The rate limiting is doubled on purpose, and the reasoning is the good part:** the guest
+> self-limits (8/sec + a 90 ms hover floor) **and** the host re-limits with `createGuestLookupGate`.
+> The guest limiter is *advice*, because it runs inside the process being defended against; the
+> host gate is the enforcement.
+
+### One test of its own I had to fix — a guard measuring the bundler, not the code
+
+`immersionGuestBridge.test.ts` asserted the serialized guest body contains `WINDOW_MS = 1000`, and
+the source says exactly that — yet it failed. The body is read back through
+`Function.prototype.toString()` **after esbuild transforms the module**, and esbuild re-encodes the
+literal as **`1e3`**. The guard was asserting how the bundler chose to spell a number, which it may
+change for any value at any time. It now parses the literal and compares numerically, keeping its
+real job (catching drift from `IMMERSION_GUEST_LIMITS`) without depending on the spelling. 37/37.
+
+## SLICE 72 — EVERY A11Y NUMBER SO FAR WAS ABOUT ONE THEME. AERO HAD 24 TEXT FAILURES AND EVERY FOCUS RING BROKEN.
+
+**The blind spot:** B1/B2/B3 have only ever run on the **default palette**. The app ships twelve
+themes. `frutiger-aero` is a **light**, glass-and-sky palette — and the hardest-won finding of the
+previous night was that *a translucent boundary cannot satisfy 1.4.11 at all*. "The app passes B2"
+was a claim about one theme wearing the name of all of them.
+
+`packaged-a11y-deep-gate.mjs` now takes **`--theme=<id>`**. Two things it does deliberately:
+the theme is read **once at boot** (`theme/engine.ts:107`), so it seeds `localStorage['jp-os-theme']`
+and **reloads** — setting it on a live page changes nothing already stamped onto `<html>`; and
+**step 0a reads the applied value back off the DOM and hard-fails on a mismatch**, because
+`applyThemeAttributes` only stamps `data-materials` when the theme actually registered, so a typo'd
+id would otherwise measure the default palette and report it as aero.
+
+`RUN_STAMP=aero01 node docs/migration/tools/packaged-a11y-deep-gate.mjs --theme=frutiger-aero`:
+
+| step | default palette | **aero** |
+|---|---|---|
+| A2 Tab coverage | PASS 125/125 | **PASS 128/128** |
+| B2 non-text | PASS — 99 of 234 scored | **"PASS" on 8 of 251 — SEE BELOW, NOT A PASS** |
+| C0 / E1 | PASS | **PASS** |
+| B1 text contrast | 0 real failures | **24 real** (26 of 129 below AA; 2 exempt) |
+| B3 focus ring | PASS | **FAIL — 4 of 4 ringed stops below 3:1** |
+
+### SLICE 73 — THE HOLE IS CLOSED. PIXEL SAMPLING SEES 231 OF 251, AND 114 CONTROLS ARE GENUINELY INVISIBLE.
+
+**Full write-up: `SLICE_73_PIXEL_CONTRAST.md`. The agent BUILT the sampler and could not run it —
+it hit its session limit with its own section 5 reading "THE NUMBERS — ALL UNMEASURED". Every
+number below was measured by the coordinator.**
+
+`docs/migration/tools/a11y-pixel-sampler.mjs` (new) + `--pixels` on the gate. It samples what is
+actually **painted** instead of resolving CSS colours, so glass and gradients stop being invisible.
+
+| | CSS path | **pixel path** |
+|---|---|---|
+| B2 controls scored | 8 of 251 | **231 of 251** |
+| B1 text samples scored | 129 (260 unmeasurable) | **326 of 389** |
+
+**All five self-proof steps passed before any number was believed** — and the design is the most
+careful instrument work in this track:
+
+- **negative controls that prove the check CAN fail** — a viewport contradicting the derived scale
+  is rejected; one stray matching pixel makes the mapping fail rather than skew;
+- **fiducials chosen against specific failure modes** — non-square (80×24, 24×80) and asymmetric so
+  an x/y transposition cannot pass, in colours like `(253,7,251)` rather than round primaries,
+  because a theme gradient can plausibly contain `#ff00ff` and essentially never `#fd07fb`;
+- **scale derived from the SEPARATION between two fiducials**, so sub-pixel antialiasing error
+  cancels, then four independent checks must agree or no number is produced;
+- **`devicePixelRatio` recorded but NOT used** — "evidence, not input";
+- **an anti-animation guard**: rects read, frame captured, rects read *again*; anything that moved
+  is dropped, because otherwise a hover transition makes geometry and pixels disagree silently;
+- **its own blind spot stated up front**: `elementFromPoint` ignores `pointer-events: none`, so a
+  decorative overlay above a control would corrupt the read undetected — which is *why* it reports
+  alongside the CSS path rather than replacing it.
+
+> **THE HEADLINE NUMBER IS 114, NOT 217.** B2p's raw `belowThree` is 217, and **that must not be
+> read as 217 defects.** 153 of 231 scored controls sit on a wide backdrop span, and the scoring is
+> deliberately strict — strongest boundary against the *weakest-contrasting* adjacent colour — so
+> over a gradient it nearly always fails somewhere. The worst control scores `ratio 1` while its
+> `bestPairRatio` is **4.86** across 9 distinct outside colours.
+>
+> The first run could not be split at all, because the proof keeps only the worst 20 rows. **The
+> summary now carries the split**, so the number is defensible rather than dramatic:
+>
+> | reading | count | meaning |
+> |---|---|---|
+> | strict | 217 | fails against the worst spot on its backdrop |
+> | **both readings** | **114** | **invisible against its ENTIRE backdrop — unambiguous** |
+> | strict only | 103 | visible against most of its backdrop; a judgement call |
+>
+> **114 aero controls have boundaries invisible against their whole backdrop.** Every one of them
+> was invisible to the old instrument. That is the real cost of the blind spot, and it is now
+> open work with a number attached rather than an unknown.
+
+### The actionable aero number: 217 → 114 → 23 → 22, and what the 23 actually are
+
+Each narrowing came from asking what the instrument was counting, not from moving a threshold.
+
+| step | count | why it shrank |
+|---|---|---|
+| `belowThree`, flat | 217 | strict reading over gradients |
+| `belowThreeOnBothReadings` | 114 | also fails the lenient reading |
+| **load-bearing** | **23** | **91 were `decorative`** — a control naming itself |
+| after the input fix | 22 | one affordance closed |
+
+> **`loadBearingBelowThreeOnBothReadings` first reported 0 — and that was a FALSE ZERO I nearly
+> shipped.** Every role read `0`, *including the catch-all `decorative`*, while 114 rows were below
+> threshold. Those cannot both be true. `carry` in `a11y-pixel-sampler.mjs` is an explicit field
+> whitelist, so `boundaryRole`/`hasText` were computed page-side and discarded before scoring.
+> **All-zero across every bucket is the shape of a field that never arrived, not of a clean run** —
+> and unlike the other eight wrong-layer findings this one produced a *reassuring* number, which is
+> the kind nobody re-examines.
+>
+> Then the count was right and still not actionable: **none of the 23 appeared in the record**,
+> because `worst` keeps the 20 lowest ratios and on aero all of those are `decorative`.
+> `worstLoadBearing` now travels with the count.
+
+**The 23, named:** 8 `os-tray-btn` (identity), 6 `os-task-win.app-*` + 6 other `.active` (state),
+3 inputs (affordance).
+
+> **The 8 tray buttons are a GATE LIMITATION, not a defect — do not "fix" them.** They paint
+> `rgb(51,151,236)` on `rgb(42,141,231)`: blue on blue, 1.12:1. The gate classes "no text" as
+> `identity`, but what identifies a tray button is its **icon**, which the gate does not measure.
+> Drawing boxes around 8 tray icons to satisfy a metric would be a visual regression for no user
+> benefit. Recorded so the next reader does not re-derive it.
+
+**Fixed — the input affordance.** `aero-apps.css:6041` hardcodes
+`border: 1px solid rgba(160,200,226,0.85)` over a white gradient, compositing to `rgb(174,208,230)`
+— matching the measured `rgb(173,207,230)` to within rounding, and **1.63:1**. That rule outranks
+the `--control-edge` token, so the token could never reach it. Now `#4f7a9b`: same family, opaque,
+4.58:1 on white and 3.85:1 on the darkest surface it sits on. Affordance 3 → 2.
+
+**Fixed — the state indicators, via a third extracted token.** Four state bars were drawn in
+`var(--accent)`, and aero's accent is a *light* cyan: **2.13–2.82:1** on its own surfaces (my
+independent arithmetic reproduced the measured 2.13 exactly). New `--state-indicator`, defaulting to
+`var(--accent)` so the dark themes are unchanged, set to `#00697f` in aero (**4.76:1** worst case).
+
+> **The pattern worth carrying: one brand colour cannot satisfy 1.4.11 across a dark theme and a
+> light one at once.** This track has now had to extract three semantic tokens for jobs `--accent`
+> was silently doing — `--control-edge` (affordance), `--focus-ring-color` (focus), and
+> `--state-indicator` (state) — and in **three separate cases a rule outranked the token meant to
+> control it**: `--control-border` shadowed by a later `:root` definition, `--focus-ring-color`
+> bypassed by `html[data-display-focus]`, and `--control-edge` overridden by a hardcoded aero
+> border. **Tokens in this codebase are advisory until something proves they win.**
+
+### The focus-ring token could not fix its own theme — a bypass, found by re-measuring my own fix
+
+`B3` still failed 4/4 on aero *after* `--focus-ring-color: #00697f` shipped in the CSS, all four on
+one element, still painting the old cyan. Cause (`styles.css:1065`, and a second copy at `:23735`):
+
+```css
+html[data-display-focus='normal'] *:focus-visible,
+html[data-display-focus='strong']  *:focus-visible {
+  outline: … color-mix(in srgb, var(--accent) calc(var(--display-focus-alpha,.75)*100%), transparent);
+}
+```
+
+It recomputes the ring from `--accent` and **never reads `--focus-ring-color`**, while outranking
+`a11y.css`'s `:focus-visible`. **A theme could not fix its own focus ring.** The tell was in the
+data all along: the *declared* alpha was 0.75 while the token said 55%.
+
+Now routed through `var(--focus-ring-color, …)`. Strength still varies — `--display-focus-width` is
+2px normal / 3px strong (`displayPrefs.ts:205`) — and the alpha is deliberately dropped, the same
+finding `--control-edge` already records: a translucent boundary cannot reliably clear 3:1.
+
+**Re-measured after rebuild: B3 PASS — `rgb(0,105,127)` on `rgb(158,216,242)` → 4.08:1**, matching
+the predicted value to the digit. **Aero's declared-colour gates are now all green: B1 0 real
+(24 → 0), B2 PASS, B3 PASS.**
+
+> ### DO NOT QUOTE "aero B2 PASS". It is a pass on 8 samples out of 251.
+>
+> | | default | aero |
+> |---|---|---|
+> | controls seen | 234 | 251 |
+> | **scored** | 99 | **8** |
+> | unmeasurable | 9 | **243** |
+>
+> **97% of aero's controls are UNMEASURABLE**, and B1 shows the same shape (260 unmeasurable
+> against 129 measured). The cause is honest and is the measurer working correctly: aero is glass
+> and gradients, and a boundary over a non-flat backdrop has no single colour to compare against —
+> the gate's own B0 self-test asserts `text over a gradient -> UNMEASURABLE as designed`.
+>
+> **But the consequence must not be rounded up.** This is the identical shape to B3's false green
+> the previous night — PASS on 2 samples of 52 — which hid a focus indicator failing on every
+> window. **Aero's non-text contrast is not verified; it is unmeasured.** The 24 B1 failures and
+> 4 B3 failures below are what the 3% *could* see, so they are a floor, not a total.
+>
+> Closing this properly needs a different instrument — sampling the actually-rendered pixels behind
+> each boundary (screenshot-based) rather than resolving CSS colours. That is a real piece of work
+> and is **not** done. Recorded rather than glossed.
+
+### B3 — and why "make it opaque" was the WRONG fix here
+
+The dark theme's taskbar ring was fixed by making a 70% accent **opaque**. That reasoning does not
+transfer. Aero is a **light** theme, so the ring must go **darker**, not merely stronger — and
+**fully opaque `--accent` (#00a8c8) still only reaches 1.82:1** on the pale glass `rgb(158,216,242)`
+it was measured against. Applying the previous fix by analogy would have produced a ring that still
+failed and a comment claiming it passed.
+
+`--focus-ring-color: #00697f` — same aqua family, deeper: **4.08 / 4.84 / 6.01:1** across the three
+backdrops, worst case carrying margin rather than sitting on the line.
+
+### B1 — all 24 real failures were the same thing: green text
+
+Not 24 independent defects. The 5 distinct failing pairs collapse to **greens tuned for dark
+panels**, used on a light theme where light-on-dark inverts:
+
+| colour | as text on aero | count |
+|---|---|---|
+| `#5fd29a` hardcoded in `styles.css` (:7638, :7805, :22009) | 1.55–1.72:1 | 14 |
+| `#35a86b` = `--accent-2` / `--aero-green` | 2.49–2.75:1 | 10 |
+
+`--accent-2` is overwhelmingly a **text** colour — **103 `color:` uses** against 35 backgrounds and
+64 borders — so the fix belongs on the token, not on 103 call sites. Both now `#1a6b43`: same green,
+deeper, **5.36:1 worst case** across the four backdrops the gate actually measured. The three
+hardcoded literals are overridden **by selector, scoped to aero**, so the dark themes keep the
+colour that is correct for them.
+
+> **The fifth failing pair was already right.** `#8aa5b3` at `aero-apps.css:5710` sits on
+> `.btn:disabled` — WCAG 1.4.3 **exempts** inactive controls, and it is exactly the 2 samples the
+> gate had already excluded. Darkening it would make disabled buttons read as enabled. Left alone,
+> for the same reason the default theme's four below-AA disabled samples were left alone.
+
+**Trade-off stated rather than hidden:** the 35 background uses of `--accent-2` become a deeper
+green too. That is coherent on a light theme, and the re-measurement is what confirms it — pending
+a rebuild, which is blocked while two agents hold `src/`.
+
+## PHASE 8 IS OPEN — SLICE 69 LANDED AUTHENTICATED MAL SYNC (item 1 of 4)
+
+The user asked for new features, so Phase 8 — deferred since 2026-07-30 — is started. Plan order is
+*Authenticated MAL sync → secure browser/overlay host → YouTube & Avant-Garde discovery →
+Chrome-extension parity*. **Item 1 is done**; full write-up in `SLICE_69_MAL_SYNC.md`.
+
+**Gates: 370 files / 4706 tests pass**, i18n exit 0, audit exit 0, architecture **"Nothing new"**.
+
+**Design, and why it is deliverable despite the network being useless tonight.** Every side effect
+is injected: HTTP goes through a `MalTransport` boundary, with `netMalTransport` using Electron's
+`net` to match `mediaProviderClients.ts`. **36 tests, zero network calls in them** — verified by
+grepping the test file for `fetch(`/`https.request`, which returns 0. That is what let a feature
+land on a night when Jikan returned 504 and AniList 403.
+
+**Security posture.** Tokens live in the **main process** at `<userData>/mal-tokens.json`,
+`safeStorage`-encrypted; the renderer is told only *whether* an account is connected, never the
+token. Where `safeStorage.isEncryptionAvailable()` is false the fallback is **visible** rather than
+a silent plaintext write. No credential or client id is committed — checked. `clientId` is
+configurable with an explicit not-configured state.
+
+**Deliberately not done:** no auto-sync loop, no sync-on-launch, no timers. A feature that silently
+mutates a real MAL list on first run is not shippable untested.
+
+> **The architecture gate earned its keep.** It failed the suite with one new finding:
+> `MalSyncPanel.tsx` was an **orphan module — nothing imported it**. The feature was fully built,
+> fully tested, and **unreachable** — the exact defect class as slice 63's allow-list, one slice
+> later. Wired into `ScraperPage.tsx` beside the other tracking panels. `orphan-module` 2 → 1.
+> A gate that demands each new finding be *judged* rather than auto-accepted is what caught it.
+
+**Before this can run against a real account:** a MAL `clientId`, and connectivity to
+`api.myanimelist.net`.
+
+## MAL API — VERIFIED AGAINST THE OFFICIAL DOCS 2026-08-02. USE THIS, NOT MODEL MEMORY.
+
+Slice 69 (Phase 8 item 1, authenticated MAL sync) had **`WebFetch` and `WebSearch` refused** by its
+permission layer, so it could not open MAL's reference and honestly flagged its whole parameter
+table as model knowledge rather than presenting it as verified. **The coordinator fetched the docs;
+these are the confirmed names.** Check the implementation against them.
+
+**OAuth2** — `https://myanimelist.net/apiconfig/references/authorization`
+
+| | |
+|---|---|
+| authorize | `https://myanimelist.net/v1/oauth2/authorize` |
+| token | `https://myanimelist.net/v1/oauth2/token` |
+| PKCE | **`plain` only** — *"Currently, only the `plain` method is supported."* Confirmed. `code_verifier` and `code_challenge` are the same string, and an S256 "fix" breaks the flow. |
+| authorize params | `response_type=code`, `client_id`, `state`, `redirect_uri`, `code_challenge`, `code_challenge_method` |
+| code exchange | `grant_type=authorization_code`, `code`, `redirect_uri`, `code_verifier`, `client_id`, `client_secret` |
+| refresh | `grant_type=refresh_token`, `refresh_token` |
+
+**Data API** — note the host differs from OAuth: **`api.myanimelist.net`**, not `myanimelist.net`.
+
+```
+PATCH https://api.myanimelist.net/v2/anime/{anime_id}/my_list_status
+content-type: application/x-www-form-urlencoded
+```
+
+> **THE TRAP, and it is the kind that silently half-works:** the request field is
+> **`num_watched_episodes`** and the response field is **`num_episodes_watched`**. Different word
+> order, same concept. Round-tripping the response field name back into a write sends a parameter
+> MAL ignores — the call returns 200 and the episode count never moves. Any test that asserts on a
+> mocked response it wrote itself will agree with the bug.
+
+Sources: [authorization reference](https://myanimelist.net/apiconfig/references/authorization),
+[unofficial API specification](https://github.com/SuperMarcus/myanimelist-api-specification).
+
+> **Outcome of the check: slice 69's table was correct on every point** — both endpoints, `plain`
+> PKCE, both grant shapes, the `api.myanimelist.net` host split, the form-urlencoded write, **and
+> the `num_watched_episodes` / `num_episodes_watched` asymmetry, which it identified on its own and
+> documented as a trap before anyone verified it.** It was still right to label the table unverified:
+> "I could not read the source" and "I happened to be correct" are different claims, and only one of
+> them is checkable at the time of writing. That is the disposition worth keeping.
+
+## SLICES 63 + 65 + 66 — THE ALLOW-LIST IS REACHABLE, THE ARTWORK FIXTURE IS ANSWERED, AND 33 PLURALS WERE SHIPPING AS RAW ICU.
+
+**Three slices, two run on separate accounts concurrently. Full write-ups:
+`SLICE_63_PROFILE_EDITOR.md` and `SLICE_65_ARTWORK_FIXTURE.md`.**
+
+> **Both agents were BLOCKED from running any gate** — `npx vitest run`, `npm test` and
+> `node …/audit-carried-items.mjs` were all refused by their permission layer, in five spellings.
+> Neither could measure its own work; both said so plainly instead of quoting the brief's baselines
+> as though they had. **The coordinator ran every number below.** Treat "agent wrote a test" and
+> "the test passes" as two different claims for the rest of this track.
+
+**Gates, measured here: `npx vitest run` → 368 files / 4664 tests pass** (from 365 / 4622),
+`node tools/i18n-check.cjs` → **6604 keys, exit 0**, `audit-carried-items.mjs` → exit 0.
+
+### B2 IS CLOSED — WCAG 1.4.11 now passes against shipped bytes
+
+Rebuilt 22:39 (package exit 0, extension-mirror hash **identical** before and after, control binary
+intact) and re-measured:
+
+```
+PASS — B2 non-text contrast: 107 boundaries scored,
+       0 LOAD-BEARING  {"identity":0,"affordance":0,"state":0}
+```
+
+**From 20 load-bearing to 0**, and only ~4 of those 20 were ever real defects — the rest were the
+probe scoring a layer the design does not use. The arc, for anyone re-reading it: 13 affordance
+borders were a genuine fix (`--control-edge`); 15 taskbar "failures" were an `::after` the probe
+could not see; 3 `.gram-level-btn.active` were a genuine 16%-alpha wash now carrying an opaque
+`inset 0 -2px 0 0 var(--accent)` underline. That underline's predicted ratios — **4.15:1** on
+`--surface-2`, **5.33:1** on the backdrop — were re-derived here from the WCAG spec in code written
+independently of the gate, and matched to the digit before the run confirmed them.
+
+The full accessibility suite now reads: **A2 121/121 PASS, B1 0 real failures, B2 PASS, B3 52
+ringed stops 0 below 3:1, E1 4/4 named.**
+
+### Slice 67 — the renderer-offline item was the GATE, not the app. Structural gap fixed; verdict blocked on a third-party outage.
+
+`phase9.untouched[6]` has carried *"the RENDERER's off-machine surface is still unexercised —
+0 external requests in BOTH modes"* since slice 50, blamed on a throwaway profile having nothing to
+fetch. **That diagnosis was wrong.** Step 3 calls `window.api.searchDiscovery`, which runs in the
+**MAIN process** across the preload bridge. Nothing was ever *rendered*, so the renderer could never
+request anything. Zero-in-both-modes was a property of the harness. **Sixth wrong-layer finding in
+this line of work.**
+
+**The renderer's external surface is not a guess — the CSP is the enforced allow-list**
+(`shared/contentSecurityPolicy.ts`):
+
+```
+img-src     … https://cdn.myanimelist.net https://*.anilist.co
+connect-src … https://huggingface.co https://*.huggingface.co https://*.hf.co
+```
+
+Remote cover art, and Whisper model downloads. **The artwork fixture cannot exercise this** — it
+seeds `playfile://` posters, which are local by construction. Only `DiscoverContent.tsx:659`
+(`<img src={candidate.posterUrl}>`) paints remote art, so that is the surface to open.
+
+New **step 3c** opens the `scraper` section and drives **the app's own search box** — deliberately
+not injecting an `<img>`, which would only prove the harness can make a request. It reports
+`MEASURED`, never PASS/FAIL, because a single run cannot be a verdict here.
+
+> **The control came back VACUOUS, and that is the gate working correctly.** `searchDiscovery`
+> resolved with `count: 0` **unblocked**, so the blocked run's zero would have proved nothing.
+> Cause established, not assumed:
+> - the machine **has** internet — `cdn.myanimelist.net` answers 404, so DNS+TCP+TLS all succeed;
+> - `api.jikan.moe` returns **504 on 3/3** attempts — upstream outage;
+> - `graphql.anilist.co` returns **403** with *and* without a browser User-Agent — blocked from
+>   this network;
+> - `searchDiscovery` queries **both** in parallel and catches each to `[]`
+>   (`mediaDiscovery.ts:77-81`), so 0 results is correct behaviour, not a defect.
+>
+> **STILL OPEN, and it needs nothing but provider availability:** re-run
+> `packaged-offline-gate.mjs --control` then the blocked half when Jikan/AniList are reachable.
+> Whisper first-use download remains deliberately untried — a multi-hundred-MB fetch is not a gate.
+
+> **A "carried defect" I recorded here and then disproved — do not re-open it.** I noted
+> `DiscoverContent.tsx:659` rendering `<img … alt="">` on remote poster art as the same unlabelled-
+> artwork defect. **It is not.** That image sits inside
+> `<aside class="disc-inspector" aria-label=…>` directly beside `<h2>{candidate.title}</h2>`
+> (`:664`), so the item is named in text and the art is genuinely decorative. `alt=""` is correct
+> there. Second time in one evening I called `alt=""` a defect without checking whether the
+> surrounding element names the item — the check is cheap and I should run it first every time.
+
+### CLOSED — the renderer's off-machine surface, open since slice 50, is now measured
+
+The blocked/control pair finally exists, and the renderer half is no longer a zero read off an
+absence:
+
+| | control | blocked |
+|---|---|---|
+| main `searchDiscovery` | **6 results** | **0** |
+| discover result rows | 6 | 0 |
+| renderer remote `<img>` | **1** — `https://s4.anilist.co/…/bx182255-…jpg` | 0 |
+| renderer external requests | **1** | 0 |
+| shell still standing | yes | yes |
+
+> **The finding, and it explains the whole history of this item.** The renderer's off-machine
+> surface is **downstream of the main process**. It fetches cover art only for a *selected
+> candidate*, and candidates come from `searchDiscovery`, which runs in main. With the internet cut
+> the search returns nothing, so there are no rows, nothing to select, and no image is ever
+> requested — `picked: {state: 'no-rows', rows: 0}`. That is why "0 external requests in BOTH modes"
+> looked identical for so long: the renderer never got as far as needing the network. The app
+> degrades cleanly rather than hanging (shell mounted, no error text, `3b` resolves in ~1 s).
+
+**Corollary worth keeping:** the renderer's offline behaviour cannot be exercised independently
+while the main-process search is upstream of it. Testing it in isolation would mean seeding results
+rather than searching for them.
+
+**Six iterations, six different causes**, each visible only because the step returns *distinct
+states* rather than a boolean. Every one of them would have read as "the app makes no external
+requests":
+
+| # | reported | actual cause |
+|---|---|---|
+| 1 | `typed` | search is a **button click**, not a form submit — Enter and `submit` reached nothing |
+| 2 | `typed-no-button` | Discover is a **page inside** `ScraperView`; its controls were never mounted |
+| 3 | `typed-button-still-disabled` | **two** `input[type=search]` exist; typed into the ScraperPage top-bar filter |
+| 4 | `typed-and-clicked`, `totalImgs: 0` | the poster lives in `.disc-inspector`, the **selected-candidate** panel |
+| 5 | `row-clicked`, `selectedRows: 0` | clicked `.disc-row **disc-row-head**` — the **column header** shares the class |
+| 6 | — | works |
+
+### C0b PASSES — and the artwork fixture immediately earned its keep
+
+`SEANIME_SIDECAR=0 node docs/migration/tools/packaged-a11y-deep-gate.mjs --fixture` — same binary,
+same fixture, **one flipped flag**. That is the controlled difference slice 65 asked for, and **no
+gate edit was needed**: the gate spreads `{ ...process.env }` into the child at line 1545, so the
+opt-out propagates from the shell. (Slice 65 believed a source change at the `spawn` was required —
+it is not.)
+
+```
+PASS — C0b: 12 of 16 distinct <img> and 8 CSS-background element(s) are fixture art
+```
+
+**Every one of slice 65's predictions held**: ~12 `playfile://` images, `cssBackgroundArt` ≥ 8
+(measured 8, control 0), and `--fixture` alone still failing identically. Predictions recorded
+before the run and then checked are worth far more than a report asserting a fix.
+
+> **The fixture existed to make a number meaningful — and the first meaningful number was an
+> INSTRUMENT ARTIFACT. Corrected below; do not quote the 13.**
+> ```
+> MEASURED — C1: 0 with NO alt attribute, 13 marked decorative (alt=""),
+>                of which 13 sit in a card carrying no text at all
+> ```
+> I read that as "thirteen poster tiles announce nothing at all" and briefed slice 68 to fix it.
+> **That was wrong, and slice 68 refused the premise and disproved it.**
+>
+> `packaged-a11y-deep-gate.mjs:792` located the card with `img.closest('… [class*="card"] …')`.
+> **`Element.closest()` starts at the element itself**, and this app names its poster image
+> `medialib-card__img` — which contains `card`. So the "card" it found *was the `<img>`*, whose
+> `textContent` is `''` by definition. Verified independently on the proof: **9 of 10 examples have
+> `cardEl === el`.** Any image in this app whose own class contains card/tile/row/item hit it.
+>
+> **The counter-measurement is in the same JSON, from the same run**: the keyboard walk records
+> twelve `div.medialib-card` stops with computed accessible names `"Fixture Title 1..12"`. The items
+> *are* announced. Two readings of one run disagreed and the one computing an accessible name wins
+> over the one running a CSS selector. **Real WCAG 1.1.1 failures in that set: 0.**
+>
+> **FIXED in the gate** (`img.parentElement?.closest(...)`) so the metric measures the card rather
+> than the image. In writing that fix I put backticks in the comment and broke the file — the exact
+> trap documented ten lines below it. Selfcheck now exit 0, `scan-probe-escapes` 0.
+>
+> **Slice 68 still shipped the valuable half**, and it is not `alt={title}` anywhere. All seven
+> call sites already name the item (`aria-label`, a printed `<strong>`/`<h3>`, or an
+> `aria-labelledby` section), so the art is genuinely decorative on every one. What it changed is
+> that `MediaArtwork` now *requires* an explicit `{ decorative: true } | { alt: string }` — omitting
+> both, passing both, or `decorative={false}` are all type errors, so no future surface can inherit
+> a silent default. It also fixed a real latent bug: the artless fallback was `aria-hidden`, so a
+> caller passing a real `alt` would have been labelled only while the image loaded and **silent for
+> exactly the items with no art**.
+>
+> **This is the seventh wrong-layer finding tonight, and the first one I authored.** The lesson the
+> record keeps re-teaching applied to me: a number is not a defect until you have checked which
+> layer produced it.
+>
+> **Confirmed by re-measurement** against the 23:07 rebuild (`SEANIME_SIDECAR=0 … --fixture`):
+> `decorativeInsideTextlessCard` **13 → 1**, and the single survivor is
+> `img.reading-garden-foreground-mask` with `cardEl: null` — the one genuinely decorative mask,
+> correctly keeping `alt=""`. **Real WCAG 1.1.1 failures: 0.** C0b still PASS; A2 PASS **125/125**
+> with the fixture library, where the 7-unit `distinctStops` shortfall is correctly explained as
+> duplicate `describe|name` pairs (eight books, each with a "Remove from library" button) rather
+> than missing stops — slice 55's identity-based counting doing exactly its job.
+
+### The `closest()` self-match class, audited across every harness
+
+All **19** `closest()` uses under `docs/migration/tools/**` were checked. The poster card was the
+**only** genuine instance, and the rule is now explicit:
+
+- **Risky:** substring class selectors — `[class*="card"]` matches an element whose *own* class
+  contains `card`.
+- **Safe:** tag and attribute selectors — `label`, `form`, `fieldset`, `button`, `[disabled]`,
+  `[aria-hidden="true"]`. An `<input>` is not a `<label>`, and where self-match *can* happen
+  (a button that is itself `[disabled]`) it is the correct answer.
+
+Worth keeping because the fix is invisible in a diff: `img.closest(…)` and
+`img.parentElement?.closest(…)` differ by one property and by every number downstream of them.
+
+### Slice 63 — the security control no user could operate (claude-x)
+
+Phase 7 proved a narrowed built-in profile makes the executor refuse a step. It proved it by
+hand-editing `localStorage`, because that was the only way: `disabledOperations` /
+`addedOperations` appeared **nowhere** in `src/renderer`, and the panel rendered the allow-list as a
+**count**. There is now an editor (`components/blanc/AgentProfileOperations.tsx`, new) that writes
+the delta form directly, lists the whole 53-operation catalogue rather than only what is enabled (a
+list of only-enabled is a one-way door — narrowable, never restorable), and leaves built-ins
+editable, since they are all a fresh user has.
+
+> **The implementation was right and its TEST was wrong — and the bug is worth carrying.**
+> `loadLocalAgentProfiles` caches the last store in a module-level `fallback` and replaces it
+> **only when localStorage HAS a value**:
+> ```js
+> if (raw) fallback = normalizeAgentProfiles(JSON.parse(raw));
+> return fallback;
+> ```
+> `beforeEach` stubbed a *fresh empty* localStorage, so the read missed and the already-imported
+> module handed back **the previous test's already-narrowed store**. The two toggles then ran
+> backwards — off→on, on→off — ending at 18 instead of 19. It **passed in isolation and failed in
+> the full file**. Fixed by seeding an empty store in `beforeEach`, which forces the parse path.
+> Two other hypotheses (an empty-delta leak; an operation missing from the catalogue) were
+> **disproved by probe** before the third held — the shared logic measured clean end to end.
+
+### Slice 65 — the artwork fixture: the bytes were never wrong (claude-backup)
+
+**Verdict: candidate 4, and no byte of `seedArtworkFixture()` needed changing.** The stores are
+correctly named, located and shaped — proved by a new unit test that drives the *real*
+`registerMediaIpc()` / `registerLibraryIpc()` handlers over the fixture's exact bytes
+(`src/main/__tests__/artworkFixture.test.ts`, **8 tests, all passing**, with `ensureMediaArtwork`
+mocked to `null` so a working thumbnailer cannot mask a broken `posterPath`).
+
+**No surface the gate opens renders `media.json` as an `<img>` any more.**
+`AppSection.tsx:73` routes `player` to `MediaWorkspaceSectionView`, which renders the Seanime
+workspace — fed by the sidecar's HTTP API and AniList key art. `MediaLibraryShell` is only reached
+on the `SEANIME_SIDECAR=0` branch, and `MediaCenterView:1332` hides its own `library`/`video` tabs
+whenever the workspace is available, closing the escape hatch. The comment in the gate described a
+mechanism **routed away from on 2026-07-31, three days before the fixture was written**.
+
+**The book half can never satisfy C0b at all**: `coverStyleFor` returns a
+`background-image` on `<div>`s, and C0b filters `document.querySelectorAll('img')`. A perfectly
+seeded book library contributes 0 to it — but should move `cssBackgroundArt` from 0 to ≥8.
+
+Its predictions, recorded before the run so they can be checked rather than admired: `--fixture`
+alone still FAILs identically (`fixtureImagesOnScreen: 0`); `cssBackgroundArt` ≥ 8 or its reading of
+the book half is wrong; **`SEANIME_SIDECAR=0 … --fixture` should PASS** with ~12 `playfile://`
+images. That last one is the real controlled difference — same binary, same fixture, one flipped
+flag.
+
+### Slice 66 — 33 plurals were rendering as raw ICU source on live surfaces
+
+Found while replacing one key on the slice-63 surface, and **not caused by that slice**.
+`isPluralForms` (`core.ts:41`) only recognises an **object** carrying `other`. A string entry falls
+through to `interpolate`, whose regex is `/\{(\w+)\}/g` — which cannot match `{count,` (the comma)
+or `{# result}` (the `#` and the spaces). So the template is returned **verbatim** and the user
+reads `{count, plural, one {# result} other {# results}}` off the screen.
+
+**Neither existing gate could see it.** `i18n-check.cjs` and the catalog-hygiene block both ask only
+whether every language *has* the key and whether its value is a non-empty string — and a broken ICU
+template is a perfectly good non-empty string. Call sites confirmed live on 4 of 5 spot-checked keys.
+
+All 33 converted to object form (en 14, ja 8, zh 8, ru 11 — the counts differ per language, so the
+"same broken shape everywhere" reading was wrong). Two `ru` entries were multi-line and were done by
+hand; the converter **refused** them rather than guessing.
+
+**Two regression guards added** to `i18n.test.ts`: no catalog value may be a string containing
+`, plural,`, and every plural object must carry an `other` arm. The first was **proved to fail on a
+reintroduced defect** (it names the offending key) and to pass again when restored — a guard that
+cannot fail is worth nothing, and an earlier attempt to verify it silently changed nothing because
+a `sed` delimiter collided with the `#` in the ICU text.
+
+### Also re-verified here
+
+**Phase 7's refusal chain still holds against the current build**, not just the 18:09 one it was
+first proven on — narrowed arm fails with the allow-list message, control arm completes the same
+step from the same persisted plan, plan produced by the real local model.
+
+`scan-probe-escapes.mjs` reports **0** suspect escapes in `packaged-a11y-deep-gate.mjs`; the six
+other files it flags are confirmed false positives (comments containing `C:\…`, ordinary Node
+regexes).
+
+## SLICE 62 — THE RING PARSER HAD NEVER RUN, AND UNDER IT THE TASKBAR'S INDICATOR IS A PSEUDO-ELEMENT.
+
+> **FINAL STATE — the first fully clean run of this gate.**
+> `proof/packaged-a11y-deep-20260802193248/` (`--fixture`): **13 PASS, 4 MEASURED,
+> 2 NOT-REACHABLE, 0 FAIL.**
+>
+> | step | result |
+> |---|---|
+> | B2 non-text contrast | **PASS** — 107 scored, **0 load-bearing** (`identity 0, affordance 0, state 0`) |
+> | B3 focus ring | **PASS** — 52 ringed stops, 0 below 3:1 |
+> | A2 keyboard reach | **PASS** — 129/129 across 4 surfaces |
+> | C0b fixture painted | **PASS** — 8 CSS-background elements are `media://` fixture art |
+> | D0 player overlay / E2 disabled sliders | **NOT-REACHABLE** — correctly *not* claimed as passing |
+>
+> **B2's arc: 20 → 18 → 3 → 0.** Of the original 20 "load-bearing failures", **17 were the
+> instrument** (2 unseen accent bars, 15 unseen `::after` markers) and **3 were a real defect**.
+> Gates alongside: 365 files / 4622 tests, audit exit 0, `progress.json` parses, extension mirror
+> identical across both packages (13 files).
+>
+> Read `$?` from this gate as trustworthiness, not conformance — see the exit-code note below.
+>
+> **Binary identity matters here and the tree is busy:** the run above measured the exe built at
+> **22:17**, whose only shipped change over the previous artifact was `styles.css`. Another session
+> rebuilt at **22:39** with slice 63's UI work included.
+>
+> **Independently re-confirmed on that newer binary** by the other coordinator's run,
+> `proof/packaged-a11y-deep-20260802194014/` (no `--fixture`, so P1 SKIPPED and no C0b):
+> **B2 PASS with `{identity 0, affordance 0, state 0}`**, `failedSteps: []`, 11 PASS / 1 SKIPPED /
+> 4 MEASURED / 2 NOT-REACHABLE / 0 FAIL. So the underline fix and the `failedSteps` persistence
+> both hold on an artifact this session did not build — measured by a different session, which is
+> the strongest form the cross-check can take here.
+
+**Two instrument defects, one real defect, and a scanner so this class stops recurring.**
+
+### 1. `ringOf` was emitting a regex that matched nothing — for two slices
+
+Written with **single** backslashes inside the page-side template literal, so `\s` reached the
+browser as a bare `s`:
+
+```
+/(rgba?([^)]*)|color([^)]*))s+(-?[d.]+)px.../     <- valid, matches nothing, throws nothing
+```
+
+`ringRatio` was `null` in **every row of every run** across slices 60 and 61. Both slices added
+ring scoring, observed no change, and concluded something about the *app*.
+
+> **The property that made it survive: a broken probe and an app with no rings emit BYTE-IDENTICAL
+> output.** There was no number to notice. What found it was comparing the emitted regex with the
+> two parsers ten lines above (`296`/`306`), which had doubled theirs — visible only as an
+> *inconsistency inside the file*.
+
+**Now verified alive**, not inferred from a count moving: `ringRatio: 1.15` on
+`.gram-level-btn.active`, parsed out of the *second* shadow layer after correctly skipping the
+`rgba(0,0,0,0.14)` drop shadow in front of it.
+
+### 2. `.gram-level-btn.active`'s ring is a 16% wash — the source CSS is not what ships
+
+`styles.css` declares `box-shadow: inset 0 0 0 1px var(--accent)` at full opacity. The runtime
+computes `color(srgb 1 0.180392 0.301961 / 0.16)` → **1.15:1**, *weaker than the 1.29 fill it sits
+on*, so the fill still carries the verdict. Something overrides it. **This is a real failure** and
+the one place the earlier "all four state failures are false positives" claim was wrong.
+
+### 3. The taskbar's active indicator is an `::after`, and 15 "failures" were the probe missing it
+
+`shell.css` **overrides** the baseline taskbar rules — it sets `box-shadow: none` and
+`border-color: transparent` on `.os-task-win.active` / `.os-desktop-switch.active` (there is a
+comment saying the baseline "stacked TWO accent cues" and it wanted one), then draws the real cue
+as a pseudo-element:
+
+```css
+.os-task-win.active::after { content:''; width:16px; height:2px; background:var(--accent); }
+```
+
+`getComputedStyle(el)` cannot see a pseudo-element. So the probe scored the quiet 11% `--text`
+wash — the design's *backing surface* — at 1.35:1, and never saw the cue a user reads.
+**Reading `styles.css` would have confirmed the wrong answer here**: the accent underline it
+declares is dead, replaced by a different mechanism in a different file.
+
+`markerOf` now scores `::before`/`::after` as a fourth boundary candidate, **against the control's
+own painted fill** rather than the outside backdrop, since the marker sits inside the control —
+the stricter reading (3.55:1 vs 4.79:1 against the taskbar).
+
+> **This is the FIFTH wrong-layer finding in this line of work** (offline never requested the
+> network; `distinctStops` counted strings against elements; `targetEnabled` read disk not app;
+> B3 scored 2 of 52; now this). The pattern is not "add another layer" — it is that **a control
+> whose indicator lives in an unexamined layer is indistinguishable from a control with no
+> indicator**, so every failure must be asked *which layer is the design actually using*. The
+> `raw*` fields exist for exactly that and must not be removed; `rawMarker` joins them.
+
+### 4. `scan-probe-escapes.mjs` — so the silent class is findable structurally
+
+New tool. `--selfcheck` proves it **flags a single-backslash probe AND passes a correctly-doubled
+one** (without the second assertion, a scanner that flags everything would look healthy — the same
+failure mode it exists to catch). Its own fixture is built with `String.fromCharCode(92)` because
+the first attempt, written as a shell heredoc, arrived with its backslashes already collapsed —
+the identical bug one layer up, which made the fixture accuse the working scanner.
+
+**Audited all 49 harness scripts.** `packaged-a11y-deep-gate.mjs` was the **only** genuine
+instance. Five other hits are confirmed false positives — regexes in `${…}` interpolations and in
+ordinary Node code, plus comments containing `C:\…`. Triage rule: *does this string get sent to a
+page?*
+
+### 5. The artwork fixture finally ran — and artwork is NOT an `<img>` problem
+
+`--fixture` **P1 PASS**: 34 files / 117,939 bytes, 12 media items with poster PNGs and 8 library
+books with cover PNGs, seeded into the scratch profile before launch. It writes only to the
+per-process scratch `--user-data-dir` under `os.tmpdir()` (it *throws* if that dir already exists),
+so **nothing touches `%APPDATA%`** — the standing rule about the real profile is not affected.
+
+What it showed, which no empty-profile run could:
+
+| surface | `<img>` | CSS background art |
+|---|---|---|
+| library | 0 | **8** |
+| scraper | 3 | 0 |
+| city | 1 | 0 |
+| reading / music / immersion / novels / player | 0 | 0 |
+
+- **The cover grid paints covers as CSS `background-image`, not `<img>`** (`LibraryView.tsx:1297`),
+  so there is no alt slot to be missing. `missingAltAttribute: 0` was never going to find anything
+  here, with or without a fixture.
+- **Not a defect.** Every card also renders `<div className="card-title">{it.title}</div>`
+  (`LibraryView.tsx:1403`), so identity is carried in text and 1.1.1 is satisfied. Recorded so
+  nobody "fixes" it by bolting `alt` onto a `<div>`.
+- **Still genuinely unmeasured:** the 12 seeded media posters rendered on **no** surface — media
+  routes showed 0 images even with the fixture on disk. `totalImages` stayed at 4 (3 scraper,
+  1 city), exactly the empty-profile number. Seeding `media.json` is evidently not sufficient to
+  make the poster grid paint; that is the next artwork question, and it is a *rendering* question,
+  not an accessibility one.
+- `D0` remains **NOT-REACHABLE**: the fixture seeds posters, not playable media, so the study
+  overlay still never mounts. Unchanged and correctly reported.
+
+> **CORRECTION — `C0b` was FAILING the whole time and I did not report it.** The gate has a step
+> `C0b the seeded artwork is ACTUALLY PAINTED, not merely on disk`, and it failed in **both**
+> fixture runs. I missed it because I summarised with `grep -E "C0 "` — a trailing space, which
+> cannot match `C0b`. So "P1 PASS" was quoted as though the artwork item were closed when the gate
+> was explicitly saying the fixture never reached the screen. **A grep is an instrument too.**
+>
+> **And `C0b`'s own conclusion was wrong — wrong-layer finding number six.** It filtered `<img>`
+> elements by `playfile://` / `media://` scheme, concluded "the app did not read the seeded
+> stores", and that is contradicted by this run's own data: library `cssBackgroundArt` went
+> **0 → 8** with the fixture, i.e. the app read `library.json` and painted all 8 covers — as CSS
+> backgrounds, which have no `src` for an `<img>` filter to match.
+>
+> `C0b` now counts fixture-scheme CSS backgrounds too, as a **separate** number rather than folded
+> into one boolean, because "8 covers landed, 0 of 12 posters landed" is the precise finding and a
+> single `fixtureLanded: true` would hide the broken half. It also now says explicitly when every
+> piece of fixture art arrived as a background, since that means the alt-text numbers beside it
+> still describe only the non-fixture images.
+>
+> **The first attempt at that fix silently dropped its own data — `Object.assign` on a string.**
+> `__describe(el)` returns a **string**, so `Object.assign(__describe(el), { bgUrl })` builds a
+> `String` WRAPPER object. The property is really there in memory, and then `JSON.stringify`
+> collapses a `String` wrapper back to the bare primitive and discards it:
+>
+> ```js
+> const w = Object.assign('div.cover', { bgUrl: 'media://x' });
+> w.bgUrl                 // 'media://x'
+> JSON.stringify([w])     // '["div.cover"]'   <- gone, no error
+> ```
+>
+> So `fixtureBackgroundArtOnScreen` came back `0`, C0b failed again, and the output was *identical*
+> to "there are no fixture backgrounds". **Third silent-loss bug in one slice**, after the
+> single-backslash regex and the unexamined pseudo-element layer — and this one was mine, written
+> while fixing the second. The shape of all three is the same: **a value that is absent and a value
+> that was never captured serialise identically.** The defence is the same too — record the raw
+> input (`bgUrl` beside the count, as `rawBoxShadow` sits beside `ringRatio`) so the two states can
+> be told apart. Build the object explicitly; never `Object.assign` onto a primitive.
+>
+> What the recorded entries *did* prove, even while broken: all 8 are `div.cover`, i.e. the seeded
+> books. The covers paint.
+>
+> **The honest artwork status: covers are proven to paint from a fixture; posters are proven NOT
+> to.** That is a rendering defect to chase, and it is the first time either half has been measured
+> rather than assumed. **Slice 65 independently found the cause** from the loader side
+> (`SLICE_65_ARTWORK_FIXTURE.md`): both stores are correctly named, located and shaped and both
+> loaders read them without complaint — but the poster grid the fixture was written for was routed
+> away from on 2026-07-31, and the book-cover grid has never painted an `<img>` at all. Its verdict
+> and this measurement agree, reached from opposite ends.
+
+### 6. A SECOND AGENT WAS RUNNING THIS GATE CONCURRENTLY — and that is what caused the EPERM
+
+Diagnosed from the proof directories, not assumed. Five records exist for four runs I launched:
+
+| record (UTC) | window | fixture | whose |
+|---|---|---|---|
+| 184956 | 18:49:56–18:54:09 | no | mine |
+| **185951** | **18:59:51–19:04:01** | no | **not mine** |
+| 190145 | 19:01:45–19:05:45 | yes | mine |
+| **190958** | **19:09:58–19:14:15** | yes | **not mine** |
+
+`185951` and `190145` **overlap**: two packaged Electron instances were up at once. That is the
+`EPERM` on `dxcompiler.dll` — the other run's app held the DLL while my `npm run package` tried to
+unlink it. Ruled out first, in order: no session cron (`CronList` empty), no hooks in any
+`settings.json`, no test that spawns the gate (`npm test` started 22:11:30, *after* the run began),
+and each of my task logs contains exactly **one** `record:` line.
+
+It is slice 63 (`docs/migration/SLICE_63_PROFILE_EDITOR.md`), making the agent-profile allow-list
+editable from the UI — the "settings UI writes profile deltas directly" item. It reports that
+`vitest` and `i18n-check` are **auto-denied** in its session, so it cannot measure its own gates and
+is inheriting this session's numbers; it labels them as such, which is the right call.
+
+**Attribution for the B2 result below is still clean, and here is why:** the exe was rebuilt at
+22:17 and slice 63's source edits to `localAgentProfiles.ts`, `localAgentProfilesStore.ts`,
+`AgentProfileOperations.tsx`, `BlancReadyToolPanels.tsx` and `catalogs/en.ts` all landed at
+**22:18–22:21**, after the artifact was sealed. The only shipped change in the measured binary is
+`styles.css` at 22:10. Its test-file edits (22:13, 22:15) came after my suite run at 22:11:30, so
+the 4622-test figure does not cover them either.
+
+**Operational rule this establishes:** `find src -newer <exe>` is necessary but not sufficient when
+another agent is live — it was empty at 22:17 and non-empty four minutes later. Check it
+*immediately* before reading a measurement, and re-check after.
+
+### Confirmed by re-measurement, and one measurement error of my own
+
+`.os-set-nav-item.active` and `.gx-notebook-folder.active` **now pass** — their 2px accent bars
+were always there and the gate finally sees them. B2 load-bearing went **20 → 18**, and the
+remaining 18 were exactly two causes (15 taskbar `::after`, 3 `gram-level-btn`), not twenty.
+
+> **Two errors of my own, for the record.** (1) The first re-run was reported as "exit code 0" when
+> the command was piped through `tail` — that was *tail's* status, not the gate's. The general rule
+> stands: never read an exit code through a pipe. (2) But the inference drawn from it — "B2 FAILed,
+> so the gate must have exited non-zero" — was **also wrong**, and this one matters more.
+>
+> **This gate exits 0 with steps FAILing, by design.** `step()` only appends to `out.steps`; the
+> exit code comes from `out.result`, and the header at THE VERDICT states the intent plainly: the
+> exit code says whether *the measurement is trustworthy*, not whether *the app conforms*, because
+> imposing an acceptance ceiling requires someone to decide which findings are accepted. That is a
+> sound distinction and it has NOT been changed. I called it "a false green / the most dangerous
+> bug here" before reading that rationale — wrong, and exactly the reflex this session keeps
+> punishing: a surprising behaviour is not yet a defect.
+>
+> What did change: failing step names are now printed at the end and stored in `out.failedSteps`,
+> with a line saying the exit code is not a conformance verdict. **`$?` from this gate is not a
+> pass/fail signal — read `failedSteps`.**
+>
+> **That change was itself half-broken on the first attempt, and the record caught it.** The block
+> was written *after* `writeFileSync`, so the terminal line was correct while `failedSteps` never
+> reached the JSON — it read as `undefined`, indistinguishable from "this field does not exist".
+> Fixed by computing it before the write. Noted because it is the **fourth** silent-loss bug in
+> this slice and it looked healthy for the same reason as the others: the half that is visible on
+> a terminal worked, and nothing errored on the half that was lost.
+
+## SLICES 60–61 — A PARSER GAP WAS HIDING THE FOCUS RING. B3 HAD BEEN PASSING ON 2 SAMPLES OUT OF 52.
+
+**The headline is not the fix, it is what the fix revealed.** `packaged-a11y-deep-gate.mjs`'s
+colour parser handled `rgb()`/`rgba()` and nothing else. Chrome computes `color-mix()` — which this
+app uses everywhere — to **`color(srgb r g b / a)`**, which the parser could not read. A boundary
+declared that way therefore scored as **ABSENT rather than weak**: a silent null that is
+indistinguishable from a clean bill of health.
+
+**B3 (focus-ring visibility) had been reporting PASS off the 2 stops that happened to use plain
+`rgb()`. The real population is 52, and 23 of them were failing.**
+
+Every one of the 23 was one token. `theme/tokens.css:195` set
+`--focus-ring-color: color-mix(in srgb, var(--accent) 70%, transparent)`, which composites to
+`rgb(186,39,64)` on the taskbar's `--panel` → **2.89:1**, under the 3:1 required. All 23 sat in
+`.os-taskbar` — `.os-start-btn`, `.os-desktop-switch`, `.os-tray-btn`, `.os-task-win` — and the
+same token over darker surfaces landed 3.09–3.38:1, **so it was passing only where the backdrop
+happened to be darker.** The token is now opaque `var(--accent)`: same hue, no design change.
+
+**Result: B3 PASS — 52 ringed stops, 0 below 3:1**, taskbar measured at **4.80:1**, which is the
+value predicted from the luminance arithmetic before the change was made.
+`proof/packaged-a11y-deep-20260802slice61/`.
+
+This is the most consequential accessibility defect found in this line of work: a focus ring is how
+a keyboard user knows where they are, and it was failing on the one surface present in every window.
+
+### Three instrument fixes, each of which had been manufacturing a wrong answer
+
+1. **`color(srgb …)` is now parsed** (components are 0–1, unlike `rgb()`). This is the systemic one
+   — it affected every step that reads a colour, not just B3.
+2. **`box-shadow` is now a boundary candidate at all**, alongside border and fill, with the
+   strongest of the three carrying the verdict and the losers kept in the record (`ringRatio`
+   beside `borderRatio`/`fillRatio`).
+3. **Every shadow LAYER is scanned, not the first**, and an **offset** counts as a boundary. This
+   app routinely puts a soft drop shadow first and the indicator second; and
+   `.os-set-nav-item.active` marks selection with a 2px inset *left bar*, not a ring, which a
+   spread-only test could never see.
+
+Rows now also record `rawBoxShadow` / `rawBorderWidths` / `rawBorderStyles`, so a null ratio can be
+told apart from a boundary the probe failed to parse. That distinction is what ended a
+three-attempt guessing loop; **it should never be removed.**
+
+> **CORRECTION (slice 62) — fixes 2 and 3 above were written but INERT, and every B2 `state`
+> number in this section was produced with ring scoring dead.** `ringOf`'s regex was authored with
+> **single** backslashes inside the page-side template literal, so `\s` reached the browser as a
+> bare `s` and it emitted `/(rgba?([^)]*)|color([^)]*))s+(-?[d.]+)px…/` — valid, and matching
+> nothing, ever. `ringRatio` was `null` in **every** row of **every** run across slices 60 and 61.
+>
+> The failure mode is the point: a broken probe and an app with no rings produce **byte-identical
+> output**. It was read as "this app has no rings" twice, and the second reading was used to
+> justify adding *more* parsing. What actually found it was comparing the emitted regex against the
+> two parsers directly above it (lines 296/306), which had it right — the bug was visible only as
+> an *inconsistency within the same file*, never as a wrong number.
+>
+> The `raw*` fields are what saved this: `.gram-level-btn.active`'s alpha-0.16 reading at line 88
+> came from `rawBoxShadow`, **not** from `ringOf`, which is why that finding stands while the
+> scored numbers below do not. This is the third time in two slices that the raw capture, not the
+> computed verdict, produced the answer.
+>
+> **Do not quote the 4 → 20 figure or the three-row table below** as measurements of this app: they
+> scored fill/border on controls whose actual indicator is a ring. Superseded numbers are in the
+> slice-62 entry.
+>
+> Audited afterwards: **all 49 harness scripts** in `docs/migration/tools/` for this same bug class
+> (a validated scanner — proven to flag a single-backslash probe and pass a doubled one — is in the
+> slice-62 notes). `packaged-a11y-deep-gate.mjs` was the **only** genuine instance; the five other
+> hits are false positives (real Node code, `${…}` interpolations, and comments containing `C:\…`).
+
+### The B2 numbers moved for the same reason, and a correction
+
+Scored boundaries went 85 → **107**, load-bearing 4 → **20** (all `state`). Those 16 are not new
+defects — they were previously invisible, scoring as "no boundary" because their colour was
+unparseable. **20 honest failures beat 4 plus a blind spot.**
+
+> **CORRECTION to the slice-58 entry below.** It states that all four `state` failures were false
+> positives, reasoned from the source CSS. That was **half wrong**, and the runtime says so:
+> `.os-set-nav-item.active` does carry a strong indicator the gate could not see (a 2px accent bar
+> at full opacity), but `.gram-level-btn.active` computes its ring as
+> `color(srgb 1 0.180392 0.301961 / 0.16)` — **alpha 0.16**, not the opaque `var(--accent)` the
+> source rule declares. Something overrides it. Reading CSS is not measuring the app; that mistake
+> was made four separate times in this session and this is the clearest instance.
+
+### Also in this slice: the affordance borders are fixed
+
+`--control-edge: #767380`, opaque, scoped to text-entry controls only — **13 affordance failures →
+0**, verified in the artifact. Two false starts worth not repeating: the first attempt reused the
+name `--control-border`, which already exists lower in the same `:root` as
+`rgba(255,255,255,0.12)` and is redefined by twelve palettes for data-grid hairlines, so it was
+silently shadowed (diagnosed by solving `65 = α×255 + (1−α)×39` from the measured pixels → α=0.12);
+and **no colour can pass through a translucent boundary here** — even pure white at that alpha
+composites to 2.86:1.
+
+**Gates: 365 files / 4622 tests pass**, i18n 6587 exit 0, audit exit 0.
+
+### B2's remaining 20, characterised — they are three things, not twenty
+
+> **SUPERSEDED — measured with `ringOf` inert (see the slice-62 correction above).** Every row here
+> scored a fill or border on controls whose real indicator may be a ring the probe could not see.
+> Kept because the *shape* of the finding held up — the failures collapse to a few tokens, not
+> twenty independent defects — but the counts are not trustworthy.
+
+| declared | ratio | count | what it is |
+|---|---|---|---|
+| `color(srgb …f5f4f7… / 0.11)` | 1.35 | **15** | a `--text` 11% wash |
+| `rgb(39,36,51)` | 1.29 | 4 | the `--panel-2` fill on `.gram-level-btn.active` |
+| `color(srgb …f5f4f7… / 0.08)` | 1.18 | 1 | a `--text` 8% wash |
+
+**One of them was a plain bug and is fixed.** `.gx-notebook-folder.active` and
+`.gx-notebook-folder:hover` were **the same declaration**, so the selected folder was
+indistinguishable from whichever one the pointer happened to be over — a defect independent of
+contrast. Selection now uses this app's own established pattern, the inset accent bar from
+`.os-set-nav-item.active`, at full opacity; hover keeps the wash, since hover is not a state a
+keyboard or screen-reader user needs to perceive.
+
+**The other 19 need a design decision, not a token bump, and that is why they are left.** The
+gate's `state` role means *this control has a state* (it carries `.active` / `aria-selected` /
+`aria-pressed` / `aria-current`), and it then scores that control's strongest boundary. A stateful
+control whose state is carried by a **text-colour or fill change** rather than by its boundary will
+therefore be flagged even when it is perfectly perceivable. Deciding which of the 19 are real needs
+looking at each control's selected-vs-unselected appearance — design review, not measurement — and
+the honest options are: adopt the accent-bar pattern per control, or record the rest as a
+deliberate gap with the ratios on file. **Do not mass-edit the token**: `--text` at 8–11% is a
+wash used for hover all over the app, and raising it would repaint hover states everywhere to fix
+a state-indication problem.
+
+**Still open:** those 19, and the artwork fixture (`P1 SKIPPED` — the gate refuses to let 4 images
+on an empty profile count as coverage).
+
+## SLICE 59 — THE UPSTREAM REHEARSAL RAN, AND ITS PREMISE WAS FALSE. THERE IS NO NEWER COMMIT.
+
+**Full write-up: `docs/migration/SLICE_59_UPSTREAM_REHEARSAL.md`.** This is the last Phase 9 item
+the user approved, and it is now answered.
+
+**There is nothing to sync to.** The pin `9bdd052` is the tip of upstream `main` and strictly
+contains every other branch: `next` is 14 behind, `next-mpv-prism` 58 behind, and the newest tag
+`v3.9.1` is behind it too. Upstream has not moved in the 10 days since the pin was taken. Verified
+from `git ls-remote`, which is server-authoritative and immune to the shallow clone.
+
+**The method when the input does not exist.** Rather than stop, the patches were replayed
+**backwards** across ten real upstream trees (2026-06-16 → the pin). `git apply` succeeds or fails
+on the difference between two trees, not on the direction of time, so this measures the same
+context divergence a forward re-sync would — using real upstream code instead of a synthetic edit.
+
+| patch | verdict |
+|---|---|
+| 0001, 0002, 0003 | apply clean at **every** rung back to 2026-06-16 |
+| 0004 | **one conflict**: `stream.go` hunk #1 at `8b5c6bb^` |
+
+`8b5c6bb` (*feat: mpv-prism*) split `BeginOpen` into a delegator plus `BeginOpenWithTarget`, and
+0004 uses the post-split body as trailing context. **The rework was performed, not estimated**:
+re-anchoring on the byte-identical `func (m *Manager) BeginOpen(` line applies clean, `+30/−0`,
+added lines byte-identical. The whole repair is a context swap. **No patch can be retired.**
+
+> **The finding to carry: upstream has something that LOOKS like patch 0004 and is not.**
+> `subtitleGeneration atomic.Int64` plus three generation-ordering tests now live in the same
+> package. But it is per-`BaseStream`, so it cannot order across the stream replacement
+> `BeginOpen` performs, and `beginSubtitleSeek` stops every subtitle stream **unconditionally**
+> with no generation check guarding the stop. A future re-syncer skimming for "does upstream do
+> generations now?" would plausibly retire a still-load-bearing patch.
+
+Also found in passing: **`AcceptOpenGeneration` guards 1 of 6 call sites that reach `BeginOpen`** —
+0004's coverage is narrower than the record implied.
+
+**Three corrections to our own docs.** The pinned checkout is a **depth-1 shallow clone with zero
+refs** and cannot answer any history question — a real re-sync needs a separate clone, which is
+what this slice used. `patches/seanime/README.md` had wrong shape counts (0001 is +127 not 94;
+0004 is +116 not 121). And **0001's hunk headers are internally inconsistent** — hunks 2–5 declare
+new-side starts one line low, producing permanent `offset 1 line` noise against a *pristine* pin;
+it applies, but that noise would mask genuine drift and it should be regenerated.
+
+**The pin was never touched** — verified independently: `HEAD 9bdd052afdfc…`, zero refs, shallow
+marker at the same commit, one reflog entry, dirty set unchanged. All work happened in a throwaway
+clone in the OS temp dir.
+
+## SLICE 58 — THE REFUSAL FINALLY CAME. AND SLICE 56'S FIX HAD A SECOND BUG THAT ONLY THE LIVE GATE COULD SEE.
+
+**Phase 7's story is now closed end to end against shipped bytes** — the first time 47e's
+allow-list, 51's queue wiring and 56's profile merge have been shown working together:
+
+```
+narrowed: dictionary.search-knowledge -> failed
+          "Search local knowledge is not enabled for the active agent profile."
+control:  dictionary.search-knowledge -> completed, error null
+```
+
+Same persisted plan, same restart, one variable. `proof/phase7-queue-refusal-20260802slice58b/`,
+gate exit 0, **step 10 in its strong form** (the gate distinguishes strong from weak and refuses to
+round one up to the other).
+
+### The detour, which is the part worth carrying
+
+The first run after the rebuild **still failed**, and the gate's own step-10 text said the cause was
+`normalizeAgentProfiles` discarding built-in edits — the exact defect slice 56 had already fixed.
+Three separate things had to be pulled apart before that meant anything:
+
+1. **The gate's "AND THE CAUSE IS KNOWN" text was hardcoded** by slice 53 and re-derives nothing.
+   It asserted a fixed cause with total confidence. **It has been rewritten** to report the
+   observation and stop, and to say explicitly why naming a cause there is a mistake.
+2. **The fix HAD shipped** — `disabledOperations`/`addedOperations` are both in
+   `resources/app/.vite/renderer/.../BlancShell-*.js`. Verified with a known-shipped control
+   (slice 52's `music.controls.volume`), so a search that silently matched nothing could not read
+   as absence.
+3. **`targetEnabled=false` proves far less than it looks.** `READ_STORAGE` computes it from **raw
+   localStorage**, so it only ever meant *the narrowing is on disk* — never *the app honoured it*.
+   Those are two quantities and only the first was being measured.
+
+A theory that `activeProfile` was resolving to `undefined` and bypassing the allow-list was also
+wrong — `getActiveAgentProfile` always returns a profile. **Reading the gate's source instead of
+reasoning further is what found the real cause.**
+
+### The real cause was slice 56's own fix
+
+`normalizeAgentProfiles` emitted `disabledOperations: []` on **every** profile it returned. Once a
+store had been through it, those empty arrays persisted — and the legacy guard tested
+`!== undefined`, so it read `[]` as "already a delta", skipped the conversion of a plain
+`enabledOperations` edit, and let the factory's 19 operations win. The gate narrows by mutating
+`enabledOperations` on exactly such a stored object.
+
+**Every unit test in slice 56 passed, because they hand the function a hand-written store while the
+app hands it one that has already been normalized once.** That gap is now itself a test —
+*"survives the real sequence: load, save, narrow, load again"*.
+
+Fixed in both directions, because either alone leaves a sharp edge:
+- empty deltas are **no longer emitted at all**, so an unedited profile round-trips
+  indistinguishable from one that was never edited;
+- an empty delta is **no longer treated as a delta** on input.
+
+> **The transferable lesson: a normalizer's output shape is an input to its next run.** Any
+> function that both reads and writes the same persisted structure has to be tested on its own
+> output, not only on hand-written fixtures. A round-trip test is not optional for this shape.
+
+### The a11y deep gate against the same build — the bell fix lands, and B2 finally runs
+
+`proof/packaged-a11y-deep-20260802slice58b/`, exit 0.
+
+**Slice 57's bell removal is confirmed exactly as predicted:** `collapsedByDescribe: 0`,
+`describeCollisions: []`, and `distinctStops` now **equals** `focusableTotal` at **121/121** —
+per surface 10/10, 43/43, 29/29, 39/39, every one of which was one short before. Slice 50's
+"every surface is exactly one short" is retired: it described the instrument.
+
+**B2 — non-text contrast (WCAG 1.4.11) — ran for the first time and FAILS.** 234 controls seen,
+85 boundaries scored, 81 below 3:1 — but the gate does not report 81. It separates
+**17 LOAD-BEARING** (`affordance` 13, `state` 4) from 64 that sit on controls identified by their
+own text, where the faint fill is decoration and 1.4.3 already covers the label, and from 148
+controls that paint no boundary at all. Only the 17 carry the verdict.
+
+Those 17 collapse into **two tokens**:
+
+| role | colour | against | ratio | count |
+|---|---|---|---|---|
+| affordance — input/select border | `rgb(45,43,55)` | `rgb(39,36,51)` | **1.09** | 5 |
+| affordance — same border | `rgb(45,43,55)` | `rgb(13,12,18)` | **1.40** | 7 |
+| affordance — same border | `rgb(45,43,55)` | `rgb(26,24,35)` | **1.26** | 1 |
+| state — `.active` fill | `rgb(39,36,51)` | `rgb(13,12,18)` | **1.29** | 4 |
+
+**This is not a nudge, and the arithmetic should be read before anyone "fixes" it.** To clear 3:1
+against `rgb(39,36,51)` the border needs a luminance around **0.158**, i.e. roughly a mid-grey near
+`rgb(111,111,111)`; the `.active` fill needs around **0.112**, near `rgb(94,94,94)`. Both are far
+lighter than the current values, so satisfying 1.4.11 here means visibly changing a deliberately
+low-contrast dark theme from *barely-there* borders to *clearly outlined* controls. **Left
+unfixed pending a design decision — it is a look-of-the-app choice, not a defect to patch.**
+
+> **CORRECTION, verified from the CSS: the 4 `state` failures are NOT credible as reported, and
+> the gate is scoring the wrong layer.** 1.4.11 does not require the *fill* to carry the state when
+> something else does, and here something else does:
+> - `.gram-level-btn.active` (3 of the 4 — 日本語, Beginner, N5) sets
+>   `box-shadow: inset 0 0 0 1px var(--accent)` **and** `border-color: var(--accent)`. With
+>   `--accent: #ff2e4d` on `--bg: #0d0c12` that is the **5.33:1** the gate itself measured in B3.
+>   The gate scored only `background: var(--panel-2)`, which is not the state indicator.
+> - `.os-set-nav-v2 .os-set-nav-item.active` (the 4th) sets
+>   `background: color-mix(in srgb, var(--accent) 88%, #000)` ≈ `rgb(224,40,68)` — nowhere near the
+>   `rgb(39,36,51)` the gate reported for it, so that sample is measuring something other than the
+>   active element's own fill.
+>
+> **So the genuine load-bearing set is the 13 affordance borders, not 17**, and the real problem is
+> ONE token: the input/select border `rgb(45,43,55)`. Fixing B2's `state` scoring to consider
+> `box-shadow` / `border-color` / `outline` — not just `backgroundColor` — is its own follow-up,
+> and until then B2's role split should not be quoted as-is.
+
+**B3 PASSES** — the focus ring is not merely present but visible: `rgb(255,46,77)` on
+`rgb(13,12,18)` → **5.33:1**, measured on the real Tab walk. **B1** is unchanged at 335 samples,
+0 real failures. **E1**: 4/4 range inputs named, **0 title-only** — slice 52's rule holds in the
+artifact, and E2 honestly reports 2 disabled sliders as NOT-REACHABLE rather than as passes.
+
+**Artwork is still NOT measured** (`P1 SKIPPED`): with no `--fixture` the gate refuses to let 4
+images on an empty profile count as coverage. That item stays open and needs a real scanned
+library.
+
+**Gates: 365 files / 4622 tests pass**, i18n 6587 exit 0, audit exit 0. Rebuilt twice this slice;
+the extension-mirror hashes were identical across both (13/13), and
+`out/jp-study-app-win32-x64.pre-storage-fix/` is untouched at 39,715 files / 4,268,283,968 bytes.
+
+## SLICE 57 — THE TRAY PAINTED TWO IDENTICAL NOTIFICATION BELLS. ONE IS GONE.
+
+Slice 55 found this and correctly declined to fix it (the shell was outside its ownership and was
+being edited concurrently). Nothing was editing it afterwards, so it is closed here.
+
+`DesktopShell.tsx` rendered `<NotificationBell />` **twice inside the same `<div class="os-tray">`**
+— lines 2387 and 2412, both bare, no conditions, both painting a
+`button.os-tray-btn.os-tray-btn-bell` with the identical `aria-label` and both dispatching
+`shell:toggleNotifications`. Committed, not a working-tree artifact. The tray is mounted in every
+window, so it shipped on every surface: a screen-reader user heard "Notifications, button" twice
+with nothing to tell them apart.
+
+**The one judgement was which to keep.** The survivor is the one beside `WiredTrayLamps` /
+`TaskbarClock` — the Windows-11 tray convention this project's `CLAUDE.md` names as its aesthetic.
+`desktopShellTrayNoDuplicates.test.ts` pins both facts (exactly one bell; it sits before the clock
+with no focusable control between), so moving it later is a decision rather than a drift. 4 tests,
+**2 failing before the change**, with a control block that proves the counter can see a component
+mounted twice — otherwise a matcher that silently found nothing would report "exactly one" forever.
+
+**Gates: 365 files / 4620 tests pass**, i18n 6587 exit 0, architecture "Nothing new", audit exit 0.
+
+## SLICE 55 — THE "ONE-SHORT TAB GAP" WAS THE INSTRUMENT, AND A REAL DEFECT WAS HIDING UNDER IT.
+
+> **Incomplete — the run hit its account's usage limit at 17:26.** It wrote its handoff *as it
+> went* (`docs/migration/SLICE_55_A11Y_CONTRAST.md`), so unlike slices 50 and 52 nothing was lost.
+> **Not reached: non-text contrast (WCAG 1.4.11) and Task 3, the artwork surfaces.** Those remain
+> open.
+
+**Task 1 — there is no keyboard-coverage defect.** Slice 50 reported every surface exactly one Tab
+stop short. That described the instrument, not the app: `distinctStops` counts `describe|name`
+**strings** while `focusableVisible` counts **elements**, and the two identical notification bells
+collapse into one Set entry. The two numbers were never commensurable and were printed side by
+side as if they were a fraction.
+
+Re-measured live on the packaged build with real CDP `Tab` presses: **125 / 125 focusable elements
+reached across 4 surfaces**, `collapsedByDescribe: 4` — one duplicate bell per surface.
+`125 = 11 + 44 + 30 + 40`, and `125 − 121 = 4`. The arithmetic closes exactly.
+
+> **The lesson worth carrying: slice 53's artifact already contained the answer.** It recorded
+> `unreachedByTab: []`, `surfacesFullyCovered: 4` and `coveredAllFocusable: true` on all four
+> surfaces — the element-level diff slice 50 said it "ended before reaching" **had in fact already
+> been run**. It simply sat next to a headline number that contradicted it, and nobody reconciled
+> the two. A contradiction between two fields of the same artifact is a finding, not noise.
+
+The gate was extended **additively** — every pre-existing field keeps its old name and value, so
+slice 50/53 numbers stay comparable — with `stopsReachedByIdentity`, `describeCollisions` (named,
+so a future off-by-one explains itself), `focusableIndex`, `inventory`, and a step **A2** that
+*resolves* the question rather than restating it: it passes only when the element-level reading
+says nothing was missed, so a genuinely unreachable control still fails, with a name attached.
+
+**Task 2 — text contrast (1.4.3): 335 samples across 8 surfaces, 0 real failures.** The desktop
+shell itself was swept for the first time; every surface in the old list was a window.
+
+**Composited, not declared, and that is the whole story.** All 4 samples below AA are `disabled`
+buttons, which WCAG 1.4.3 exempts outright as inactive components — and they are exactly where the
+two readings part company:
+
+| control | declared | **composited** | if opacity ignored |
+|---|---|---|---|
+| dictionary "Search" | `rgb(245,244,247)` | `rgb(117,116,121)` | 17.77 vs **4.22** |
+| anki "Saved" | `rgb(245,244,247)` | `rgb(132,130,139)` | 13.82 vs **3.98** |
+
+Nothing was fixed, because there is nothing to fix: raising the disabled opacity would make
+disabled buttons look enabled. **The worst ACTIVE sample is 4.60:1** (`span.res-cost.cost-freemium`
+on the reading surface) against a 4.5 requirement — a real pass on a 0.1 margin, worth knowing
+before anyone darkens that panel.
+
+**The measurer was self-tested before any app number was believed** — `#000` on `#fff` → 21.00,
+`#777` on `#888` → 1.26, `#fff` on `#000` at `opacity:.5` → 5.28 (21.00 if opacity were ignored),
+and text over a gradient → UNMEASURABLE by design rather than attributed to whatever is behind it.
+Both traps the brief named were re-verified in-run: the viewport override was confirmed by
+re-reading `clientWidth/clientHeight` **in the same probe**, and every style read waits 320 ms so
+no value is taken mid-transition.
+
+## SLICE 56 — EVERY EDIT TO A BUILT-IN AGENT PROFILE WAS BEING DISCARDED ON LOAD.
+
+This is the defect slice 53 found live and correctly declined to fix, because the fix needed a
+product decision. The decision was taken (by the user, delegated) and it is now fixed.
+
+**What was happening.** `normalizeAgentProfiles` seeded its map with the four factory built-ins
+and then `continue`d on any stored profile whose id was already present — which is every built-in
+id. So a stored edit to a built-in was **silently discarded on every load**. Slice 53 measured the
+consequence end to end: narrow a profile from 19 operations to 18, restart, run the queued task →
+`status: "completed", error: null`, identical to the control. No refusal, no error, no effect.
+
+**Why it mattered more than it looks.** Slice 47e's execution-time allow-list re-check is correct
+and was **unreachable on a built-in profile** — and the four built-ins are all a fresh user has. A
+user narrowing a built-in's permissions got no feedback and no protection.
+
+**The rule now implemented.** The product question was what happens when a future version adds an
+operation to a built-in the user has edited. Storing the user's list wholesale would freeze that
+profile forever; discarding it is what caused this bug. So operations are stored as a **delta**:
+
+- **identity** (`id`, `name`, `description`, `role`, `builtIn`) stays **factory-owned** — a future
+  version can re-word a built-in, and a stored entry cannot impersonate one;
+- **preferences** (`permission`, model, response/explanation/language/teaching/correction,
+  `enabled`) are the **user's** and override outright;
+- **operations** are `disabledOperations` / `addedOperations` applied over the **current** factory
+  list, never a frozen copy — so a narrowing always sticks *and* a newly added factory operation
+  still appears.
+
+**Legacy stores are converted, not ignored.** A store written before the delta existed carries a
+whole `enabledOperations` list — one that has never once taken effect. On load it is converted to
+the equivalent delta, so an edit the user made earlier finally applies. Both directions are
+honoured (a removal and an addition), but only for operations that still exist in
+`ALL_OPERATIONS`, so an operation the product has since removed cannot be resurrected by a stale
+list.
+
+**Non-vacuity.** `src/shared/__tests__/localAgentProfileOverrides.test.ts` — 11 tests, written
+first, **6 failing before the change and 5 passing**. The 5 that passed pre-fix are the control
+block and they are the point: an untouched store still yields the exact factory operations, custom
+profiles are untouched, all four built-ins survive an override, and an unknown id in a delta
+changes nothing. Without them a normalizer that returned the factory list for everything would be
+green forever.
+
+The security-relevant assertion is its own test: **`getActiveAgentProfile` is what hands
+`allowedOperations` to the single renderer execution boundary**, so it is asserted directly rather
+than inferred from the store.
+
+**Still open, deliberately:** the settings UI still writes a whole `enabledOperations` list, which
+the legacy path converts on load. That works, but the round-trip only stabilises onto the delta
+after one save. Having the UI write the delta directly is a clean follow-up.
+
+## SLICE 53 — THE SLIDER FIX IS PROVEN IN A SHIPPED ARTIFACT, AND THE GATE THAT FOUND IT COULD NOT HAVE SEEN THE FIX.
+
+*(written as the slice ran, not afterwards — the previous two runs both died at their usage limit
+having done the work and none of the recording)*
+
+### Step 0 — the rebuild
+
+`npm run package` at 2026-08-02 15:05, exit 0.
+
+- **`sync-extension-mirror.cjs` wrote NOTHING.** It reported `mirror already up to date (12/12
+  files match)`, and all 13 files under `src/main/chrome-extension/` are byte-identical
+  before and after (SHA-256 hashed from PowerShell both times). The recorded risk that
+  `npm run package` can write into `src/` is real — the script does `fs.writeFileSync` whenever
+  `extension/` and the mirror differ — but on this tree they did not differ, so it was inert.
+  It was checked by predicting it first: a 12-file hash comparison of `extension/` against the
+  mirror **before** the build already showed `differing: 0`.
+- **Slice 49's control binary was not touched.** `out/jp-study-app-win32-x64.pre-storage-fix/`
+  is still 39,715 files / 4,268,283,968 bytes / exe `F767FD9C…FB50`, dir mtime unchanged at
+  2026-08-01 14:39:58. Forge's only `rmSync` calls target the sidecar staging slot, not `out/`.
+
+| | control | fresh |
+|---|---|---|
+| dir | `out/jp-study-app-win32-x64.pre-storage-fix/` | `out/jp-study-app-win32-x64/` |
+| renderer entry | `main-DMgBDn1J.js` | **`main-BINSThf4.js`** (1,069,297 b) |
+| `MusicContent` chunk | `MusicContent-DZDOj9DG.js` | `MusicContent-ChVNzQhH.js` |
+
+> **The `jp-study-app.exe` hash is identical in both builds** (`F767FD9C…FB50`) and is **not** a
+> discriminator — app code ships in `resources/app`, not in the Electron host exe. Slice 49 recorded
+> the exe hash as evidence the *control* was preserved, which is what it is good for; it must not be
+> read as evidence about which app bytes are running. The renderer chunk name is the discriminator.
+
+### The finding that had to come first: the gate could not have seen this fix
+
+`packaged-a11y-deep-gate.mjs`'s naming helper `__name()` **accepts `title`** as an accessible name
+(line 197-198), one step before falling back to `textContent`. Slice 52's source gate
+`sliderAccessibleName.test.ts` **deliberately rejects `title`**, because it is only the last-resort
+fallback and is not announced by every screen reader. The two instruments disagree — so re-running
+the deep gate unmodified would have produced a **false null on the music widget's slider**:
+
+```
+CONTROL MusicContent-DZDOj9DG.js:
+  "input",{type:"range",className:"music-volume",…,title:n("music.controls.volume")}
+FRESH   MusicContent-ChVNzQhH.js:
+  "input",{type:"range",className:"music-volume",…,title:n("music.controls.volume"),
+                                                 "aria-label":n("music.controls.volume")}
+```
+
+That slider gained a real `aria-label` in slice 52 — and slice 50's deep gate had **already
+reported its name as `"Volume"`**, read off the `title`. Both artifacts print `"Volume"`; the fix is
+invisible to the unmodified instrument. This is the same class of error as slice 50's own vacuous
+offline pass: a green reading that is not measuring the thing it is named after.
+
+**Which also corrects how slice 50's finding should be read.** In its isolated run
+(`proof/packaged-a11y-deep-20260802slice50iso/`) the nameless stop on the `music` surface is
+recorded as bare `"input"` — twice — while `input.music-volume` reads `"Volume"`. Those are two
+different sliders. The nameless one is the **media-center player bar's** volume slider
+(`MediaCenterView.tsx:1293`, inside `div.mc-player-volume`, no className, so `__describe` renders it
+as just `input`), which had neither `aria-label` nor `title`. Slice 50 named the right control; the
+`music-volume` class in the same walk is a decoy that reads like corroboration and is not.
+
+### What was added to the instrument, once, BEFORE either arm ran
+
+Slice 49's rule — *changing the instrument between control and treatment destroys the comparison* —
+so `packaged-a11y-deep-gate.mjs` was extended first and **both artifacts were then measured with
+the identical file**. Three additions:
+
+- `__nameInfo(el)` returns the name **and its source** (`aria-label` > `aria-labelledby` >
+  `label[for]` > wrapping `<label>` > `title` > `placeholder` > text). `__name()` is untouched, so
+  every pre-existing number stays comparable; the walk now records `nameStrict` and `nameSource`
+  alongside it. A stop named only by `title` is now visibly a *different state* from a stop with an
+  `aria-label`, which is the distinction the whole slice turns on.
+- `__path(el)` — a four-deep ancestor chain, because `__describe()` renders a class-less `<input>`
+  as bare `"input"`, which is how slice 50's real finding and an unrelated nameless field became
+  the same string in the same array.
+- **Phase E, a slider census.** Every `input[type=range]` is enumerated *directly from the DOM*,
+  reachable or not. This exists because the Tab walk cannot answer the question alone: slice 50
+  recorded that the seek slider is `disabled` with nothing playing, so sequential navigation skips
+  it, and a walk-only reading reports its name as absent-because-unreached — which is **not** the
+  same claim as absent-because-nameless and must never be written down as a pass. `E2` reports the
+  unreachable ones separately, by name, as `NOT-REACHABLE`.
+
+### TASK 1 — the answer: YES, the slider fix is real in a shipped build
+
+```
+node docs/migration/tools/packaged-a11y-deep-gate.mjs --exe=<...>/jp-study-app.exe
+```
+
+| | **control** `…win32-x64.pre-storage-fix` | **fresh** `…win32-x64` |
+|---|---|---|
+| built | 2026-08-01 11:40Z | 2026-08-02 12:05Z |
+| distinct `input[type=range]` | 4 | 4 |
+| named by accname precedence | **0 / 4** | **4 / 4** |
+| `title`-only | 1 | 0 |
+| no name at all | **3** | **0** |
+| step E1 | **FAIL** | **PASS** |
+| proof | `proof/packaged-a11y-deep-20260802slice53control/` | `proof/packaged-a11y-deep-20260802slice53fixed/` |
+
+Element by element — same four controls, same paths, one instrument:
+
+| slider | control | fresh |
+|---|---|---|
+| `footer.mc-playerbar > div.mc-player-volume > input` **(slice 50's finding)** | `name="" source=none` | `name="Volume" source=aria-label` |
+| `footer.mc-playerbar > div.mc-player-progress > input` (seek) | `name="" source=none` | `name="Track position" source=aria-label` |
+| `div.music-controls > input.music-seek` | `name="" source=none` | `name="Track position" source=aria-label` |
+| `div.music-controls > input.music-volume` | `name="Volume"` **`source=title`** | `name="Volume"` **`source=aria-label`** |
+
+**That last row is the false null, caught.** The name string is `"Volume"` in *both* artifacts. Only
+the `source` field separates them — and without the `__nameInfo` addition the gate would have
+printed an identical line for the fixed build and the broken one.
+
+Anchored in the shipped bytes, independently of the gate:
+
+```
+CONTROL MediaCenterView-C7e9Ezoy.js:
+  "mc-player-volume",…,e.jsx("input",{type:"range",min:0,max:1,step:.05,value:a.volume,
+                                      onChange:o=>Ra(Number(o.target.value))})
+FRESH   MediaCenterView-DcMjcz-h.js:
+  "mc-player-volume",…,e.jsx("input",{type:"range",min:0,max:1,step:.05,value:a.volume,
+                                      onChange:o=>Ra(Number(o.target.value)),
+                                      "aria-label":i("music.controls.volume")})
+```
+
+**E2 — reported honestly as NOT-REACHABLE, in both arms.** The two *seek* sliders are
+`disabled=true` on a fresh profile with nothing playing, so sequential navigation skips them and no
+Tab stop exists to read. Their names come from the DOM census, not from a keyboard walk, and the
+gate says so in its own output rather than folding them into the pass. Slice 50's note was right,
+and it now has a number attached: 2 of 4. **The volume slider that was slice 50's actual finding IS
+Tab-reachable** (`disabled=false`), so for that control the verdict is a keyboard-reachable,
+properly-named stop — not an inference.
+
+**Unchanged between the arms**, which is what makes the slider column attributable: keyboard walk
+10/43/29/39 distinct stops on both, 0 unnamed stops, 0 missing focus indicators, contrast
+self-test exact in both (21.00 / 1.26 / 5.28), 3 distinct images, study overlay NOT-REACHABLE in
+both. The only thing that moved is the thing slice 52 changed.
+
+### Gates, measured this slice
+
+| gate | result |
+|---|---|
+| `node tools/i18n-check.cjs` | **6587 keys, all translated in ja/zh/ru, exit 0** |
+| `node tools/architecture-audit.cjs` | **1332 modules, 18 findings, "Nothing new", exit 0** |
+| `node docs/migration/tools/audit-carried-items.mjs` | **exit 0, 2 OPEN rows** (`mediacontent-uncommitted`, `media-study-localstorage-half-never-round-tripped`) — unchanged |
+| `npx vitest run` | **362 files / 4599 tests pass, exit 0** |
+
+The architecture count moved **1331 → 1332** since slice 51. It is not this slice's: that scanner
+walks only `.ts/.tsx` under `src/`, and **slice 53 added no `src` file at all** — every file it
+touched is under `docs/migration/`. The extra module belongs to one of the other tracks holding
+the ~1,000 uncommitted paths.
+
+### TASK 2 — a NEW defect, found by driving Phase 7 live: a legal zero-argument plan is rejected
+
+The very first live run never reached the queue at all, and what stopped it is worth more than the
+run was:
+
+```
+[phase7-refusal] FAIL — 3 a LIVE plan was produced by the real local model:
+  no queue item after the plan click (clicked);
+  status line: ["Local model step 1 needs an arguments object."]
+```
+
+Asked to *"List every flashcard deck folder I have"*, Qwen3-1.7B chose **`flashcard.list-decks`** —
+a legal, allow-listed, **zero-argument** operation. It cleared `evaluateAgentToolAccess` at
+`localAgentPrompt.ts:128`. Two lines later, `:137` threw the whole plan away because the step had
+no `arguments` object:
+
+```ts
+if (!step.arguments || typeof step.arguments !== 'object' || Array.isArray(step.arguments)) {
+  throw new Error(`Local model step ${index + 1} needs an arguments object.`);
+}
+```
+
+**The rule is applied to operations that take no arguments.** `flashcard.list-decks`'s handler is
+`() => ({ folders: loadDeckFolders(), cards: loadDeck().length })` — it reads none. The system
+prompt does show `"arguments":{}` in its shape example, so the model is out of spec; but the
+failure mode is a **total plan rejection with a message about a field the operation does not use**,
+and the recommended local stack is exactly the size of model that omits it. This is a one-line fix
+(`arguments: step.arguments ?? {}`, or the check made conditional on the operation declaring
+parameters) and it is **not** something this slice changed — no `src` edit was in scope here.
+
+**It is systematic, not a one-off.** Retargeting at `calendar.list` — also zero-argument
+(`() => ({ events: loadEvents().slice(0, 100) })`) — was rejected **5 attempts out of 5** with the
+same message. With `flashcard.list-decks` that is **6 rejections out of 6 across two zero-argument
+operations**. The inverse also reproduces: pointed at `dictionary.search-knowledge`, which *does*
+take an argument, the model emitted the `arguments` field and the plan parsed **2 times out of 2**.
+
+> **The model omits `arguments` precisely when the operation needs none — which is exactly when the
+> parser insists on it.** That is the shape of the defect, and it makes the zero-argument half of
+> the tool catalogue effectively unreachable from a local plan.
+
+A second-order consequence worth recording: passing the parser is not the same as being runnable.
+`dictionary.search-knowledge` parsed with `"arguments":{}` — an *empty* object — and then died in
+its own handler with `The operation needs query.`, identically in both arms. The gate now resamples
+until the model actually populates the field, and records `args`/`argCount` for every attempt.
+
+**Recorded as found, not worked around silently.** The gate now steers at
+`dictionary.search-knowledge`, which has an obvious `query` argument a small model emits naturally,
+and it retries the same objective up to 5 times, recording every rejection in the proof. Retrying
+is legitimate here — it re-rolls until a plan *parses*, never until a particular operation appears —
+but the reason it has to retry at all is the defect above.
+
+**A second live-only discovery, from the same first run.** `loadLocalAgentProfiles()` falls back to
+the built-in profiles **in memory and never writes them**, so on a fresh install
+`jp-study-local-agent-profiles-v1` does not exist in localStorage at all — the gate read
+`activeProfileId: null` and would have narrowed nothing while reporting a story. *You cannot remove
+an operation from a profile that was never saved.* The gate now drives the panel's own profile
+picker to another profile and back, which makes `changeProfile` call `saveLocalAgentProfiles`, so
+the store that lands on disk is the app's own rather than the gate's idea of it.
+
+> **A harness rule this slice paid for, and the next one should not.** The second run came back
+> from the restart with `row=MISSING` in **both** arms — which reads exactly like "the persisted
+> queue does not persist", the very claim under test. **It was the harness.** `window.close()` on
+> the main window did not end the process (the Blanc window held it open), so it was
+> `taskkill /T /F`-ed 15 s later; Chromium's localStorage is LevelDB-backed and flushed
+> asynchronously. The tell was in the data: the **profile** store survived — written ~10 minutes
+> before shutdown — while the **queue**, written seconds before the kill, did not. A harness that
+> force-kills the process it is testing persistence *through* cannot tell an unflushed write from a
+> storage bug. The gate now closes every page target through DevTools' own `/json/close`, waits 40 s
+> for a real exit, and if it still has to force, **says so and downgrades step 7 to INCONCLUSIVE
+> rather than FAIL** — because at that point the two explanations are indistinguishable and calling
+> it a finding would be inventing one.
+
+**And a third: the ORDER of the story is load-bearing, not narrative.** With the shutdown fixed, the
+run reached the queue — `row=queued` after the restart, `click=clicked:Run`, the per-row control
+slice 51 built — and then both arms returned the **byte-identical** error
+`"The operation needs query."`. The gate refused to call that a pass, correctly. The cause: the
+first version narrowed the profile *after* the restart, in the session that then clicked Run.
+`LocalAgentPanel` reads the profile store **once**, in a `useState` initializer
+(`BlancReadyToolPanels.tsx:319`), and the attempt to force a remount by switching tools did nothing
+because **`calculator` is not in `BLANC_TOOL_IDS`** — so the panel never unmounted and both arms ran
+with the original 19-operation profile. Narrowing a *running* panel is not the narrowing the run
+will see. Each arm now gets two sessions — one that narrows and exits, one that is the restart —
+and the control arm takes the same two, so the arms differ in the narrowing and not in how many
+times the process restarted.
+
+> **A fourth, smaller one, from the same run: passing the parser is not being runnable.** Steering
+> the objective at `dictionary.search-knowledge` got a plan that parsed — the model wrote
+> `"arguments":{}` — but with no `query` inside it, so the handler threw in *both* arms. The target
+> is now `calendar.list`, whose handler is `() => ({ events: loadEvents().slice(0, 100) })` and
+> takes **no arguments at all**, so an empty `arguments:{}` is not merely accepted, it is complete.
+> That is what lets the control arm reach `completed` rather than failing for its own reason.
+>
+> **NARROWED 2026-08-02 by slice 54 — the `calendar.list` half of that paragraph is a plan, not a
+> measurement.** In `proof/phase7-queue-refusal-20260802slice53e/phase7-queue-refusal.json` both
+> `preferredOperation` and `chosenOperation` are `dictionary.search-knowledge`, and every step
+> carries `argCount: 1`, `args: {"query":"neko"}`. `calendar.list` occurs in that artifact only as
+> an element of the available-operations lists (three times), never as the operation actually run —
+> so **the run never exercised it** and there is no live evidence here that `calendar.list` with
+> empty arguments completes. Slice 54 supplies that evidence at the adapter layer instead.
+> (Slice 54's own phrasing, "`calendar.list` does not appear in the artifact at all", is itself
+> too strong — it appears, just never as the chosen operation. The correction stands; the wording
+> did not.)
+
+### TASK 2 — the story ran end to end, and THE REFUSAL NEVER CAME. Here is why.
+
+`proof/phase7-queue-refusal-20260802slice53e/` — every precondition passed and the verdict still
+failed, which is the gate working:
+
+| step | result |
+|---|---|
+| 3 a LIVE plan from the real model | **PASS** — `dictionary.search-knowledge` with `args={"query":"neko"}`, attempt 1 |
+| 5 the planning process exited | **OK — cleanly, code 0** |
+| 7 the queued task survived the restart | **PASS** — `row=queued` in both arms |
+| 8 the narrowing took **and survived the restart** | **PASS** — `19 → 18`, `targetEnabled=false` after the restart |
+| 9 the queued row was **RUN**, not merely listed | **PASS** — `clicked:Run` in both arms |
+| **10 the differential** | **FAIL** — narrowed: `completed`, error `null`; control: `completed`, error `null` |
+
+**The step the profile no longer permits completed anyway.** Not refused, not
+`waiting-confirmation` — `status: "completed", error: null`, with
+`dictionary.search-knowledge` absent from the active profile's `enabledOperations` on disk both
+before and after the restart.
+
+**The allow-list is not the bug.** `evaluateAgentToolAccess` is wired exactly as 47e left it, and
+`runAgentTaskStep` is the single renderer boundary slice 51 made it. The narrowing never *reaches*
+it:
+
+```
+localAgentProfiles.ts:146   for (const p of EMPTY_AGENT_PROFILE_STORE.profiles) byId.set(p.id, p);
+localAgentProfiles.ts:151   if (!id || byId.has(id)) continue;   // ← every built-in id collides
+```
+
+`normalizeAgentProfiles()` seeds its map with the **factory defaults first**, then skips any
+persisted profile whose id is already present — which is all four built-ins. `loadLocalAgentProfiles()`
+normalizes on every read and `getActiveAgentProfile()` normalizes **again**, so the panel's
+`activeProfile` is the factory profile no matter what the user saved.
+
+Measured on the real module, with a control, by
+**`node docs/migration/tools/agent-profile-narrowing-probe.mjs`** (new, exit 0, verdict CONFIRMED):
+
+```
+ 18 ops · dictionary.search-knowledge present = false · persisted store (what lands in localStorage)
+ 19 ops · dictionary.search-knowledge present = true  · after normalizeAgentProfiles()
+ 19 ops · dictionary.search-knowledge present = true  · getActiveAgentProfile() — the panel's allowedOperations
+ 18 ops · dictionary.search-knowledge present = false · CONTROL — identical edit on a CUSTOM profile
+```
+
+The custom-profile control is what makes the **built-in id** the attributable cause rather than
+"editing profiles is broken generally".
+
+> **This re-reads 47e a third time.** Slice 48 found the queue could not be run. Slice 51 wired it,
+> which made 47e's story *reachable*. Slice 53 drove it and found the story still cannot happen —
+> for a different reason, one layer further out. 47e's execution-time re-check is correct and
+> **unreachable on a built-in profile**, and the four built-ins are the only profiles a fresh user
+> has. A user who narrows a built-in profile gets no refusal, ever; only a profile created through
+> *Create profile* (`createLocalAgentProfile`, which mints a `custom-…` id) can be narrowed at all.
+
+**Not fixed here.** The fix is in `src/shared/localAgentProfiles.ts` and it is a real design
+decision, not a typo — built-in profiles are presumably re-seeded so that a new app version can add
+operations to them. Merging persisted edits over the defaults per-profile (rather than skipping the
+persisted copy wholesale) is the obvious shape, but it needs a rule for what happens when a built-in
+gains an operation the user never saw. That is a slice of its own; **no `src` file was edited in
+slice 53.**
+
+**The next run should be cheap.** Fix that merge, then re-run
+`phase7-queue-refusal-live-gate.mjs` unchanged — step 10 should flip FAIL → PASS with no edit to the
+instrument, which is the cleanest possible confirmation.
+
+### Everything slice 53 touched
+
+**Modified (2):** `docs/migration/NEXT_SESSION.md`, `docs/migration/progress.json`
+(`phase9.slice53`, `phase7.slice53`, `phase7.remaining`).
+
+**New tools (2):** `docs/migration/tools/phase7-queue-refusal-live-gate.mjs`,
+`docs/migration/tools/agent-profile-narrowing-probe.mjs`. **Extended (1):**
+`docs/migration/tools/packaged-a11y-deep-gate.mjs` (`__nameInfo`, `__path`, Phase E). Note that
+file was **untracked** — slice 50 never committed it.
+
+**Proof (7):** `packaged-a11y-deep-20260802slice53control/`, `…slice53fixed/`, and
+`phase7-queue-refusal-20260802slice53{,b,c,d,e}/`. The four failed Phase 7 runs are kept on purpose
+— each one is the evidence for a different lesson above (`53` the zero-argument rejection, `53b` the
+force-kill flush, `53c` the narrow-after-restart ordering, `53d` 5/5 zero-argument rejections) and
+**`53e` is the authoritative run**.
+
+**No `src` file was edited, and none was added** — which is also why no new i18n keys were needed.
+`npm run package` did not write into `src/main/chrome-extension/`; all 13 files hash identically
+before and after.
+
+## SLICE 52 — EVERY RANGE SLIDER NOW HAS AN ACCESSIBLE NAME, AND THE AGENT PANEL IS TRANSLATED.
+
+> **The run hit its account's usage limit at 14:58 after doing all the work and none of the
+> recording** — no handoff, no gates. This section was written afterwards from the tree. It is the
+> second time in one session that a run died having already changed the repo: **check the tree,
+> not the log.** The gates below were run by hand after the fact.
+
+**Task 1 — the slider names.** Slice 50 found the media-center volume slider announcing as a bare
+"slider". The fix is better than labelling each call site: a shared primitive
+`src/renderer/components/ui/Slider.tsx` whose props make the name **required at the type level** —
+a union of `{'aria-label': string}` and `{'aria-labelledby': string}`, not an optional `?:`, so a
+nameless `<Slider>` cannot compile. 20 component files were converted.
+
+The standing gate is `src/renderer/__tests__/sliderAccessibleName.test.ts`, and it is built the way
+this track has learned to build gates:
+- It approximates the **accname algorithm** in precedence order (`aria-labelledby` >
+  `aria-label` > `<label for=id>` > wrapping `<label>`), and **deliberately rejects `title`**,
+  which is only the last-resort fallback and is not announced by every screen reader.
+- It carries an explicit **non-vacuity guard** — `controls.length >= 55` and at least 8 `<Slider>`
+  call sites — so an empty pass cannot be silent. Slice 52 measured 48 raw range inputs plus 8
+  `<Slider>` sites; the assertion is a floor, not an equality, because new sliders are expected.
+- It exempts the primitive's own definition (nameless by construction, the name arrives from the
+  caller) and replaces that check by pinning the **type** instead — because `tsc` is not a gate here.
+- A fourth block tests **that the analyser detects what it claims to**, so a scanner that silently
+  matched nothing could not stay green.
+
+**Task 2 — i18n.** The agent panel was half-converted: slice 51's six new strings were raw English,
+and so were their siblings `Pause`/`Resume`/`Cancel`/`Prioritize`. The panel now goes through
+`t()` throughout, and the catalogs grew **6436 → 6587 keys**, all four languages filled.
+
+> **`i18n-check` cannot see this class of problem.** It only compares keys that already exist, so
+> raw literals pass it silently — exit 0 is necessary, not sufficient. The sweep has to be done by
+> reading the component.
+
+**One breakage, and it is worth keeping.** Converting the panel broke slice 51's own structural
+test, which asserted the literal English word `Run` appeared after `<legend>Task queue</legend>`.
+Two lessons in one line: **an assertion coupled to English text fails the moment the app is
+translated, and says nothing about whether the control does anything**; and it was *vacuous by
+construction*, because `indexOf` returns `-1` when the legend changes and `slice(-1)` then tests a
+single character rather than failing loudly. It now asserts the wiring — that a queue row passes
+`item.id` to `runQueued`, and that `runQueued` goes through `selectAgentQueueRun` — which is
+language-independent and actually about behaviour.
+
+**Gates, measured by hand after the run died:** `npx vitest run` **362 files / 4599 tests pass** ·
+i18n **6587 keys, exit 0** · architecture **18 findings, "Nothing new", exit 0** ·
+`audit-carried-items.mjs` **exit 0**.
+
+**Not proven in a packaged artifact.** The current `out/` build predates this change, so the
+slider fix is proven **in source only**. `packaged-a11y-deep-gate.mjs` should be re-run after the
+next `npm run package` to confirm the volume slider announces a name in a shipped build — that is
+the same "proven in source ≠ proven in the artifact" gap slices 46 and 49 both paid for.
+
+## SLICE 51 — THE PERSISTED AGENT QUEUE WAS A DEAD END, AND NOW IT RUNS.
+
+**Full write-up: `docs/migration/SLICE_51_PHASE7_QUEUE.md`** (written to its own file because
+another agent held this one during the concurrent Phase 9 run). Summary:
+
+Slice 48's structural finding was **real**. `nextRunnableAgentQueueItem` had exactly two
+references repo-wide — its definition and its own test — and nothing set the panel's `task` from
+a queue item. A queued plan could be listed, paused, resumed and cancelled, never executed.
+
+**One correction to slice 48's framing:** it recorded this as cross-session. The stranding also
+happened *within* a session — `plan()` cleared `task` and then overwrote it while enqueuing every
+plan, so planning a second objective stranded the first permanently. Dead rows accumulated from
+the second plan, not the second session.
+
+**This re-reads slice 47e.** 47e's motivating story — a task planned while a profile enabled
+`flashcard.delete-deck` staying runnable after the operation is removed — was describing a path
+that **could not execute**. Slice 51 makes it real for the first time, which is why the fix had to
+carry the allow-list rather than bolt `setTask` onto a queue row.
+
+New module `src/renderer/localAgentQueueRun.ts`. **The renderer's execution boundaries went from
+two to one**: `executeAgentTaskStep` was called at `BlancReadyToolPanels.tsx:578` and `:609`, and
+is now called once inside `runAgentTaskStep`, shared by all three verbs. `allowedOperations` is a
+**required** property of `AgentQueueRunOptions` typed to admit `undefined`, so a caller must state
+what the profile permits and cannot silently omit it into full access — while staying optional on
+`AgentExecutionOptions`, as 47e intended. A structural test fails any future verb that calls the
+executor directly.
+
+**Non-vacuity, honestly handled.** The structural half failed 3/3 pre-fix with a 3-test control
+block that passed. The behavioural half's only pre-fix failure was `Cannot find module`, which
+proves the fixture rather than the code — so it was checked by **mutation** instead: reverting
+just the allow-list pass-through gives `expected "vi.fn()" to not be called at all, but actually
+been called 1 times`. The deletion handler ran, the same signature 47e reported.
+
+**Verified independently against the tree:** 361 files / 4589 tests pass, exactly three `src`
+files touched, the slice-48/49 storage files never opened.
+
+## SLICE 50 — THE THREE PACKAGED GATES RE-RUN AGAINST THE FRESH ARTIFACT, AND THE OFFLINE PASS TURNED OUT TO BE VACUOUS.
+
+> **This section was written from slice 50's artifacts, not by slice 50.** The run produced ten
+> proof directories and two tools and then ended without writing its handoff or its gate totals.
+> Verdicts below are read from the proof JSON. **Check the tree, not the log.**
+
+All three gates pass against `out/jp-study-app-win32-x64/` (rebuilt 2026-08-02 13:39, carrying the
+slice-49 storage fix):
+
+| gate | verdict | proof |
+|---|---|---|
+| packaged CSP | **PASS** | `proof/packaged-csp-20260802slice50/` |
+| packaged offline | **PASS** (after the gate was fixed — see below) | `proof/packaged-offline-20260802slice50fixed/` |
+| packaged a11y | **PASS** | `proof/packaged-a11y-20260802slice50/` |
+
+**The offline gate was passing vacuously, and its own new non-vacuity step caught it.** Step 5,
+"the block actually bit something", failed on the paired run: *0 external requests failed across 0
+hosts*. The app had been passing an offline test **without ever attempting to reach the internet**,
+which proves nothing about offline resilience. A control mode was added alongside it
+(`CONTROL-REACHED-THE-INTERNET`), so the instrument is now a differential rather than a single
+green run.
+
+**Read the fixed PASS precisely.** Its signal is the **main process**: `searchDiscovery` resolves
+6 results in the control and **0** when blocked. The renderer still reports *0 external requests
+in both modes* — its off-machine surface remains unexercised, because a throwaway profile has no
+library, no posters and no scrape results to fetch. Offline resilience is demonstrated for the
+main-process discovery path only.
+
+**A real accessibility defect, on a real player surface.** The media-center player bar's volume
+slider takes keyboard focus with **no accessible name** — announced as just "slider". Statically:
+**51 `<input type="range">` across `src/renderer` + `src/media`, zero with an `aria-label`**, while
+the renderer uses `aria-label` 539 times elsewhere. So it is an isolated gap in one control type,
+not a general omission. The count *understates* it: the seek slider at `MediaCenterView.tsx:1288`
+is equally nameless but was `disabled` with nothing playing, so Tab skipped it.
+
+Keyboard walk (real CDP `Tab` presses, surfaces isolated by closing windows between each):
+
+| surface | stops reached / focusable | focus indicator |
+|---|---|---|
+| desktop shell | 10 / 11 | 120/120 |
+| settings | 43 / 44 | 117/120 |
+| library | 29 / 30 | 120/120 |
+| notebook | 39 / 40 | 120/120 |
+
+0 stops without a focus indicator, 0 offscreen, 0 zero-size, 0 positive-tabindex reordering. **The
+consistent one-short gap on every surface is unexplained** — the element-level diff that would name
+it was the phase the run ended before reaching.
+
+**Two things it correctly declined to report as findings**, both of which read worse than the
+truth: the "decorative image in a textless card" is the reading-garden foreground mask, where
+`alt=""` is *correct*; and 47k's `imagesWithoutAlt: 0` still holds but rests on only **3 distinct
+images**, because poster and cover-art grids need a scanned library. **The player study overlay is
+recorded NOT-REACHABLE, not passing** — no sidecar and no media on a fresh profile, so
+`.study-cue-overlay` never mounts.
+
+New tool `docs/migration/tools/packaged-a11y-deep-gate.mjs`; `packaged-offline-gate.mjs` gained
+step 5 and its control mode. **Still open from this slice:** the one-short keyboard gap, the
+volume/seek slider names, the renderer's unexercised offline surface, and the study overlay —
+all four need a profile with real content, or a fixture that supplies one.
+
+## SLICE 49 — THE STORAGE FIX IS PROVEN IN A PACKAGED BUILD, AS A DIFFERENTIAL AGAINST THE BINARY THAT STILL CARRIES THE DEFECT.
+
+Slice 48's defect is fixed, and the fix is now measured where it ships. **The control binary was
+preserved first**, before the rebuild, so there is an unfixed artifact to measure against:
+`out/jp-study-app-win32-x64.pre-storage-fix/` — 39,715/39,715 files, 0 failed, 0 mismatch,
+identical total bytes and identical exe sha256 to the 2026-08-01 build it copied.
+
+| | control | fixed |
+|---|---|---|
+| binary | `out/jp-study-app-win32-x64.pre-storage-fix/` (2026-08-01) | `out/jp-study-app-win32-x64/` (2026-08-02) |
+| renderer bundle | `main-DMgBDn1J.js` | `main-Ct5UAKwv.js` |
+| **verdict** | **FAIL, exit 1** | **PASS, exit 0** |
+| proof | `proof/storage-migration-20260802slice49control/` | `proof/storage-migration-20260802slice49fixed/` |
+
+```
+node docs/migration/tools/storage-migration-gate.mjs --exe=<...>/jp-study-app.exe
+```
+
+The gate was **not edited** for this slice. Changing the instrument between control and treatment
+would have destroyed the comparison, so the `RETAINED_LS` gap noted below was left alone on
+purpose rather than fixed mid-run.
+
+**What flipped**
+
+| step | control | fixed |
+|---|---|---|
+| `round-trip` | FAIL — 5/5 keys re-encoded, depth 1 -> 2 | PASS — every retained key byte-identical |
+| `escalation` | FAIL — second run adds another layer | PASS — second run changes nothing |
+| `escalation-third-run` | FAIL — `1/2/3/4` on all five | PASS — `1/1/1/1` on all five |
+| `idb-retention` | DROPS `media-study-database` | drops nothing |
+
+`jp-flashcard-deck` went **88 -> 110 -> 242 bytes** on the control across seed / one / three
+migrations and read back as a string; **88 -> 88 -> 88** on the fixed build. `jp-slice48-control`,
+outside `LS_KEYS`, is byte-identical in both runs — which is what makes the change attributable to
+the runner.
+
+Both halves are also visible in the shipped bundles, so the differential is anchored in the
+artifact rather than only in the source tree:
+
+```js
+// control  main-DMgBDn1J.js
+function dB(e,s){try{localStorage.setItem(e,JSON.stringify(s))}catch{}}
+// fixed    main-Ct5UAKwv.js
+function kF(e,s){try{localStorage.setItem(e,typeof s=="string"?s:JSON.stringify(s))}catch{}}
+```
+
+and the retention lists go 5 -> 6 (localStorage, adds `jp-media-study-database-v1`) and 11 -> 12
+(IndexedDB, adds `media-study-database`).
+
+**Three things the next session should not over-read**
+
+1. **`idb-retention` is informational, not scored.** The gate hardcodes it to `OK` and puts the
+   dropped list in its detail, so it contributed to neither exit code. The exit codes are carried
+   by `round-trip`, `escalation` and `escalation-third-run`. The media-study row genuinely
+   flipped, but it flipped *detail text*, not a verdict. Do not quote it as "the media-study row
+   went FAIL -> PASS".
+2. **The media-study *localStorage* half is still not round-tripped.** `RETAINED_LS` in the gate
+   is slice 48's five keys; `jp-media-study-database-v1` is not seeded. That half rests on the
+   retention list and on its IndexedDB twin. Carried as
+   `media-study-localstorage-half-never-round-tripped` — seeding a sixth key is the obvious next
+   edit to the gate.
+3. **`interrupt-evidence` is WEAKER on the fixed run, not better.** Control: `OK` (next boot found
+   `storage-version` still 0, so the kill landed mid-flight). Fixed: `INCONCLUSIVE` — the next
+   boot's own migration reached the version cell before the harness's first read. A race in the
+   observation window, not a regression; `recovery` PASSes on both with 14 keys present. The
+   mid-flight kill is proven by the control run only.
+
+**Gates measured after the run:** `npx vitest run` 360 files / 4575 tests pass ·
+`node tools/i18n-check.cjs` 6436 keys, exit 0 · `node tools/architecture-audit.cjs` 1329 modules,
+18 findings, nothing new, exit 0 · `node docs/migration/tools/audit-carried-items.mjs` exit 0
+(the two slice-48 storage rows retired to DONE; one new row OPEN).
+
+Nothing under `src/` was edited. `npm run package` runs `tools/sync-extension-mirror.cjs`, which
+*can* write into `src/main/chrome-extension/` — it reported "mirror already up to date (12/12
+files match)" and the 13 file hashes there are unchanged across the build.
+
+## SLICE 48 — THE MIGRATION LAYER EXISTS, AND IT CORRUPTS EVERY KEY IT CLAIMS TO KEEP. PHASE 7 IS FULLY DRIVEN LIVE; ITS "BLOCKER" WAS NEVER REAL.
+
+> **Two things in the record were wrong, and both were load-bearing.** Slice 47 could not find a
+> schema-migration layer and suggested Phase 9's `interrupted migration` item might name nothing.
+> It names something, and that something is actively losing data. Separately, Phase 7's live half
+> was recorded as blocked on a multi-GB model download — **the model has been sitting in
+> `~/Downloads` since 2026-07-07** and `resolveModelPath` has always searched there.
+
+### Task A — the item is real, and the uninterrupted run is worse than the interrupted one
+
+Evidence: `docs/migration/proof/storage-migration-20260802slice48/` (README first). Reproduce:
+
+```
+node docs/migration/tools/storage-migration-gate.mjs
+```
+
+| | |
+|---|---|
+| runner | `src/renderer/storage/migrationRunner.ts` → `runStorageMigrations()` |
+| called from | `src/renderer/main.tsx:239`, `runWhenIdle(…, 8000)` — **every main-window boot** |
+| boundary | `src/shared/storageMigrationBoundary.ts`, `STORAGE_MIGRATION_VERSION = 5` |
+| version cell | `storage-version` in IndexedDB `jp-study-db/kv` |
+
+**The interruption itself is fine.** The process was killed 409 ms into a run calibrated at
+908 ms; on the next boot `storage-version` was still `0`, proving `replaceAtomic` was cut before
+it returned. All 14 IndexedDB keys survived, nothing was lost beyond the one key this build
+deliberately drops, and the next boot's migration completed normally. The version cell is written
+last, so an interrupted run is simply replayed.
+
+**The completed run is the problem.** Seed the five retained `localStorage` keys at JSON parse
+depth 1; after one completed migration they read **2**, after two **3**, after three **4** —
+while a control key outside `LS_KEYS` stays byte-identical.
+
+`collectSnapshot()` stores the **raw string** from `getItem`; `writeLocal()` then does
+`setItem(key, JSON.stringify(value))` on that string. One extra encoding layer per boot, forever.
+The app's readers parse **once** (`flashcardDeck.ts:72`), so after a single migration
+`JSON.parse(raw)` returns a *string*, `parsed.cards` is `undefined`, and `readStore()` hands back
+an empty deck. The IndexedDB mirror is still correct — but **nothing restores the deck from it**,
+and the next deck write mirrors the empty store back over the good copy. Affected:
+`jp-flashcard-deck`, `jp-study-csv-editor-v1`, `jp-clipboard-history`, `jp-calendar-events`,
+`jp-media-tracking-v1`.
+
+**It has already happened on the real profile.** `%APPDATA%/jp-study-app/Local Storage/leveldb/000110.log`
+carries successive `jp-clipboard-history` records at zero, one, two and three encoding layers,
+then a clean one — the history read as empty and was rebuilt from new activity.
+
+Second defect from the same run: `IDB_KEYS.mediaStudy` (`media-study-database`) is **enumerated**
+by the adapter and **absent** from `HEAVY_INDEXED_DB_KEYS`, so `replaceAtomic` writes `undefined`
+over it on every boot. Measured live: the packaged build drops it.
+
+The committed `migrationRunner.ts` at HEAD says, in its own header, *"an interrupted migration can
+never lose data because nothing is removed"*. The uncommitted rewrite deleted that invariant along
+with the reconcile logic that made it true.
+
+> **Nothing was fixed here.** `migrationRunner.ts`, `storage.ts` and `main.tsx` are another
+> track's uncommitted work and this slice does not own them. Three audit rows now carry the
+> findings and expire on their own when the code changes.
+
+### Task B — all four Phase 7 verbs driven live
+
+Evidence: `docs/migration/proof/phase7-live-20260802slice48/`. Reproduce:
+
+```
+node docs/migration/tools/phase7-live-gate.mjs
+```
+
+| verb | observed |
+|---|---|
+| **preview** | the **Task plan** table rendered `study.preview-cards` at `Queued` — a proposed step shown before anything ran |
+| **confirm** | `settings.apply-theme` was **held**: `confirmation-required`, then *Confirm sensitive step* → `tool-started` → `tool-completed · 2ms` |
+| **cancel** | real click on a persisted queue row: `queued → cancelled`, written back to storage, and the row then offers no buttons |
+| **audit** | the **Execution log** rendered `tool-started · study.preview-cards` and `tool-failed · … · 4ms` |
+
+The model requirement was located by a differential, because a refusal has no positive observable:
+agent disabled → `The local agent is disabled in Settings.`; enabled but pointed at a missing file
+→ `No local GGUF model was found.` Two different refusals from one call.
+
+- **Model-gated:** producing a plan — and therefore step-level preview, run, confirm and every
+  `AgentExecutionEvent`, since all hang off the in-memory `task` that only `plan()` sets.
+- **Not model-gated:** the whole persisted-queue surface, the profile/permission selects, the refusal.
+
+**Under `limited-actions` a confirming operation is DENIED, never held.** Every confirming
+operation needs `full-automation`, and `evaluateAgentToolAccess` checks the permission level
+*before* the confirmation reason (`localAgent.ts:231,237`). The confirm path was reached by
+switching to the built-in Automation Assistant profile — itself a live Phase 7 surface.
+
+### The structural finding — the persisted queue is a dead end
+
+With two tasks in `jp-study-local-agent-task-queue-v1`, *Run next approved step* and *Confirm
+sensitive step* both read `disabled=true`. Nothing sets `task` from a queue item, and
+`nextRunnableAgentQueueItem` (`localAgentTaskQueue.ts:90`) is referenced only by its own test.
+The queue's paused/resumed states, its 100-item cap and its persistence describe work that can be
+listed and cancelled but **never resumed into execution**.
+
+This changes how slice 47e reads. Its allow-list re-check at the execution boundary is still
+correct and still needed *within* a session — plan, narrow the profile, run — but the
+cross-session case it describes ("a queued task outlives the profile that authorized it") cannot
+arise today, because a task that outlives the session cannot be run at all.
+
+### Traps this slice paid for
+
+- **A probe must not create the database.** `indexedDB.open('jp-study-db')` with no
+  `onupgradeneeded` creates an empty v1 DB with no `kv` store. The app's `openDb()` then opens it
+  *successfully* — the version matches, so its upgrade handler never runs — and every `withStore`
+  throws `NotFoundError` forever. The migration's try/catch logs "skipped", and the gate reads
+  back byte-identical values and calls it a PASS. **The first version of the gate reported three
+  PASSes about a run in which the migration never executed.**
+- **Seeding must not land inside a run.** The runner reads its snapshot, awaits the IndexedDB
+  loop, and only then touches localStorage. A harness write inside that window is not in the
+  snapshot and is *removed* by the next line. The second version seeded right after
+  `readyState === 'complete'` and reported "all five retained keys were REMOVED" — a race in the
+  instrument, not the app.
+- **The write loop cannot be watched while it runs.** IndexedDB serialises readonly transactions
+  behind readwrite ones on the same store, so a poll issued mid-loop only answers once the loop
+  has drained. Polling every 25 ms for five seconds returned "already complete" about a loop it
+  had been watching throughout. The kill is timed off a calibration run instead, and the proof it
+  landed mid-flight is read afterwards from `storage-version`.
+- **A reused throwaway profile makes "wait for the migration" vacuous.** `storage-version` is
+  already 5 from the previous run, so the wait returns before this boot's migration starts. Fresh
+  profile per run.
+
+### What is still open on these two lines
+
+- Nobody has fixed the two migration defects; that is a decision for whoever owns
+  `migrationRunner.ts`. A two-line fix (`JSON.parse` the snapshot value, or write it raw) plus
+  adding `media-study-database` to the retention list would close both.
+- The packaged build is **2026-08-01** and predates slice 47e, so the allow-list re-check was not
+  exercised live. Re-run `phase7-live-gate.mjs` after the next `npm run package`.
+- Whether any *other* persisted store (`profileRules` v1→v2, `desktop.ts` schemaVersion 1→2,
+  extension settings) has the same shape was not examined.
+
+## SLICE 47e — PHASE 7 IS STARTED. Most of it already existed; what was missing was the boundary where it matters.
+
+`AGENT_TOOL_OPERATIONS` is already a typed capability registry — 52 operations over 8 tool
+groups, each with a `minimumPermission` and an optional confirmation reason — with three
+permission levels, per-profile `enabledOperations`, and authorization computed **outside the
+model** in `parseLocalAgentModelPlan`. Phase 7's requirements were largely met and simply not
+recorded as Phase 7 work.
+
+**The gap was that authorization was computed once, at the wrong boundary.**
+`evaluateAgentToolAccess` took only the permission *level*. The per-profile allow-list was
+checked only at plan time, while `executeAgentTaskStep` re-checked the level alone — and
+`AgentTask`s are **persisted** in `AgentTaskQueue` (up to 100 items, with paused/resumed
+states). So a task planned while a profile enabled `flashcard.delete-deck` **stayed runnable
+after the user removed that operation from the profile**. Narrowing a profile did not reach
+work already queued.
+
+Fixed by giving `evaluateAgentToolAccess` the allow-list and having **both** boundaries call
+the one rule, so they cannot drift apart. `AgentExecutionOptions.allowedOperations` carries it;
+both renderer call sites pass `activeProfile?.enabledOperations`. It is optional rather than
+required, so a caller with genuinely no profile is still governed by the permission level
+instead of being denied everything by an allow-list it never set.
+
+**The test was confirmed non-vacuous**: with the guard temporarily removed it fails with
+`expected 'completed' to be 'failed'` — i.e. the handler ran. The audit row checks the guard at
+the **execution** site specifically, because a fix that only re-tightened the parser would
+leave the persisted-task path exactly as it was.
+
+Still unmeasured in Phase 7: preview/confirm/cancel/audit all exist in code and no Phase 7
+surface has been driven live.
+
+## SLICE 47f — `virtualizationAtScale` WAS STALE IN BOTH HALVES, AND THE REAL QUESTION HAD NO TEST.
+
+The gap has read "MediaCardLazyGrid engages above 48 items, test library has 15 titles" since
+Phase 2. **`MediaCardLazyGrid` does not exist anywhere in the tree**, and its replacement
+`VirtualGrid` has no engagement threshold — it virtualises from the first item. The question
+underneath was still real and untested; `VirtualGrid` had no tests at all.
+
+`src/renderer/__tests__/virtualGridAtScale.test.ts`: **5,000 items render exactly as many cards
+as 60 do** (at most 7 rows × 3 columns), while the scroll spacer still measures the whole
+library (1,667 rows × 200 px) so nothing becomes unreachable.
+
+**The precondition is pinned too, and it is the interesting half.** `VirtualGrid` renders
+*every* row while its viewport height is still 0 — deliberately, so a collapsed flex parent
+shows a grid rather than nothing (`VirtualGrid.tsx:68`). A library opened into a zero-height
+parent therefore renders in full. That is a real scale hazard and not a bug to fix blindly, so
+it is pinned rather than silently relied on.
+
+> **A jsdom trap worth keeping.** jsdom ships no `ResizeObserver` **and** reports
+> `clientWidth`/`clientHeight` as 0. `useElementSize` subscribes and then *immediately* does
+> `setSize({ width: el.clientWidth, height: el.clientHeight })`, so a stub that only fires the
+> observer callback is overwritten a moment later, the grid sees a 0-height viewport, and it
+> renders every row — the test then reads "50,000 cards" and looks like a virtualisation
+> failure when it is a harness failure. Both must be stubbed, and the prototype patch must be
+> deleted in `afterEach`, because `unstubAllGlobals` does not undo it.
+
+## SLICE 47g — THE PACKAGED CSP IS NOW READABLE BY A TEST, AND THE ONE CHECK IT HAD WAS SCRAPING SOURCE TEXT.
+
+**Correcting my own earlier summary first:** I wrote that "the app currently runs with
+`unsafe-eval`". That is true of a **dev** run and says nothing about a packaged build. The
+packaged CSP is thorough and carefully reasoned, and it is registered on the `app:` origin,
+which only exists in production — the Vite dev origin is deliberately untouched because HMR
+needs `eval`. Electron's boot-time warning is expected there and is not a finding.
+
+The real gap was that the policy was **an inline string inside `registerContentSecurityPolicy`
+in `main.ts`**, so nothing could read it without importing Electron. It is now
+`src/shared/contentSecurityPolicy.ts` — the same directives, moved verbatim, with
+`cspDirectiveSources(name)` for asking about one line rather than parsing a 1,200-character
+string. `main.ts` imports the header.
+
+Eight tests pin the properties `PHASE_6_5_AUDIT.md` §3 exists for: **no `unsafe-eval` anywhere**,
+`script-src 'self'` stated outright rather than inherited from `default-src`, no off-machine
+`connect-src` host except the documented HuggingFace ones, no wildcard host, the two named
+image CDNs only, `object-src`/`form-action` `'none'`, and — deliberately — that
+`cspDirectiveSources` returns `null` for an **absent** directive rather than `[]`, because an
+absent directive falls back to `default-src` and is a far weaker statement than an empty one.
+
+### The check it did have would have passed on a commented-out policy
+
+`mediaCenterIntegration.test.ts` regex-matched `main.ts`'s **source text** for `"img-src …"`.
+Moving the policy broke it, which is how it was found. That form is worse than brittle: a
+comment is still text, so the same assertion would have passed against a policy that had been
+commented out entirely. It asks the module now.
+
+> **A block-comment trap.** `app://*/*` inside a `/** … */` comment **terminates the comment**
+> at the `*/`, and the file fails to parse with an error pointing at prose. It cost two runs
+> here. Write the scheme without the glob in comments.
+
+### What this does NOT show — answered immediately below, by slice 47h
+
+That the header is actually applied in a packaged build.
+
+## SLICE 47h — IT IS. THE PACKAGED CSP IS DELIVERED *AND* ENFORCED, MEASURED FOR THE FIRST TIME.
+
+Evidence: `docs/migration/proof/packaged-csp-20260802slice47h3/` (README first). Reproduce
+(needs a packaged build in `out/`, no dev server, throwaway user-data-dir):
+
+```
+node docs/migration/tools/packaged-csp-gate.mjs
+```
+
+```text
+0   window origin   app://bundle/index.html
+1   header          527 chars, byte-identical to shared/contentSecurityPolicy.ts
+2   script-src      ['self'] — no unsafe-eval anywhere
+3   ENFORCEMENT     inline <script> refused; violatedDirective = script-src-elem; did not run
+```
+
+`PHASE_6_5_AUDIT.md` §3's chained High finding is mitigated by this policy, and no dev run
+could ever exercise it, because the `app:` origin only exists in a packaged build. Every claim
+for it until now was an argument about source code.
+
+### THE TRAP — it would have been a fabricated security finding
+
+The gate's first version tested enforcement with `eval('1+1')` and reported **`eval-allowed`**,
+against a build whose header is demonstrably correct.
+
+> **`Runtime.evaluate` bypasses the page's CSP by design**, exactly as the DevTools console
+> does — and so does `Page.addScriptToEvaluateOnNewDocument`. Anything the harness executes
+> *directly* is the wrong instrument for measuring a page's policy.
+
+What *is* subject to CSP is the page's own DOM, so the gate appends an inline `<script>` and
+listens for `securitypolicyviolation`: the element is created from a bypassing context, but the
+**load** of it belongs to the page. Had the first reading been written down, the record would
+now carry "the packaged CSP does not block eval" — a false alarm about a live security control,
+pointing at a policy that was already correct.
+
+A duller companion trap: the CDP target exists as soon as the **window** does, which is before
+the **document** is usable — `Failed to fetch` and a null `document.head`, both of which read
+as findings about the policy. The gate waits for `readyState === 'complete'`.
+
+### What it does not show
+
+The packaged artifact predates slice 47g's extraction, so it validates the mechanism and the
+policy *content* but was built from the version with the string inline. Re-run after the next
+`npm run package`. Only `script-src` was exercised behaviourally; `object-src`, `form-action`,
+`base-uri` and the `connect-src` host list are asserted from the header text.
+
+## SLICE 47i — THE TRANSITIVE LICENSE TREE IS AUDITED, AND `LICENSING_PLAN.md` WAS WRONG IN THREE PLACES.
+
+Reproduce (no network, no new dependency, exit 0 = posture unchanged):
+
+```
+node docs/migration/tools/license-audit-gate.mjs
+```
+
+The plan's dependency table covers **17** declared runtime dependencies and has carried
+"`npx license-checker --production` over the transitive tree" as an unchecked box since
+2026-07-27. `package.json` now declares **81**, and the lockfile resolves **623 non-dev
+packages**. The audit of record described a tree that had grown out from under it.
+
+| Class | Count | Notes |
+|---|---:|---|
+| permissive | 600 | |
+| dual, permissive branch available | 4 | `jszip`, `rc`, `type-fest` ×2 |
+| weak copyleft | 15 | `@img/sharp-libvips-*` (LGPL-3.0), **`jassub`** |
+| **strong copyleft** | **2** | `ffmpeg-static`, **`rvfc-polyfill` (GPL-3.0)** |
+| AGPL | **0** | |
+| no declared license | 2 | `fast-shallow-equal`, `react-universal-interface` |
+
+**`rvfc-polyfill` was in no record at all** — a GPL-3.0 polyfill sitting in the shipped tree.
+It is *fine* for a GPL-3.0-or-later work; the point is that it arrived without a decision,
+which is what an unchecked box hides. It is acknowledged now, so a **third** one fails the gate.
+
+### Three corrections to `LICENSING_PLAN.md`
+
+1. "Current declaration: `"license": "MIT"` — **this is already inaccurate**" — the flip has
+   *happened*. It declares `GPL-3.0-or-later`, and `LICENSE` is the GPLv3 text. The gate checks
+   **both**, because they are separate claims that have disagreed before.
+2. "**Sidecar:** unmodified pinned binary … conventional separate-program posture" — **not true
+   since slice 46.** The staged sidecar is a *modified* build. The plan's own rule for that case
+   now applies: the fork's source must be published on distribution, and that source is
+   `patches/seanime/*.patch` + upstream `9bdd052…`, which reproduce the binary exactly. The gate
+   fails if the staged sidecar carries patch markers while `patches/seanime/` is empty.
+3. Two checklist boxes were done and unticked.
+
+> **A gate correctness note, kept because it nearly became a false finding.** The first run
+> reported `jszip` as unrecorded strong copyleft. Its license is `(MIT OR GPL-3.0-or-later)` —
+> an `OR` is the **licensee's choice**, and taking MIT is permitted. Only an expression whose
+> every branch is copyleft constrains anything. Note also that `LGPL-3.0` contains the substring
+> `GPL-3.0`, so weak copyleft must be tested first or all 15 sharp binaries read as strong.
+
+Nothing is distributed today (`private: true`), so no obligation has attached. **A package built
+from here on ships the modified server**, and that is the trigger.
+
+## SLICE 47j — THE PACKAGED APP SURVIVES WITH NO INTERNET, AND THE FIRST VERSION OF THE GATE PROVED NOTHING WHILE SAYING IT DID.
+
+Evidence: `docs/migration/proof/packaged-offline-20260802slice47j3/` (README first). Reproduce:
+
+```
+node docs/migration/tools/packaged-offline-gate.mjs
+```
+
+A packaged **first run** (throwaway profile) with DNS blackholed: the desktop mounts,
+`lookupTerm`/`lookupTermOffline`/`dictAvailableLangs` all answer, the shell is still standing
+after the failures land, and the network-dependent surface degrades instead of hanging.
+
+| `searchDiscovery('frieren')` | |
+|---|---|
+| with the internet | **6 results**, 2,720 ms |
+| with DNS blackholed | **0 results**, 1,034 ms |
+
+Same query, same build — only DNS changed. That differential is what makes "it survived" mean
+something.
+
+### THE MISTAKE — a gate that would have certified an app that was plainly online
+
+The first version blocked requests through the **renderer's** CDP `Fetch` domain. It reported
+`0 external requests blocked` while `searchDiscovery` returned **6 real results**.
+
+> **This app networks in the MAIN process** (`ipcRenderer.invoke('discovery:search', …)`), and
+> main-process requests never pass through a renderer's CDP session. A renderer-side block can
+> only ever prove things about the renderer.
+
+Only the control caught it — the gate refuses to call a run PASS unless the block bit something.
+Without that, "the shell survived with the internet blocked" would have been written down about
+a run with the internet fully connected.
+
+The block is `--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE localhost"` now, applied by
+Chromium's network stack, which Electron's `net` module uses too. Literal `127.0.0.1` is not a
+hostname, so the sidecar is untouched — **the internet is gone and the machine is not**, which
+is the only version of "offline" that means anything for this app.
+`Network.emulateNetworkConditions({ offline: true })` was rejected for the mirror-image reason:
+it kills loopback too, and would have blamed the local server the user still has.
+
+### What it does not show
+
+One surface stands in for "needs the internet". Metadata sweeps, artwork, subtitle discovery,
+AniList sync and **Whisper's first-use model download** were not exercised — the last is the
+one most likely to behave badly offline. No media playback: this is a boot-and-surfaces run.
+
+## SLICE 47k — AN ACCESSIBILITY BASELINE, AND ITS FIRST RUN WAS A CLEAN SWEEP THAT HAD SEEN NOTHING.
+
+Evidence: `docs/migration/proof/packaged-a11y-20260802slice47k2/` (README first). Reproduce:
+
+```
+node docs/migration/tools/packaged-a11y-gate.mjs
+```
+
+Nine surfaces of the packaged app, opened the way the app opens them (`os:open` with a section
+id — the command palette's own route). On the widest: **148 visible controls, 15 form fields,
+893 elements**. Every control named, every field labelled, no positive `tabindex`, no duplicate
+ids, document `lang` present.
+
+### The first run passed everything and meant nothing
+
+It examined **39 controls and zero form fields** — the desktop shell is icons and a taskbar —
+and returned the same clean sweep. **A PASS on "no unlabelled fields" from a run that saw no
+field is not a pass.** The gate opens the form-bearing sections now, and every surface records
+its own coverage so a future clean sweep can be read against how much it looked at. The audit
+row requires ≥100 controls and ≥10 fields before it will accept a run at all.
+
+### One check is vacuous here and is labelled as such
+
+`imagesWithoutAlt` is **0 out of 0**: this app renders iconography as inline `<svg>` and there
+is not one `<img>` across all nine surfaces. Artwork surfaces do use images and were not
+reachable — no sidecar, empty library — so that check is **untested, not passing**.
+
+### It is a floor, not a conformance claim
+
+No keyboard walk (so `positiveTabindex: 0` means the sequence was not *globally reordered*, not
+that focus order is sensible), no contrast, no motion, no screen-reader phrasing, and no player
+surfaces. A field with only a `placeholder` is not flagged, which is weaker than WCAG — a
+deliberate, recorded choice rather than an oversight.
+
+## SLICE 47l — AN INTERRUPTED DOWNLOAD IS NOW ACTUALLY INTERRUPTED, AND IT TOOK TWO WRONG ALARMS TO GET THERE.
+
+Phase 9 lists "interrupted-download tests". Four already existed — append to a partial, restart
+when the server ignores `Range`, discard a partial from another version, adopt an orphaned
+partial on boot — so that checklist item was **stale in the same way `virtualizationAtScale`
+was**. But every one of them **hand-writes the `.part` file** and calls it "a download that was
+interrupted". They cover the resume *arithmetic*; **nothing had ever killed a transfer in
+flight.**
+
+`downloads.test.ts` now has one that does: the server promises the full `Content-Length`, writes
+800 KB of a 1.6 MB body, and destroys the socket. Result — the app is fine. The `.part` and its
+`.meta.json` both survive, the retry sends `Range: bytes=<what survived>-`, and the reassembled
+file is **byte-identical**, which is what proves the running hash was rebuilt correctly across
+the interruption.
+
+### Two false alarms, both of which would have been recorded as defects
+
+1. **"The partial is discarded on a dropped connection."** The first run measured `keptBytes = 0`
+   against the existing 60 KB fixture — but `fs.createWriteStream`'s buffer is 64 KB, so cutting
+   a 60 KB transfer anywhere leaves nothing on disk. The fixture was smaller than one buffer. At
+   real model sizes the loss is bounded by that buffer and everything before it is long since
+   written. Hence the dedicated 1.6 MB payload.
+2. **"It still keeps nothing at 800 KB."** Also wrong. `res.socket.destroy()` in the same tick as
+   `res.write()` throws the write away before it reaches the network — the client saw a bare
+   `fetch failed` with zero bytes received in 38 ms. That is the *fixture* never sending a
+   partial, not the app losing one. Waiting for the write callback plus a 60 ms beat produces a
+   real mid-body abort (`terminated`), and the partial appears.
+
+Both readings looked exactly like "resume is broken". The tell in each case was the same
+question this track keeps having to ask: **did the instrument actually do the thing it claims
+to have done?**
+
+## WHAT IS ACTUALLY LEFT — surveyed 2026-08-02 (slice 47d), measured rather than assumed
+
+**Phase 6 is done in substance.** Slices 1-13 landed and `phase6-live-20260731` is a DONE live
+pass over every surface from slices 2-8. `progress.json`'s `phase6.status` still read "slices
+1-5 landed" and has been corrected. `phaseComplete` is left `false` deliberately — nobody has
+written down what would make Phase 6 *complete* as opposed to *landed*, and inventing that
+criterion here would be the kind of self-certification this track avoids.
+
+**`audit-carried-items.mjs` has exactly one OPEN row, and it is a guard, not a task.**
+`mediacontent-uncommitted` says another track's uncommitted work in `MediaContent.tsx` must not
+be deleted by a session passing through. `OPEN` there means "the reason still holds", which is
+the desired state. It is also not one stray file — the working tree carries ~1,050 changed
+paths, and `CURRENT_STATE.md:721` records the policy: parallel-session work stays uncommitted
+and owned by its sessions. **Nobody should try to close that row by committing that file.**
+
+**Phase 7 (AI capabilities) — STARTED 2026-08-02 (slice 47e), and it was further along than
+"not started" suggested.** The typed registry, permission levels, confirmation reasons and
+out-of-model authorization already existed; the execution-boundary gap is now closed. What
+remains is *live* measurement — preview/confirm/cancel/audit exist in code and no Phase 7
+surface has ever been driven in the real app.
+
+**Phase 8 is deferred by user decision (2026-07-30)** — qBittorrent Web UI and debrid.
+
+**Phase 9 (hardening and retirement) has not started**, and slice 46 made one of its items
+sharper: CSP, dependency+license audit, accessibility, interrupted-migration and
+interrupted-download tests, large-library and offline tests, Windows packaging with the
+sidecar, clean-machine smoke, upgrade from representative old data, and an upstream-sync
+rehearsal against a newer Seanime commit.
+
+> **The licensing item is now live rather than theoretical.** `SeanimeSidecarStagingPlugin`
+> stages *the resolved binary*, and since 2026-08-02 07:51 that binary is patched. Nothing is
+> distributed today — `package.json` is `private: true`, and GPL source-publication obligations
+> attach on distribution — but **a package built from here on ships a patched sidecar**, which
+> is exactly the case `LICENSING_PLAN.md` flags.
+
+Also still open, from the slices below: the app's own client has never produced a genuinely
+overtaken open against a patched sidecar (needs a deliberate race, not another clean run).
+`knownGaps.virtualizationAtScale` was **closed and its wording corrected** by slice 47f — it
+named a component that no longer exists.
+
+## SLICE 47 — THE DUAL-SUBTITLE FIX WAS MEASURED IN THE APP FOR THE FIRST TIME, AND THE BINARY THIS APP LAUNCHED UNTIL YESTERDAY STOPPED DELIVERING SUBTITLES AT 6.5 s OF A 30.4 s FILE.
+
+Evidence: `docs/migration/proof/subtitle-tail-20260802slice47gate/` (README first — four things
+it does NOT show). Reproduce (needs Vite on 5173; two Electron sessions, ~7 minutes):
+
+```
+npx vite --config vite.renderer.config.ts --port 5173 --strictPort   # in another terminal
+node docs/migration/tools/subtitle-tail-gate.mjs
+```
+
+### The measurement
+
+| | control | subject |
+|---|---|---|
+| binary | `seanime.exe.pre-patches-20260727` (`62d6af1b…`) | the deployed `seanime.exe` (`70ecf65d…`) |
+| carries `0002` | no | yes |
+| **latest cue the client received** | **6,500 ms** | **24,148 ms** |
+| cues over the run | 5 | 14 |
+| last line seen | `The weather is really nice today.` | `明日の朝、一緒に朝ご飯を食べましょう。` |
+
+Same 30.386 s two-track fixture, same app build, same probe, a fresh datadir each. The subject
+run overrides nothing — it is the app resolving its own sidecar. **Three runs each, in both
+orders, always exactly those two numbers.**
+
+### Why this is the first real proof of a fix recorded as closed in Phase 3
+
+`0002` reorders the terminal branch of `startSubtitleStreamP`: upstream calls
+`subtitleStream.Stop(true)` and *then* `flushBatch(false)`, and `Stop` runs `cleanupFunc`,
+which is `subtitleCtxCancel` (`subtitles.go:424`); `sendSubtitleEvents` returns `false` on its
+first line once that context is cancelled (`subtitles.go:151`). The final batch is assembled
+and thrown away. A local file at offset 0 flushes every 300 ms with a cap of 50, and this
+fixture's whole track parses in well under one tick — so "the final batch" is most of the file.
+
+Every earlier proof of `0002` ran against a purpose-built exe handed over through
+`SEANIME_EXE`. Nothing sets that in normal operation, so **what shipped had the defect the
+whole time**: subtitles simply stopped a fifth of the way in, with no error anywhere. Slice 46
+deployed the patched build; this is what that deployment bought, measured rather than argued.
+
+### The discriminator is the LATEST CUE, and a count would have been wrong
+
+The patch changes exactly one of the goroutine's three exits — the terminal `errCh` branch.
+`ctx.Done()` drops the batch in **both** builds; both channels closing flushes in **both**.
+Which of the probe's two opens reaches the terminal branch **moves between runs**: the two
+subject runs split 2/12 and 11/3 across steps 1 and 2 while agreeing on the latest cue. A
+per-step count — the obvious thing to assert — would have flapped. `subtitlesRun.maxStartTimeMs`
+is stable because on a patched sidecar *some* open always reaches the end of the track and on
+an unpatched one *none ever does*.
+
+Step 1 measured 2 cues on both binaries in five of the six runs: the two agree exactly where
+the patch cannot apply, which is the comparison's internal control.
+
+### A tool bug that produced a confident wrong answer, and the rule that came out of it
+
+The gate's first run reported `n/a` for both sides while the probes it had just run were
+plainly measuring 6,500 against 24,148.
+
+1. The probe takes its stamp from `process.env.RUN_STAMP`, and **a child inherits it** — so
+   both runs wrote into one proof directory and the second overwrote the first.
+2. The gate then read `blanc-open-retry-<stamp>-control`, which happened to exist from an
+   earlier manual run, and reported a record written **before the field existed**.
+
+Both are fixed: the stamp is set per child, and **the gate refuses to read a proof directory it
+did not just create**. The mixed directory that run left — a control's sidecar log beside a
+subject's JSON — was deleted, being an artifact of the bug rather than a measurement. The rule
+worth carrying: a harness that names its own output directory must not also trust what it finds
+there.
+
+### What else this run establishes
+
+- **The sidecar swap regressed nothing.** Six PASS steps on the deployed patched binary:
+  Blanc's first open succeeded (`readyState 4`, 1920x1080), the second open succeeded, the
+  clock moved 3.3 → 7.3 s, the video occupied real space, and Blanc's nav stayed reachable.
+- **No generation was refused, by anything, in any of these runs** — zero non-2xx on every
+  directstream POST and no `stale open` line in any sidecar log. That is the expected result:
+  the client channel serialises opens and its generation counter only ascends. It leaves the
+  0004 open item exactly where slice 46 left it.
+
+### Still open on this line
+
+- **The app's own client has never produced a genuinely overtaken open against a patched
+  sidecar.** Unchanged from slice 46. Every generation the app sent here was accepted, which is
+  what the channel is for; the case `0004` exists for is the abandoned-`fetch` one, and forcing
+  it live needs a deliberate race, not another clean run.
+
+## SLICE 47b — `rollup-unseen-in-the-app` IS CLOSED, AND CLOSING IT FOUND A PANEL THAT NEVER FINISHES LOADING.
+
+Evidence: `docs/migration/proof/mining-rollup-live-20260802slice47mine4/` (README first).
+Reproduce (needs Vite on 5173 **and** Anki on 8765; mines one real card and deletes it by id):
+
+```
+node docs/migration/tools/prepare-gplay-datadir.mjs "%TEMP%/gplay-dd-slice35/cue-library/Sousou no Frieren - 01.mkv" "%TEMP%/gplay-dd-mining"
+node docs/migration/tools/mining-rollup-live-harness.mjs --datadir="%TEMP%/gplay-dd-mining"
+```
+
+### The row's conclusion did not follow from its own measurement
+
+Slice 42 measured the blocker honestly — the history store was `[]` — and then concluded
+**"only the user can create it, by mining one card while watching."** That last step is the
+part that was wrong. Driving the app's own mine button, on a real cue, against live Anki, is
+not the seeded fixture slice 42 rightly refused: nothing in the harness writes to that store.
+`VideoCoreMiningPanel`'s own effect does, from the result of the app's own `ankiMineNote`.
+
+```text
+history before   0 entries      <- exactly the state the OPEN row described
+mined            status exported, noteId 1785650130128, deck StudyOS::_MigrationProbe
+Anki confirms    model JP Study App::JA-EN Classic
+rollup           1 card in the real Review panel, term = the mined sentence, "Cards 1"
+```
+
+Blanc mines, the main window reads. Same origin, same `localStorage` — the number never
+crossed a process.
+
+### The defect it found: the Review panel never finishes loading
+
+**No card ever got a stage.** The first two runs sampled as soon as `.study-loop-card` existed
+and recorded `untracked` — a fact about when the harness looked, not about the app, since the
+panel renders cards synchronously and only *then* awaits the snapshot. So the harness now waits
+for the panel's own `loading` flag. **It never clears:** still `Reading your mining history…`
+after 90 s, and a direct `ankiGetIntervals()` did not return inside a 60 s CDP timeout.
+
+Measured against the live collection:
+
+| | |
+|---|---|
+| default profile `syncQuery` | `deck:*` (`shared/profiles.ts:235`) |
+| notes it matches here | **155,377** |
+| `intervals.ts` walk | 500 per call, **sequential** |
+| implied calls | 311 × `notesInfo` + ≥311 × `cardsInfo` |
+| one measured `notesInfo(500)` | 55 ms → ~17 s for notesInfo alone |
+
+The rollup needs intervals for the note ids **in the mining history** — one. It asks for the
+whole collection because that is the only snapshot API there is. Tracked as
+`interval-snapshot-stalls-the-review-panel`; the fix is a narrower IPC, not a faster loop, and
+is deliberately not started here.
+
+### Two harness bugs worth not repeating
+
+- **`notesInfo` answers `[{}]` for a deleted note**, and `{}` is truthy. The cleanup check
+  counted that as a survivor and reported `residualNotes: 1` about a collection that was
+  already clean. Verify by `noteId`, never by truthiness.
+- **A deck COUNT cannot name a leftover.** When it went 83 → 84 the run could say a deck had
+  appeared but not which. It records the deck list now.
+
+## SLICE 47c — THE STALL IS FIXED, BY USER DECISION, AND FIXING IT UNCOVERED A SECOND DEFECT THAT WOULD HAVE SURVIVED IT.
+
+Evidence: `docs/migration/proof/mining-rollup-live-20260802slice47fix/`, same harness as 47b
+with the main process rebuilt between runs.
+
+| | before | after |
+|---|---|---|
+| snapshot settles | **never, in 90 s** | **3,196 ms** |
+| stage on the mined card | `untracked` | **`new`** |
+| panel tiles | `Not tracked 1` | `New 1` |
+
+`new` versus `untracked` is slice 42's own discriminator, and it is now satisfied **in the
+app** rather than headlessly.
+
+### What changed
+
+`intervalsForNotes(noteIds)` in `src/main/anki/intervals.ts`, behind a new
+`anki:getIntervalsForNotes` channel, and both rollup panels now call it. It issues two bulk
+calls for the notes the caller named instead of walking every profile's `syncQuery`. It
+deliberately does **not** touch the cached snapshot, persist, or notify listeners — a one-note
+answer must never overwrite the collection index other surfaces depend on.
+
+### The second defect, which the stall was hiding
+
+`runPoll` builds an index of *expressions* for word study, so it skips any term that is empty,
+longer than 24 characters, or contains whitespace. `VideoCoreMiningPanel` produces
+`cardKind: 'sentence'` with `term = sentence` **by default**. So the card measured in 47b would
+have been dropped by a snapshot that *finished* — the stage would still have read `untracked`,
+and the obvious fix of "just make the poll faster" would have proved nothing. A by-note lookup
+has no reason to filter by shape: the caller already named the notes it means.
+
+**Two defects, one symptom.** The visible one had a 90-second timer on it and the invisible one
+did not; only measuring the fix end to end separated them.
+
+### Gates
+
+357 files / 4555 tests pass (was 356/4547 — six new main-process tests for `intervalsForNotes`
+and two new panel tests). The panel test's stub deliberately **omits** `ankiGetIntervals`, so a
+future panel that reaches for the collection-wide poll fails loudly instead of quietly going
+back to the slow path. ESLint clean on every changed file; architecture audit "Nothing new";
+i18n 0.
+
+### One thing left in the collection, on purpose
+
+`JP Study::N2 Vocab` is empty and still there. The `--deck=` run let the app's own profile rule
+choose the destination — what a user's mine does — and the rule named that deck; creating it
+was the app's doing. Its note was deleted. **A deck in someone's collection is not a harness's
+to remove**, so it is reported rather than deleted, and the harness now only ever deletes a
+deck it itself named.
+
+## SLICE 46 — PATCH 0004 HAS BEEN RUN OVER THE WIRE, AGAINST A REAL BINARY, WITH THE DEPLOYED SIDECAR AS THE CONTROL. Two of its three parts had never been executed by anything.
+
+Evidence: `docs/migration/proof/open-generation-wire-20260802075705/` (README first — it lists
+four things the run does NOT show). Reproduce (needs nothing running; builds its own sidecar
+into the OS temp dir on first use):
+
+```
+node docs/migration/tools/open-generation-wire-gate.mjs
+```
+
+### The gap, which a green unit test was hiding
+
+`open_generation_test.go` constructs a `Manager` and calls `AcceptOpenGeneration`. That is one
+of the patch's three parts. The other two — `Generation int64 \`json:"generation"\`` on the
+handler's body struct, and the `Generation: b.Generation` it forwards into
+`PlayLocalFileOptions` — **cannot fail a test that builds the receiver by hand**, and had never
+been executed. Neither had the client-id resolution the whole rule is keyed on. Slice 43 added
+0004 to the build list and checked the compiled exe for the patch's *string*; a string is not a
+behaviour. `StudyPlayerSlice.tsx` has been putting `generation` on the wire since slice 44.
+
+Seven POSTs at a patched binary, then the identical seven at the deployed one. **Exactly two
+steps differ, and they are the two the patch is about:** `alpha` at generation 1 after
+generation 2 (refused / accepted), and `alpha` at generation 2 after the bar moved to 3
+(refused / accepted). Both binaries report v3.10.2. Step 4 is the one that proves the claimed
+client id reached the rule at all: `beta` at generation 1 is accepted in the same second that
+`alpha` at generation 1 is refused.
+
+### A refusal has NO positive observable, so the verdict is a DIFFERENCE — read it that way
+
+`PlayLocalFile` returns **before** `BeginOpen`, so the `defer` that would call `AbortOpen` is
+never registered and nothing is logged. And both outcomes answer a byte-identical `500
+{"message":"Internal Server Error"}`: echo's default error handler with `e.Debug = false`
+(`internal/core/echo.go:21`) replaces every non-`HTTPError` with that constant, and Seanime
+installs **no request-logging middleware**, so there is not even an access line to bracket the
+gap with. Treating the missing marker as the finding would be the absence-of-a-line trap this
+track has already paid for three times.
+
+Hence the control binary: the absence is bracketed by its own HTTP response (the server
+received that exact request and answered it) and by the same step producing the marker on the
+other binary. A step with neither a marker nor a response fails as `INCONCLUSIVE`, not as
+refused. Timing corroborates without being relied on — accepted steps hit the marker in 1–3 ms,
+the two refused steps pay the full 4 s wait.
+
+### The latent hazard it surfaced
+
+A client cannot tell a *correct* refusal from a real failure: both are that same opaque 500.
+Today that is harmless **by construction, not by design** — the launch path always posts the
+newest generation, so the only launch POST that can be refused is one whose `fetch` the
+supersession already aborted, and that branch returns without reporting
+(`StudyPlayerSlice.tsx:802`); the recovery path re-sends the launch's own generation, which is
+the equal case, and its `.catch` reports nothing. One changed assumption and a legitimate
+refusal reaches the user-visible error at `StudyPlayerSlice.tsx:798`. If 0004 goes upstream, a
+distinguishable status or error body belongs in it.
+
+### Two traps paid for here
+
+1. **`X-Seanime-Token` is the sha256 of the password, not the password** (`internal/core/app.go:232`,
+   and the app derives it the same way in `main/seanime/supervisor.ts`). The first run sent the
+   password and every step read "refused" on *both* binaries — a perfect, meaningless PASS on
+   the one row that was supposed to fail. `/api/v1/status` is the trap's accomplice: it is
+   exempt from auth and answers **200 with its fields redacted**, so a probe that gates on
+   "did status answer" reports a healthy connection while every real call is 401.
+2. **`build-patched-sidecar.mjs` spawned a bare `tar.exe`** under a comment asserting it
+   "resolves to System32's". That was a fact about the shell it was first run from — under Git
+   Bash, Git's own `usr/bin/tar` wins and reads `-C C:\…` as a remote host, which is slice 41's
+   trap arriving through the front door this time. It now spawns `%SystemRoot%\System32\tar.exe`
+   by absolute path. A build tool must not let its caller's PATH choose between two programs
+   with the same name.
+
+### The finding that came out of asking what the control binary actually is
+
+Before recommending a deployment it was worth knowing what the deployed exe already had. It
+has **nothing**. `0002` ships no new string literal, so it cannot be probed the way `0004` can
+— but **Go keeps function names in pclntab for stack traces, and `-ldflags=-s -w` strips the
+symbol table, not that**. `flushTerminalSubtitleBatch` is present in a patched build and
+**absent from the deployed one**. The deployed exe is the bare pin.
+
+So the **dual-subtitle fix is not in the binary this app launches.** Phase 3 recorded terminal
+cue delivery as closed; every live proof of it ran against a purpose-built exe handed over via
+`SEANIME_EXE` (`NEXT_SESSION.md:5099` still shows one in its repro block). Nothing sets that
+variable in normal operation — `exePath.ts` falls through to the sibling checkout — and
+`SeanimeSidecarStagingPlugin` stages *the resolved binary*, so a package built today would ship
+the unpatched one too. `patched-sidecar-not-deployed` now reports the whole patch inventory
+rather than 0004 alone, and its check probes both.
+
+**A patch existing, applying, compiling and passing its tests says nothing about which bytes
+are running.** Three separate lines here — dual subtitles, the open channel, packaging — were
+each closed against a binary the product never launches.
+
+### AND THEN IT WAS DEPLOYED, BY EXPLICIT USER DECISION
+
+They were asked — because it overwrites an 84 MB binary in a checkout outside this repo, which
+slice 43 recorded as the user's call — and chose "deploy, keep a backup".
+
+`../seanime-upstream/seanime.exe` is now the 2026-08-02 build carrying `0002` **and** `0004`
+(sha256 `70ecf65d…`). The bare pin it replaced is preserved beside it as
+**`seanime.exe.pre-patches-20260727`** (sha256 `62d6af1b…`); both hashes were verified after
+each copy, and the app was down for it.
+
+`audit-carried-items.mjs` reported the change itself — `DRIFT patched-sidecar-not-deployed —
+the deployed sidecar (built 2026-08-02) carries every Go patch` — before the row was touched.
+That is the second time the tool has caught a lifted blocker before a person wrote it down.
+
+**Then the gate was re-run with the deployed binary as the SUBJECT and the preserved pin as the
+CONTROL** — `proof/open-generation-wire-20260802080608/`, exit 0, same two steps differing. So
+the claim is no longer "a binary can refuse": **the binary this app launches refuses**, and the
+one it launched until 07:51 today does not, measured side by side.
+
+> The preserved pin is not just a rollback. It is the gate's **control**, and the gate prefers
+> it automatically now (`--control=` still overrides). Deleting that file costs the gate its
+> ability to prove anything, and a control that carried 0004 would make every step agree — so
+> the tool errors out rather than running.
+
+Nothing is distributed by any of this: GPL source-publication obligations attach on
+distribution and `package.json` is `private: true`. A **packaged** build is a separate matter —
+`SeanimeSidecarStagingPlugin` stages the resolved binary, so a package built from here on ships
+a patched sidecar, which is the case `LICENSING_PLAN.md` already flags.
+
+### What is still open on this line
+
+- **The app's own client has never produced a genuinely overtaken open against a patched
+  sidecar.** These generations were posted by the probe. That is the last unmeasured step, and
+  it needs a live Blanc run, not a gate.
+- **`0002` is in the deployed binary but still unexercised by it.** The dual-subtitle terminal
+  flush has only ever been proven against a purpose-built exe via `SEANIME_EXE`; what changed
+  is that the binary carrying it is finally the one the product runs.
 
 ## SLICE 42 — THE ANKI BLOCKER LIFTED AND THE TOOL CAUGHT IT, NOT A PERSON. The rollup's live join has now run: a real interval snapshot from the shipped main-process code, through the shipped rollup, against a live 83-deck collection — and cleaned up after itself.
 
@@ -133,8 +2804,11 @@ insertions, **0 deletions**.
 1. **Git Bash's `tar` cannot extract to a Windows path** — `git archive | tar -C C:\…` fails
    with `Cannot connect to C: resolve failed`, because it reads `C:` as a remote host. The
    authoring and verification tools use `git clone` instead, which also gives the diff a
-   `.git` to be taken against. (`build-patched-sidecar.mjs` gets away with `tar.exe` because
-   it resolves to System32's.)
+   `.git` to be taken against. (~~`build-patched-sidecar.mjs` gets away with `tar.exe` because
+   it resolves to System32's.~~ **Wrong — corrected in slice 46.** That was a fact about the
+   shell it had been run from, not about the tool. Launched from Git Bash it picks Git's own
+   `tar` and dies exactly as described above. It now spawns `System32\tar.exe` by its absolute
+   `%SystemRoot%` path.)
 2. **`git clone` honours the user's global `core.autocrlf`**, so the working tree comes out
    CRLF, every multi-line anchor stops matching, and a patch generated from it would carry
    line-ending churn into an upstream-submittable diff. Both tools clone and check out with
@@ -5699,3 +8373,253 @@ belongs in `StudyPlayerSlice`/`BlancStudyPlayer`. Proven in a dev build only.
 Gates: vitest **331 files / 3788 tests pass**; `tsc --noEmit` **288** (baseline, unchanged);
 i18n **exit 0, 6348 keys**; architecture audit **exit 0, "Nothing new"**; CSS containment
 **6950/6950 scoped, 0 unscoped**.
+
+## Slice 43 (2026-08-02) — three carried items closed: the handler, the props, the glob
+
+Appended by the carried-items session. Earlier slices are untouched. Scope was
+`src/media/**`, `src/main/mediaStudyOrchestrator.ts`, the two exiled `shared/` rules,
+`vitest.config.ts` and this file; the ~990 uncommitted files belonging to other tracks were
+not read-modified, staged or reverted.
+
+**1. `analyse-handler-untracked` — closed by commit `1f5e327`.** `main/mediaStudyOrchestrator.ts`
+was read before it was committed rather than after: all 15 named imports from
+`shared/mediaStudyOrchestrator.ts` resolve, `registerMediaStudyOrchestratorIpc` is the only
+export `main.ts:1422` consumes, and the 15 handlers it registers are complete. Nothing needed
+finishing. Committed on its own, that path only.
+
+**2. `analyse-action-unwired-in-production` — closed, and the record's framing was wrong.**
+The record says the fix is "one prop". **It is three, and the other two are not decoration.**
+`onAnalyse` alone does make the button render and fire — and `joinSeanimeStudyLibrary` derives
+every row's state from the orchestrator document and the readiness fingerprints, which the
+panel takes as props and does not own. With only `onAnalyse`, `readinessFor(NO_DOCUMENT, id)`
+finds nothing for any file, so every linked row is pinned at `unanalyzed` forever, `ready` and
+`stale` are unreachable states, and a successful analyse changes nothing the user can see. A
+one-prop fix would have replaced a button that does nothing with a button that reports success
+and does nothing visible. The panel's own header said so at lines 350-355; the record did not.
+
+`MediaWorkspaceHost.tsx` now supplies all three. `onAnalyse` calls the real
+`prepareStudyMediaById(entry.studyMediaId, entry.subtitleRecordId)` — both arguments are
+guaranteed present on exactly the two states that render the button. `orchestrator` and
+`fingerprints` load when the readiness segment is first shown, and a `window.api.onStudyChanged`
+subscription keeps the document fresh, so the main process's `persist()` broadcast is what moves
+the badge. Both halves of the runtime are `await import()`ed, never statically imported: this
+file's standing promise is that a build with the sidecar off boots unchanged, and
+`renderer/mediaStudyOrchestrator.ts` reaches the known-words store, the level lists and the
+frequency dictionaries.
+
+**3. `media-unreachable-by-vitest` — closed, and the two exiles came home.** `vitest.config.ts`
+now collects `src/media/**/*.test.ts`. Adding the glob alone was verified inert first — the
+suite was byte-identical to the baseline taken before any edit — and only then were
+`directstreamOpenRecovery.ts` and `videoCoreResumeWrite.ts` moved from `src/shared/` to
+`src/media/`, beside `StudyPlayerSlice.tsx`, their only consumer, with their tests. Both headers
+explained the exile; both now explain the return. They stay separate modules rather than being
+inlined into the component, because `StudyPlayerSlice.tsx` pulls React and the adopted VideoCore
+bundle and no node-environment test can import it.
+
+**A consequence worth not rediscovering:** two proof harnesses load those modules by absolute
+path — `replay-media-verdict.mjs` and `measure-resume-write.mjs`. Both were one-line path
+constants and both were updated with the move. Leaving them would have silently broken another
+track's tooling.
+
+New coverage: `src/media/__tests__/studyReadinessWiring.test.ts` pins the claim the wiring rests
+on — that all three props are load-bearing. Its central test reads one prepared file two ways:
+`ready` with the document supplied, `unanalyzed` without. That test fails against the one-prop
+wiring, which is the point of it.
+
+**Not done, deliberately:** `rollup-unseen-in-the-app` needs the live dev app, which another
+session owns (pid 7400) — untouched. `mediacontent-uncommitted` is another track's file and its
+16 dead `MediaState` members were left alone. `shared/directstreamOpenChannel.ts` still trips the
+architecture audit's `test-only-module` rule; that failure predates this slice, is not one of
+these three claims, and the file is not this track's.
+
+Gates: `npx vitest run src/media` **3 files / 50 tests pass**. `npx vitest run src/media src/shared`
+**191 files pass / 2527 tests pass**, with one pre-existing failure (`architectureBaseline`, the
+`directstreamOpenChannel` finding, byte-identical to the pre-change baseline). Full suite
+**337 files / 3958 tests pass, 1 pre-existing failure** — identical to the baseline captured
+before the first edit. Re-verified at the close of the slice: **338 files / 3968 tests pass,
+the same single failure**. The +1 file / +10 tests are another session's untracked tests landing
+in this tree mid-slice, not a change from this one — a full-suite total is not a stable number
+while a second session is writing to the same working tree, so compare the failure, not the
+count. `eslint` on every changed file **0 problems**; the one error reported on
+`vitest.config.ts` (`import/no-unresolved` for `vitest/config`, line 4) reproduces on the HEAD
+version of that file and is not from this slice. `tsc --noEmit` **289 total, 0 in this slice's
+files** (not a gate here). `node docs/migration/tools/audit-carried-items.mjs` **exit 0**, with
+these three rows moved to `recordedAs: 'expired'`.
+
+## Slice 44 (2026-08-02) — the open channel is wired, and the generation is not the request id
+
+Appended by the stale-open session. Earlier slices are untouched. Scope was
+`shared/directstreamOpenChannel.ts`, `media/directstreamOpenRecovery.ts`, the open path in
+`media/StudyPlayerSlice.tsx`, those three files' tests, and the record. The ~990 uncommitted
+files belonging to other tracks were not read-modified, staged or reverted; `extension/**` and
+`src/main/scraper/**` were not touched.
+
+**The client half of the stale-open fix ships.** Slice 37 designed the channel and left it
+unwired; slice 39 wired it and reverted for want of a live run it never got (another session
+owned port 5173); slice 41 wrote the sidecar half as `patches/seanime/0004`. The missing piece
+was the client: `StudyPlayerSlice.tsx` now **supersedes** on a launch, **asks the channel**
+before every stage-1 recovery, sends a **generation** on every open body, and settles the
+channel on the **response**. `shared/directstreamOpenChannel.ts` has a non-test consumer for
+the first time, and the architecture audit's `test-only-module` finding for it cleared as a
+consequence — `architectureBaseline.test.ts` was failing on exactly that one finding before
+this slice and passes now, with no edit to `tools/architecture-baseline.json`.
+
+**The record asked for `generation: requestId`, and that would have been a live defect.** The
+sidecar's rule is an ORDER — `AcceptOpenGeneration` refuses a strictly older generation
+permanently, per client id — and `requestId` is not one. It has two producers:
+`normalizeMediaWorkspaceOpenRequest` defaults it to `Date.now()` (~1.75e12), and
+`BlancStudyPlayer.hashRequestId` is an FNV-1a hash `>>> 0`, deliberately derived from the item
+and its resume point rather than from a clock so a re-render is not read as a new request
+(slice 23 depends on that). Four plausible Blanc items hash to
+`201922087, 1814900818, 1189880965, 3550868197` — **not ascending**, so the third open would
+have been refused with "stale open request" and the play button would have stopped working for
+that file, for good. One `Date.now()` open on the same client id would have refused every
+Blanc open after it. The order therefore comes from a counter the channel keeps
+(`directstreamOpenGenerationFor`), minted on a launch and re-sent unchanged by every recovery
+for that request — which is precisely the equal-generation case patch 0004 accepts on purpose.
+The test models `AcceptOpenGeneration` from the patch and runs both wirings through it.
+
+**`settled` means the server answered — and the caller that gets this wrong looks reasonable.**
+The module header names this as the hole it cannot close, and it is a caller-side rule, so it
+is asserted on the caller: the abort branch returns before any settle can run, a `!ok` response
+settles and *then* throws, and the double settle that creates is made safe by ticket IDENTITY
+(`if (openChannel.outstanding !== ticket) return;`) rather than by a flag — which also stops a
+late answer to a superseded open from clearing the channel that is holding the current one.
+The channel is module-scoped for the same reason `seanimeSocketPool` is: a ref would be torn
+down by the very effect cleanup that fires the abort.
+
+**What the two reverted stage-2 attempts got wrong, and how this differs.** The first fired on
+the *absence* of a readiness signal, and absence is ambiguous — "no `mediaReady` yet" is
+equally consistent with an element handle the code could not read, and a recovery POST calls
+`BeginOpen` -> `beginSubtitleSeek`, which stops every active subtitle stream. The second fixed
+the predicate (presence of the measured empty-source signature) and **fired correctly and was
+destructive anyway**: its POST landed inside the NEXT attempt's healthy stream. Both were
+reverted after failing phase E once. This slice changes neither predicate. It changes what a
+POST can do after it is sent, which is the thing both reverts pointed at — and **stage 2 still
+does not re-open**: `DIRECTSTREAM_MEDIA_REPORT_ONLY` is unchanged at `0`, there is still no
+`postDirectstreamOpen` on that path, and the test that pins `directstreamMediaReopened` out of
+the product still passes. A mechanism existing is not a run saying it holds.
+
+**One behaviour genuinely changed, deliberately, and it is the cost of the gate.** A refused
+recovery counts no attempt, so `directstreamOpenVerdict` can no longer walk to `failed` on its
+own, and an open POST that answers *never* would leave the channel busy forever — turning "an
+error at ~16 s" into a silent spinner, i.e. the slice-24 defect reintroduced by its own fix.
+`directstreamOpenPresumedDead` bounds it: past the silence window plus
+`DIRECTSTREAM_OPEN_QUEUE_DEADLINE_MS` (8 s + 10 s = 18 s) the caller reports
+`mediaWorkspace.openStalled` — the same message, ~2 s later than before. It returns whether to
+SPEAK, never whether to send; the refusal still stands.
+
+Deliberately left unwired and pinned by a test so a later session has to mean it: the queueing
+path and `directstreamOpenOverdue` (the stricter rule — reach for it only if a launch is ever
+observed racing a launch) and `directstreamOpenReset` (every path that would call it is
+followed by a launch that supersedes).
+
+**WHAT IS STILL UNPROVEN — this slice took no live measurement of any kind.** The Blanc
+measurement the record asks for is not in here: this session could not drive the running app,
+and the dev server on 5173 belongs to another session and was not touched. Everything above is
+a unit test or an argument. Specifically owed, and now mechanically tracked as
+`open-channel-unmeasured-live` in `audit-carried-items.mjs`:
+
+1. **Blanc's first open still recovers.** Slice 39 named this as the risk and it is untested:
+   Blanc's first open depends on the stage-1 recovery firing, and the channel can now refuse
+   one. The measured window is thin — in `proof/blanc-open-retry-20260801072500` the launch
+   POST answered at 9 177 ms and stage 1 fires at ~10 018 ms, a margin of 841 ms — so a
+   slightly slower POST means the first recovery tick is dropped as `busy` and the next tick
+   issues it. Argued to cost ~1 s and nothing else; **not observed.** Check `openAttempts`
+   against `proof/retirement-step3-20260801194522` and `-20260801195221` (ten phases PASS,
+   `openAttempts: 2`), then `blanc-player-harness.mjs`.
+2. **Phase E is still the discriminator.** Nine phases PASS on a tree with this wired is what
+   would move the tally past "7 of 7 with nothing wired".
+3. **No sidecar has ever refused a generation.** Patch 0004 is verified against the pin and is
+   NOT in `build-patched-sidecar.mjs`, so the field is accepted and ignored by every sidecar
+   this app launches. Carried as `open-generation-not-in-the-build`.
+4. **Nothing here justifies re-opening on stage 2.** That needs 1-3 first, then the control the
+   module header specifies: prove the stage stays silent on a HEALTHY open before proving it
+   rescues a broken one.
+
+Record the run as `docs/migration/proof/open-channel-live-<stamp>/` and claim 3 expires by
+itself.
+
+Gates: `npx vitest run src/shared src/media` **199 files / 2774 tests pass, 0 failures** —
+against a baseline taken before the first edit of **199 files / 2755 tests with 1 failure**
+(`architectureBaseline`, the `directstreamOpenChannel` test-only finding). +19 tests, and the
+pre-existing failure is the one this slice cleared. Re-run 12 minutes later at the close of the
+slice: **199 files / 2778 tests pass, 0 failures**, with nothing changed by this session in
+between — `src/shared/__tests__/extension*.ts` is being written by another session right now
+(mtimes inside this session's window), so as slice 43 already recorded, **compare the failure,
+not the total**. `npx vitest run src/media` **3 files / 62 tests pass** (50 before this slice);
+`npx vitest run src/media src/shared/__tests__/directstreamOpenChannel.test.ts`, i.e. this
+slice's four files, **92 tests pass** (73 before). `eslint` on all five changed files
+**0 problems**; on `docs/migration/tools/audit-carried-items.mjs` **0 errors, 1 warning** —
+`'reachable' is assigned a value but never used`, which reproduces byte-for-byte on the `HEAD`
+version of that file (slice 42 removed the port probe's last caller) and is not from this
+slice. `tsc --noEmit` **0 in this
+slice's files** (not a gate; the tree total moves with other tracks' uncommitted work).
+`node tools/architecture-audit.cjs` **exit 0, "Nothing new"**, 1 311 modules, `test-only-module`
+8 -> 7. `node docs/migration/tools/verify-open-generation-patch.mjs` re-run: **PASS**, all eight
+steps, five Go subtests, pinned checkout unmoved —
+`proof/open-generation-patch-20260802034702/`. `node docs/migration/tools/measure-resume-write.mjs`
+**PASS** (the other slice's wiring anchors in the same file are intact) —
+`proof/resume-write-20260802034706/`. `node docs/migration/tools/audit-carried-items.mjs`
+**exit 0**, with `open-channel-unwired` recorded expired and two new claims open. No new i18n
+keys — the stall path reuses `mediaWorkspace.openStalled`.
+
+**The wiring test was mutated before it was believed.** `StudyPlayerSlice.tsx` cannot be
+imported by a node-environment test, so the wiring assertions are textual, and a textual
+assertion that cannot fail is worse than none. Six mutants, all caught, file restored
+byte-exactly (`sha256 7d643728…d024db6` before and after): settling inside the abort branch;
+dropping `generation` from the body; sending `playbackRequest.requestId` as the generation;
+posting the recovery without asking the channel; minting a fresh generation on the recovery;
+and moving the channel out of module scope. The first is the module header's named hole and
+the third is the wiring the record originally asked for — both fail the suite now.
+
+## SLICE 45 — THE OPEN CHANNEL WAS OBSERVED AGAINST A LIVE SIDECAR, AND BLANC'S FIRST OPEN PASSED.
+
+Evidence: `docs/migration/proof/open-channel-live-20260802043116/` (README first — it lists
+three things the run does NOT show). Reproduce:
+
+```
+node docs/migration/tools/prepare-gplay-datadir.mjs "%TEMP%/gplay-dd-slice35/cue-library/Sousou no Frieren - 01.mkv" "%TEMP%/gplay-dd-openchannel-b"
+node docs/migration/tools/blanc-player-open-retry-probe.mjs --datadir="%TEMP%/gplay-dd-openchannel-b"
+```
+
+Slice 44 wired the channel and said plainly it had taken no measurement of any kind. This is
+that measurement. Verdict `DONE`, exit 0, six PASS steps, sidecar v3.10.2.
+
+### The two results worth carrying
+
+**Blanc's first open succeeded** — `readyState 4`, playing, 1920x1080, `sliceState "active"`,
+clock 3.151 → 7.159 s of a 30.386 s file. The tally before this was 7 of 7 phase-E passes with
+nothing wired, and Blanc's first open historically needing a rescue.
+
+**The recovery gate was seen dropping a recovery.** Second open, same mounted session, new
+requestId: `directstreamPosts 1`, `recoveryFired FALSE`. That is rule 3 of
+`shared/directstreamOpenChannel.ts` — a recovery is dropped, never queued — in a real run
+rather than a unit test.
+
+The thin margin slice 44 flagged held: its worry came from a POST answering at 9,177 ms against
+a stage-1 tick at ~10,018 ms. Here the POST landed at **9,696 ms** — 519 ms later — and the open
+succeeded instead of being rescued.
+
+### Do not over-read it
+
+- **One run**, of a margin roughly 300–800 ms wide. Evidence it *can* hold, not that it does.
+- **The first open is not clean**: 4 directstream POSTs and 2 `video-terminated` frames
+  (sockets 2 opened / 1 closed, first close 9,715 ms). The channel serialises opens; it does
+  not collapse the sequence to one POST.
+- **No sidecar refused a generation.** See `patched-sidecar-not-deployed` — the deployed binary
+  predates 0004, so the field this slice sends is accepted and ignored.
+
+### The probe now says WHY there is no card
+
+An earlier run that morning (`proof/blanc-open-retry-20260802012909/`) died at `no library
+card`. `.media-card` comes from a **virtualised** grid (`MediaGrid` → `VirtualGrid` in
+`components/media/MediaContent.tsx`), so one message was covering three unrelated failures.
+`blanc-player-open-retry-probe.mjs` now classifies it as `noItems` (the panel never saw the
+store write), `allFiltered` (a kind/folder/search filter excluded the fixture), `zeroHeight`
+(the virtualiser measured its container at zero — no longer wait fixes that) or
+`mediaTabNeverOpened`, and records the grid rect, viewport and status text with it.
+
+**The classifier has never fired.** The stall did not recur, nothing was changed in the app to
+address it, and this pass must not be read as a repair — the diagnostic is for next time.
+`MediaContent.tsx` was not touched; it still carries another track's uncommitted insertions.

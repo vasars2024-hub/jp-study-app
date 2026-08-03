@@ -1,0 +1,160 @@
+{
+  "gate": "packaged-offline-gate.mjs",
+  "question": "Does the packaged app boot and stay usable on a FIRST RUN with no internet, while the loopback sidecar is still reachable?",
+  "startedAt": "2026-08-03T04:25:56.288Z",
+  "mode": "control (internet REACHABLE)",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "blocked": [],
+  "wouldHaveBlocked": [
+    {
+      "at": 1785731199349,
+      "url": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx182255-butzrqd4I0aC.jpg"
+    }
+  ],
+  "allowedLoopback": 41,
+  "steps": [
+    {
+      "name": "0 the packaged window exists",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "1 CONTROL: nothing is blocked; off-machine requests are recorded and let through",
+      "result": "PASS",
+      "detail": "no --host-resolver-rules, Fetch continues every request"
+    },
+    {
+      "name": "2 the desktop shell mounts with no internet",
+      "result": "PASS",
+      "detail": "{\"ready\":\"complete\",\"desktop\":true,\"api\":true}"
+    },
+    {
+      "name": "3 local study machinery answers offline",
+      "result": "MEASURED",
+      "detail": "{\"errors\":[],\"lookupTerm\":3,\"lookupTermOffline\":3,\"dictAvailableLangs\":3}"
+    },
+    {
+      "name": "3b a network-dependent surface degrades instead of hanging",
+      "result": "PASS",
+      "detail": "{\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2806}"
+    },
+    {
+      "name": "3c the RENDERER was given something off-machine to fetch (discover cover art)",
+      "result": "MEASURED",
+      "detail": "{\"kind\":\"ran\",\"nav\":\"nav-clicked\",\"search\":{\"state\":\"typed-and-clicked\",\"boxClass\":\"(no class)\",\"boxValue\":\"frieren\",\"hasBtn\":true,\"btnDisabled\":false,\"inputs\":[\"search:scr-search-input\",\"search:(no class)\",\"checkbox:(no class)\"],\"buttons\":[\"fwin-b\",\"fwin-b\",\"fwin-b\",\"fwin-b fwin-close\",\"ui-icon-btn ui-focusable ui-icon-btn--sm scr-topbar-hamburger\",\"ui-btn ui-focusable ui-btn--primary ui-btn--sm\",\"ui-btn ui-focusable ui-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"scr-rail-item\"]},\"picked\":{\"state\":\"row-clicked\",\"rows\":6,\"clickedClass\":\"disc-row \",\"clickedTag\":\"DIV\",\"clickedText\":\"1Frieren: Beyond Journey’s End Season 2葬送のフリーレン 第2期72N3TV108\"},\"inspector\":{\"hasInspector\":true,\"hasNoArtFallback\":false,\"selectedRows\":1,\"inspectorTitle\":\"Frieren: Beyond Journey’s End Season 2\"},\"totalImgs\":1,\"remoteImgs\":1,\"sample\":[\"https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx182255-butzrqd4I0aC.jpg\"],\"rendererRequestsDuringStep\":1,\"elapsedMs\":26088}"
+    },
+    {
+      "name": "4 the shell is still standing after the failures land",
+      "result": "PASS",
+      "detail": "{\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}"
+    },
+    {
+      "name": "5 CONTROL: the unblocked run reaches the internet, so the block has something to cut",
+      "result": "PASS",
+      "detail": "renderer: 1 external request(s) would have been blocked across 1 host(s) [s4.anilist.co], 41 local; main process: searchDiscovery {\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2806}"
+    }
+  ],
+  "exeBuiltAt": "2026-08-02T20:07:46.347Z",
+  "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-offline-20260803042556-control-50036",
+  "hostResolverRules": null,
+  "mounted": {
+    "ready": "complete",
+    "desktop": true,
+    "api": true
+  },
+  "consentDismissed": 1,
+  "localCapabilities": {
+    "errors": [],
+    "lookupTerm": 3,
+    "lookupTermOffline": 3,
+    "dictAvailableLangs": 3
+  },
+  "networkSurface": {
+    "kind": "resolved",
+    "count": 6,
+    "elapsedMs": 2806
+  },
+  "rendererSurface": {
+    "kind": "ran",
+    "nav": "nav-clicked",
+    "search": {
+      "state": "typed-and-clicked",
+      "boxClass": "(no class)",
+      "boxValue": "frieren",
+      "hasBtn": true,
+      "btnDisabled": false,
+      "inputs": [
+        "search:scr-search-input",
+        "search:(no class)",
+        "checkbox:(no class)"
+      ],
+      "buttons": [
+        "fwin-b",
+        "fwin-b",
+        "fwin-b",
+        "fwin-b fwin-close",
+        "ui-icon-btn ui-focusable ui-icon-btn--sm scr-topbar-hamburger",
+        "ui-btn ui-focusable ui-btn--primary ui-btn--sm",
+        "ui-btn ui-focusable ui-btn--sm",
+        "ui-icon-btn ui-focusable ui-icon-btn--sm",
+        "ui-icon-btn ui-focusable ui-icon-btn--sm",
+        "ui-icon-btn ui-focusable ui-icon-btn--sm",
+        "ui-icon-btn ui-focusable ui-icon-btn--sm",
+        "scr-rail-item"
+      ]
+    },
+    "picked": {
+      "state": "row-clicked",
+      "rows": 6,
+      "clickedClass": "disc-row ",
+      "clickedTag": "DIV",
+      "clickedText": "1Frieren: Beyond Journey’s End Season 2葬送のフリーレン 第2期72N3TV108"
+    },
+    "inspector": {
+      "hasInspector": true,
+      "hasNoArtFallback": false,
+      "selectedRows": 1,
+      "inspectorTitle": "Frieren: Beyond Journey’s End Season 2"
+    },
+    "totalImgs": 1,
+    "remoteImgs": 1,
+    "sample": [
+      "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx182255-butzrqd4I0aC.jpg"
+    ],
+    "rendererRequestsDuringStep": 1,
+    "elapsedMs": 26088
+  },
+  "health": {
+    "stillMounted": true,
+    "visibleErrorText": "",
+    "bodyChildren": 2
+  },
+  "mainProcessLogTail": [
+    "DevTools listening on ws://127.0.0.1:49922/devtools/browser/2fd43942-62e6-4b63-b4ff-278429dcf60d",
+    "[yomitan] Seeding bundled Kanjium pitch data…",
+    "[extensionServer] listening on 127.0.0.1:18765",
+    "[yomitan] Kanjium pitch seeded (107978 entries).",
+    "[yomitan] Downloading JMdict (Japanese–English)…",
+    "[yomitan] JMdict (Japanese–English) ready (305255 terms).",
+    "[yomitan] Downloading JMdict (Japanese–Russian)…",
+    "[yomitan] JMdict (Japanese–Russian) ready (93355 terms).",
+    "[yomitan] Downloading Moedict (Chinese monolingual)…",
+    "[yomitan] Moedict (Chinese monolingual) ready (70589 terms)."
+  ],
+  "blockedHosts": [
+    "s4.anilist.co"
+  ],
+  "verdict": "CONTROL-REACHED-THE-INTERNET",
+  "result": "CONTROL-REACHED-THE-INTERNET",
+  "finishedAt": "2026-08-03T04:26:52.613Z",
+  "log": [
+    "[offline] PASS — 0 the packaged window exists: app://bundle/index.html",
+    "[offline] PASS — 1 CONTROL: nothing is blocked; off-machine requests are recorded and let through: no --host-resolver-rules, Fetch continues every request",
+    "[offline] PASS — 2 the desktop shell mounts with no internet: {\"ready\":\"complete\",\"desktop\":true,\"api\":true}",
+    "[offline] MEASURED — 3 local study machinery answers offline: {\"errors\":[],\"lookupTerm\":3,\"lookupTermOffline\":3,\"dictAvailableLangs\":3}",
+    "[offline] PASS — 3b a network-dependent surface degrades instead of hanging: {\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2806}",
+    "[offline] MEASURED — 3c the RENDERER was given something off-machine to fetch (discover cover art): {\"kind\":\"ran\",\"nav\":\"nav-clicked\",\"search\":{\"state\":\"typed-and-clicked\",\"boxClass\":\"(no class)\",\"boxValue\":\"frieren\",\"hasBtn\":true,\"btnDisabled\":false,\"inputs\":[\"search:scr-search-input\",\"search:(no class)\",\"checkbox:(no class)\"],\"buttons\":[\"fwin-b\",\"fwin-b\",\"fwin-b\",\"fwin-b fwin-close\",\"ui-icon-btn ui-focusable ui-icon-btn--sm scr-topbar-hamburger\",\"ui-btn ui-focusable ui-btn--primary ui-btn--sm\",\"ui-btn ui-focusable ui-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"ui-icon-btn ui-focusable ui-icon-btn--sm\",\"scr-rail-item\"]},\"picked\":{\"state\":\"row-clicked\",\"rows\":6,\"clickedClass\":\"disc-row \",\"clickedTag\":\"DIV\",\"clickedText\":\"1Frieren: Beyond Journey’s End Season 2葬送のフリーレン 第2期72N3TV108\"},\"inspector\":{\"hasInspector\":true,\"hasNoArtFallback\":false,\"selectedRows\":1,\"inspectorTitle\":\"Frieren: Beyond Journey’s End Season 2\"},\"totalImgs\":1,\"remoteImgs\":1,\"sample\":[\"https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx182255-butzrqd4I0aC.jpg\"],\"rendererRequestsDuringStep\":1,\"elapsedMs\":26088}",
+    "[offline] PASS — 4 the shell is still standing after the failures land: {\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}",
+    "[offline] PASS — 5 CONTROL: the unblocked run reaches the internet, so the block has something to cut: renderer: 1 external request(s) would have been blocked across 1 host(s) [s4.anilist.co], 41 local; main process: searchDiscovery {\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2806}"
+  ]
+}

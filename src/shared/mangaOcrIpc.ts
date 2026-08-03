@@ -78,6 +78,10 @@ export interface MangaOcrVolumeRequest {
   targetLang?: string;
   /** Detector aggressiveness for fresh scans. Default 'normal'. */
   detectionSensitivity?: DetectionSensitivity;
+  /** Inclusive 0-based start page. Defaults to 0. */
+  startPage?: number;
+  /** Inclusive 0-based end page. Defaults to last page. */
+  endPage?: number;
 }
 
 export interface MangaOcrVolumeProgress {
@@ -91,6 +95,12 @@ export interface MangaOcrVolumeProgress {
   mediaUrl?: string;
   message?: string;
   error?: string;
+  /**
+   * A run that finished but could not translate some pages. Distinct from
+   * `error`: OCR succeeded and those pages simply have no translation cached,
+   * which the user needs told rather than shown as silently untranslated text.
+   */
+  warning?: string;
   ocrMeta?: {
     ocrPages: number;
     translatedPages: number;

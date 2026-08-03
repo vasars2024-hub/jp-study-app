@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Moonlit harbor placeholder artwork">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#10182f"/>
+      <stop offset=".6" stop-color="#24385b"/>
+      <stop offset="1" stop-color="#13202e"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#bg)"/>
+  <circle cx="245" cy="43" r="27" fill="#dce7ff"/>
+  <circle cx="254" cy="38" r="26" fill="#15203b"/>
+  <path d="M0 116l50-19 31 13 51-31 47 29 52-35 49 36 40-11v82H0z" fill="#111a28"/>
+  <path d="M0 144c54-9 108-6 160 3 53 9 106 9 160-2v35H0z" fill="#213f56"/>
+  <path d="M196 128h58l-10 17h-39z" fill="#9b4f4f"/>
+  <path d="M221 83v45m0-42l28 24h-28z" fill="#d8d4c2" stroke="#d8d4c2" stroke-width="2"/>
+  <text x="18" y="28" fill="#fff" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700">MOONLIT HARBOR</text>
+  <text x="19" y="47" fill="#b8c8e9" font-family="sans-serif" font-size="10" letter-spacing="2">EPISODE 04</text>
+</svg>

@@ -38,6 +38,10 @@
 import type { NormalizedGrammarPoint } from './data/grammar/normalize';
 import { getFamiliarity, GX_KNOWN_THRESHOLD, type FamiliarityState, type GxLevel } from './grammarFamiliarity';
 import { IDB_KEYS, mirrorToIdb } from './storage/storage';
+import {
+  grammarSurfaceCore,
+  MIN_GRAMMAR_SURFACE_CORE,
+} from '../shared/grammarPatternSurface';
 
 export const SESSION_DIRECTIONS = ['recognition', 'production', 'mixed'] as const;
 export type SessionDirection = (typeof SESSION_DIRECTIONS)[number];
@@ -73,7 +77,7 @@ export type MasteredMode = (typeof MASTERED_MODES)[number];
 export const MASTERED_LEVEL: GxLevel = 3;
 
 /** Minimum literal core length for cloze, unless the core contains a kanji. */
-export const MIN_CLOZE_CORE = 4;
+export const MIN_CLOZE_CORE = MIN_GRAMMAR_SURFACE_CORE;
 
 export interface SessionOptions {
   count: number;
@@ -160,8 +164,6 @@ function shuffled<T>(items: readonly T[], rng: () => number): T[] {
 
 // ---- cloze eligibility -----------------------------------------------------
 
-const KANJI = /[一-龯㐀-䶿]/;
-
 /**
  * The literal core of a pattern title, or '' when there isn't a usable one.
  *
@@ -176,16 +178,7 @@ const KANJI = /[一-龯㐀-䶿]/;
  * of both is not.
  */
 export function clozeCore(title: string): string {
-  const first = String(title || '').split(/[/／]/)[0];
-  const core = first
-    .replace(/[（(][^）)]*[）)]/g, '')
-    .replace(/[〜～~.．…・]/g, '')
-    .replace(/[A-Za-z0-9]+/g, '')
-    .replace(/\s+/g, '')
-    .trim();
-  if (!core) return '';
-  if (core.length >= MIN_CLOZE_CORE || KANJI.test(core)) return core;
-  return '';
+  return grammarSurfaceCore(title);
 }
 
 export interface ClozeMaterial {

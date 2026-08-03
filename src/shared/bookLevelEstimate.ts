@@ -25,6 +25,10 @@ import {
 /** Exam scheme inferred from study language. */
 export type BookLevelScheme = 'jlpt' | 'hsk';
 
+import { schemeForLang } from './levelEstimate';
+
+export { schemeForLang };
+
 export interface BookLevelBand {
   /** Slot id, e.g. 'jlpt-n3' / 'hsk-3'. */
   id: LevelSlotId;
@@ -75,9 +79,9 @@ export function examSlotsForLang(lang: StudyLang): readonly {
   }));
 }
 
-export function schemeForLang(lang: StudyLang): BookLevelScheme {
-  return lang === 'zh' ? 'hsk' : 'jlpt';
-}
+// One definition, in levelEstimate. Both copies were `lang === 'zh' ? 'hsk' : 'jlpt'`
+// over the same 'jlpt' | 'hsk' union. Re-exported so existing importers of this
+// module are unaffected.
 
 /**
  * Estimate the exam level of a text from its content lemmas and per-band vocab.

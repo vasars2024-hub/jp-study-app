@@ -14,6 +14,14 @@ export default defineConfig({
       'src/renderer/environment/**/*.test.ts',
       // Renderer modules whose only browser dependency (localStorage) is stubbed via vi.stubGlobal.
       'src/renderer/__tests__/**/*.test.ts',
+      // The adopted MEDIA surface. Added 2026-08-02, closing `media-unreachable-by-vitest`:
+      // `src/media/**` was outside every glob above, so rules that belong to those components
+      // had to be exiled into `src/shared/` to get a test at all, and the two that were
+      // (`directstreamOpenRecovery.ts`, `videoCoreResumeWrite.ts`) said so in their headers.
+      // They now live beside their only consumer. Node-env applies here too: a test in this
+      // tree may import the pure modules, never `StudyPlayerSlice.tsx` itself, which pulls
+      // React and the adopted bundle.
+      'src/media/**/*.test.ts',
     ],
     environment: 'node',
     testTimeout: 20000,

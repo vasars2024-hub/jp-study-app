@@ -98,17 +98,6 @@ export function registerBuddySchedulerIpc(): void {
     else stopTimer();
   });
 
-  ipcMain.handle('buddyScheduler:testFire', (_e, routineId: unknown): { ok: boolean } => {
-    if (typeof routineId !== 'string' || !routineId) return { ok: false };
-    const entry = schedule.find((s) => s.routineId === routineId) ?? {
-      routineId,
-      forType: '*',
-      startHour: 0,
-      endHour: 24,
-    };
-    broadcastTrigger(entry);
-    return { ok: true };
-  });
 }
 
 export function stopBuddyScheduler(): void {

@@ -1,14 +1,54 @@
 /**
- * Seanime sidecar — shared contract (Phase 1, read-only proof).
+ * Seanime sidecar — shared contract.
  *
- * The whole feature is gated behind SEANIME_SIDECAR_ENABLED. It is off unless the
- * env flag is set, so a normal run of Study OS never spawns the sidecar and never
- * touches its data. Rollback is this flag plus deleting the temp datadir.
+ * The whole feature is gated behind SEANIME_SIDECAR_ENABLED. Through Phases 1–6 it was
+ * off unless `SEANIME_SIDECAR=1`, so a normal run never spawned the sidecar. It is now
+ * **on by default** — see the flag below. Rollback is `SEANIME_SIDECAR=0`.
  */
 
-/** Dev-only gate. Set SEANIME_SIDECAR=1 to arm the Phase-1 sidecar. */
+/**
+ * Sidecar gate. **Default ON since 2026-07-31** (old-player retirement).
+ *
+ * It read `=== '1'` while default-on was unsafe, and both reasons are now closed:
+ * the binary ships with the package (`forge.config.ts`'s staging plugin, which *fails*
+ * the build rather than shipping a dead media surface) and the datadir is durable
+ * (`main/seanime/dataDir.ts`), so a normal run no longer comes up `failed` on other
+ * machines or re-scans into a throwaway directory on this one. A packaged start was
+ * then watched reaching `ready` from the packaged slot
+ * (`docs/migration/proof/packaged-sidecar-launch-20260731102252/`).
+ *
+ * **Set `SEANIME_SIDECAR=0` to opt out.** That is the rollback for this flip, and `=1`
+ * still works so every existing harness and recipe keeps its meaning.
+ *
+ * Turning this on does **not** spawn anything at boot: nothing calls `startSeanime()`
+ * eagerly, so the only effect is that the initial status is `stopped` rather than
+ * `disabled` and the media surface becomes reachable.
+ *
+ * **Only the main process reads this.** The renderer gates on the reported
+ * `SeanimeStatus.kind !== 'disabled'` (`media/MediaWorkspaceHost.tsx:177`), which main
+ * derives from this flag — one source of truth, and the renderer needs no `process.env`.
+ * That is why a context where `process` is absent reads `false` here: it is never the
+ * value anything acts on, and `false` is the safe direction.
+ */
+export const SEANIME_SIDECAR_OPT_OUT_VALUES = ['0', 'false', 'off'] as const;
+
+/**
+ * Pure form of the gate, so the semantics are testable without re-importing this module
+ * under a mutated `process.env`. `raw` is the unparsed `SEANIME_SIDECAR` value.
+ *
+ * Three spellings opt out rather than only `0`, because `SEANIME_SIDECAR=false` is the
+ * obvious thing to type and silently getting an *enabled* sidecar from it would be the
+ * worst kind of surprise — the rollback would look applied and not be. An empty value is
+ * treated as unset, matching how `forge.config.ts` reads its own sidecar env.
+ */
+export function seanimeSidecarEnabledFrom(raw: string | undefined): boolean {
+  const value = raw?.trim().toLowerCase();
+  if (!value) return true;
+  return !(SEANIME_SIDECAR_OPT_OUT_VALUES as readonly string[]).includes(value);
+}
+
 export const SEANIME_SIDECAR_ENABLED =
-  typeof process !== 'undefined' && process.env?.SEANIME_SIDECAR === '1';
+  typeof process !== 'undefined' && seanimeSidecarEnabledFrom(process.env?.SEANIME_SIDECAR);
 
 /**
  * Lifecycle of the sidecar process. `failed` and `offline` are explicit terminal
@@ -86,6 +126,37 @@ export interface SeanimeConnection {
   token: string;
 }
 
+export interface SeanimeHeartbeatState {
+  awaitingPong: boolean;
+  missedPongs: number;
+}
+
+export interface SeanimeHeartbeatTick {
+  state: SeanimeHeartbeatState;
+  shouldReconnect: boolean;
+}
+
+/**
+ * Advance heartbeat state by one interval that actually ran.
+ *
+ * This deliberately accepts no clock value: a suspended/throttled renderer must not turn
+ * elapsed wall time into missed pongs for ping callbacks that never executed.
+ */
+export function advanceSeanimeHeartbeat(
+  state: Readonly<SeanimeHeartbeatState>,
+  maxMissedPongs = 3,
+): SeanimeHeartbeatTick {
+  const missedPongs = state.awaitingPong ? state.missedPongs + 1 : 0;
+  return {
+    state: { awaitingPong: true, missedPongs },
+    shouldReconnect: missedPongs >= Math.max(1, maxMissedPongs),
+  };
+}
+
+export function acknowledgeSeanimePong(): SeanimeHeartbeatState {
+  return { awaitingPong: false, missedPongs: 0 };
+}
+
 export const SEANIME_CHANNELS = {
   status: 'seanime:status',
   start: 'seanime:start',
@@ -94,4 +165,6 @@ export const SEANIME_CHANNELS = {
   connection: 'seanime:connection',
   extractAudio: 'seanime:extractAudio',
   statusEvent: 'seanime:statusEvent',
+  /** Phase 6: the read-only Seanime library projection for Study Mode. */
+  studyLibrary: 'seanime:studyLibrary',
 } as const;

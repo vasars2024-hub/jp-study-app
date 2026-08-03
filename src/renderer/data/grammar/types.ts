@@ -104,7 +104,7 @@ export type GrammarVerification =
 export type GrammarFramework = 'jlpt' | 'hsk3.0' | 'grammarx';
 
 export interface GrammarProvenance {
-  /** Human-readable origin, e.g. 'mazii-n3-dump' or 'authored:core-n5'. */
+  /** Human-readable origin, e.g. 'supplement-n3' or 'authored:core-n5'. */
   source?: string;
   /** License / permitted-use note for imported content. */
   license?: string;
@@ -182,7 +182,7 @@ export interface GrammarPoint {
   /** When and how to use it. */
   explanation: string;
   examples: GrammarExample[];
-  /** Legacy Mazii function tags. Kept as searchable aliases; see taxonomy.ts. */
+  /** Legacy function tags. Kept as searchable aliases; see taxonomy.ts. */
   functions?: GrammarFunctionId[];
   /** Register / politeness band. Defaults to neutral. */
   register?: GrammarRegister;
@@ -190,7 +190,7 @@ export interface GrammarPoint {
   categories?: string[];
   /**
    * Levels other sources assign to this same pattern, set during dedupe when
-   * they disagree. Kept rather than resolved — 53 of the 189 authored/Mazii
+   * they disagree. Kept rather than resolved — 53 of the 189 authored/supplement
    * duplicate pairs conflict, and picking a winner silently would dress one
    * source's claim up as settled.
    */

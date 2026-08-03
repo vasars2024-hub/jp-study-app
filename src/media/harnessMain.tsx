@@ -53,5 +53,7 @@ const noop = (): void => {
 void (async () => {
   const conn = await bootstrapSeanimeConnection();
   const { default: MediaWorkspace } = await import('./MediaWorkspace');
-  createRoot(document.getElementById('root') as HTMLElement).render(<MediaWorkspace conn={conn} />);
+  createRoot(document.getElementById('root') as HTMLElement).render(
+    <MediaWorkspace conn={conn} playbackRequest={null} />,
+  );
 })();

@@ -19,6 +19,7 @@ import {
   type WallpaperFit,
 } from '../../wallpaperFit';
 import { useT } from '../../i18n';
+import { setReduceMotion as setDisplayReduceMotion } from '../../displayPrefs';
 
 const TOGGLE_EVENT = 'shell:toggleQuickSettings';
 
@@ -27,11 +28,9 @@ function isReduceMotion(): boolean {
 }
 function setReduceMotion(on: boolean): void {
   document.documentElement.classList.toggle('reduce-motion', on);
-  try {
-    localStorage.setItem('jp-os-reduce-motion', on ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
+  // Through displayPrefs, which owns the key and keeps `animationLevel` in step —
+  // writing the mirror directly left the two disagreeing.
+  setDisplayReduceMotion(on);
 }
 
 const PERF_KEY: Record<PerfTier, string> = {
@@ -204,6 +203,7 @@ export default function QuickSettings() {
                 setMusicVolume(v);
               }}
               style={{ maxWidth: 150 }}
+              aria-label={t('quickSettings.volume')}
             />
           </div>
           {SOUND_MIXERS.map(({ category, labelKey }) => (
@@ -221,6 +221,7 @@ export default function QuickSettings() {
                   soundEngine.setCategoryVolume(category, v);
                 }}
                 style={{ maxWidth: 150 }}
+                aria-label={t(labelKey)}
               />
             </div>
           ))}

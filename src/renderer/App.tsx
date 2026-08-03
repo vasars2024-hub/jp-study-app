@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import DesktopShell from './components/DesktopShell';
+import { useExtensionSnapshots } from './analysisActions';
 import BootScreen from './components/BootScreen';
 import ConsentScreen from './components/ConsentScreen';
 import AppSection from './components/AppSection';
@@ -13,6 +14,7 @@ import type { DesktopWinSection } from '../shared/desktop';
 import CompanionHostView from './environment/CompanionHostView';
 import PerfOverlay from './components/PerfOverlay';
 import SecretAeroTrigger from './theme/SecretAeroTrigger';
+import SecretHistoryTrigger from './theme/SecretHistoryTrigger';
 import {
   bootFocusModeIfNeeded,
   loadFocusMode,
@@ -36,6 +38,8 @@ import SeanimeDevPanel from './components/SeanimeDevPanel';
 import MediaWorkspaceHost from '../media/MediaWorkspaceHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { registerCommandHandler } from './keyboardShortcuts';
+import { useReaderResumeHandoff } from './readerResumeHandoff';
+import { sectionOpensMediaWorkspace } from '../shared/mediaWorkspace';
 import { addDeckCards } from './flashcardDeck';
 import { recordClipboardEntry, loadClipboardHistory, type ClipboardEntryType } from './clipboardHistory';
 import { getLevel, setLevel, type WkLevel } from './knownWords';
@@ -117,7 +121,7 @@ function MiniMainBridge() {
 }
 
 // Sections that may be shown alone in a pop-out window. Mirrors POPOUT_SECTIONS
-// in the main process (src/main.ts). `player`→Media and `city`→Noctis match the
+// in the main process (src/main.ts). `player`→Media and `city`→Mooncap match the
 // desktop's app labels.
 const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   library: 'Library',
@@ -127,9 +131,10 @@ const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   grammar: 'Grammar',
   notebook: 'Notebook',
   translate: 'Translate',
-  player: 'Media',
-  video: 'Video',
-  music: 'Music',
+  player: 'Media Center',
+  scraper: 'Scraper',
+  video: 'Media Center · Video',
+  music: 'Media Center · Music',
   musicwidget: '',
   anki: 'Anki',
   flashcards: 'Flashcards',
@@ -137,7 +142,7 @@ const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   stats: 'Statistics',
   resources: 'Resources',
   settings: 'Settings',
-  city: 'Noctis',
+  city: 'Mooncap Garden',
   immersion: 'Immersion',
   calendar: 'Calendar',
 };
@@ -307,48 +312,34 @@ export default function App() {
   useEffect(() => {
     return window.api.onExtensionTranscribeRequest(({ id, pcmBase64 }) => {
       void (async () => {
+        const { decodePcmBase64, transcribePcm } = await import('./whisperTranscribePcm');
         try {
-          const raw = atob(pcmBase64);
-          const bytes = new Uint8Array(raw.length);
-          for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-          const audio = new Float32Array(bytes.buffer);
-          if (!audio.length) {
-            window.api.replyExtensionTranscribe(id, { ok: false, error: 'Empty audio PCM' });
-            return;
-          }
-          const { loadWhisperDevice, loadWhisperModelTier, whisperHfId } = await import('./whisperSettings');
-          const { getStudyLang } = await import('./studyEnvironment');
-          const studyLang = getStudyLang() === 'zh' ? 'zh' : 'ja';
-          const worker = new Worker(new URL('./whisperWorker.ts', import.meta.url), { type: 'module' });
-          const chunks: string[] = [];
-          const finish = (ok: boolean, text?: string, error?: string): void => {
-            worker.terminate();
-            window.api.replyExtensionTranscribe(id, ok ? { ok: true, text: text || '' } : { ok: false, error: error || 'Transcription failed' });
-          };
-          worker.onmessage = (ev: MessageEvent) => {
-            const m = ev.data as { type?: string; cues?: Array<{ text?: string }>; message?: string };
-            if (m.type === 'partial' && Array.isArray(m.cues)) {
-              for (const c of m.cues) {
-                if (c?.text?.trim()) chunks.push(c.text.trim());
-              }
-            } else if (m.type === 'done') {
-              finish(true, chunks.join(' ').trim());
-            } else if (m.type === 'error') {
-              finish(false, undefined, m.message || 'Whisper error');
-            }
-          };
-          worker.onerror = (err) => finish(false, undefined, err.message || 'Whisper worker failed');
-          worker.postMessage(
-            {
-              audio,
-              model: whisperHfId(loadWhisperModelTier(studyLang)),
-              prefer: loadWhisperDevice(),
-              lang: studyLang,
-            },
-            [audio.buffer],
-          );
+          const result = await transcribePcm(decodePcmBase64(pcmBase64));
+          window.api.replyExtensionTranscribe(id, result.ok
+            ? { ok: true, text: result.text ?? '' }
+            : { ok: false, error: result.error ?? 'Transcription failed' });
         } catch (err) {
           window.api.replyExtensionTranscribe(id, {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })();
+    });
+  }, []);
+
+  // Transcription queue → Whisper. The main process owns the queue but cannot
+  // run the model, so it asks the renderer one chunk at a time.
+  useEffect(() => {
+    return window.api.onTranscriptionChunkRequest?.(({ id, pcmBase64, lang }) => {
+      void (async () => {
+        const { decodePcmBase64, transcribePcm } = await import('./whisperTranscribePcm');
+        try {
+          const result = await transcribePcm(decodePcmBase64(pcmBase64), lang);
+          window.api.replyTranscriptionChunk({ id, ...result });
+        } catch (err) {
+          window.api.replyTranscriptionChunk({
+            id,
             ok: false,
             error: err instanceof Error ? err.message : String(err),
           });
@@ -450,6 +441,10 @@ export default function App() {
       }
     });
   }, []);
+
+  // Analysis snapshots raised by the browser extension. The notebook lives in
+  // renderer storage, so the main window files them on the extension's behalf.
+  useExtensionSnapshots();
 
   useEffect(() => {
     return window.api.onExtensionTranslationResult((payload) => {
@@ -557,6 +552,11 @@ export default function App() {
     });
   }, []);
 
+  // Phase 6 slice 14. The reader branch below mounts `CommandPalette` without a
+  // `MediaWorkspaceHost`, so `video.resumeLast` had no listener and blamed the sidecar.
+  const closeReader = useCallback(() => setReading(null), []);
+  useReaderResumeHandoff(Boolean(reading), closeReader);
+
   // Transparent OS overlay for desktop pets (L4) — skip chrome / boot entirely.
   if (isCompanionHostWindow()) {
     return <CompanionHostView />;
@@ -602,6 +602,7 @@ export default function App() {
         </Suspense>
         <GlobalDictionaryOverlay />
         <ToastHost />
+        <MediaWorkspaceHost />
       </>
     );
   }
@@ -666,11 +667,16 @@ export default function App() {
 
   if (popout) {
     // The OS window itself is borderless (frame: false), so we supply our own
-    // thin drag strip + window buttons — the Noctis-style frameless look.
+    // thin drag strip + window buttons — the immersive frameless look.
     const flush = popout === 'music' || popout === 'city' || popout === 'musicwidget' || popout === 'settings' || popout === 'games';
+    const mooncapWidget = popout === 'city';
     return (
-      <div className="popout-root">
-        <PopoutChrome label={POPOUT_LABELS[popout] ?? popout} />
+      <div className={`popout-root ${mooncapWidget ? 'popout-root-mooncap' : ''}`}>
+        <PopoutChrome
+          label={mooncapWidget ? '' : (POPOUT_LABELS[popout] ?? popout)}
+          canMaximize={!mooncapWidget}
+          widget={mooncapWidget}
+        />
         <div className={`popout-body ${flush ? 'popout-body-flush' : ''}`}>
           <AppSection section={popout} onOpenBook={setReading} />
         </div>
@@ -678,6 +684,9 @@ export default function App() {
         <ClipboardHistoryPanel />
         <GlobalDictionaryOverlay />
         <ToastHost />
+        {/* Slice 14: `player` routes to the workspace too, and a pop-out is its own
+            renderer — without a host here its open button dispatched into nothing. */}
+        {sectionOpensMediaWorkspace(popout) && <MediaWorkspaceHost />}
       </div>
     );
   }
@@ -697,6 +706,7 @@ export default function App() {
       <ClipboardHistoryPanel />
       <PerfOverlay />
       <SecretAeroTrigger />
+      <SecretHistoryTrigger />
       <GlobalDictionaryOverlay />
       <ToastHost />
       {/* Phase-1 Seanime proof. Self-hides unless the sidecar flag is armed. */}
@@ -710,9 +720,9 @@ export default function App() {
 // Chrome for a borderless pop-out window: a drag strip (the OS drag itself is
 // done in CSS via -webkit-app-region: drag) and min/max/close buttons that drive
 // this very window through the main process.
-function PopoutChrome({ label }: { label: string }) {
+function PopoutChrome({ label, canMaximize = true, widget = false }: { label: string; canMaximize?: boolean; widget?: boolean }) {
   return (
-    <div className="popout-bar">
+    <div className={`popout-bar ${widget ? 'popout-bar-widget' : ''}`}>
       <div className={`popout-drag ${label ? '' : 'popout-drag-icon'}`}>
         {label}
       </div>
@@ -720,9 +730,11 @@ function PopoutChrome({ label }: { label: string }) {
         <button className="popout-btn" title="Minimize" onClick={() => void window.api.popoutControl('minimize')}>
           ─
         </button>
-        <button className="popout-btn" title="Maximize" onClick={() => void window.api.popoutControl('maximize')}>
-          ▢
-        </button>
+        {canMaximize && (
+          <button className="popout-btn" title="Maximize" onClick={() => void window.api.popoutControl('maximize')}>
+            ▢
+          </button>
+        )}
         <button className="popout-btn popout-close" title="Close" onClick={() => void window.api.popoutControl('close')}>
           ×
         </button>

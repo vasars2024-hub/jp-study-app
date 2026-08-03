@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shell layer scale harness</title>
+    <!--
+      Measures the SHELL LAYER SCALE (theme/tokens.css) in a real engine.
+
+      jsdom has no stacking model and no hit testing, so `shellLayerScale.test.ts`
+      can only pin the numbers and the bindings. What it cannot answer is the
+      question the defect was actually about: with the media workspace open, does
+      a click at the command palette reach the palette?
+
+      This page reproduces the shell's REAL nesting — the part that matters is
+      that `.os-desktop` declares `contain: layout paint`, which creates a
+      stacking context and traps the taskbar's z-index inside it — and then
+      hit-tests with document.elementFromPoint().
+
+      Phase 1 runs the fix. Phase 2 puts the pre-fix values back on :root and
+      re-measures, so the instrument is shown catching the defect it exists for.
+      A harness that only ever reports PASS has proved nothing.
+
+      Phases 3 and 4 do the same for the VIEW-SCOPED overlay tier
+      (`--z-view-overlay*`), added when the last two raw z-index numbers in
+      styles.css were tokenised. `.lib-import` — a modal owned by the Library
+      view — declared 300000/300001, above this window's own title bar, so the
+      question there is the mirror of the one above: does a click at the title
+      bar still reach the title bar while a view's dialog is open?
+    -->
+    <link rel="stylesheet" href="../theme/tokens.css" />
+    <link rel="stylesheet" href="../styles.css" />
+    <!-- `.main-window-chrome` (this OS window's own title bar) lives here, and the
+         view-overlay probes below are measured against it. -->
+    <link rel="stylesheet" href="../components/shell/shell.css" />
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; }
+      /* The report sits above everything on purpose — it is the instrument,
+         not part of the fixture, so it is numbered outside the scale entirely. */
+      #probe-report {
+        position: fixed;
+        inset: auto 0 0 0;
+        max-height: 46vh;
+        overflow: auto;
+        z-index: 2147483000;
+        /* The report is fixed to the bottom of the viewport, which is exactly
+           where the toast host and the taskbar are. Without this it wins its own
+           hit tests and reports `<body>` for both — the instrument occluding its
+           own measurement. elementFromPoint honours pointer-events: none. */
+        pointer-events: none;
+        margin: 0;
+        padding: 12px 16px;
+        background: #07060a;
+        border-top: 2px solid #ff2e4d;
+        color: #f5f4f7;
+        font: 12px/1.55 ui-monospace, Consolas, monospace;
+        white-space: pre;
+      }
+      .probe-pass { color: #4caf7d; }
+      .probe-fail { color: #ff6b81; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Real nesting: the taskbar lives INSIDE .os-desktop, which is a
+           stacking context (contain: layout paint). -->
+      <div class="desktop-root">
+        <div class="os-desktop">
+          <div class="os-taskbar"><span class="os-clock-time">taskbar</span></div>
+        </div>
+      </div>
+
+      <!-- Root-level shell siblings, in App.tsx's own order. -->
+      <div class="palette-backdrop"></div>
+      <div class="palette" role="dialog" aria-label="probe palette">
+        <div class="palette-head">
+          <input class="palette-input" value="continue" />
+          <span class="palette-hint muted">Esc</span>
+        </div>
+        <div class="palette-list">
+          <div class="palette-row" data-idx="0">Continue watching — probe row</div>
+        </div>
+      </div>
+
+      <div class="os-toast-host"><div class="os-toast">probe toast</div></div>
+
+      <!-- The full-screen view. Opaque, covers the viewport. -->
+      <div class="seanime-host" role="dialog" aria-modal="true" aria-label="probe workspace">
+        <header class="seanime-host-bar"><strong class="seanime-host-title">workspace</strong></header>
+        <div class="seanime-host-body"><div class="seanime-host-pane" data-active="true"></div></div>
+      </div>
+
+      <!-- The first-launch telemetry gate. Hidden unless a probe asks for it: it is
+           blocking chrome, so while it is up nothing below the lock screen may cover
+           it — including the overlays this scale just raised. -->
+      <div class="consent" id="consent-fixture" style="display: none">
+        <div class="consent-card"><div class="consent-actions">
+          <button class="consent-yes" type="button">Yes</button>
+          <button class="consent-no" type="button">No</button>
+        </div></div>
+      </div>
+
+      <!-- A VIEW-SCOPED overlay: the Library's import dialog, which belongs to one
+           view rather than to the app. Root-level, i.e. the Focus shell, where
+           nothing between it and #root opens a stacking context. This is the shape
+           in which its old 300000/300001 was real. -->
+      <div id="view-modal-fixture" style="display: none">
+        <div class="lib-import-backdrop"></div>
+        <div class="lib-import">
+          <h3>import</h3>
+          <div class="lib-import-actions"><button type="button">Import</button></div>
+        </div>
+      </div>
+
+      <!-- The same dialog inside a desktop window. `.fwin` declares BOTH
+           `contain: layout style paint` and `transform: translateZ(0)`, so its
+           children's z-indexes are local and a `position: fixed` child is pinned to
+           the window's box. Measured, not assumed: it is the control for the claim
+           that the old number was inert on the desktop. -->
+      <div id="view-modal-in-window" style="display: none">
+        <div class="desktop-root"><div class="os-desktop">
+          <div class="fwin" style="left: 40px; top: 120px; width: 320px; height: 220px">
+            <div class="lib-import-backdrop"></div>
+            <div class="lib-import"><h3>import, inside a window</h3></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- The tier's other surface. Only its computed value is read: it is the same
+           token at the same number it always had, so nothing about it should move. -->
+      <div class="reading-source-backdrop" id="reading-source-fixture" style="display: none"></div>
+
+      <!-- This OS window's own title bar. The strip carries -webkit-app-region: drag,
+           so a dialog painting over it takes away how the window is moved. -->
+      <div class="main-window-chrome" id="window-chrome-fixture" style="display: none">
+        <div class="main-window-chrome-drag"><span>title bar</span></div>
+      </div>
+    </div>
+
+    <pre id="probe-report">measuring…</pre>
+
+    <script type="module">
+      /** The element the user's pointer would actually hit at (x, y). */
+      function hit(x, y) {
+        const el = document.elementFromPoint(x, y);
+        return el ? el : null;
+      }
+
+      /** Nearest ancestor (or self) carrying one of the fixture's layer classes. */
+      const LAYERS = [
+        'palette', 'palette-backdrop', 'seanime-host', 'os-toast-host',
+        'os-taskbar', 'os-desktop', 'lockscreen', 'consent',
+        'lib-import', 'lib-import-backdrop', 'main-window-chrome', 'fwin',
+      ];
+      function layerAt(x, y) {
+        let el = hit(x, y);
+        while (el && el !== document.body) {
+          for (const name of LAYERS) if (el.classList.contains(name)) return name;
+          el = el.parentElement;
+        }
+        return el ? `<${el.tagName.toLowerCase()}>` : 'nothing';
+      }
+
+      function centerOf(selector) {
+        const r = document.querySelector(selector).getBoundingClientRect();
+        return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)];
+      }
+
+      function computedZ(selector) {
+        return getComputedStyle(document.querySelector(selector)).zIndex;
+      }
+
+      /**
+       * `.os-toast-host` ships `pointer-events: none` — it must never intercept
+       * a click meant for the app under it. elementFromPoint honours that, so
+       * hit-testing a toast returns whatever is BENEATH it and would report the
+       * toast as covered while it is plainly readable. Paint order and hit order
+       * follow the same stacking order, so the honest way to measure the toast's
+       * LAYER is to make it hittable for the length of the test and restore it.
+       */
+      function withHittableToast(fn) {
+        const host = document.querySelector('.os-toast-host');
+        const prior = host.style.pointerEvents;
+        host.style.pointerEvents = 'auto';
+        try { return fn(); } finally { host.style.pointerEvents = prior; }
+      }
+
+      /** One measurement round. `label` distinguishes the fix from the control. */
+      function round(label) {
+        const [px, py] = centerOf('.palette');
+        const [tx, ty] = centerOf('.os-toast');
+        const [bx, by] = centerOf('.os-taskbar');
+        // A point on the backdrop only: same row as the palette, far left of it.
+        const paletteRect = document.querySelector('.palette').getBoundingClientRect();
+        const backdropPoint = [Math.max(8, Math.round(paletteRect.left / 2)), py];
+
+        // The same taskbar point with the full-screen view hidden, which is the
+        // "did raising the palette change the shell?" half of the question.
+        const host = document.querySelector('.seanime-host');
+        host.style.display = 'none';
+        const taskbarNoWorkspace = layerAt(bx, by);
+        host.style.display = '';
+
+        // The first-launch gate, shown only for this measurement. Nothing below the
+        // lock screen may cover it — and raising the palette is exactly the kind of
+        // change that quietly does, since it used to sit under `.consent` at 1201.
+        const consent = document.getElementById('consent-fixture');
+        consent.style.display = 'flex';
+        const consentHits = {
+          'over the palette': layerAt(px, py),
+          'over a toast': withHittableToast(() => layerAt(tx, ty)),
+        };
+        consent.style.display = 'none';
+
+        return {
+          label,
+          viewport: `${document.documentElement.clientWidth}x${document.documentElement.clientHeight}`,
+          computed: {
+            'seanime-host': computedZ('.seanime-host'),
+            'palette-backdrop': computedZ('.palette-backdrop'),
+            palette: computedZ('.palette'),
+            'os-toast-host': computedZ('.os-toast-host'),
+            'os-taskbar': computedZ('.os-taskbar'),
+          },
+          hits: {
+            'palette centre': layerAt(px, py),
+            'backdrop only': layerAt(backdropPoint[0], backdropPoint[1]),
+            'toast centre': withHittableToast(() => layerAt(tx, ty)),
+            'taskbar centre': layerAt(bx, by),
+            'taskbar, no workspace': taskbarNoWorkspace,
+            'consent over the palette': consentHits['over the palette'],
+            'consent over a toast': consentHits['over a toast'],
+          },
+          points: { palette: [px, py], backdrop: backdropPoint, toast: [tx, ty], taskbar: [bx, by] },
+        };
+      }
+
+      /**
+       * The VIEW-SCOPED overlay tier (`--z-view-overlay*`), added when the last two raw
+       * z-index numbers in styles.css were tokenised.
+       *
+       * `.lib-import` declared 300000/300001 — above `--z-window-chrome` (250000) and
+       * above `--z-shell-chrome-raised`. The scrim is `inset: 0`, so it is the honest
+       * probe for "what does this modal cover": every shell surface lies under some
+       * point of it, and the answer is a hit test rather than a comparison of numbers.
+       */
+      function viewOverlayRound(label) {
+        const modal = document.getElementById('view-modal-fixture');
+        const nested = document.getElementById('view-modal-in-window');
+        const chrome = document.getElementById('window-chrome-fixture');
+        const consent = document.getElementById('consent-fixture');
+
+        chrome.style.display = 'flex';
+        modal.style.display = '';
+        const [px, py] = centerOf('.palette');
+        const [tx, ty] = centerOf('.os-toast');
+        const [cx, cy] = centerOf('#window-chrome-fixture');
+        const [dx, dy] = centerOf('#view-modal-fixture .lib-import');
+
+        // The palette and its scrim are always up in this fixture, and the scrim is
+        // `inset: 0` at 20000 — so it is the topmost thing over a view's modal at every
+        // point, which is the correct ordering and useless for measuring the modal
+        // against its OWN scrim. Hide the shell pair for that one hit only.
+        const paletteEls = [
+          document.querySelector('.palette-backdrop'),
+          document.querySelector('.palette'),
+        ];
+        const priorDisplay = paletteEls.map((el) => el.style.display);
+        paletteEls.forEach((el) => { el.style.display = 'none'; });
+        const dialogOverOwnScrim = layerAt(dx, dy);
+        paletteEls.forEach((el, i) => { el.style.display = priorDisplay[i]; });
+
+        const hits = {
+          'dialog over its own scrim': dialogOverOwnScrim,
+          'dialog centre, palette open': layerAt(dx, dy),
+          'palette over the scrim': layerAt(px, py),
+          'toast over the scrim': withHittableToast(() => layerAt(tx, ty)),
+          'title bar over the scrim': layerAt(cx, cy),
+        };
+        consent.style.display = 'flex';
+        hits['consent over the dialog'] = layerAt(dx, dy);
+        consent.style.display = 'none';
+
+        // Same dialog, same numbers, nested in a desktop window. Recorded in both
+        // phases: if the control below reproduces the defect at root level and NOT
+        // here, that is the measurement behind "the old number was inert on the
+        // desktop and real in the Focus shell".
+        modal.style.display = 'none';
+        nested.style.display = '';
+        hits['title bar, dialog inside a window'] = layerAt(cx, cy);
+        nested.style.display = 'none';
+        chrome.style.display = 'none';
+
+        return {
+          label,
+          computed: {
+            'lib-import': computedZ('#view-modal-fixture .lib-import'),
+            'lib-import-backdrop': computedZ('#view-modal-fixture .lib-import-backdrop'),
+            'reading-source-backdrop': computedZ('#reading-source-fixture'),
+            'main-window-chrome': computedZ('#window-chrome-fixture'),
+          },
+          hits,
+          points: { dialog: [dx, dy], titleBar: [cx, cy] },
+        };
+      }
+
+      function runProbe() {
+      const report = [];
+      function line(ok, text) {
+        report.push(`${ok ? 'PASS' : 'FAIL'}  ${text}`);
+        return ok;
+      }
+
+      // A hit test in a zero-sized viewport returns null for every point, which
+      // reads as "every layer failed" — a fiction, not a finding. This harness
+      // is opened from a pane that is 0x0 until it is sized, so refuse to
+      // report at all rather than produce a result that looks like a defect.
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+      if (vw < 320 || vh < 320) {
+        const out = document.getElementById('probe-report');
+        out.textContent = `SKIPPED — viewport is ${vw}x${vh}. Size the pane, then call window.runShellLayerProbe().`;
+        out.className = 'probe-fail';
+        window.__shellLayerProbe = { ok: null, skipped: true, viewport: `${vw}x${vh}` };
+        return window.__shellLayerProbe;
+      }
+
+      // ---- Phase 1: the fix, as shipped -------------------------------------
+      const fixed = round('fix');
+      let allOk = true;
+      allOk = line(fixed.hits['palette centre'] === 'palette',
+        `palette is clickable over the workspace (hit: ${fixed.hits['palette centre']})`) && allOk;
+      allOk = line(fixed.hits['backdrop only'] === 'palette-backdrop',
+        `the scrim, not the workspace, is under the palette (hit: ${fixed.hits['backdrop only']})`) && allOk;
+      allOk = line(fixed.hits['toast centre'] === 'os-toast-host',
+        `a toast is visible over the workspace (hit: ${fixed.hits['toast centre']})`) && allOk;
+      allOk = line(fixed.computed.palette === '20001' && fixed.computed['seanime-host'] === '9999',
+        `tokens resolved: palette ${fixed.computed.palette}, workspace ${fixed.computed['seanime-host']}`) && allOk;
+
+      // ---- Phase 2: the control, with the pre-fix values put back ------------
+      const root = document.documentElement;
+      root.style.setProperty('--z-shell-overlay-backdrop', '1200');
+      root.style.setProperty('--z-shell-overlay', '1201');
+      root.style.setProperty('--z-shell-feedback', '5000');
+      const control = round('control (pre-fix values)');
+      allOk = line(control.hits['palette centre'] === 'seanime-host',
+        `control reproduces the defect — the workspace eats the palette click (hit: ${control.hits['palette centre']})`) && allOk;
+      root.style.removeProperty('--z-shell-overlay-backdrop');
+      root.style.removeProperty('--z-shell-overlay');
+      root.style.removeProperty('--z-shell-feedback');
+
+      // The first-launch gate. This is a REGRESSION CHECK on slice 10 itself: the
+      // palette used to sit at 1201, under `.consent`'s 9000, so raising it to 20001
+      // put a working command surface on top of a gate the user has not answered yet.
+      allOk = line(fixed.hits['consent over the palette'] === 'consent',
+        `the consent gate covers the palette (hit: ${fixed.hits['consent over the palette']})`) && allOk;
+      allOk = line(fixed.hits['consent over a toast'] === 'consent',
+        `the consent gate covers a toast (hit: ${fixed.hits['consent over a toast']})`) && allOk;
+
+      // The shell must be UNCHANGED by the raise. `.os-taskbar` declares 200000,
+      // but it sits inside `.os-desktop`, which declares `contain: layout paint`
+      // and therefore forms a stacking context — so that 200000 is local, and the
+      // taskbar has always painted below every root-level overlay. If that is
+      // true, the fix and the control must agree here.
+      allOk = line(fixed.hits['taskbar, no workspace'] === control.hits['taskbar, no workspace'],
+        `raising the palette did not change what covers the taskbar `
+        + `(fix: ${fixed.hits['taskbar, no workspace']}, control: ${control.hits['taskbar, no workspace']})`) && allOk;
+
+      // ---- The view-scoped overlay tier, and its own control -----------------
+      const view = viewOverlayRound('view overlays, as shipped');
+      allOk = line(view.hits['dialog over its own scrim'] === 'lib-import',
+        `a view's modal sits above its own scrim (hit: ${view.hits['dialog over its own scrim']})`) && allOk;
+      allOk = line(view.hits['title bar over the scrim'] === 'main-window-chrome',
+        `the window's title bar stays above a view's modal — its drag region with it `
+        + `(hit: ${view.hits['title bar over the scrim']})`) && allOk;
+      allOk = line(view.hits['palette over the scrim'] === 'palette',
+        `the command palette stays reachable over a view's modal `
+        + `(hit: ${view.hits['palette over the scrim']})`) && allOk;
+      allOk = line(view.hits['toast over the scrim'] === 'os-toast-host',
+        `a toast stays readable over a view's modal (hit: ${view.hits['toast over the scrim']})`) && allOk;
+      allOk = line(view.hits['consent over the dialog'] === 'consent',
+        `the consent gate still covers a view's modal (hit: ${view.hits['consent over the dialog']})`) && allOk;
+      allOk = line(view.computed['lib-import'] === '12501'
+        && view.computed['lib-import-backdrop'] === '12500'
+        && view.computed['reading-source-backdrop'] === '12500',
+        `view-overlay tokens resolved: dialog ${view.computed['lib-import']}, `
+        + `scrim ${view.computed['lib-import-backdrop']}, `
+        + `manga source picker ${view.computed['reading-source-backdrop']}`) && allOk;
+
+      // The control: the literals this change removed. 300001 outranked the title bar.
+      root.style.setProperty('--z-view-overlay-backdrop', '300000');
+      root.style.setProperty('--z-view-overlay', '300001');
+      const viewControl = viewOverlayRound('control (the removed literals)');
+      allOk = line(viewControl.hits['title bar over the scrim'] === 'lib-import-backdrop',
+        `control reproduces it — at 300000 the scrim covers the title bar `
+        + `(hit: ${viewControl.hits['title bar over the scrim']})`) && allOk;
+      allOk = line(viewControl.hits['palette over the scrim'] === 'lib-import-backdrop',
+        `control: and the palette too (hit: ${viewControl.hits['palette over the scrim']})`) && allOk;
+      root.style.removeProperty('--z-view-overlay-backdrop');
+      root.style.removeProperty('--z-view-overlay');
+
+      // ---- Contrast: the palette now floats on VIDEO, not on the desktop -----
+      // `backdrop-filter: blur()` averages what is behind, so the worst realistic
+      // case is a bright frame averaging to white showing through the surface's
+      // own alpha. Composite the MEASURED rgba over white and score WCAG.
+      function parseRgb(value) {
+        const nums = value.match(/[\d.]+/g).map(Number);
+        // color-mix resolves to color(srgb r g b / a) in Chromium — 0..1 channels.
+        const srgb = value.startsWith('color(');
+        return {
+          r: srgb ? nums[0] * 255 : nums[0],
+          g: srgb ? nums[1] * 255 : nums[1],
+          b: srgb ? nums[2] * 255 : nums[2],
+          a: nums.length > 3 ? nums[3] : 1,
+        };
+      }
+      function over(fg, bg) {
+        return {
+          r: fg.r * fg.a + bg.r * (1 - fg.a),
+          g: fg.g * fg.a + bg.g * (1 - fg.a),
+          b: fg.b * fg.a + bg.b * (1 - fg.a),
+        };
+      }
+      function luminance(c) {
+        const ch = [c.r, c.g, c.b].map((v) => {
+          const s = v / 255;
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+      }
+      function contrast(a, b) {
+        const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+        return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
+      }
+
+      const paletteEl = document.querySelector('.palette');
+      const WHITE = { r: 255, g: 255, b: 255 };
+      const surfaceOverWhite = over(parseRgb(getComputedStyle(paletteEl).backgroundColor), WHITE);
+      const textColor = parseRgb(getComputedStyle(paletteEl).color);
+      const mutedColor = parseRgb(
+        getComputedStyle(document.querySelector('.palette-hint') || paletteEl).color,
+      );
+      const textRatio = contrast(textColor, surfaceOverWhite);
+      const mutedRatio = contrast(mutedColor, surfaceOverWhite);
+      allOk = line(mutedRatio >= 4.5,
+        `palette muted text clears AA against a white frame behind the glass `
+        + `(${mutedRatio}:1; body text ${textRatio}:1)`) && allOk;
+
+      // ---- Recorded, not asserted -------------------------------------------
+      report.push('');
+      report.push(`note  taskbar with BOTH open: ${fixed.hits['taskbar centre']} `
+        + `— the palette's scrim is the topmost thing over it; hide the palette and `
+        + `the full-screen view covers it instead. Either way the taskbar is not reachable.`);
+      report.push(`note  taskbar computed z-index: ${fixed.computed['os-taskbar']}, `
+        + `local to .os-desktop's stacking context (contain: layout paint)`);
+      report.push(`note  with the palette open, the point at a view modal's centre reports `
+        + `${view.hits['dialog centre, palette open']} — the palette's own scrim is inset: 0 `
+        + `at 20000, so it is above a view's dialog everywhere. That is the ordering working, `
+        + `not a collision: a shell overlay outranks a view's modal by design.`);
+      report.push(`note  the same dialog nested in a desktop window, title-bar point: `
+        + `${view.hits['title bar, dialog inside a window']} with the tokens, `
+        + `${viewControl.hits['title bar, dialog inside a window']} with the removed `
+        + `literals — .fwin declares contain: layout style paint AND transform, so the `
+        + `300000 was inert there and only ever real in a root-level shell (Focus).`);
+
+      const out = document.getElementById('probe-report');
+      out.textContent = [
+        `shell layer scale — ${allOk ? 'ALL PASS' : 'FAILURES PRESENT'}`,
+        `viewport ${fixed.viewport}`,
+        '',
+        ...report,
+        '',
+        JSON.stringify({ fixed, control, view, viewControl }, null, 2),
+      ].join('\n');
+      out.className = allOk ? 'probe-pass' : 'probe-fail';
+      window.__shellLayerProbe = { ok: allOk, report, fixed, control, view, viewControl };
+      return window.__shellLayerProbe;
+      }
+
+      window.runShellLayerProbe = runProbe;
+      runProbe();
+      // Re-measure whenever the pane is sized, so a run that opened at 0x0
+      // corrects itself instead of leaving a stale skip on screen.
+      window.addEventListener('resize', () => runProbe());
+    </script>
+  </body>
+</html>

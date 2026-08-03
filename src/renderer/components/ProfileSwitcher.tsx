@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { confirmDialog } from './ui';
-import { PROFILE_GROUPS, type ProfileId } from '../../shared/profiles';
+import type { ProfileId } from '../../shared/profiles';
+import { PROFILE_GROUPS } from '../../shared/seedProfiles';
 import {
   createProfile,
   DEFAULT_PROFILE_ID,

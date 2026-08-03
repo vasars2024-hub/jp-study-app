@@ -232,6 +232,7 @@ export default function RegionEditorModal({
               max={90}
               value={Math.round(splitFraction * 100)}
               onChange={(e) => onSplitFractionChange(Number(e.target.value) / 100)}
+              aria-label={t('a11y.slider.regionSplit')}
             />
             <div className="region-editor-row">
               <button

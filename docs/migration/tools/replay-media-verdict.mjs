@@ -24,7 +24,9 @@ import esbuild from 'esbuild';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
 const PROOF = path.join(REPO, 'docs/migration/proof');
-const MODULE = path.join(REPO, 'src/shared/directstreamOpenRecovery.ts');
+// Moved out of src/shared/ on 2026-08-02, when vitest.config.ts gained a src/media glob and
+// the rule no longer had to live outside its component to be testable.
+const MODULE = path.join(REPO, 'src/media/directstreamOpenRecovery.ts');
 
 const newestRun = () => {
   const runs = fs

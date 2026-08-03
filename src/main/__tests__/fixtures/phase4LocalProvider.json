@@ -1,0 +1,12 @@
+{
+  "id": "phase4-local-proof",
+  "name": "Phase 4 Local Proof",
+  "description": "Deterministic localhost provider used only for the Phase 4 live integration proof.",
+  "manifestURI": "",
+  "version": "1.0.0",
+  "author": "Study OS",
+  "type": "onlinestream-provider",
+  "language": "javascript",
+  "lang": "en",
+  "payload": "class Provider {\n  getSettings() {\n    return { episodeServers: [\"local-proof\"], supportsDub: false };\n  }\n\n  async search(options) {\n    return [{\n      id: \"phase4-local-anime\",\n      title: options.query || \"Phase 4 Local Anime\",\n      url: \"http://127.0.0.1:18846/catalogue/phase4-local-anime\",\n      subOrDub: \"sub\"\n    }];\n  }\n\n  async findEpisodes(id) {\n    return [{\n      id: id + \"-episode-1\",\n      number: 1,\n      url: \"http://127.0.0.1:18846/catalogue/phase4-local-anime/1\",\n      title: \"Episode 1\"\n    }];\n  }\n\n  async findEpisodeServer(episode, server) {\n    return {\n      server: server,\n      headers: { \"X-Phase4-Proof\": \"provider-header\" },\n      videoSources: [{\n        url: \"http://127.0.0.1:18846/phase4-proof.mp4\",\n        type: \"mp4\",\n        quality: \"720p\",\n        subtitles: [{\n          id: \"ja\",\n          url: \"http://127.0.0.1:18846/phase4-proof.vtt\",\n          language: \"ja\",\n          isDefault: true\n        }]\n      }]\n    };\n  }\n}\n"
+}

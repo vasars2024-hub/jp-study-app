@@ -1,7 +1,7 @@
 /**
  * Shell extension points (Phase 2 · M16) — typed, no-op seams so LATER phases
  * (living wallpapers, particles, weather, companions, desktop pets, outside-app
- * overlays, Noctis, Anime Edition) can plug into the desktop shell without
+ * overlays and Anime Edition) can plug into the desktop shell without
  * changing it. NOTHING is implemented here — only the contract + registry.
  *
  * The `DesktopLayer` registry lets a future system mount a full-bleed layer over
@@ -36,7 +36,6 @@ export type ExtensionKind =
   | 'companion'
   | 'desktop-pet'
   | 'overlay-window'
-  | 'noctis'
   | 'anime-edition';
 
 const layers = new Map<string, DesktopLayer>();

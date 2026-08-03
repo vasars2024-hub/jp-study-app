@@ -184,7 +184,8 @@ const SEQUENCES = [
 
 async function main() {
   const startedAt = new Date().toISOString();
-  const { resumeWriteAction } = await load('src/shared/videoCoreResumeWrite.ts');
+  // Moved out of src/shared/ on 2026-08-02 — see the module header.
+  const { resumeWriteAction } = await load('src/media/videoCoreResumeWrite.ts');
   const { seanimeContinueWatching } = await load('src/shared/seanimeContinueWatching.ts');
 
   const wiring = measureWiring();

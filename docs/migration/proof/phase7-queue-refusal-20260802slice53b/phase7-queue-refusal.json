@@ -1,0 +1,303 @@
+{
+  "gate": "phase7-queue-refusal-live-gate.mjs",
+  "question": "47e's original story, driven live for the first time: does narrowing a profile take effect on work that was already planned, queued and survived a process restart?",
+  "startedAt": "2026-08-02T12:35:51.837Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "preferredOperation": "dictionary.search-knowledge",
+  "chosenOperation": "dictionary.search-knowledge",
+  "objective": "Search my local knowledge for the word neko and show what you find.",
+  "steps": [
+    {
+      "name": "P0 every page-side probe compiles",
+      "result": "PASS",
+      "detail": "7 expressions parsed"
+    },
+    {
+      "name": "0 the model precondition",
+      "result": "OK",
+      "detail": "~/Downloads holds Qwen_Qwen3-1.7B-Q4_K_M.gguf — resolveModelPath searches there",
+      "gguf": [
+        "Qwen_Qwen3-1.7B-Q4_K_M.gguf"
+      ]
+    },
+    {
+      "name": "1 the agent panel rendered",
+      "result": "PASS",
+      "detail": "found by shape (a full-automation option), 4 action buttons, 2 objective textarea(s) — no UI prose was matched"
+    },
+    {
+      "name": "2 the profile store is ON DISK, so there is something to narrow",
+      "result": "PASS",
+      "detail": "persisted:study-tutor via media-assistant (4 profiles); active profile study-tutor carries 19 operations. The operation under test is chosen from the plan the model produces, not asserted here.",
+      "activeProfileOps": [
+        "dictionary.lookup",
+        "dictionary.explain-grammar",
+        "dictionary.analyze-sentence",
+        "dictionary.search-knowledge",
+        "flashcard.list-decks",
+        "flashcard.add-cards",
+        "flashcard.create-deck",
+        "calendar.list",
+        "calendar.schedule-session",
+        "study.get-context",
+        "study.list-opportunities",
+        "study.filter-vocabulary",
+        "study.undo-filter",
+        "study.preview-cards",
+        "study.create-cards",
+        "study.preview-anki",
+        "study.export-anki",
+        "study.resume-session",
+        "study.open-context"
+      ]
+    },
+    {
+      "name": "3 a LIVE plan was produced by the real local model",
+      "result": "PASS",
+      "detail": "queued item agent-1785674158255 \"Search my local knowledge for the word neko and show what you find.\" with 1 step(s): dictionary.search-knowledge[pending] (after 1 attempt(s))",
+      "item": {
+        "id": "agent-1785674158255",
+        "status": "queued",
+        "priority": 0,
+        "objective": "Search my local knowledge for the word neko and show what you find.",
+        "steps": [
+          {
+            "id": "agent-1785674158255-step-1",
+            "status": "pending",
+            "operation": "dictionary.search-knowledge",
+            "error": null
+          }
+        ]
+      },
+      "planAttempts": [
+        {
+          "attempt": 1,
+          "planClick": "clicked",
+          "status": null,
+          "produced": true
+        }
+      ]
+    },
+    {
+      "name": "4 the operation under test, chosen from the plan the model actually produced",
+      "result": "PASS",
+      "detail": "dictionary.search-knowledge (\"Search local knowledge\", minimum read-only, no confirmation) — it is in the plan, in the profile's allow-list, and runnable at limited-actions, so the control arm can complete it and the only thing separating the arms is the narrowing",
+      "candidates": [
+        "dictionary.search-knowledge"
+      ]
+    },
+    {
+      "name": "5 the process that planned the task has exited",
+      "result": "OK",
+      "detail": "the queue must now come back from disk, not from component state"
+    },
+    {
+      "name": "6 the persisted profile was forked into two identical copies",
+      "result": "OK",
+      "detail": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53b-42148\\narrowed and C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53b-42148\\control — both restart from the SAME plan, so the only variable below is whether the operation was removed"
+    },
+    {
+      "name": "7 the queued task SURVIVED the process restart",
+      "result": "FAIL",
+      "detail": "narrowed arm: ROW MISSING; control arm: ROW MISSING. Without this, nothing below is about persistence."
+    },
+    {
+      "name": "8 the narrowing actually took",
+      "result": "PASS",
+      "detail": "narrowed arm: narrowed:19->18, dictionary.search-knowledge enabled = false; control arm untouched, enabled = true"
+    },
+    {
+      "name": "9 the queued row was RUN, not merely listed",
+      "result": "FAIL",
+      "detail": "narrowed arm click -> no-row; control arm click -> no-row. Before slice 51 there was no such button to click."
+    },
+    {
+      "name": "10 THE DIFFERENTIAL — same plan, same restart, one variable",
+      "result": "FAIL",
+      "detail": "narrowed: step undefined -> undefined, error null; control: step undefined -> undefined, error null. A refusal in one arm and a completion in the other, from identical persisted input, is what makes the allow-list the cause rather than any of the dozen other ways a step can fail."
+    }
+  ],
+  "arms": {
+    "narrowed": {
+      "dir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53b-42148\\narrowed",
+      "queueSurvivedRestart": false,
+      "rowAtRestart": null,
+      "narrowResult": "narrowed:19->18",
+      "targetEnabledAfterNarrow": false,
+      "activeProfileOpsAfterNarrow": [
+        "dictionary.lookup",
+        "dictionary.explain-grammar",
+        "dictionary.analyze-sentence",
+        "flashcard.list-decks",
+        "flashcard.add-cards",
+        "flashcard.create-deck",
+        "calendar.list",
+        "calendar.schedule-session",
+        "study.get-context",
+        "study.list-opportunities",
+        "study.filter-vocabulary",
+        "study.undo-filter",
+        "study.preview-cards",
+        "study.create-cards",
+        "study.preview-anki",
+        "study.export-anki",
+        "study.resume-session",
+        "study.open-context"
+      ],
+      "clicked": "no-row",
+      "rowAfterRun": null,
+      "status": [],
+      "events": [],
+      "planRows": []
+    },
+    "control": {
+      "dir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53b-42148\\control",
+      "queueSurvivedRestart": false,
+      "rowAtRestart": null,
+      "narrowResult": "not-narrowed",
+      "targetEnabledAfterNarrow": true,
+      "activeProfileOpsAfterNarrow": [
+        "dictionary.lookup",
+        "dictionary.explain-grammar",
+        "dictionary.analyze-sentence",
+        "dictionary.search-knowledge",
+        "flashcard.list-decks",
+        "flashcard.add-cards",
+        "flashcard.create-deck",
+        "calendar.list",
+        "calendar.schedule-session",
+        "study.get-context",
+        "study.list-opportunities",
+        "study.filter-vocabulary",
+        "study.undo-filter",
+        "study.preview-cards",
+        "study.create-cards",
+        "study.preview-anki",
+        "study.export-anki",
+        "study.resume-session",
+        "study.open-context"
+      ],
+      "clicked": "no-row",
+      "rowAfterRun": null,
+      "status": [],
+      "events": [],
+      "planRows": []
+    }
+  },
+  "exeBuiltAt": "2026-08-02T12:05:28.551Z",
+  "scratchRoot": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53b-42148",
+  "planAttempts": [
+    {
+      "attempt": 1,
+      "planClick": "clicked",
+      "status": null,
+      "produced": true
+    }
+  ],
+  "panelAfterPlan": {
+    "panel": true,
+    "actions": [
+      {
+        "i": 0,
+        "text": "Create local plan",
+        "disabled": false
+      },
+      {
+        "i": 1,
+        "text": "Run next approved step",
+        "disabled": false
+      },
+      {
+        "i": 2,
+        "text": "Confirm sensitive step",
+        "disabled": true
+      },
+      {
+        "i": 3,
+        "text": "Run next queued plan",
+        "disabled": false
+      }
+    ],
+    "queueRows": [
+      {
+        "objective": "Search my local knowledge for the word neko and show what you find.",
+        "cells": [
+          "Search my local knowledge for the word neko and show what you find.",
+          "Queued",
+          "0",
+          "RunPauseCancelPrioritize"
+        ],
+        "buttons": [
+          {
+            "text": "Run",
+            "disabled": false
+          },
+          {
+            "text": "Pause",
+            "disabled": false
+          },
+          {
+            "text": "Cancel",
+            "disabled": false
+          },
+          {
+            "text": "Prioritize",
+            "disabled": false
+          }
+        ]
+      }
+    ],
+    "planRows": [
+      [
+        "Search local knowledge for the word neko",
+        "dictionary.search-knowledge",
+        "Queued",
+        "—"
+      ]
+    ],
+    "status": [
+      "Plan ready. Review it before running."
+    ],
+    "events": [],
+    "textareas": 2
+  },
+  "operationCandidates": [
+    {
+      "operation": "dictionary.search-knowledge",
+      "inProfile": true,
+      "def": {
+        "id": "dictionary.search-knowledge",
+        "category": "dictionary",
+        "label": "Search local knowledge",
+        "minimumPermission": "read-only",
+        "confirmation": null
+      }
+    }
+  ],
+  "refusal": null,
+  "controlStep": null,
+  "verdict": "FAIL",
+  "result": "FAIL",
+  "finishedAt": "2026-08-02T12:45:32.723Z",
+  "log": [
+    "[phase7-refusal] PASS — P0 every page-side probe compiles: 7 expressions parsed",
+    "[phase7-refusal] OK — 0 the model precondition: ~/Downloads holds Qwen_Qwen3-1.7B-Q4_K_M.gguf — resolveModelPath searches there",
+    "[phase7-refusal] PASS — 1 the agent panel rendered: found by shape (a full-automation option), 4 action buttons, 2 objective textarea(s) — no UI prose was matched",
+    "[phase7-refusal] PASS — 2 the profile store is ON DISK, so there is something to narrow: persisted:study-tutor via media-assistant (4 profiles); active profile study-tutor carries 19 operations. The operation under test is chosen from the plan the model produces, not asserted here.",
+    "[phase7-refusal] plan attempt 1/5 -> clicked",
+    "[phase7-refusal]   attempt 1: PLAN PRODUCED",
+    "[phase7-refusal] PASS — 3 a LIVE plan was produced by the real local model: queued item agent-1785674158255 \"Search my local knowledge for the word neko and show what you find.\" with 1 step(s): dictionary.search-knowledge[pending] (after 1 attempt(s))",
+    "[phase7-refusal] PASS — 4 the operation under test, chosen from the plan the model actually produced: dictionary.search-knowledge (\"Search local knowledge\", minimum read-only, no confirmation) — it is in the plan, in the profile's allow-list, and runnable at limited-actions, so the control arm can complete it and the only thing separating the arms is the narrowing",
+    "[phase7-refusal] seed: window.close() did not end the process; forcing",
+    "[phase7-refusal] OK — 5 the process that planned the task has exited: the queue must now come back from disk, not from component state",
+    "[phase7-refusal] OK — 6 the persisted profile was forked into two identical copies: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53b-42148\\narrowed and C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-20260802slice53b-42148\\control — both restart from the SAME plan, so the only variable below is whether the operation was removed",
+    "[phase7-refusal] narrowed: restart row=MISSING narrow=narrowed:19->18 click=no-row -> []",
+    "[phase7-refusal] narrowed: window.close() did not end the process; forcing",
+    "[phase7-refusal] control: restart row=MISSING narrow=not-narrowed click=no-row -> []",
+    "[phase7-refusal] control: window.close() did not end the process; forcing",
+    "[phase7-refusal] FAIL — 7 the queued task SURVIVED the process restart: narrowed arm: ROW MISSING; control arm: ROW MISSING. Without this, nothing below is about persistence.",
+    "[phase7-refusal] PASS — 8 the narrowing actually took: narrowed arm: narrowed:19->18, dictionary.search-knowledge enabled = false; control arm untouched, enabled = true",
+    "[phase7-refusal] FAIL — 9 the queued row was RUN, not merely listed: narrowed arm click -> no-row; control arm click -> no-row. Before slice 51 there was no such button to click.",
+    "[phase7-refusal] FAIL — 10 THE DIFFERENTIAL — same plan, same restart, one variable: narrowed: step undefined -> undefined, error null; control: step undefined -> undefined, error null. A refusal in one arm and a completion in the other, from identical persisted input, is what makes the allow-list the cause rather than any of the dozen other ways a step can fail."
+  ]
+}

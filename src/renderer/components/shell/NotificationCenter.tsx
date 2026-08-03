@@ -4,7 +4,7 @@
  * bell via the `shell:toggleNotifications` event. Escape / backdrop closes;
  * opening marks all read.
  */
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Notification, Toggle, useWiredMaterials } from '../ui';
 import {
   clearAll,
@@ -25,39 +25,63 @@ function uiKind(k: NotificationKind): 'default' | 'success' | 'warning' | 'error
   return k === 'info' ? 'default' : k;
 }
 
-function timeAgo(ts: number): string {
-  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+function useTimeAgo() {
+  const { t, lang } = useT();
+  return useCallback(
+    (ts: number) => {
+      const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+      if (s < 60) return t('notifications.time.justNow');
+      const m = Math.floor(s / 60);
+      if (m < 60) return t('notifications.time.minutes', { count: m });
+      const h = Math.floor(m / 60);
+      if (h < 24) return t('notifications.time.hours', { count: h });
+      return t('notifications.time.days', { count: Math.floor(h / 24) });
+    },
+    // t is identity-stable by design (useT wraps it in useCallback([]));
+    // depending on lang forces recompute when the user switches language.
+    [lang]
+  );
 }
 
 export default function NotificationCenter() {
   const { t } = useT();
   const wired = useWiredMaterials();
+  const timeAgo = useTimeAgo();
   const [open, setOpen] = useState(false);
   const [, force] = useReducer((n: number) => n + 1, 0);
   const panelRef = useRef<HTMLElement>(null);
   // Wired teletype dismiss (§4): scan-collapse the entry, then archive it.
   const [closingIds, setClosingIds] = useState<ReadonlySet<number>>(new Set());
-  const dismissEntry = (id: number) => {
-    if (!wired || closingIds.has(id)) {
-      dismiss(id);
-      return;
-    }
-    setClosingIds((prev) => new Set(prev).add(id));
-    window.setTimeout(() => {
-      dismiss(id);
-      setClosingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }, 200);
-  };
+  // Track pending dismiss timers for cleanup on unmount.
+  const dismissTimers = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      for (const id of dismissTimers.current) window.clearTimeout(id);
+      dismissTimers.current = [];
+    };
+  }, []);
+
+  const dismissEntry = useCallback(
+    (id: number) => {
+      if (!wired || closingIds.has(id)) {
+        dismiss(id);
+        return;
+      }
+      setClosingIds((prev) => new Set(prev).add(id));
+      const timer = window.setTimeout(() => {
+        dismiss(id);
+        setClosingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        dismissTimers.current = dismissTimers.current.filter((t) => t !== timer);
+      }, 200);
+      dismissTimers.current.push(timer);
+    },
+    [wired, closingIds]
+  );
 
   useEffect(() => onNotificationsChanged(force), []);
 
@@ -102,16 +126,21 @@ export default function NotificationCenter() {
             onClick={clearAll}
             disabled={items.length === 0}
           >
-            Clear all
+            {t('notifications.clearAll')}
           </button>
         </header>
-        <div className="os-flyout-body">
+        <div className="os-flyout-body" role="log" aria-label={t('notifications.listLabel')}>
           {items.length === 0 ? (
             <div className="os-notif-empty type-body">{wired ? 'BULLETIN CHANNEL EMPTY / NO DISPATCHES' : t('notifications.empty')}</div>
           ) : (
             items.map((n) => (
               <div key={n.id} className={closingIds.has(n.id) ? 'wired-notif-closing' : undefined}>
-              <Notification title={n.title} kind={uiKind(n.kind)} onClose={() => dismissEntry(n.id)}>
+              <Notification
+                title={n.title}
+                kind={uiKind(n.kind)}
+                dismissLabel={t('notifications.dismiss')}
+                onClose={() => dismissEntry(n.id)}
+              >
                 {wired && (
                   <div className="wired-notif-meta">
                     <span>{`TX-${String(n.id % 10000).padStart(4, '0')}`}</span>

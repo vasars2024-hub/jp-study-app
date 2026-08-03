@@ -6,8 +6,24 @@ import { Readable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import type { MediaItem, MediaOpen, SubtitlePick, YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
+import type { MediaBackupContract, MediaOrganizationPreview, MediaRelationship, MediaDuplicateChoice } from '../shared/mediaHub';
+import { previewMediaOrganization } from '../shared/mediaHub';
+import { inferMediaCategory, parseMediaFileName } from '../shared/mediaFileIdentity';
 import { classifyMediaKind } from '../shared/mediaKind';
+import { clearMediaArtwork, ensureMediaArtwork } from './mediaArtwork';
+import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
+import { registerMediaDiscoveryIpc } from './mediaDiscovery';
+import { registerTranscriptionIpc } from './transcriptionJobs';
+import {
+  clearSubtitleCache,
+  loadDiscoverySettings,
+  pickPlaybackSubtitle,
+  readSubtitleRecord,
+  registerSubtitleDiscoveryIpc,
+  runSubtitleDiscovery,
+} from './subtitleDiscovery';
 import { mt } from './i18n';
+import type { ExternalPlayerProfile, PlaybackHandoff } from '../shared/externalPlayer';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -26,6 +42,9 @@ const MEDIA_MIME: Record<string, string> = {
   '.flv': 'video/x-flv', '.wmv': 'video/x-ms-wmv',
   '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac',
   '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.opus': 'audio/ogg',
+  // Generated poster/still art is served over the same token protocol, so the
+  // renderer gets library artwork without ever learning a disk path.
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
 };
 
 function focusedWindow(): BrowserWindow | undefined {
@@ -50,6 +69,7 @@ function pathForUrl(url: string): string | undefined {
 interface MediaDb {
   items: MediaItem[];
   watchFolder?: string;
+  relationships?: MediaRelationship[];
 }
 function dbPath(): string {
   return path.join(app.getPath('userData'), 'media.json');
@@ -57,9 +77,9 @@ function dbPath(): string {
 function readDb(): MediaDb {
   try {
     const db = JSON.parse(fs.readFileSync(dbPath(), 'utf-8')) as MediaDb;
-    return { items: Array.isArray(db.items) ? db.items : [], watchFolder: db.watchFolder };
+    return { items: Array.isArray(db.items) ? db.items : [], watchFolder: db.watchFolder, relationships: Array.isArray(db.relationships) ? db.relationships : [] };
   } catch {
-    return { items: [] };
+    return { items: [], relationships: [] };
   }
 }
 function writeDb(db: MediaDb): void {
@@ -78,6 +98,48 @@ function cleanTitle(file: string): string {
   );
   t = t.replace(/\s+/g, ' ').trim();
   return t || path.basename(file);
+}
+
+/**
+ * Read the release identity out of the file name and stamp it onto the item, so
+ * the library can group a folder into one series without re-parsing every render.
+ *
+ * `title` deliberately keeps `cleanTitle`'s per-file result: the parsed title has
+ * the season/episode markers stripped, which is exactly right for grouping and
+ * exactly wrong for a card label — every episode of a run would read "The Big O".
+ * The parsed title becomes `seriesTitle` instead.
+ *
+ * Returns true when anything changed, so callers can decide whether to persist.
+ */
+function applyReleaseIdentity(item: MediaItem, fileName: string): boolean {
+  const parsed = parseMediaFileName(fileName);
+  let changed = false;
+
+  // Never unsets a field: a name the parser cannot read should leave whatever a
+  // provider or the user already put there alone.
+  const set = <K extends keyof MediaItem>(key: K, value: MediaItem[K] | undefined): void => {
+    if (value === undefined || item[key] === value) return;
+    item[key] = value;
+    changed = true;
+  };
+
+  set('seriesKey', parsed.titleKey || undefined);
+  set('seriesTitle', parsed.title || undefined);
+  // The release-aware classifier, not the keyword one. `mediaCategory` alone
+  // cannot see that "The Big O - 07 [BDRip].mkv" is an episode, so a whole
+  // fansub folder lands in `inbox` — where nothing groups into a series and the
+  // library renders 26 identical cards instead of one title. It respects an
+  // explicit user/metadata category, so this never overrides a manual choice.
+  set('category', inferMediaCategory(item, parsed));
+  set('season', parsed.season ?? undefined);
+  set('episode', parsed.episode ?? undefined);
+  set('episodeKind', parsed.kind);
+  set('releaseGroup', parsed.releaseGroup ?? undefined);
+  set('resolution', parsed.resolution ?? undefined);
+  // A year supplied by a metadata provider outranks one guessed from a file name.
+  if (item.year === undefined) set('year', parsed.year ?? undefined);
+
+  return changed;
 }
 
 function addOrGetItem(
@@ -102,6 +164,7 @@ function addOrGetItem(
       sourceUrl: extra?.sourceUrl,
       youtubeId: extra?.youtubeId,
     };
+    applyReleaseIdentity(item, fileName);
     db.items.unshift(item);
   } else {
     if (!item.kind) item.kind = classifyMediaKind(item.fileName, item.durationSec);
@@ -112,6 +175,7 @@ function addOrGetItem(
       item.fileName = path.basename(absPath);
       item.title = cleanTitle(absPath);
     }
+    if (item.seriesKey === undefined) applyReleaseIdentity(item, item.fileName);
   }
   if (touch) item.lastPlayedAt = Date.now();
   writeDb(db);
@@ -167,11 +231,17 @@ export async function downloadYoutubeUrl(
     ? ['-f', 'ba[ext=m4a]/ba/b', '-x', '--audio-format', 'm4a']
     : ['-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b', '--merge-output-format', 'mp4'];
   const subtitleLangs = opts.audioOnly ? [] : resolveYtDlpSubtitleLangs(opts);
-  const subtitleArgs =
-    subtitleLangs.length > 0
-      ? ['--write-subs', '--sub-langs', subtitleLangs.join(','), '--sub-format', 'vtt/srt/ass/best']
-      : [];
-  const args = [
+  // allSubs wins over the per-language list: take every track, including ASR
+  // captions, so a video with no creator subs still yields usable text.
+  // --sub-format stays a preference list, so "all" never fails on odd formats.
+  const subtitleArgs = opts.audioOnly
+    ? []
+    : opts.allSubs
+      ? ['--write-subs', '--write-auto-subs', '--sub-langs', 'all', '--sub-format', 'vtt/srt/ass/best']
+      : subtitleLangs.length > 0
+        ? ['--write-subs', '--sub-langs', subtitleLangs.join(','), '--sub-format', 'vtt/srt/ass/best']
+        : [];
+  const args = await withYtDlpJsRuntime([
     trimmed,
     ...format,
     ...subtitleArgs,
@@ -187,7 +257,7 @@ export async function downloadYoutubeUrl(
     '--print-to-file',
     'after_move:filepath',
     pathFile,
-  ];
+  ]);
   return new Promise((resolve) => {
     const proc = spawn(bin, args);
     let err = '';
@@ -238,8 +308,9 @@ export async function ytDlpJson(args: string[]): Promise<{ ok: true; data: unkno
   if (!bin) {
     return { ok: false, error: 'yt-dlp was not found on your PATH.' };
   }
+  const fullArgs = await withYtDlpJsRuntime(args);
   return new Promise((resolve) => {
-    const proc = spawn(bin, args);
+    const proc = spawn(bin, fullArgs);
     let out = '';
     let err = '';
     proc.stdout.on('data', (d: Buffer) => (out += d.toString()));
@@ -306,7 +377,7 @@ function pruneOrphanCache(): void {
 }
 
 function wipeCacheDirs(): void {
-  for (const sub of ['covers', 'media-cache', 'youtube']) {
+  for (const sub of ['covers', 'artwork', 'subtitles', 'media-cache', 'youtube']) {
     try {
       fs.rmSync(userDataSubdir(sub), { recursive: true, force: true });
     } catch {
@@ -403,28 +474,96 @@ async function extractCoverArt(id: string, file: string): Promise<string | null>
 }
 
 /** Remux/transcode any video into a browser-playable MP4 (cached by source path). */
-function convertToMp4(file: string): Promise<string> {
+async function convertToMp4(file: string): Promise<string> {
   const cacheDir = path.join(app.getPath('userData'), 'media-cache');
   fs.mkdirSync(cacheDir, { recursive: true });
   const out = path.join(cacheDir, crypto.createHash('md5').update(file).digest('hex') + '.mp4');
   if (fs.existsSync(out) && fs.statSync(out).size > 0) return Promise.resolve(out);
 
+  // Validate the source before invoking FFmpeg so we surface a clear error for
+  // empty or missing files instead of a cryptic EBML header failure.
+  if (!fs.existsSync(file)) throw new Error('Media file not found.');
+  const stat = fs.statSync(file);
+  if (!stat.isFile()) throw new Error('Media path is not a file.');
+  if (stat.size === 0) throw new Error('Media file is empty.');
+
+  // Resolve symlinks and use forward slashes for the FFmpeg input path; this
+  // avoids backslash-quoting edge cases on Windows with spaces/brackets.
+  const resolved = fs.realpathSync(file).replace(/\\/g, '/');
+  const output = out.replace(/\\/g, '/');
+
+  const recoverableCopyErrors = [
+    'codec not currently supported in container',
+    'could not write header',
+    'could not find tag',
+    'invalid argument',
+    'unsupported codec',
+    'unknown encoder',
+    'incompatible with output codec',
+  ];
+
+  const isRecoverable = (err: string): boolean => {
+    const lower = err.toLowerCase();
+    return recoverableCopyErrors.some((phrase) => lower.includes(phrase));
+  };
+
+  const unreadableInputErrors = [
+    'invalid data found when processing input',
+    'ebml header parsing failed',
+    'no such file or directory',
+    'permission denied',
+  ];
+
+  const formatFfmpegError = (err: string): string => {
+    const lower = err.toLowerCase();
+    if (unreadableInputErrors.some((phrase) => lower.includes(phrase))) {
+      return `The media file could not be read (it may be corrupted, incomplete, or inaccessible). Original error: ${err.trim()}`;
+    }
+    return err.trim();
+  };
+
   const run = (videoArgs: string[]): Promise<void> =>
     new Promise((resolve, reject) => {
-      const args = ['-i', file, ...videoArgs, '-c:a', 'aac', '-movflags', '+faststart', '-y',
-        '-hide_banner', '-loglevel', 'error', out];
-      const proc = spawn(ffmpegPath, args);
+      const args = ['-err_detect', 'ignore_err', '-fflags', '+genpts', '-i', resolved,
+        ...videoArgs, '-c:a', 'aac', '-movflags', '+faststart', '-y',
+        '-hide_banner', '-loglevel', 'error', output];
+      const proc = spawn(ffmpegPath, args, { shell: false });
       let err = '';
       proc.stderr.on('data', (d: Buffer) => (err += d.toString()));
       proc.on('error', reject);
       proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error(err.trim() || `ffmpeg exited ${code}`))));
     });
 
-  // Try a fast stream-copy of the video first (works for H.264/H.265); if the
-  // codec isn't MP4-compatible, fall back to a (slower) re-encode.
-  return run(['-c:v', 'copy'])
-    .catch(() => run(['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23']))
-    .then(() => out);
+  // Try a fast stream-copy of the video first; if the container/codec doesn't
+  // allow copying, fall back to a slower re-encode. For non-codec failures
+  // (corrupt/empty input, permission errors, etc.) preserve the original error
+  // and avoid a misleading second attempt.
+  let firstError: Error | undefined;
+  try {
+    await run(['-c:v', 'copy']);
+  } catch (e) {
+    firstError = e instanceof Error ? e : new Error(String(e));
+    if (!isRecoverable(firstError.message)) {
+      cleanupPartialOutput(out);
+      throw new Error(formatFfmpegError(firstError.message));
+    }
+    try {
+      await run(['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23']);
+    } catch (e) {
+      cleanupPartialOutput(out);
+      throw new Error(formatFfmpegError(firstError.message));
+    }
+  }
+
+  return out;
+}
+
+function cleanupPartialOutput(out: string): void {
+  try {
+    if (fs.existsSync(out)) fs.unlinkSync(out);
+  } catch {
+    /* ignore cleanup failures */
+  }
 }
 
 // ----- Remote media download (yt-dlp — YouTube, Vimeo, and 1000+ sites) -----
@@ -438,11 +577,11 @@ function isRemoteMediaLink(url: string): boolean {
   }
 }
 
-/** Locate the user's yt-dlp on PATH (they install it themselves). */
-function findYtDlp(): Promise<string | null> {
+/** Locate an executable on PATH (first hit). */
+function findOnPath(name: string): Promise<string | null> {
   return new Promise((resolve) => {
     const finder = process.platform === 'win32' ? 'where' : 'which';
-    const w = spawn(finder, ['yt-dlp']);
+    const w = spawn(finder, [name]);
     let out = '';
     w.stdout.on('data', (d: Buffer) => (out += d.toString()));
     w.on('error', () => resolve(null));
@@ -451,6 +590,39 @@ function findYtDlp(): Promise<string | null> {
       resolve(code === 0 && first ? first : null);
     });
   });
+}
+
+/** Locate the user's yt-dlp on PATH (they install it themselves). */
+function findYtDlp(): Promise<string | null> {
+  return findOnPath('yt-dlp');
+}
+
+/**
+ * YouTube extraction needs a JS runtime + EJS challenge solver. Prefer Deno
+ * (yt-dlp's recommended runtime), fall back to Node. Cached after first resolve.
+ * See https://github.com/yt-dlp/yt-dlp/wiki/EJS
+ */
+let ytDlpJsRuntimeArgsPromise: Promise<string[]> | null = null;
+
+function resolveYtDlpJsRuntimeArgs(): Promise<string[]> {
+  if (!ytDlpJsRuntimeArgsPromise) {
+    ytDlpJsRuntimeArgsPromise = (async () => {
+      // Prefer Deno (yt-dlp's recommended runtime). Do not use process.execPath —
+      // in Electron that is the app binary, not a usable Node runtime for EJS.
+      const deno = await findOnPath('deno');
+      const node = deno ? null : await findOnPath('node');
+      const runtime = deno ? `deno:${deno}` : node ? `node:${node}` : null;
+      if (!runtime) return [];
+      return ['--js-runtimes', runtime, '--remote-components', 'ejs:github'];
+    })();
+  }
+  return ytDlpJsRuntimeArgsPromise;
+}
+
+/** Prepend JS-runtime flags so every yt-dlp spawn can solve YouTube challenges. */
+export async function withYtDlpJsRuntime(args: string[]): Promise<string[]> {
+  const runtimeArgs = await resolveYtDlpJsRuntimeArgs();
+  return runtimeArgs.length ? [...runtimeArgs, ...args] : args;
 }
 
 const OFFICIAL_SUB_LANGS = new Set(['ja', 'zh', 'en', 'ru']);
@@ -470,6 +642,7 @@ function normalizeYoutubeDownloadOptions(audioOnly?: boolean, raw?: YouTubeDownl
     audioOnly: Boolean(raw?.audioOnly ?? audioOnly),
     subtitleLang,
     subtitleLangs: subtitleLangs?.length ? subtitleLangs : undefined,
+    allSubs: raw?.allSubs === true,
   };
 }
 
@@ -500,6 +673,64 @@ function resolveYtDlpSubtitleLangs(opts: YouTubeDownloadOptions): string[] {
     return [...new Set(out)];
   }
   return ytDlpSubtitleLangs(opts.subtitleLang);
+}
+
+/**
+ * Rank subtitle filenames for a wanted language tag. Lower sorts first.
+ * Exact match beats a regional variant (ja-JP), which beats Japanese, then
+ * English, then anything. Auto-generated tracks lose to creator tracks.
+ */
+function subtitleRank(name: string, wanted: string): number {
+  const lower = name.toLowerCase();
+  const tag = lower.slice(0, lower.lastIndexOf('.'));
+  const auto = /(^|[.-])a\.[a-z-]+$|orig|auto/.test(tag) ? 100 : 0;
+  const has = (prefix: string): boolean =>
+    new RegExp(`(^|\\.)${prefix}(\\.|-|$)`).test(tag);
+  if (has(wanted)) return auto + 0;
+  if (wanted !== 'ja' && has('ja')) return auto + 2;
+  if (has('en')) return auto + 3;
+  return auto + 9;
+}
+
+function readSubtitleFile(dir: string, name: string): SubtitlePick | undefined {
+  try {
+    return { name, text: fs.readFileSync(path.join(dir, name), 'utf8') };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Best subtitle sitting in a directory (yt-dlp's `<id>.<lang>.vtt` output). */
+function pickSubtitleFromDir(dir: string, wanted: string): SubtitlePick | undefined {
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  const subs = entries
+    .filter((name) => SUBTITLE_EXT.includes(path.extname(name).slice(1).toLowerCase()))
+    .sort((a, b) => subtitleRank(a, wanted) - subtitleRank(b, wanted) || a.localeCompare(b));
+  return subs[0] ? readSubtitleFile(dir, subs[0]) : undefined;
+}
+
+/** Best subtitle written next to a downloaded media file (same stem). */
+function pickSubtitleBeside(mediaFile: string, wanted: string): SubtitlePick | undefined {
+  const dir = path.dirname(mediaFile);
+  const stem = path.basename(mediaFile, path.extname(mediaFile));
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  const subs = entries
+    .filter((name) => {
+      if (!SUBTITLE_EXT.includes(path.extname(name).slice(1).toLowerCase())) return false;
+      return name.startsWith(`${stem}.`);
+    })
+    .sort((a, b) => subtitleRank(a, wanted) - subtitleRank(b, wanted) || a.localeCompare(b));
+  return subs[0] ? readSubtitleFile(dir, subs[0]) : undefined;
 }
 
 function findDownloadedSubtitle(mediaFile: string, lang: YouTubeSubtitleLang | undefined): SubtitlePick | undefined {
@@ -536,10 +767,7 @@ function findDownloadedSubtitle(mediaFile: string, lang: YouTubeSubtitleLang | u
 let watcher: fs.FSWatcher | undefined;
 let watchTimer: NodeJS.Timeout | undefined;
 
-function scanWatchFolder(): MediaItem[] {
-  const db = readDb();
-  if (!db.watchFolder || !fs.existsSync(db.watchFolder)) return db.items;
-  const known = new Set(db.items.map((i) => i.path));
+function collectMediaFilesInDir(root: string, maxDepth = 4): string[] {
   const found: string[] = [];
   const walk = (dir: string, depth: number): void => {
     let entries: fs.Dirent[];
@@ -551,15 +779,23 @@ function scanWatchFolder(): MediaItem[] {
     for (const e of entries) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
-        if (depth < 4) walk(full, depth + 1);
-      } else if (MEDIA_EXT.has(path.extname(e.name).toLowerCase()) && !known.has(full)) {
+        if (depth < maxDepth) walk(full, depth + 1);
+      } else if (MEDIA_EXT.has(path.extname(e.name).toLowerCase())) {
         found.push(full);
       }
     }
   };
-  walk(db.watchFolder, 0);
-  if (found.length === 0) return db.items;
+  walk(root, 0);
   found.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return found;
+}
+
+function scanWatchFolder(): MediaItem[] {
+  const db = readDb();
+  if (!db.watchFolder || !fs.existsSync(db.watchFolder)) return db.items;
+  const known = new Set(db.items.map((i) => i.path));
+  const found = collectMediaFilesInDir(db.watchFolder).filter((full) => !known.has(full));
+  if (found.length === 0) return db.items;
   for (const f of found) {
     db.items.push({
       id: crypto.randomUUID(),
@@ -567,6 +803,7 @@ function scanWatchFolder(): MediaItem[] {
       path: f,
       fileName: path.basename(f),
       addedAt: Date.now(),
+      kind: classifyMediaKind(path.basename(f)),
     });
   }
   writeDb(db);
@@ -597,7 +834,102 @@ function stopWatching(): void {
 
 // ----- IPC -----
 
+/**
+ * Applies one patch to many items in a single read/write, then broadcasts once.
+ *
+ * The metadata sweep stamps a whole series at a time, and `media.json` is
+ * rewritten in full on every save — patching 26 files individually would be 26
+ * full-file writes and 26 renderer re-renders for one logical change.
+ */
+/** Debounce so importing a 26-file folder schedules one sweep, not twenty-six. */
+let metadataSweepTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Look up metadata for anything newly imported, in the background.
+ *
+ * Deliberately fire-and-forget: the sweep is rate-limited by the providers and can
+ * take a while over a large folder, and the import call must not block on it. The
+ * job's own `sweeping` guard collapses overlapping triggers, and it broadcasts
+ * progress, so the library fills in while the user carries on.
+ */
+function scheduleMetadataSweep(): void {
+  if (metadataSweepTimer) clearTimeout(metadataSweepTimer);
+  metadataSweepTimer = setTimeout(() => {
+    metadataSweepTimer = null;
+    void runMediaMetadata({})
+      // Subtitles run *after* metadata, not in parallel: Jimaku matches on the
+      // AniList id the metadata pass stores, so searching first would throw away
+      // the one signal that makes its hits exact.
+      .catch(() => undefined)
+      .then(() => {
+        if (loadDiscoverySettings().autoDiscover) return runSubtitleDiscovery({});
+        return undefined;
+      })
+      .catch(() => {
+        // Reported through the progress channels; a failed sweep must never take
+        // the import down with it.
+      });
+  }, 1_200);
+}
+
+function patchEachItem(entries: ReadonlyArray<readonly [string, Partial<MediaItem>]>): void {
+  if (entries.length === 0) return;
+  const byId = new Map(entries);
+  const db = readDb();
+  let touched = false;
+  for (const item of db.items) {
+    const patch = byId.get(item.id);
+    if (!patch) continue;
+    Object.assign(item, patch);
+    touched = true;
+  }
+  if (!touched) return;
+  writeDb(db);
+  broadcastMedia();
+}
+
+function patchItems(ids: readonly string[], patch: Partial<MediaItem>): void {
+  if (ids.length === 0) return;
+  const wanted = new Set(ids);
+  const db = readDb();
+  let touched = false;
+  for (const item of db.items) {
+    if (!wanted.has(item.id)) continue;
+    Object.assign(item, patch);
+    touched = true;
+  }
+  if (!touched) return;
+  writeDb(db);
+  broadcastMedia();
+}
+
 export function registerMediaIpc(): void {
+  // The metadata job needs to read and stamp library items but must not own the
+  // JSON store, so it is handed exactly those two operations.
+  registerMediaMetadataIpc({
+    listItems: () => readDb().items,
+    patchItems,
+    patchEachItem,
+  });
+  registerSubtitleDiscoveryIpc({
+    listItems: () => readDb().items,
+    patchItems,
+  });
+  registerTranscriptionIpc({
+    listItems: () => readDb().items,
+    patchItems,
+  });
+  // Discovery reads the same two provider APIs but touches nothing in the
+  // library, so it gets no host at all — it can only search and browse.
+  registerMediaDiscoveryIpc();
+
+  ipcMain.handle('media:handoff', async (_e, handoff: PlaybackHandoff, profile: ExternalPlayerProfile): Promise<string | null> => {
+    if (!handoff || !profile || !path.isAbsolute(handoff.mediaPath) || !fs.existsSync(handoff.mediaPath) || !path.isAbsolute(profile.executablePath)) return 'Media and player paths must be existing absolute paths.';
+    const args = profile.arguments.map((arg) => arg.replaceAll('{media}', handoff.mediaPath).replaceAll('{subtitle}', handoff.subtitlePath ?? '').replaceAll('{title}', handoff.title));
+    const child = spawn(profile.executablePath, args, { detached: true, stdio: 'ignore', shell: false, windowsHide: true });
+    child.unref();
+    return null;
+  });
   // Stream a token's file, honouring HTTP Range so the <video> can seek.
   protocol.handle('playfile', (request) => {
     try {
@@ -649,10 +981,119 @@ export function registerMediaIpc(): void {
         item.kind = classifyMediaKind(item.fileName, item.durationSec);
         dirty = true;
       }
+      // Backfill release identity for libraries imported before it existed, so
+      // series grouping works without asking the user to re-import anything.
+      if (item.seriesKey === undefined && applyReleaseIdentity(item, item.fileName)) dirty = true;
     }
     if (dirty) writeDb(db);
     return db.items;
   });
+  ipcMain.handle('media:pathExists', (_e, filePath: string) =>
+    typeof filePath === 'string' && fs.existsSync(filePath),
+  );
+  ipcMain.handle('media:scanStorage', (_e, paths: string[]) => {
+    const files: Array<{ path: string; size: number; modifiedAt: number }> = [];
+    for (const value of Array.isArray(paths) ? paths : []) {
+      if (typeof value !== 'string') continue;
+      try { const s = fs.statSync(value); if (s.isFile()) files.push({ path: value, size: s.size, modifiedAt: s.mtimeMs }); } catch { /* inaccessible */ }
+    }
+    return { totalBytes: files.reduce((n, f) => n + f.size, 0), files };
+  });
+  ipcMain.handle('media:updateMetadata', (_e, id: string, metadata: Partial<Pick<MediaItem, 'title' | 'artist' | 'genres' | 'actors' | 'year' | 'lang' | 'category' | 'jlptLevel' | 'vocabularyCount' | 'kanjiCount' | 'metadataSource'>>) => {
+    const db = readDb(); const item = db.items.find((entry) => entry.id === id);
+    if (!item || !metadata || typeof metadata !== 'object') return null;
+    Object.assign(item, metadata); item.metadataUpdatedAt = Date.now(); writeDb(db); broadcastMedia(); return item;
+  });
+  ipcMain.handle('media:organizationPreview', (_e, id: string, root: string): MediaOrganizationPreview | null => {
+    const db = readDb(); const item = db.items.find((entry) => entry.id === id);
+    return item && typeof root === 'string' && path.isAbsolute(root) ? previewMediaOrganization(item, root, db.items) : null;
+  });
+  ipcMain.handle('media:organize', (_e, preview: MediaOrganizationPreview, choice: MediaDuplicateChoice = 'keep-existing') => {
+    if (!preview || !path.isAbsolute(preview.sourcePath) || !path.isAbsolute(preview.targetPath) || !fs.existsSync(preview.sourcePath)) return { ok: false, error: 'Invalid media organization preview.' };
+    if (preview.action === 'noop') return { ok: true };
+    if (preview.action === 'conflict' && choice !== 'keep-incoming' && choice !== 'keep-both') return { ok: false, error: 'A duplicate resolution choice is required.' };
+    let target = preview.targetPath;
+    if (choice === 'keep-both' && fs.existsSync(target)) { const ext = path.extname(target); target = `${target.slice(0, -ext.length)} (${Date.now()})${ext}`; }
+    try { fs.mkdirSync(path.dirname(target), { recursive: true }); fs.renameSync(preview.sourcePath, target); const db = readDb(); const item = db.items.find((entry) => entry.id === preview.itemId); if (item) { item.path = target; item.fileName = path.basename(target); item.title = path.basename(target, path.extname(target)); writeDb(db); broadcastMedia(); } return { ok: true, path: target }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Could not organize file.' }; }
+  });
+  ipcMain.handle('media:backup', (): MediaBackupContract => { const db = readDb(); return { schema: 1, createdAt: Date.now(), items: db.items, relationships: db.relationships ?? [] }; });
+  ipcMain.handle('media:relationships', (_e, fromId?: string) => readDb().relationships?.filter((r) => !fromId || r.fromId === fromId || r.toId === fromId) ?? []);
+  ipcMain.handle('media:addRelationship', (_e, relationship: Omit<MediaRelationship, 'id' | 'createdAt'>) => { const db = readDb(); const next: MediaRelationship = { ...relationship, id: crypto.randomUUID(), createdAt: Date.now() }; db.relationships = [...(db.relationships ?? []), next]; writeDb(db); return next; });
+
+  /**
+   * Library artwork as a `playfile://` URL — a poster for audio, a still for
+   * video. Returns null when the file has no usable image; that answer is cached
+   * on disk, so a null here is cheap to ask for again.
+   *
+   * A URL rather than a data URL on purpose: a few hundred base64 JPEGs crossing
+   * the bridge is both slow and permanently resident, while the token protocol
+   * streams them and lets Chromium cache them like any other image.
+   */
+  ipcMain.handle('media:artwork', async (_e, id: string, variant: 'poster' | 'banner' | 'still' = 'poster'): Promise<string | null> => {
+    const item = readDb().items.find((i) => i.id === id);
+    if (!item) return null;
+
+    // Provider art, when a metadata pass has fetched some. Stored as a
+    // userData-relative path, so the token is minted here rather than persisted.
+    const provided = variant === 'banner' ? item.bannerPath : variant === 'poster' ? item.posterPath : undefined;
+    if (provided) {
+      const file = path.join(app.getPath('userData'), provided);
+      if (fs.existsSync(file)) return `playfile://${tokenFor(file)}`;
+    }
+    // A banner has no local substitute — the caller falls back to the poster.
+    if (variant === 'banner') return null;
+
+    try {
+      const file = await ensureMediaArtwork({
+        id: item.id,
+        file: item.path,
+        kind: item.kind,
+        durationSec: item.durationSec,
+      });
+      return file ? `playfile://${tokenFor(file)}` : null;
+    } catch {
+      return null;
+    }
+  });
+
+  /**
+   * Per-item user state (favorite, study queue, note, collections). This lived in
+   * the renderer's `localStorage` and so was invisible to everything outside the
+   * one component that wrote it — the library rail counts, the Hub shelves and
+   * any other window all disagreed. Persisting it beside the item and
+   * broadcasting makes one source of truth out of it.
+   */
+  ipcMain.handle(
+    'media:setItemState',
+    (_e, id: string, patch: Partial<Pick<MediaItem, 'favorite' | 'studyQueue' | 'note' | 'collections'>>) => {
+      const db = readDb();
+      const item = db.items.find((entry) => entry.id === id);
+      if (!item || !patch || typeof patch !== 'object') return null;
+
+      if (typeof patch.favorite === 'boolean') item.favorite = patch.favorite;
+      if (typeof patch.studyQueue === 'boolean') item.studyQueue = patch.studyQueue;
+      if (typeof patch.note === 'string') {
+        const note = patch.note.slice(0, 4000);
+        if (note.trim()) item.note = note;
+        else delete item.note;
+      }
+      if (Array.isArray(patch.collections)) {
+        const names = [...new Set(
+          patch.collections
+            .filter((name): name is string => typeof name === 'string')
+            .map((name) => name.trim())
+            .filter(Boolean)
+            .map((name) => name.slice(0, 120)),
+        )].sort();
+        if (names.length) item.collections = names;
+        else delete item.collections;
+      }
+
+      writeDb(db);
+      broadcastMedia();
+      return item;
+    },
+  );
 
   ipcMain.handle('media:coverArt', async (_e, id: string): Promise<string | null> => {
     const item = readDb().items.find((i) => i.id === id);
@@ -667,17 +1108,47 @@ export function registerMediaIpc(): void {
   ipcMain.handle('media:pick', async (): Promise<MediaOpen | null> => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
       title: mt('dialog.openVideoAudio.title'),
-      properties: ['openFile'],
+      properties: ['openFile', 'multiSelections'],
       filters: [
         { name: mt('dialog.filter.videoAudio'), extensions: [...MEDIA_EXT].map((e) => e.slice(1)) },
         { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
       ],
     });
     if (res.canceled || !res.filePaths[0]) return null;
-    const item = addOrGetItem(res.filePaths[0]);
+    let first: MediaOpen | null = null;
+    for (const filePath of res.filePaths) {
+      if (!MEDIA_EXT.has(path.extname(filePath).toLowerCase())) continue;
+      const item = addOrGetItem(filePath, !first);
+      if (!first) first = { item, url: `playfile://${tokenFor(item.path)}` };
+    }
     broadcastMedia();
-    return { item, url: `playfile://${tokenFor(item.path)}` };
+    scheduleMetadataSweep();
+    return first;
   });
+
+  ipcMain.handle(
+    'media:addFolder',
+    async (e): Promise<{ items: MediaItem[]; added: number }> => {
+      const win = BrowserWindow.fromWebContents(e.sender) ?? focusedWindow();
+      const res = await dialog.showOpenDialog(win ?? undefined!, {
+        title: mt('dialog.addMediaFolder.title'),
+        properties: ['openDirectory'],
+      });
+      if (res.canceled || !res.filePaths[0]) return { items: readDb().items, added: 0 };
+      const root = res.filePaths[0];
+      const before = new Set(readDb().items.map((i) => i.path));
+      let added = 0;
+      for (const filePath of collectMediaFilesInDir(root)) {
+        addOrGetItem(filePath, false);
+        if (!before.has(filePath)) added += 1;
+      }
+      if (added > 0) {
+        broadcastMedia();
+        scheduleMetadataSweep();
+      }
+      return { items: readDb().items, added };
+    },
+  );
 
   // Resolve a saved absolute media path back to a playable URL (used by the
   // desktop's video wallpaper on startup).
@@ -742,7 +1213,10 @@ export function registerMediaIpc(): void {
         /* unreadable file — skip it */
       }
     }
-    if (added) broadcastMedia();
+    if (added) {
+      broadcastMedia();
+      scheduleMetadataSweep();
+    }
     return readDb().items;
   });
 
@@ -751,16 +1225,96 @@ export function registerMediaIpc(): void {
     const item = db.items.find((i) => i.id === id);
     if (!item || !fs.existsSync(item.path)) return null;
     item.lastPlayedAt = Date.now();
+    // Counted here because this handler is what actually opens a file for
+    // playback. Without it "sort by play count" was a menu entry over a number
+    // nothing ever incremented.
+    item.listenCount = (item.listenCount ?? 0) + 1;
     writeDb(db);
-    return { item, url: `playfile://${tokenFor(item.path)}` };
+
+    // Hand the player whatever subtitle discovery already found. Without this the
+    // whole discovery pipeline is write-only: tracks are downloaded, listed in the
+    // drawer, and never actually shown while watching.
+    let subtitle: SubtitlePick | undefined;
+    const record = pickPlaybackSubtitle(item.subtitles, loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja');
+    if (record) {
+      const text = readSubtitleRecord(record);
+      if (text) subtitle = { name: record.label ?? `${record.lang} (${record.source})`, text };
+    }
+    // Fall back to a file sitting beside the video, which is what this handler
+    // effectively did before discovery existed.
+    if (!subtitle) subtitle = pickSubtitleBeside(item.path, item.lang ?? 'ja');
+
+    return { item, url: `playfile://${tokenFor(item.path)}`, subtitle };
   });
+
+  /**
+   * "Load subtitles" for YouTube-sourced media: prefer a sidecar file already
+   * written next to the video (downloads now fetch every track), otherwise pull
+   * them straight from YouTube with yt-dlp. Returns the subtitle text so the
+   * renderer can parse it exactly like a picked file.
+   */
+  ipcMain.handle(
+    'media:fetchYoutubeSubs',
+    async (_e, id: string, preferLang?: string): Promise<{ ok: true; name: string; text: string } | { ok: false; error: string }> => {
+      const item = readDb().items.find((i) => i.id === id);
+      if (!item) return { ok: false, error: 'Media item not found.' };
+
+      const wanted = (preferLang || item.lang || 'ja').toLowerCase();
+
+      // 1. Sidecar files beside the downloaded video.
+      const local = pickSubtitleBeside(item.path, wanted);
+      if (local) return { ok: true, name: local.name, text: local.text };
+
+      // 2. Ask YouTube directly.
+      const url =
+        (item.sourceUrl && /youtu\.?be/i.test(item.sourceUrl) ? item.sourceUrl : '') ||
+        (item.youtubeId ? `https://www.youtube.com/watch?v=${item.youtubeId}` : '');
+      if (!url) return { ok: false, error: 'This item has no YouTube source to fetch subtitles from.' };
+
+      const bin = await findYtDlp();
+      if (!bin) return { ok: false, error: 'yt-dlp was not found on your PATH.' };
+
+      const outDir = path.join(userDataSubdir('subs-cache'), item.youtubeId || item.id);
+      fs.mkdirSync(outDir, { recursive: true });
+      const ytArgs = await withYtDlpJsRuntime([
+        url,
+        '--skip-download',
+        '--write-subs',
+        '--write-auto-subs',
+        '--sub-langs',
+        'all',
+        '--sub-format',
+        'vtt/srt/ass/best',
+        '--no-playlist',
+        '-o',
+        path.join(outDir, '%(id)s'),
+      ]);
+      const code = await new Promise<number>((resolve) => {
+        // 'all' plus auto-subs: creator tracks when they exist, ASR otherwise.
+        const proc = spawn(bin, ytArgs);
+        proc.on('error', () => resolve(-1));
+        proc.on('close', (c) => resolve(c ?? -1));
+      });
+
+      const picked = pickSubtitleFromDir(outDir, wanted);
+      if (picked) return { ok: true, name: picked.name, text: picked.text };
+      return {
+        ok: false,
+        error: code === 0 ? 'No subtitles are available for this video.' : 'Could not fetch subtitles from YouTube.',
+      };
+    },
+  );
 
   ipcMain.handle('media:remove', (_e, id: string) => {
     const db = readDb();
     const removed = db.items.find((i) => i.id === id);
     db.items = db.items.filter((i) => i.id !== id);
     writeDb(db);
-    if (removed) removeCoverFiles(new Set([removed.id]));
+    if (removed) {
+      removeCoverFiles(new Set([removed.id]));
+      clearMediaArtwork(new Set([removed.id]));
+      clearSubtitleCache(new Set([removed.id]));
+    }
     pruneOrphanCache();
     broadcastMedia();
     return db.items;

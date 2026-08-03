@@ -656,6 +656,111 @@ function broadcastLibrary(items: LibraryItem[]): void {
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send('library:changed', items);
 }
 
+export interface MangaPageBuffer {
+  bytes: Buffer;
+  contentType: string;
+}
+
+export interface ProviderMangaChapterImport {
+  title: string;
+  pages: MangaPageBuffer[];
+  source: NonNullable<LibraryItem['readingSource']>;
+}
+
+export interface ProviderMangaChapterImportResult {
+  item: LibraryItem;
+  alreadyPresent: boolean;
+}
+
+function imageExtensionForContentType(contentType: string): string {
+  const normalized = contentType.split(';')[0]?.trim().toLowerCase();
+  switch (normalized) {
+    case 'image/png': return '.png';
+    case 'image/webp': return '.webp';
+    case 'image/gif': return '.gif';
+    case 'image/bmp': return '.bmp';
+    case 'image/avif': return '.avif';
+    case 'image/jpeg':
+    case 'image/jpg':
+    default:
+      return '.jpg';
+  }
+}
+
+/**
+ * Commits a fully fetched provider chapter as one normal local manga item.
+ *
+ * The caller downloads every page before entering this function. Files are
+ * first written under a private staging directory and renamed only after all
+ * writes succeed, so a failed download never leaves a half-readable library
+ * item behind. Repeating the same provider/media/chapter request is idempotent.
+ */
+export function importProviderMangaChapter(
+  input: ProviderMangaChapterImport,
+): ProviderMangaChapterImportResult {
+  const items = readDb();
+  const existing = items.find((item) =>
+    item.readingSource?.kind === 'seanime-manga-chapter'
+    && item.readingSource.mediaId === input.source.mediaId
+    && item.readingSource.providerId === input.source.providerId
+    && item.readingSource.chapterId === input.source.chapterId);
+  if (existing) return { item: existing, alreadyPresent: true };
+  if (!input.pages.length) throw new Error('The provider chapter has no pages.');
+
+  ensureMangaFolder();
+  ensureLibrary();
+  const id = crypto.randomUUID();
+  const staging = path.join(libraryRoot(), `.provider-chapter-${id}.pending`);
+  const finalDir = itemDir(id);
+  const pagesDir = path.join(staging, 'pages');
+
+  try {
+    fs.mkdirSync(pagesDir, { recursive: true });
+    const names = input.pages.map((page, index) => {
+      if (!Buffer.isBuffer(page.bytes) || page.bytes.byteLength === 0) {
+        throw new Error(`Provider page ${index + 1} is empty.`);
+      }
+      const name = `${String(index + 1).padStart(4, '0')}${imageExtensionForContentType(page.contentType)}`;
+      fs.writeFileSync(path.join(pagesDir, name), page.bytes);
+      return name;
+    });
+
+    const coverName = pickCoverPage(pagesDir, names) || names[0];
+    let coverPath = `pages/${coverName}`;
+    if (coverName) {
+      const coverFile = `cover${path.extname(coverName) || '.jpg'}`;
+      fs.copyFileSync(path.join(pagesDir, coverName), path.join(staging, coverFile));
+      coverPath = coverFile;
+    }
+
+    fs.renameSync(staging, finalDir);
+    const item: LibraryItem = {
+      id,
+      title: input.title.trim().slice(0, 160) || 'Downloaded manga chapter',
+      kind: 'manga',
+      createdAt: Date.now(),
+      pageCount: names.length,
+      coverPath,
+      folder: MANGA_FOLDER,
+      readingSource: { ...input.source },
+    };
+    items.unshift(item);
+    writeDb(items);
+    broadcastLibrary(items);
+    return { item, alreadyPresent: false };
+  } catch (error) {
+    try {
+      if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true, force: true });
+      if (fs.existsSync(finalDir) && !items.some((item) => item.id === id)) {
+        fs.rmSync(finalDir, { recursive: true, force: true });
+      }
+    } catch {
+      // Preserve the original failure.
+    }
+    throw error;
+  }
+}
+
 function ensureInboxFolder(): void {
   const cfg = readConfig();
   const folders = cfg.folders ?? [];
@@ -1136,6 +1241,50 @@ export function registerLibraryIpc(): void {
     return items;
   });
 
+  /**
+   * Import an archive the caller already knows the path of.
+   *
+   * `library:importFiles` can only ever import what a human picked out of a
+   * file dialog, which is the wrong shape for anything that *finished on its
+   * own* — a completed download knows exactly where it landed and has nobody to
+   * ask. Same import, no dialog, and it answers with the item so the caller can
+   * open the reader on it rather than making the user go hunting.
+   *
+   * Refuses anything outside the archive types the picker itself offers, and
+   * anything that is not a real file, so a bad path fails here rather than
+   * halfway through unzipping.
+   */
+  ipcMain.handle('library:importArchivePath', async (_event, rawPath: unknown) => {
+    const filePath = String(rawPath ?? '').trim();
+    if (!filePath) return { ok: false, error: 'No path given.' };
+    const ext = path.extname(filePath).toLowerCase();
+    if (!ARCHIVE_EXT.has(ext)) {
+      return { ok: false, error: `${ext || 'That file'} is not a manga archive.` };
+    }
+    try {
+      if (!fs.statSync(filePath).isFile()) return { ok: false, error: 'Not a file.' };
+    } catch {
+      return { ok: false, error: 'That file no longer exists.' };
+    }
+
+    const items = readDb();
+    // Re-importing the same archive would duplicate the shelf entry and the
+    // extracted pages; handing back what is already there is what the caller
+    // actually wants, which is something to open.
+    const existing = items.find((item) => item.sourcePath === filePath);
+    if (existing) return { ok: true, item: existing, alreadyPresent: true };
+
+    try {
+      const item = importMangaArchive(filePath);
+      if (!item.pageCount) return { ok: false, error: 'That archive holds no images.' };
+      items.unshift(item);
+      writeDb(items);
+      return { ok: true, item, alreadyPresent: false };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   ipcMain.handle('library:importFolder', async () => {
     const res = await dialog.showOpenDialog(focusedWindow()!, {
       title: mt('dialog.importMangaFolder.title'),
@@ -1522,18 +1671,9 @@ export function registerLibraryIpc(): void {
     },
   );
 
-  ipcMain.handle(
-    'library:updateOcrMeta',
-    (
-      _e,
-      id: string,
-      patch: NonNullable<LibraryItem['ocrMeta']>,
-      opts?: { broadcast?: boolean },
-    ) => {
-      if (typeof id !== 'string' || !patch || typeof patch !== 'object') return readDb();
-      return updateLibraryOcrMeta(id, patch, opts);
-    },
-  );
+  // No `library:updateOcrMeta` channel: OCR metadata is only ever written from the
+  // main process itself (mangaOcr.ts calls `updateLibraryOcrMeta` directly), so the
+  // handler that used to sit here was never invoked from a renderer.
 
   // Import files dropped onto the app window (no dialog).
   ipcMain.handle('library:importPaths', (_e, paths: string[]) => {

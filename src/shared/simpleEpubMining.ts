@@ -2,7 +2,6 @@ import {
   DEFAULT_EPUB_EXPORT_OPTIONS,
   DEFAULT_EXCLUDE_NAMES,
   DEFAULT_MINING_LIMITS,
-  DEFAULT_TRADITIONAL_MINING_CONFIG,
   type TraditionalMiningConfig,
 } from './mining';
 

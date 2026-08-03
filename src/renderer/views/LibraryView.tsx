@@ -32,6 +32,7 @@ import {
   levelSortKey,
 } from '../../shared/libraryLevel';
 import { coverStyleFor } from '../utils/coverArt';
+import { takeHandoff } from '../pendingHandoff';
 
 interface Props {
   onOpen: (item: LibraryItem) => void;
@@ -161,15 +162,8 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
       setFolders(fs.includes(INBOX_FOLDER) ? fs : [...fs, INBOX_FOLDER]);
     });
     // Deep-link from Chrome extension settings / capture UI.
-    try {
-      const focus = sessionStorage.getItem('jp-library-focus-folder');
-      if (focus) {
-        sessionStorage.removeItem('jp-library-focus-folder');
-        setActive(focus);
-      }
-    } catch {
-      /* ignore */
-    }
+    const focus = takeHandoff('libraryFocusFolder');
+    if (focus) setActive(focus);
     // Live updates when files are dropped into the watch folder while open.
     const unsub = window.api.onLibraryChanged((list) => {
       void enrichInboxItems(list).then(setItems);
@@ -598,6 +592,14 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
         },
         { separator: true, label: '' },
         { id: 'new-folder', label: t('library.menu.newFolder'), onSelect: () => setCreating(true) },
+        {
+          id: 'delete-folder',
+          label: t('library.deleteFolder.title'),
+          disabled: typeof active !== 'string' || active === 'all' || active === 'unfiled' || active === INBOX_FOLDER,
+          onSelect: () => {
+            if (typeof active === 'string' && folders.includes(active)) void deleteFolder(active);
+          },
+        },
       ],
     },
     {
@@ -1025,10 +1027,35 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                   <Button variant="primary" leftIcon={<Icon name="novels" size={14} />} onClick={() => onOpen(selectedItem)}>
                     {t('library.open')}
                   </Button>
+                  {selectedItem.kind === 'manga' && (
+                    <Button
+                      leftIcon={<Icon name="image" size={14} />}
+                      onClick={(e) => void openCoverMenu(e, selectedItem.id)}
+                    >
+                      {t('library.card.setCoverTitle')}
+                    </Button>
+                  )}
                   <Button leftIcon={<Icon name="close" size={14} />} onClick={() => void removeItem(selectedItem.id)}>
                     {t('common.remove')}
                   </Button>
                 </div>
+                {coverMenu === selectedItem.id && (
+                  <div className="card-cover-menu aero-library-cover-menu" onClick={(e) => e.stopPropagation()}>
+                    {coverMenuPages.length === 0 ? (
+                      <div className="card-file-empty muted">{t('library.card.loadingPages')}</div>
+                    ) : (
+                      coverMenuPages.map((pageUrl) => (
+                        <button
+                          key={pageUrl}
+                          className="card-cover-thumb"
+                          onClick={(e) => void setCoverFromPage(e, selectedItem.id, pageUrl)}
+                        >
+                          <img src={pageUrl} alt="" draggable={false} />
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
                 {/* Only page-image items have anything to OCR; a normal EPUB already has text. */}
                 {canOcrToText(selectedItem) && <BookOcrPanel item={selectedItem} />}
               </>
@@ -1390,6 +1417,24 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                     </>
                   )}
                 </div>
+                {canOcrToText(it) && (
+                  <button
+                    type="button"
+                    className="btn small library-card-convert"
+                    aria-expanded={selectedId === it.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedId((current) => (current === it.id ? null : it.id));
+                    }}
+                  >
+                    {it.epubFile ? t('bookOcr.reconvert') : t('bookOcr.convert')}
+                  </button>
+                )}
+                {selectedId === it.id && canOcrToText(it) && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <BookOcrPanel item={it} />
+                  </div>
+                )}
               </div>
             );
                 })}

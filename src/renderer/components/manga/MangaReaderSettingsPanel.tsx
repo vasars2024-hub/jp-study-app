@@ -75,6 +75,7 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                   max={MAX_PAGE_WIDTH_MAX}
                   value={settings.maxPageWidthPct}
                   onChange={(e) => onChange({ maxPageWidthPct: Number(e.target.value) })}
+                  aria-label={t('manga.settings.maxPageWidth')}
                 />
               </div>
               <div className="manga-settings-row">
@@ -109,6 +110,7 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                   max={SPREAD_COUNT_MAX}
                   value={settings.spreadPageCount}
                   onChange={(e) => onChange({ spreadPageCount: Number(e.target.value) })}
+                  aria-label={t('manga.settings.spreadCount')}
                 />
               </div>
               <div className="manga-settings-row">
@@ -120,6 +122,7 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                   max={Math.max(0, settings.spreadPageCount - 1)}
                   value={settings.spreadPageOffset}
                   onChange={(e) => onChange({ spreadPageOffset: Number(e.target.value) })}
+                  aria-label={t('manga.settings.spreadOffset')}
                 />
               </div>
               <div className="manga-settings-row manga-settings-row-toggle">
@@ -169,6 +172,7 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                     const v = Number(e.target.value);
                     onChange({ preloadPages: v > PRELOAD_PAGES_MAX ? -1 : v });
                   }}
+                  aria-label={t('manga.settings.preloadPages')}
                 />
               </div>
               <div className="manga-settings-row">
@@ -181,6 +185,7 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                   step={5}
                   value={settings.preloadConcurrency}
                   onChange={(e) => onChange({ preloadConcurrency: Number(e.target.value) })}
+                  aria-label={t('manga.settings.preloadConcurrency')}
                 />
               </div>
               <div className="manga-settings-row">
@@ -193,6 +198,7 @@ export default function MangaReaderSettingsPanel({ settings, onChange, onClose }
                   step={5}
                   value={settings.scrollSpeedPx}
                   onChange={(e) => onChange({ scrollSpeedPx: Number(e.target.value) })}
+                  aria-label={t('manga.settings.scrollSpeed')}
                 />
               </div>
               <div className="manga-settings-row manga-settings-row-toggle">

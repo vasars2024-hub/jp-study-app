@@ -396,7 +396,7 @@ carry **no** hardcoded legacy-red — they inherit Phase 1's calm tokens. Outsta
 |---|---|---|---|
 | `.ui-toolbar` (all apps) | Flattened the grey chrome band: default/named themes get transparent bg + no shadow + single hairline separator (macOS toolbar). Guarded; Aero glass/Wired/Blanc keep theirs. | computed style: study-os transparent/no-shadow, Aero sheen+shadow return | 657bb95 |
 | Shell red leftovers | `.fwin-frameless.focused` (P2 missed the frameless variant) → neutral elevation; `.os-start-backdrop.drop-ready` → accent; `.btn.danger:hover` brand-red → `--danger`. Guarded. | computed style: study-os neutral/accent/danger, Aero red returns | 24599e2 |
-| Per-app content cards | `.cs-card .gram-card .gram-item .bundle-card .bundle-download-card .media-card .cbh-card .guide-item .pl-item` two-cue (border+fill) → single `--surface-2` cue. EXCLUDED (border legit): `.cal-month-cell` (grid), `.consent-card` (modal), `.flash-card` (study surface), `card-*-menu` (dropdowns). Guarded. | computed style: 6/6 sampled study-os border 0/surface-2, Aero baseline returns | (this commit) |
+| Per-app content cards | `.cs-card .gram-card .gram-item .bundle-card .bundle-download-card .media-card .cbh-card .guide-item .pl-item` two-cue (border+fill) → single `--surface-2` cue. EXCLUDED (border legit): `.cal-month-cell` (grid), `.consent-card` (modal), `.flash-card` (study surface), `card-*-menu` (dropdowns). Guarded. | computed style: 6/6 sampled study-os border 0/surface-2, Aero baseline returns | b12387c |
 
 **Every-app pass outcome:** all app-surface hardcoded legacy-red eliminated (Novels/Media/Music) and shell-red leftovers closed; the grey toolbar band flattened app-wide; the two-cue content cards collapsed to one cue. Apps with no such issues (Video, Manga, Games, Immersion, Library, Dictionary body, Calendar grid) already inherit Phase 1's calm tokens and were left unchanged rather than churned.
 
@@ -434,3 +434,71 @@ seen live on the core-shell Electron instance.
 ### Sign-off
 Marquee redesign integrated and the every-app legacy-red/toolbar/card cleanup complete. All gates at
 or above baseline; protected skins provably unchanged. Ready for user review on `ui/integration`.
+
+---
+
+## Post-integration pass — closing the shared-ownership integration requests
+
+`ui/integration` is fully merged into `grammarx/phase-1-5` (`0e82dc1`; `git log ui/integration ^HEAD`
+is empty). The A/B split no longer exists, so the three IRs that were blocked **purely** by master §15(1)
+— "the selector is not exclusively owned by the branch proposing the change" — are now in scope and are
+closed here. Same guarded idiom, no new system.
+
+| IR | Family | What changed | Commit |
+|---|---|---|---|
+| IR-2 | `.anki-card` | Fill + 1px border + `--shadow-card` = **three** containment cues where §8 allows one. Collapsed to the single raised-surface cue every other card family already uses (`border: 0`, `box-shadow: none`, `background: var(--surface-2)`). Padding/radius/margin untouched — the CSV toolbar card and the EPUB settings card must keep sharing height, padding and radius. | uncommitted (working tree) |
+| IR-8 | `.form-msg` | `.err` painted errors in the **brand** hue (`var(--accent)`) — the exact §8 defect Phase 3A fixed on `.status-dot.bad` but could not fix here. → `var(--status-error)`. `.ok`'s hardcoded `#5ad08a` → `var(--status-success)`. | uncommitted (working tree) |
+| IR-9 | `.res-card` | Two cues (`1px solid var(--border)` + `--panel` fill) **and** a brand-coloured `--accent-2` border on mere hover. → single `--surface-2` cue, borderless, with the neutral `--surface-3` hover wash `.ui-card--interactive` uses. Moves Reading Finder, Resources and BundleDetail together, which is why it had to be done from an integrated tree. | uncommitted (working tree) |
+
+### Verification
+
+Measured in a clean Chromium against the authoritative cascade from `main.tsx` (tokens → styles → materials →
+frutiger-aero → typography → ui → a11y → aero-apps → wired-apps → blanc), probe elements per family.
+
+| Family | study-os (refined) | Aero (must equal baseline) | Wired (must equal baseline) | Blanc (must equal baseline) |
+|---|---|---|---|---|
+| `.anki-card` | `rgb(39,36,51)` = `--surface-2`, border `0px none`, shadow `none` | `rgb(255,255,255)` + `1px rgba(135,190,216,.9)` + Aero inset sheen — **returns** | `rgba(2,18,27,.82)` + `1px rgba(109,241,255,.2)` + shadow — **returns** | `rgb(38,38,40)` + `1px rgba(255,255,255,.07)` — Blanc's own re-skin intact |
+| `.res-card` | `rgb(39,36,51)`, border `0px none` | `rgb(26,24,35)` = `--panel` + `1px rgb(45,43,55)` = `--border` — **returns** | same base baseline — **returns** | base baseline intact |
+| `.form-msg.ok` | `rgb(56,178,107)` = `--status-success` | `rgb(23,66,95)` (aero-apps.css:5170) — **returns** | `rgb(90,208,138)` = the old `#5ad08a` — **returns** | Blanc `--text` intact |
+| `.form-msg.err` | `rgb(209,52,56)` = `--status-error` | `rgb(23,66,95)` — **returns** | `rgb(255,46,77)` = brand red — **returns** | Blanc `--text` intact |
+
+Structural guard proof (the exhaustive method the Phase 2 checkpoint adopted): enumerating every loaded rule
+and testing `el.matches()` per probe, the count of **guard-carrying rules that match is 0** under
+`data-materials='aero'`, 0 under `'wired'`, and 0 for probes nested in `.blanc-root`. Leakage is structurally
+impossible, not merely unobserved. State restored (`data-materials` back to null, probes removed).
+
+**Method warning — a real measurement trap, logged so the next session doesn't lose an hour to it.**
+Reading `getComputedStyle()` in the **same JS task** as the `data-materials` attribute write returns
+*partially* stale values in this Chromium: `border-width` re-resolved to the skin baseline while
+`background` and `border-color` still reported the study-os values, producing an impossible mixture of two
+rules on one element and a convincing false "the guard leaks" reading. Forcing layout (`void offsetHeight`)
+does **not** fix it. Stamp the attribute in one `javascript_exec`, measure in the **next** one. This joins the
+Phase 2 note's list of skin-comparison artifacts; it is the same class of error and it invalidated four
+measurement rounds before it was caught by noticing `border-color: currentColor` (only obtainable from the
+`border: 0` reset) sitting next to `border-width: 1px` (only obtainable from the base rule).
+
+### Gates
+
+| Gate | Result | Verdict |
+|---|---|---|
+| i18n check | **clean, exit 0** — 4292 EN keys translated ja/zh/ru | pass |
+| Vitest | **2025/2026**; the one failure is `keyboardShortcuts` chord-conflict, from the tree's **pre-existing uncommitted** `src/renderer/keyboardShortcuts.ts` work | pass (not caused here — this pass is CSS-only) |
+| TypeScript | 365 total / 306 `src` | unaffected (CSS is not typechecked) |
+| ESLint | **2 errors / 166 warnings** repo-wide (both errors are the long-known root-level `vitest/config` resolution) | unaffected (CSS is not linted) |
+
+**Baseline-drift disclosure:** the numbers recorded in this file's coordination header (vitest 946/946, tsc
+1291/9, eslint 65/171) are **stale** relative to the current tree — TypeScript was unpinned 4.5→5.2
+(`a09d994`), the suite has grown to 2026 tests, and the working tree carries ~1,100 lines of unrelated
+uncommitted change. They are left as written because they are the historical record of what the UI phases were
+measured against; they should not be read as the current baseline.
+
+### Integration requests — remaining
+
+| IR | Status | Note |
+|---|---|---|
+| IR-1 | **closed** | `.ui-segmented` landed in `b7580ed`; `.gram-level-btn` aligned. Adoption at the call sites is still open as ordinary migration work, not a missing primitive. |
+| IR-2, IR-8, IR-9 | **closed** | This pass. |
+| IR-3, IR-4 | **closed** | The proposed strategy (default-theme-scoped refinement behind the Phase 1 guard, no component extraction, no export changes) is what Phases 3A/3B and this pass actually shipped, and it is now verified rendered against Blanc for `.anki-card` and `.form-msg` as well as by structure. |
+| IR-7 | **closed** | Superseded — with a single integrated branch there is no A/B contention for the debug bridge, and the isolated-renderer route (`.claude/launch.json` `renderer`, port 5174) works for probe-level verification without touching the app's ports. The §8 **narrow ~940×600** criterion was verified for the shell in Phase 2 (measured, real viewport); it remains unverified for the app screens. |
+| **IR-5** | **open — needs a decision** | Adopt the shared `Notification` primitive in place of bespoke `status-banner` / `form-msg`. Now unblocked technically (both families are semantically correct after 3A + IR-8), but it is a **structural** migration of live call sites, not a CSS repoint, and `form-msg` alone spans AnkiContent, AiCardStudio, ProfileSwitcher and views/SettingsView. Recommendation: worth doing, but as its own reviewable pass with its own before/after capture — not folded into a CSS commit. |
+| **IR-6 / IR-10** | **open — needs a decision** | Replace the bespoke `nov-modal` family with the shared `Dialog`. This is the last "second design system" left standing (master §6). It is genuinely harder than the others: `nov-modal*` is used by ReadingFinderContent **and** ProfileSwitcher **and** NovelsContent/NovelsView, and is overridden by protected `aero-apps.css`/`wired-apps.css` — so migrating it means either (a) moving all call sites at once and re-verifying Aero/Wired render the shared `Dialog` acceptably (the protected overrides would stop matching, which is the IR-3 failure mode in reverse), or (b) explicitly accepting two modal systems. `Dialog` also needs backdrop / close affordance / focus-trap / Esc parity confirmed before any swap. Recommendation: **(a)**, as a dedicated pass; do not attempt it as a side effect of anything else. |

@@ -37,6 +37,19 @@ const {
 const PAYLOAD = Buffer.from('MODEL-BYTES-'.repeat(5000)); // 60 KB
 const PAYLOAD_SHA = crypto.createHash('sha256').update(PAYLOAD).digest('hex');
 
+/**
+ * A payload big enough that the write stream MUST flush before an interruption.
+ *
+ * `PAYLOAD` is 60 KB and `fs.createWriteStream`'s buffer is 64 KB, so cutting a 60 KB transfer
+ * anywhere leaves ZERO bytes on disk — the whole body is still sitting in the buffer when the
+ * stream is destroyed. The first cut of the mid-transfer test used it and measured `keptBytes
+ * = 0`, which looks exactly like "resume is broken" and is really "the fixture is smaller than
+ * one buffer". At real model sizes the loss is bounded by that buffer and everything else has
+ * long since hit disk, so the fixture has to be big enough to reach the case that matters.
+ */
+const BIG_PAYLOAD = Buffer.from('BIG-MODEL-BYTES-'.repeat(100_000)); // 1.6 MB
+const BIG_PAYLOAD_SHA = crypto.createHash('sha256').update(BIG_PAYLOAD).digest('hex');
+
 const ZIP = (() => {
   const zip = new AdmZip();
   zip.addFile('model.onnx', Buffer.from('onnx-weights'));
@@ -51,6 +64,17 @@ let baseUrl = '';
 let ignoreRange = false;
 /** Serve a tiny HTML body instead of the model — mimics a captive portal. */
 let serveTinyHtml = false;
+/**
+ * Send this many bytes and then DESTROY the socket, mid-body, with the
+ * `Content-Length` already promising the full file — a dropped connection, not a
+ * short response. 0 disables it.
+ *
+ * The other resume tests hand-write a `.part` file and call it "a download that was
+ * interrupted". That covers the resume ARITHMETIC but never the interruption itself:
+ * no test has ever killed a transfer in flight, so nothing exercised what the writer
+ * leaves on disk when the body stops early.
+ */
+let truncateAfterBytes = 0;
 let requests: { range: string | undefined }[] = [];
 
 beforeAll(async () => {
@@ -60,7 +84,9 @@ beforeAll(async () => {
       ? Buffer.from('<html>login required</html>')
       : req.url?.startsWith('/archive')
         ? ZIP
-        : PAYLOAD;
+        : req.url?.startsWith('/big')
+          ? BIG_PAYLOAD
+          : PAYLOAD;
     const range = ignoreRange ? undefined : req.headers.range;
 
     if (range) {
@@ -72,6 +98,18 @@ beforeAll(async () => {
         ETag: '"v1"',
       });
       res.end(slice);
+      return;
+    }
+    if (truncateAfterBytes > 0) {
+      // Content-Length promises the whole file, then the socket dies part-way through.
+      res.writeHead(200, { 'Content-Length': String(body.length), ETag: '"v1"' });
+      // Destroying the socket in the same tick discards the write before it reaches the
+      // network — the client then sees a bare `fetch failed` with zero bytes, which looks
+      // like the app losing the partial and is really the fixture never sending one. Wait for
+      // the write callback AND give the TCP stack a beat, then cut it.
+      res.write(body.subarray(0, truncateAfterBytes), () => {
+        setTimeout(() => res.socket?.destroy(), 60);
+      });
       return;
     }
     res.writeHead(200, { 'Content-Length': String(body.length), ETag: '"v1"' });
@@ -90,6 +128,7 @@ beforeEach(async () => {
   userDataDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'jp-downloads-'));
   ignoreRange = false;
   serveTinyHtml = false;
+  truncateAfterBytes = 0;
   requests = [];
 });
 
@@ -243,6 +282,56 @@ describe('resume', () => {
     // running hash was correctly rebuilt from the bytes already on disk.
     expect(fs.readFileSync(assetPath('test-model') as string)).toEqual(PAYLOAD);
     expect(requests.at(-1)?.range).toBe('bytes=20000-');
+  });
+
+  it('survives a connection dropped MID-TRANSFER and resumes from what it kept', async () => {
+    // The interruption the other resume tests only SIMULATE. They hand-write a `.part` file,
+    // which exercises the resume arithmetic but never the interruption: nothing had ever killed
+    // a transfer in flight, so nothing exercised what the writer leaves on disk when the body
+    // stops early. Here the server promises the full Content-Length, writes 800 KB of a 1.6 MB
+    // body, then destroys the socket.
+    const spec = fileSpec({
+      url: `${baseUrl}/big.bin`,
+      sizeBytes: BIG_PAYLOAD.length,
+      sha256: BIG_PAYLOAD_SHA,
+    });
+    await boot(spec);
+
+    truncateAfterBytes = 800_000;
+    await startDownload('test-model');
+    await settle('test-model');
+
+    // It must NOT install: a truncated body cannot hash to the pinned digest, and installing it
+    // would put a permanently corrupt model on disk under a green checkmark.
+    expect(getAssetStatus('test-model')?.state).not.toBe('installed');
+
+    // The meta sidecar has to survive too, or the resume cannot know the partial came from
+    // this URL and version and will discard it.
+    expect(fs.existsSync(path.join(userDataDir, 'models', '.partial', 'test-model.meta.json')))
+      .toBe(true);
+
+    // The bytes that survived are what the resume has to be correct about. The write stream may
+    // hold back up to its buffer, so this asserts on the FILE rather than on 800,000 — but it
+    // must be a real amount, or the run below would be an ordinary fresh download wearing this
+    // test's name.
+    const keptBytes = fs.existsSync(partialPath('test-model'))
+      ? fs.statSync(partialPath('test-model')).size
+      : 0;
+    expect(keptBytes).toBeGreaterThan(100_000);
+    expect(keptBytes).toBeLessThan(BIG_PAYLOAD.length);
+
+    // Second run against a healthy server — what a user retrying gets.
+    truncateAfterBytes = 0;
+    requests = [];
+    await startDownload('test-model');
+    await settle('test-model');
+
+    expect(getAssetStatus('test-model')?.state).toBe('installed');
+    // It resumed from exactly what survived, rather than starting over.
+    expect(requests.at(-1)?.range).toBe(`bytes=${keptBytes}-`);
+    // And the reassembled file is byte-identical, so nothing was spliced or double-counted
+    // across the interruption — the running hash was rebuilt correctly from the partial.
+    expect(fs.readFileSync(assetPath('test-model') as string)).toEqual(BIG_PAYLOAD);
   });
 
   it('starts over when the server ignores the Range request', async () => {

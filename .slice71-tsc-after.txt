@@ -1,0 +1,406 @@
+src/main/__tests__/ankiIntervalsForNotes.test.ts(28,51): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/artworkFixture.test.ts(78,30): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/artworkFixture.test.ts(79,32): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/desktop.test.ts(13,28): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/downloads.test.ts(33,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/library.test.ts(64,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/library.test.ts(184,26): error TS2493: Tuple type '[]' of length '0' has no element at index '0'.
+src/main/__tests__/mangaOcr.test.ts(33,3): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/mangaOcrTranslateCache.test.ts(52,32): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperAntibot.test.ts(27,28): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperAntibot.test.ts(28,35): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperAntibot.test.ts(29,54): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperAntibot.test.ts(35,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperAntibot.test.ts(41,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperAntibot.test.ts(50,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperCatalogue.test.ts(75,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperEngine.test.ts(85,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperEnginePerformance.test.ts(46,42): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperEnginePerformance.test.ts(47,35): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperEngineSiteRule.test.ts(44,3): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperExtractionRules.test.ts(38,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperHistory.test.ts(16,3): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperHistory.test.ts(17,33): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperHttp.test.ts(11,65): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperHttp.test.ts(12,49): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperHttpCache.test.ts(25,28): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperHttpCache.test.ts(38,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperHttpCache.test.ts(39,54): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperImages.test.ts(25,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperImages.test.ts(26,44): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperLogBus.test.ts(25,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperLogBus.test.ts(26,53): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperMalUnits.test.ts(50,26): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperMetadataSettings.test.ts(73,61): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperMetadataSettings.test.ts(74,47): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperMetadataSettings.test.ts(75,49): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNetworkPolicy.test.ts(26,28): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNetworkPolicy.test.ts(27,35): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNetworkPolicy.test.ts(37,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNetworkPolicy.test.ts(38,54): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNotifications.test.ts(58,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNotifications.test.ts(64,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNotifications.test.ts(65,64): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNotifications.test.ts(66,33): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperNotifications.test.ts(68,3): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperOutputs.test.ts(39,52): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperOutputs.test.ts(40,59): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperOutputs.test.ts(41,52): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperOutputs.test.ts(42,33): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperQbittorrent.test.ts(36,3): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperQbittorrent.test.ts(38,3): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperQbittorrent.test.ts(39,33): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperScheduler.test.ts(46,19): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperScheduler.test.ts(47,51): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperScheduler.test.ts(48,38): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperScheduler.test.ts(49,48): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperSources.test.ts(18,3): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperSources.test.ts(19,50): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/scraperTorrents.test.ts(27,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/seasonWindow.test.ts(54,7): error TS2322: Type '{ season: "WINTER" | "SPRING" | "SUMMER" | "FALL"; year: number; }' is not assignable to type '{ season: "SUMMER"; year: number; }'.
+  Types of property 'season' are incompatible.
+    Type '"WINTER" | "SPRING" | "SUMMER" | "FALL"' is not assignable to type '"SUMMER"'.
+      Type '"WINTER"' is not assignable to type '"SUMMER"'.
+src/main/__tests__/translateGuards.test.ts(24,30): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/__tests__/youtubeDiscovery.test.ts(40,5): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/main/anki/apkgImport.ts(35,35): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/main/debugBridge.ts(336,71): error TS2322: Type 'string[]' is not assignable to type '("shift" | "meta" | "cmd" | "ctrl" | "left" | "right" | "control" | "alt" | "command" | "iskeypad" | "isautorepeat" | "leftbuttondown" | "middlebuttondown" | "rightbuttondown" | "capslock" | "numlock")[]'.
+  Type 'string' is not assignable to type '"shift" | "meta" | "cmd" | "ctrl" | "left" | "right" | "control" | "alt" | "command" | "iskeypad" | "isautorepeat" | "leftbuttondown" | "middlebuttondown" | "rightbuttondown" | "capslock" | "numlock"'.
+src/main/debugBridge.ts(337,69): error TS2322: Type 'string[]' is not assignable to type '("shift" | "meta" | "cmd" | "ctrl" | "left" | "right" | "control" | "alt" | "command" | "iskeypad" | "isautorepeat" | "leftbuttondown" | "middlebuttondown" | "rightbuttondown" | "capslock" | "numlock")[]'.
+src/main/desktop.ts(116,38): error TS2322: Type 'unknown' is not assignable to type 'number'.
+src/main/extensionInstall.ts(14,26): error TS2307: Cannot find module './chrome-extension/manifest.json?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(15,26): error TS2307: Cannot find module './chrome-extension/background.js?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(16,23): error TS2307: Cannot find module './chrome-extension/popup.html?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(17,21): error TS2307: Cannot find module './chrome-extension/popup.js?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(18,22): error TS2307: Cannot find module './chrome-extension/shared.js?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(19,23): error TS2307: Cannot find module './chrome-extension/content.js?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(20,24): error TS2307: Cannot find module './chrome-extension/content.css?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(21,25): error TS2307: Cannot find module './chrome-extension/options.html?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(22,23): error TS2307: Cannot find module './chrome-extension/options.js?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(23,24): error TS2307: Cannot find module './chrome-extension/settings.js?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(24,22): error TS2307: Cannot find module './chrome-extension/tabs.html?raw' or its corresponding type declarations.
+src/main/extensionInstall.ts(25,20): error TS2307: Cannot find module './chrome-extension/tabs.js?raw' or its corresponding type declarations.
+src/main/jiten.ts(372,34): error TS2345: Argument of type 'JitenDeck' is not assignable to parameter of type 'Partial<JitenPlanEntry & JitenDeck>'.
+  Types of property 'genres' are incompatible.
+    Type 'number[] | undefined' is not assignable to type '(string[] & number[]) | undefined'.
+      Type 'number[]' is not assignable to type 'string[] & number[]'.
+        Type 'number[]' is not assignable to type 'string[]'.
+          Type 'number' is not assignable to type 'string'.
+src/main/mangaOcr.ts(492,18): error TS2503: Cannot find namespace 'ort'.
+src/main/mangaOcr.ts(806,10): error TS2552: Cannot find name 'MokuroBlockKind'. Did you mean 'MokuroBlock'?
+src/main/mangaOcr.ts(1863,31): error TS18048: 'r.lines' is possibly 'undefined'.
+src/main/mining.ts(1803,29): error TS2345: Argument of type '(...args: T) => unknown' is not assignable to parameter of type '(event: IpcMainInvokeEvent, ...args: any[]) => any'.
+  Types of parameters 'args' and 'event' are incompatible.
+    Type '[event: IpcMainInvokeEvent, ...args: any[]]' is not assignable to type 'T'.
+      '[event: IpcMainInvokeEvent, ...args: any[]]' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint 'unknown[]'.
+src/main/paddleOcr.ts(135,71): error TS2322: Type 'InferenceSession | null' is not assignable to type 'InferenceSession | undefined'.
+  Type 'null' is not assignable to type 'InferenceSession | undefined'.
+src/main/pdfRasterize.ts(21,35): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/main/readabilityExtract.ts(9,31): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/main/readingFetch.ts(24,31): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/__tests__/aeroEnvironmentPersist.test.ts(113,25): error TS2322: Type '"sakura"' is not assignable to type 'ParticlePresetId'.
+src/renderer/__tests__/findingFeatureMigration.test.ts(28,82): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/renderer/__tests__/findingFeatureMigration.test.ts(31,88): error TS1378: Top-level 'await' expressions are only allowed when the 'module' option is set to 'es2022', 'esnext', 'system', 'node16', or 'nodenext', and the 'target' option is set to 'es2017' or higher.
+src/renderer/__tests__/grammarCuration.test.ts(25,5): error TS2783: 'id' is specified more than once, so this usage will be overwritten.
+src/renderer/__tests__/mediaProviderPanel.test.ts(25,123): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'ReactNode'.
+src/renderer/__tests__/sliderAccessibleName.test.ts(89,39): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+src/renderer/__tests__/unifiedSearchLocalLibrary.test.ts(20,5): error TS2322: Type '"reader"' is not assignable to type 'FlashcardSource'.
+src/renderer/__tests__/virtualGridAtScale.test.ts(74,10): error TS2704: The operand of a 'delete' operator cannot be a read-only property.
+src/renderer/__tests__/virtualGridAtScale.test.ts(75,10): error TS2704: The operand of a 'delete' operator cannot be a read-only property.
+src/renderer/App.tsx(294,28): error TS2339: Property 'audioDataUrl' does not exist on type '{ mode: "sentence" | "word"; term: string; sentence?: string | undefined; text: string; url?: string | undefined; title?: string | undefined; folder?: string | undefined; anki: { ok: boolean; noteId?: number | undefined; error?: string | undefined; }; }'.
+src/renderer/App.tsx(294,65): error TS2339: Property 'audioDataUrl' does not exist on type '{ mode: "sentence" | "word"; term: string; sentence?: string | undefined; text: string; url?: string | undefined; title?: string | undefined; folder?: string | undefined; anki: { ok: boolean; noteId?: number | undefined; error?: string | undefined; }; }'.
+src/renderer/App.tsx(295,25): error TS2339: Property 'audioDataUrl' does not exist on type '{ mode: "sentence" | "word"; term: string; sentence?: string | undefined; text: string; url?: string | undefined; title?: string | undefined; folder?: string | undefined; anki: { ok: boolean; noteId?: number | undefined; error?: string | undefined; }; }'.
+src/renderer/App.tsx(299,55): error TS2339: Property 'audioDataUrl' does not exist on type '{ mode: "sentence" | "word"; term: string; sentence?: string | undefined; text: string; url?: string | undefined; title?: string | undefined; folder?: string | undefined; anki: { ok: boolean; noteId?: number | undefined; error?: string | undefined; }; }'.
+src/renderer/audio/soundEngine.ts(300,11): error TS2367: This comparison appears to be unintentional because the types '"suspended"' and '"running"' have no overlap.
+src/renderer/components/anki/AnkiContent.tsx(196,39): error TS2741: Property 'modelName' is missing in type '{ deckName: string; }' but required in type 'AnkiBinding'.
+src/renderer/components/AppSection.tsx(46,13): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/blanc/BlancLibraryPanels.tsx(51,13): error TS2307: Cannot find module '../../theme/studyos-compat.css' or its corresponding type declarations.
+src/renderer/components/blanc/BlancMediaPanels.tsx(45,13): error TS2307: Cannot find module '../../theme/studyos-compat.css' or its corresponding type declarations.
+src/renderer/components/blanc/BlancMediaPanels.tsx(180,13): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/blanc/BlancReadyToolPanels.tsx(106,13): error TS2307: Cannot find module '../../theme/studyos-compat.css' or its corresponding type declarations.
+src/renderer/components/blanc/BlancShell.tsx(1082,71): error TS2345: Argument of type 'BlancToolId' is not assignable to parameter of type 'ToolboxModuleId'.
+  Type '"music"' is not assignable to type 'ToolboxModuleId'.
+src/renderer/components/blanc/BlancShell.tsx(1122,87): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/blanc/BlancShell.tsx(1171,61): error TS2345: Argument of type '() => ToolboxModuleId[] | BlancToolId[]' is not assignable to parameter of type 'BlancToolId[] | (() => BlancToolId[])'.
+  Type '() => ToolboxModuleId[] | BlancToolId[]' is not assignable to type '() => BlancToolId[]'.
+    Type 'ToolboxModuleId[] | BlancToolId[]' is not assignable to type 'BlancToolId[]'.
+      Type 'ToolboxModuleId[]' is not assignable to type 'BlancToolId[]'.
+        Type 'ToolboxModuleId' is not assignable to type 'BlancToolId'.
+          Type '"flashcards"' is not assignable to type 'BlancToolId'.
+src/renderer/components/blanc/BlancShell.tsx(1173,63): error TS2677: A type predicate's type must be assignable to its parameter's type.
+  Type 'BlancToolId' is not assignable to type 'ToolboxModuleId'.
+src/renderer/components/blanc/BlancShell.tsx(1261,18): error TS2345: Argument of type 'ToolboxModuleId[]' is not assignable to parameter of type 'SetStateAction<BlancToolId[]>'.
+  Type 'ToolboxModuleId[]' is not assignable to type 'BlancToolId[]'.
+src/renderer/components/blanc/BlancShell.tsx(1261,67): error TS2677: A type predicate's type must be assignable to its parameter's type.
+  Type 'BlancToolId' is not assignable to type 'ToolboxModuleId'.
+src/renderer/components/blanc/BlancShell.tsx(1306,27): error TS2322: Type 'BlancToolId[]' is not assignable to type 'ToolboxModuleId[]'.
+  Type 'BlancToolId' is not assignable to type 'ToolboxModuleId'.
+src/renderer/components/blanc/BlancShell.tsx(1306,70): error TS2677: A type predicate's type must be assignable to its parameter's type.
+  Type 'ToolboxModuleId' is not assignable to type 'BlancToolId'.
+src/renderer/components/blanc/BlancShell.tsx(1606,22): error TS2304: Cannot find name 't'.
+src/renderer/components/blanc/BlancShell.tsx(2595,59): error TS2677: A type predicate's type must be assignable to its parameter's type.
+  Type 'ToolboxModuleId' is not assignable to type 'BlancToolId'.
+src/renderer/components/blanc/BlancShell.tsx(2613,20): error TS2322: Type '("music" | "dictionary" | "grammar" | "furigana" | "pitch-accent" | "novels" | "notebook" | "translate" | "flashcards" | "games" | "resources" | "visualizer" | "immersion" | "calendar" | ... 53 more ... | "local-agent")[]' is not assignable to type 'ToolboxModuleId[]'.
+  Type '"music" | "dictionary" | "grammar" | "furigana" | "pitch-accent" | "novels" | "notebook" | "translate" | "flashcards" | "games" | "resources" | "visualizer" | "immersion" | "calendar" | ... 53 more ... | "local-agent"' is not assignable to type 'ToolboxModuleId'.
+    Type '"music"' is not assignable to type 'ToolboxModuleId'.
+src/renderer/components/blanc/BlancShell.tsx(3122,43): error TS2345: Argument of type 'BlancToolId' is not assignable to parameter of type 'ToolboxModuleId'.
+src/renderer/components/blanc/BlancShell.tsx(3130,43): error TS2345: Argument of type 'BlancToolId' is not assignable to parameter of type 'ToolboxModuleId'.
+src/renderer/components/blanc/BlancStudyPanels.tsx(106,13): error TS2307: Cannot find module '../../theme/studyos-compat.css' or its corresponding type declarations.
+src/renderer/components/DesktopShell.tsx(789,11): error TS2367: This comparison appears to be unintentional because the types '"video" | "preset" | "slideshow"' and '"image"' have no overlap.
+src/renderer/components/DesktopShell.tsx(1931,11): error TS2322: Type 'RefObject<HTMLDivElement | null>' is not assignable to type 'RefObject<HTMLDivElement>'.
+src/renderer/components/DesktopShell.tsx(1949,67): error TS2783: 'color' is specified more than once, so this usage will be overwritten.
+src/renderer/components/DesktopShell.tsx(1982,11): error TS2322: Type 'RefObject<HTMLDivElement | null>' is not assignable to type 'RefObject<HTMLDivElement>'.
+src/renderer/components/DictionaryResults.tsx(137,3): error TS2322: Type 'LangCode' is not assignable to type '"ja" | "en" | "ru"'.
+  Type '"zh"' is not assignable to type '"ja" | "en" | "ru"'.
+src/renderer/components/DictionaryResults.tsx(391,53): error TS2322: Type 'string | undefined' is not assignable to type 'string | number'.
+  Type 'undefined' is not assignable to type 'string | number'.
+src/renderer/components/DictionaryResults.tsx(447,7): error TS2345: Argument of type 'Partial<Record<"ja" | "zh" | "en" | "ru", number>> | undefined' is not assignable to parameter of type 'Partial<Record<ExampleCountLang, number>>'.
+  Type 'undefined' is not assignable to type 'Partial<Record<ExampleCountLang, number>>'.
+src/renderer/components/EpubFilterPipelinePanel.tsx(71,83): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/EpubMiningPanel.tsx(55,5): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/EpubVariablePalette.tsx(36,8): error TS2339: Property 'dictAvailableLangs' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'.
+src/renderer/components/EpubVariablePalette.tsx(37,14): error TS7006: Parameter 'available' implicitly has an 'any' type.
+src/renderer/components/FieldHint.tsx(10,64): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/FieldMappingEditor.tsx(165,7): error TS2739: Type '{ fieldTemplates: Record<string, string>; exampleCounts: Partial<Record<ExampleCountLang, number>>; exampleFallback: boolean; exampleFallbackTemplates: Record<...>; }' is missing the following properties from type 'AnkiBinding': deckName, modelName
+src/renderer/components/FieldMappingEditor.tsx(183,51): error TS2739: Type '{ fieldTemplates: {}; }' is missing the following properties from type 'AnkiBinding': deckName, modelName
+src/renderer/components/flashcards/FlashcardsContent.tsx(787,5): error TS2322: Type 'RefObject<HTMLDivElement | null>' is not assignable to type 'RefObject<HTMLDivElement>'.
+src/renderer/components/flashcards/FlashcardsContent.tsx(846,66): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/flashcards/FlashcardsContent.tsx(1659,10): error TS2741: Property 'onRename' is missing in type '{ group: BookGroup; folders: string[]; onClose: () => void; onReview: () => void; onSaveCsv: () => undefined; onMoveFolder: (folder: string | null) => void; onDelete: () => void; }' but required in type 'Props'.
+src/renderer/components/games/GameArenaContent.tsx(388,24): error TS2339: Property 'usingFallback' does not exist on type 'GameContent'.
+src/renderer/components/games/GameArenaContent.tsx(438,31): error TS18047: 'session' is possibly 'null'.
+src/renderer/components/games/GameArenaContent.tsx(439,31): error TS18047: 'session' is possibly 'null'.
+src/renderer/components/games/GameArenaContent.tsx(440,33): error TS18047: 'session' is possibly 'null'.
+src/renderer/components/games/GameArenaContent.tsx(441,30): error TS18047: 'session' is possibly 'null'.
+src/renderer/components/games/GameArenaContent.tsx(443,32): error TS18047: 'session' is possibly 'null'.
+src/renderer/components/games/GameArenaContent.tsx(444,28): error TS18047: 'session' is possibly 'null'.
+src/renderer/components/games/GameArenaContent.tsx(444,45): error TS18047: 'session' is possibly 'null'.
+src/renderer/components/GlobalDictionaryOverlay.tsx(149,20): error TS18047: 'sel' is possibly 'null'.
+src/renderer/components/GlobalDictionaryOverlay.tsx(153,20): error TS18047: 'sel' is possibly 'null'.
+src/renderer/components/grammar/GrammarExplorer.tsx(191,68): error TS2677: A type predicate's type must be assignable to its parameter's type.
+  Type 'NormalizedGrammarPoint' is not assignable to type 'NormalizedGrammarPoint & WithFamiliarity'.
+    Type 'NormalizedGrammarPoint' is missing the following properties from type 'WithFamiliarity': familiarity, familiarityManual
+src/renderer/components/grammar/GrammarExplorer.tsx(205,40): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(223,71): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(234,15): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(236,18): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(237,19): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(238,16): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(239,18): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(239,30): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(239,49): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(444,26): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(444,58): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(445,36): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(446,58): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(447,36): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarExplorer.tsx(452,51): error TS18048: 'p' is possibly 'undefined'.
+src/renderer/components/grammar/GrammarFilterPanel.tsx(132,16): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type 'Record<"other" | "time" | "frequency" | "as" | "negative" | "passive" | "standard" | "forced" | "status" | "case" | "definition" | "value" | "method" | "finish" | "order" | "result" | ... 168 more ... | "future-time", string>'.
+  No index signature with a parameter of type 'string' was found on type 'Record<"other" | "time" | "frequency" | "as" | "negative" | "passive" | "standard" | "forced" | "status" | "case" | "definition" | "value" | "method" | "finish" | "order" | "result" | ... 168 more ... | "future-time", string>'.
+src/renderer/components/media/MediaContent.tsx(818,67): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/media/MediaContent.tsx(1621,5): error TS2322: Type 'RefObject<HTMLVideoElement | null>' is not assignable to type 'RefObject<HTMLVideoElement>'.
+  Type 'HTMLVideoElement | null' is not assignable to type 'HTMLVideoElement'.
+    Type 'null' is not assignable to type 'HTMLVideoElement'.
+src/renderer/components/media/StudyOrchestratorWorkspace.tsx(3531,21): error TS2322: Type 'string | undefined' is not assignable to type 'string | number'.
+src/renderer/components/MiniShell.tsx(636,16): error TS2739: Type '{}' is missing the following properties from type 'WidgetProps': settings, setSettings, size
+src/renderer/components/music/MusicContent.tsx(349,5): error TS2322: Type 'RefObject<HTMLDivElement | null>' is not assignable to type 'RefObject<HTMLDivElement>'.
+  Type 'HTMLDivElement | null' is not assignable to type 'HTMLDivElement'.
+    Type 'null' is not assignable to type 'HTMLDivElement'.
+src/renderer/components/novels/NovelsContent.tsx(180,40): error TS2345: Argument of type 'JitenDeck' is not assignable to parameter of type 'Partial<JitenPlanEntry & JitenDeck>'.
+src/renderer/components/novels/NovelsContent.tsx(606,7): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/renderer/components/PlaylistEditor.tsx(98,13): error TS2304: Cannot find name 'uid'.
+src/renderer/components/PlaylistEditor.tsx(114,17): error TS2304: Cannot find name 'uid'.
+src/renderer/components/PlaylistEditor.tsx(132,17): error TS2304: Cannot find name 'uid'.
+src/renderer/components/PlaylistEditor.tsx(153,11): error TS2304: Cannot find name 'uid'.
+src/renderer/components/PlaylistEditor.tsx(155,51): error TS2304: Cannot find name 'uid'.
+src/renderer/components/PlaylistEditor.tsx(225,15): error TS2304: Cannot find name 'uid'.
+src/renderer/components/PlaylistEditor.tsx(241,15): error TS2304: Cannot find name 'uid'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(43,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(48,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(52,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(56,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(60,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(64,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(89,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(93,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(97,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGarden.tsx(101,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGardenLifeCanvas.tsx(10,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGardenLifeCanvas.tsx(14,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGardenLifeCanvas.tsx(18,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGardenSkyEvents.tsx(293,8): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/reading-garden/ReadingGardenSkyEvents.tsx(293,20): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/renderer/components/reading/ReadingFinderContent.tsx(47,39): error TS2345: Argument of type 'number' is not assignable to parameter of type 'LevelTier'.
+src/renderer/components/reading/ReadingFinderContent.tsx(47,64): error TS2345: Argument of type 'number' is not assignable to parameter of type 'LevelTier'.
+src/renderer/components/reading/ReadingFinderContent.tsx(47,87): error TS2345: Argument of type 'number' is not assignable to parameter of type 'LevelTier'.
+src/renderer/components/scraper/artwork.ts(2,50): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/scraper/artwork.ts(3,55): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/scraper/artwork.ts(4,51): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/scraper/artwork.ts(5,52): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/scraper/artwork.ts(6,52): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/scraper/artwork.ts(11,3): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/components/scraper/pages/NewScrapePage.tsx(424,25): error TS2322: Type 'number | null' is not assignable to type 'number | undefined'.
+  Type 'null' is not assignable to type 'number | undefined'.
+src/renderer/components/scraper/ScraperSearch.tsx(156,31): error TS2322: Type '"history"' is not assignable to type 'IconName'.
+src/renderer/components/scraper/settings/ScraperSettingsDrawer.tsx(141,11): error TS2322: Type 'string[] | ScraperTorrentTracker[]' is not assignable to type 'string[]'.
+  Type 'ScraperTorrentTracker[]' is not assignable to type 'string[]'.
+    Type 'ScraperTorrentTracker' is not assignable to type 'string'.
+src/renderer/components/scraper/strings.ts(607,40): error TS2554: Expected 2 arguments, but got 1.
+src/renderer/components/settings/pages/ExtensionBridgeSection.tsx(28,15): error TS2345: Argument of type '{ running: boolean; port: number; token: string; folderPath: string; }' is not assignable to parameter of type 'SetStateAction<{ running: boolean; port: number; token: string; folderPath: string; extensionVersion: string; } | null>'.
+  Property 'extensionVersion' is missing in type '{ running: boolean; port: number; token: string; folderPath: string; }' but required in type '{ running: boolean; port: number; token: string; folderPath: string; extensionVersion: string; }'.
+src/renderer/components/settings/pages/MalSyncPanel.tsx(74,37): error TS2339: Property 'malStatus' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'.
+src/renderer/components/settings/pages/MalSyncPanel.tsx(106,26): error TS2339: Property 'malSetClientId' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'.
+src/renderer/components/settings/pages/MalSyncPanel.tsx(110,24): error TS2339: Property 'malBeginAuth' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'.
+src/renderer/components/settings/pages/MalSyncPanel.tsx(116,24): error TS2339: Property 'malCompleteAuth' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'.
+src/renderer/components/settings/pages/MalSyncPanel.tsx(125,24): error TS2339: Property 'malFetchList' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'.
+src/renderer/components/settings/pages/MalSyncPanel.tsx(204,90): error TS2339: Property 'malSignOut' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'.
+src/renderer/components/settings/pages/SpecialPage.tsx(211,25): error TS2345: Argument of type 'string[]' is not assignable to parameter of type 'WiredFindingFeature[]'.
+  Type 'string' is not assignable to type 'WiredFindingFeature'.
+src/renderer/components/settings/pages/SpecialPage.tsx(239,22): error TS2345: Argument of type 'string[]' is not assignable to parameter of type 'AeroLegacyFeature[]'.
+  Type 'string' is not assignable to type 'AeroLegacyFeature'.
+src/renderer/components/settings/SettingsApp.tsx(249,27): error TS2339: Property 'label' does not exist on type 'SettingsNavPage'.
+src/renderer/components/shell/WiredFindingOverlay.tsx(19,26): error TS2307: Cannot find module '../../assets/wired-lain-reference.jpg' or its corresponding type declarations.
+src/renderer/components/shell/WiredLyricStream.tsx(158,37): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/shell/WiredLyricStream.tsx(181,17): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/shell/WiredLyricStream.tsx(184,21): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/shell/WiredLyricStream.tsx(195,21): error TS2503: Cannot find namespace 'JSX'.
+src/renderer/components/translate/TranslateContent.tsx(139,49): error TS2322: Type 'string | undefined' is not assignable to type 'string | number'.
+src/renderer/csvParseAsync.ts(25,65): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/data/grammar/practiceFilters.ts(246,65): error TS2345: Argument of type 'string' is not assignable to parameter of type '"other" | "time" | "frequency" | "as" | "negative" | "passive" | "standard" | "forced" | "status" | "case" | "definition" | "value" | "method" | "finish" | "order" | "result" | ... 168 more ... | "future-time"'.
+src/renderer/data/grammar/practiceFilters.ts(316,7): error TS2322: Type 'NormalizedGrammarPoint[]' is not assignable to type 'T[]'.
+  Type 'NormalizedGrammarPoint' is not assignable to type 'T'.
+    'NormalizedGrammarPoint' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint 'NormalizedGrammarPoint'.
+src/renderer/environment/CompanionLayer.tsx(200,7): error TS2322: Type '{ mood: CompanionMood; status?: string | undefined; speechBubble?: string | null | undefined; id: string; typeId: CompanionTypeId; x: number; y: number; ... 12 more ...; motionVy?: number | undefined; }[]' is not assignable to type 'CompanionInstance[]'.
+  Type '{ mood: CompanionMood; status?: string | undefined; speechBubble?: string | null | undefined; id: string; typeId: CompanionTypeId; x: number; y: number; ... 12 more ...; motionVy?: number | undefined; }' is not assignable to type 'CompanionInstance'.
+    Types of property 'speechBubble' are incompatible.
+      Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+        Type 'null' is not assignable to type 'string | undefined'.
+src/renderer/environment/CompanionLayer.tsx(201,15): error TS2345: Argument of type '{ mood: CompanionMood; status?: string | undefined; speechBubble?: string | null | undefined; id: string; typeId: CompanionTypeId; x: number; y: number; ... 12 more ...; motionVy?: number | undefined; }[]' is not assignable to parameter of type 'SetStateAction<CompanionInstance[]>'.
+  Type '{ mood: CompanionMood; status?: string | undefined; speechBubble?: string | null | undefined; id: string; typeId: CompanionTypeId; x: number; y: number; ... 12 more ...; motionVy?: number | undefined; }[]' is not assignable to type 'CompanionInstance[]'.
+src/renderer/environment/nostalgicWallpaperPack.ts(12,5): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/nostalgicWallpaperPack.ts(16,5): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/nostalgicWallpaperPack.ts(20,5): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/nostalgicWallpaperPack.ts(24,5): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/nostalgicWallpaperPack.ts(28,5): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/nostalgicWallpaperPack.ts(54,5): error TS4104: The type 'readonly ["aero", "day", "character", "readable-icons"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+src/renderer/environment/nostalgicWallpaperPack.ts(64,5): error TS4104: The type 'readonly ["aero", "day", "scenery", "readable-icons"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+src/renderer/environment/nostalgicWallpaperPack.ts(74,5): error TS4104: The type 'readonly ["aero", "night", "scenery", "readable-icons"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+src/renderer/environment/nostalgicWallpaperPack.ts(84,5): error TS4104: The type 'readonly ["aero", "rain", "scenery", "readable-icons"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+src/renderer/environment/nostalgicWallpaperPack.ts(94,5): error TS4104: The type 'readonly ["aero", "room", "study", "scenery", "readable-icons"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+src/renderer/environment/shimejiPacks.ts(72,20): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/shimejiPacks.ts(72,32): error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+src/renderer/environment/shimejiPacks.ts(75,20): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/shimejiPacks.ts(75,32): error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+src/renderer/environment/shimejiPacks.ts(78,20): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/shimejiPacks.ts(78,32): error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+src/renderer/environment/shimejiPacks.ts(81,20): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/shimejiPacks.ts(81,32): error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+src/renderer/environment/shimejiPacks.ts(84,20): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/shimejiPacks.ts(84,32): error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+src/renderer/environment/shimejiPacks.ts(87,20): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/shimejiPacks.ts(87,32): error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+src/renderer/environment/shimejiPacks.ts(90,20): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/environment/shimejiPacks.ts(90,32): error TS2339: Property 'glob' does not exist on type 'ImportMeta'.
+src/renderer/games/engine.ts(340,70): error TS2304: Cannot find name 'KanaPrompt'.
+src/renderer/hooks.ts(32,11): error TS2322: Type 'RefObject<T | null>' is not assignable to type 'RefObject<T>'.
+  Type 'T | null' is not assignable to type 'T'.
+    'T' could be instantiated with an arbitrary type which could be unrelated to 'T | null'.
+src/renderer/main.tsx(148,15): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/main.tsx(148,27): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/renderer/pdfLoader.ts(9,23): error TS2307: Cannot find module 'pdfjs-dist/build/pdf.worker.min.mjs?url' or its corresponding type declarations.
+src/renderer/readabilityArticle.ts(156,11): error TS7022: 'parent' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+src/renderer/readabilityArticle.ts(234,13): error TS7022: 'parent' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+src/renderer/readabilityArticle.ts(238,67): error TS2339: Property 'remove' does not exist on type '{}'.
+src/renderer/readabilityArticle.ts(241,34): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'Element'.
+src/renderer/readabilityArticle.ts(601,26): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/renderer/scraperSettingsStore.ts(24,11): error TS2304: Cannot find name 'ScraperSettingsIssue'.
+src/renderer/storage/storage.ts(335,13): error TS2352: Conversion of type '{ [k: string]: unknown; desktopIndex: number; }' to type 'DesktopLayout' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ [k: string]: unknown; desktopIndex: number; }' is missing the following properties from type 'DesktopLayout': windows, icons, notes, widgets, and 2 more.
+src/renderer/tokenizer.ts(85,41): error TS2554: Expected 0 arguments, but got 1.
+src/renderer/useWhisperTranscribe.ts(130,65): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/views/MangaReader.tsx(94,32): error TS2367: This comparison appears to be unintentional because the types '"ja" | "zh"' and '"en"' have no overlap.
+src/renderer/views/MangaReader.tsx(959,48): error TS2367: This comparison appears to be unintentional because the types '"ja" | "zh"' and '"en"' have no overlap.
+src/renderer/views/NovelReader.tsx(111,12): error TS2339: Property 'lang' does not exist on type 'LibraryItem'.
+src/renderer/views/NovelReader.tsx(111,34): error TS2339: Property 'lang' does not exist on type 'LibraryItem'.
+src/renderer/views/NovelReader.tsx(111,56): error TS2339: Property 'lang' does not exist on type 'LibraryItem'.
+src/renderer/views/NovelReader.tsx(111,83): error TS2339: Property 'lang' does not exist on type 'LibraryItem'.
+src/renderer/views/SettingsView.tsx(144,34): error TS2551: Property 'dictSetYomitanLang' does not exist on type '{ relaunchApp(): Promise<{ ok: boolean; }>; launchAutomationBuilder(): Promise<AutomationBuilderLaunchResult>; toolboxPickSearchFolder(): Promise<...>; ... 480 more ...; onSeanimeStatus(cb: (s: SeanimeStatus) => void): () => void; }'. Did you mean 'dictListYomitan'?
+src/renderer/visualizerSettings.ts(44,9): error TS2367: This comparison appears to be unintentional because the types '"wave" | "particles" | "spectrum" | "xp-classic" | "vista-aero" | undefined' and '"bars"' have no overlap.
+src/renderer/whisperModelCache.ts(166,59): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/whisperTranscribePcm.ts(45,57): error TS1343: The 'import.meta' meta-property is only allowed when the '--module' option is 'es2020', 'es2022', 'esnext', 'system', 'node16', or 'nodenext'.
+src/renderer/whisperWorker.ts(18,1): error TS18048: 'env.backends.onnx.wasm' is possibly 'undefined'.
+src/shared/__tests__/analysisPanelRender.test.ts(16,23): error TS7016: Could not find a declaration file for module 'jsdom'. 'C:/Users/Arseniy/Projects/jp-study-app/node_modules/jsdom/lib/api.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/jsdom` if it exists or add a new declaration (.d.ts) file containing `declare module 'jsdom';`
+src/shared/__tests__/epubDeck.test.ts(48,7): error TS2740: Type '{ filterBy: "deck-frequency"; sortBy: "deck-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: false; }' is missing the following properties from type 'EpubExportOptions': format, strategy, occurrenceFilterOp, occurrenceThreshold, and 8 more.
+src/shared/__tests__/epubDeck.test.ts(69,7): error TS2739: Type '{ maxCommonRank: number; }' is missing the following properties from type 'MiningLimitSettings': minFrequency, blacklist
+src/shared/__tests__/epubDeck.test.ts(70,7): error TS2740: Type '{ filterBy: "deck-frequency"; sortBy: "deck-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: false; }' is missing the following properties from type 'EpubExportOptions': format, strategy, occurrenceFilterOp, occurrenceThreshold, and 8 more.
+src/shared/__tests__/epubDeck.test.ts(91,7): error TS2739: Type '{ maxCommonRank: number; }' is missing the following properties from type 'MiningLimitSettings': minFrequency, blacklist
+src/shared/__tests__/epubDeck.test.ts(92,7): error TS2740: Type '{ filterBy: "term-frequency"; sortBy: "deck-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: false; }' is missing the following properties from type 'EpubExportOptions': format, strategy, occurrenceFilterOp, occurrenceThreshold, and 8 more.
+src/shared/__tests__/epubDeck.test.ts(113,7): error TS2739: Type '{ minFrequency: number; }' is missing the following properties from type 'MiningLimitSettings': maxCommonRank, blacklist
+src/shared/__tests__/epubDeck.test.ts(114,7): error TS2740: Type '{ filterBy: "deck-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: false; }' is missing the following properties from type 'EpubExportOptions': format, strategy, sortBy, occurrenceFilterOp, and 9 more.
+src/shared/__tests__/epubDeck.test.ts(135,7): error TS2741: Property 'blacklist' is missing in type '{ minFrequency: number; maxCommonRank: number; }' but required in type 'MiningLimitSettings'.
+src/shared/__tests__/epubDeck.test.ts(136,7): error TS2740: Type '{ filterBy: "deck-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: true; excludeNames: { japanese: true; chinese: true; russian: true; places: true; }; }' is missing the following properties from type 'EpubExportOptions': format, strategy, sortBy, occurrenceFilterOp, and 8 more.
+src/shared/__tests__/epubDeck.test.ts(161,7): error TS2739: Type '{ minFrequency: number; }' is missing the following properties from type 'MiningLimitSettings': maxCommonRank, blacklist
+src/shared/__tests__/epubDeck.test.ts(162,7): error TS2740: Type '{ filterBy: "deck-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: false; }' is missing the following properties from type 'EpubExportOptions': format, strategy, sortBy, occurrenceFilterOp, and 9 more.
+src/shared/__tests__/epubDeck.test.ts(177,7): error TS2739: Type '{ minFrequency: number; }' is missing the following properties from type 'MiningLimitSettings': maxCommonRank, blacklist
+src/shared/__tests__/epubDeck.test.ts(178,7): error TS2740: Type '{ filterBy: "deck-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: false; }' is missing the following properties from type 'EpubExportOptions': format, strategy, sortBy, occurrenceFilterOp, and 9 more.
+src/shared/__tests__/epubDeck.test.ts(201,9): error TS2739: Type '{ minFrequency: number; }' is missing the following properties from type 'MiningLimitSettings': maxCommonRank, blacklist
+src/shared/__tests__/epubDeck.test.ts(202,9): error TS2740: Type '{ filterBy: "deck-frequency" | "term-frequency"; freqRangeMin: number; freqRangeMax: number; excludeKanaOnly: true; excludeNames: { japanese: false; chinese: false; russian: false; places: false; }; }' is missing the following properties from type 'EpubExportOptions': format, strategy, sortBy, occurrenceFilterOp, and 8 more.
+src/shared/__tests__/epubDeck.test.ts(217,7): error TS2740: Type '{ strategy: "occurrences"; occurrenceFilterOp: "gte"; occurrenceThreshold: number; excludeKanaOnly: true; }' is missing the following properties from type 'EpubExportOptions': format, filterBy, sortBy, freqRangeMin, and 9 more.
+src/shared/__tests__/gameEngine.test.ts(20,36): error TS2345: Argument of type 'GameId' is not assignable to parameter of type '"sentence-builder" | "speed-type" | "word-match" | "kana-sprint" | "kanji-reading" | "cloze-blitz" | "listening-flash" | "particle-panic" | "counter-quiz" | "reverse-recall" | "star-invaders" | "comet-courier" | "capsule-sorter" | "signal-simon"'.
+  Type '"mirror-writing"' is not assignable to type '"sentence-builder" | "speed-type" | "word-match" | "kana-sprint" | "kanji-reading" | "cloze-blitz" | "listening-flash" | "particle-panic" | "counter-quiz" | "reverse-recall" | "star-invaders" | "comet-courier" | "capsule-sorter" | "signal-simon"'.
+src/shared/__tests__/gameEngine.test.ts(32,36): error TS2345: Argument of type 'GameId' is not assignable to parameter of type '"sentence-builder" | "speed-type" | "word-match" | "kana-sprint" | "kanji-reading" | "cloze-blitz" | "listening-flash" | "particle-panic" | "counter-quiz" | "reverse-recall" | "star-invaders" | "comet-courier" | "capsule-sorter" | "signal-simon"'.
+src/shared/__tests__/gameEngine.test.ts(71,38): error TS2345: Argument of type 'GameId' is not assignable to parameter of type '"sentence-builder" | "speed-type" | "word-match" | "kana-sprint" | "kanji-reading" | "cloze-blitz" | "listening-flash" | "particle-panic" | "counter-quiz" | "reverse-recall" | "star-invaders" | "comet-courier" | "capsule-sorter" | "signal-simon"'.
+src/shared/__tests__/gameEngine.test.ts(104,45): error TS2345: Argument of type '{ vocab: { word: string; reading: string; meaning: string; }[]; cloze: never[]; sentences: never[]; }' is not assignable to parameter of type 'GameContent'.
+  Types of property 'vocab' are incompatible.
+    Type '{ word: string; reading: string; meaning: string; }[]' is not assignable to type 'VocabItem[]'.
+      Property 'level' is missing in type '{ word: string; reading: string; meaning: string; }' but required in type 'VocabItem'.
+src/shared/__tests__/gameEngine.test.ts(105,42): error TS2345: Argument of type '{ vocab: { word: string; reading: string; meaning: string; }[]; cloze: never[]; sentences: never[]; }' is not assignable to parameter of type 'GameContent'.
+src/shared/__tests__/mediaProviderSyncResolution.test.ts(86,67): error TS2345: Argument of type '{ path: string; decision: string; } | { path: string; decision: string; }' is not assignable to parameter of type 'unknown[]'.
+  Type '{ path: string; decision: string; }' is missing the following properties from type 'unknown[]': length, pop, push, concat, and 35 more.
+src/shared/__tests__/studyPipelineStageDetail.test.ts(42,9): error TS2345: Argument of type '{ mediaId: string; phase: "error" | "queued" | "cancelled" | "done" | "preparing" | "extracting-audio" | "aligning"; done: number; total: number; }' is not assignable to parameter of type 'TranscriptionProgress'.
+  Type '{ mediaId: string; phase: "error" | "queued" | "cancelled" | "done" | "preparing" | "extracting-audio" | "aligning"; done: number; total: number; }' is missing the following properties from type 'TranscriptionProgress': title, startedAt
+src/shared/__tests__/studyPipelineStageDetail.test.ts(52,7): error TS2345: Argument of type '{ mediaId: string; phase: "transcribing"; done: number; total: number; }' is not assignable to parameter of type 'TranscriptionProgress'.
+  Type '{ mediaId: string; phase: "transcribing"; done: number; total: number; }' is missing the following properties from type 'TranscriptionProgress': title, startedAt
+src/shared/__tests__/studyPipelineStageDetail.test.ts(60,7): error TS2345: Argument of type '{ mediaId: string; phase: "transcribing"; done: number; total: number; }' is not assignable to parameter of type 'TranscriptionProgress'.
+  Type '{ mediaId: string; phase: "transcribing"; done: number; total: number; }' is missing the following properties from type 'TranscriptionProgress': title, startedAt
+src/shared/__tests__/studyPipelineStageDetail.test.ts(70,7): error TS2345: Argument of type '{ mediaId: string; phase: "transcribing"; done: number; total: number; }' is not assignable to parameter of type 'TranscriptionProgress'.
+  Type '{ mediaId: string; phase: "transcribing"; done: number; total: number; }' is missing the following properties from type 'TranscriptionProgress': title, startedAt
+src/shared/__tests__/studyPipelineStageDetail.test.ts(75,7): error TS2345: Argument of type '{ mediaId: string; phase: "done"; done: number; total: number; }' is not assignable to parameter of type 'TranscriptionProgress'.
+  Type '{ mediaId: string; phase: "done"; done: number; total: number; }' is missing the following properties from type 'TranscriptionProgress': title, startedAt
+src/shared/aiPromptBuilder.ts(115,9): error TS2322: Type '{ [x: string]: string | undefined; } | { expression: "勉強する"; reading: "べんきょうする"; meaning: "to study"; meaningRu: "заниматься, учиться"; meaningZh: "学习"; translation: "заниматься, учиться"; ... 11 more ...; 'cloze-after': "しています。"; }' is not assignable to type 'Record<string, string>'.
+  Type '{ [x: string]: string | undefined; }' is not assignable to type 'Record<string, string>'.
+    'string' index signatures are incompatible.
+      Type 'string | undefined' is not assignable to type 'string'.
+        Type 'undefined' is not assignable to type 'string'.
+src/shared/connectionProfiles.ts(541,11): error TS2304: Cannot find name 'ScraperSettingsIssue'.
+src/shared/connectionProfiles.ts(724,17): error TS2304: Cannot find name 'ScraperSettingsIssue'.
+src/shared/connectionProfiles.ts(834,72): error TS2304: Cannot find name 'ScraperSettingsIssue'.
+src/shared/scraperSettings.ts(466,5): error TS2740: Type 'Record<string, unknown>' is missing the following properties from type 'ScraperMetadataSettings': providerOrder, fetchSynopsis, fetchGenres, fetchStaff, and 6 more.
+src/shared/scraperSettings.ts(466,39): error TS2345: Argument of type 'ScraperMetadataSettings' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'ScraperMetadataSettings'.
+src/shared/scraperSettings.ts(468,5): error TS2740: Type 'Record<string, unknown>' is missing the following properties from type 'ScraperLoggingSettings': level, persistToDisk, retentionDays, maxFileSizeMb, and 5 more.
+src/shared/scraperSettings.ts(468,38): error TS2345: Argument of type 'ScraperLoggingSettings' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'ScraperLoggingSettings'.
+src/shared/scraperSettings.ts(470,5): error TS2740: Type 'Record<string, unknown>' is missing the following properties from type 'ScraperExportSettings': format, destinationRef, includeColumns, splitBySeason, and 4 more.
+src/shared/scraperSettings.ts(470,37): error TS2345: Argument of type 'ScraperExportSettings' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'ScraperExportSettings'.
+src/shared/scraperSettings.ts(471,5): error TS2740: Type 'Record<string, unknown>' is missing the following properties from type 'ScraperSchedulerSettings': enabled, entries, maxConcurrentScheduled, skipIfRunning, and 5 more.
+src/shared/scraperSettings.ts(471,40): error TS2345: Argument of type 'ScraperSchedulerSettings' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'ScraperSchedulerSettings'.
+src/shared/scraperSettings.ts(473,5): error TS2740: Type 'Record<string, unknown>' is missing the following properties from type 'ScraperDeveloperSettings': showRawHtml, showSelectorOverlay, recordNetworkTrace, allowScriptConsole, and 4 more.
+src/shared/scraperSettings.ts(473,40): error TS2345: Argument of type 'ScraperDeveloperSettings' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'ScraperDeveloperSettings'.
+src/shared/scraperSourceSettings.ts(364,49): error TS2339: Property 'enabled' does not exist on type 'UnknownRecord | { url: any; }'.
+  Property 'enabled' does not exist on type '{ url: any; }'.
+src/shared/toolboxSettings.ts(216,8): error TS2352: Conversion of type 'ToolboxSettings' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ToolboxSettings'.
+src/shared/toolboxSettings.ts(273,8): error TS2352: Conversion of type 'ToolboxSettings' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+src/shared/toolboxShortcuts.ts(334,5): error TS2322: Type '"Study"' is not assignable to type 'ToolboxShortcutCategory'.
+src/shared/toolboxShortcuts.ts(346,5): error TS2322: Type '"Study"' is not assignable to type 'ToolboxShortcutCategory'.
+src/shared/toolboxShortcuts.ts(358,5): error TS2322: Type '"Study"' is not assignable to type 'ToolboxShortcutCategory'.
+src/shared/toolboxShortcuts.ts(370,5): error TS2322: Type '"Study"' is not assignable to type 'ToolboxShortcutCategory'.
+src/shared/toolboxShortcuts.ts(382,5): error TS2322: Type '"Study"' is not assignable to type 'ToolboxShortcutCategory'.

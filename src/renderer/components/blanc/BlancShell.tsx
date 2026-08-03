@@ -16,6 +16,7 @@ import {
 import type { ToolboxFileSearchResult } from '../../../shared/toolboxFileSearch';
 import { LANG_LABELS, LANG_TAGS, UI_LANGS, type UiLang } from '../../../shared/i18n/core';
 import Icon, { type IconName } from '../Icons';
+import VirtualList from '../VirtualList';
 import FocusMusicBar from '../FocusMusicBar';
 import ClipboardHistoryPanel from '../ClipboardHistoryPanel';
 import {
@@ -44,6 +45,7 @@ import {
 } from '../../toolboxSettings';
 import { applyBlancTheme } from '../../blancThemeApply';
 import { applyBlancCustomCss } from '../../blancCustomCssApply';
+import { loadBlancThemeHistory, recordBlancThemeHistory, undoBlancThemeHistory } from '../../blancThemeHistoryStore';
 import { MAX_CUSTOM_CSS_LENGTH } from '../../../shared/blancCustomCss';
 import {
   BLANC_THEME_PRESETS,
@@ -89,7 +91,6 @@ import {
 import { ProfileSwitcher } from '../ProfileSwitcher';
 import {
   BatchConverterPanel,
-  WorkspaceLauncherPanel,
   BlancModelsPanel,
   BlancYoutubePanel,
   ContextSearchPanel,
@@ -97,6 +98,7 @@ import {
   FrequencyExplorerPanel,
   ImmersionTrackerPanel,
   KanjiInspectorPanel,
+  LocalAgentPanel,
   NotificationCenterPanel,
   SubtitleImporterPanel,
 } from './BlancReadyToolPanels';
@@ -157,6 +159,9 @@ const BlancReadingFinderPanel = lazy(() =>
 const BlancNovelsPanel = lazy(() =>
   import('./BlancLibraryPanels').then((m) => ({ default: m.BlancNovelsPanel })),
 );
+const BlancDiscoverPanel = lazy(() =>
+  import('./BlancLibraryPanels').then((m) => ({ default: m.BlancDiscoverPanel })),
+);
 const BlancGamesPanel = lazy(() =>
   import('./BlancLibraryPanels').then((m) => ({ default: m.BlancGamesPanel })),
 );
@@ -189,6 +194,9 @@ const BlancConsolePanel = lazy(() =>
 const BlancAudioMinePanel = lazy(() =>
   import('./BlancStudyNativePanels').then((m) => ({ default: m.BlancAudioMinePanel })),
 );
+
+// Pillar 3 — App Drawer. Supersedes workspace-launcher (retired below).
+const BlancAppDrawerPanel = lazy(() => import('./BlancAppDrawerPanel'));
 
 const TAB_META: Record<BlancTabId, { label: string; icon: IconName }> = {
   read: { label: 'Read', icon: 'library' },
@@ -841,7 +849,7 @@ function BlancDeckPanel({ advanced }: { advanced: boolean }) {
  * does not model. `coverage` established this pattern; Pillar 2 ports reuse it
  * rather than adding entries to `TOOLBOX_MODULES`, which Study OS also reads.
  */
-type BlancOnlyToolId = 'coverage' | 'notebook' | 'translate' | 'music' | 'novels' | 'games' | 'immersion' | 'visualizer';
+type BlancOnlyToolId = 'coverage' | 'notebook' | 'translate' | 'music' | 'novels' | 'discover' | 'games' | 'immersion' | 'visualizer' | 'local-agent';
 
 type BlancToolId =
   | BlancOnlyToolId
@@ -858,7 +866,7 @@ type BlancToolId =
   | 'hash-checker'
   | 'image-converter'
   | 'batch-converter'
-  | 'workspace-launcher'
+  | 'app-drawer'
   | 'dictionary'
   | 'grammar'
   | 'reading-finder'
@@ -908,11 +916,13 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
   'pitch-accent',
   'dev-console',
   'audio-mine',
+  'local-agent',
   'coverage',
   'notebook',
   'translate',
   'music',
   'novels',
+  'discover',
   'games',
   'immersion',
   'visualizer',
@@ -927,7 +937,7 @@ const BLANC_TOOL_IDS: BlancToolId[] = [
   'hash-checker',
   'image-converter',
   'batch-converter',
-  'workspace-launcher',
+  'app-drawer',
   'dictionary',
   'grammar',
   'reading-finder',
@@ -951,11 +961,13 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   'pitch-accent': 'music',
   'dev-console': 'wrench',
   'audio-mine': 'caption',
+  'local-agent': 'sparkle',
   coverage: 'stats',
   notebook: 'note',
   translate: 'globe',
   music: 'music',
   novels: 'library',
+  discover: 'sparkle',
   games: 'dice',
   immersion: 'globe',
   visualizer: 'music',
@@ -970,7 +982,7 @@ const BLANC_TOOL_ICONS: Record<BlancToolId, IconName> = {
   'hash-checker': 'check',
   'image-converter': 'image',
   'batch-converter': 'image',
-  'workspace-launcher': 'wrench',
+  'app-drawer': 'folder',
   dictionary: 'dictionary',
   grammar: 'grammar',
   'reading-finder': 'search',
@@ -1019,9 +1031,11 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
   translate: { category: 'language', description: 'Offline JA/ZH/EN/RU translation with history, re-run, and mine-to-deck.' },
   music: { category: 'language', description: 'Song library, karaoke lyrics, and click-to-look-up — shares the app-wide player.' },
   novels: { category: 'language', description: 'Search Jiten and the local catalogue, plan to read, and import or mine EPUBs.' },
+  discover: { category: 'language', description: 'What to watch next at your level, ranked against your library, with the reasons spelled out.' },
   games: { category: 'language', description: 'The full Game Arena — sentence builder, cloze, match, kana sprint, and more; XP and mistakes sync app-wide.' },
   immersion: { category: 'language', description: 'The full immersion browser — live guest, Reader Mode, sites rail, and click-to-look-up; feeds reading stats.' },
   visualizer: { category: 'productivity', description: 'Live music visualizer with style, colour, and sensitivity controls — shared with the desktop wallpaper.' },
+  'local-agent': { category: 'system', description: 'Offline local assistant with reviewed plans, permissions, confirmations, and task progress.' },
   calculator: { category: 'quick', description: 'Offline arithmetic with a compact result display.', shortcut: 'Alt+1' },
   'unit-converter': { category: 'quick', description: 'Static length, weight, temperature, and data conversions.', shortcut: 'Alt+2' },
   'hash-checker': { category: 'quick', description: 'Generate SHA-256 and compare downloaded files.', shortcut: 'Alt+3' },
@@ -1034,7 +1048,7 @@ const TOOL_DESCRIPTIONS: Record<BlancToolId, { category: BlancToolCategory; desc
   'system-monitor': { category: 'system', description: 'CPU, RAM, storage, uptime, and battery at a glance.', shortcut: 'Alt+8' },
   'file-search': { category: 'system', description: 'Capped local filename search with open/copy actions.', shortcut: 'Alt+9' },
   'automation-builder': { category: 'system', description: 'Launch the existing Windows automation builder.' },
-  'workspace-launcher': { category: 'system', description: 'Open a saved group of apps, files, and links in one click.' },
+  'app-drawer': { category: 'system', description: 'Folders of apps, files, links, and Blanc tools — launch a whole folder in one click.' },
   dictionary: { category: 'language', description: 'Lookup, dictionaries, examples, and study actions.' },
   grammar: { category: 'language', description: 'Deterministic Japanese grammar reference.' },
   'reading-finder': { category: 'language', description: 'Find and import readable Japanese sources.' },
@@ -1056,9 +1070,11 @@ const BLANC_ONLY_LABELS: Record<BlancOnlyToolId, string> = {
   translate: 'Translate',
   music: 'Music',
   novels: 'Novels',
+  discover: 'Discover',
   games: 'Games',
   immersion: 'Immersion',
   visualizer: 'Visualizer',
+  'local-agent': 'Local AI Agent',
 };
 
 const BLANC_TOOLS: BlancToolEntry[] = BLANC_TOOL_IDS.map((id) => ({
@@ -1116,9 +1132,11 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'translate') return <BlancTranslatePanel />;
   if (tool === 'music') return <BlancMusicPanel />;
   if (tool === 'novels') return <BlancNovelsPanel />;
+  if (tool === 'discover') return <BlancDiscoverPanel />;
   if (tool === 'games') return <BlancGamesPanel />;
   if (tool === 'immersion') return <BlancImmersionPanel />;
   if (tool === 'visualizer') return <BlancVisualizerPanel />;
+  if (tool === 'local-agent') return <LocalAgentPanel />;
   if (tool === 'clipboard') return <BlancClipboardPanel />;
   if (tool === 'automation-builder') return <AutomationBuilderPanel />;
   if (tool === 'calculator') return <CalculatorPanel />;
@@ -1130,7 +1148,7 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'hash-checker') return <HashCheckerPanel />;
   if (tool === 'image-converter') return <ImageConverterPanel />;
   if (tool === 'batch-converter') return <BatchConverterPanel />;
-  if (tool === 'workspace-launcher') return <WorkspaceLauncherPanel />;
+  if (tool === 'app-drawer') return <BlancAppDrawerPanel />;
   if (tool === 'dictionary') return <BlancDictionaryPanel />;
   if (tool === 'grammar') return <BlancGrammarPanel />;
   if (tool === 'reading-finder') return <BlancReadingFinderPanel onOpenBook={onOpenBook} />;
@@ -2033,6 +2051,12 @@ function parseExtensions(value: string): string[] {
     .filter(Boolean);
 }
 
+// toolboxFileSearch caps at up to 500 results (sanitizeToolboxFileSearchRequest)
+// with honest truncation reporting; VirtualList keeps only the visible rows
+// mounted regardless of how close to that cap a search lands.
+const FILE_SEARCH_ROW_HEIGHT = 38;
+const FILE_SEARCH_LIST_MAX_HEIGHT = 420;
+
 function FileSearchPanel() {
   const [root, setRoot] = useState('');
   const [query, setQuery] = useState('');
@@ -2122,34 +2146,38 @@ function FileSearchPanel() {
       <fieldset>
         <legend>Results</legend>
         {results.length > 0 ? (
-          <div className="blanc-table-scroll">
-            <table className="blanc-coverage-table blanc-file-search-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Size</th>
-                  <th>Modified</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((result) => (
-                  <tr key={result.path}>
-                    <td title={result.path}>{result.name}</td>
-                    <td>{result.isDirectory ? 'Folder' : result.ext || 'file'}</td>
-                    <td>{result.isDirectory ? '-' : formatBytes(result.size)}</td>
-                    <td>{formatDateTime(result.modifiedMs)}</td>
-                    <td>
-                      <div className="blanc-row-actions">
-                        <button type="button" onClick={() => void openPath(result.path)}>Open</button>
-                        <button type="button" onClick={() => void copyPath(result.path)}>Copy path</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          // A plain <table> here would put up to 500 raw <tr> rows in the DOM
+          // at once (toolboxFileSearch's cap) — VirtualList only keeps the
+          // rows intersecting the viewport mounted, so this renders as a
+          // CSS-grid row list instead of an HTML table.
+          <div className="blanc-file-search-results">
+            <div className="blanc-file-search-row blanc-file-search-header">
+              <span>Name</span>
+              <span>Type</span>
+              <span>Size</span>
+              <span>Modified</span>
+              <span>Actions</span>
+            </div>
+            <VirtualList
+              items={results}
+              itemHeight={FILE_SEARCH_ROW_HEIGHT}
+              overscan={8}
+              getKey={(result) => result.path}
+              className="blanc-file-search-vlist"
+              style={{ height: Math.min(results.length * FILE_SEARCH_ROW_HEIGHT, FILE_SEARCH_LIST_MAX_HEIGHT) }}
+              renderItem={(result) => (
+                <div className="blanc-file-search-row">
+                  <span className="blanc-file-search-name" title={result.path}>{result.name}</span>
+                  <span>{result.isDirectory ? 'Folder' : result.ext || 'file'}</span>
+                  <span>{result.isDirectory ? '-' : formatBytes(result.size)}</span>
+                  <span>{formatDateTime(result.modifiedMs)}</span>
+                  <span className="blanc-row-actions">
+                    <button type="button" onClick={() => void openPath(result.path)}>Open</button>
+                    <button type="button" onClick={() => void copyPath(result.path)}>Copy path</button>
+                  </span>
+                </div>
+              )}
+            />
           </div>
         ) : (
           <p className="blanc-note">No results yet.</p>
@@ -2490,6 +2518,7 @@ function BlancSettingsPanel({
   const [pinSet, setPinSet] = useState(() => hasLockscreenPin());
   const [memory, setMemory] = useState<BlancMemorySettings>(() => loadBlancMemory());
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
+  const [themeHistoryCount, setThemeHistoryCount] = useState(() => loadBlancThemeHistory().length);
   const [settingsQuery, setSettingsQuery] = useState('');
   const [settingsImport, setSettingsImport] = useState('');
   const [settingsMsg, setSettingsMsg] = useState('');
@@ -2507,6 +2536,10 @@ function BlancSettingsPanel({
   };
 
   const patchToolbox = (patch: Partial<ToolboxSettings>): void => {
+    if ('themePreset' in patch || 'themeOverrides' in patch) {
+      recordBlancThemeHistory(loadToolboxSettings());
+      setThemeHistoryCount(loadBlancThemeHistory().length);
+    }
     setToolboxSettings(saveToolboxSettings(patch));
   };
 
@@ -2974,6 +3007,20 @@ function BlancSettingsPanel({
             onClick={() => patchToolbox({ themeOverrides: {} })}
           >
             Clear customisations
+          </button>
+          <button
+            type="button"
+            disabled={!themeHistoryCount}
+            onClick={() => {
+              const previous = undoBlancThemeHistory();
+              if (!previous) return;
+              const next = saveToolboxSettings({ themePreset: previous.preset, themeOverrides: previous.overrides });
+              setToolboxSettings(next);
+              setThemeHistoryCount(loadBlancThemeHistory().length);
+              setSettingsMsg('Previous theme restored.');
+            }}
+          >
+            Undo theme change
           </button>
           <button
             type="button"

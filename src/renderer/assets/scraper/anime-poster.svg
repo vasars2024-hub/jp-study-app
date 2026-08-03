@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 650" role="img" aria-label="Grand Line poster placeholder artwork">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#4c174f"/>
+      <stop offset=".43" stop-color="#a23b5e"/>
+      <stop offset="1" stop-color="#e6a35f"/>
+    </linearGradient>
+  </defs>
+  <rect width="460" height="650" fill="url(#bg)"/>
+  <circle cx="346" cy="146" r="105" fill="#ffdda4" opacity=".65"/>
+  <path d="M0 410c80-50 150-47 212 8 69 61 152 63 248 5v227H0z" fill="#17263d"/>
+  <path d="M100 513c29-112 73-180 133-180 64 0 110 69 139 180z" fill="#111728"/>
+  <circle cx="234" cy="282" r="71" fill="#d69a68"/>
+  <path d="M164 278c26-85 117-94 150-5-65-26-99-25-150 5z" fill="#151827"/>
+  <path d="M122 513h224l-30 94H145z" fill="#8c293d"/>
+  <path d="M204 356l30 36 31-36v92h-61z" fill="#f4e4c6"/>
+  <text x="36" y="68" fill="#fff" font-family="Segoe UI, sans-serif" font-size="28" font-weight="700" letter-spacing="4">GRAND LINE</text>
+  <text x="39" y="100" fill="#ffe4d0" font-family="sans-serif" font-size="13" letter-spacing="6">ARCHIVES</text>
+  <text x="36" y="616" fill="#fff" font-family="Segoe UI, sans-serif" font-size="16" letter-spacing="3">THE COMPLETE VOYAGE</text>
+</svg>

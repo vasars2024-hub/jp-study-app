@@ -4,7 +4,12 @@ import type { ShimejiPackId } from './shimejiPacks';
 import type { CompanionEdge } from './shimejiPhysics';
 import type { VoiceProfile } from './beepSpeech';
 
-export type CompanionTypeId = 'study-buddy' | 'critter' | 'timekeeper' | 'noctis' | 'miko-shimeji' | 'wired-navi';
+export type CompanionTypeId =
+  | 'study-buddy'
+  | 'critter'
+  | 'timekeeper'
+  | 'miko-shimeji'
+  | 'wired-navi';
 export type CompanionMood = 'calm' | 'happy' | 'sleepy' | 'curious' | 'celebrate';
 export type CompanionReactivity = 'quiet' | 'normal' | 'playful';
 export type CompanionMotion = 'stand' | 'walk' | 'sit' | 'wall' | 'ceiling' | 'fall' | 'drag' | 'celebrate';
@@ -58,16 +63,6 @@ const ALL_COMPANION_DEFS: CompanionDef[] = [
     variant: 'shimeji',
     spritePack: 'maka',
     voice: { baseHz: 440, wave: 'sine', stepPerMora: 28 },
-  },
-  {
-    id: 'noctis',
-    label: 'Noctis emissary',
-    blurb: 'A quiet light from the city — reacts to study as growth.',
-    color: '#7c5cff',
-    accent: '#c4b5fd',
-    variant: 'noctis',
-    spritePack: 'konoha',
-    voice: { baseHz: 380, wave: 'sawtooth', stepPerMora: 22 },
   },
   {
     id: 'miko-shimeji',
@@ -163,15 +158,6 @@ export function defaultCompanions(w = 900, h = 500): CompanionInstance[] {
       facing: 1,
       mood: 'calm',
       status: 'Watching the clock',
-    },
-    {
-      id: 'c-noctis',
-      typeId: 'noctis',
-      x: Math.max(40, w * 0.38),
-      y: Math.max(80, h * 0.48),
-      facing: 1,
-      mood: 'calm',
-      status: 'Listening for light',
     },
     {
       id: 'c-bonzi',

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resume-last over the media workspace</title>
+    <!--
+      The slice 10 + slice 11 story end to end, in a real engine:
+
+        the media workspace is open (opaque, full screen)
+        -> Ctrl+Space opens the palette in COMMANDS mode
+        -> the palette is visible and focused, over the workspace
+        -> "resume" matches `video.resumeLast`
+        -> Enter dispatches seanime:media-workspace-open with a startAtSec
+
+      Every step of that was individually true before and the chain still did not
+      work, because the palette rendered behind an opaque overlay and the only
+      resume affordance lived in a mode Ctrl+Space does not open.
+
+      Read window.__resumeLastProbe, or call window.runResumeLastProbe().
+    -->
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; background: #0d0c12; }
+      #probe-report {
+        position: fixed;
+        inset: auto 0 0 0;
+        max-height: 40vh;
+        overflow: auto;
+        z-index: 2147483000;
+        /* The instrument must never win its own hit tests — see the shell-layers
+           harness, where exactly that reported two fictions. */
+        pointer-events: none;
+        margin: 0;
+        padding: 12px 16px;
+        background: #07060a;
+        border-top: 2px solid #ff2e4d;
+        color: #f5f4f7;
+        font: 12px/1.55 ui-monospace, Consolas, monospace;
+        white-space: pre-wrap;
+      }
+      .probe-pass { color: #4caf7d; }
+      .probe-fail { color: #ff6b81; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <pre id="probe-report">loading…</pre>
+    <script type="module" src="./resumeLastHarness.tsx"></script>
+  </body>
+</html>

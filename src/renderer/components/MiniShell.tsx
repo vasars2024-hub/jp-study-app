@@ -32,6 +32,7 @@ import {
 } from '../miniMode';
 import { ClipboardWidget } from '../widgets/system';
 import { useAeroMaterials, useWiredMaterials } from './ui';
+import { useT } from '../i18n';
 
 /** Base craft window size — height follows from locked aspect ratio. */
 const BASE_W = 352;
@@ -107,6 +108,7 @@ export default function MiniShell({
   /** True when running inside the dedicated transparent OS widget window. */
   widgetMode?: boolean;
 }) {
+  const { t } = useT();
   const [cfg, setCfg] = useState<MiniModeSettings>(() => loadMiniMode());
   const [panelOpen, setPanelOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -691,6 +693,7 @@ export default function MiniShell({
                   setScale(s);
                   saveScale(s);
                 }}
+                aria-label={t('a11y.slider.miniWindowSize')}
               />
               <p className="muted mini-panel-note">Scale only — width and height stay locked together.</p>
             </section>
@@ -801,6 +804,7 @@ export default function MiniShell({
                 value={wallBlur}
                 className="mini-size-slider"
                 onChange={(e) => setCfg(saveMiniMode({ wallpaperBlur: Number(e.target.value) }))}
+                aria-label={t('a11y.slider.miniWallpaperBlur')}
               />
             </section>
 

@@ -47,18 +47,10 @@ export interface BookOcrResult {
 }
 
 /**
- * Estimate milliseconds remaining from throughput so far.
+ * Estimate milliseconds remaining from throughput so far. Returns undefined until
+ * there is enough history to be worth showing.
  *
- * Returns undefined until there is enough history to be worth showing — an ETA
- * extrapolated from one page swings wildly and reads as a bug.
+ * Declared in `jobEta.ts` and re-exported here: every background job wants the
+ * same behaviour, and existing importers take it from this module.
  */
-export const MIN_SAMPLES_FOR_ETA = 3;
-
-export function estimateEtaMs(
-  done: number,
-  total: number,
-  elapsedMs: number,
-): number | undefined {
-  if (done < MIN_SAMPLES_FOR_ETA || done >= total || elapsedMs <= 0) return undefined;
-  return Math.round((elapsedMs / done) * (total - done));
-}
+export { MIN_SAMPLES_FOR_ETA, estimateEtaMs } from './jobEta';

@@ -49,16 +49,6 @@ const POOLS: Record<CompanionTypeId, Partial<Record<DialogueContext, string[]>>>
     levelUp: ['Milestone clocked.', 'Level advanced.'],
     click: ['Yes?', 'On the hour.', 'Listening.'],
   },
-  noctis: {
-    idle: ['Listening for light…', 'The canopy hums.', 'Crystal steady.'],
-    morning: ['Dawn under the canopy.', 'Soft light rising.'],
-    night: ['Night ecology awake.', 'City lights below.'],
-    music: ['Resonating.', 'Signal in the song.'],
-    study: ['Growth from study.', 'Crystal warmed.'],
-    flashcard: ['Another facet.', 'Bright.'],
-    levelUp: ['The city brightens.', 'You climbed a tier.'],
-    click: ['…yes.', 'I hear you.', 'Speak softly.'],
-  },
   'miko-shimeji': {
     idle: ['Still climbing.', 'Wall or ceiling?', 'Hmm.'],
     morning: ['Morning climb!', 'Up we go.'],

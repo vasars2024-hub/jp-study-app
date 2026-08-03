@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-30T01:50:00+03:00",
+  "activePhase": "SM-032: the Study surface's own chrome is localized in EN/JA/ZH/RU, stage details carry i18n keys, and rank 24 is connected to the episode rail. Two visual defects found live in Japanese and fixed.",
+  "activeTaskId": "SM-032",
+  "currentBranch": "grammarx/phase-1-5",
+  "verifiedCommit": "9ee04eef147527b5c784652fda4df91909461d99",
+  "status": "verified",
+  "blockedTasks": [],
+  "completedTasks": [
+    "SM-001",
+    "SM-002",
+    "SM-003",
+    "SM-004",
+    "SM-005",
+    "SM-006",
+    "SM-007",
+    "SM-008",
+    "SM-009",
+    "SM-010",
+    "SM-011",
+    "SM-012",
+    "SM-013",
+    "SM-014",
+    "SM-015",
+    "SM-016",
+    "SM-017",
+    "SM-018",
+    "SM-019",
+    "SM-020",
+    "SM-021",
+    "SM-022",
+    "SM-023",
+    "SM-024",
+    "SM-025",
+    "SM-026",
+    "SM-027",
+    "SM-028",
+    "SM-029",
+    "SM-030",
+    "SM-031",
+    "SM-032"
+  ],
+  "completedCleanup": {
+    "summary": "The rank-24 live pass created no fixture. The Study document was audited before being touched — only 2 QA action records and 3 app-restamped opportunity timestamps differed — then restored byte-for-byte with the app down. media.json was never modified.",
+    "studyDocument": {
+      "changedByQa": [
+        "actions 15 -> 17 (one filter-vocabulary, one undo-filter)",
+        "3 authentic opportunity records re-stamped by the app's own boot sync"
+      ],
+      "result": "restored byte-for-byte; 1 workspace, 3 readiness, 3 opportunities, 15 actions, history 3, selection 30/370",
+      "sha256": "FC9E50B9799629697B19C34B893F393EC27A428BFDA1C6BD3C7FF62DCD3C4490"
+    },
+    "mediaDocument": {
+      "removed": [],
+      "result": "never modified this session; 67,474 bytes, still stamped 2026-07-29 21:01:11",
+      "sha256": "DC2C4E37F832A7073B262C973AD4D64CB163AB0F46837826F24CC20986731F52"
+    },
+    "ankiSnapshot": "Rewritten at 00:52:35 by the app's own bounded poll. Nothing here touched Anki and that data is authentic, so it was left as written: 2C70FFC4036BCF8E77A33FBF86BFA9C9201AA802A10F5B544E26C2536DC9BB9E.",
+    "desktopLayout": "No pre-session baseline was captured — the backup was taken after the QA had already opened a window. The layout was instead restored through the app: the Video window this pass opened was closed, and the Media window was returned to Library and re-minimized. Back up every userData file next time.",
+    "clipboard": "The user's clipboard was read before the copy proof and written back afterwards, verified identical.",
+    "removers": [
+      "src/.coordination/study-mode/remove-rank22-fixture.cjs",
+      "src/.coordination/study-mode/remove-rank22-media-fixture.cjs"
+    ]
+  },
+  "knownFailingTests": [
+    "src/shared/__tests__/architectureBaseline.test.ts > has no stale baseline entries - stale entry for deleted src/main/city/assets/validateAssets.ts; unrelated to this track"
+  ],
+  "nextAction": {
+    "description": "Rank 25, offline preparation bundle. Audit before implementing: check whether VideoCore has a managed local-asset path that can be pre-warmed (rank 12 found no write/update path for repair, which may be a different question) and what the existing preparation pass already caches, so the bundle reuses it instead of becoming a second cache. Rank 23's live proof still needs SEANIME_SIDECAR=1 and a genuinely drifting subtitle track; rank 22's panel reveal now needs only its two-episode fixture.",
+    "files": [
+      "src/shared/studyFilterRecipe.ts",
+      "src/renderer/components/media/StudyOrchestratorWorkspace.tsx",
+      "src/renderer/views/mediaCenter.css"
+    ],
+    "verificationCommands": [
+      "npx vitest run --reporter=dot",
+      "node tools/i18n-check.cjs",
+      "npx vite build --config vite.renderer.config.ts",
+      "npx vite build --config vite.main.config.ts --ssr src/main.ts",
+      "npx vite build --config vite.preload.config.ts --ssr src/preload.ts"
+    ]
+  }
+}

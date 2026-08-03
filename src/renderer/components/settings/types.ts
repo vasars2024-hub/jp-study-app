@@ -31,6 +31,7 @@ export type SettingsPageId =
   | 'study'
   | 'profile-rules'
   | 'reading'
+  | 'scraper'
   | 'transcription'
   | 'visualizer'
   | 'special'

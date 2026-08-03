@@ -64,7 +64,7 @@ describe('videoCoreMining', () => {
       asset: { filename: 'cue.webm', mimeType: 'audio/webm', bytes: 20 },
     });
     expect(buildVideoCoreMineRequest(draft)).toMatchObject({
-      route: { source: 'audio', cardKind: 'sentence', language: 'ja' },
+      route: { source: 'subtitle', cardKind: 'sentence', language: 'ja' },
       term: '猫',
       reading: 'ねこ',
       meaning: 'cat',
@@ -79,6 +79,33 @@ describe('videoCoreMining', () => {
     });
   });
 
+  it('keeps captured base64 out of provenance and persisted history', () => {
+    const captured = {
+      base64: 'large-binary-payload',
+      filename: 'shot.png',
+      mimeType: 'image/png',
+      bytes: 10,
+    };
+    const draft = withVideoCoreMiningAsset(
+      createVideoCoreMiningDraft(cue, '猫が寝ている。', source, 1000),
+      'screenshot',
+      { base64: captured.base64, asset: captured },
+    );
+    const entry = createVideoCoreMiningHistoryEntry(
+      draft,
+      { ok: true, noteId: 42 },
+      3000,
+    );
+
+    expect(draft.screenshotBase64).toBe(captured.base64);
+    expect(draft.provenance.assets.screenshot).toEqual({
+      filename: 'shot.png',
+      mimeType: 'image/png',
+      bytes: 10,
+    });
+    expect(JSON.stringify(entry)).not.toContain(captured.base64);
+  });
+
   it('records duplicate outcomes and marks successful notes undone', () => {
     const draft = createVideoCoreMiningDraft(cue, '猫が寝ている。', source, 1000);
     const duplicate = createVideoCoreMiningHistoryEntry(
@@ -88,10 +115,17 @@ describe('videoCoreMining', () => {
     );
     const exported = createVideoCoreMiningHistoryEntry(
       draft,
-      { ok: true, noteId: 42, profileName: 'Japanese' },
+      {
+        ok: true,
+        noteId: 42,
+        profileName: 'Japanese',
+        deckName: 'JP Study::Immersion',
+        deckOverriddenByRule: true,
+      },
       3000,
     );
     expect(duplicate.status).toBe('duplicate');
+    expect(exported.destination).toBe('JP Study::Immersion');
     expect(markVideoCoreMiningHistoryUndone([duplicate, exported], 42)[1])
       .toMatchObject({ noteId: 42, status: 'undone' });
   });

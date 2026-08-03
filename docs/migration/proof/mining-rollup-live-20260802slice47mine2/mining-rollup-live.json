@@ -1,0 +1,150 @@
+{
+  "harness": "mining-rollup-live-harness.mjs",
+  "question": "Can the per-row mining rollup be seen non-zero in the real Review panel, against a card the app itself mined through its own button?",
+  "startedAt": "2026-08-02T05:46:48.821Z",
+  "mediaFile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47mine2\\cue-library\\Sousou no Frieren - 01.mkv",
+  "dataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47mine2",
+  "probeDeck": "",
+  "steps": [
+    {
+      "name": "0a Anki answers and the deck count is recorded",
+      "result": "PASS",
+      "detail": "AnkiConnect v6, 83 decks"
+    },
+    {
+      "name": "0b the mining history before anything is driven",
+      "result": "MEASURED",
+      "detail": "0 entries — this is the state the OPEN row described"
+    },
+    {
+      "name": "0c sidecar ready",
+      "result": "PASS",
+      "detail": "pid 33688, port 55925, v3.10.2"
+    },
+    {
+      "name": "1 the fixture is playing in Blanc",
+      "result": "PASS",
+      "detail": "{\"readyState\":4,\"duration\":30.386} after 1 open attempt(s)"
+    },
+    {
+      "name": "2 the mining panel has a real cue to mine",
+      "result": "PASS",
+      "detail": "button enabled, term \"The cat is sleeping by the window.\""
+    },
+    {
+      "name": "3 the destination is left to the app",
+      "result": "MEASURED",
+      "detail": "the field is untouched, so the profile rule chooses — the same thing a user gets"
+    },
+    {
+      "name": "4 the app mined a real card through its own button",
+      "result": "PASS",
+      "detail": "status exported, noteId 1785649637035, destination JP Study::N2 Vocab"
+    },
+    {
+      "name": "4b Anki confirms the note by id",
+      "result": "PASS",
+      "detail": "noteId 1785649637035, model JP Study App::JA-EN Classic, deck JP Study::N2 Vocab"
+    },
+    {
+      "name": "5 the Review segment is open in the real workspace",
+      "result": "PASS",
+      "detail": "host launcher, review clicked"
+    },
+    {
+      "name": "6 the rollup shows the mined card in the app",
+      "result": "PASS",
+      "detail": "1 card(s), stages [\"untracked\"], stats [{\"label\":\"Cards\",\"value\":\"1\"}]"
+    }
+  ],
+  "anki": {
+    "version": 6,
+    "decksBefore": 83
+  },
+  "historyBefore": null,
+  "historyBeforeCount": 0,
+  "sidecar": {
+    "pid": 33688,
+    "port": 55925,
+    "version": "3.10.2"
+  },
+  "item": {
+    "id": "2c630884-e603-4e8d-b6d0-d9bc7aaa6d03",
+    "fileName": "Sousou no Frieren - 01.mkv"
+  },
+  "openAttempts": 1,
+  "draft": {
+    "fields": 6,
+    "firstText": "The cat is sleeping by the window."
+  },
+  "entry": {
+    "id": "video-core-mine-msbdotym-4-0",
+    "status": "exported",
+    "noteId": 1785649637035,
+    "destination": "JP Study::N2 Vocab",
+    "term": "The cat is sleeping by the window.",
+    "sentence": "The cat is sleeping by the window.",
+    "localFilePath": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\gplay-dd-slice47mine2\\cue-library\\Sousou no Frieren - 01.mkv"
+  },
+  "panelMessage": "Mined to JP Study::N2 Vocab.",
+  "ankiNote": {
+    "noteId": 1785649637035,
+    "modelName": "JP Study App::JA-EN Classic",
+    "tags": [
+      "cue-4-0",
+      "jp-study-app",
+      "jp-study-app::p1-ja-focus",
+      "media-154587",
+      "video-core"
+    ],
+    "fields": [
+      "Term",
+      "Reading",
+      "Meaning",
+      "Sentence"
+    ]
+  },
+  "ankiDeckOfNote": "JP Study::N2 Vocab",
+  "rollup": {
+    "empty": false,
+    "cards": 1,
+    "stages": [
+      "untracked"
+    ],
+    "terms": [
+      "The cat is sleeping by the window."
+    ],
+    "stats": [
+      {
+        "label": "Cards",
+        "value": "1"
+      }
+    ],
+    "note": ""
+  },
+  "verdict": "PASS",
+  "result": "PASS",
+  "cleanup": {
+    "noteDeleted": "{\"ok\":true}",
+    "residualNotes": 0,
+    "probeDeckRemoved": false,
+    "probeDeckNote": "the card landed in JP Study::N2 Vocab, which is not this harness's to remove",
+    "decksAfter": 84,
+    "deckCountUnchanged": false,
+    "historyRestored": true
+  },
+  "finishedAt": "2026-08-02T05:47:20.155Z",
+  "log": [
+    "[mining] PASS — 0a Anki answers and the deck count is recorded: AnkiConnect v6, 83 decks",
+    "[mining] MEASURED — 0b the mining history before anything is driven: 0 entries — this is the state the OPEN row described",
+    "[mining] PASS — 0c sidecar ready: pid 33688, port 55925, v3.10.2",
+    "[mining] PASS — 1 the fixture is playing in Blanc: {\"readyState\":4,\"duration\":30.386} after 1 open attempt(s)",
+    "[mining] PASS — 2 the mining panel has a real cue to mine: button enabled, term \"The cat is sleeping by the window.\"",
+    "[mining] MEASURED — 3 the destination is left to the app: the field is untouched, so the profile rule chooses — the same thing a user gets",
+    "[mining] PASS — 4 the app mined a real card through its own button: status exported, noteId 1785649637035, destination JP Study::N2 Vocab",
+    "[mining] PASS — 4b Anki confirms the note by id: noteId 1785649637035, model JP Study App::JA-EN Classic, deck JP Study::N2 Vocab",
+    "[mining] PASS — 5 the Review segment is open in the real workspace: host launcher, review clicked",
+    "[mining] PASS — 6 the rollup shows the mined card in the app: 1 card(s), stages [\"untracked\"], stats [{\"label\":\"Cards\",\"value\":\"1\"}]"
+  ],
+  "sidecarLog": "sidecar-seanime-2026-08-02_08-46-54.log"
+}

@@ -29,6 +29,29 @@ Date: 2026-07-17.
      (`app://` protocol isn't registered in dev mode). Scheduled for a real check
      during Batch C/E's packaged-build pass — flagging here rather than claiming it's
      confirmed working.
+   - **2026-08-01 — that live check ran, and this directive was wrong.** The
+     packaged-build pass (`docs/migration/tools/packaged-blanc-harness.mjs`) found
+     `connect-src` blocking every renderer call to the bundled seanime sidecar:
+     `Connecting to 'http://127.0.0.1:<port>/api/v1/status' violates the following
+     Content Security Policy directive`. The study player gates on that status
+     fetch, so the player never loaded in a packaged build at all — while dev was
+     unaffected, since dev runs off the Vite origin this header never touches.
+     The pre-write grep above is what missed it: it asked whether the renderer
+     called **external hosts** and correctly answered no. The sidecar is loopback,
+     so it was never in scope of the question. Fixed by adding
+     `http://127.0.0.1:* ws://127.0.0.1:*` (both — the player also holds a
+     `/events` websocket). Port is wildcarded because a CSP binds to a document at
+     load time, so the live port cannot be named: Blanc can open before the sidecar
+     has a port, and the supervisor can restart it onto a new one mid-session.
+   - **`media-src` needed it too, and this took a second pass to find.** With only
+     `connect-src` fixed the harness got a live socket, one clean POST and a
+     `watch` at 1514ms — and still no picture, because the `<video>` element's load
+     of `/api/v1/directstream/stream` is governed by `media-src`, not `connect-src`.
+     The two directives cover different steps of the same open: `connect-src` the
+     `fetch()` that *prepares* the stream, `media-src` the element that then *plays*
+     it. A grep for renderer `fetch()` calls — which is how both this entry and the
+     2026-07-17 note above framed the question — cannot see the second one. Any
+     future host added for playback has to be checked against both.
 
 2. **Unnecessary `webviewTag: true` on 3 of 5 windows (Low, per §6a's open question).**
    Traced the only `<webview>` consumer in the renderer (`ImmersionView.tsx`) and

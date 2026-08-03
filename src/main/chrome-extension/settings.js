@@ -48,6 +48,15 @@ const JP_DEFAULT_SETTINGS = {
   // Pairing
   token: '',
   port: 18765,
+  // AI OCR / Dictionary AI — what a highlight or an OCR resolves to. The two
+  // are separate because highlighting is a constant, low-intent gesture while
+  // an OCR is deliberate: wanting a full AI read of every drag-select but not
+  // of every screenshot (or the reverse) is the normal case, not an edge one.
+  aiOnHighlight: false,
+  aiOnOcr: false,
+  // Minimum selected characters before a highlight is treated as a sentence
+  // worth a cloud call rather than a word worth a dictionary lookup.
+  aiMinChars: 6,
   // Hover lookup
   hoverLookup: true,
   hoverKey: 'shift', // shift | alt | ctrl
@@ -150,6 +159,10 @@ function jpNormalizeSettings(raw) {
   s.version = JP_SETTINGS_VERSION;
   s.port = jpClampInt(s.port, 1, 65535, 18765);
   s.token = typeof s.token === 'string' ? s.token : '';
+
+  s.aiOnHighlight = s.aiOnHighlight === true;
+  s.aiOnOcr = s.aiOnOcr === true;
+  s.aiMinChars = jpClampInt(s.aiMinChars, 2, 60, 6);
 
   s.hoverLookup = s.hoverLookup !== false;
   s.hoverKey = JP_HOVER_KEYS.includes(s.hoverKey) ? s.hoverKey : 'shift';

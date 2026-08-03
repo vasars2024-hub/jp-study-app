@@ -25,6 +25,34 @@ export interface AnkiModel {
 }
 export type AnkiModels = Record<string, AnkiModel>;
 
+export interface NormalizedAnkiFieldRow {
+  mid: string;
+  modelName: string;
+  ord: number;
+  fieldName: string;
+}
+
+/** Build the legacy model map from Anki's newer normalized notetypes/fields tables. */
+export function modelsFromNormalizedRows(rows: readonly NormalizedAnkiFieldRow[]): AnkiModels {
+  const output: AnkiModels = {};
+  for (const row of rows) {
+    const mid = String(row.mid);
+    const model = output[mid] ?? {
+      name: typeof row.modelName === 'string' ? row.modelName : '',
+      flds: [],
+    };
+    model.flds.push({
+      name: typeof row.fieldName === 'string' ? row.fieldName : '',
+      ord: Number.isFinite(row.ord) ? Math.max(0, Math.floor(row.ord)) : model.flds.length,
+    });
+    output[mid] = model;
+  }
+  for (const model of Object.values(output)) {
+    model.flds.sort((a, b) => a.ord - b.ord);
+  }
+  return output;
+}
+
 /**
  * Which field of a note holds the studied word. Mirrors the `term` role regex
  * in src/main/anki/fieldMapper.ts (kept in sync deliberately — the two live in

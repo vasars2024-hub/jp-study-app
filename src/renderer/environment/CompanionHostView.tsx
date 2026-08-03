@@ -13,6 +13,7 @@ import {
   mapDeskToDisplayWorkArea,
   pickDisplayForVirtualPoint,
 } from './shimejiPhysics';
+import { useT } from '../i18n';
 
 interface HostState {
   companions: CompanionInstance[];
@@ -82,6 +83,7 @@ function mapToHost(
 }
 
 export default function CompanionHostView() {
+  const { t } = useT();
   const [state, setState] = useState<HostState>({ companions: [], enabled: true });
   const [vp, setVp] = useState<Viewport | null>(null);
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
@@ -198,7 +200,7 @@ export default function CompanionHostView() {
               ['--c-body' as string]: def.color,
               ['--c-accent' as string]: def.accent,
             }}
-            title={`${def.label}${c.status ? ` — ${c.status}` : ''} · Click: run routine`}
+            title={`${def.label}${c.status ? ` — ${c.status}` : ''} · ${t('companion.host.tooltip.hint')}`}
             onClick={(e) => {
               e.stopPropagation();
               const rid = resolvePrimaryRoutineId(c);
@@ -243,10 +245,10 @@ export default function CompanionHostView() {
                     setMenuId(null);
                   }}
                 >
-                  Run routine
+                  {t('companion.host.menu.runRoutine')}
                 </button>
                 <button type="button" className="btn small" onClick={() => setMenuId(null)}>
-                  Close
+                  {t('common.close')}
                 </button>
               </div>
             )}

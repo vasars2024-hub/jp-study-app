@@ -6,10 +6,10 @@ import SettingsApp from './settings/SettingsApp';
 import type { SettingsWallProps, WallChoice } from './settings/types';
 import { bootPersonalization, savePersonalization } from '../osPersonalization';
 import { bootDesktopPrefs } from '../desktopPrefs';
+import { getReduceMotion } from '../displayPrefs';
 
 export type { WallChoice };
 
-const MOTION_KEY = 'jp-os-reduce-motion';
 
 /** @deprecated Prefer savePersonalization — kept for any external callers. */
 export function applyAccent(id: string): void {
@@ -25,7 +25,7 @@ export function bootOsLook(): void {
   try {
     bootPersonalization();
     bootDesktopPrefs();
-    applyMotion(localStorage.getItem(MOTION_KEY) === '1');
+    applyMotion(getReduceMotion());
   } catch {
     /* ignore */
   }

@@ -17,13 +17,13 @@
 
 import type { VocabItem } from './games/contentSource';
 import type { WkLevel } from './knownWords';
+import { hasKanji } from '../shared/furigana';
 
-/** Han ideographs plus the iteration/abbreviation marks that behave like them. */
-const KANJI_RE = /[一-鿿々〆ヵヶ]/;
+export { hasKanji };
 
-export function hasKanji(text: string): boolean {
-  return KANJI_RE.test(text);
-}
+// One definition, in shared/furigana — it now covers the union of the ranges the two
+// copies used. Re-exported so this module's existing importers (and its tests) are
+// unaffected.
 
 /**
  * Deterministic index into `length` for `seed`.

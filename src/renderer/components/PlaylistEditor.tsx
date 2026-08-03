@@ -15,6 +15,7 @@ import {
   type WallpaperPlaylist,
 } from '../environment';
 import type { CalendarCategory } from '../environment/types';
+import { useT } from '../i18n';
 
 const CAL_CATS: { id: CalendarCategory; label: string }[] = [
   { id: 'exam', label: 'Exam' },
@@ -56,6 +57,7 @@ export default function PlaylistEditor({
   disabled?: boolean;
   onChange: (partial: Partial<EnvironmentSettings>) => void;
 }) {
+  const { t } = useT();
   const playlists = env.playlists?.length ? env.playlists : [buildDefaultDayCyclePlaylist()];
   const activeId = playlists.some((p) => p.id === env.activePlaylistId)
     ? env.activePlaylistId
@@ -339,6 +341,7 @@ export default function PlaylistEditor({
           value={active.transitionMs}
           disabled={disabled}
           onChange={(e) => updateActive({ transitionMs: Number(e.target.value) })}
+          aria-label={t('a11y.slider.transitionDuration')}
         />
         <span className="muted">{active.transitionMs}ms</span>
       </div>

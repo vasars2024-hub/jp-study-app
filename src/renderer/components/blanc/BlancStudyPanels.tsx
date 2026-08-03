@@ -56,6 +56,7 @@ import {
   StatsBooks,
   StatsCards,
   StatsChart,
+  StatsShows,
   WordKnowledge,
   useStats,
 } from '../stats/StatsContent';
@@ -883,6 +884,13 @@ export function BlancStatisticsPanel() {
         <fieldset>
           <legend>By book</legend>
           <StatsBooks state={state} />
+        </fieldset>
+      )}
+
+      {s.shows.length > 0 && (
+        <fieldset>
+          <legend>By show</legend>
+          <StatsShows state={state} />
         </fieldset>
       )}
 

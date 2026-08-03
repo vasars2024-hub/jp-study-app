@@ -78,7 +78,6 @@ export type ToolboxModuleId =
   | 'audio-recorder'
   | 'focus-timer'
   | 'quick-notes'
-  | 'workspace-launcher'
   | 'download-organizer'
   | 'batch-converter'
   | 'clipboard-ocr'
@@ -101,7 +100,8 @@ export type ToolboxModuleId =
   | 'review-forecast'
   | 'pitch-accent'
   | 'dev-console'
-  | 'audio-mine';
+  | 'audio-mine'
+  | 'app-drawer';
 
 export type ToolboxModuleCategory =
   | 'study'
@@ -832,8 +832,8 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     migrationNotes: 'Shares the canvas conversion approach with image-converter; extract a shared helper if a third consumer appears.',
   },
   {
-    id: 'workspace-launcher',
-    label: 'Workspace Launcher',
+    id: 'app-drawer',
+    label: 'App Drawer',
     category: 'automation',
     status: 'ready',
     capabilities: ['automation', 'file-system'],
@@ -841,18 +841,19 @@ export const TOOLBOX_MODULES: ToolboxModule[] = [
     launchContexts: BLANC_READY_CONTEXTS,
     supportsBackground: false,
     appearsInBlanc: true,
-    appearsInNormalOs: true,
+    appearsInNormalOs: false,
     supportsGlobalShortcut: false,
     supportsAutomation: true,
     acceptsExternalInput: true,
     aiRequired: false,
     localOnlyCapable: true,
-    implementation: 'Built-in Blanc workspace groups: named sets of targets launched in order through the existing desktop:launch IPC.',
+    implementation:
+      "Folders of shortcuts — apps/files via the native picker, http(s) links, and Blanc's own built-in tools, nested one level deep — backed by the same main-process store as the Resources app's saved-sites list (shared/collectedTools.ts) rather than a second parallel store. Supersedes workspace-launcher, whose saved groups migrate in as folders the first time this panel opens.",
     externalAdapter: {
       strategy: 'built-in',
-      notes: 'Reuses desktop:pickShortcut and desktop:launch — no new main-process surface. Window placement/sizing on launch needs a window-control adapter later.',
+      notes: "Reuses desktop:pickShortcut and desktop:launch for app/file/link kinds; a 'tool' shortcut switches Blanc's own active panel and never touches desktop:launch.",
     },
-    migrationNotes: 'Targets are added via the native picker (or typed http(s) URLs) so the desktop:launch caller invariant holds; keep that if this moves to normal OS.',
+    migrationNotes: 'Pillar 3. Blanc-only by design: there is no Study OS counterpart to port from, unlike the Pillar 2 parity tracks.',
   },
   {
     id: 'notification-center',

@@ -1,18 +1,22 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import type { DesktopWinSection } from '../../shared/desktop';
 import MusicWidget from './MusicWidget';
 import { useVisualizer, VizStage } from './visualizer/VisualizerContent';
 import { WALL_PRESETS } from '../environment/wallCatalog';
-import { getCityState, onCityChanged } from '../cityState';
-import type { CityStateMessage } from '../../main/city/ipc/channels';
-const NoctisWorkspace = lazy(() => import('../../main/city/ui/NoctisWorkspace'));
+const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 
 const LibraryView = lazy(() => import('../views/LibraryView'));
 const NovelsView = lazy(() => import('../views/NovelsView'));
-const MediaView = lazy(() => import('../views/MediaView'));
-const VideoPlayerView = lazy(() => import('../views/VideoPlayerView'));
-const MusicView = lazy(() => import('../views/MusicView'));
+const MediaCenterView = lazy(() => import('../views/MediaCenterView'));
+/**
+ * Old-player retirement, 2026-07-31. `player` and `video` hand off to the adopted Seanime
+ * workspace; it falls back to `MediaCenterView` when the sidecar is disabled, so
+ * `SEANIME_SIDECAR=0` remains a rollback rather than a way to lose the media surface.
+ * `music` still routes to `MediaCenterView` directly — the workspace has no music surface.
+ */
+const MediaWorkspaceSectionView = lazy(() => import('../views/MediaWorkspaceSectionView'));
+const ScraperView = lazy(() => import('../views/ScraperView'));
 const TranslateView = lazy(() => import('../views/TranslateView'));
 const DictionaryView = lazy(() => import('../views/DictionaryView'));
 const AnkiView = lazy(() => import('../views/AnkiView'));
@@ -58,7 +62,7 @@ export default function AppSection({
       );
       break;
     case 'city':
-      view = <NoctisView />;
+      view = <ReadingGarden />;
       break;
     case 'library':
       view = <LibraryView onOpen={onOpenBook} />;
@@ -67,16 +71,19 @@ export default function AppSection({
       view = <NovelsView />;
       break;
     case 'player':
-      view = <MediaView mode="library" />;
+      view = <MediaWorkspaceSectionView legacyTab="library" />;
+      break;
+    case 'scraper':
+      view = <ScraperView />;
       break;
     case 'video':
-      view = <VideoPlayerView />;
+      view = <MediaWorkspaceSectionView legacyTab="video" />;
       break;
     case 'youtube':
       view = <YouTubePlaylistsView />;
       break;
     case 'music':
-      view = <MusicView />;
+      view = <MediaCenterView initialTab="music" />;
       break;
     case 'visualizer':
       view = <VisualizerWidget />;
@@ -124,12 +131,6 @@ export default function AppSection({
       view = null;
   }
   return <Suspense fallback={<div className="app-section-loading muted">Loading...</div>}>{view}</Suspense>;
-}
-
-function NoctisView() {
-  const [message, setMessage] = useState<CityStateMessage | null>(getCityState());
-  useEffect(() => onCityChanged(setMessage), []);
-  return <NoctisWorkspace message={message} />;
 }
 
 export function VisualizerWidget() {

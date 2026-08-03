@@ -12,19 +12,21 @@ import type {
   ProfileId,
   ProfileSnapshot,
   ProfileStoreSchema,
-  SeedProfileId,
   StudyProfile,
 } from '../shared/profiles';
 import {
   CARD_CONTENTS,
   DEFAULT_ANKI_URL,
-  DEFAULT_PROFILE_ID,
   JLPT_TARGETS,
   LOOKUP_PIPELINES,
   makeCustomProfile,
+} from '../shared/profiles';
+import {
+  DEFAULT_PROFILE_ID,
   PROFILE_IDS,
   SEED_PROFILES,
-} from '../shared/profiles';
+  type SeedProfileId,
+} from '../shared/seedProfiles';
 
 const MIGRATION_TIMEOUT_MS = 10000; // T4: renderer had no legacy keys or crashed
 

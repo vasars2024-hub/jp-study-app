@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { getTranslateTarget, setTranslateTarget } from '../translateTarget';
 import type { LibraryItem } from '../../shared/types';
+import {
+  progressFromReadingLocator,
+  readingLocatorFromProgress,
+} from '../../shared/readingLibraryAdapter';
 import type { MokuroBlock, MokuroBlockKind, MokuroBox, MokuroPage } from '../../shared/mokuroTypes';
 import { formatBytes } from '../../shared/assetRegistry';
 import DictionaryPopup from '../components/DictionaryPopup';
@@ -22,7 +27,9 @@ import { stripFuriganaFragments } from '../../shared/mangaOcrText';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { useAssetInstalled } from '../assetStore';
-import { useT, getUiLang } from '../i18n';
+import { useT } from '../i18n';
+import { KNOWN_LANGS } from '../../shared/langs';
+import { getActiveProfile } from '../profileState';
 import { medianBorderColor } from '../mangaBubbleFill';
 import { getZoomFactor } from '../appZoom';
 import MangaReaderSettingsPanel from '../components/manga/MangaReaderSettingsPanel';
@@ -78,18 +85,39 @@ function findBlockNearBox(page: MokuroPage, box: MokuroBox): MokuroBlock | null 
 }
 
 /**
- * The manga translate target language. Single source of truth so the save,
- * the page-load cache read, and the volume analyze can never disagree on the
- * cache-file key (a mismatch is what makes translations "not persist").
+ * Shared translation target (same key as EPUB / Translate view). Never equals
+ * the study/source language so Japanese UI cannot produce JA→JA duplicates.
  */
 function mangaTargetLang(): string {
-  return getUiLang() === 'ja' ? 'en' : getUiLang();
+  const source = getActiveProfile().targetLang;
+  const saved = getTranslateTarget();
+  if (saved === source) return source === 'en' ? 'ru' : 'en';
+  return saved;
+}
+
+function writeMangaTargetLang(code: string): void {
+  setTranslateTarget(code);
+}
+
+/**
+ * The saved page, read through the canonical reading model (Phase 5) rather
+ * than off `progress.page` directly. The projection refuses a position stored
+ * in a form this format cannot mean, so a corrupt or cross-format save opens at
+ * page 0 instead of somewhere that does not mean what it says.
+ */
+function savedPageIndex(item: LibraryItem): number {
+  const locator = readingLocatorFromProgress(item, item.progress);
+  return locator?.kind === 'page' ? locator.index : 0;
 }
 
 export default function MangaReader({ item, onClose }: Props) {
   const { t } = useT();
+  const sourceLang = getActiveProfile().targetLang;
+  const [targetLang, setTargetLang] = useState(() => mangaTargetLang());
+  const targetLangRef = useRef(targetLang);
+  targetLangRef.current = targetLang;
   const [pages, setPages] = useState<string[]>([]);
-  const [idx, setIdx] = useState(item.progress?.page ?? 0);
+  const [idx, setIdx] = useState(() => savedPageIndex(item));
   const [mangaSettings, setMangaSettingsState] = useState<MangaReaderSettings>(() => loadMangaReaderSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -143,6 +171,10 @@ export default function MangaReader({ item, onClose }: Props) {
   const [fillByRegion, setFillByRegion] = useState<Record<string, string>>({});
   const [translating, setTranslating] = useState(false);
   const [translateError, setTranslateError] = useState('');
+  const [pageRangeFrom, setPageRangeFrom] = useState(1);
+  const [pageRangeTo, setPageRangeTo] = useState(1);
+  const [chapterRangeFrom, setChapterRangeFrom] = useState(1);
+  const [chapterRangeTo, setChapterRangeTo] = useState(1);
   // Same shape as the novel reader's popup state: a word click opens the
   // dictionary, a phrase/sentence selection opens the sentence translator.
   const [popup, setPopup] = useState<{
@@ -179,7 +211,7 @@ export default function MangaReader({ item, onClose }: Props) {
     window.api.getMangaPages(item.id).then((p) => {
       setPages(p);
       ttbNavIntent.current = true;
-      setIdx(Math.min(item.progress?.page ?? 0, Math.max(0, p.length - 1)));
+      setIdx(Math.min(savedPageIndex(item), Math.max(0, p.length - 1)));
     });
   }, [item.id]);
 
@@ -374,7 +406,7 @@ export default function MangaReader({ item, onClose }: Props) {
       setOcrText(pageToOcrText(page));
       setOcrStatus('done');
       setOcrOpen(true);
-      const target = mangaTargetLang();
+      const target = targetLangRef.current;
       const tr = await window.api.mangaOcrLoadTranslateCache(item.id, url, target);
       if (cancelled) return;
       if (!tr) {
@@ -618,13 +650,17 @@ export default function MangaReader({ item, onClose }: Props) {
     });
   }, []);
 
-  const analyzeEntireManga = useCallback(async () => {
+  const analyzeMangaRange = useCallback(async (startPage: number, endPage: number) => {
     if (volumeBusy) return;
+    if (!pages.length) return;
+    const last = pages.length - 1;
+    const start = Math.min(last, Math.max(0, Math.floor(startPage)));
+    const end = Math.min(last, Math.max(start, Math.floor(endPage)));
     setVolumeBusy(true);
     setOcrOpen(true);
     setOcrError('');
-    setVolumeProgress({ phase: 'ocr', pageIndex: 0, pageTotal: pages.length || 1 });
-    const target = mangaTargetLang();
+    setVolumeProgress({ phase: 'ocr', pageIndex: 0, pageTotal: end - start + 1 });
+    const target = targetLang;
     try {
       const res = await window.api.mangaOcrAnalyzeVolume({
         itemId: item.id,
@@ -632,12 +668,16 @@ export default function MangaReader({ item, onClose }: Props) {
         targetLang: target,
         force: false,
         detectionSensitivity: mangaSettings.detectionSensitivity,
+        startPage: start,
+        endPage: end,
       });
       if (!res.ok) {
         if (!res.cancelled) setOcrError(res.error || t('manga.ocr.volumeFailed'));
         return;
       }
-      // Reload current page caches so overlay updates immediately.
+      // A run can succeed at OCR and still translate nothing. Say so — the
+      // alternative is a page that looks translated and is not.
+      if (res.warning) setOcrError(res.warning);
       const url = pages[idx];
       if (url) {
         const page = await window.api.mangaOcrLoadCache(item.id, url);
@@ -666,7 +706,47 @@ export default function MangaReader({ item, onClose }: Props) {
     t,
     ensureTextOverlayMode,
     mangaSettings.detectionSensitivity,
+    targetLang,
   ]);
+
+  const analyzeEntireManga = useCallback(async () => {
+    if (!pages.length) return;
+    await analyzeMangaRange(0, pages.length - 1);
+  }, [pages, analyzeMangaRange]);
+
+  const translateAheadPages = useCallback(async () => {
+    if (!pages.length || idx >= pages.length - 1) {
+      setOcrError(t('manga.translate.nothingAhead'));
+      return;
+    }
+    await analyzeMangaRange(idx + 1, pages.length - 1);
+  }, [pages, idx, analyzeMangaRange, t]);
+
+  const translatePageRange = useCallback(async () => {
+    if (!pages.length) return;
+    const start = Math.max(0, pageRangeFrom - 1);
+    const end = Math.max(start, pageRangeTo - 1);
+    await analyzeMangaRange(start, end);
+  }, [pages, pageRangeFrom, pageRangeTo, analyzeMangaRange]);
+
+  /** Manga has no native chapter map — treat chapters as equal page buckets (~20 pages). */
+  const mangaChapterCount = Math.max(1, Math.ceil(pages.length / 20) || 1);
+  const translateChapterRange = useCallback(async () => {
+    if (!pages.length) return;
+    const fromCh = Math.min(mangaChapterCount, Math.max(1, chapterRangeFrom));
+    const toCh = Math.min(mangaChapterCount, Math.max(fromCh, chapterRangeTo));
+    const start = (fromCh - 1) * 20;
+    const end = Math.min(pages.length - 1, toCh * 20 - 1);
+    await analyzeMangaRange(start, end);
+  }, [pages, mangaChapterCount, chapterRangeFrom, chapterRangeTo, analyzeMangaRange]);
+
+  useEffect(() => {
+    if (!pages.length) return;
+    setPageRangeFrom(1);
+    setPageRangeTo(pages.length);
+    setChapterRangeFrom(1);
+    setChapterRangeTo(Math.max(1, Math.ceil(pages.length / 20)));
+  }, [pages.length]);
 
   const cancelVolumeAnalyze = useCallback(() => {
     void window.api.mangaOcrCancelVolume(item.id);
@@ -687,14 +767,14 @@ export default function MangaReader({ item, onClose }: Props) {
       !!meta &&
       meta.ocrPages >= pages.length &&
       meta.translatedPages >= pages.length &&
-      meta.targetLang === mangaTargetLang();
+      meta.targetLang === targetLang;
     if (alreadyDone) return;
     autoVolumeStartedRef.current = true;
     void analyzeEntireManga();
-  }, [mangaSettings.autoTranslate, engineReady, pages.length, item.ocrMeta, analyzeEntireManga]);
+  }, [mangaSettings.autoTranslate, engineReady, pages.length, item.ocrMeta, analyzeEntireManga, targetLang]);
 
   /**
-   * Run batch translation for a Mokuro page and show the English (or UI-lang) overlay.
+   * Run batch translation for a Mokuro page and show the target-lang overlay.
    * Pass the page explicitly so callers (e.g. draw-region) aren't racing React state.
    */
   const runTranslatePage = useCallback(
@@ -703,7 +783,7 @@ export default function MangaReader({ item, onClose }: Props) {
       setTranslating(true);
       setTranslateError('');
       try {
-        const target = mangaTargetLang();
+        const target = targetLang;
         const items: Array<{ id: string; text: string; source: string; target: string }> = [];
         for (const block of page.blocks) {
           if (block.kind === 'ignore') continue;
@@ -712,7 +792,7 @@ export default function MangaReader({ item, onClose }: Props) {
           if (!id) continue;
           const text = block.lines.join(block.vertical ? '' : '\n').trim();
           if (!text) continue;
-          items.push({ id, text, source: 'ja', target });
+          items.push({ id, text, source: sourceLang, target });
         }
         if (!items.length) {
           setTranslateError(t('manga.translate.noText'));
@@ -776,7 +856,7 @@ export default function MangaReader({ item, onClose }: Props) {
         setTranslating(false);
       }
     },
-    [translating, showSfx, pages, idx, item.id, t, ensureTextOverlayMode],
+    [translating, showSfx, pages, idx, item.id, t, ensureTextOverlayMode, targetLang, sourceLang],
   );
   translateRef.current = runTranslatePage;
 
@@ -828,11 +908,17 @@ export default function MangaReader({ item, onClose }: Props) {
 
   useEffect(() => {
     if (!pages.length) return;
-    window.api.setProgress(item.id, {
-      page: idx,
-      percent: pages.length > 1 ? idx / (pages.length - 1) : 1,
-    });
-  }, [idx, pages.length, item.id]);
+    // Written through the model so the locator is validated against this
+    // edition's format before it reaches the library's loose `Progress` shape.
+    window.api.setProgress(
+      item.id,
+      progressFromReadingLocator(
+        item,
+        { kind: 'page', index: idx },
+        pages.length > 1 ? idx / (pages.length - 1) : 1,
+      ),
+    );
+  }, [idx, pages.length, item]);
 
   useEffect(() => {
     setOcrStatus('idle');
@@ -868,6 +954,33 @@ export default function MangaReader({ item, onClose }: Props) {
     }
     await runTranslatePage(mokuroPage);
   }, [mokuroPage, translating, translatedPage, showTranslated, runTranslatePage, ensureTextOverlayMode]);
+
+  const setTranslateTarget = useCallback((code: string) => {
+    const finalTarget = code === sourceLang ? (sourceLang === 'en' ? 'ru' : 'en') : code;
+    writeMangaTargetLang(finalTarget);
+    setTargetLang(finalTarget);
+    setTranslatedPage(null);
+    setShowTranslated(false);
+    setFillByRegion({});
+    autoVolumeStartedRef.current = false;
+  }, [sourceLang]);
+
+  const toggleTranslationVisibility = useCallback(() => {
+    if (!mokuroPage) return;
+    if (translatedPage && showTranslated) {
+      setShowTranslated(false);
+      setOcrText(pageToOcrText(mokuroPage));
+      return;
+    }
+    if (translatedPage && !showTranslated) {
+      setShowTranslated(true);
+      setOcrText(pageToOcrText(translatedPage));
+      ensureTextOverlayMode();
+      return;
+    }
+    void runTranslatePage(mokuroPage);
+  }, [mokuroPage, translatedPage, showTranslated, ensureTextOverlayMode, runTranslatePage]);
+
   useEffect(() => {
     const offs = [
       registerCommandHandler('manga.nextPage', () => {
@@ -895,9 +1008,12 @@ export default function MangaReader({ item, onClose }: Props) {
       registerCommandHandler('reader.zoomReset', () => {
         setZoom(1);
       }),
+      registerCommandHandler('reader.toggleTranslation', () => {
+        toggleTranslationVisibility();
+      }),
     ];
     return () => offs.forEach((off) => off());
-  }, [go, bumpZoom]);
+  }, [go, bumpZoom, toggleTranslationVisibility]);
 
   /**
    * Cubari's "browser history/back-button behavior" setting has no real analog
@@ -1408,6 +1524,21 @@ export default function MangaReader({ item, onClose }: Props) {
                     />
                     {t('manga.ocr.autoTranslate')}
                   </label>
+                  <label className="ocr-check muted manga-translate-target">
+                    <span>{t('manga.translate.target')}</span>
+                    <select
+                      value={targetLang}
+                      disabled={volumeBusy || translating}
+                      onChange={(e) => setTranslateTarget(e.target.value)}
+                      aria-label={t('manga.translate.target')}
+                    >
+                      {KNOWN_LANGS.filter((l) => l.code !== sourceLang).map((l) => (
+                        <option key={l.code} value={l.code}>
+                          {l.nativeLabel}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <button
                     className="btn small"
                     disabled={ocrStatus === 'scanning' || !mokuroPage || translating || volumeBusy}
@@ -1418,6 +1549,17 @@ export default function MangaReader({ item, onClose }: Props) {
                       : showTranslated
                         ? t('manga.translate.showOriginal')
                         : t('manga.translate.page')}
+                  </button>
+                  <button
+                    className={`btn small${showTranslated ? ' active' : ''}`}
+                    disabled={!mokuroPage || translating || volumeBusy}
+                    title={t('manga.translate.toggleVisibility')}
+                    onClick={() => toggleTranslationVisibility()}
+                  >
+                    <Icon name="eye" size={14} />
+                    <span>
+                      {showTranslated ? t('manga.translate.hide') : t('manga.translate.show')}
+                    </span>
                   </button>
                   {volumeBusy ? (
                     <button className="btn small" onClick={cancelVolumeAnalyze}>
@@ -1433,6 +1575,98 @@ export default function MangaReader({ item, onClose }: Props) {
                       {t('manga.ocr.volumeAnalyze')}
                     </button>
                   )}
+                  <div className="manga-translate-range">
+                    <div className="manga-translate-range-actions">
+                      <button
+                        className="btn small"
+                        disabled={
+                          volumeBusy ||
+                          translating ||
+                          !engineReady ||
+                          idx >= pages.length - 1
+                        }
+                        title={t('manga.translate.ahead.hint')}
+                        onClick={() => void translateAheadPages()}
+                      >
+                        {t('manga.translate.ahead')}
+                      </button>
+                    </div>
+                    <div className="manga-translate-range-group">
+                      <span className="manga-translate-range-label">
+                        {t('manga.translate.chapterRange')}
+                      </span>
+                      <div className="manga-translate-range-row">
+                        <input
+                          type="number"
+                          min={1}
+                          max={mangaChapterCount}
+                          value={chapterRangeFrom}
+                          disabled={volumeBusy || translating || !engineReady}
+                          onChange={(e) => setChapterRangeFrom(Number(e.target.value) || 1)}
+                          aria-label={t('manga.translate.rangeFrom')}
+                        />
+                        <span className="muted">–</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={mangaChapterCount}
+                          value={chapterRangeTo}
+                          disabled={volumeBusy || translating || !engineReady}
+                          onChange={(e) => setChapterRangeTo(Number(e.target.value) || 1)}
+                          aria-label={t('manga.translate.rangeTo')}
+                        />
+                        <button
+                          className="btn small"
+                          disabled={volumeBusy || translating || !engineReady}
+                          onClick={() => void translateChapterRange()}
+                        >
+                          {t('manga.translate.runRange')}
+                        </button>
+                      </div>
+                      <span className="muted manga-translate-range-label">
+                        {t('manga.translate.chapterRange.hint', { size: 20, max: mangaChapterCount })}
+                      </span>
+                    </div>
+                    <div className="manga-translate-range-group">
+                      <span className="manga-translate-range-label">
+                        {t('manga.translate.pageRange')}
+                      </span>
+                      <div className="manga-translate-range-row">
+                        <input
+                          type="number"
+                          min={1}
+                          max={Math.max(1, pages.length)}
+                          value={pageRangeFrom}
+                          disabled={volumeBusy || translating || !engineReady}
+                          onChange={(e) => setPageRangeFrom(Number(e.target.value) || 1)}
+                          aria-label={t('manga.translate.rangeFrom')}
+                        />
+                        <span className="muted">–</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={Math.max(1, pages.length)}
+                          value={pageRangeTo}
+                          disabled={volumeBusy || translating || !engineReady}
+                          onChange={(e) => setPageRangeTo(Number(e.target.value) || 1)}
+                          aria-label={t('manga.translate.rangeTo')}
+                        />
+                        <button
+                          className="btn small"
+                          disabled={volumeBusy || translating || !engineReady}
+                          onClick={() => void translatePageRange()}
+                        >
+                          {t('manga.translate.runRange')}
+                        </button>
+                      </div>
+                      <span className="muted manga-translate-range-label">
+                        {t('manga.translate.pageRange.hint', {
+                          max: Math.max(1, pages.length),
+                          current: idx + 1,
+                        })}
+                      </span>
+                    </div>
+                  </div>
                   <button
                     className={`btn small${handwritingOpen ? ' active' : ''}`}
                     onClick={() => setHandwritingOpen((v) => !v)}
@@ -1612,6 +1846,7 @@ export default function MangaReader({ item, onClose }: Props) {
             value={Math.min((scrub ?? idx) + 1, Math.max(1, pages.length))}
             disabled={!pages.length}
             title={t('manga.seek')}
+            aria-label={t('a11y.slider.pagePosition')}
             onChange={(e) => setScrub(Number(e.target.value) - 1)}
             onMouseMove={(e) => {
               if (!mangaSettings.showPagePreviews || !pages.length) return;

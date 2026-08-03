@@ -271,7 +271,14 @@
   line-height: 1.5;
 }
 
-/* Phase-3 player slice: adopted VideoCore plus a sibling Study OS cue consumer. */
+/* Phase-3 player slice: adopted VideoCore plus a sibling Study OS cue consumer.
+   The slice stays mounted while idle so the adopted player is never unmounted
+   between streams (see StudyPlayerSlice.tsx), so hide it rather than letting a
+   fixed, full-viewport layer sit over the library. */
+#media-workspace .study-player-slice[data-study-player='idle'] {
+  display: none;
+}
+
 #media-workspace .study-player-slice {
   position: fixed;
   inset: 0;
@@ -293,16 +300,9 @@
   bottom: 9.25rem;
   z-index: 90;
   width: min(46rem, calc(100% - 3rem));
-  padding: 0.75rem 1rem;
+  padding: 0.25rem 1rem;
   transform: translateX(-50%);
-  border: 1px solid rgb(var(--color-gray-700) / 0.9);
-  border-radius: 0.65rem;
-  background: rgb(13 12 18 / 0.88);
-  box-shadow:
-    0 18px 50px rgb(0 0 0 / 0.45),
-    inset 0 1px rgb(255 255 255 / 0.04);
   text-align: center;
-  backdrop-filter: blur(18px);
   pointer-events: auto;
 }
 
@@ -313,6 +313,12 @@
   font-weight: 600;
   line-height: 1.35;
   text-wrap: balance;
+  text-shadow:
+    -2px -2px 2px rgb(0 0 0 / 0.95),
+    2px -2px 2px rgb(0 0 0 / 0.95),
+    -2px 2px 2px rgb(0 0 0 / 0.95),
+    2px 2px 2px rgb(0 0 0 / 0.95),
+    0 3px 6px rgb(0 0 0 / 0.95);
 }
 
 #media-workspace .study-cue-timing,
@@ -329,6 +335,7 @@
   margin: 0.55rem 0 0;
   color: rgb(var(--color-gray-200) / 1);
   font-size: 0.92rem;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 1);
 }
 
 #media-workspace .study-cue-secondary {
@@ -338,9 +345,20 @@
   font-weight: 520;
   line-height: 1.3;
   text-wrap: balance;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.92);
+  text-shadow:
+    -1px -1px 2px rgb(0 0 0 / 0.98),
+    1px -1px 2px rgb(0 0 0 / 0.98),
+    -1px 1px 2px rgb(0 0 0 / 0.98),
+    1px 1px 2px rgb(0 0 0 / 0.98),
+    0 2px 5px rgb(0 0 0 / 1);
 }
 
+/*
+ * The dock was a fixed 7.5rem scroller holding four flat rows of ~35 controls, so it
+ * always overflowed and its last row — the Whisper pipeline — sat below an invisible
+ * fold. It is now: one always-visible primary row that never scrolls, plus an advanced
+ * section that is collapsed by default and scrolls on its own when opened.
+ */
 #media-workspace .study-control-dock {
   position: absolute;
   right: 1rem;
@@ -348,15 +366,30 @@
   left: 1rem;
   z-index: 92;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0.45rem;
-  max-height: 7.5rem;
+  max-height: min(60%, 22rem);
   padding: 0.65rem;
-  overflow: auto;
   border: 1px solid rgb(var(--color-gray-700) / 0.92);
   border-radius: 0.7rem;
   background: rgb(13 12 18 / 0.94);
   box-shadow: 0 18px 48px rgb(0 0 0 / 0.5);
   backdrop-filter: blur(20px);
+}
+
+#media-workspace .study-control-dock[data-study-controls='collapsed'] {
+  max-height: none;
+}
+
+#media-workspace .study-control-advanced {
+  min-height: 0;
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgb(var(--color-gray-800) / 1);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 #media-workspace .study-control-row {
@@ -366,11 +399,48 @@
   align-items: center;
 }
 
+/* Related controls read as one unit; separate units get their own gap. Without this the
+   primary row is eleven equally-spaced buttons with no discernible structure. */
+#media-workspace .study-control-primary {
+  gap: 0.85rem;
+}
+
+#media-workspace .study-control-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+#media-workspace .study-control-more {
+  margin-left: auto;
+}
+
+/* Each advanced row says what it is. gray-400 is 6.87:1 on this panel; gray-500 is
+   3.73:1 and would fail AA at this size. */
+#media-workspace .study-control-legend {
+  flex: 0 0 5.6rem;
+  color: rgb(var(--color-gray-400) / 1);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#media-workspace .study-control-mode {
+  gap: 0.25rem;
+}
+
+#media-workspace .study-control-row input[type='checkbox'],
+#media-workspace .study-control-row input[type='radio'] {
+  accent-color: rgb(var(--color-brand-500) / 1);
+}
+
 #media-workspace .study-control-row button,
 #media-workspace .study-control-row select,
 #media-workspace .study-dictation button,
 #media-workspace .study-dictation input,
-#media-workspace .study-shadowing button {
+#media-workspace .study-shadowing button,
+#media-workspace .study-shadowing-suggestion button {
   min-height: 1.9rem;
   padding: 0.25rem 0.55rem;
   border: 1px solid rgb(var(--color-gray-700) / 1);
@@ -382,14 +452,16 @@
 
 #media-workspace .study-control-row button:hover:not(:disabled),
 #media-workspace .study-dictation button:hover:not(:disabled),
-#media-workspace .study-shadowing button:hover:not(:disabled) {
+#media-workspace .study-shadowing button:hover:not(:disabled),
+#media-workspace .study-shadowing-suggestion button:hover:not(:disabled) {
   border-color: rgb(var(--color-brand-500) / 0.8);
   background: rgb(var(--color-brand-950) / 0.9);
 }
 
 #media-workspace .study-control-row button:disabled,
 #media-workspace .study-dictation button:disabled,
-#media-workspace .study-shadowing button:disabled {
+#media-workspace .study-shadowing button:disabled,
+#media-workspace .study-shadowing-suggestion button:disabled {
   opacity: 0.45;
 }
 
@@ -450,6 +522,43 @@
   text-align: left;
 }
 
+#media-workspace .study-shadowing-suggestion {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgb(var(--color-brand-500) / 0.72);
+  border-radius: 0.55rem;
+  background:
+    linear-gradient(135deg, rgb(var(--color-brand-950) / 0.76), rgb(13 12 18 / 0.94));
+  box-shadow: inset 0 1px rgb(255 255 255 / 0.05);
+  text-align: left;
+}
+
+#media-workspace .study-shadowing-suggestion > div:first-child {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+#media-workspace .study-shadowing-suggestion strong {
+  color: rgb(var(--color-gray-50) / 1);
+  font-size: 0.82rem;
+}
+
+#media-workspace .study-shadowing-suggestion span {
+  color: rgb(var(--color-gray-300) / 1);
+  font-size: 0.74rem;
+}
+
+#media-workspace .study-shadowing-suggestion-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.4rem;
+}
+
 #media-workspace .study-shadowing-copy {
   display: grid;
   gap: 0.12rem;
@@ -494,13 +603,14 @@
   right: 1rem;
   z-index: 91;
   display: grid;
-  gap: 0.7rem;
+  /* rows: heading · result message · scrolling body. The first two stay pinned. */
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0.55rem;
   min-width: 0;
   width: min(24rem, calc(100% - 2rem));
-  max-height: 21rem;
+  max-height: min(21rem, calc(100% - 2rem));
   padding: 0.8rem;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   box-sizing: border-box;
   border: 1px solid rgb(var(--color-gray-700) / 0.94);
   border-radius: 0.72rem;
@@ -510,9 +620,132 @@
   backdrop-filter: blur(20px);
 }
 
+/* Collapsed the panel is a single bar, so the video underneath is usable again. */
+#media-workspace .study-mining-panel[data-study-mining-expanded='false'] {
+  max-height: none;
+}
+
+#media-workspace .study-mining-body {
+  min-height: 0;
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 #media-workspace .study-mining-panel[data-study-mining='waiting'] {
+  display: block;
   width: auto;
   color: rgb(var(--color-gray-400) / 1);
+}
+
+/* Specificity has to clear `.study-mining-panel button`, which otherwise gives the
+   heading toggle a full input-style box and a brand hover fill. */
+#media-workspace .study-mining-panel .study-mining-toggle,
+#media-workspace .study-mining-panel .study-mining-toggle:hover:not(:disabled) {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
+
+#media-workspace .study-mining-panel .study-mining-toggle:hover:not(:disabled) {
+  color: rgb(var(--color-brand-300) / 1);
+}
+
+#media-workspace .study-mining-chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transform-origin: center;
+  transition: transform 120ms ease;
+}
+
+#media-workspace .study-mining-toggle[aria-expanded='false'] .study-mining-chevron {
+  transform: rotate(-45deg);
+}
+
+/* Attachment state has to survive collapsing — these are the only cue that a
+   screenshot or cue audio is already armed when the form is hidden. */
+#media-workspace .study-mining-armed {
+  display: inline-flex;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+
+#media-workspace .study-mining-armed > span {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 50%;
+  background: rgb(var(--color-gray-600) / 1);
+}
+
+#media-workspace .study-mining-armed > span[data-armed='true'] {
+  background: rgb(var(--color-brand-400) / 1);
+}
+
+#media-workspace .study-mining-message {
+  min-height: 0;
+  color: rgb(var(--color-gray-300) / 1);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+#media-workspace .study-mining-message:empty {
+  display: none;
+}
+
+/* "You already mined this line." A caution, not an error — the mine is still allowed,
+   it will just be refused as a duplicate. Border and the leading rule carry it alongside
+   the colour so it never depends on hue, and it sits with the result message rather than
+   inside the collapsible form so it is legible before any capture work is done. */
+#media-workspace .study-mining-mined {
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid rgb(var(--color-brand-500) / 0.45);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: rgb(var(--color-brand-500) / 0.1);
+  color: rgb(var(--color-gray-200) / 1);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+#media-workspace .study-mining-preview {
+  display: grid;
+  gap: 0.4rem;
+}
+
+#media-workspace .study-mining-preview img {
+  width: 100%;
+  max-height: 8rem;
+  border: 1px solid rgb(var(--color-gray-700) / 1);
+  border-radius: 0.42rem;
+  object-fit: contain;
+  background: rgb(var(--color-gray-950) / 1);
+}
+
+#media-workspace .study-mining-preview audio {
+  width: 100%;
+  height: 2rem;
+}
+
+#media-workspace .study-mining-hint {
+  color: rgb(var(--color-gray-400) / 1);
+  font-size: 0.68rem;
 }
 
 #media-workspace .study-mining-panel p {
@@ -606,11 +839,6 @@
   font-size: 0.7rem;
 }
 
-#media-workspace .study-mining-actions output {
-  color: rgb(var(--color-gray-300) / 1);
-  font-size: 0.72rem;
-}
-
 #media-workspace .study-mining-provenance {
   color: rgb(var(--color-gray-300) / 1);
   font-size: 0.72rem;
@@ -627,8 +855,10 @@
   margin: 0.5rem 0 0;
 }
 
+/* gray-500 on the 0.94-alpha panel measures 3.73:1 — below WCAG AA's 4.5:1 for text
+   this size. gray-400 is 6.87:1 on the same background and still reads as a label. */
 #media-workspace .study-mining-provenance dt {
-  color: rgb(var(--color-gray-500) / 1);
+  color: rgb(var(--color-gray-400) / 1);
 }
 
 #media-workspace .study-mining-provenance dd {
@@ -663,13 +893,17 @@
     right: 0.5rem;
     bottom: 0.5rem;
     left: 0.5rem;
-    max-height: 9.5rem;
+    max-height: min(64%, 18rem);
+  }
+
+  #media-workspace .study-control-legend {
+    flex-basis: 100%;
   }
 
   #media-workspace .study-mining-panel {
     top: 0.5rem;
     right: 0.5rem;
     width: calc(100% - 1rem);
-    max-height: 16rem;
+    max-height: min(16rem, calc(100% - 1rem));
   }
 }

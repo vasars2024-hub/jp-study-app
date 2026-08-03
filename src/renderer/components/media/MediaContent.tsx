@@ -23,15 +23,18 @@
  *
  * Nothing here may import `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import DictionaryPopup from '../DictionaryPopup';
 import Icon from '../Icons';
 import MediaLibraryActions from '../MediaLibraryActions';
-import SubtitleCueLine from '../SubtitleCueLine';
+import MediaStudyActions from './MediaStudyActions';
 import VirtualGrid from '../VirtualGrid';
 import { translate } from '../../translator';
 import type { MediaItem, MediaOpen, YouTubeSubtitleLang } from '../../../shared/types';
 import type { MediaKind } from '../../../shared/mediaKind';
+import { buildMediaHubSections, diagnoseMediaPaths, searchMediaHub, type MediaCategory, type MediaHubDiagnostics, type MediaDuplicateChoice, type MediaOrganizationPreview, type MediaRelationship } from '../../../shared/mediaHub';
+import { resolveLocalMediaIdentities } from '../../../shared/mediaFileIdentity';
+import { loadMediaHubState, saveMediaHubState } from '../../mediaHubStore';
 import { WHISPER_MODEL_SPECS, type WhisperModelTier } from '../../../shared/whisperModels';
 import { parseSubtitles, type Cue } from '../../subtitles';
 import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../../subtitlesExport';
@@ -57,17 +60,54 @@ import {
   collectTreeItems,
   filterItemsById,
   flattenFolderNav,
-  searchMediaByFileName,
 } from '../../mediaLibrary';
-import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../../wordLookup';
-import { registerCommandHandler } from '../../keyboardShortcuts';
+import { lookupWordFromMouseUp, isLookupClick } from '../../wordLookup';
 import { useT } from '../../i18n';
+import { mediaHubBackupFilename } from '../../mediaHubStoragePanel';
+import {
+  endMediaStudySession,
+  loadMediaStudyDatabase,
+  onMediaStudyDatabaseChanged,
+  startMediaStudySession,
+} from '../../mediaStudyStore';
+import {
+  evaluateJapaneseDictation,
+  type DictationEvaluation,
+} from '../../../shared/listeningTraining';
+import { openMediaWorkspace } from '../../mediaWorkspaceBridge';
+import { findSubtitleMatches, wrapSubtitleMatch } from '../../../shared/subtitleSearch';
+import {
+  buildPlayerDiagnosticReport,
+  type PlayerDiagnosticReport,
+} from '../../../shared/playerDiagnostics';
+import {
+  normalizePlayerPreferences,
+  type SubtitleVerticalPosition,
+} from '../../../shared/playerPreferences';
+import { takeHandoff, takeHandoffJson } from '../../pendingHandoff';
+import {
+  studyContextSeekPosition,
+  type StudyContextRef,
+} from '../../../shared/mediaStudyOrchestrator';
+import type { StudyListeningAvailability } from '../../../shared/studyListeningFirstRecipe';
+import { inspectStudyListeningAudio } from '../../studyListeningAudio';
 
 const CARD_MIN_WIDTH = 230;
 const CARD_GAP = 12;
 const CARD_ROW_HEIGHT = 108; // card content height + gap, generous enough to never clip
 const COLLAPSED_KEY = 'jp-media-collapsed';
+const PLAYER_PREFERENCES_KEY = 'jp-media-player-preferences-v1';
 export const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
+
+function loadPlayerPreferences() {
+  try {
+    return normalizePlayerPreferences(
+      JSON.parse(localStorage.getItem(PLAYER_PREFERENCES_KEY) ?? 'null'),
+    );
+  } catch {
+    return normalizePlayerPreferences(null);
+  }
+}
 
 function loadCollapsed(): Set<string> {
   try {
@@ -78,7 +118,77 @@ function loadCollapsed(): Set<string> {
   }
 }
 
+const SECTION_COLLAPSED_KEY = 'jp-media-sections-collapsed';
+
+function loadSectionCollapsed(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SECTION_COLLAPSED_KEY) ?? '[]');
+    return new Set(Array.isArray(raw) ? raw.filter((v) => typeof v === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistSectionCollapsed(next: Set<string>): void {
+  try {
+    localStorage.setItem(SECTION_COLLAPSED_KEY, JSON.stringify(Array.from(next)));
+  } catch {
+    /* storage is optional */
+  }
+}
+
+/** Shared collapsible header for Media Hub shelves and library sections. */
+export function MediaCollapsibleSection({
+  id,
+  title,
+  actions,
+  children,
+  className,
+  headingLevel = 3,
+}: {
+  id: string;
+  title: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  headingLevel?: 2 | 3;
+}): ReactElement {
+  const [collapsed, setCollapsed] = useState(() => loadSectionCollapsed().has(id));
+  const toggle = (): void => {
+    const next = loadSectionCollapsed();
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    persistSectionCollapsed(next);
+    setCollapsed(next.has(id));
+  };
+  const HeadingTag = headingLevel === 2 ? 'h2' : 'h3';
+  return (
+    <section className={`media-collapsible ${className ?? ''}`.trim()} data-collapsed={collapsed || undefined}>
+      <div className="media-collapsible-head">
+        <button
+          type="button"
+          className="media-collapsible-toggle"
+          aria-expanded={!collapsed}
+          onClick={toggle}
+        >
+          <span className="media-collapsible-chevron" aria-hidden />
+          <HeadingTag className="media-collapsible-title">{title}</HeadingTag>
+        </button>
+        {actions ? <div className="media-collapsible-actions">{actions}</div> : null}
+      </div>
+      {!collapsed && <div className="media-collapsible-body">{children}</div>}
+    </section>
+  );
+}
+
 export type GenState = 'idle' | 'extracting' | 'loading' | 'transcribing' | 'done' | 'error';
+
+/**
+ * Category dropdown value. 'in-progress' is virtual — it lists running
+ * downloads/transcriptions rather than filtering library items, so it is not a
+ * MediaCategory.
+ */
+export type MediaCategoryFilterValue = MediaCategory | 'all' | 'in-progress';
 
 const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -93,6 +203,7 @@ export interface MediaState {
   showLibrary: boolean;
   showPlayer: boolean;
   videoRef: React.RefObject<HTMLVideoElement>;
+  videoWrapRef: React.RefObject<HTMLDivElement | null>;
   sigBurst: boolean;
   fireSigBurst: () => void;
   items: MediaItem[];
@@ -102,6 +213,9 @@ export interface MediaState {
   src: string | null;
   cues: Cue[];
   subName: string;
+  secondaryCues: Cue[];
+  secondarySubName: string;
+  secondaryActive: Cue | null;
   subStatus: string;
   subOffset: number;
   active: Cue | null;
@@ -139,6 +253,8 @@ export interface MediaState {
   setSelectedFolder: (f: string | null) => void;
   kindFilter: MediaKind | 'all';
   setKindFilter: (k: MediaKind | 'all') => void;
+  categoryFilter: MediaCategoryFilterValue;
+  setCategoryFilter: (category: MediaCategoryFilterValue) => void;
   displayedItems: MediaItem[];
   folderRows: ReturnType<typeof flattenFolderNav>;
   hasFolders: boolean;
@@ -151,15 +267,79 @@ export interface MediaState {
   setLoopLine: React.Dispatch<React.SetStateAction<boolean>>;
   furigana: boolean;
   setFurigana: React.Dispatch<React.SetStateAction<boolean>>;
+  primarySubs: boolean;
+  setPrimarySubs: React.Dispatch<React.SetStateAction<boolean>>;
   dualSubs: boolean;
   setDualSubs: (v: boolean) => void;
+  dictationMode: boolean;
+  setDictationMode: React.Dispatch<React.SetStateAction<boolean>>;
+  dictationInput: string;
+  setDictationInput: React.Dispatch<React.SetStateAction<string>>;
+  dictationResult: DictationEvaluation | null;
+  dictationRevealed: boolean;
+  checkDictation: () => void;
+  revealDictation: () => void;
+  shadowingMode: boolean;
+  setShadowingMode: React.Dispatch<React.SetStateAction<boolean>>;
+  shadowRecording: boolean;
+  shadowAudioUrl: string;
+  shadowError: string;
+  startShadowRecording: () => Promise<void>;
+  stopShadowRecording: () => void;
+  clearShadowRecording: () => void;
+  subtitleSearchQuery: string;
+  setSubtitleSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  subtitleSearchMatches: number[];
+  subtitleSearchPosition: number;
+  jumpSubtitleSearch: (direction: -1 | 1) => void;
+  diagnosticsOpen: boolean;
+  setDiagnosticsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  diagnosticsRunning: boolean;
+  playerDiagnostics: PlayerDiagnosticReport | null;
+  runPlayerDiagnostics: () => Promise<void>;
+  exportPlayerDiagnostics: () => void;
+  stepFrame: (direction: -1 | 1) => void;
+  toggleFullscreen: () => Promise<void>;
+  togglePictureInPicture: () => Promise<void>;
+  subtitleFontSize: number;
+  setSubtitleFontSize: React.Dispatch<React.SetStateAction<number>>;
+  subtitlePosition: SubtitleVerticalPosition;
+  setSubtitlePosition: React.Dispatch<React.SetStateAction<SubtitleVerticalPosition>>;
+  subtitleOverlay: boolean;
+  setSubtitleOverlay: React.Dispatch<React.SetStateAction<boolean>>;
+  subtitleOverlayBackground: number;
+  setSubtitleOverlayBackground: React.Dispatch<React.SetStateAction<number>>;
+  learningModeActive: boolean;
+  studySessionActive: boolean;
+  handlePlayerPlay: () => void;
+  handlePlayerPause: () => void;
+  audioTracks: Array<{ index: number; label: string; language: string; enabled: boolean }>;
+  listeningAvailability: StudyListeningAvailability | null;
+  refreshListeningAvailability: () => void;
+  refreshAudioTracks: () => void;
+  selectAudioTrack: (index: number) => void;
+  abStart: number | null;
+  abEnd: number | null;
+  abLoop: boolean;
+  setAbLoop: React.Dispatch<React.SetStateAction<boolean>>;
+  markAbStart: () => void;
+  markAbEnd: () => void;
+  clearAbRepeat: () => void;
+  volumeNormalization: boolean;
+  applyVolumeNormalization: (enabled: boolean) => Promise<void>;
   openFile: () => Promise<void>;
+  openFolder: () => Promise<void>;
   openItem: (id: string) => Promise<void>;
+  /** Loads an item AND brings the player forward. See the implementation note. */
+  playItem: (id: string) => Promise<void>;
   removeItem: (id: string, e: React.MouseEvent) => Promise<void>;
   downloadYouTube: () => Promise<void>;
   chooseWatchFolder: () => Promise<void>;
   clearWatch: () => Promise<void>;
   openSubs: () => Promise<void>;
+  /** Load subtitle cues from raw text (a stored track, a picked file). */
+  applySubtitleFile: (name: string, text: string) => boolean;
+  openSecondarySubs: () => Promise<void>;
   convertAndPlay: () => Promise<void>;
   runGeneration: (url: string) => Promise<void>;
   jumpLine: (delta: number) => void;
@@ -176,7 +356,9 @@ export interface MediaState {
 
 export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaState {
   const { t } = useT();
+  const initialPlayerPreferences = useRef(loadPlayerPreferences()).current;
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoWrapRef = useRef<HTMLDivElement | null>(null);
   // §5.1 SIG-VID: 300ms static burst on load/seek = "signal acquisition".
   const [sigBurst, setSigBurst] = useState(false);
   const sigBurstTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,12 +377,28 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const workerRef = useRef<Worker | null>(null);
   const resumeRef = useRef(0);
   const cuesRef = useRef<Cue[]>([]);
+  const secondaryCuesRef = useRef<Cue[]>([]);
   const offsetRef = useRef(0);
   const autoPauseRef = useRef(false);
   const loopLineRef = useRef(false);
+  const abStartRef = useRef<number | null>(null);
+  const abEndRef = useRef<number | null>(null);
+  const abLoopRef = useRef(false);
   const lastCueEndRef = useRef<number | null>(null);
   const rafRef = useRef(0);
   const currentYoutubeIdRef = useRef<string | undefined>(undefined);
+  const shadowRecorderRef = useRef<MediaRecorder | null>(null);
+  const shadowStreamRef = useRef<MediaStream | null>(null);
+  const shadowStopTimerRef = useRef<number | null>(null);
+  const shadowAudioUrlRef = useRef('');
+  const shadowGenerationRef = useRef(0);
+  const studySessionIdRef = useRef('');
+  const studySessionMediaIdRef = useRef('');
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const normalizedGainRef = useRef<GainNode | null>(null);
+  const bypassGainRef = useRef<GainNode | null>(null);
+  const pendingStudyContextRef = useRef<StudyContextRef | null>(null);
 
   const [items, setItems] = useState<MediaItem[]>([]);
   const [watchFolder, setWatchFolder] = useState<string | null>(null);
@@ -208,6 +406,9 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const [src, setSrc] = useState<string | null>(null);
   const [cues, setCues] = useState<Cue[]>([]);
   const [subName, setSubName] = useState('');
+  const [secondaryCues, setSecondaryCues] = useState<Cue[]>([]);
+  const [secondarySubName, setSecondarySubName] = useState('');
+  const [secondaryActive, setSecondaryActive] = useState<Cue | null>(null);
   const [subStatus, setSubStatus] = useState('');
   const [subOffset, setSubOffset] = useState(0);
   const [active, setActive] = useState<Cue | null>(null);
@@ -242,16 +443,57 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed);
   const [kindFilter, setKindFilter] = useState<MediaKind | 'all'>('all');
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [autoPause, setAutoPause] = useState(false);
-  const [loopLine, setLoopLine] = useState(false);
-  const [furigana, setFurigana] = useState(false);
-  const [dualSubs, setDualSubs] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<MediaCategoryFilterValue>('all');
+  const [playbackRate, setPlaybackRate] = useState(initialPlayerPreferences.playbackRate);
+  const [autoPause, setAutoPause] = useState(initialPlayerPreferences.autoPause);
+  const [loopLine, setLoopLine] = useState(initialPlayerPreferences.loopLine);
+  const [furigana, setFurigana] = useState(initialPlayerPreferences.furigana);
+  const [primarySubs, setPrimarySubs] = useState(initialPlayerPreferences.primarySubs);
+  const [dualSubs, setDualSubs] = useState(initialPlayerPreferences.dualSubs);
+  const [dictationMode, setDictationMode] = useState(initialPlayerPreferences.dictationMode);
+  const [dictationInput, setDictationInput] = useState('');
+  const [dictationResult, setDictationResult] = useState<DictationEvaluation | null>(null);
+  const [dictationRevealed, setDictationRevealed] = useState(false);
+  const [shadowingMode, setShadowingMode] = useState(initialPlayerPreferences.shadowingMode);
+  const [shadowRecording, setShadowRecording] = useState(false);
+  const [shadowAudioUrl, setShadowAudioUrl] = useState('');
+  const [shadowError, setShadowError] = useState('');
+  const [subtitleSearchQuery, setSubtitleSearchQuery] = useState('');
+  const [subtitleSearchPosition, setSubtitleSearchPosition] = useState(-1);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [diagnosticsRunning, setDiagnosticsRunning] = useState(false);
+  const [playerDiagnostics, setPlayerDiagnostics] = useState<PlayerDiagnosticReport | null>(null);
+  const [studySessionActive, setStudySessionActive] = useState(false);
+  const [subtitleFontSize, setSubtitleFontSize] = useState(initialPlayerPreferences.subtitleFontSize);
+  const [subtitlePosition, setSubtitlePosition] = useState<SubtitleVerticalPosition>(
+    initialPlayerPreferences.subtitlePosition,
+  );
+  const [subtitleOverlay, setSubtitleOverlay] = useState(initialPlayerPreferences.subtitleOverlay);
+  const [subtitleOverlayBackground, setSubtitleOverlayBackground] = useState(
+    initialPlayerPreferences.subtitleOverlayBackground,
+  );
+  const [audioTracks, setAudioTracks] = useState<MediaState['audioTracks']>([]);
+  const [listeningAvailability, setListeningAvailability] =
+    useState<StudyListeningAvailability | null>(null);
+  const [abStart, setAbStart] = useState<number | null>(null);
+  const [abEnd, setAbEnd] = useState<number | null>(null);
+  const [abLoop, setAbLoop] = useState(false);
+  const [volumeNormalization, setVolumeNormalization] = useState(
+    initialPlayerPreferences.volumeNormalization,
+  );
+  const [preferredAudioLanguage, setPreferredAudioLanguage] = useState(
+    initialPlayerPreferences.preferredAudioLanguage,
+  );
 
   const showLibrary = mode === 'full' || mode === 'library';
   const showPlayer = mode === 'full' || mode === 'video';
   const generating =
     genState === 'extracting' || genState === 'loading' || genState === 'transcribing';
+  const learningModeActive = autoPause || loopLine || abLoop || dictationMode || shadowingMode;
+
+  useEffect(() => {
+    setListeningAvailability(null);
+  }, [src]);
 
   useEffect(() => {
     autoPauseRef.current = autoPause;
@@ -259,15 +501,66 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   useEffect(() => {
     loopLineRef.current = loopLine;
   }, [loopLine]);
+  useEffect(() => {
+    abStartRef.current = abStart;
+    abEndRef.current = abEnd;
+    abLoopRef.current = abLoop;
+  }, [abEnd, abLoop, abStart]);
 
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify(Array.from(collapsed)));
   }, [collapsed]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(PLAYER_PREFERENCES_KEY, JSON.stringify(normalizePlayerPreferences({
+        playbackRate,
+        autoPause,
+        loopLine,
+        furigana,
+        primarySubs,
+        dualSubs,
+        dictationMode,
+        shadowingMode,
+        volumeNormalization,
+        preferredAudioLanguage,
+        subtitleFontSize,
+        subtitlePosition,
+        subtitleOverlay,
+        subtitleOverlayBackground,
+      })));
+    } catch {
+      // Player preferences remain available for the current session.
+    }
+  }, [
+    autoPause,
+    dictationMode,
+    dualSubs,
+    furigana,
+    loopLine,
+    playbackRate,
+    primarySubs,
+    preferredAudioLanguage,
+    shadowingMode,
+    subtitleFontSize,
+    subtitleOverlay,
+    subtitleOverlayBackground,
+    subtitlePosition,
+    volumeNormalization,
+  ]);
+
   const tree = useMemo(() => buildMediaTree(items), [items]);
   const searchIndex = useMemo(() => buildMediaFileSearchIndex(items), [items]);
   const debouncedQuery = useDebouncedValue(query, 80);
   const searchActive = debouncedQuery.trim().length > 0;
+  const subtitleSearchMatches = useMemo(
+    () => findSubtitleMatches(cues, subtitleSearchQuery),
+    [cues, subtitleSearchQuery],
+  );
+
+  useEffect(() => {
+    setSubtitleSearchPosition(-1);
+  }, [subtitleSearchQuery, cues]);
 
   const displayedItems = useMemo(() => {
     let list = items;
@@ -275,8 +568,10 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     else if (mode === 'library' && kindFilter !== 'all') {
       list = list.filter((i) => (i.kind ?? 'video') === kindFilter);
     }
-    if (searchActive) {
-      const hit = new Set(searchMediaByFileName(searchIndex, debouncedQuery).map((i) => i.id));
+    // 'in-progress' is a virtual live-jobs view — library still shows everything.
+    const libraryCategory = categoryFilter === 'in-progress' ? 'all' : categoryFilter;
+    if (searchActive || libraryCategory !== 'all') {
+      const hit = new Set(searchMediaHub(list, { query: debouncedQuery, category: libraryCategory }).map((i) => i.id));
       return list.filter((i) => hit.has(i.id));
     }
     if (selectedFolder) {
@@ -284,7 +579,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       return filterItemsById(list, new Set(inFolder.map((it) => it.id)));
     }
     return list;
-  }, [searchActive, searchIndex, debouncedQuery, selectedFolder, tree, items, mode, kindFilter]);
+  }, [searchActive, searchIndex, debouncedQuery, selectedFolder, tree, items, mode, kindFilter, categoryFilter]);
 
   const folderRows = useMemo(() => flattenFolderNav(tree, collapsed), [tree, collapsed]);
   const hasFolders = folderRows.length > 0;
@@ -322,11 +617,125 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     cuesRef.current = cues;
   }, [cues]);
   useEffect(() => {
+    secondaryCuesRef.current = secondaryCues;
+  }, [secondaryCues]);
+  useEffect(() => {
     offsetRef.current = subOffset;
   }, [subOffset]);
   useEffect(() => {
     setLineTrans('');
+    setDictationInput('');
+    setDictationResult(null);
+    setDictationRevealed(false);
   }, [active]);
+
+  const checkDictation = useCallback(() => {
+    if (!active) return;
+    setDictationResult(evaluateJapaneseDictation(dictationInput, active.text));
+  }, [active, dictationInput]);
+
+  const revealDictation = useCallback(() => {
+    if (!active) return;
+    setDictationRevealed(true);
+    setDictationResult(evaluateJapaneseDictation(dictationInput, active.text));
+  }, [active, dictationInput]);
+
+  const clearShadowRecording = useCallback(() => {
+    shadowGenerationRef.current += 1;
+    const url = shadowAudioUrlRef.current;
+    shadowAudioUrlRef.current = '';
+    setShadowAudioUrl('');
+    if (url) URL.revokeObjectURL(url);
+  }, []);
+
+  const stopShadowRecording = useCallback(() => {
+    if (shadowStopTimerRef.current != null) {
+      window.clearTimeout(shadowStopTimerRef.current);
+      shadowStopTimerRef.current = null;
+    }
+    const recorder = shadowRecorderRef.current;
+    if (recorder?.state === 'recording') recorder.stop();
+  }, []);
+
+  const startShadowRecording = useCallback(async () => {
+    if (shadowRecorderRef.current?.state === 'recording') return;
+    setShadowError('');
+    clearShadowRecording();
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('Microphone recording is not supported in this player.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      shadowStreamRef.current = stream;
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+      ].find((candidate) => MediaRecorder.isTypeSupported(candidate));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const generation = shadowGenerationRef.current;
+      const chunks: Blob[] = [];
+      shadowRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        setShadowError('The microphone recording stopped unexpectedly.');
+      };
+      recorder.onstop = () => {
+        if (shadowStopTimerRef.current != null) {
+          window.clearTimeout(shadowStopTimerRef.current);
+          shadowStopTimerRef.current = null;
+        }
+        for (const track of stream.getTracks()) track.stop();
+        if (shadowStreamRef.current === stream) shadowStreamRef.current = null;
+        if (shadowRecorderRef.current === recorder) shadowRecorderRef.current = null;
+        setShadowRecording(false);
+        if (!chunks.length || generation !== shadowGenerationRef.current) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        shadowAudioUrlRef.current = url;
+        setShadowAudioUrl(url);
+      };
+      recorder.start(250);
+      setShadowRecording(true);
+      shadowStopTimerRef.current = window.setTimeout(() => {
+        if (recorder.state === 'recording') recorder.stop();
+      }, 60_000);
+    } catch (recordingError) {
+      for (const track of shadowStreamRef.current?.getTracks() ?? []) track.stop();
+      shadowStreamRef.current = null;
+      shadowRecorderRef.current = null;
+      setShadowRecording(false);
+      setShadowError(
+        recordingError instanceof Error
+          ? recordingError.message
+          : 'Could not start microphone recording.',
+      );
+    }
+  }, [clearShadowRecording]);
+
+  useEffect(() => {
+    stopShadowRecording();
+    clearShadowRecording();
+    setShadowError('');
+  }, [active?.start, active?.text, clearShadowRecording, stopShadowRecording]);
+
+  useEffect(() => () => {
+    shadowGenerationRef.current += 1;
+    if (shadowStopTimerRef.current != null) window.clearTimeout(shadowStopTimerRef.current);
+    const recorder = shadowRecorderRef.current;
+    if (recorder?.state === 'recording') recorder.stop();
+    for (const track of shadowStreamRef.current?.getTracks() ?? []) track.stop();
+    const url = shadowAudioUrlRef.current;
+    if (url) URL.revokeObjectURL(url);
+  }, []);
 
   useEffect(() => {
     window.api.listMedia().then(setItems);
@@ -357,24 +766,25 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setActive(null);
     setCues([]);
     setSubName('');
+    setSecondaryCues([]);
+    setSecondarySubName('');
+    setSecondaryActive(null);
     setSubStatus('');
     setSubOffset(r.item.subOffsetSec ?? 0);
     setGenState('idle');
     setGenMsg('');
     setGenError('');
     setLineTrans('');
+    setAudioTracks([]);
+    setAbStart(null);
+    setAbEnd(null);
+    setAbLoop(false);
   }, []);
 
   // Deep-open from playlist manager / external open request.
   useEffect(() => {
     if (mode !== 'video' && mode !== 'full') return;
-    let pending: string | null = null;
-    try {
-      pending = sessionStorage.getItem('jp-pending-media-id');
-      if (pending) sessionStorage.removeItem('jp-pending-media-id');
-    } catch {
-      pending = null;
-    }
+    const pending = takeHandoff('mediaId');
     if (!pending) return;
     void window.api.openMedia(pending).then((r) => {
       if (r) loadOpened(r);
@@ -463,8 +873,36 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
 
   const openFile = useCallback(async () => {
     const r = await window.api.pickMedia();
-    if (r) loadOpened(r);
+    if (r) {
+      loadOpened(r);
+      openMediaWorkspace({ localFilePath: r.item.path });
+    }
   }, [loadOpened]);
+
+  const openFolder = useCallback(async () => {
+    setError('');
+    try {
+      // Dedicated one-shot import (preload + main must be restarted after first ship).
+      if (typeof window.api.addMediaFolder === 'function') {
+        const r = await window.api.addMediaFolder();
+        setItems(r.items);
+        if (r.added === 0) setError(t('media.openFolder.noneFound'));
+        return;
+      }
+      // Hot-reload fallback: reuse the existing watch-folder dialog IPC, import
+      // once, then clear the watch if the user did not already have one set.
+      const prev = await window.api.getMediaWatchFolder();
+      const r = await window.api.setMediaWatchFolder();
+      setItems(r.items);
+      setWatchFolder(r.folder);
+      if (!prev) {
+        await window.api.clearMediaWatchFolder();
+        setWatchFolder(null);
+      }
+    } catch (e) {
+      setError(t('media.openFolder.failed', { detail: msg(e) }));
+    }
+  }, [t]);
 
   const openItem = useCallback(
     async (id: string) => {
@@ -473,10 +911,30 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         window.dispatchEvent(new CustomEvent('wired:tape-seek'));
       }
       const r = await window.api.openMedia(id);
-      if (r) loadOpened(r);
+      if (r) {
+        loadOpened(r);
+        openMediaWorkspace({ localFilePath: r.item.path });
+      }
       else setError('That file has moved or been deleted.');
     },
     [loadOpened],
+  );
+
+  /**
+   * Open an item *and* surface the player.
+   *
+   * `openItem` alone loads the file into state and stops. In the library entry
+   * point (`mode: 'library'`) the player stage is not mounted at all, so a card
+   * click used to look like it did nothing — the item loaded into a component
+   * nobody was rendering. Raising `os:open` navigates to the video app, the
+   * same route `MediaStudyMode`'s study-episode action already takes.
+   */
+  const playItem = useCallback(
+    async (id: string) => {
+      await openItem(id);
+      if (!showPlayer) window.dispatchEvent(new CustomEvent('os:open', { detail: 'video' }));
+    },
+    [openItem, showPlayer],
   );
 
   const removeItem = useCallback(
@@ -532,19 +990,119 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setWatchFolder(null);
   }, []);
 
-  const openSubs = useCallback(async () => {
-    const r = await window.api.pickSubtitle();
-    if (!r) return;
-    const parsed = parseSubtitles(r.text);
+  const applySubtitleFile = useCallback((name: string, text: string) => {
+    const parsed = parseSubtitles(text);
     setCues(parsed);
-    setSubName(r.name);
+    setSubName(name);
     setSubOffset(0);
     setSubStatus(
       parsed.length
         ? t('media.subStatus.loaded', { count: parsed.length })
-        : t('media.subStatus.noLines', { name: r.name }),
+        : t('media.subStatus.noLines', { name }),
     );
+    return parsed.length > 0;
   }, [t]);
+
+  const applyStudyContext = useCallback(async (context: StudyContextRef): Promise<void> => {
+    const opened = await window.api.openMedia(context.mediaId);
+    if (!opened) {
+      setError('The source media has moved or been deleted.');
+      return;
+    }
+    loadOpened(opened);
+    const seekPosition = studyContextSeekPosition(context);
+    resumeRef.current = seekPosition;
+    if (
+      typeof context.cueEndSec === 'number'
+      && Number.isFinite(context.cueEndSec)
+      && context.cueEndSec > seekPosition
+    ) {
+      setAbStart(seekPosition);
+      setAbEnd(context.cueEndSec);
+      setAbLoop(true);
+    } else {
+      setAbStart(null);
+      setAbEnd(null);
+      setAbLoop(false);
+    }
+    if (context.subtitleRecordId) {
+      const subtitle = await window.api.readSubtitleRecord(
+        context.mediaId,
+        context.subtitleRecordId,
+      );
+      if (subtitle) applySubtitleFile(subtitle.name, subtitle.text);
+    }
+    if (context.listeningMode === 'dictation') {
+      stopShadowRecording();
+      setShadowingMode(false);
+      setLoopLine(false);
+      setAutoPause(true);
+      setPrimarySubs(true);
+      setDictationInput('');
+      setDictationResult(null);
+      setDictationRevealed(false);
+      setDictationMode(true);
+    }
+    window.setTimeout(() => {
+      if (videoRef.current) videoRef.current.currentTime = seekPosition;
+    }, 160);
+  }, [applySubtitleFile, loadOpened, stopShadowRecording]);
+
+  useEffect(() => {
+    if (!showPlayer) return;
+    const openPendingContext = (context: StudyContextRef): void => {
+      pendingStudyContextRef.current = null;
+      void applyStudyContext(context);
+    };
+    const onStudyContext = (event: Event): void => {
+      const context = (event as CustomEvent<StudyContextRef>).detail;
+      if (context?.mediaId) openPendingContext(context);
+    };
+    window.addEventListener('study:open-media-context', onStudyContext);
+    const pending = pendingStudyContextRef.current
+      ?? takeHandoffJson<StudyContextRef>('studyContextRef');
+    if (pending?.mediaId) openPendingContext(pending);
+    return () => window.removeEventListener('study:open-media-context', onStudyContext);
+  }, [applyStudyContext, showPlayer]);
+
+  const openSubs = useCallback(async () => {
+    // YouTube-sourced media pulls its own subtitles first — sidecar files from
+    // the download, else straight from YouTube. Only fall back to the file
+    // picker when there is nothing to fetch, so the button does the obvious
+    // thing on a YouTube video instead of always asking for a file.
+    const item = current;
+    const isYoutube = !!item && (!!item.youtubeId || /youtu\.?be/i.test(item.sourceUrl ?? ''));
+    if (item && isYoutube) {
+      setSubStatus(t('media.subStatus.fetching'));
+      try {
+        const fetched = await window.api.fetchYoutubeSubs(item.id, item.lang);
+        if (fetched.ok) {
+          applySubtitleFile(fetched.name, fetched.text);
+          return;
+        }
+        setSubStatus(fetched.error || t('media.subStatus.fetchFailed'));
+      } catch (e) {
+        setSubStatus(msg(e));
+      }
+    }
+    const r = await window.api.pickSubtitle();
+    if (!r) return;
+    applySubtitleFile(r.name, r.text);
+  }, [applySubtitleFile, current, t]);
+
+  const openSecondarySubs = useCallback(async () => {
+    const result = await window.api.pickSubtitle();
+    if (!result) return;
+    const parsed = parseSubtitles(result.text);
+    setSecondaryCues(parsed);
+    setSecondarySubName(result.name);
+    setDualSubs(true);
+    setSubStatus(
+      parsed.length
+        ? `Loaded ${parsed.length} translation subtitle lines from ${result.name}.`
+        : `No subtitle lines found in ${result.name}.`,
+    );
+  }, []);
 
   const convertAndPlay = useCallback(async () => {
     if (!src) return;
@@ -578,6 +1136,19 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       setActive((prev) =>
         prev?.start === found?.start && prev?.text === found?.text ? prev : found,
       );
+      let foundSecondary: Cue | null = null;
+      const secondaryList = secondaryCuesRef.current;
+      for (let index = 0; index < secondaryList.length; index += 1) {
+        if (tNow >= secondaryList[index].start && tNow < secondaryList[index].end) {
+          foundSecondary = secondaryList[index];
+          break;
+        }
+      }
+      setSecondaryActive((previous) => (
+        previous?.start === foundSecondary?.start && previous?.text === foundSecondary?.text
+          ? previous
+          : foundSecondary
+      ));
 
       if (found) {
         const end = found.end + offsetRef.current;
@@ -594,6 +1165,18 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         }
       } else {
         lastCueEndRef.current = null;
+      }
+      const repeatStart = abStartRef.current;
+      const repeatEnd = abEndRef.current;
+      if (
+        abLoopRef.current
+        && repeatStart != null
+        && repeatEnd != null
+        && repeatEnd > repeatStart
+        && v.currentTime >= repeatEnd - 0.04
+      ) {
+        v.currentTime = repeatStart;
+        if (v.paused) void v.play();
       }
 
       if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
@@ -649,6 +1232,261 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     void v.play();
   }, [active]);
 
+  const stepFrame = useCallback((direction: -1 | 1) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.pause();
+    video.currentTime = Math.max(
+      0,
+      Math.min(Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER, video.currentTime + direction / 30),
+    );
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    // Fullscreen the wrapper (not the bare <video>) so the subtitle overlay
+    // stays visible in fullscreen; the native controls keep working inside it.
+    const target = videoWrapRef.current ?? videoRef.current;
+    if (!target) return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await target.requestFullscreen();
+    } catch (fullscreenError) {
+      setError(fullscreenError instanceof Error ? fullscreenError.message : 'Fullscreen failed.');
+    }
+  }, []);
+
+  const togglePictureInPicture = useCallback(async () => {
+    const video = videoRef.current as HTMLVideoElement & {
+      requestPictureInPicture?: () => Promise<unknown>;
+    };
+    if (!video?.requestPictureInPicture) return;
+    const pictureDocument = document as Document & {
+      pictureInPictureElement?: Element | null;
+      exitPictureInPicture?: () => Promise<void>;
+    };
+    try {
+      if (pictureDocument.pictureInPictureElement) await pictureDocument.exitPictureInPicture?.();
+      else await video.requestPictureInPicture();
+    } catch (pictureError) {
+      setError(
+        pictureError instanceof Error ? pictureError.message : 'Picture-in-picture failed.',
+      );
+    }
+  }, []);
+
+  const refreshAudioTracks = useCallback(() => {
+    const video = videoRef.current as HTMLVideoElement & {
+      audioTracks?: {
+        length: number;
+        [index: number]: { label?: string; language?: string; enabled: boolean };
+      };
+    };
+    const tracks = video?.audioTracks;
+    if (!tracks) {
+      setAudioTracks([]);
+      return;
+    }
+    const nextTracks = Array.from({ length: tracks.length }, (_, index) => ({
+      index,
+      label: tracks[index]?.label?.trim() || `Audio ${index + 1}`,
+      language: tracks[index]?.language?.trim() || '',
+      enabled: tracks[index]?.enabled === true,
+    }));
+    const preferred = nextTracks.find(
+      (track) => preferredAudioLanguage && track.language.toLowerCase() === preferredAudioLanguage,
+    );
+    if (preferred && !preferred.enabled) {
+      for (let index = 0; index < tracks.length; index += 1) {
+        tracks[index].enabled = index === preferred.index;
+      }
+      for (const track of nextTracks) track.enabled = track.index === preferred.index;
+    }
+    setAudioTracks(nextTracks);
+  }, [preferredAudioLanguage]);
+
+  const refreshListeningAvailability = useCallback(() => {
+    if (!current?.id) {
+      setListeningAvailability(null);
+      return;
+    }
+    const next = inspectStudyListeningAudio(current.id, videoRef.current);
+    setListeningAvailability((previous) => (
+      JSON.stringify(previous) === JSON.stringify(next) ? previous : next
+    ));
+  }, [current?.id]);
+
+  const selectAudioTrack = useCallback((selectedIndex: number) => {
+    const video = videoRef.current as HTMLVideoElement & {
+      audioTracks?: {
+        length: number;
+        [index: number]: { enabled: boolean };
+      };
+    };
+    const tracks = video?.audioTracks;
+    if (!tracks || selectedIndex < 0 || selectedIndex >= tracks.length) return;
+    for (let index = 0; index < tracks.length; index += 1) {
+      tracks[index].enabled = index === selectedIndex;
+    }
+    const language = audioTracks.find((track) => track.index === selectedIndex)?.language;
+    if (language) setPreferredAudioLanguage(language.toLowerCase());
+    refreshAudioTracks();
+  }, [audioTracks, refreshAudioTracks]);
+
+  const applyVolumeNormalization = useCallback(async (enabled: boolean) => {
+    const video = videoRef.current;
+    setVolumeNormalization(enabled);
+    if (!video) return;
+    try {
+      let context = audioContextRef.current;
+      if (!context) {
+        if (typeof AudioContext === 'undefined') {
+          throw new Error('Web Audio volume normalization is unavailable.');
+        }
+        context = new AudioContext();
+        const source = context.createMediaElementSource(video);
+        const compressor = context.createDynamicsCompressor();
+        compressor.threshold.value = -24;
+        compressor.knee.value = 24;
+        compressor.ratio.value = 8;
+        compressor.attack.value = 0.006;
+        compressor.release.value = 0.28;
+        const normalizedGain = context.createGain();
+        normalizedGain.gain.value = enabled ? 1.25 : 0;
+        const bypassGain = context.createGain();
+        bypassGain.gain.value = enabled ? 0 : 1;
+        source.connect(compressor);
+        compressor.connect(normalizedGain);
+        normalizedGain.connect(context.destination);
+        source.connect(bypassGain);
+        bypassGain.connect(context.destination);
+        audioContextRef.current = context;
+        audioSourceRef.current = source;
+        normalizedGainRef.current = normalizedGain;
+        bypassGainRef.current = bypassGain;
+      }
+      const at = context.currentTime;
+      normalizedGainRef.current?.gain.setTargetAtTime(enabled ? 1.25 : 0, at, 0.015);
+      bypassGainRef.current?.gain.setTargetAtTime(enabled ? 0 : 1, at, 0.015);
+      if (context.state === 'suspended') await context.resume().catch(() => undefined);
+    } catch (normalizationError) {
+      setVolumeNormalization(false);
+      setError(
+        normalizationError instanceof Error
+          ? normalizationError.message
+          : 'Volume normalization failed.',
+      );
+    }
+  }, []);
+
+  useEffect(() => () => {
+    void audioContextRef.current?.close();
+    audioContextRef.current = null;
+    audioSourceRef.current = null;
+    normalizedGainRef.current = null;
+    bypassGainRef.current = null;
+  }, []);
+
+  const markAbStart = useCallback(() => {
+    const position = videoRef.current?.currentTime;
+    if (position == null) return;
+    setAbStart(position);
+    setAbEnd((end) => end != null && end > position ? end : null);
+  }, []);
+
+  const markAbEnd = useCallback(() => {
+    const position = videoRef.current?.currentTime;
+    if (position == null || abStartRef.current == null) return;
+    if (position <= abStartRef.current + 0.05) {
+      setError('B must be after A.');
+      return;
+    }
+    setAbEnd(position);
+  }, []);
+
+  const clearAbRepeat = useCallback(() => {
+    setAbStart(null);
+    setAbEnd(null);
+    setAbLoop(false);
+  }, []);
+
+  const jumpSubtitleSearch = useCallback((direction: -1 | 1) => {
+    const position = wrapSubtitleMatch(
+      subtitleSearchPosition,
+      subtitleSearchMatches.length,
+      direction,
+    );
+    if (position < 0) return;
+    setSubtitleSearchPosition(position);
+    const cue = cuesRef.current[subtitleSearchMatches[position]];
+    const video = videoRef.current;
+    if (cue && video) {
+      video.currentTime = cue.start + offsetRef.current;
+      void video.play();
+    }
+  }, [subtitleSearchMatches, subtitleSearchPosition]);
+
+  const runPlayerDiagnostics = useCallback(async () => {
+    setDiagnosticsRunning(true);
+    try {
+      const video = videoRef.current;
+      const probe = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const audioTracks = video as HTMLVideoElement & { audioTracks?: { length: number } };
+      let currentFileBytes: number | undefined;
+      if (current?.path) {
+        const storage = await window.api.scanMediaStorage([current.path]);
+        currentFileBytes = storage.files.find((file) => file.path === current.path)?.size;
+      }
+      const allSubtitleCues = [...cues, ...secondaryCues];
+      const timelineValid = [cues, secondaryCues].every((track) => track.every((cue, index) => (
+        cue.start >= 0
+        && cue.end > cue.start
+        && (index === 0 || cue.start >= track[index - 1].start)
+      )));
+      setPlayerDiagnostics(buildPlayerDiagnosticReport({
+        formatSupport: {
+          MP4: !!probe.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"'),
+          WebM: !!probe.canPlayType('video/webm; codecs="vp9, opus"'),
+          HLS: !!probe.canPlayType('application/vnd.apple.mpegurl'),
+          MOV: !!probe.canPlayType('video/quicktime'),
+          AVI: !!probe.canPlayType('video/x-msvideo'),
+          MKV: !!probe.canPlayType('video/x-matroska'),
+        },
+        pictureInPicture: (
+          'pictureInPictureEnabled' in document
+          && !!(document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled
+        ),
+        fullscreen: document.fullscreenEnabled,
+        mediaRecorder: typeof MediaRecorder !== 'undefined',
+        webgl: !!(canvas.getContext('webgl2') || canvas.getContext('webgl')),
+        readyState: video?.readyState ?? 0,
+        networkState: video?.networkState ?? 0,
+        durationSec: Number.isFinite(video?.duration) ? video?.duration ?? 0 : 0,
+        videoWidth: video?.videoWidth ?? 0,
+        videoHeight: video?.videoHeight ?? 0,
+        audioTrackCount: audioTracks?.audioTracks?.length ?? 0,
+        subtitleCueCount: allSubtitleCues.length,
+        subtitleTimelineValid: timelineValid,
+        currentExtension: current?.fileName.split('.').pop()?.toLowerCase() ?? '',
+        currentFileBytes,
+      }));
+    } finally {
+      setDiagnosticsRunning(false);
+    }
+  }, [cues, current, secondaryCues]);
+
+  const exportPlayerDiagnostics = useCallback(() => {
+    if (!playerDiagnostics) return;
+    const blob = new Blob([JSON.stringify(playerDiagnostics, null, 2)], {
+      type: 'application/json',
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `player-diagnostics-${new Date(playerDiagnostics.generatedAt).toISOString().replace(/[:.]/g, '-')}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, [playerDiagnostics]);
+
   const translateLine = useCallback(async () => {
     if (!active) return;
     setLineBusy(true);
@@ -676,6 +1514,62 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     const v = videoRef.current;
     if (v && current && v.currentTime > 3) window.api.setMediaPosition(current.id, v.currentTime);
   }, [current]);
+
+  const endActiveStudySession = useCallback(() => {
+    const sessionId = studySessionIdRef.current;
+    const positionSec = videoRef.current?.currentTime ?? 0;
+    if (sessionId) endMediaStudySession(sessionId, positionSec);
+    studySessionIdRef.current = '';
+    studySessionMediaIdRef.current = '';
+    setStudySessionActive(false);
+  }, []);
+
+  const beginActiveStudySession = useCallback(() => {
+    if (!learningModeActive || !current || studySessionIdRef.current) return;
+    const existingSession = loadMediaStudyDatabase().sessions.find(
+      (session) => session.mediaId === current.id && session.endedAt == null,
+    );
+    if (existingSession) {
+      studySessionMediaIdRef.current = current.id;
+      setStudySessionActive(true);
+      return;
+    }
+    const positionSec = videoRef.current?.currentTime ?? 0;
+    studySessionIdRef.current = startMediaStudySession({
+      mediaId: current.id,
+      title: current.title,
+      action: 'study-episode',
+      positionSec,
+    });
+    studySessionMediaIdRef.current = current.id;
+    setStudySessionActive(true);
+  }, [current, learningModeActive]);
+
+  const handlePlayerPlay = useCallback(() => {
+    if (volumeNormalization && audioContextRef.current?.state === 'suspended') {
+      void audioContextRef.current.resume();
+    }
+    if (learningModeActive) beginActiveStudySession();
+  }, [beginActiveStudySession, learningModeActive, volumeNormalization]);
+
+  const handlePlayerPause = useCallback(() => {
+    saveProgress();
+    endActiveStudySession();
+  }, [endActiveStudySession, saveProgress]);
+
+  useEffect(() => {
+    const sessionForDifferentMedia = (
+      studySessionMediaIdRef.current
+      && studySessionMediaIdRef.current !== current?.id
+    );
+    if (!learningModeActive || sessionForDifferentMedia) {
+      endActiveStudySession();
+      return;
+    }
+    if (current && videoRef.current && !videoRef.current.paused) beginActiveStudySession();
+  }, [beginActiveStudySession, current, endActiveStudySession, learningModeActive]);
+
+  useEffect(() => () => endActiveStudySession(), [endActiveStudySession]);
 
   const nudge = useCallback(
     (delta: number) => {
@@ -709,23 +1603,16 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setCurrent(null);
   }, []);
 
-  // Video learning shortcuts (Phase 5b).
-  useEffect(() => {
-    if (!showPlayer) return;
-    const offs = [
-      registerCommandHandler('video.replayLine', () => replayLine()),
-      registerCommandHandler('video.prevLine', () => jumpLine(-1)),
-      registerCommandHandler('video.nextLine', () => jumpLine(1)),
-      registerCommandHandler('video.subEarlier', () => nudge(-0.1)),
-      registerCommandHandler('video.subLater', () => nudge(0.1)),
-      registerCommandHandler('video.subEarlierLarge', () => nudge(-0.5)),
-      registerCommandHandler('video.subLaterLarge', () => nudge(0.5)),
-      registerCommandHandler('video.toggleAutoPause', () => setAutoPause((v) => !v)),
-      registerCommandHandler('video.toggleLoop', () => setLoopLine((v) => !v)),
-      registerCommandHandler('video.toggleFurigana', () => setFurigana((v) => !v)),
-    ];
-    return () => offs.forEach((off) => off());
-  }, [showPlayer, replayLine, jumpLine, nudge]);
+  /*
+   * The ten `video.*` shortcut registrations that lived here are GONE — slice 19.
+   *
+   * They were Phase 5b's, and every one of them acted on `videoRef`, which slice 16 left
+   * unattached when it deleted `MediaPlayerStage`. Nothing failed: the handlers kept
+   * registering, `commandIsLive()` kept answering true, and Settings kept listing ten
+   * bindable rows. `VideoCoreStudyOverlay` owns those actions now, against the player that
+   * is actually mounted. This hook keeps `replayLine`, `jumpLine` and `nudge` because the
+   * Study surfaces still call them directly.
+   */
 
   return {
     mode,
@@ -741,6 +1628,9 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     src,
     cues,
     subName,
+    secondaryCues,
+    secondarySubName,
+    secondaryActive,
     subStatus,
     subOffset,
     active,
@@ -777,6 +1667,8 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     selectedFolder,
     setSelectedFolder,
     kindFilter,
+    categoryFilter,
+    setCategoryFilter,
     setKindFilter,
     displayedItems,
     folderRows,
@@ -790,15 +1682,78 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setLoopLine,
     furigana,
     setFurigana,
+    primarySubs,
+    setPrimarySubs,
     dualSubs,
     setDualSubs,
+    dictationMode,
+    setDictationMode,
+    dictationInput,
+    setDictationInput,
+    dictationResult,
+    dictationRevealed,
+    checkDictation,
+    revealDictation,
+    shadowingMode,
+    setShadowingMode,
+    shadowRecording,
+    shadowAudioUrl,
+    shadowError,
+    startShadowRecording,
+    stopShadowRecording,
+    clearShadowRecording,
+    subtitleSearchQuery,
+    setSubtitleSearchQuery,
+    subtitleSearchMatches,
+    subtitleSearchPosition,
+    jumpSubtitleSearch,
+    diagnosticsOpen,
+    setDiagnosticsOpen,
+    diagnosticsRunning,
+    playerDiagnostics,
+    runPlayerDiagnostics,
+    exportPlayerDiagnostics,
+    stepFrame,
+    toggleFullscreen,
+    togglePictureInPicture,
+    subtitleFontSize,
+    setSubtitleFontSize,
+    subtitlePosition,
+    setSubtitlePosition,
+    subtitleOverlay,
+    setSubtitleOverlay,
+    subtitleOverlayBackground,
+    setSubtitleOverlayBackground,
+    videoWrapRef,
+    learningModeActive,
+    studySessionActive,
+    handlePlayerPlay,
+    handlePlayerPause,
+    audioTracks,
+    listeningAvailability,
+    refreshListeningAvailability,
+    refreshAudioTracks,
+    selectAudioTrack,
+    abStart,
+    abEnd,
+    abLoop,
+    setAbLoop,
+    markAbStart,
+    markAbEnd,
+    clearAbRepeat,
+    volumeNormalization,
+    applyVolumeNormalization,
     openFile,
+    openFolder,
     openItem,
+    playItem,
     removeItem,
     downloadYouTube,
     chooseWatchFolder,
     clearWatch,
     openSubs,
+    applySubtitleFile,
+    openSecondarySubs,
     convertAndPlay,
     runGeneration,
     jumpLine,
@@ -966,192 +1921,6 @@ export function MediaGenerationStatus({ state }: { state: MediaState }) {
         <div className="media-substatus muted">{state.subStatus}</div>
       )}
     </>
-  );
-}
-
-/** The `<video>` element, its error/convert affordance, and the subtitle bar. */
-export function MediaPlayerStage({ state }: { state: MediaState }) {
-  const { t } = useT();
-  const { cues, active, current, error } = state;
-  if (!state.src) return null;
-
-  return (
-    <div className={`media-stage${state.sigBurst ? ' is-acquiring' : ''}`}>
-      {/* Subtitles are rendered by SubtitleCueLine below, not as a <track>, so the
-          video element deliberately has no caption child. */}
-      <video
-        ref={state.videoRef}
-        className="media-video"
-        src={state.src}
-        controls
-        autoPlay
-        onLoadStart={state.fireSigBurst}
-        onSeeking={state.fireSigBurst}
-        onLoadedMetadata={() => {
-          const v = state.videoRef.current;
-          if (v && state.resumeRef.current > 5 && state.resumeRef.current < v.duration - 5) {
-            v.currentTime = state.resumeRef.current;
-          }
-          if (v) {
-            v.preservesPitch = true;
-            v.playbackRate = state.playbackRate;
-          }
-        }}
-        onPause={state.saveProgress}
-        onError={() => state.setError(t('media.playError'))}
-      />
-
-      {error && (
-        <div className="media-error media-error-inline">
-          <span>{error}</span>
-          <button
-            className="btn small"
-            onClick={() => void state.convertAndPlay()}
-            disabled={state.converting}
-          >
-            {state.converting ? (
-              t('media.converting')
-            ) : (
-              <>
-                <Icon name="video" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                {t('media.convertToMp4')}
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      <div className="media-subbar">
-        {cues.length > 0 && (
-          <div className="media-subctrls">
-            <button className="btn small" onClick={() => state.jumpLine(-1)}>
-              <Icon name="skip-back" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-              {t('media.subctrl.prev')}
-            </button>
-            <button className="btn small" onClick={state.replayLine} disabled={!active}>
-              <Icon name="refresh" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-              {t('media.subctrl.replay')}
-            </button>
-            <button className="btn small" onClick={() => state.jumpLine(1)}>
-              {t('media.subctrl.next')}
-              <Icon name="skip-forward" size={13} style={{ marginLeft: 4, verticalAlign: '-2px' }} />
-            </button>
-            <div className="media-sync">
-              <button
-                className="btn small"
-                onClick={() => state.nudge(-0.1)}
-                title={t('media.sync.earlier')}
-              >
-                −0.1s
-              </button>
-              <span className="media-sync-val" title={t('media.sync.offsetTitle')}>
-                {state.subOffset > 0 ? '+' : ''}
-                {state.subOffset.toFixed(2)}s
-              </span>
-              <button
-                className="btn small"
-                onClick={() => state.nudge(0.1)}
-                title={t('media.sync.later')}
-              >
-                +0.1s
-              </button>
-            </div>
-            <select
-              className="media-rate-select"
-              value={state.playbackRate}
-              aria-label={t('video.rate')}
-              onChange={(e) => state.setPlaybackRate(Number(e.target.value))}
-            >
-              {RATE_PRESETS.map((r) => (
-                <option key={r} value={r}>
-                  {r.toFixed(2)}x
-                </option>
-              ))}
-            </select>
-            <label className="ocr-check muted">
-              <input
-                type="checkbox"
-                checked={state.autoPause}
-                onChange={(e) => state.setAutoPause(e.target.checked)}
-              />
-              {t('video.autoPause')}
-            </label>
-            <label className="ocr-check muted">
-              <input
-                type="checkbox"
-                checked={state.loopLine}
-                onChange={(e) => state.setLoopLine(e.target.checked)}
-              />
-              {t('video.loopLine')}
-            </label>
-            <label className="ocr-check muted">
-              <input
-                type="checkbox"
-                checked={state.furigana}
-                onChange={(e) => state.setFurigana(e.target.checked)}
-              />
-              {t('video.furigana')}
-            </label>
-            <label className="ocr-check muted">
-              <input
-                type="checkbox"
-                checked={state.dualSubs}
-                onChange={(e) => state.setDualSubs(e.target.checked)}
-              />
-              {t('video.dualSubs')}
-            </label>
-            <button
-              className="btn small"
-              onClick={() => void state.translateLine()}
-              disabled={!active || state.lineBusy}
-            >
-              {state.lineBusy ? (
-                '…'
-              ) : (
-                <>
-                  <Icon name="globe" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                  {t('media.translate')}
-                </>
-              )}
-            </button>
-            <button
-              className="btn small"
-              onClick={() => state.exportSubs('srt')}
-              disabled={!cues.length}
-            >
-              {t('video.exportSrt')}
-            </button>
-            {current && (
-              <button
-                className="btn small"
-                onClick={() => window.api.openExternal(malUrl(current.title))}
-              >
-                {t('media.mal')}
-                <Icon name="external" size={12} style={{ marginLeft: 4, verticalAlign: '-2px' }} />
-              </button>
-            )}
-          </div>
-        )}
-        {active ? (
-          <SubtitleCueLine
-            className="media-subtitle"
-            text={active.text}
-            furigana={state.furigana}
-            onMouseDown={(e) => {
-              state.popupOpenOnDownRef.current = !!state.popupRef.current;
-              noteLookupPointerDown(e);
-            }}
-            onMouseUp={state.lookupAt}
-          />
-        ) : (
-          <div className="media-subtitle"> </div>
-        )}
-        {state.dualSubs && state.lineTrans && (
-          <div className="media-subtrans">{state.lineTrans}</div>
-        )}
-        {cues.length === 0 && <p className="media-subhint muted">{t('media.noSubsHint')}</p>}
-      </div>
-    </div>
   );
 }
 
@@ -1328,6 +2097,273 @@ export function MediaKindFilter({ state }: { state: MediaState }) {
     </div>
   );
 }
+
+export function MediaCategoryFilter({ state }: { state: MediaState }) {
+  const { t } = useT();
+  const categories: MediaCategoryFilterValue[] = ['all', 'in-progress', 'anime', 'drama', 'movie', 'tv', 'music', 'podcast', 'audiobook', 'learning', 'personal', 'inbox'];
+  const label = (category: MediaCategoryFilterValue): string => {
+    if (category === 'all') return 'All categories';
+    if (category === 'in-progress') return t('media.category.inProgress');
+    return category[0].toUpperCase() + category.slice(1);
+  };
+  return <select aria-label="Media category" value={state.categoryFilter} onChange={(event) => state.setCategoryFilter(event.target.value as MediaCategoryFilterValue)}>
+    {categories.map((category) => <option key={category} value={category}>{label(category)}</option>)}
+  </select>;
+}
+
+/** Small dashboard shelves shared by the full Media Hub and library entry points. */
+export function MediaHubDashboard({ items, onOpen }: { items: MediaItem[]; onOpen: (id: string) => void }) {
+  const shelves = buildMediaHubSections(items);
+  const [state, setState] = useState(loadMediaHubState);
+  const [studyDatabase, setStudyDatabase] = useState(loadMediaStudyDatabase);
+  const [diagnostics, setDiagnostics] = useState<MediaHubDiagnostics>({ duplicates: [], missing: [] });
+  useEffect(() => { saveMediaHubState(state); }, [state]);
+  useEffect(() => onMediaStudyDatabaseChanged(setStudyDatabase), []);
+  useEffect(() => {
+    let active = true;
+    void Promise.all(items.map(async (item) => [item.path, await window.api.mediaPathExists(item.path)] as const))
+      .then((checks) => { if (active) setDiagnostics(diagnoseMediaPaths(items, (path) => checks.find(([p]) => p === path)?.[1] ?? false)); });
+    return () => { active = false; };
+  }, [items]);
+  const rows = [
+    ['Favorites', items.filter((item) => state[item.id]?.favorite)],
+    ['Study queue', items.filter((item) => state[item.id]?.studyQueue)],
+    ['Recently added', shelves.recentlyAdded],
+    ['Continue watching', shelves.continueWatching],
+    ['Recently studied', shelves.recentlyStudied],
+    ['Recently listened', shelves.recentlyListened],
+    ['Recommended', shelves.recommended],
+    ['Unorganized files', shelves.unorganized],
+  ] as const;
+  return (
+    <section className="media-hub-dashboard" aria-label="Media Hub dashboard">
+      {rows.map(([label, shelf]) => shelf.length > 0 && (
+        <MediaCollapsibleSection id={`shelf:${label}`} key={label} title={label} className="media-hub-shelf">
+          <div className="media-hub-shelf-row">
+            {shelf.map((item) => (
+              <div className="media-hub-shelf-item" key={item.id}>
+                <button className="media-hub-item-title" type="button" title={item.title} onClick={() => onOpen(item.id)}>
+                  <span>{item.title}</span>
+                </button>
+                <MediaStudyActions item={item} />
+                <div className="media-hub-item-actions">
+                  <button
+                    type="button"
+                    className="media-hub-favorite"
+                    aria-pressed={state[item.id]?.favorite === true}
+                    onClick={() => setState((prev) => ({
+                      ...prev,
+                      [item.id]: { ...prev[item.id], favorite: !prev[item.id]?.favorite },
+                    }))}
+                  >
+                    <Icon name="bookmark" size={12} />
+                    <span>{state[item.id]?.favorite ? 'Favorited' : 'Favorite'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="media-hub-queue"
+                    aria-pressed={state[item.id]?.studyQueue === true}
+                    onClick={() => setState((previous) => ({
+                      ...previous,
+                      [item.id]: {
+                        ...previous[item.id],
+                        studyQueue: !previous[item.id]?.studyQueue,
+                      },
+                    }))}
+                  >
+                    {state[item.id]?.studyQueue ? 'Queued' : 'Study queue'}
+                  </button>
+                </div>
+                {studyDatabase.profiles[item.id] && (
+                  <small className="media-hub-language-profile">
+                    {studyDatabase.profiles[item.id].difficulty.jlptLevel ?? studyDatabase.profiles[item.id].difficulty.band}
+                    {' · '}
+                    {studyDatabase.profiles[item.id].vocabulary.uniqueWords} words
+                  </small>
+                )}
+                <small className="media-hub-item-meta">
+                  {item.kind ?? 'video'}{item.positionSec ? ` · ${Math.round(item.positionSec)}s` : ''}
+                </small>
+                <input
+                  className="media-hub-note"
+                  aria-label={`Note for ${item.title}`}
+                  placeholder="Add note"
+                  value={state[item.id]?.note ?? ''}
+                  onChange={(event) => setState((prev) => ({
+                    ...prev,
+                    [item.id]: { ...prev[item.id], note: event.target.value },
+                  }))}
+                />
+              </div>
+            ))}
+          </div>
+        </MediaCollapsibleSection>
+      ))}
+      <MediaHubSeriesPanel items={items} />
+      {(diagnostics.duplicates.length > 0 || diagnostics.missing.length > 0) && (
+        <div className="media-hub-diagnostics" role="status">
+          {diagnostics.duplicates.length > 0 && <span>Duplicate paths: {diagnostics.duplicates.length}</span>}
+          {diagnostics.missing.length > 0 && <span>Missing files: {diagnostics.missing.length}</span>}
+          {diagnostics.missing.length > 0 && <button type="button" onClick={() => void window.api.pruneMedia()}>Remove missing entries</button>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * MASTER_PLAN §10 — series view over the local library: which titles the Hub has
+ * grouped, which episodes are missing from a run, and which slots hold more than one
+ * file. Read-only on purpose; resolving a duplicate is the storage panel's job.
+ */
+export function MediaHubSeriesPanel({ items }: { items: MediaItem[] }) {
+  const { t, lang } = useT();
+  const series = useMemo(
+    () => resolveLocalMediaIdentities(items).identities.filter(
+      (identity) => Object.keys(identity.episodesBySeason).length > 0,
+    ),
+    [items],
+  );
+  const formatList = useMemo(() => new Intl.ListFormat(lang, { style: 'short', type: 'unit' }), [lang]);
+  if (series.length === 0) return null;
+  return (
+    <MediaCollapsibleSection
+      id="series"
+      className="media-hub-shelf media-hub-series"
+      title={t('mediaHub.series.title')}
+    >
+      <div className="media-hub-series-list">
+        {series.map((identity) => {
+          const seasons = Object.keys(identity.episodesBySeason).map(Number).sort((a, b) => a - b);
+          const total = seasons.reduce((sum, season) => sum + identity.episodesBySeason[season].length, 0);
+          const gaps = seasons.filter((season) => identity.missingBySeason[season]?.length);
+          return (
+            <div className="media-hub-series-row" key={identity.id}>
+              <strong>{identity.title}</strong>
+              <small>{t('mediaHub.series.episodeCount', { count: total })}</small>
+              {gaps.length > 0
+                ? gaps.map((season) => (
+                  <small className="media-hub-series-gap" key={season}>
+                    {t('mediaHub.series.missing', {
+                      season,
+                      episodes: formatList.format(identity.missingBySeason[season].map(String)),
+                    })}
+                  </small>
+                ))
+                : <small className="media-hub-series-complete">{t('mediaHub.series.noGaps')}</small>}
+              {identity.duplicateKeys.length > 0 && (
+                <small className="media-hub-series-duplicate">
+                  {t('mediaHub.series.duplicateSlots', { count: identity.duplicateKeys.length })}
+                </small>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </MediaCollapsibleSection>
+  );
+}
+
+export function MediaHubStoragePanel({ items }: { items: MediaItem[] }) {
+  const { t } = useT();
+  const [root, setRoot] = useState('');
+  const [selectedId, setSelectedId] = useState(items[0]?.id ?? '');
+  const [preview, setPreview] = useState<MediaOrganizationPreview | null>(null);
+  const [choice, setChoice] = useState<MediaDuplicateChoice>('keep-existing');
+  const [scan, setScan] = useState<{ totalBytes: number; files: Array<{ path: string; size: number; modifiedAt: number }> } | null>(null);
+  const [relationships, setRelationships] = useState<MediaRelationship[]>([]);
+  const [targetId, setTargetId] = useState('');
+  const [relationshipType, setRelationshipType] = useState<MediaRelationship['type']>('note');
+  const selected = items.find((item) => item.id === selectedId);
+  useEffect(() => { if (!selected && items[0]) setSelectedId(items[0].id); }, [items, selected]);
+  useEffect(() => { if (selected) void window.api.listMediaRelationships(selected.id).then(setRelationships); }, [selected]);
+  const previewOrganization = async () => { if (!selected || !root.trim()) return; setPreview(await window.api.previewMediaOrganization(selected.id, root.trim())); };
+  const applyOrganization = async () => { if (!preview) return; const result = await window.api.organizeMedia(preview, choice); if (result.ok) setPreview(null); };
+  const scanStorage = async () => { const result = await window.api.scanMediaStorage(items.map((item) => item.path)); setScan(result); };
+  const exportBackup = async () => { const backup = await window.api.backupMedia(); const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = mediaHubBackupFilename(backup.createdAt); link.click(); URL.revokeObjectURL(link.href); };
+  const addRelationship = async () => { if (!selected || !targetId) return; const relation = await window.api.addMediaRelationship({ fromId: selected.id, toId: targetId, type: relationshipType }); setRelationships((current) => [...current, relation]); setTargetId(''); };
+  return (
+    <>
+      <MediaCollapsibleSection
+        id="storage"
+        className="media-hub-storage"
+        title={t('media.storage.title')}
+        actions={(
+          <div>
+            <button type="button" className="btn" onClick={() => void scanStorage()}>{t('media.storage.scanBytes')}</button>
+            <button type="button" className="btn" onClick={() => void exportBackup()}>{t('media.storage.exportBackup')}</button>
+          </div>
+        )}
+      >
+        <div className="media-hub-storage-grid">
+          <label>{t('media.storage.item')}
+            <select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setPreview(null); }}>
+              {items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </select>
+          </label>
+          <label>{t('media.storage.organizationRoot')}
+            <input value={root} onChange={(event) => setRoot(event.target.value)} placeholder="C:\\Media" />
+          </label>
+          <button type="button" className="btn primary" disabled={!selected || !root.trim()} onClick={() => void previewOrganization()}>
+            {t('media.storage.previewOrganization')}
+          </button>
+        </div>
+        {preview && (
+          <div className="media-hub-preview" role="status">
+            <strong>{preview.action === 'conflict' ? t('media.storage.conflictDetected') : t('media.storage.organizationPreview')}</strong>
+            <span>{preview.sourcePath} → {preview.targetPath}</span>
+            {preview.action === 'conflict' && (
+              <select aria-label={t('media.storage.duplicateChoice')} value={choice} onChange={(event) => setChoice(event.target.value as MediaDuplicateChoice)}>
+                <option value="keep-existing">{t('media.storage.keepExisting')}</option>
+                <option value="keep-incoming">{t('media.storage.keepIncoming')}</option>
+                <option value="keep-both">{t('media.storage.keepBoth')}</option>
+                <option value="skip">{t('media.storage.skip')}</option>
+              </select>
+            )}
+            <button type="button" className="btn" onClick={() => void applyOrganization()} disabled={preview.action === 'noop'}>
+              {t('media.storage.applyChoice')}
+            </button>
+          </div>
+        )}
+        {scan && (
+          <div className="media-hub-scan" role="status">
+            {t('media.storage.scanSummary', { files: scan.files.length, bytes: scan.totalBytes.toLocaleString() })}
+          </div>
+        )}
+      </MediaCollapsibleSection>
+      {selected && (
+        <MediaCollapsibleSection id="relationships" className="media-hub-relationships" title={t('media.relationships.title')}>
+          <div>
+            <select aria-label={t('media.relationships.target')} value={targetId} onChange={(event) => setTargetId(event.target.value)}>
+              <option value="">{t('media.relationships.chooseTarget')}</option>
+              {items.filter((item) => item.id !== selected.id).map((item) => (
+                <option key={item.id} value={item.id}>{item.title}</option>
+              ))}
+            </select>
+            <select
+              aria-label={t('media.relationships.type')}
+              value={relationshipType}
+              onChange={(event) => setRelationshipType(event.target.value as MediaRelationship['type'])}
+            >
+              <option value="vocabulary">{t('media.relationships.vocabulary')}</option>
+              <option value="sentence">{t('media.relationships.sentence')}</option>
+              <option value="lyrics">{t('media.relationships.lyrics')}</option>
+              <option value="note">{t('media.relationships.note')}</option>
+              <option value="flashcard">{t('media.relationships.flashcard')}</option>
+            </select>
+            <button type="button" className="btn" disabled={!targetId} onClick={() => void addRelationship()}>
+              {t('media.relationships.add')}
+            </button>
+          </div>
+          {relationships.map((relation) => (
+            <span key={relation.id}>{relation.type} → {relation.toId}</span>
+          ))}
+        </MediaCollapsibleSection>
+      )}
+    </>
+  );
+}
+
 
 export { MediaLibraryActions };
 

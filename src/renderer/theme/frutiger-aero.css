@@ -32,13 +32,38 @@
      Study OS uses red for --accent/--red. Aero puts sky aqua on --accent and
      keeps warm red on --red/--red-deep for danger/caution controls. */
   --accent: #00a8c8;
-  --accent-2: #35a86b;
+  /* WCAG 1.4.3 (4.5:1 for body text). Measured 2026-08-03 on the packaged aero theme: 24 real
+     text failures, and EVERY ONE of them was green. #35a86b reads 2.49–2.75:1 as text on aero's
+     light glass — it is a green tuned for dark surfaces, where light-on-dark works, and aero
+     inverts that. `--accent-2` is overwhelmingly a TEXT colour here (103 `color:` uses against 35
+     backgrounds and 64 borders), so the fix belongs on the token rather than on 103 call sites.
+     #1a6b43 is the same green, deeper: 5.36:1 worst case across the four backdrops the gate
+     actually measured (pale green, lilac, mint, near-white).
+     Trade-off, stated rather than hidden: the 35 background uses become a deeper green too. That
+     is coherent on a light theme, and B1/B2 re-measurement is what confirms it. */
+  --accent-2: #1a6b43;
   --red: #c21f45;
   --red-deep: #861a33;
   --aero-aqua: #00b8d0;
-  --aero-green: #35a86b;
+  --aero-green: #1a6b43;
   --aero-amber: #f4b04c;
-  --focus-ring-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  /* WCAG 1.4.11 (3:1 for a focus indicator). Measured 2026-08-03 on the packaged aero theme:
+     the ring painted rgb(40,180,211) on the pale glass rgb(158,216,242) -> 1.59:1, and ALL FOUR
+     ringed stops failed. Two things make aero different from the dark themes:
+
+       1. translucency cannot be rescued here either — see the --control-edge note in styles.css;
+       2. aero is a LIGHT theme, so the ring has to go DARKER, not merely opaque. Fully opaque
+          --accent (#00a8c8) still only reaches 1.82:1 on that glass, so "make it solid", which
+          fixed the dark theme's taskbar ring, is not enough on its own.
+
+     #00697f is the same aqua family, just deeper: 4.08:1 on the pale glass, 4.84:1 on the panel
+     tint and 6.01:1 on frosted white — the worst case carries real margin rather than sitting on
+     the line. --accent is deliberately NOT changed; it fills half the theme. */
+  --focus-ring-color: #00697f;
+  /* Same reasoning as the focus ring above, same value: aero is LIGHT, so a state indicator drawn
+     in --accent (#00a8c8) reads 2.13-2.82:1 on its surfaces and fails 1.4.11. #00697f scores
+     4.76:1 on the worst backdrop the gate measured (rgb(196,228,250)) and 6.31:1 on white. */
+  --state-indicator: #00697f;
   --status-info: var(--accent);
 
   /* ---- Controls — frosted white ---- */
@@ -91,4 +116,21 @@
 
   /* ---- Friendly, slightly heavier display face ---- */
   --font-display: 'Segoe UI Semibold', 'Segoe UI', var(--font-body);
+}
+
+/* ---------------------------------------------------------------------------
+   WCAG 1.4.3 — three hardcoded #5fd29a greens that no token can reach.
+
+   `styles.css` writes `color: #5fd29a` literally at :7638, :7805 and :22009.
+   That green is 1.55–1.72:1 as text on aero's light surfaces (14 of the 24
+   real failures the gate measured), because it was chosen for dark panels.
+   Overriding by selector rather than editing those call sites keeps the dark
+   themes exactly as they are — the colour is correct there and only wrong here.
+
+   #1a6b43 matches --accent-2 above: 5.36:1 worst case on the measured backdrops.
+   --------------------------------------------------------------------------- */
+:root[data-materials='aero'] .res-cost.cost-free,
+:root[data-materials='aero'] .bundle-card-checkmark.done,
+:root[data-materials='aero'] .rf-furigana-badge {
+  color: #1a6b43;
 }

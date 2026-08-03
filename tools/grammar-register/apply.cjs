@@ -44,7 +44,7 @@ for (const file of fs.readdirSync(DATA_DIR)) {
   const raw = fs.readFileSync(full, 'utf-8');
   if (!raw.includes("id: '")) continue;
 
-  // A few generated files (the Mazii imports) are CRLF while the rest are LF.
+  // A few generated files (the supplement imports) are CRLF while the rest are LF.
   // Normalize to LF for matching so the record-boundary regex below doesn't
   // silently miss every record in a CRLF file, then restore CRLF on write if
   // that's what the file started with.

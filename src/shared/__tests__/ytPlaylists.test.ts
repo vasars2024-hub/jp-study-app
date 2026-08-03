@@ -72,7 +72,8 @@ describe('ytPlaylists helpers', () => {
         position: 1,
       },
     ]);
-    const aaa = merged.find((v) => v.youtubeId === 'aaa')!;
+    const aaa = merged.find((v) => v.youtubeId === 'aaa');
+    if (!aaa) throw new Error('missing aaa');
     expect(aaa.title).toBe('New title');
     expect(aaa.downloaded).toBe(true);
     expect(aaa.mediaItemId).toBe('m1');
@@ -81,7 +82,8 @@ describe('ytPlaylists helpers', () => {
     expect(aaa.loggedAt).toBe(100);
     expect(aaa.viewCount).toBe(99);
     expect(merged.find((v) => v.youtubeId === 'bbb')).toBeUndefined();
-    const ccc = merged.find((v) => v.youtubeId === 'ccc')!;
+    const ccc = merged.find((v) => v.youtubeId === 'ccc');
+    if (!ccc) throw new Error('missing ccc');
     expect(ccc.downloaded).toBe(false);
     expect(typeof ccc.firstSeenAt).toBe('number');
     expect(aaa.firstSeenAt).toBeUndefined();
@@ -92,10 +94,13 @@ describe('ytPlaylists helpers', () => {
       id: 'pl1',
       title: 'P',
       url: 'https://www.youtube.com/playlist?list=PLx',
+      channelTitle: 'Channel',
       youtubePlaylistId: 'PLx',
+      subscriptionStatus: 'subscribed',
       lang: 'ja',
       preferSubs: ['ja'],
       autoUpdate: true,
+      updateFrequencyHours: 12,
       sortDefault: 'playlist',
       createdAt: 1,
     };
@@ -130,6 +135,7 @@ describe('ytPlaylists helpers', () => {
           id: 'pl1',
           title: 'Old',
           url: 'https://www.youtube.com/playlist?list=PLx',
+          channelTitle: 'Channel',
           youtubePlaylistId: 'PLx',
           lang: 'ja',
           autoUpdate: true,
@@ -143,7 +149,120 @@ describe('ytPlaylists helpers', () => {
     expect(normalized.planToWatchIds).toEqual([]);
     expect(normalized.folders).toHaveLength(1);
     expect(normalized.playlists[0]?.preferSubs).toEqual(['ja']);
+    expect(normalized.playlists[0]?.subscriptionStatus).toBe('subscribed');
+    expect(normalized.playlists[0]?.updateFrequencyHours).toBe(12);
     expect(planToWatchVideos(normalized)).toEqual([]);
+  });
+
+  it('normalizeYtStore derives tracked channels from playlist metadata', () => {
+    const normalized = normalizeYtStore({
+      version: 1,
+      playlists: [
+        {
+          id: 'pl1',
+          title: 'Tracked',
+          url: 'https://www.youtube.com/playlist?list=PLx',
+          channelId: 'UC123',
+          channelTitle: 'Tracked channel',
+          channelIconUrl: 'https://example.test/icon.png',
+          youtubePlaylistId: 'PLx',
+          subscriptionStatus: 'watching',
+          lang: 'ja',
+          preferSubs: ['ja'],
+          autoUpdate: true,
+          lastCheckedAt: 10,
+          updateFrequencyHours: 18,
+          sortDefault: 'playlist',
+          createdAt: 1,
+        },
+      ],
+      videos: [vid({ id: 'ytv-1', youtubeId: 'a', title: 'A' })],
+    });
+    expect(normalized.channels).toHaveLength(1);
+    expect(normalized.channels[0]).toMatchObject({
+      channelId: 'UC123',
+      title: 'Tracked channel',
+      iconUrl: 'https://example.test/icon.png',
+      subscriptionStatus: 'watching',
+      lastCheckedAt: 10,
+      updateFrequencyHours: 18,
+      playlistIds: ['pl1'],
+      videoCount: 1,
+    });
+  });
+
+  it('preserves connector metadata and defaults cadence fields when normalizing', () => {
+    const normalized = normalizeYtStore({
+      version: 1,
+      playlists: [
+        {
+          id: 'pl2',
+          title: 'Tracked channel',
+          url: 'https://www.youtube.com/playlist?list=PLtracked',
+          youtubePlaylistId: 'PLtracked',
+          channelId: 'UC123',
+          channelTitle: 'Tracked channel',
+          channelIconUrl: 'https://example.test/icon.png',
+          subscriptionStatus: 'watching',
+          lang: 'en',
+          preferSubs: ['en'],
+          autoUpdate: true,
+          lastCheckedAt: 1,
+          updateFrequencyHours: 24,
+          sortDefault: 'date',
+          createdAt: 1,
+        },
+      ],
+      videos: [],
+    });
+    expect(normalized.playlists[0]).toMatchObject({
+      channelId: 'UC123',
+      channelTitle: 'Tracked channel',
+      channelIconUrl: 'https://example.test/icon.png',
+      subscriptionStatus: 'watching',
+      lastCheckedAt: 1,
+      updateFrequencyHours: 24,
+    });
+  });
+
+  it('preserves explicit channel records while syncing playlist metadata into them', () => {
+    const normalized = normalizeYtStore({
+      version: 1,
+      channels: [
+        {
+          id: 'ytc-UC123',
+          channelId: 'UC123',
+          title: 'Local title',
+          subscriptionStatus: 'custom',
+          updateFrequencyHours: 8,
+          playlistIds: ['pl1'],
+          videoCount: 0,
+          createdAt: 1,
+        },
+      ],
+      playlists: [
+        {
+          id: 'pl1',
+          title: 'Tracked',
+          url: 'https://www.youtube.com/playlist?list=PLx',
+          channelId: 'UC123',
+          channelTitle: 'Remote title',
+          youtubePlaylistId: 'PLx',
+          subscriptionStatus: 'subscribed',
+          lang: 'ja',
+          preferSubs: ['ja'],
+          autoUpdate: true,
+          sortDefault: 'playlist',
+          createdAt: 1,
+        },
+      ],
+      videos: [],
+    });
+    expect(normalized.channels[0]).toMatchObject({
+      title: 'Remote title',
+      subscriptionStatus: 'subscribed',
+      playlistIds: ['pl1'],
+    });
   });
 
   it('plan helpers tolerate undefined planToWatchIds on legacy objects', () => {
@@ -162,10 +281,13 @@ describe('ytPlaylists helpers', () => {
       id: 'pl1',
       title: 'P',
       url: 'https://www.youtube.com/playlist?list=PLx',
+      channelTitle: 'Channel',
       youtubePlaylistId: 'PLx',
+      subscriptionStatus: 'subscribed',
       lang: 'ja',
       preferSubs: ['ja'],
       autoUpdate: true,
+      updateFrequencyHours: 12,
       sortDefault: 'playlist',
       createdAt: 1,
     };

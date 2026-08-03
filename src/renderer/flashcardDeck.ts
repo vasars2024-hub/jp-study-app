@@ -7,7 +7,8 @@ export type FlashcardSource =
   | 'import'
   | 'csv'
   | 'jiten'
-  | 'extension';
+  | 'extension'
+  | 'media';
 
 export interface DeckFlashcard {
   id: string;
@@ -21,8 +22,20 @@ export interface DeckFlashcard {
   bookId?: string;
   bookTitle?: string;
   folder?: string;
+  studyKind?: import('../shared/visualNovelStudyCards').VisualNovelStudyCardKind;
+  frequency?: number;
+  jlptLevel?: string;
+  sceneReference?: string;
+  /** Exact media context retained by Study Mode and player handoffs. */
+  sourceRef?: import('../shared/mediaStudyOrchestrator').StudyContextRef;
+  /** Reversible Study action that created this card batch. */
+  studyActionId?: string;
   /** Optional recorded audio as a data URL (short clips from extension). */
   audioDataUrl?: string;
+  /** Managed VN voice clip, loaded on demand to keep localStorage compact. */
+  audioPath?: string;
+  /** Managed VN capture image, loaded on demand to avoid localStorage bloat. */
+  imagePath?: string;
   /** Persisted study state — marked via review "Got it". */
   known?: boolean;
   addedAt: number;
@@ -139,6 +152,23 @@ export function addDeckCards(entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[]): 
   return store.cards;
 }
 
+/** Add cards while returning only the new rows, without changing legacy callers. */
+export function addDeckCardsTracked(
+  entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[],
+): DeckFlashcard[] {
+  return addDeckCards(entries).slice(0, entries.length);
+}
+
+/** One persisted write for a reversible Study-created batch. */
+export function removeDeckCards(ids: readonly string[]): DeckFlashcard[] {
+  if (!ids.length) return loadDeck();
+  const wanted = new Set(ids);
+  const store = readStore();
+  store.cards = store.cards.filter((card) => !wanted.has(card.id));
+  writeStore(store);
+  return store.cards;
+}
+
 export function removeDeckCard(id: string): DeckFlashcard[] {
   const store = readStore();
   store.cards = store.cards.filter((c) => c.id !== id);
@@ -158,6 +188,14 @@ export function updateDeckCard(
       | 'sentence'
       | 'front'
       | 'back'
+      | 'imagePath'
+      | 'audioPath'
+      | 'studyKind'
+      | 'frequency'
+      | 'jlptLevel'
+      | 'sceneReference'
+      | 'sourceRef'
+      | 'studyActionId'
       | 'ankiExported'
       | 'ankiExportedAt'
       | 'ankiNoteId'
@@ -284,11 +322,10 @@ export function filterDeckCards(cards: DeckFlashcard[], filter: DeckFolderFilter
 }
 
 /**
- * Free-text card search. Matches every field a user can read off a card —
- * word, reading, meaning, front/back, sentence, and the source book title —
- * so typing a book name narrows to that deck the same as typing a word does.
- * Case-insensitive substring; kana/kanji need no folding since Japanese text
- * is matched verbatim.
+ * Substring search across every field a user can read on a card, so typing a
+ * deck name, a reading, or a remembered fragment of the mined sentence all
+ * narrow the same box. Case-insensitive; an empty or whitespace query is not a
+ * filter and returns the input untouched.
  */
 export function searchDeckCards(cards: DeckFlashcard[], query: string): DeckFlashcard[] {
   const q = query.trim().toLowerCase();

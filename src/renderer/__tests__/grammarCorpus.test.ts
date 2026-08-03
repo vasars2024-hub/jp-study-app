@@ -6,20 +6,20 @@ import {
   frameworkForLevel,
   isUnofficialLevel,
 } from '../data/grammar';
-import { N1_MAZII } from '../data/grammar/n1-mazii';
-import { N2_MAZII } from '../data/grammar/n2-mazii';
-import { N3_MAZII } from '../data/grammar/n3-mazii';
-import { N4_MAZII } from '../data/grammar/n4-mazii';
+import { N1_SUPPLEMENT } from '../data/grammar/n1-supplement';
+import { N2_SUPPLEMENT } from '../data/grammar/n2-supplement';
+import { N3_SUPPLEMENT } from '../data/grammar/n3-supplement';
+import { N4_SUPPLEMENT } from '../data/grammar/n4-supplement';
 
 const JLPT = ['N5', 'N4', 'N3', 'N2', 'N1'];
 const HSK = ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6', 'HSK7-9', 'HSK10'];
 
 describe('GrammarX corpus', () => {
-  it('includes Mazii N1–N4 and HSK bands', () => {
-    expect(N1_MAZII.length).toBeGreaterThan(200);
-    expect(N2_MAZII.length).toBeGreaterThan(300);
-    expect(N3_MAZII.length).toBeGreaterThan(100);
-    expect(N4_MAZII.length).toBeGreaterThan(50);
+  it('includes supplemental N1–N4 and HSK bands', () => {
+    expect(N1_SUPPLEMENT.length).toBeGreaterThan(200);
+    expect(N2_SUPPLEMENT.length).toBeGreaterThan(300);
+    expect(N3_SUPPLEMENT.length).toBeGreaterThan(100);
+    expect(N4_SUPPLEMENT.length).toBeGreaterThan(50);
     expect(GRAMMAR.length).toBeGreaterThan(1000);
     expect(GRAMMAR_COUNTS.N1).toBeGreaterThan(200);
     expect(GRAMMAR_COUNTS.N2).toBeGreaterThan(300);
@@ -65,10 +65,11 @@ describe('GrammarX corpus', () => {
   });
 
   it('never reports a heuristic tag as authored', () => {
-    // Every Mazii record arrived pre-tagged by the same inference, so none of
-    // them may claim authored provenance no matter what the source file says.
+    // Every supplemental record arrived pre-tagged by the same inference, so
+    // none may claim authored provenance no matter what the source file says.
     const overclaiming = GRAMMAR.filter(
-      (p) => p.provenance.source?.startsWith('mazii-') && p.provenance.tagSource === 'authored',
+      (p) =>
+        p.provenance.source?.startsWith('supplement-') && p.provenance.tagSource === 'authored',
     );
     expect(overclaiming.map((p) => p.id)).toEqual([]);
   });

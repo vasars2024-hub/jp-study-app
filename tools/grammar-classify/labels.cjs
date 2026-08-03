@@ -1,5 +1,5 @@
 /**
- * Canonical grammar-function label set (deduped from the Mazii function list).
+ * Canonical grammar-function label set (deduped from the legacy function list).
  *
  * The source list shipped ~180 labels containing true synonym pairs — e.g.
  * "What did not match the prediction" / "What does not match the prediction",

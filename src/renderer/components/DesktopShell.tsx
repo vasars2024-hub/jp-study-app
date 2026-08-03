@@ -59,7 +59,6 @@ import AeroFindingOverlay from './shell/AeroFindingOverlay';
 import WiredFindingOverlay from './shell/WiredFindingOverlay';
 import { startCompanionOsBridge, stopCompanionOsBridge } from '../environment/companionOsBridge';
 import { startAchievementWatcher } from '../environment/achievements';
-import { startNoctisLightBridge } from '../environment/noctisLightBridge';
 import { loadPersonalization, onPersonalizationChanged } from '../osPersonalization';
 import { syncPillarboxWallImage } from '../pillarboxSettings';
 import { getZoomFactor } from '../appZoom';
@@ -76,7 +75,8 @@ import { useT } from '../i18n';
 type WinSection =
   | 'library' | 'novels' | 'dictionary' | 'grammar' | 'notebook' | 'translate'
   | 'player' | 'video' | 'music' | 'anki' | 'flashcards' | 'stats' | 'resources' | 'settings' | 'note'
-  | 'games' | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar' | 'reading' | 'youtube';
+  | 'games' | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar' | 'reading' | 'youtube'
+  | 'scraper';
 
 interface Win {
   id: string;
@@ -122,9 +122,15 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'music', labelKey: 'palette.section.music', glyph: 'music' },
   { id: 'dictionary', labelKey: 'palette.section.dictionary', glyph: 'dictionary' },
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
+  // 'sparkle', not 'scan' or 'search': Reading already owns 'scan' (the OCR
+  // lens) and the Scraper's job is proposing titles, not reading one.
+  { id: 'scraper', labelKey: 'palette.section.scraper', glyph: 'sparkle' },
   { id: 'library', labelKey: 'palette.section.library', glyph: 'library' },
   { id: 'novels', labelKey: 'palette.section.novels', glyph: 'novels' },
-  { id: 'reading', labelKey: 'palette.section.reading', glyph: 'search' },
+  // 'scan', not 'search': Reading is the OCR reading lens, and sharing the
+  // generic search glyph left it as the one app in Start without an app icon
+  // (inline affordances like search stay monochrome — see theme/aeroIconPack.ts).
+  { id: 'reading', labelKey: 'palette.section.reading', glyph: 'scan' },
   { id: 'translate', labelKey: 'palette.section.translate', glyph: 'translate' },
   { id: 'grammar', labelKey: 'palette.section.grammar', glyph: 'grammar' },
   { id: 'notebook', labelKey: 'palette.section.notebook', glyph: 'note' },
@@ -150,10 +156,11 @@ const START_PRIMARY_SECTIONS: WinSection[] = [
   'player',
 ];
 const START_HINTS: Partial<Record<WinSection, string>> = {
-  player: 'Media library',
-  video: 'Subtitle learning player',
+  player: 'Media Center · Library',
+  scraper: 'Find what to watch next',
+  video: 'Media Center · Video',
   youtube: 'Immersion playlists',
-  music: 'Listening room',
+  music: 'Media Center · Music',
   dictionary: 'Lookup and pitch',
   grammar: 'Reference, Practice, guides',
   notebook: 'Unified study history',
@@ -169,11 +176,12 @@ const START_HINTS: Partial<Record<WinSection, string>> = {
   calendar: 'Study schedule',
   resources: 'Reference hub',
   settings: 'Control panel',
-  city: 'Night desktop',
+  city: 'Grow a mooncap by reading',
 };
 
 const WIRED_MODULES: Partial<Record<WinSection, { code: string; name: string; hint: string; ready: string }>> = {
   player: { code: 'SIG-LIB', name: 'Signal Library', hint: 'Local media catalog', ready: 'LIB READY' },
+  scraper: { code: 'SCOUT', name: 'Catalogue Scout', hint: 'Remote index sweep', ready: 'INDEX ONLINE' },
   video: { code: 'SIG-VID', name: 'Signal Archive', hint: 'Recovered field recordings', ready: 'SIGNAL READY' },
   youtube: { code: 'YT-DIP', name: 'Playlist Tracker', hint: 'Immersion playlist sync', ready: 'LIST READY' },
   music: { code: 'AUD-DAT', name: 'Audio Deck', hint: 'DAT catalog / ear calibration', ready: 'DECK LINKED' },
@@ -191,7 +199,7 @@ const WIRED_MODULES: Partial<Record<WinSection, { code: string; name: string; hi
   resources: { code: 'LINK', name: 'Uplink Directory', hint: 'External relay nodes', ready: 'NODES LISTED' },
   settings: { code: 'SYS', name: 'Service Panel', hint: 'Machine configuration', ready: 'SERVICE MODE' },
   games: { code: 'DRILL', name: 'Training Lab', hint: 'Fast recall exercise bay', ready: 'DRILL READY' },
-  city: { code: 'NOCTIS', name: 'Observation Node', hint: 'Civilization mirror', ready: 'MIRROR WAITING' },
+  city: { code: 'CAP-50', name: 'Mooncap Garden', hint: 'EPUB growth habitat', ready: 'GARDEN AWAKE' },
   musicwidget: { code: 'AUD-MINI', name: 'Mini Audio Deck', hint: 'Compact transport module', ready: 'AUDIO READY' },
   visualizer: { code: 'OSC', name: 'Visualizer Scope', hint: 'Waveform monitor', ready: 'SCOPE READY' },
   note: { code: 'NOTE', name: 'Field Note', hint: 'Monitor tape annotation', ready: 'NOTE OPEN' },
@@ -343,7 +351,7 @@ const START_GROUPS: { id: string; labelKey: string; sections: WinSection[] }[] =
     sections: ['dictionary', 'grammar', 'reading', 'translate', 'notebook', 'anki', 'flashcards'],
   },
   { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion'] },
-  { id: 'media', labelKey: 'desktop.startCategory.media', sections: ['player', 'video', 'youtube', 'music'] },
+  { id: 'media', labelKey: 'desktop.startCategory.media', sections: ['player', 'video', 'youtube', 'music', 'scraper'] },
   { id: 'progress', labelKey: 'desktop.startCategory.progress', sections: ['stats', 'calendar'] },
   { id: 'system', labelKey: 'desktop.startCategory.system', sections: ['games', 'resources', 'city', 'settings'] },
 ];
@@ -431,7 +439,7 @@ function iconFromSnapshot(icon: IconSnapshot): DeskIcon {
     target: icon.target,
     action: icon.action,
     name: icon.name,
-    // Prefer the live app catalog glyph so shared/legacy icons (e.g. Noctis→stats) refresh.
+    // Prefer the live app catalog glyph so shared/legacy icons refresh.
     glyph: icon.kind === 'app' ? appGlyphForSection(section, icon.glyph as IconName | undefined) : ((icon.glyph as IconName | undefined) ?? 'app'),
     icon: icon.icon,
     x: icon.x,
@@ -862,8 +870,6 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   }, []);
   // L5: streak / daily-volume celebrations → companion events.
   useEffect(() => startAchievementWatcher(), []);
-  // Light Noctis pulse bus (no city engine / simulation coupling).
-  useEffect(() => startNoctisLightBridge(), []);
   const deskSize = () => ({
     w: deskRef.current?.clientWidth ?? 1200,
     h: (deskRef.current?.clientHeight ?? 720) - taskbarH(deskPrefs),
@@ -877,7 +883,13 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   const focus = (id: string) =>
     setWins((ws) => ws.map((w) => (w.id === id ? { ...w, z: ++zTop.current, min: false } : w)));
   const patch = (id: string, p: Partial<Win>) =>
-    setWins((ws) => ws.map((w) => (w.id === id ? { ...w, ...p } : w)));
+    setWins((ws) =>
+      ws.map((w) => {
+        if (w.id !== id) return w;
+        const next = w.section === 'city' && p.max ? { ...p, max: false } : p;
+        return { ...w, ...next };
+      }),
+    );
 
   // §2 lifecycle helpers: stamp a phase class on the window, then run the real
   // mutation after the phase duration. Duration 0 (non-wired) mutates inline.
@@ -1012,7 +1024,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     setStartOpen(false);
     // Already popped out into its own real window — focus that instead of
     // opening a second, in-desktop copy (that's exactly how the duplicate
-    // Noctis windows happened).
+    // immersive frameless windows happened).
     if (poppedSections.has(section)) {
       void window.api.popOut(section);
       return;
@@ -1029,10 +1041,11 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       if (existing) return ws.map((w) => (w.id === existing.id ? { ...w, z: ++zTop.current, min: false } : w));
       const { w: dw, h: dh } = deskSize();
       const n = ws.length % 6;
+      const isMediaCenter = section === 'player' || section === 'video' || section === 'music';
       const wantW =
-        section === 'visualizer' ? 380 : section === 'musicwidget' ? 430 : section === 'music' ? 980 : section === 'youtube' ? 980 : section === 'settings' ? 960 : section === 'city' ? 960 : section === 'games' ? 980 : 820;
+        section === 'visualizer' ? 380 : section === 'musicwidget' ? 430 : isMediaCenter ? 1080 : section === 'youtube' ? 980 : section === 'settings' ? 960 : section === 'city' ? 680 : section === 'games' ? 980 : 820;
       const wantH =
-        section === 'visualizer' ? 200 : section === 'musicwidget' ? 190 : section === 'music' ? 640 : section === 'youtube' ? 640 : section === 'settings' ? 680 : section === 'city' ? 640 : section === 'games' ? 660 : 580;
+        section === 'visualizer' ? 200 : section === 'musicwidget' ? 190 : isMediaCenter ? 700 : section === 'youtube' ? 640 : section === 'settings' ? 680 : section === 'city' ? 800 : section === 'games' ? 660 : 580;
       return [
         ...ws,
         {
@@ -1130,14 +1143,14 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         const nextIdx = (currentIdx + 1) % ws.length;
         const next = ws[nextIdx];
         focus(next.id);
-        patch(next.id, { max: true, min: false });
+        patch(next.id, { max: next.section !== 'city', min: false });
       } else {
         // Backward: cycle to previous window and maximize it
         const currentIdx = ws.findIndex((w) => w.id === currentFocused.id);
         const prevIdx = currentIdx <= 0 ? ws.length - 1 : currentIdx - 1;
         const prev = ws[prevIdx];
         focus(prev.id);
-        patch(prev.id, { max: true, min: false });
+        patch(prev.id, { max: prev.section !== 'city', min: false });
       }
     };
     // Window-management shortcuts (Settings → Shortcuts → Window). One event
@@ -1158,6 +1171,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       switch (action) {
         case 'maximize': {
           if (!topWin) return;
+          if (topWin.section === 'city') return;
           if (topWin.max) {
             const r = topWin.rect;
             patch(topWin.id, r ? { max: false, ...r, rect: undefined } : { max: false });
@@ -1172,6 +1186,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         case 'snapLeft':
         case 'snapRight': {
           if (!topWin) return;
+          if (topWin.section === 'city') return;
           const left = action === 'snapLeft';
           // Half → quarter → half. Repeating the same shortcut narrows the
           // window instead of doing nothing, which is what Windows 11 does.
@@ -2369,7 +2384,6 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
           <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title={t('desktop.widgets')} onClick={() => setGalleryOpen((o) => !o)}>
             <Icon name="app" size={18} />
           </button>
-          <NotificationBell />
           <button
             className="os-tray-btn"
             title={t('desktop.clipboardHistory')}
@@ -2549,15 +2563,16 @@ const FloatingWindow = memo(function FloatingWindow({
   const isNote = win.section === 'note';
   const isVisualizer = win.section === 'visualizer';
   const isMusicWidget = win.section === 'musicwidget';
-  const isNoctis = win.section === 'city';
-  // Real apps (incl. Noctis, music widget) can detach into their own OS window;
+  const isGarden = win.section === 'city';
+  const isMaximized = Boolean(win.max) && !isGarden;
+  // Real apps (including Mooncap Garden and the music widget) can detach into their own OS window;
   // desktop-only trinkets (notes, the viz widget) cannot.
   const canPopOut = !isNote && !isVisualizer;
   const title = wired
     ? wiredModuleLabel(win.section)
     : isNote
       ? t('desktop.stickyNote')
-      : isVisualizer || isMusicWidget || isNoctis
+      : isVisualizer || isMusicWidget || isGarden
         ? ''
         : app
           ? t(app.labelKey)
@@ -2573,7 +2588,7 @@ const FloatingWindow = memo(function FloatingWindow({
 
   const dragStart = (e: RPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button')) return;
-    if (win.max) return;
+    if (isMaximized) return;
     e.preventDefault();
     onFocus();
     const el = e.currentTarget;
@@ -2620,7 +2635,7 @@ const FloatingWindow = memo(function FloatingWindow({
       const rect = desk?.getBoundingClientRect();
       const half = Math.max(MIN_W, Math.floor(dw / 2) - 10);
       // Commit once: an edge-snap if applicable, else the dragged position.
-      if (rect && !isNote) {
+      if (rect && !isNote && !isGarden) {
         const px = (ev.clientX - rect.left) / z;
         const py = (ev.clientY - rect.top) / z;
         if (py <= WIN_SNAP / 2) return onPatch({ x: 0, y: 0, w: dw, h: dh });
@@ -2637,7 +2652,7 @@ const FloatingWindow = memo(function FloatingWindow({
     e.preventDefault();
     e.stopPropagation();
     onFocus();
-    if (win.max) onPatch({ max: false });
+    if (isMaximized) onPatch({ max: false });
     const el = e.currentTarget;
     el.setPointerCapture(e.pointerId);
     const desk = deskRef.current;
@@ -2682,11 +2697,11 @@ const FloatingWindow = memo(function FloatingWindow({
   return (
     <section
       ref={winRef}
-      className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isNoctis ? 'fwin-frameless' : ''} ${win.max ? 'fwin-max' : ''} ${animPhase ? `fwin-anim-${animPhase}` : ''}`}
+      className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isGarden ? 'fwin-frameless' : ''} ${isMaximized ? 'fwin-max' : ''} ${animPhase ? `fwin-anim-${animPhase}` : ''}`}
       style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.pin ? PIN_Z_BASE + win.z : win.z, display: hidden ? 'none' : undefined }}
       onPointerDown={onFocus}
     >
-      {!isNoctis && (
+      {!isGarden && (
         <div
           className="fwin-bar"
           style={isNote && noteColor ? { background: noteColor, borderBottomColor: 'rgba(0,0,0,0.15)' } : undefined}
@@ -2724,9 +2739,9 @@ const FloatingWindow = memo(function FloatingWindow({
           </span>
         </div>
       )}
-      {isNoctis && (
+      {isGarden && (
         <>
-          <div className="fwin-drag-strip" onPointerDown={dragStart} onDoubleClick={() => onMaximize()} aria-hidden />
+          <div className="fwin-drag-strip" onPointerDown={dragStart} aria-hidden />
           <div className="fwin-frameless-controls">
             {canPopOut && (
               <button className="fwin-b" title={t('desktop.popOut')} onClick={onPopOut}>
@@ -2736,9 +2751,6 @@ const FloatingWindow = memo(function FloatingWindow({
             <button className="fwin-b" title={t('desktop.minimize')} onClick={onMinimize}>
               ─
             </button>
-            <button className="fwin-b" title={t('desktop.maximize')} onClick={onMaximize}>
-              ▢
-            </button>
             <button className="fwin-b fwin-close" title={t('common.close')} onClick={onClose}>
               ×
             </button>
@@ -2746,17 +2758,17 @@ const FloatingWindow = memo(function FloatingWindow({
         </>
       )}
       <div
-        className={`fwin-body ${isNote ? 'fwin-body-note' : ''} ${isVisualizer || isMusicWidget || win.section === 'music' || isNoctis ? 'fwin-body-flush' : ''} ${isNoctis ? 'fwin-body-frameless' : ''}`}
+        className={`fwin-body ${isNote ? 'fwin-body-note' : ''} ${isVisualizer || isMusicWidget || win.section === 'music' || isGarden ? 'fwin-body-flush' : ''} ${isGarden ? 'fwin-body-frameless' : ''}`}
       >
         {children}
       </div>
-      {wired && !isNoctis && (
+      {wired && !isGarden && (
         <div className="fwin-wired-status">
           <span>{wiredModule(win.section).ready}</span>
           <span>WIN-ID {win.id.toUpperCase()}</span>
         </div>
       )}
-      {!win.max && (
+      {!isMaximized && (
         <>
           <div className="fwin-edge-r" onPointerDown={resizeStart('right')} />
           <div className="fwin-edge-b" onPointerDown={resizeStart('bottom')} />

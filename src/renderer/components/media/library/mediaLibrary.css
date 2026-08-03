@@ -1,0 +1,1285 @@
+/*
+ * Media library — rail / poster grid / detail drawer.
+ *
+ * Rules of this file:
+ *  1. Tokens only. No literal colours, radii, spacing or durations. That is what
+ *     makes Aero, Wired and Blanc restyle for free instead of needing a per-theme
+ *     copy of every rule (Blanc in particular must stay neutral, not Fluent red).
+ *  2. Accent is spent on four things and nothing else: the one primary button,
+ *     the active rail item, the progress fill, and the focus ring.
+ *  3. Every transform is gated behind prefers-reduced-motion at the bottom.
+ *
+ * Layout responds to the *window*, not the viewport, so it uses container queries
+ * — this lives inside a desktop shell window that is routinely far narrower than
+ * the screen, and viewport media queries would read the wrong number entirely.
+ */
+
+/* The library page fills its host window instead of sitting in the 1040px
+   reading column every other Study OS view uses — a rail/grid/drawer layout
+   boxed to 1040px is just a narrow list. Selector is doubled so it beats
+   `.media-view`'s max-width regardless of stylesheet injection order. */
+.media-view.media-view--library {
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-height: 0;
+  height: 100%;
+}
+
+.media-view--library > .medialib-root {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Edge to edge inside a floating window: cancel the host's 16/18px padding so
+   the rail meets the window frame. The height compensation keeps the margin box
+   exactly the size of the scroll container, so nothing gains an outer scrollbar. */
+.fwin-body > .media-view--library {
+  margin: -16px -18px;
+  height: calc(100% + 32px);
+}
+
+.medialib-root {
+  container-type: inline-size;
+  container-name: medialib;
+  position: relative;
+  min-height: 0;
+  height: 100%;
+  /* Column, because the background-job strip stacks above the three panes.
+     The shell takes the remaining height via `flex: 1`. */
+  display: flex;
+  flex-direction: column;
+}
+
+.medialib-shell {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr) 360px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  /* Panes are separated by hairlines, not gutters — that single 1px rule doing
+     the separating everywhere is most of why the reference screenshots read as
+     one surface rather than three floating boxes. */
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.medialib-shell[data-drawer='hidden'] {
+  grid-template-columns: 224px minmax(0, 1fr);
+}
+
+/* ---------------------------------------------------------------- rail ---- */
+
+.medialib-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-md) var(--space-sm);
+  background: var(--surface-sunken);
+  border-right: 1px solid var(--border);
+}
+
+.medialib-rail__group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.medialib-rail__heading {
+  padding: 0 var(--space-sm) var(--space-xs);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The shared .ui-sidebar is a plain <nav>; these rules only tighten it for the
+   rail's density and add the trailing count. Its states are inherited. */
+.medialib-rail .ui-sidebar {
+  gap: 1px;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.medialib-rail .ui-sidebar__item {
+  gap: var(--space-sm);
+  padding: 6px var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* The shared .ui-sidebar wraps each item's label in a plain <span>, and the rail
+   passes a label *and* a trailing count through it. That wrapper is the flex
+   item, so it has to become the row itself — otherwise the two collapse into one
+   run of text ("Recently added30") instead of sitting at opposite ends. */
+.medialib-rail .ui-sidebar__item > span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.medialib-rail__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.medialib-rail__count {
+  flex-shrink: 0;
+  font-size: var(--font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.medialib-rail__foot {
+  margin-top: auto;
+  padding: var(--space-sm);
+  font-size: var(--font-size-2xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- browser ---- */
+
+.medialib-browser {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* For panes that scroll as one block (the tracking dashboard) rather than
+   delegating the scroll to a virtualized grid. */
+.medialib-browser--scroll {
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.medialib-browser__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+}
+
+.medialib-browser__heading {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.medialib-browser__title {
+  margin: 0;
+  font-size: var(--font-size-3xl);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medialib-browser__sub {
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.medialib-browser__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  padding-top: var(--space-xs);
+}
+
+/*
+ * `flex: 0 0 auto` is load-bearing, not cosmetic. As a shrinkable flex item the
+ * toggle was collapsing from its natural 60px to 34px inside
+ * `.medialib-browser__tools`, and because it also clips (`overflow: hidden`)
+ * the second button — list view — was rendered but completely invisible and
+ * unclickable. A two-state segmented control must never shrink below both
+ * states.
+ */
+.medialib-view-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.medialib-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  /* 6px + 14px icon + 6px = 26px, clear of the 24px minimum target height. */
+  padding: 6px var(--space-sm);
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-view-toggle button:hover { background: var(--accent-weak); color: var(--text); }
+.medialib-view-toggle button[aria-pressed='true'] { background: var(--surface-2); color: var(--text); }
+
+.medialib-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: 0 var(--space-lg) var(--space-md);
+}
+
+.medialib-chip {
+  padding: 4px var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-chip:hover { color: var(--text); border-color: var(--muted); }
+
+.medialib-chip[aria-pressed='true'] {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.medialib-browser__body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+/* The grid owns the scroll; the browser pane itself never scrolls, so the
+   header and chips stay put while a 6,000-episode library moves under them. */
+.medialib-grid {
+  height: 100%;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------- card ---- */
+
+.medialib-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-card__art {
+  position: relative;
+  width: 100%;
+  /* aspect-ratio reserves the box before the image resolves, so a library that
+     fills in over several seconds never reflows under the pointer. */
+  aspect-ratio: var(--medialib-art-ratio, 2 / 3);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: var(--elevation-1);
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--dur-normal) var(--ease-standard);
+}
+
+/* Deterministic stand-in for artwork we could not produce. A hue derived from
+   the title beats a repeated glyph: the grid stays legible and stops looking
+   like a field of broken images. */
+.medialib-card__fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-4xl);
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.18);
+  user-select: none;
+}
+
+/* Overlay text sits on arbitrary artwork. Without this it is illegible on
+   roughly half of any real library. */
+.medialib-card__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.85), rgb(0 0 0 / 0.15) 42%, transparent 62%);
+  pointer-events: none;
+}
+
+.medialib-card__badge {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.66);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.medialib-card__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.medialib-card__progress i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.medialib-card__overlay-title {
+  position: absolute;
+  left: var(--space-sm);
+  right: var(--space-sm);
+  bottom: var(--space-sm);
+  color: #fff;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medialib-card__more {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-card:hover .medialib-card__more,
+.medialib-card:focus-within .medialib-card__more,
+.medialib-card__more:focus-visible { opacity: 1; }
+
+.medialib-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.medialib-card__title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.medialib-card__sub {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- card states --- */
+
+.medialib-card:hover { transform: translateY(-2px); }
+.medialib-card:hover .medialib-card__art {
+  border-color: var(--accent);
+  box-shadow: var(--elevation-3);
+}
+.medialib-card:hover .medialib-card__img { transform: scale(1.03); }
+
+.medialib-card:active { transform: translateY(0) scale(0.995); }
+
+.medialib-card:focus-visible { outline: none; }
+.medialib-card:focus-visible .medialib-card__art {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+.medialib-card[data-active='true'] .medialib-card__art { border-color: var(--accent); }
+
+.medialib-card[data-busy='true'] { pointer-events: none; }
+.medialib-card[data-busy='true'] .medialib-card__art { opacity: 0.6; }
+.medialib-card[data-busy='true'] .medialib-card__art::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: medialib-indeterminate 1.1s linear infinite;
+}
+
+.medialib-card[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+
+/* --- skeleton --- */
+
+.medialib-skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size: 200% 100%;
+  animation: medialib-shimmer 1.2s var(--ease-standard) infinite;
+}
+
+@keyframes medialib-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes medialib-indeterminate {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* ---------------------------------------------------------------- pill ---- */
+
+.medialib-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: var(--font-size-2xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medialib-pill::before {
+  content: '';
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.medialib-pill[data-tone='ready'] { color: var(--success); }
+.medialib-pill[data-tone='active'] { color: var(--accent); }
+.medialib-pill[data-tone='warning'] { color: var(--warning); }
+.medialib-pill[data-tone='error'] { color: var(--danger); }
+.medialib-pill[data-tone='busy']::before { animation: medialib-pulse 1.4s var(--ease-standard) infinite; }
+
+.medialib-pill__retry {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@keyframes medialib-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* -------------------------------------------------------------- drawer ---- */
+
+.medialib-drawer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+}
+
+.medialib-drawer__hero {
+  position: relative;
+  height: 168px;
+  flex-shrink: 0;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.medialib-drawer__hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Fades the art into the panel instead of ending on a hard edge — the single
+     detail that makes the drawer read as one surface. */
+  mask-image: linear-gradient(to bottom, #000 38%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 38%, transparent);
+}
+
+.medialib-drawer__close {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+
+.medialib-drawer__close:hover { background: rgb(0 0 0 / 0.75); }
+
+.medialib-drawer__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 0 var(--space-lg) var(--space-lg);
+  margin-top: -44px;
+  position: relative;
+}
+
+.medialib-drawer__title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.medialib-drawer__native {
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+
+.medialib-drawer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.medialib-drawer__meta span + span::before {
+  content: '·';
+  margin-right: var(--space-sm);
+}
+
+.medialib-drawer__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.medialib-drawer__synopsis {
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.medialib-drawer__synopsis[data-clamped='true'] {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.medialib-drawer__more {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.medialib-drawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.medialib-drawer__section h4 {
+  margin: 0;
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.medialib-drawer__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  height: 100%;
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.medialib-study {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* --- provider metadata --- */
+
+.medialib-drawer__score {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.medialib-drawer__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.medialib-drawer__review {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.medialib-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.medialib-tag {
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--font-size-2xs);
+  color: var(--muted);
+}
+
+/* --- manual match dialog --- */
+
+.medialib-match {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  overflow-y: auto;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+}
+
+.medialib-match__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.medialib-match__head .medialib-drawer__close { position: static; }
+
+.medialib-match__search {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.medialib-match__search > :first-child { flex: 1; min-width: 0; }
+
+.medialib-match__error { color: var(--danger); font-size: var(--font-size-xs); margin: 0; }
+
+.medialib-match__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.medialib-match__hit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-match__hit:hover { background: var(--surface-2); border-color: var(--border); }
+.medialib-match__hit:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+
+.medialib-match__hit img,
+.medialib-match__noart {
+  flex-shrink: 0;
+  width: 42px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.medialib-match__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: var(--font-size-xs);
+}
+
+.medialib-match__text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medialib-match__name { font-weight: 600; font-size: var(--font-size-sm); }
+
+.medialib-match__score {
+  flex-shrink: 0;
+  font-size: var(--font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medialib-match__hit { transition: none; }
+}
+
+.medialib-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--font-size-xs);
+}
+
+.medialib-facts > div {
+  display: flex;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.medialib-facts dt {
+  flex-shrink: 0;
+  width: 92px;
+  color: var(--muted);
+}
+
+.medialib-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.medialib-note {
+  width: 100%;
+  min-height: 62px;
+  resize: vertical;
+  padding: var(--control-pad);
+  background: var(--surface-input);
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-xs);
+}
+
+/* --------------------------------------------------------- episode row ---- */
+
+.medialib-eplist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.medialib-ep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs);
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-ep:hover { background: var(--surface-2); }
+.medialib-ep:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+.medialib-ep[data-active='true'] { background: var(--accent-weak); }
+
+.medialib-ep__num {
+  flex-shrink: 0;
+  width: 22px;
+  text-align: right;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.medialib-ep__thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 84px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.medialib-ep__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.medialib-ep__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.medialib-ep__title {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medialib-ep__dur {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.medialib-ep__check { flex-shrink: 0; color: var(--success); }
+.medialib-ep__check[data-watched='false'] { color: var(--border); }
+
+/* --------------------------------------------------------------- empty ---- */
+
+.medialib-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  height: 100%;
+  padding: var(--space-3xl) var(--space-lg);
+  text-align: center;
+  color: var(--muted);
+}
+
+.medialib-empty__icon { color: var(--border); }
+.medialib-empty__title { font-size: var(--font-size-lg); color: var(--text); }
+.medialib-empty__hint { font-size: var(--font-size-sm); max-width: 42ch; line-height: 1.5; }
+.medialib-empty__actions { display: flex; gap: var(--space-sm); }
+
+/* --------------------------------------------------------- responsive ---- */
+
+/* The drawer stops being a column and becomes an overlay before it starts
+   squeezing the grid down to two cards per row. */
+@container medialib (max-width: 1240px) {
+  .medialib-shell { grid-template-columns: 224px minmax(0, 1fr); }
+  .medialib-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 90%);
+    z-index: 3;
+    box-shadow: var(--elevation-4);
+  }
+}
+
+@container medialib (max-width: 1000px) {
+  .medialib-shell { grid-template-columns: 64px minmax(0, 1fr); }
+  .medialib-rail { align-items: center; }
+  .medialib-rail__heading { display: none; }
+  .medialib-rail__label,
+  .medialib-rail__count,
+  .medialib-rail__foot { display: none; }
+  .medialib-rail .ui-sidebar__item { justify-content: center; padding: var(--space-sm); }
+  .medialib-browser__head { padding: var(--space-md) var(--space-md) var(--space-sm); }
+  .medialib-browser__title { font-size: var(--font-size-2xl); }
+  .medialib-chips,
+  .medialib-browser__body { padding-left: var(--space-md); padding-right: var(--space-md); }
+}
+
+@container medialib (max-width: 720px) {
+  .medialib-browser__head { flex-direction: column; align-items: stretch; }
+  .medialib-browser__tools { padding-top: 0; }
+}
+
+/* ------------------------------------------------------ reduced motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .medialib-card,
+  .medialib-card__art,
+  .medialib-card__img,
+  .medialib-chip,
+  .medialib-ep,
+  .medialib-view-toggle button {
+    transition: none;
+  }
+  .medialib-card:hover,
+  .medialib-card:active { transform: none; }
+  .medialib-card:hover .medialib-card__img { transform: none; }
+  .medialib-skeleton,
+  .medialib-pill[data-tone='busy']::before,
+  .medialib-card[data-busy='true'] .medialib-card__art::after { animation: none; }
+}
+
+/* --- subtitle track list (drawer) --- */
+
+.medialib-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.medialib-track {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.medialib-track__lang {
+  flex-shrink: 0;
+  min-width: 34px;
+  padding: 1px var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--accent-weak);
+  color: var(--text);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.medialib-track__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: var(--font-size-2xs);
+}
+
+.medialib-track__text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medialib-track__label { font-size: var(--font-size-xs); }
+
+/* --- subtitle provider settings --- */
+
+.subtitle-provider-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.subtitle-provider-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.subtitle-provider-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.subtitle-provider-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  cursor: pointer;
+}
+
+.subtitle-provider-toggle > span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.subtitle-provider-order {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.subtitle-provider-order button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.subtitle-provider-order button:disabled { opacity: 0.35; cursor: default; }
+.subtitle-provider-order button:not(:disabled):hover { background: var(--accent-weak); }
+
+.subtitle-provider-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+}
+
+.subtitle-provider-key input[type='password'] {
+  flex: 1;
+  min-width: 180px;
+  padding: var(--control-pad);
+  background: var(--surface-input);
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+  color: var(--text);
+  font: inherit;
+}
+
+.subtitle-provider-link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.subtitle-test-ok { color: var(--success); }
+.subtitle-test-fail { color: var(--danger); }
+
+.subtitle-language-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* --- background job strip --- */
+
+.medialib-jobs {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.medialib-jobs__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.medialib-jobs__title {
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.medialib-jobs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* A 500-file import must not push the grid off screen. */
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.medialib-jobs__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.medialib-jobs__row[data-state='done'] { color: var(--success); }
+.medialib-jobs__row[data-state='error'] { color: var(--danger); }
+
+.medialib-jobs__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.medialib-jobs__phase { flex-shrink: 0; }
+
+.medialib-jobs__bar {
+  flex-shrink: 0;
+  width: 90px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.medialib-jobs__bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--dur-normal) var(--ease-standard);
+}
+
+.medialib-jobs__eta {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-2xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medialib-jobs__bar i { transition: none; }
+}
+
+/* Selectable subtitle track rows. */
+.medialib-track--action {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-track--action:hover { border-color: var(--muted); }
+.medialib-track--action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: -2px;
+}
+.medialib-track--action[data-active='true'] { border-color: var(--accent); }
+
+.medialib-track__check { flex-shrink: 0; color: var(--success); }
+
+@media (prefers-reduced-motion: reduce) {
+  .medialib-track--action { transition: none; }
+}
+
+.medialib-ep__aired {
+  flex-shrink: 0;
+  font-size: var(--font-size-2xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

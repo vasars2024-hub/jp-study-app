@@ -303,7 +303,7 @@ export function normalizeGrammarPoint(
 
   /*
    * Summary only. The two dimensions stay separate because they are genuinely
-   * independent: a Mazii record's categories are regex output, but if its
+   * independent: a supplemental record's categories are regex output, but if its
    * pattern contains お〜になる then its register is a fact about the
    * morphology. Collapsing them made every derived Japanese register
    * unreachable behind the verified-tags gate — the Formal filter returned

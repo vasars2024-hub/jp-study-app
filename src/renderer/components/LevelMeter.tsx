@@ -13,7 +13,11 @@ import {
   setLevelThreshold,
   type LevelReport,
 } from '../levelService';
-import { parseWords, upsertSlotList } from '../levelLists';
+import {
+  flushLevelListsPersistence,
+  parseWords,
+  upsertSlotList,
+} from '../levelLists';
 import { importApkgWords } from '../apkgImport';
 import { slotsForLang, tierName, type LevelSlot, type StudyLang } from '../../shared/levelScale';
 import { onStudyLangChanged, setStudyLang } from '../studyEnvironment';
@@ -106,6 +110,16 @@ function SlotRow({
       return;
     }
     upsertSlotList(slot.id, slot.label, kind, res.words ?? []);
+    try {
+      await flushLevelListsPersistence();
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        busy: false,
+        msg: error instanceof Error ? error.message : t('settings.study.level.importFailed'),
+      }));
+      return;
+    }
     setState((s) => ({
       ...s,
       busy: false,
@@ -117,13 +131,23 @@ function SlotRow({
     onChanged();
   };
 
-  const savePaste = (): void => {
+  const savePaste = async (): Promise<void> => {
     const words = parseWords(state.paste);
     if (words.length === 0) {
       setState((s) => ({ ...s, pasting: false, paste: '' }));
       return;
     }
     upsertSlotList(slot.id, slot.label, kind, words);
+    try {
+      await flushLevelListsPersistence();
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        busy: false,
+        msg: error instanceof Error ? error.message : t('settings.study.level.importFailed'),
+      }));
+      return;
+    }
     setState((s) => ({
       ...s,
       pasting: false,
@@ -172,7 +196,7 @@ function SlotRow({
             onChange={(e) => setState((s) => ({ ...s, paste: e.target.value }))}
           />
           <div className="level-slot-paste-actions">
-            <button type="button" className="btn small primary" onClick={savePaste}>
+            <button type="button" className="btn small primary" onClick={() => void savePaste()}>
               {t('common.save')}
             </button>
             <button

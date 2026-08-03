@@ -18,7 +18,8 @@ Closes the one gap Phase 1's Probe A found. Everything else the Study Overlay ne
 was already reachable from outside the component; there was no `activeCue` and no
 `cuechange`.
 
-**Shape:** 94 insertions, **0 deletions** — purely additive.
+**Shape:** 127 insertions, **0 deletions** — purely additive.
+(Corrected slice 59 — this line said "94 insertions" until 2026-08-02; counted from the patch body.)
 
 | Added | Where |
 |---|---|
@@ -276,8 +277,9 @@ guard is unambiguously not what its comment says.
 
 ## 0004 — a client-supplied generation the server can refuse, so a stale open cannot cancel a live one
 
-**Shape:** 121 insertions, **0 deletions** — purely additive, and inert for every client that
+**Shape:** 116 insertions, **0 deletions** — purely additive, and inert for every client that
 does not opt in.
+(Corrected slice 59 — this line said "121 insertions" until 2026-08-02; counted from the patch body.)
 
 ### The defect, measured over five slices
 
@@ -321,11 +323,84 @@ pass, and the **whole `internal/directstream` package's existing tests still pas
 
 ### Note for whoever submits this upstream, and for whoever wires it here
 
-Nothing sends `generation` yet — not Study OS, not upstream — so applying this patch changes
+~~Nothing sends `generation` yet — not Study OS, not upstream — so applying this patch changes
 no observable behaviour. That is deliberate: the server half can land and be verified on its
 own, and the client half (`generation: requestId` in the open body, plus the same value on
 every recovery for that request) is a separate, live-measured step. It is **not** in
-`build-patched-sidecar.mjs`'s patch list for the same reason.
+`build-patched-sidecar.mjs`'s patch list for the same reason.~~
+
+**Superseded 2026-08-02.** Study OS sends `generation` (slice 44, `StudyPlayerSlice.tsx`) —
+though *not* `requestId`, which slice 44 found is not an order at all and would have been
+refused permanently; it is a counter the open channel keeps. 0004 **is** in
+`build-patched-sidecar.mjs`'s patch list (slice 43).
+
+Slice 46 then ran the patch **over the wire**: seven POSTs at a binary built with it, and the
+identical seven at one built without it as the control. Only the two steps the patch is about
+differ. Evidence `docs/migration/proof/open-generation-wire-20260802075705/`, reproduce with
+`node docs/migration/tools/open-generation-wire-gate.mjs`. Two things whoever submits this
+should know from that run:
+
+- **A refusal is indistinguishable from any other open failure over HTTP.** `PlayLocalFile`
+  returns before `BeginOpen`, so nothing is logged, and echo's default error handler
+  (`e.Debug = false`) answers a byte-identical `500 {"message":"Internal Server Error"}` either
+  way. A client that wants to treat a benign refusal differently from a real failure has
+  nothing to key on. A distinguishable status or error body would be worth adding before
+  submission.
+- **The binary the app launches is still unpatched** — see the `patched-sidecar-not-deployed`
+  row in `docs/migration/tools/audit-carried-items.mjs`.
 
 Upstream's own web client would benefit identically: its `video-terminated` → cancel path has
 the same shape, and any client that retries an open has the same un-recallable request.
+
+### Two things slice 59 found that a submitter must say out loud
+
+**1. Upstream already has a `generation`, and it is NOT this one.** `internal/directstream` at the
+pin carries `BaseStream.subtitleGeneration atomic.Int64` (`stream.go:616`) plus
+`TestBeginSubtitleSeekCancelsPreviousGeneration`, `TestStartSubtitleStreamPRejectsStaleGeneration`
+and `TestSendSubtitleEventsRejectsStaleGeneration`. It looks like this patch and is not — it is
+**per-`BaseStream`**, so it cannot order events across the stream replacement that `BeginOpen`
+performs, and `beginSubtitleSeek` stops every active subtitle stream **unconditionally**, with no
+generation check guarding the stop. Upstream's counter orders subtitle work *after* the
+destructive step; 0004 refuses the request *before* it. Complementary, not redundant — but a
+reviewer (or a future re-syncer deciding whether 0004 can be retired) will conflate them unless
+told. **Do not retire 0004 on the strength of `subtitleGeneration`.**
+
+**2. The guard covers one of six entry points.** `AcceptOpenGeneration` is consulted only in
+`HandleDirectstreamPlayLocalFile`, but six call sites reach `BeginOpen` →
+`beginSubtitleSeek` at the pin:
+
+```
+internal/directstream/localfile.go:296   PlayLocalFile     <- guarded
+internal/directstream/nakama.go:55                         <- unguarded
+internal/directstream/urlstream.go:50                      <- unguarded
+internal/debrid/client/stream.go:120                       <- unguarded
+internal/torrentstream/stream.go:152                       <- unguarded
+internal/directstream/stream.go:210      PrepareNewStream  <- unguarded
+```
+
+Sufficient for Study OS, which only drives `play/localfile`. For upstream the durable shape is to
+move the check inside `BeginOpenWithTarget` — the single choke point, and currently called from
+exactly one place (`BeginOpen`).
+
+## Re-sync durability — measured, slice 59 (2026-08-02)
+
+Full method and evidence: `docs/migration/SLICE_59_UPSTREAM_REHEARSAL.md`.
+
+All four patches were replayed across ten real upstream trees spanning 2026-06-16 → the pin.
+
+| patch | survives back to | breaks on | rework |
+|---|---|---|---|
+| 0001 | `8b5c6bb^` (06-16) — every rung tested | — | none |
+| 0002 | `8b5c6bb^` (06-16) — every rung tested | — | none |
+| 0003 | `8b5c6bb^` (06-16) — every rung tested | — | none |
+| 0004 | `ae92bc8^` (06-22) | `8b5c6bb` *feat: mpv-prism*, which split `BeginOpen` into a delegator + `BeginOpenWithTarget`; 0004's `stream.go` hunk #1 uses the post-split body as trailing context | re-anchor one hunk; the hunk is purely additive, so no design decision |
+
+Two maintenance notes from the same run:
+
+- **`0001`'s hunk headers are internally inconsistent.** Hunks 2–5 declare new-side start lines one
+  lower than they should be, so `git apply` reports `offset 1 line` even against a pristine
+  `9bdd052`. It applies (git matches on old-side context), but the permanent 1-line noise **masks
+  genuine drift**. Regenerate it with `git diff` instead of hand-editing.
+- **The pinned checkout cannot answer history questions.** `C:/Users/Arseniy/Projects/seanime-upstream`
+  is a **depth-1 shallow clone with zero refs** — no `git log`, no blame, no `origin/main`. Any real
+  re-sync must fetch history first, or work in a separate clone.

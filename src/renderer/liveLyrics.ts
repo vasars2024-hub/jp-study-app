@@ -19,12 +19,15 @@ import {
 } from './lyrics';
 import { loadLyricsSettings, onLyricsSettingsChanged } from './lyricsSettings';
 
+/** Where a set of lyrics came from, carried so the UI can attribute them. */
+export type LyricsSource = 'lrclib' | 'file';
+
 export type LyricsState =
   | { kind: 'none' }
   | { kind: 'loading' }
   | { kind: 'missing'; error?: string }
-  | { kind: 'synced'; cues: Cue[] }
-  | { kind: 'plain'; lines: string[] };
+  | { kind: 'synced'; cues: Cue[]; source?: LyricsSource }
+  | { kind: 'plain'; lines: string[]; source?: LyricsSource };
 
 export interface LiveLyrics {
   lyrics: LyricsState;

@@ -517,7 +517,17 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
           <div key={cat} className="sc-group">
             <h3 className="sc-group-title">{commandCategory(cat, t)}</h3>
             {inCat.map((r) => (
-              <div key={r.id} className={`sc-row ${r.conflictsWith.length ? 'conflict' : ''}`}>
+              // `data-shortcut-id` / `-keys` are the only language-independent handle on a
+              // row. Every visible string here goes through `useT()` and the app ships four
+              // UI languages, so a driven pass keyed to the English label or to the word
+              // "Unbound" passes on an English machine and fails after a language switch.
+              // Same idiom as `data-study-action` in the player overlay.
+              <div
+                key={r.id}
+                className={`sc-row ${r.conflictsWith.length ? 'conflict' : ''}`}
+                data-shortcut-id={r.id}
+                data-shortcut-keys={r.keys}
+              >
                 <div className="sc-row-text">
                   <span className="sc-label">{displayLabel(r, t)}</span>
                   {r.note && <span className="sc-note muted">{r.note}</span>}
@@ -534,6 +544,7 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
                     type="button"
                     className={`sc-keys ${capturing === r.id && captureMode === 'replace' ? 'capturing' : ''} ${r.keys ? '' : 'unbound'}`}
                     title={t('settings.shortcuts.captureTitle')}
+                    data-shortcut-capture={r.id}
                     onClick={() => startCapture(r.id, 'replace')}
                   >
                     {capturing === r.id && captureMode === 'replace'

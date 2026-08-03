@@ -54,7 +54,7 @@ for (const file of fs.readdirSync(DATA_DIR)) {
     },
   );
 
-  // The hand-curated files (n5.ts, n1-extra.ts, …) predate the Mazii import and
+  // The hand-curated files (n5.ts, n1-extra.ts, …) predate the supplement import and
   // carry `categories` but no `functions` key at all, so there is nothing to
   // rewrite — the field has to be inserted after the id line instead.
   src = src.replace(/^(\s*)id:\s*'([^']+)',$/gm, (match, indent, id) => {

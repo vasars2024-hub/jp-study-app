@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phase 6 Continue-Watching Harness</title>
+    <style>
+      html, body { width: 100%; margin: 0; background: #0d0c12; }
+      /* The widget lives on the desktop, over the wallpaper. A flat dark surface is the
+         honest neutral: anything richer would flatter the panel's own contrast. */
+      .cw-harness {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 26px 32px;
+        padding: 28px;
+      }
+      .cw-harness-label {
+        margin: 0 0 6px;
+        font: 11px/1.4 system-ui, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8b8794;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./continueWatchingHarness.tsx"></script>
+  </body>
+</html>

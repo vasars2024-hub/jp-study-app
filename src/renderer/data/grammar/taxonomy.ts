@@ -2,7 +2,7 @@
  * Canonical grammar-function taxonomy.
  *
  * Replaces the flat 185-id list in `functions.ts` as the thing the UI shows and
- * the filters query. Those 185 ids were scraped Mazii category labels, machine
+ * the filters query. Those 185 ids were scraped category labels, machine
  * translated ("How to say the first", "Levels are few", "Much less volume"),
  * and a corpus audit found 96 of them match zero records — over half the filter
  * column could never return a result.
@@ -225,7 +225,7 @@ export const CATEGORY_BY_ID: ReadonlyMap<string, GrammarCategory> = new Map(
 export const CATEGORY_IDS: string[] = GRAMMAR_CATEGORIES.map((c) => c.id);
 
 /**
- * Legacy Mazii id -> canonical id(s).
+ * Legacy function id -> canonical id(s).
  *
  * Every one of the 185 ids in GRAMMAR_FUNCTION_IDS appears exactly once as a
  * key (enforced by taxonomy.test.ts). Mappings were assigned from what the

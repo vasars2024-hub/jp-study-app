@@ -169,21 +169,44 @@ export function HabitTracker({ settings, setSettings }: WidgetProps) {
   );
 }
 
-// ---------- Learning heatmap (last 14 days reading time) ----------
+// ---------- Learning heatmap (last 14 days of study activity) ----------
+/**
+ * Intensity is reading **plus** watching (Phase 6 slice 8). The widget is called a
+ * *learning* heat-map and its cells are the same "was this a day you studied" judgement
+ * the streak makes, so counting only one of the two channels made an evening in the media
+ * player render as an empty day. A day's tooltip names both numbers rather than only the
+ * total, because a single figure would hide which activity produced it.
+ */
 export function LearningHeatmap() {
   const { t } = useT();
   const s = getSummary();
-  const max = Math.max(1, ...s.recent.map((d) => d.seconds));
+  const dayTotal = (d: { seconds: number; watchSeconds: number }) => d.seconds + d.watchSeconds;
+  const max = Math.max(1, ...s.recent.map(dayTotal));
   const level = (sec: number) => (sec <= 0 ? 0 : Math.min(4, Math.ceil((sec / max) * 4)));
   return (
     <div className="wgt wgt-heatmap">
       <div className="wgt-heatmap-grid">
         {s.recent.map((d) => (
-          <div key={d.date} className={`wgt-heat-cell l${level(d.seconds)}`} title={`${d.date}: ${formatDuration(d.seconds)}`} />
+          <div
+            key={d.date}
+            className={`wgt-heat-cell l${level(dayTotal(d))}`}
+            title={
+              d.watchSeconds > 0
+                ? t('widgets.heatmap.cellSplit', {
+                    date: d.date,
+                    read: formatDuration(d.seconds),
+                    watched: formatDuration(d.watchSeconds),
+                  })
+                : `${d.date}: ${formatDuration(d.seconds)}`
+            }
+          />
         ))}
       </div>
       <div className="wgt-stat-sub">
-        {t('widgets.heatmap.summary', { days: s.recent.length, duration: formatDuration(s.totalSeconds) })}
+        {t('widgets.heatmap.summary', {
+          days: s.recent.length,
+          duration: formatDuration(s.totalSeconds + s.totalWatchSeconds),
+        })}
       </div>
     </div>
   );

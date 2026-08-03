@@ -39,6 +39,7 @@ export const STREAM_KEYS: NotebookStream[] = [
   'audio',
   'clipboard',
   'extension',
+  'transcript',
 ];
 
 /** How many timeline rows we ever render — the same cap Study OS has always had. */

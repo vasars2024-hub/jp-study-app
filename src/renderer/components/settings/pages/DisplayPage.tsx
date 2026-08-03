@@ -84,6 +84,7 @@ export default function DisplayPage() {
             step={0.05}
             value={zoom}
             onChange={(e) => setZoomValue(Number(e.target.value))}
+            aria-label={t('settings.a11y.zoom.aria')}
           />
           <button type="button" className="btn small" onClick={() => bumpZoomBy(0.1)} disabled={zoom >= ZOOM_MAX}>
             +
@@ -115,6 +116,7 @@ export default function DisplayPage() {
             step={1}
             value={d.baseFontPx}
             onChange={(e) => patch({ baseFontPx: Number(e.target.value) })}
+            aria-label={t('a11y.slider.baseFontSize')}
           />
           <span className="muted">{d.baseFontPx}px</span>
         </div>
@@ -188,6 +190,7 @@ export default function DisplayPage() {
             step={0.05}
             value={d.nightLight}
             onChange={(e) => patch({ nightLight: Number(e.target.value) })}
+            aria-label={t('a11y.slider.nightLightWarmth')}
           />
           <span className="muted">{Math.round(d.nightLight * 100)}%</span>
         </div>
@@ -208,6 +211,7 @@ export default function DisplayPage() {
             step={0.01}
             value={d.brightness}
             onChange={(e) => patch({ brightness: Number(e.target.value) })}
+            aria-label={t('settings.display.label.brightness')}
           />
           <span className="muted">{Math.round(d.brightness * 100)}%</span>
         </div>
@@ -220,6 +224,7 @@ export default function DisplayPage() {
             step={0.05}
             value={d.saturation}
             onChange={(e) => patch({ saturation: Number(e.target.value) })}
+            aria-label={t('settings.display.label.saturation')}
           />
           <span className="muted">{Math.round(d.saturation * 100)}%</span>
         </div>

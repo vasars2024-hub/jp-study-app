@@ -12,6 +12,12 @@ import { loadTranslationHistory } from '../translationHistory';
 import { listKnownEntries } from '../knownWords';
 import type { LibraryItem } from '../../shared/types';
 import type { JitenPlanEntry } from '../../shared/jiten';
+import {
+  type CaptionScript,
+  dayKey,
+  scriptText,
+  scriptTitle,
+} from '../../shared/liveCaptions';
 
 export interface NotebookFolderBucket {
   id: string;
@@ -34,6 +40,8 @@ export interface NotebookOverview {
 export interface NotebookSources {
   library?: LibraryItem[];
   plan?: JitenPlanEntry[];
+  /** Captured Windows Live Captions sessions, oldest first. */
+  captionScripts?: CaptionScript[];
 }
 
 function push(
@@ -148,6 +156,36 @@ export function aggregateNotebook(sources: NotebookSources = {}): NotebookOvervi
       origin: 'app',
       href: 'dictionary',
       meta: { level },
+    });
+  }
+
+  // Live Captions scripts. The timeline row is a single click-through button
+  // with no clamp on `detail`, so only a bounded preview goes there; the whole
+  // script travels in `meta.text` for the notebook's transcript panel.
+  const captionScripts = sources.captionScripts ?? [];
+  const perDay = new Map<string, number>();
+  const now = Date.now();
+  for (const script of captionScripts) {
+    if (script.lines.length === 0) continue;
+    const key = dayKey(script.startedAt);
+    const seen = perDay.get(key) ?? 0;
+    perDay.set(key, seen + 1);
+    const text = scriptText(script);
+    push(entries, {
+      id: `lc-${script.id}`,
+      stream: 'transcript',
+      title: scriptTitle(script, now, seen),
+      detail: text.length > 240 ? `${text.slice(0, 240)}…` : text,
+      folder: 'Live captions',
+      ts: script.startedAt,
+      origin: 'app',
+      href: 'notebook',
+      meta: {
+        text,
+        lineCount: script.lines.length,
+        startedAt: script.startedAt,
+        endedAt: script.endedAt,
+      },
     });
   }
 
@@ -303,7 +341,7 @@ export function aggregateNotebook(sources: NotebookSources = {}): NotebookOvervi
  * stream, so failures resolve to empty instead of taking the whole hub down.
  */
 export async function loadNotebookSources(): Promise<NotebookSources> {
-  const [library, plan] = await Promise.all([
+  const [library, plan, captionScripts] = await Promise.all([
     Promise.resolve()
       .then(() => window.api?.listLibrary?.() ?? [])
       .catch(() => [] as LibraryItem[]),
@@ -311,8 +349,11 @@ export async function loadNotebookSources(): Promise<NotebookSources> {
       .then(() => window.api?.jitenGetStore?.())
       .then((s) => s?.plan ?? [])
       .catch(() => [] as JitenPlanEntry[]),
+    Promise.resolve()
+      .then(() => window.api?.liveCaptionsScripts?.() ?? [])
+      .catch(() => [] as CaptionScript[]),
   ]);
-  return { library, plan };
+  return { library, plan, captionScripts };
 }
 
 /** Convenience: load the IPC stores, then aggregate. */

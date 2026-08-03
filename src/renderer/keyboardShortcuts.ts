@@ -12,6 +12,9 @@ import { performUndo, canUndo, peekUndo } from './actionHistory';
 import { bumpZoom, setZoom, ZOOM_DEFAULT, ZOOM_STEP } from './appZoom';
 import { TOOLBOX_SHORTCUT_COMMANDS } from '../shared/toolboxShortcuts';
 import { loadToolboxSettings } from './toolboxSettings';
+import { resumeMostRecentWatched } from './continueWatchingStore';
+import { reachMediaWorkspace } from './mediaWorkspaceBridge';
+import { t } from './i18n';
 
 export type CommandCategory =
   | 'Navigation'
@@ -103,7 +106,7 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'nav.open.calendar', label: 'Open Calendar', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.resources', label: 'Open Resources', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.games', label: 'Open Game Arena', category: 'Navigation', defaultKeys: '' },
-  { id: 'nav.open.city', label: 'Open Noctis', category: 'Navigation', defaultKeys: '' },
+  { id: 'nav.open.city', label: 'Open Mooncap', category: 'Navigation', defaultKeys: '' },
 
   // Window management — the desktop's own windows, not the Electron frame.
   //
@@ -211,14 +214,16 @@ export const COMMAND_CATALOG: AppCommand[] = [
     id: 'nav.nextDesktop',
     label: 'Switch to next desktop',
     category: 'Window',
-    defaultKeys: 'Meta+Ctrl+ArrowRight',
+    // Normal form is Ctrl before Meta. Spelled the Windows way ('Meta+Ctrl+…') this never
+    // matched a keypress — see effectiveKeys.
+    defaultKeys: 'Ctrl+Meta+ArrowRight',
     note: 'Cycles Desktop 1 → Desktop 2. Saves the current layout before switching.',
   },
   {
     id: 'nav.prevDesktop',
     label: 'Switch to previous desktop',
     category: 'Window',
-    defaultKeys: 'Meta+Ctrl+ArrowLeft',
+    defaultKeys: 'Ctrl+Meta+ArrowLeft',
     note: 'Cycles Desktop 2 → Desktop 1. Saves the current layout before switching.',
   },
   {
@@ -248,6 +253,13 @@ export const COMMAND_CATALOG: AppCommand[] = [
   },
   { id: 'reader.dictLookup', label: 'Dictionary lookup (selection)', category: 'Reader', defaultKeys: 'Ctrl+D' },
   { id: 'reader.translateSel', label: 'Translate selection', category: 'Reader', defaultKeys: 'Ctrl+T' },
+  {
+    id: 'reader.toggleTranslation',
+    label: 'Show / hide book translation',
+    category: 'Reader',
+    defaultKeys: 'Ctrl+Alt+Shift+T',
+    note: 'Toggles original-only vs bilingual/translation overlay in EPUB and manga readers. Ctrl+Shift+T belongs to the Toolbox (Reopen Last Tool).',
+  },
   { id: 'reader.fontUp', label: 'Increase font size', category: 'Reader', defaultKeys: 'Ctrl+=' },
   { id: 'reader.fontDown', label: 'Decrease font size', category: 'Reader', defaultKeys: 'Ctrl+-' },
   { id: 'reader.zoomReset', label: 'Reset font size', category: 'Reader', defaultKeys: 'Ctrl+0' },
@@ -431,6 +443,24 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'clipboard.open', label: 'Open clipboard history', category: 'Utility', defaultKeys: 'Ctrl+Shift+V' },
   { id: 'calendar.open', label: 'Open calendar', category: 'Utility', defaultKeys: '' },
   {
+    id: 'app.toggle',
+    label: 'Hide / show GrammarX',
+    category: 'Utility',
+    defaultKeys: 'Ctrl+Alt+Shift+G',
+    global: true,
+    note:
+      'System-wide. With the Windows Startup helper enabled (Settings → Shortcuts), this works even when GrammarX is fully quit — press to start, press again to hide. Without the helper, it only works while the app is running. Rebind anytime in Shortcuts; the helper picks up the new chord automatically.',
+  },
+  {
+    id: 'app.restart',
+    label: 'Fully restart GrammarX',
+    category: 'Utility',
+    defaultKeys: 'Ctrl+Alt+Shift+R',
+    global: true,
+    note:
+      'Quits and relaunches so main-process / helper / code changes apply. Not the same as Hide / show. With the Startup helper installed, the chord stays OS-level and syncs when you rebind it here.',
+  },
+  {
     id: 'study.focusMode',
     label: 'Toggle focus mode',
     category: 'Utility',
@@ -457,20 +487,87 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'music.prev', label: 'Previous track', category: 'Music', defaultKeys: 'Ctrl+ArrowLeft' },
   { id: 'music.volumeUp', label: 'Volume up', category: 'Music', defaultKeys: 'Ctrl+ArrowUp' },
   { id: 'music.volumeDown', label: 'Volume down', category: 'Music', defaultKeys: 'Ctrl+ArrowDown' },
+  // The lyric-line transport (slice 20's buttons, pressed live in slice 21). These are
+  // MUSIC ids, not the `video.*` ones the same three gestures carry in the player, and the
+  // reason is mechanical rather than tidy: `registerCommandHandler` is a last-registrant-wins
+  // STACK, and `MediaWorkspaceHost` mounts at App level, so the lyrics pane and the video
+  // overlay can be mounted at the same time. Sharing an id would silently give one of them
+  // both gestures depending on mount order.
+  //
+  // Unbound by default, for the same reason `music.playPause` above is: every free single
+  // letter belongs to the adopted player's own keymap, and the Music block already spends
+  // all four `Ctrl+Arrow*` chords on track/volume while `Ctrl+Alt+Arrow*` is virtual-desktop
+  // navigation. A row the user binds beats a default chosen to fill a column — and
+  // bind-then-press is proven (phase I of `retirement-step3-harness.mjs`).
+  //
+  // Unlike their neighbours these three are NOT built-ins: stepping needs the cue sheet of
+  // the track on screen, which lives in the lyrics pane, not in `playerBus`. So they work
+  // while Music is open, which is the only place a lyric line means anything.
+  {
+    id: 'music.prevLine',
+    label: 'Previous lyric line',
+    category: 'Music',
+    defaultKeys: '',
+    note: 'Synced lyrics only. Unbound by default — bind it in this list.',
+  },
+  {
+    id: 'music.replayLine',
+    label: 'Replay lyric line',
+    category: 'Music',
+    defaultKeys: '',
+    note: 'Synced lyrics only. Unbound by default — bind it in this list.',
+  },
+  {
+    id: 'music.nextLine',
+    label: 'Next lyric line',
+    category: 'Music',
+    defaultKeys: '',
+    note: 'Synced lyrics only. Unbound by default — bind it in this list.',
+  },
 
   // Video player (Phase 5b)
   { id: 'nav.open.video', label: 'Open Video player', category: 'Navigation', defaultKeys: '' },
   { id: 'nav.open.youtube', label: 'Open YouTube', category: 'Navigation', defaultKeys: '' },
-  { id: 'video.replayLine', label: 'Replay subtitle line', category: 'Video', defaultKeys: 'r' },
-  { id: 'video.prevLine', label: 'Previous subtitle line', category: 'Video', defaultKeys: 'a' },
-  { id: 'video.nextLine', label: 'Next subtitle line', category: 'Video', defaultKeys: 'd' },
-  { id: 'video.subEarlier', label: 'Subtitle earlier (−100 ms)', category: 'Video', defaultKeys: '[' },
-  { id: 'video.subLater', label: 'Subtitle later (+100 ms)', category: 'Video', defaultKeys: ']' },
-  { id: 'video.subEarlierLarge', label: 'Subtitle earlier (−500 ms)', category: 'Video', defaultKeys: 'Shift+[' },
-  { id: 'video.subLaterLarge', label: 'Subtitle later (+500 ms)', category: 'Video', defaultKeys: 'Shift+]' },
-  { id: 'video.toggleAutoPause', label: 'Toggle auto-pause', category: 'Video', defaultKeys: 'p' },
-  { id: 'video.toggleLoop', label: 'Toggle line loop', category: 'Video', defaultKeys: 'l' },
-  { id: 'video.toggleFurigana', label: 'Toggle furigana', category: 'Video', defaultKeys: 'f' },
+  // These ten were the LEGACY player's, registered by `useMedia` against its own
+  // `videoRef`. Slice 16 deleted the component that rendered `<video ref={videoRef}>`, so
+  // every one of them became a handler acting on a ref nothing attaches. Slice 19 moved
+  // them onto `VideoCoreStudyOverlay`, which owns the same six capabilities against the
+  // adopted player — so the rows are true again rather than merely present.
+  //
+  // The defaults moved with them, and the rule is the adopted keymap
+  // (`vc_defaultKeybindings`), read from source rather than from memory. It takes
+  // KeyA/KeyD (seek ±30s), KeyF (fullscreen), KeyP (picture-in-picture) and both brackets
+  // (speed) — which is four of the six old defaults, including the only two that ever
+  // dispatched. R/W/S/Semicolon/Quote are the codes the overlay itself already chose from
+  // what that map leaves free.
+  { id: 'video.replayLine', label: 'Replay subtitle line', category: 'Video', defaultKeys: 'R' },
+  { id: 'video.prevLine', label: 'Previous subtitle line', category: 'Video', defaultKeys: 'W' },
+  { id: 'video.nextLine', label: 'Next subtitle line', category: 'Video', defaultKeys: 'S' },
+  { id: 'video.subEarlier', label: 'Subtitle earlier (−100 ms)', category: 'Video', defaultKeys: ';' },
+  { id: 'video.subLater', label: 'Subtitle later (+100 ms)', category: 'Video', defaultKeys: "'" },
+  // Unbound rather than re-homed: `Shift+[` was unreachable for a second reason — Shift
+  // already changed the symbol, so `chordFromEvent` never records it and no keypress can
+  // produce that string. There is no obvious free chord for a ±500 ms nudge, and an
+  // unbound row a user binds beats a default chosen to fill a column.
+  { id: 'video.subEarlierLarge', label: 'Subtitle earlier (−500 ms)', category: 'Video', defaultKeys: '' },
+  { id: 'video.subLaterLarge', label: 'Subtitle later (+500 ms)', category: 'Video', defaultKeys: '' },
+  { id: 'video.toggleAutoPause', label: 'Toggle auto-pause', category: 'Video', defaultKeys: '' },
+  { id: 'video.toggleLoop', label: 'Toggle line loop', category: 'Video', defaultKeys: '' },
+  { id: 'video.toggleFurigana', label: 'Toggle furigana', category: 'Video', defaultKeys: '' },
+  // Phase 6 slice 11. Unlike its neighbours this one is a BUILT-IN, not a command
+  // a view registers: the point is that it works from anywhere, including from
+  // inside the full-screen media workspace, where the palette's Continue-watching
+  // group is out of reach because that group is search-mode only.
+  // Unbound by default — every free single letter here belongs to the adopted
+  // player's own keymap, and a chord that collides is worse than one you bind
+  // yourself in Settings.
+  {
+    id: 'video.resumeLast',
+    label: 'Resume last episode',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Reopens the most recently watched file at the second you stopped. Needs the media server enabled.',
+  },
   ...TOOLBOX_SHORTCUT_COMMANDS.map((command): AppCommand => ({
     id: command.id,
     label: command.name,
@@ -505,7 +602,7 @@ export const SHORTCUT_OPEN_APPS: { id: string; label: string }[] = [
   { id: 'resources', label: 'Resources' },
   { id: 'games', label: 'Game Arena' },
   { id: 'settings', label: 'Settings' },
-  { id: 'city', label: 'Noctis' },
+  { id: 'city', label: 'Mooncap' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -599,27 +696,61 @@ function loadStore(): ShortcutStore {
 
 let store: ShortcutStore = loadStore();
 
-function persist(): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(store));
-  } catch {
-    /* ignore */
-  }
-  window.dispatchEvent(new CustomEvent(EVENT));
-  syncToolboxGlobalShortcut();
-}
-
-export function onShortcutsChanged(cb: () => void): () => void {
-  const h = (): void => cb();
-  window.addEventListener(EVENT, h);
-  return () => window.removeEventListener(EVENT, h);
-}
-
 // Keep the OS-level global shortcut for `toolbox.open` in sync with the user's
 // current binding (pushed to main on boot and on every rebind). If another
 // application owns the accelerator, main reports it and the in-app binding
 // keeps working — the failure is surfaced once as a quiet toast.
 let lastSyncedToolboxOpenKeys: string | null = null;
+let lastSyncedAppToggleKeys: string | null = null;
+let lastSyncedAppRestartKeys: string | null = null;
+let lastSyncedOsHotkeyPayload: string | null = null;
+let osHotkeyInstalledCache: boolean | null = null;
+
+const NAV_OPEN_PREFIX = 'nav.open.';
+
+function firstOsChord(keys: string): string {
+  if (!keys) return '';
+  const first = keys.split('|')[0]!.trim();
+  if (!first || /Mouse(Left|Middle|Right|4|5)/i.test(first)) return '';
+  return first;
+}
+
+/** Collect toggle / restart / open-app chords for the Windows Startup helper. */
+export function collectOsHotkeyBindings(): {
+  toggle: string;
+  restart: string;
+  opens: { section: string; chord: string }[];
+} {
+  const toggle = firstOsChord(effectiveKeys('app.toggle')) || 'Ctrl+Alt+Shift+G';
+  const restart = firstOsChord(effectiveKeys('app.restart'));
+  const opens: { section: string; chord: string }[] = [];
+  const seen = new Set<string>();
+
+  for (const cmd of COMMAND_CATALOG) {
+    if (!cmd.id.startsWith(NAV_OPEN_PREFIX)) continue;
+    const section = cmd.id.slice(NAV_OPEN_PREFIX.length);
+    const chord = firstOsChord(effectiveKeys(cmd.id));
+    if (!chord || seen.has(section)) continue;
+    seen.add(section);
+    opens.push({ section, chord });
+  }
+
+  for (const custom of store.customCommands) {
+    if (custom.action.type !== 'openApp') continue;
+    const section = String(custom.action.appId || '').trim().toLowerCase();
+    if (!section || seen.has(section)) continue;
+    const chord = firstOsChord(effectiveKeys(custom.id));
+    if (!chord) continue;
+    // Prefer catalog nav.open.* when both exist; custom fills gaps.
+    if (SHORTCUT_OPEN_APPS.some((a) => a.id === section)) {
+      seen.add(section);
+      opens.push({ section, chord });
+    }
+  }
+
+  return { toggle, restart, opens };
+}
+
 function syncToolboxGlobalShortcut(): void {
   try {
     if (!window.api?.blancSetGlobalShortcut) return;
@@ -643,9 +774,113 @@ function syncToolboxGlobalShortcut(): void {
   }
 }
 
+function syncAppToggleGlobalShortcut(): void {
+  try {
+    if (!window.api?.appSetToggleShortcut) return;
+    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
+    const keys = getBindings().find((row) => row.id === 'app.toggle')?.keys ?? '';
+    if (keys === lastSyncedAppToggleKeys) return;
+    lastSyncedAppToggleKeys = keys;
+    void window.api.appSetToggleShortcut(keys).then((result) => {
+      if (result && !result.ok && result.error) {
+        window.dispatchEvent(
+          new CustomEvent('os:toast', {
+            detail: { message: `Hide/show GrammarX shortcut: ${result.error}`, kind: 'muted' },
+          }),
+        );
+      }
+    });
+  } catch {
+    /* Non-Electron harness */
+  }
+}
+
+function syncAppRestartGlobalShortcut(): void {
+  try {
+    if (!window.api?.appSetRestartShortcut) return;
+    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
+    const keys = getBindings().find((row) => row.id === 'app.restart')?.keys ?? '';
+    if (keys === lastSyncedAppRestartKeys) return;
+    lastSyncedAppRestartKeys = keys;
+    void window.api.appSetRestartShortcut(keys).then((result) => {
+      if (result && !result.ok && result.error) {
+        window.dispatchEvent(
+          new CustomEvent('os:toast', {
+            detail: { message: `Full restart shortcut: ${result.error}`, kind: 'muted' },
+          }),
+        );
+      }
+    });
+  } catch {
+    /* Non-Electron harness */
+  }
+}
+
+/** Push current Shortcuts chords into the Startup helper (when installed). */
+export function syncOsHotkeyHelperFromShortcuts(force = false): void {
+  try {
+    if (!window.api?.osHotkeySync) return;
+    if (new URLSearchParams(window.location.search).get('blanc') === '1') return;
+    const payload = collectOsHotkeyBindings();
+    const serialized = JSON.stringify(payload);
+    if (!force && serialized === lastSyncedOsHotkeyPayload && osHotkeyInstalledCache === true) return;
+
+    void window.api.osHotkeyStatus?.().then((status) => {
+      osHotkeyInstalledCache = Boolean(status?.installed);
+      if (!status?.installed) {
+        lastSyncedOsHotkeyPayload = null;
+        return;
+      }
+      if (!force && serialized === lastSyncedOsHotkeyPayload) return;
+      lastSyncedOsHotkeyPayload = serialized;
+      void window.api.osHotkeySync(payload).then((result) => {
+        if (result && !result.ok && result.error) {
+          window.dispatchEvent(
+            new CustomEvent('os:toast', {
+              detail: { message: `Startup helper: ${result.error}`, kind: 'muted' },
+            }),
+          );
+        }
+      });
+    });
+  } catch {
+    /* Non-Electron harness */
+  }
+}
+
+/** Mark helper install state so the next persist syncs (or skips) correctly. */
+export function setOsHotkeyInstalledCache(installed: boolean): void {
+  osHotkeyInstalledCache = installed;
+  if (!installed) lastSyncedOsHotkeyPayload = null;
+}
+
+function persist(): void {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(store));
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent(EVENT));
+  syncToolboxGlobalShortcut();
+  syncAppToggleGlobalShortcut();
+  syncAppRestartGlobalShortcut();
+  syncOsHotkeyHelperFromShortcuts();
+}
+
+export function onShortcutsChanged(cb: () => void): () => void {
+  const h = (): void => cb();
+  window.addEventListener(EVENT, h);
+  return () => window.removeEventListener(EVENT, h);
+}
+
 // Initial registration once the module (and the preload bridge) are up.
 if (typeof window !== 'undefined') {
-  window.setTimeout(() => syncToolboxGlobalShortcut(), 0);
+  window.setTimeout(() => {
+    syncToolboxGlobalShortcut();
+    syncAppToggleGlobalShortcut();
+    syncAppRestartGlobalShortcut();
+    syncOsHotkeyHelperFromShortcuts(true);
+  }, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -777,14 +1012,27 @@ function describeCustomAction(action: CustomAction): string {
   return `Dispatches ${action.event}${action.detail ? ` (${action.detail})` : ''}`;
 }
 
-/** Effective chord string for a command under the active profile ('' = unbound). */
+/**
+ * Effective chord string for a command under the active profile ('' = unbound).
+ *
+ * **Normalized on the way out.** `chordMatches` compares this to the output of
+ * `chordFromEvent` with `===`, and that output is always in normal form — single keys
+ * upper-cased, modifiers in Ctrl+Alt+Shift+Meta order. A hand-written `defaultKeys`
+ * literal in any other form therefore matched *nothing*, with no error and no warning:
+ * Settings listed the row, the row looked bound, and the key did nothing. Slice 19
+ * measured **8 of 101** catalog defaults in that state — six lowercase `video.*` letters
+ * and both virtual-desktop chords, which spelled their modifiers `Meta+Ctrl+…`.
+ *
+ * Normalizing here rather than at the call sites keeps one answer to "what is this bound
+ * to?" for dispatch, for the conflict list and for what the user is shown.
+ */
 export function effectiveKeys(id: string): string {
   const ov = store.profiles[store.active]?.[id];
   if (ov === null) return '';
-  if (typeof ov === 'string') return ov;
+  if (typeof ov === 'string') return normalizeChord(ov);
   const fromCustom = store.customCommands.find((c) => c.id === id);
-  if (fromCustom) return fromCustom.defaultKeys;
-  return COMMAND_CATALOG.find((c) => c.id === id)?.defaultKeys ?? '';
+  if (fromCustom) return normalizeChord(fromCustom.defaultKeys);
+  return normalizeChord(COMMAND_CATALOG.find((c) => c.id === id)?.defaultKeys ?? '');
 }
 
 /** True if chord matches any alternative in the effective binding. */
@@ -1013,6 +1261,62 @@ function openApp(appId: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: appId }));
 }
 
+function resumeToast(key: string): void {
+  // Module-level `t` (not the hook) resolves against the live language on every call, so
+  // this stays correct after a language switch without the command registry re-running —
+  // same reason GlobalDictionaryOverlay uses it.
+  window.dispatchEvent(new CustomEvent('os:toast', {
+    detail: { message: t(key), kind: 'muted' },
+  }));
+}
+
+/**
+ * `video.resumeLast` — Phase 6 slices 11 and 14.
+ *
+ * Three ways this can decline, and slice 14 exists because two of them used to share one
+ * sentence. `video.resumeLast` is a *built-in*, so it is offered in every shell that mounts
+ * `CommandPalette` — and only some of those mount `MediaWorkspaceHost`:
+ *
+ *   App.tsx  reader (NovelReader / MangaReader)   palette YES   host NO
+ *   App.tsx  pop-out (music, settings, games, …)  palette YES   host only for `video`
+ *   App.tsx  desktop                              palette YES   host YES
+ *
+ * In the first two the old code found no `.seanime-host-launcher` in the DOM and reported
+ * *"The media server is off"* — measured false with the sidecar at `ready`, and false by
+ * default since the slice-12 flip. A missing host is a fact about the **window**; whether
+ * the sidecar is disabled is a fact about the **machine**, and only main can answer it.
+ *
+ * The await is affordable here and nowhere near a render tick: this runs on Enter, once.
+ * `App` registers its own handler for this id while a book is open, so the reader never
+ * reaches the `no-host` branch — it closes the reader and comes back through this.
+ */
+export function reportMediaWorkspaceUnavailable(): void {
+  // Exported for `App`'s reader handoff, which has to decline BEFORE it closes the book
+  // and so cannot reach this through the built-in. Borrowing the sentence keeps one
+  // situation described one way.
+  resumeToast('mediaWorkspace.resumeLast.unavailable');
+}
+
+async function resumeLastEpisode(): Promise<void> {
+  // The host-then-sidecar sequence moved to `reachMediaWorkspace` when slice 19 gave it a
+  // second caller. The wording stays here: only this command knows the user asked to
+  // *resume* rather than to open something specific.
+  const reach = await reachMediaWorkspace();
+  if (reach === 'no-host') {
+    resumeToast('mediaWorkspace.resumeLast.noWorkspaceHere');
+    return;
+  }
+  if (reach === 'unavailable') {
+    resumeToast('mediaWorkspace.resumeLast.unavailable');
+    return;
+  }
+  // `no-host` cannot come back here — checked above, and nothing unmounts a host across
+  // one await — so the only remaining decline is an empty resume store.
+  if (resumeMostRecentWatched() !== 'opened') {
+    resumeToast('mediaWorkspace.resumeLast.nothing');
+  }
+}
+
 function dispatchToolboxCommand(id: string): boolean {
   const command = TOOLBOX_SHORTCUT_COMMANDS.find((item) => item.id === id);
   if (!command) return false;
@@ -1077,6 +1381,8 @@ function builtinHandler(id: string): Handler | null {
       return () => void window.dispatchEvent(new CustomEvent('palette:open', { detail: 'commands' }));
     case 'nav.search':
       return () => void window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+    case 'video.resumeLast':
+      return () => void resumeLastEpisode();
     case 'nav.settings':
       return () => void openApp('settings');
     case 'nav.home':
@@ -1176,6 +1482,14 @@ function builtinHandler(id: string): Handler | null {
       return () => void toggleWordHighlight();
     case 'clipboard.open':
       return () => void window.dispatchEvent(new CustomEvent('clipboard:open'));
+    case 'app.toggle':
+      return () => {
+        void window.api?.appToggle?.();
+      };
+    case 'app.restart':
+      return () => {
+        void window.api?.relaunchApp?.();
+      };
     case 'calendar.open':
       return () => void openApp('calendar');
     case 'music.playPause':

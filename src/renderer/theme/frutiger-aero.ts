@@ -9,6 +9,8 @@
 
 import { registerTheme, type Theme } from './engine';
 import { AERO_PROOF_SOUND_PACK_ID } from '../audio/aeroProofPack';
+import { NOSTALGIC_WALLPAPER_PACK_ID } from '../environment/nostalgicWallpaperPack';
+import { AERO_ICON_PACK_ID, registerAeroIconPack } from './aeroIconPack';
 
 export const AERO_THEME_ID = 'frutiger-aero';
 
@@ -20,7 +22,12 @@ export const FRUTIGER_AERO_THEME: Theme = {
   light: true,
   version: 1,
   materialSet: 'aero',
-  assetPack: { id: 'frutiger-aero-assets', sounds: AERO_PROOF_SOUND_PACK_ID },
+  assetPack: {
+    id: 'frutiger-aero-assets',
+    sounds: AERO_PROOF_SOUND_PACK_ID,
+    wallpapers: NOSTALGIC_WALLPAPER_PACK_ID,
+    icons: AERO_ICON_PACK_ID,
+  },
   swatch: { bg: '#bfe6ff', text: '#123a52', border: '#a9d4ef' },
 };
 
@@ -29,6 +36,9 @@ let registered = false;
 /** Idempotently register the Aero theme. Call before bootTheme() in main.tsx. */
 export function registerFrutigerAero(): void {
   if (registered) return;
+  // The icon pack must exist before the theme that names it, or the first
+  // applyAssetPack() would resolve `icons` to null and fall back to line glyphs.
+  registerAeroIconPack();
   registerTheme(FRUTIGER_AERO_THEME);
   registered = true;
 }

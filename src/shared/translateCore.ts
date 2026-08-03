@@ -51,6 +51,15 @@ export function buildBatchPrompt(items: TranslateBatchItem[]): string {
   const source = langLabel(items[0].source);
   const target = langLabel(items[0].target);
   const lines = items.map((item) => `[${item.id}] ${item.text}`);
+  const longForm = items.some((item) => item.text.length > 40);
+  if (longForm) {
+    return (
+      `/no_think\nTranslate each numbered ${source} passage into ${target}. ` +
+      `Keep meaning and tone; output ${target} only. ` +
+      `Return ONLY a JSON array: [{"id":"0","text":"<${target} translation>"}, ...]\n\n` +
+      lines.join('\n')
+    );
+  }
   return (
     `/no_think\nTranslate each numbered ${source} term into ${target}. ` +
     `Give the ${target} meaning only — never romaji, kana, or the original word. ` +

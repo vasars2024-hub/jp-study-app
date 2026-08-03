@@ -1,8 +1,12 @@
 // Multi-language study-profile data model (SERVICES_PATCH.md section 4).
 // Types shared verbatim by main and renderer. No Electron imports allowed here.
 
-/** Built-in profile ids — see seedProfiles.ts for the full catalog. */
-export type SeedProfileId = import('./seedProfiles').SeedProfileId;
+// This module owns the *types*; `seedProfiles.ts` owns the *catalog* and imports them.
+// It deliberately does not import back: a `SeedProfileId` alias and a compatibility
+// re-export block used to live here, and between them they made profiles.ts,
+// seedProfiles.ts, kinomotoCard.ts and profileFields.ts one four-module cycle.
+// Import `SeedProfileId`, `SEED_PROFILES`, `PROFILE_IDS`, `PROFILE_GROUPS` and
+// `DEFAULT_PROFILE_ID` from './seedProfiles' directly.
 
 /**
  * A profile identifier. The seeds use the SeedProfileId literals; user-created
@@ -190,15 +194,7 @@ export const JLPT_TARGETS: readonly NonNullable<DeckParams['jlptTarget']>[] = [
 ];
 
 // ----- Seed profiles (section 4.3) ------------------------------------------
-// Full catalog lives in seedProfiles.ts. Re-exported here for backward compat.
-
-export {
-  DEFAULT_PROFILE_ID,
-  PROFILE_GROUPS,
-  PROFILE_IDS,
-  SEED_PROFILES,
-  type SeedProfileId,
-} from './seedProfiles';
+// The catalog lives in seedProfiles.ts and is imported from there directly.
 
 /**
  * Build a fresh user-created profile. Defaults mirror the Japanese-focus seed

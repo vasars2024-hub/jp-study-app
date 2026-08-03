@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phase 6 Study-Ledger Harness</title>
+    <style>
+      html, body { width: 100%; margin: 0; background: #0d0c12; }
+      .sl-harness { padding: 28px; display: flex; flex-direction: column; gap: 34px; }
+      .sl-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 26px 32px; }
+      .sl-label {
+        margin: 0 0 6px;
+        font: 11px/1.4 system-ui, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8b8794;
+      }
+      /* The Statistics view is a page, not a widget — give it a page-shaped column on the
+         app's own surface so the chart is measured against the background it really has. */
+      .sl-page {
+        width: 760px;
+        max-width: 100%;
+        padding: 22px 24px;
+        border-radius: 14px;
+        background: var(--bg, #16151c);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./studyLedgerHarness.tsx"></script>
+  </body>
+</html>

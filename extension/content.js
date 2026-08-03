@@ -1683,6 +1683,14 @@
     }
     // Selection lookup also requires the hover key so drag-select stays normal.
     if (!eventHasHoverKey(e) || !cfg.clickLookup) return;
+    // AI OCR mode: a selection long enough to be a sentence gets the full
+    // annotation instead of a dictionary entry. Short selections still go to the
+    // dictionary — a one-word cloud call is slower and costs money for an answer
+    // the offline dictionary already has.
+    if (aiWantsSelection(text)) {
+      void runSentenceAnalysis(text, { anchorY: e.clientY, context: document.title || '' });
+      return;
+    }
     void lookupText(text, e.clientX, e.clientY);
   }
 
@@ -1896,6 +1904,34 @@
   let wheelHoverIdx = -1;
   let wheelPageInfo = { kind: 'article', category: 'other' };
 
+  /**
+   * Page kind/category computed from this frame, with no background round-trip.
+   * YouTube is an SPA, so `chrome.tabs.query` in the background can report a
+   * stale url right after a navigation — and if the `detect` message fails
+   * outright we used to fall back to 'article', which silently disables
+   * Download. location.href here is always current.
+   */
+  function localPageInfo() {
+    const url = location.href;
+    return {
+      kind: S.detectPageKind ? S.detectPageKind(url) : 'article',
+      category: S.detectContentCategory
+        ? S.detectContentCategory(url, { title: document.title })
+        : 'other',
+    };
+  }
+
+  /** Best available page info: the background's answer, else this frame's. */
+  function resolvePageInfo(detect) {
+    const local = localPageInfo();
+    if (!detect?.ok) return local;
+    // A local YouTube match beats a stale 'article' from the background.
+    return {
+      kind: detect.kind === 'article' && local.kind !== 'article' ? local.kind : detect.kind,
+      category: detect.category === 'other' ? local.category : detect.category,
+    };
+  }
+
   const WHEEL_RADIUS = 118; // px — compact; labels sit inside
 
   function wheelCommands() {
@@ -1975,6 +2011,31 @@
     return Math.floor(ang / slice) % count;
   }
 
+  function wheelSliceAvailable(idx) {
+    const cmds = wheelCommands();
+    const id = cmds[idx];
+    if (!id) return false;
+    if (!S.commandAvailableOnPage) return true;
+    return S.commandAvailableOnPage(id, wheelPageInfo.kind, wheelPageInfo.category);
+  }
+
+  function activateWheelIndex(idx, activatingEvent) {
+    if (typeof idx !== 'number' || idx < 0) {
+      closeWheel(false);
+      return;
+    }
+    if (!wheelSliceAvailable(idx)) {
+      // Never fail silently: a disabled slice used to swallow the click, which
+      // reads as "the button is broken" (most often Download on a YouTube tab
+      // whose kind failed to detect).
+      const cmd = S.getCommand ? S.getCommand(wheelCommands()[idx]) : null;
+      closeWheel(false);
+      toast(`${cmd ? cmd.label : 'That action'} is not available on this page`, 'err');
+      return;
+    }
+    closeWheel(true, idx, activatingEvent || null);
+  }
+
   function onWheelPointerMove(e) {
     if (!wheelActive || !wheelEl) return;
     const rect = wheelEl.getBoundingClientRect();
@@ -1985,17 +2046,40 @@
   }
 
   function onWheelPointerUp(e) {
-    if (!wheelActive) return;
+    if (!wheelActive || !wheelEl) return;
     e.preventDefault();
     e.stopPropagation();
-    const target = e.target.closest('.jp-wheel-slice, .jp-wheel-center');
-    if (!target) return;
-    const idx = Number(target.dataset.idx);
-    if (idx >= 0 && !target.disabled) {
-      closeWheel(true, idx, e);
-    } else if (idx === -1) {
+
+    // Prefer the sector under the pointer. Slice pills are tiny hit targets; the
+    // center also previews the hovered command label, so users release there
+    // expecting confirm — not cancel.
+    const rect = wheelEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const angleIdx = angleIndex(e.clientX, e.clientY, cx, cy, wheelCommands().length);
+
+    if (angleIdx === -2) {
+      // Outside the wheel disc.
       closeWheel(false);
+      return;
     }
+    if (angleIdx >= 0) {
+      activateWheelIndex(angleIdx, e);
+      return;
+    }
+
+    // Dead-zone / center: confirm the currently previewed command when one is
+    // highlighted; otherwise cancel.
+    if (wheelHoverIdx >= 0) {
+      activateWheelIndex(wheelHoverIdx, e);
+      return;
+    }
+    const target = e.target && e.target.closest ? e.target.closest('.jp-wheel-slice, .jp-wheel-center') : null;
+    if (target && target.classList.contains('jp-wheel-slice') && !target.disabled) {
+      activateWheelIndex(Number(target.dataset.idx), e);
+      return;
+    }
+    closeWheel(false);
   }
 
   function handleWheelKey(e) {
@@ -2006,7 +2090,7 @@
       if (idx < n) {
         e.preventDefault();
         e.stopPropagation();
-        closeWheel(true, idx, e);
+        activateWheelIndex(idx, e);
       }
       return;
     }
@@ -2019,7 +2103,7 @@
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       e.stopPropagation();
-      if (wheelHoverIdx >= 0) closeWheel(true, wheelHoverIdx, e);
+      if (wheelHoverIdx >= 0) activateWheelIndex(wheelHoverIdx, e);
       else closeWheel(false);
     }
   }
@@ -2036,7 +2120,7 @@
     await loadCfg();
     hidePopup();
     const detect = await safeRuntimeSend({ type: 'detect' });
-    if (detect?.ok) wheelPageInfo = { kind: detect.kind, category: detect.category };
+    wheelPageInfo = resolvePageInfo(detect);
     const el = ensureWheel();
     renderWheel();
     const half = WHEEL_RADIUS + 10;
@@ -2077,6 +2161,7 @@
     'reader.knownTint',
     'tabs.picker',
     'app.open',
+    'settings.special',
   ];
 
   function ensureMoreMenu() {
@@ -2100,8 +2185,7 @@
   function openMoreMenu(x, y) {
     const el = ensureMoreMenu();
     void safeRuntimeSend({ type: 'detect' }).then((detect) => {
-      const kind = detect?.ok ? detect.kind : 'article';
-      const category = detect?.ok ? detect.category : 'other';
+      const { kind, category } = resolvePageInfo(detect);
       el.innerHTML = MORE_MENU_COMMANDS.filter((id) =>
         S.commandAvailableOnPage ? S.commandAvailableOnPage(id, kind, category) : true,
       )
@@ -3111,6 +3195,7 @@
       <textarea class="jp-ocr-body" lang="ja" rows="4" aria-label="Recognized text — edit before saving"></textarea>
       <div class="jp-ocr-hint">Double-click a word to look it up. Edit the text if the recognition missed characters.</div>
       <div class="jp-actions">
+        <button type="button" class="rp-act rp-primary" data-act="analyze">AI analysis</button>
         <button type="button" class="rp-act" data-act="lookup">Look up</button>
         <button type="button" class="rp-act" data-act="save">Save to GrammarX</button>
         <button type="button" class="rp-act" data-act="retry">Re-select</button>
@@ -3133,7 +3218,13 @@
         return;
       }
       if (!text) return;
-      if (act === 'lookup') {
+      if (act === 'analyze') {
+        // Read from the textarea, not the raw OCR result — the reader may have
+        // just fixed a misrecognized character, and analyzing the uncorrected
+        // text would explain a sentence that was never on screen.
+        ocrOverlay.classList.remove('open');
+        void runSentenceAnalysis(text, { anchorY: 80, context: document.title || '' });
+      } else if (act === 'lookup') {
         ocrOverlay.classList.remove('open');
         void lookupText(text, window.innerWidth / 2, 120);
       } else if (act === 'save') {
@@ -3197,6 +3288,13 @@
       ? `${describeOcrEngine(res)} · Double-click a word to look it up.`
       : 'No text was recognized in that area — try a tighter box.';
     el.classList.add('open');
+    // AI OCR mode analyses the read straight away. The overlay still opens first
+    // so the recognized text — and the chance to correct it — stays reachable
+    // behind the panel rather than being skipped.
+    if (cfg.aiOnOcr && body.value) {
+      el.classList.remove('open');
+      void runSentenceAnalysis(body.value, { anchorY: 80, context: document.title || '' });
+    }
   }
 
   /** Which engine and language actually read the capture — confirms auto-detection. */
@@ -3205,6 +3303,304 @@
     const names = { ja: 'Japanese', zh: 'Chinese', ru: 'Russian' };
     const lang = names[res?.lang];
     return lang ? `Read as ${lang}` : 'Read with web OCR';
+  }
+
+  /* --------------------------- AI sentence analysis -------------------------- */
+  //
+  // The extension's half of "AI OCR / Dictionary AI". The app owns the prompt,
+  // the preferences and the cache; this owns the panel, the gestures that open
+  // it, and the keyboard. Annotations arrive already aligned (start/end are
+  // offsets into `result.sentence`), so rendering is a straight walk — the
+  // extension never tries to locate spans itself, which is what keeps the
+  // highlight identical to the one the desktop app draws.
+
+  /**
+   * State for the panel. `renderAiAnalysis` hands this straight to
+   * `S.aiPanelHtml`, so the markup lives in shared.js where it can be tested in
+   * a sandbox without a browser (src/shared/__tests__/analysisPanelRender.test.ts).
+   */
+  let aiPanel = null;
+  let aiState = null;
+  let aiKeyHandler = null;
+  let aiRequestToken = 0;
+
+  /** Study language for the page, reusing the OCR language hint. */
+  function aiStudyLang() {
+    const hint = currentLangHint();
+    return hint === 'zh' || hint === 'ru' ? hint : 'ja';
+  }
+
+  function aiUiLang() {
+    const nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    return ['en', 'ja', 'zh', 'ru'].includes(nav) ? nav : 'en';
+  }
+
+  /**
+   * Is this selection a sentence worth a cloud call, or a word the offline
+   * dictionary answers instantly and for free? Length is the only signal
+   * available before the call, so it is the one the user gets to tune.
+   */
+  function aiWantsSelection(text) {
+    return !!cfg.aiOnHighlight && String(text || '').trim().length >= (cfg.aiMinChars || 6);
+  }
+
+  function ensureAiPanel() {
+    if (aiPanel) return aiPanel;
+    aiPanel = document.createElement('div');
+    aiPanel.id = 'jp-study-ai';
+    aiPanel.setAttribute('role', 'dialog');
+    aiPanel.setAttribute('aria-label', 'AI sentence analysis');
+    aiPanel.innerHTML = `
+      <div class="ai-head">
+        <span class="ai-title">AI OCR \u00b7 Sentence analysis</span>
+        <button type="button" class="rp-icon" data-act="reanalyze" title="Re-analyze (R)">\u21bb</button>
+        <button type="button" class="rp-icon" data-act="close" aria-label="Close">\u00d7</button>
+      </div>
+      <div class="ai-body"></div>`;
+    aiPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+    aiPanel.addEventListener('click', onAiPanelClick);
+    document.documentElement.appendChild(aiPanel);
+    return aiPanel;
+  }
+
+  function onAiPanelClick(e) {
+    e.stopPropagation();
+    const seg = e.target.closest('.ai-seg');
+    if (seg) {
+      aiSelectSegment(Number(seg.dataset.index));
+      return;
+    }
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const act = btn.getAttribute('data-act');
+    if (act === 'close') closeAiPanel();
+    else if (act) aiRunCommand(act);
+  }
+
+  function closeAiPanel() {
+    if (aiPanel) aiPanel.classList.remove('open');
+    aiState = null;
+    if (aiKeyHandler) {
+      window.removeEventListener('keydown', aiKeyHandler, true);
+      aiKeyHandler = null;
+    }
+  }
+
+  /**
+   * Bind the keyboard while the panel is open.
+   *
+   * Capture phase and only unmodified keys: the page underneath keeps every
+   * chord it had, and a single letter never fires while the reader is typing in
+   * a field \u2014 which on a web page can be almost anything, hence the guard.
+   */
+  function bindAiKeys() {
+    if (aiKeyHandler) return;
+    aiKeyHandler = (e) => {
+      if (!aiState) return;
+      if (S.aiIsTextEntry && S.aiIsTextEntry(e.target)) return;
+      const command = S.aiCommandForKey ? S.aiCommandForKey(e) : null;
+      if (!command) return;
+      if (aiRunCommand(command)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', aiKeyHandler, true);
+  }
+
+  function aiRunCommand(command) {
+    if (!aiState) return false;
+    const { result } = aiState;
+    const count = result && result.annotations ? result.annotations.length : 0;
+    if (command && typeof command === 'object' && command.select != null) {
+      if (command.select >= count) return false;
+      aiSelectSegment(command.select);
+      return true;
+    }
+    const active = count ? result.annotations[aiState.selected] : null;
+    switch (command) {
+      case 'close':
+        closeAiPanel();
+        return true;
+      case 'next':
+        if (!count) return false;
+        aiSelectSegment((aiState.selected + 1) % count);
+        return true;
+      case 'prev':
+        if (!count) return false;
+        aiSelectSegment((aiState.selected - 1 + count) % count);
+        return true;
+      case 'translations':
+        aiState.showTranslations = !aiState.showTranslations;
+        renderAiAnalysis();
+        return true;
+      case 'reanalyze':
+        void runSentenceAnalysis(aiState.text, { force: true });
+        return true;
+      case 'copy': {
+        if (!active) return false;
+        const parts = [
+          active.headword || active.text,
+          active.meaning,
+          active.explanation,
+          result.sentence,
+        ];
+        void navigator.clipboard?.writeText(parts.filter(Boolean).join('\n'));
+        toast('Copied');
+        return true;
+      }
+      case 'listen': {
+        const text = active ? active.text : result.sentence;
+        try {
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = aiState.lang === 'zh' ? 'zh-CN' : aiState.lang === 'ru' ? 'ru-RU' : 'ja-JP';
+          speechSynthesis.cancel();
+          speechSynthesis.speak(utter);
+        } catch {
+          toast('Speech is unavailable here', 'err');
+        }
+        return true;
+      }
+      case 'dictionary':
+        if (!active) return false;
+        void lookupText(active.text, window.innerWidth / 2, 140);
+        return true;
+      case 'mine':
+        if (!active) return false;
+        void aiMine(aiState.selected, undefined);
+        return true;
+      case 'saveSentence':
+        void aiMine(aiState.selected, 'sentence');
+        return true;
+      case 'snapshot':
+        void aiSnapshot();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  async function aiMine(index, cardKind) {
+    if (!aiState || !aiState.result) return;
+    aiState.mine = 'busy';
+    renderAiAnalysis();
+    const res = await safeRuntimeSend({
+      type: 'sentence-analysis-mine',
+      result: aiState.result,
+      annotationIndex: index,
+      cardKind,
+      lang: aiState.lang,
+      uiLang: aiState.uiLang,
+    });
+    // A duplicate means the card the reader wanted is already in Anki, which is
+    // the outcome they asked for \u2014 reporting it as a failure would be wrong.
+    aiState.mine = res && (res.ok || res.error === 'duplicate') ? 'done' : 'error';
+    renderAiAnalysis();
+    if (aiState.mine === 'error') toast((res && res.error) || 'Could not add the card', 'err');
+  }
+
+  async function aiSnapshot() {
+    if (!aiState || !aiState.result) return;
+    aiState.snapshot = 'busy';
+    renderAiAnalysis();
+    const res = await safeRuntimeSend({
+      type: 'sentence-analysis-snapshot',
+      result: aiState.result,
+      lang: aiState.lang,
+      sourceLabel: `Captured from ${document.title || location.hostname}`,
+    });
+    aiState.snapshot = res && res.ok ? 'done' : 'error';
+    renderAiAnalysis();
+    if (aiState.snapshot === 'error') toast((res && res.error) || 'Snapshot failed', 'err');
+  }
+
+  function aiSelectSegment(index) {
+    if (!aiState || !Number.isFinite(index)) return;
+    aiState.selected = index;
+    // Each span has its own action outcomes; carrying "Added" across to the next
+    // word would claim a card that was never made.
+    aiState.mine = 'idle';
+    renderAiAnalysis();
+  }
+
+  /** Position the panel so it never covers the selection it is explaining. */
+  function positionAiPanel(anchorY) {
+    const el = ensureAiPanel();
+    const pad = 12;
+    const width = Math.min(560, window.innerWidth - pad * 2);
+    el.style.width = `${width}px`;
+    el.style.left = `${Math.max(pad, (window.innerWidth - width) / 2)}px`;
+    const top = Math.max(pad, Math.min(typeof anchorY === 'number' ? anchorY + 24 : 80, window.innerHeight - 160));
+    el.style.top = `${top}px`;
+    el.style.maxHeight = `${window.innerHeight - top - pad}px`;
+  }
+
+  function renderAiAnalysis() {
+    if (!aiState) return;
+    const el = ensureAiPanel();
+    el.querySelector('.ai-body').innerHTML = S.aiPanelHtml ? S.aiPanelHtml(aiState) : '';
+  }
+
+  /**
+   * Analyze `text` and show the panel.
+   *
+   * The token guard matters more here than in the app: a reader drag-selecting
+   * their way down a page fires this repeatedly, and an earlier, slower response
+   * landing last would replace the sentence they are actually looking at.
+   */
+  async function runSentenceAnalysis(text, opts = {}) {
+    const value = String(text || '').trim();
+    if (!value) {
+      toast('Select a sentence first', 'err');
+      return;
+    }
+    if (!isExtensionAlive()) {
+      markExtensionDead();
+      return;
+    }
+    hidePopup();
+    const token = ++aiRequestToken;
+    aiState = {
+      text: value,
+      lang: aiStudyLang(),
+      uiLang: aiUiLang(),
+      status: 'loading',
+      selected: 0,
+      showTranslations: false,
+      mine: 'idle',
+      snapshot: 'idle',
+      result: null,
+      error: '',
+    };
+    positionAiPanel(opts.anchorY);
+    ensureAiPanel().classList.add('open');
+    bindAiKeys();
+    renderAiAnalysis();
+
+    const res = await safeRuntimeSend({
+      type: 'sentence-analysis',
+      text: value,
+      lang: aiState.lang,
+      explainIn: aiState.uiLang,
+      context: opts.context || '',
+    });
+    if (token !== aiRequestToken || !aiState) return;
+    if (res && res.ok && res.result) {
+      aiState.status = 'ready';
+      aiState.result = res.result;
+    } else {
+      aiState.status = 'error';
+      const rawErr = (res && res.error) || '';
+      aiState.error =
+        (res && res.needsKey
+          ? 'AI analysis needs an API key. Add one in GrammarX → Flashcards → AI Card Studio.'
+          : res && res.needsLocalModel
+            ? 'AI analysis needs the local Qwen model. Install Qwen3-1.7B via GrammarX → Translate, or switch to Cloud in Flashcards → AI Card Studio.'
+            : rawErr === 'Not found'
+              ? 'GrammarX is outdated or not fully started — restart the app, then reload this extension.'
+              : rawErr) || 'The analysis failed.';
+    }
+    renderAiAnalysis();
   }
 
   /* ------------------------------ message wiring ---------------------------- */
@@ -3241,6 +3637,16 @@
     }
     if (msg?.type === 'jp-toast') {
       toast(String(msg.message || ''), msg.kind === 'err' ? 'err' : msg.kind === 'ok' ? 'ok' : undefined, msg.action);
+      sendResponse({ ok: true });
+      return true;
+    }
+    // AI analysis of whatever is selected, regardless of the highlight mode —
+    // the command and the context-menu entry are the explicit ask, so they do
+    // not consult cfg.aiOnHighlight the way a bare drag-select does.
+    if (msg?.type === 'jp-analyze-selection') {
+      const text = String(msg.text || '').trim() || getSavePayload().text;
+      if (!text) toast('Select a sentence first', 'err');
+      else void runSentenceAnalysis(text, { anchorY: lastHoverPoint.y || 80, context: document.title || '' });
       sendResponse({ ok: true });
       return true;
     }

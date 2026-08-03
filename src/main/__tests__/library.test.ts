@@ -57,7 +57,11 @@ vi.mock('./readingFetch', () => ({ fetchReadingContent: () => Promise.resolve(nu
 vi.mock('./i18n', () => ({ mt: (k: string) => k }));
 vi.mock('./epubMeta', () => ({ extractEpubTitleFromOpf: () => undefined }));
 
-const { pickCoverPage, importMangaFromImageUrls } = await import('../library');
+const {
+  pickCoverPage,
+  importMangaFromImageUrls,
+  importProviderMangaChapter,
+} = await import('../library');
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -179,5 +183,66 @@ describe('importMangaFromImageUrls', () => {
     for (const call of fetchMock.mock.calls) {
       expect(String(call[0])).not.toMatch(/127\.0\.0\.1|10\.0\.0\.5|192\.168\.1\.1/);
     }
+  });
+});
+
+describe('importProviderMangaChapter', () => {
+  it('commits a complete local manga item with provider identity', () => {
+    const source = {
+      kind: 'seanime-manga-chapter' as const,
+      mediaId: 30_002,
+      malId: 2,
+      workId: 'seanime-manga:30002',
+      workTitle: 'Berserk',
+      workTitleNative: 'ベルセルク',
+      editionId: 'seanime:fixture:30002',
+      providerId: 'fixture',
+      providerLabel: 'Fixture',
+      chapterId: 'chapter-1',
+      chapterNumber: '1',
+      chapterTitle: '第一話',
+      language: 'ja',
+    };
+    const result = importProviderMangaChapter({
+      title: 'Berserk — Chapter 1',
+      source,
+      pages: [
+        { bytes: Buffer.alloc(128, 1), contentType: 'image/png' },
+        { bytes: Buffer.alloc(128, 2), contentType: 'image/webp' },
+      ],
+    });
+
+    expect(result.alreadyPresent).toBe(false);
+    expect(result.item).toMatchObject({
+      title: 'Berserk — Chapter 1',
+      kind: 'manga',
+      pageCount: 2,
+      readingSource: source,
+    });
+    const pagesDir = path.join(tmpRoot, 'library', result.item.id, 'pages');
+    expect(fs.readdirSync(pagesDir).sort()).toEqual(['0001.png', '0002.webp']);
+  });
+
+  it('is idempotent for the same provider chapter', () => {
+    const source = {
+      kind: 'seanime-manga-chapter' as const,
+      mediaId: 30_002,
+      workId: 'seanime-manga:30002',
+      workTitle: 'Berserk',
+      editionId: 'seanime:fixture:30002',
+      providerId: 'fixture',
+      providerLabel: 'Fixture',
+      chapterId: 'chapter-1',
+      chapterNumber: '1',
+      chapterTitle: '',
+      language: 'ja',
+    };
+    const result = importProviderMangaChapter({
+      title: 'Duplicate',
+      source,
+      pages: [{ bytes: Buffer.alloc(128), contentType: 'image/jpeg' }],
+    });
+    expect(result.alreadyPresent).toBe(true);
+    expect(result.item.title).toBe('Berserk — Chapter 1');
   });
 });

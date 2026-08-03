@@ -1613,59 +1613,289 @@
 .wired-found-ribbon {
   display: none;
 }
-.wired-found-lyric-stage {
+.wlyric-stage {
   position: absolute;
   left: 0;
   right: 0;
-  top: 34%;
-  height: 240px;
+  top: 32%;
+  height: 260px;
   pointer-events: none;
   overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent 0%, black 9%, black 91%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 9%, black 91%, transparent 100%);
 }
-.wired-found-lyric-line {
+.wlyric-stage::before {
+  /* Signal detection: a faint vertical pulse near the entry edge, always on,
+     independent of any given line — it announces the channel, not a lyric. */
+  content: '';
+  position: absolute;
+  right: 7%;
+  top: 10%;
+  bottom: 10%;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(109, 241, 255, 0.55), transparent);
+  animation: wlyricSignalPulse 3.6s ease-in-out infinite;
+}
+/* ----- back lane: the next line, mirrored and small, crawling the other way ----- */
+.wlyric-back-line {
   position: absolute;
   left: 0;
-  top: 50%;
+  top: 20%;
+  z-index: 0;
   display: flex;
   align-items: center;
   white-space: nowrap;
-  will-change: transform, filter, opacity;
+  opacity: 0.4;
+  filter: blur(0.3px);
+  will-change: transform;
+  transform: translate3d(-120vw, 0, 0);
 }
-.wired-found-lyric-line-inner {
+.wlyric-back-inner {
+  display: inline-block;
+  transform: scaleX(-1);
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+  font-size: clamp(14px, 2vw, 26px);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  color: rgba(154, 226, 236, 0.55);
+  text-shadow: 0 0 6px rgba(109, 241, 255, 0.22);
+}
+.wlyric-back-ch {
   position: relative;
-  font-size: clamp(42px, 7vw, 100px);
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: rgba(216, 251, 255, 0.68);
-  text-shadow:
-    0 0 14px rgba(109, 241, 255, 0.34),
-    0 0 38px rgba(109, 241, 255, 0.12);
-  opacity: 0.8;
+  display: inline-block;
 }
-.wired-found-lyric-line-glow {
+.wlyric-back-ch-base {
+  position: relative;
+  display: inline-block;
+}
+.wlyric-back-ch-glitch {
   position: absolute;
-  inset: -28px -72px;
-  background: radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.22), transparent 60%);
-  filter: blur(8px);
+  inset: 0;
   opacity: 0;
-  transform: scale(0.9);
+  color: rgba(191, 252, 255, 0.9);
+}
+.wlyric-back-ch.is-flicker .wlyric-back-ch-base {
+  animation: wlyricBackBaseFlicker var(--fdur, 2.4s) steps(1) infinite;
+  animation-delay: var(--fdelay, 0s);
+}
+.wlyric-back-ch.is-flicker .wlyric-back-ch-glitch {
+  animation: wlyricBackGlitchFlicker var(--fdur, 2.4s) steps(1) infinite;
+  animation-delay: var(--fdelay, 0s);
+}
+@keyframes wlyricBackBaseFlicker {
+  0%, 86%, 100% { opacity: 1; }
+  90%, 95% { opacity: 0; }
+}
+@keyframes wlyricBackGlitchFlicker {
+  0%, 86%, 100% { opacity: 0; }
+  90%, 95% { opacity: 1; }
+}
+
+.wlyric-line {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  will-change: transform;
+  transform: translate3d(120vw, 0, 0);
+}
+.wlyric-inner {
+  position: relative;
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+  font-size: clamp(34px, 5.6vw, 78px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: rgba(216, 251, 255, 0.86);
+  text-shadow: 0 0 10px rgba(109, 241, 255, 0.3), 0 0 26px rgba(109, 241, 255, 0.1);
+  transition: text-shadow 240ms ease, color 240ms ease;
+}
+.wlyric-line.is-clear .wlyric-inner {
+  color: #eafcff;
+  text-shadow: 0 0 14px rgba(109, 241, 255, 0.5), 0 0 40px rgba(109, 241, 255, 0.16);
+}
+.wlyric-glow {
+  position: absolute;
+  inset: -30px -60px;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(109, 241, 255, 0.12), transparent 62%);
+  filter: blur(10px);
   mix-blend-mode: screen;
 }
-.wired-found-lyric-stage.is-impact .wired-found-lyric-line-inner {
-  color: #f6ffff;
-  text-shadow:
-    0 0 22px rgba(109, 241, 255, 0.92),
-    0 0 54px rgba(109, 241, 255, 0.22);
-  opacity: 0.98;
-  filter: drop-shadow(0 0 18px rgba(109, 241, 255, 0.24));
+
+/* ----- damped visualizer, riding beneath the line's baseline ------------- */
+.wlyric-bars {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 30px;
+  width: min(560px, 60vw);
+  opacity: 0.55;
+  mask-image: radial-gradient(closest-side, black, transparent);
+  -webkit-mask-image: radial-gradient(closest-side, black, transparent);
 }
-.wired-found-lyric-stage.is-impact .wired-found-lyric-line-glow {
-  opacity: 1;
-  animation: wiredLyricSplash 0.66s ease-out;
+.wlyric-bar {
+  flex: 1 1 auto;
+  height: 100%;
+  transform-origin: bottom center;
+  transform: scaleY(0.05);
+  background: linear-gradient(180deg, rgba(109, 241, 255, 0.85), rgba(109, 241, 255, 0.04));
+  border-radius: 1px;
+  will-change: transform;
 }
-.wired-found-lyric-stage.is-leaving .wired-found-lyric-line-inner {
-  opacity: 0.58;
-  filter: blur(0.6px);
+
+/* ----- per-character transmission effects --------------------------------- */
+.wlyric-ch {
+  position: relative;
+  display: inline-block;
+}
+.wlyric-ch-base {
+  position: relative;
+  display: inline-block;
+}
+.wlyric-ch-glitch {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  color: #bffcff;
+}
+.wlyric-range {
+  display: inline-block;
+}
+
+/* substitute / decode: the base glyph flickers out to the alternate glyph
+   and back. Both keyframes end exactly where they started — nothing is
+   ever left mid-transform. */
+.wlyric-ch.is-substitute .wlyric-ch-base,
+.wlyric-ch.is-decode .wlyric-ch-base {
+  animation: wlyricBaseFlick 220ms ease both;
+}
+.wlyric-ch.is-substitute .wlyric-ch-glitch,
+.wlyric-ch.is-decode .wlyric-ch-glitch {
+  animation: wlyricGlitchFlick 220ms ease both;
+}
+@keyframes wlyricBaseFlick {
+  0%, 100% { opacity: 1; }
+  22%, 74% { opacity: 0; }
+}
+@keyframes wlyricGlitchFlick {
+  0%, 100% { opacity: 0; }
+  22%, 74% { opacity: 1; }
+}
+
+/* shear: a one-, two-pixel shove that snaps back to the shared baseline. */
+.wlyric-ch.is-shear .wlyric-ch-base {
+  animation: wlyricShear 220ms ease-out;
+}
+@keyframes wlyricShear {
+  0%, 100% { transform: translate(0, 0); }
+  32% { transform: translate(1.4px, -1px); }
+  64% { transform: translate(-1px, 1.4px); }
+}
+
+/* duplicate-channel separation: a faint color-split ghost of the same glyph,
+   read straight off the character's own data-ch attribute. */
+.wlyric-ch.is-duplicate::after {
+  content: attr(data-ch);
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+.wlyric-ch.is-duplicate.dup-cyan::after {
+  color: #7af2ff;
+  animation: wlyricDuplicate 260ms ease-out;
+}
+.wlyric-ch.is-duplicate.dup-amber::after {
+  color: #ffcf8a;
+  animation: wlyricDuplicate 260ms ease-out;
+}
+.wlyric-ch.is-duplicate.dup-magenta::after {
+  color: #e2a0e8;
+  animation: wlyricDuplicate 260ms ease-out;
+}
+@keyframes wlyricDuplicate {
+  0%, 100% { opacity: 0; transform: translate(0, 0); }
+  40% { opacity: 0.6; transform: translate(2.4px, -1.4px); }
+  75% { opacity: 0.26; transform: translate(-1.4px, 1px); }
+}
+
+/* scan displacement: a narrow slice shifts as one, like a damaged signal. */
+.wlyric-range-scan.is-scan {
+  animation: wlyricScan 260ms ease-out;
+}
+@keyframes wlyricScan {
+  0%, 100% { transform: translateY(0); }
+  35% { transform: translateY(-3px); }
+  70% { transform: translateY(2px); }
+}
+
+/* compression pulse: tracking tightens and relaxes — glyphs never collide. */
+.wlyric-range-compress.is-compress {
+  animation: wlyricCompress 220ms ease-out;
+}
+@keyframes wlyricCompress {
+  0%, 100% { letter-spacing: 0; }
+  50% { letter-spacing: -0.03em; }
+}
+@keyframes wlyricSignalPulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.6; }
+}
+
+/* ----- right-side analysis rail: semantic + system-metadata feed --------- */
+.wired-found-lyric-rail {
+  right: 18px;
+  top: 300px;
+  bottom: 132px;
+  width: 118px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  opacity: 0.86;
+}
+.wired-found-lyric-rail header {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(109, 241, 255, 0.6);
+}
+.wired-found-lyric-rail ul {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+  overflow: hidden;
+}
+.wired-found-lyric-rail li {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(216, 251, 255, 0.7);
+  border-left: 1px solid rgba(109, 241, 255, 0.3);
+  padding-left: 6px;
+  animation: wlyricRailIn 320ms ease-out;
+}
+.wired-found-lyric-rail li.is-semantic {
+  color: #d8fbff;
+  font-size: 15px;
+}
+.wired-found-lyric-rail li.is-metadata {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(109, 241, 255, 0.56);
+}
+@keyframes wlyricRailIn {
+  0% { opacity: 0; transform: translateX(6px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 .wired-found-matrix-col {
   color: rgba(109, 241, 255, 0.34);
@@ -2115,32 +2345,17 @@
   .wired-found-ticker-track,
   .wired-found-radar-sweep,
   .wired-found-map-sweep,
-  .wired-found-lyric-line,
   .wired-found-guide-glitch,
-  .wired-found-guide-scan {
+  .wired-found-guide-scan,
+  .wlyric-stage::before,
+  .wlyric-back-ch-base,
+  .wlyric-back-ch-glitch {
     animation: none;
   }
 
   .wired-found-eye-iris,
   .wired-found-radar-point {
     transition: none;
-  }
-}
-@keyframes wiredLyricSplash {
-  0% {
-    opacity: 0;
-    transform: scale(0.86);
-    filter: blur(9px);
-  }
-  30% {
-    opacity: 1;
-    transform: scale(1.1);
-    filter: blur(1.5px);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.7);
-    filter: blur(12px);
   }
 }
 @keyframes wiredMatrixFade {

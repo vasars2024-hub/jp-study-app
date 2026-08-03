@@ -230,6 +230,23 @@ export function saveDisplayPrefs(partial: Partial<DisplayPrefs>): DisplayPrefs {
   return next;
 }
 
+/**
+ * Reduce-motion, as a first-class preference rather than a raw key.
+ *
+ * `jp-os-reduce-motion` is a *mirror* of `animationLevel`, written by
+ * `applyDisplayPrefs`. Three other modules used to set it directly, which left the
+ * mirror and the preference it mirrors disagreeing until the next `applyDisplayPrefs`
+ * overwrote whatever they wrote. Going through here keeps both in step.
+ */
+export function getReduceMotion(): boolean {
+  const level = loadDisplayPrefs().animationLevel;
+  return level === 'reduced' || level === 'none';
+}
+
+export function setReduceMotion(on: boolean): void {
+  saveDisplayPrefs({ animationLevel: on ? 'reduced' : 'full' });
+}
+
 export function bootDisplayPrefs(): void {
   applyDisplayPrefs(loadDisplayPrefs());
 }

@@ -204,6 +204,23 @@
 .lens-chrome button:hover {
   background: rgba(255, 255, 255, 0.16);
 }
+.lens-chrome button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+.lens-chrome .lens-vn-save {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(178, 59, 71, 0.2);
+}
+.lens-chrome .lens-vn-save.saved {
+  background: rgba(64, 140, 101, 0.28);
+}
+.lens-chrome .lens-vn-save.error {
+  background: rgba(178, 59, 71, 0.42);
+}
 .lens-chrome-close {
   font-size: 16px !important;
   line-height: 1;
@@ -429,4 +446,137 @@
 .lens-reader-chip-punct {
   opacity: 0.55;
   padding: 0 1px;
+}
+
+/* ---- Mode toggle (Dictionary / AI) ---- */
+
+.lens-mode {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+}
+.lens-chrome .lens-mode-btn {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  background: transparent;
+}
+.lens-chrome .lens-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.lens-chrome .lens-mode-btn.active {
+  background: var(--lens-accent);
+  color: #fff;
+}
+
+/* ---- AI analysis panel ---- */
+
+/* Docked to a screen edge rather than anchored: an analysis is a page, and the
+   sentence it explains has to stay visible next to it. */
+.lens-analysis {
+  position: fixed;
+  top: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--lens-bg);
+  color: var(--lens-ink);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+}
+
+.lens-analysis-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.lens-analysis-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.lens-analysis-retry {
+  flex: none;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lens-ink);
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.lens-analysis-retry:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lens-analysis-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.lens-analysis-source {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  font-family: 'Yu Gothic', 'Meiryo', 'MS Gothic', sans-serif;
+  word-break: break-word;
+}
+
+.lens-analysis-loading,
+.lens-analysis-error {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.lens-analysis-error p {
+  margin: 0;
+  opacity: 0.75;
+  line-height: 1.5;
+}
+.lens-analysis-spinner {
+  font-size: 12px;
+  opacity: 0.6;
+  /* Breathes so a 10s cloud call still reads as "working", not "stuck". */
+  animation: lens-analysis-pulse 1.4s ease-in-out infinite;
+}
+@keyframes lens-analysis-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.lens-analysis-error-actions {
+  display: flex;
+  gap: 6px;
+}
+.lens-analysis-error-actions button {
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lens-ink);
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.lens-analysis-error-actions button:hover {
+  background: rgba(255, 255, 255, 0.16);
 }

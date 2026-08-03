@@ -1,15 +1,24 @@
 /**
- * Seanime sidecar supervisor (Phase 1 — read-only architecture proof).
+ * Seanime sidecar supervisor.
  *
- * Owns exactly one `seanime.exe` child: ephemeral loopback port, isolated temp
- * datadir, token auth, no external bind. It never reads or writes Study OS user
- * data — the sidecar's `--datadir` is a throwaway directory under the OS temp dir.
+ * Owns exactly one `seanime.exe` child: ephemeral loopback port, token auth, no
+ * external bind, and a datadir the sidecar alone owns. That datadir was a throwaway
+ * temp directory for Phase 1 and is now durable — `<userData>/seanime`, or whatever
+ * `SEANIME_DATADIR` names. See `dataDir.ts` for why the change was required and for
+ * the sense in which Study OS data is still untouched (its own subdirectory; no
+ * shared file).
  *
  * Lifecycle is the thing Phase 1 is proving, so the kill path is deliberately
  * belt-and-braces: graceful quit, `will-quit`, and a synchronous `process.on('exit')`
  * sweep. On Windows a child is NOT reaped with its parent, so `taskkill /T /F` is the
  * backstop. `--desktop-sidecar` additionally arms Seanime's own dead-man switch, which
- * exits the server ~15s after the websocket drops.
+ * exits the server ~10s after the last websocket client drops.
+ *
+ * That switch is why this file holds a websocket of its own — see `keepalive.ts`. The
+ * only client used to live inside the media workspace, a transient overlay, so closing
+ * the workspace killed a healthy server the app still owned. The supervisor now holds
+ * the client for as long as the app runs, which is the lifetime the switch was written
+ * to track; it is released before the child is killed so a stop still stops.
  */
 
 import { app } from 'electron';
@@ -20,10 +29,96 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { SEANIME_SIDECAR_ENABLED, type SeanimeStatus } from '../../shared/seanime';
+import {
+  resolveSeanimeDataDir,
+  seanimeDataDirLogLine,
+  type SeanimeDataDirIo,
+} from './dataDir';
+import {
+  resolveSeanimeExe,
+  seanimeExeMissingMessage,
+  type SeanimeExeResolution,
+} from './exePath';
+import {
+  createSeanimeKeepalive,
+  type SeanimeKeepaliveIo,
+} from './keepalive';
 
-/** Where the pinned build lives. Overridable so the path is not baked in. */
-const SEANIME_EXE =
-  process.env.SEANIME_EXE ?? 'C:/Users/Arseniy/Projects/seanime-upstream/seanime.exe';
+/**
+ * Where the binary comes from. Resolved per start rather than at module load, so
+ * a proof harness can set `SEANIME_EXE` after import, and so `app.isPackaged` /
+ * `app.getAppPath()` are read when they are meaningful. See `exePath.ts` for the
+ * order and for the packaging slot this deliberately names.
+ */
+function currentExe(): SeanimeExeResolution {
+  return resolveSeanimeExe(
+    {
+      envOverride: process.env.SEANIME_EXE,
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      appPath: app.getAppPath(),
+    },
+    (candidate) => fs.existsSync(candidate),
+  );
+}
+
+/**
+ * The filesystem surface `dataDir.ts` asks for. `copyDir` skips a segment by name so an
+ * adopted profile brings its settings, library and extensions but not another run's logs.
+ */
+const dataDirIo: SeanimeDataDirIo = {
+  exists: (target) => fs.existsSync(target),
+  isDirectory: (target) => {
+    try {
+      return fs.statSync(target).isDirectory();
+    } catch {
+      return false;
+    }
+  },
+  mkdirp: (target) => fs.mkdirSync(target, { recursive: true }),
+  readDirNames: (target) => fs.readdirSync(target),
+  mtimeMs: (target) => {
+    try {
+      return fs.statSync(target).mtimeMs;
+    } catch {
+      return 0;
+    }
+  },
+  copyDir: (from, to, skip) =>
+    fs.cpSync(from, to, {
+      recursive: true,
+      filter: (src) => !skip.includes(path.basename(src)),
+    }),
+};
+
+/**
+ * The real socket and clock behind `keepalive.ts`.
+ *
+ * `WebSocket` is a global in Electron 42's Node 24 runtime; the guard is not defensive
+ * about that so much as about the module being loaded somewhere it is not, in which case
+ * rule 5 applies and the sidecar simply behaves as it did before. No `message` listener
+ * is attached on purpose — this client exists to be counted, not to be talked to, and
+ * `SendEvent` broadcasts every progress event to every connection.
+ */
+const keepaliveIo: SeanimeKeepaliveIo = {
+  connect: (url, handlers) => {
+    if (typeof WebSocket !== 'function') {
+      throw new Error('no WebSocket in this runtime');
+    }
+    const socket = new WebSocket(url);
+    socket.addEventListener('open', () => handlers.onOpen());
+    socket.addEventListener('close', () => handlers.onClose());
+    // An `error` is always followed by `close`, so this listener exists only so the
+    // event has a handler rather than to duplicate the terminal path.
+    socket.addEventListener('error', () => undefined);
+    return () => socket.close();
+  },
+  setTimer: (fn, ms) => setTimeout(fn, ms),
+  clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  log: (line) => pushLog(line),
+};
+
+const keepalive = createSeanimeKeepalive(keepaliveIo);
 
 const HEALTH_TIMEOUT_MS = 90_000;
 const HEALTH_INTERVAL_MS = 500;
@@ -35,8 +130,6 @@ let child: ChildProcess | null = null;
 let status: SeanimeStatus = emptyStatus(SEANIME_SIDECAR_ENABLED ? 'stopped' : 'disabled');
 let token = '';
 let dataDir: string | null = null;
-/** True when the datadir came from SEANIME_DATADIR, so stop() must not delete it. */
-let dataDirIsExternal = false;
 let logTail: string[] = [];
 let exitHookInstalled = false;
 const listeners = new Set<(s: SeanimeStatus) => void>();
@@ -162,32 +255,37 @@ function installExitHook(): void {
 
 export async function startSeanime(): Promise<SeanimeStatus> {
   if (!SEANIME_SIDECAR_ENABLED) {
-    setStatus({ ...emptyStatus('disabled'), error: 'SEANIME_SIDECAR is not set' });
+    // The flag is on by default now, so the only way to be here is an explicit opt-out.
+    setStatus({ ...emptyStatus('disabled'), error: 'SEANIME_SIDECAR=0 disables the sidecar' });
     return status;
   }
   if (child && child.exitCode === null) return status;
 
-  if (!fs.existsSync(SEANIME_EXE)) {
+  const exe = currentExe();
+  if (!exe.exists) {
     logTail = [];
-    setStatus({ ...emptyStatus('failed'), error: `seanime.exe not found at ${SEANIME_EXE}` });
+    setStatus({ ...emptyStatus('failed'), error: seanimeExeMissingMessage(exe) });
     return status;
   }
 
   installExitHook();
   logTail = [];
 
-  // Isolated datadir. Deliberately NOT under app.getPath('userData') in either branch.
-  // SEANIME_DATADIR lets a Phase-1 session reuse one already-scanned dir across restarts
-  // (a fresh mkdtemp starts with no settings and no library, so the grid would be empty);
-  // it is then the caller's to delete, which is the documented rollback.
-  const override = process.env.SEANIME_DATADIR?.trim();
-  dataDirIsExternal = Boolean(override);
-  if (override) {
-    fs.mkdirSync(override, { recursive: true });
-    dataDir = override;
-  } else {
-    dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seanime-phase1-'));
-  }
+  // Durable datadir: SEANIME_DATADIR when a harness names one, else <userData>/seanime,
+  // with a one-time adoption of a leftover Phase 1 temp datadir. Never disposable —
+  // see dataDir.ts. The log line makes an adoption or a failed one visible in the dev
+  // panel instead of silent.
+  const resolvedDataDir = resolveSeanimeDataDir(
+    {
+      envOverride: process.env.SEANIME_DATADIR,
+      userDataPath: app.getPath('userData'),
+      tmpDir: os.tmpdir(),
+    },
+    dataDirIo,
+  );
+  dataDir = resolvedDataDir.dataDir;
+  pushLog(seanimeDataDirLogLine(resolvedDataDir));
+
   const password = crypto.randomBytes(24).toString('hex');
   token = crypto.createHash('sha256').update(password).digest('hex');
 
@@ -206,7 +304,7 @@ export async function startSeanime(): Promise<SeanimeStatus> {
   });
 
   child = spawn(
-    SEANIME_EXE,
+    exe.exePath,
     [
       `--datadir=${dataDir}`,
       '--host=127.0.0.1', // loopback only — never binds an external interface
@@ -221,6 +319,9 @@ export async function startSeanime(): Promise<SeanimeStatus> {
   child.stderr?.on('data', pushLog);
   child.on('exit', (code) => {
     child = null;
+    // Release the client before anything else: a keepalive left running would retry
+    // against a port with nothing behind it until the next start replaced it.
+    keepalive.stop();
     // A crash while we believed we were up is the "offline" state, not a silent stop.
     if (status.kind === 'ready' || status.kind === 'starting') {
       setStatus({
@@ -235,6 +336,9 @@ export async function startSeanime(): Promise<SeanimeStatus> {
 
   const kind = await pollHealth(port, Date.now() + HEALTH_TIMEOUT_MS);
   if (kind === 'ready') {
+    // Before the status goes out, so the log line it writes rides the same update and
+    // the dev panel shows the client being held rather than reporting it a poll later.
+    keepalive.start({ baseUrl: `http://127.0.0.1:${port}`, token });
     setStatus({ kind: 'ready', error: null });
   } else {
     setStatus({
@@ -248,18 +352,17 @@ export async function startSeanime(): Promise<SeanimeStatus> {
 
 /** Synchronous so it is safe from `will-quit` and `process.on('exit')`. */
 export function stopSeanime(): void {
+  // First, and synchronously: while this client is held the dead-man switch will never
+  // fire, so a stop that killed the child without releasing it would leave the one thing
+  // that could still finish the job holding a socket to a dead port.
+  keepalive.stop();
   const pid = child?.pid;
   child = null;
   if (pid) killTree(pid);
-  if (dataDir && !dataDirIsExternal) {
-    try {
-      fs.rmSync(dataDir, { recursive: true, force: true });
-    } catch {
-      /* temp dir; the OS reclaims it */
-    }
-  }
+  // The datadir deliberately survives: it holds the sidecar's settings, library and any
+  // installed provider extension. Phase 1 deleted it here, which is exactly what made a
+  // normal run start empty every time.
   dataDir = null;
-  dataDirIsExternal = false;
   token = '';
   if (status.kind !== 'offline' && status.kind !== 'failed') {
     setStatus({ ...emptyStatus('stopped'), logTail: status.logTail });

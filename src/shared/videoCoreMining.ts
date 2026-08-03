@@ -63,6 +63,8 @@ export interface VideoCoreMiningHistoryEntry {
   createdAt: number;
   status: VideoCoreMiningHistoryStatus;
   noteId?: number;
+  /** Actual Anki media names returned by the mining gateway (after image renaming). */
+  mediaFilenames?: string[];
   destination?: string;
   error?: string;
   term: string;
@@ -179,13 +181,22 @@ export function withVideoCoreMiningAsset(
   kind: 'screenshot' | 'audio',
   input: { base64: string; asset: VideoCoreMiningAsset },
 ): VideoCoreMiningDraft {
+  // Capture helpers return `{ base64, filename, mimeType, bytes }`. Structural
+  // typing permits that richer object to be passed as `asset`, so never retain
+  // the object by reference: doing so persisted the full binary payload inside
+  // provenance/history as well as in the transient draft.
+  const metadata: VideoCoreMiningAsset = {
+    filename: input.asset.filename,
+    mimeType: input.asset.mimeType,
+    bytes: input.asset.bytes,
+  };
   return {
     ...draft,
     [`${kind}Base64`]: input.base64,
-    [kind]: input.asset,
+    [kind]: metadata,
     provenance: {
       ...draft.provenance,
-      assets: { ...draft.provenance.assets, [kind]: input.asset },
+      assets: { ...draft.provenance.assets, [kind]: metadata },
     },
   };
 }
@@ -197,7 +208,7 @@ export function buildVideoCoreMineRequest(draft: VideoCoreMiningDraft): MineNote
     : 'media-local';
   return {
     route: {
-      source: 'audio',
+      source: 'subtitle',
       cardKind: draft.cardKind,
       language: 'ja',
     },
@@ -232,6 +243,10 @@ export function createVideoCoreMiningHistoryEntry(
   result: MineNoteResult,
   now = Date.now(),
 ): VideoCoreMiningHistoryEntry {
+  const historyProvenance = provenance(draft.provenance);
+  if (!historyProvenance) {
+    throw new Error('Cannot record mining history without valid cue provenance.');
+  }
   const status: VideoCoreMiningHistoryStatus = result.ok
     ? 'exported'
     : result.error === 'duplicate'
@@ -242,11 +257,16 @@ export function createVideoCoreMiningHistoryEntry(
     createdAt: now,
     status,
     ...(result.noteId ? { noteId: result.noteId } : {}),
-    ...(result.profileName ? { destination: result.profileName } : {}),
+    ...(result.mediaFilenames?.length ? { mediaFilenames: result.mediaFilenames.slice() } : {}),
+    // Prefer the deck the note actually landed in; the profile label is a coarser
+    // fallback and hides a rule-routed deck override.
+    ...(result.deckName || result.profileName
+      ? { destination: result.deckName ?? result.profileName }
+      : {}),
     ...(result.error ? { error: result.error } : {}),
     term: draft.term.trim(),
     sentence: draft.sentence.trim(),
-    provenance: draft.provenance,
+    provenance: historyProvenance,
   };
 }
 
@@ -282,6 +302,13 @@ export function normalizeVideoCoreMiningHistory(value: unknown): VideoCoreMining
       createdAt: Math.max(0, Math.round(createdAt)),
       status: status as VideoCoreMiningHistoryStatus,
       ...(noteId != null ? { noteId: Math.round(noteId) } : {}),
+      ...(Array.isArray(raw.mediaFilenames)
+        ? {
+            mediaFilenames: [...new Set(
+              raw.mediaFilenames.map((filename) => text(filename, 180)).filter(Boolean),
+            )],
+          }
+        : {}),
       ...(text(raw.destination, 240) ? { destination: text(raw.destination, 240) } : {}),
       ...(text(raw.error, 1000) ? { error: text(raw.error, 1000) } : {}),
       term,

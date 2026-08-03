@@ -319,6 +319,22 @@ export function seek(t: number): void {
   if (!isLeader()) return delegate({ type: 'seek', time: t });
   seekLocal(t);
 }
+
+/**
+ * The live `<audio>` element — **only in the leader window**, `null` everywhere else.
+ *
+ * Added in slice 18 so mining a lyric line can record that line's audio with the same
+ * `recordCueAudio` video uses. Returning `null` in a follower is the whole point of the
+ * accessor: a follower mirrors UI state and has no element with a sound on it, so a
+ * capture there would silently produce an empty blob. The caller must handle `null` by
+ * mining without audio rather than by failing.
+ *
+ * Callers must not retain this across tracks or hold it beyond one operation — the element
+ * is module-owned and its `src` changes underneath them.
+ */
+export function getLeaderAudioElement(): HTMLAudioElement | null {
+  return isLeader() ? audio : null;
+}
 function setVolumeLocal(v: number): void {
   state.volume = Math.min(1, Math.max(0, v));
   audio.volume = state.volume;

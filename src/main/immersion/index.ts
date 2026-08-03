@@ -22,6 +22,7 @@ import {
   type ImmersionSitesStore,
   type ImmersionVisitInput,
 } from '../../shared/immersion';
+import { registerVisualNovelIpc } from './visualNovels';
 
 function immersionDir(): string {
   const dir = path.join(app.getPath('userData'), 'immersion');
@@ -257,6 +258,7 @@ export function recordVisitFromBridge(
 
 export function registerImmersionIpc(): void {
   immersionDir();
+  registerVisualNovelIpc();
 
   ipcMain.handle('immersion:listSites', async () => loadSites());
 

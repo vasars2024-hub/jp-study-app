@@ -28,6 +28,8 @@ export interface AnkiCardInfo {
   /** Days; negative values (learning steps in seconds) clamp to 0 at fold time. */
   interval: number;
   note: number;
+  /** Anki scheduler queue. -1 is the authoritative suspended state. */
+  queue?: number;
 }
 
 export interface CreateModelParams {
@@ -48,6 +50,7 @@ export interface AnkiActionMap {
   addNote: { params: { note: AnkiNoteInput }; result: number };
   canAddNotes: { params: { notes: AnkiNoteInput[] }; result: boolean[] };
   deleteNotes: { params: { notes: number[] }; result: null };
+  deleteMediaFile: { params: { filename: string }; result: null };
   storeMediaFile: { params: { filename: string; data: string }; result: string };
   findNotes: { params: { query: string }; result: number[] };
   /** Read-only card search. Used by the due forecast, which lets Anki's own
@@ -76,6 +79,7 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   addNote: MUTATE_TIMEOUT_MS,
   canAddNotes: MUTATE_TIMEOUT_MS,
   deleteNotes: MUTATE_TIMEOUT_MS,
+  deleteMediaFile: MUTATE_TIMEOUT_MS,
   storeMediaFile: MUTATE_TIMEOUT_MS,
   findNotes: BULK_TIMEOUT_MS,
   findCards: BULK_TIMEOUT_MS,

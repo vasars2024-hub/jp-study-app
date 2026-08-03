@@ -49,8 +49,6 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
     bookGroups,
     epubReviewBooks,
     epubReviewCandidates,
-    filteredSaved,
-    search,
     recentStrip,
     reviewBookKey,
     reviewUnknownOnly,
@@ -199,19 +197,6 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
               </Button>
             )}
             <ToolbarSpacer />
-            <div className="aero-flash-search">
-              <Icon name="search" size={13} />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => state.setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') state.setSearch('');
-                }}
-                placeholder={t('flash.search.placeholder')}
-                aria-label={t('flash.search.aria')}
-              />
-            </div>
             <Button
               size="sm"
               leftIcon={<Icon name="dictionary" size={14} />}
@@ -374,9 +359,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
 
               {overviewTab === 'epub' ? (
                 filteredDeck.length === 0 ? (
-                  <div className="aero-flash-empty">
-                    {search ? t('flash.search.noMatches', { query: search }) : t('flash.noCardsInView')}
-                  </div>
+                  <div className="aero-flash-empty">{t('flash.noCardsInView')}</div>
                 ) : (
                   <div className="aero-flash-table" role="table" aria-label={t('flash.aero.table.aria')}>
                     <div className="aero-flash-table-head" role="row">
@@ -389,8 +372,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                     <div className="aero-flash-groups">
                       {bookGroups.map((group) => {
                         const groupKey = `${group.bookId}::${group.bookTitle}`;
-                        // Searching force-opens every group so matches stay visible.
-                        const collapsed = search ? false : (collapsedBooks[groupKey] ?? false);
+                        const collapsed = collapsedBooks[groupKey] ?? false;
                         const knownCount = group.cards.filter((card) => card.known).length;
                         return (
                           <section key={groupKey} className="aero-flash-group">
@@ -501,11 +483,9 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 )
               ) : saved.length === 0 ? (
                 <div className="aero-flash-empty">{t('flash.aero.empty.dictionary')}</div>
-              ) : filteredSaved.length === 0 ? (
-                <div className="aero-flash-empty">{t('flash.search.noMatches', { query: search })}</div>
               ) : (
                 <div className="aero-flash-dict-list" role="list">
-                  {filteredSaved.map((word) => (
+                  {saved.map((word) => (
                     <div className="aero-flash-dict-row" key={word.word} role="listitem">
                       <span className="aero-flash-word" lang="ja">
                         {word.word}

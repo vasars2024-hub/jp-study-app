@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { PluginBase } from '@electron-forge/plugin-base';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -20,11 +22,98 @@ class PackagerKeepAlivePlugin extends PluginBase<Record<string, never>> {
     let timer: ReturnType<typeof setInterval> | undefined;
     return {
       prePackage: async () => {
-        timer = setInterval(() => {}, 30_000);
+        timer = setInterval(() => {
+          /* no-op: only here to hold the event loop open */
+        }, 30_000);
       },
       postPackage: async () => {
         if (timer) clearInterval(timer);
         timer = undefined;
+      },
+    };
+  }
+}
+
+/**
+ * The Seanime sidecar's packaged home. `src/main/seanime/exePath.ts` resolves
+ * `<resourcesPath>/seanime/seanime.exe` at runtime and has named that slot since the
+ * exe path stopped being a hardcoded developer home directory; nothing populated it, so
+ * a packaged build shipped no sidecar at all and the media surface was dead on any
+ * machine but the one the proofs ran on. `SIDECAR_RESOURCE_DIR` must stay equal to
+ * `PACKAGED_RESOURCE_DIR` over there — `src/main/__tests__/seanimeExePath.test.ts`
+ * fails if the two drift.
+ *
+ * The binary is staged into a gitignored directory rather than committed: it is 84 MB
+ * and it is GPL-3.0. `docs/migration/LICENSING_PLAN.md` treats an *unmodified* pinned
+ * binary with a documented HTTP API as the conventional separate-program posture, and
+ * obligations attach on distribution — this app is `private: true`. A *patched* sidecar
+ * (`docs/migration/tools/build-patched-sidecar.mjs`, needed for the dual-subtitle fix)
+ * is a modified Go server, so shipping one obliges publishing that fork's source.
+ * Staging honours `SEANIME_EXE`, which is how a patched binary gets in — deliberately,
+ * and with that consequence recorded here.
+ */
+const SIDECAR_RESOURCE_DIR = 'seanime';
+const SIDECAR_EXE = 'seanime.exe';
+/** Copied into the resources root by basename, so this must be named for the slot. */
+const SIDECAR_STAGING_DIR = path.join('build', SIDECAR_RESOURCE_DIR);
+/** The pinned sibling checkout, same rule `exePath.ts` uses in a dev tree. */
+const SIDECAR_SOURCE_CHECKOUT = 'seanime-upstream';
+/** Opt out of a sidecar-bearing package, loudly, rather than shipping a broken one. */
+const SIDECAR_SKIP_ENV = 'SEANIME_SKIP_SIDECAR_PACKAGING';
+
+/**
+ * Stages `seanime.exe` into the resource slot before packaging, and **fails the build**
+ * when it cannot. A silently absent binary is exactly the failure this exists to prevent:
+ * the app packages fine, installs fine, and every media surface is dead at runtime.
+ *
+ * The staging directory is always created, even when empty — `extraResource` throws
+ * ENOENT on a missing path, and an empty slot still produces the actionable
+ * "seanime.exe not found. Tried: …" message from `exePath.ts` instead of a crash.
+ */
+class SeanimeSidecarStagingPlugin extends PluginBase<Record<string, never>> {
+  name = 'seanime-sidecar-staging';
+
+  getHooks() {
+    return {
+      prePackage: async (_config: unknown, platform?: string) => {
+        const stagingDir = path.resolve(process.cwd(), SIDECAR_STAGING_DIR);
+        const target = path.join(stagingDir, SIDECAR_EXE);
+        fs.mkdirSync(stagingDir, { recursive: true });
+
+        // A .exe has no business in a Linux package, and the makers include deb/rpm.
+        if (platform && platform !== 'win32') {
+          fs.rmSync(target, { force: true });
+          console.log(`[sidecar] platform ${platform}: shipping no Windows sidecar`);
+          return;
+        }
+
+        if (process.env[SIDECAR_SKIP_ENV]?.trim()) {
+          fs.rmSync(target, { force: true });
+          console.warn(
+            `[sidecar] ${SIDECAR_SKIP_ENV} is set — packaging WITHOUT the sidecar. ` +
+              'The media workspace will be dead in this build.',
+          );
+          return;
+        }
+
+        const override = process.env.SEANIME_EXE?.trim();
+        const source =
+          override ||
+          path.resolve(process.cwd(), '..', SIDECAR_SOURCE_CHECKOUT, SIDECAR_EXE);
+        if (!fs.existsSync(source)) {
+          throw new Error(
+            `[sidecar] cannot stage ${SIDECAR_EXE}: ${source} does not exist ` +
+              `(${override ? 'from SEANIME_EXE' : `expected the pinned ${SIDECAR_SOURCE_CHECKOUT} sibling checkout`}). ` +
+              `Point SEANIME_EXE at a binary, or set ${SIDECAR_SKIP_ENV}=1 to package without one.`,
+          );
+        }
+
+        fs.copyFileSync(source, target);
+        const bytes = fs.statSync(target).size;
+        console.log(
+          `[sidecar] staged ${source} -> ${path.join(SIDECAR_STAGING_DIR, SIDECAR_EXE)} (${bytes} bytes); ` +
+            `resources slot ${SIDECAR_RESOURCE_DIR}/${SIDECAR_EXE}`,
+        );
       },
     };
   }
@@ -39,7 +128,10 @@ const config: ForgeConfig = {
     // ffmpeg/tesseract stay executable.
     asar: false,
     // Ship large runtime blobs once via extraResource (not duplicated into Vite output).
-    extraResource: ['public'],
+    // Each entry lands in the resources root under its basename, so `build/seanime`
+    // becomes `<resourcesPath>/seanime` — the slot `exePath.ts` resolves. Populated by
+    // SeanimeSidecarStagingPlugin's prePackage hook; the directory always exists by then.
+    extraResource: ['public', SIDECAR_STAGING_DIR],
     // Ship Vite output + production node_modules; public ships once via extraResource.
     ignore: (file) => {
       if (!file) return false;
@@ -100,6 +192,7 @@ const config: ForgeConfig = {
       [FuseV1Options.OnlyLoadAppFromAsar]: false,
     }),
     new PackagerKeepAlivePlugin({}),
+    new SeanimeSidecarStagingPlugin({}),
   ],
 };
 

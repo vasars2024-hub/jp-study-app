@@ -99,6 +99,7 @@ export default function VisualizerPage() {
                   step={0.05}
                   value={viz.intensity}
                   onChange={(e) => patchViz({ intensity: Number(e.target.value) })}
+                  aria-label={t('a11y.slider.visualizerSensitivity')}
                 />
                 <span className="muted">{Math.round(viz.intensity * 100)}%</span>
               </div>

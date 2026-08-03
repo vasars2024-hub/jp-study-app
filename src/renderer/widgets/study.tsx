@@ -1,19 +1,34 @@
 import { useEffect, useState } from 'react';
-import { getSummary, formatDuration, formatNumber, READING_RECORDED_EVENT, type StatsSummary } from '../stats';
+import type { WidgetProps } from './types';
+import {
+  getSummary,
+  formatDuration,
+  formatNumber,
+  READING_RECORDED_EVENT,
+  WATCH_RECORDED_EVENT,
+  type StatsSummary,
+} from '../stats';
 import { loadSaved, onSavedChanged, type SavedWord } from '../savedWords';
 import { knowledgeCounts } from '../knownWords';
 import { useT } from '../i18n';
 
-/** Live stats summary — refreshes whenever the reader records activity. */
+/**
+ * Live stats summary — refreshes whenever the reader **or the media player** records
+ * activity. Both events, because since Phase 6 slice 8 either one can move these numbers
+ * and a widget that repainted for only one of them would sit stale for up to 30 s in the
+ * middle of the session that was changing it.
+ */
 function useStatsSummary(): StatsSummary {
   const [s, setS] = useState<StatsSummary>(() => getSummary());
   useEffect(() => {
     const refresh = () => setS(getSummary());
     window.addEventListener(READING_RECORDED_EVENT, refresh);
+    window.addEventListener(WATCH_RECORDED_EVENT, refresh);
     // Also pick up cross-day changes / other windows.
     const t = window.setInterval(refresh, 30000);
     return () => {
       window.removeEventListener(READING_RECORDED_EVENT, refresh);
+      window.removeEventListener(WATCH_RECORDED_EVENT, refresh);
       window.clearInterval(t);
     };
   }, []);
@@ -33,15 +48,103 @@ export function StudyStreak() {
   );
 }
 
-// ---------- Today's study time ----------
-export function TodayStudyTime() {
+/**
+ * Below this content height the split layout cannot show a headline, a label, the bar and
+ * a legend at once. Measured, not chosen: 34px value + 16px label + 6px bar + 17px legend
+ * line + three 6px gaps = 91, plus `.widget-body`'s own 20px of padding. `WidgetFrame`
+ * passes `widget.h - 30` for its title bar but **not** that padding — the fact slice 7
+ * recorded and this is the second widget to need.
+ */
+const TODAY_FULL_SPLIT_H = 113;
+
+/**
+ * Below this width the two legend entries do not fit on one line and wrap to two, which
+ * costs 17px the frame may not have. Measured at the app's own font: "30m read" is 58px,
+ * "15m watched" is 77px, plus the 12px gap and 24px of body padding = 171; 200 leaves
+ * room for the longer durations a real day produces ("1h 23m watched").
+ */
+const TODAY_FULL_SPLIT_W = 200;
+
+/**
+ * Today's study time — both channels.
+ *
+ * This widget is named for study time and, until slice 8, showed reading time: an evening
+ * mining an episode in the media player left it reading `0s`. The headline is now the sum,
+ * which is the number its own label has always promised, and the split bar underneath is
+ * what makes the sum honest rather than a merge — you can always see which half it came
+ * from. A channel with no time contributes no segment and no legend entry, so a user who
+ * only reads sees one bar and one number, not a permanent empty half.
+ *
+ * At the registry's minimum frame the split drops to durations-only and gives up the
+ * label, because the legend is then what explains the headline. The alternative was to
+ * raise the widget's minimum size to fit the full layout, which would have made the
+ * minimum equal to the default — a widget that cannot be made small is not a small widget.
+ */
+export function TodayStudyTime({ size }: WidgetProps) {
   const { t } = useT();
   const s = useStatsSummary();
+  const read = Math.max(0, s.todaySeconds);
+  const watched = Math.max(0, s.todayWatchSeconds);
+  const total = read + watched;
+  const split = watched > 0;
+  const compact =
+    split && (size.h < TODAY_FULL_SPLIT_H || size.w < TODAY_FULL_SPLIT_W);
+
   return (
-    <div className="wgt wgt-stat">
-      <div className="wgt-stat-value">{formatDuration(s.todaySeconds)}</div>
-      <div className="wgt-stat-label">{t('widgets.todayStudyTime.readToday')}</div>
-      <div className="wgt-stat-sub">{t('widgets.todayStudyTime.characters', { count: formatNumber(s.todayChars) })}</div>
+    <div className="wgt wgt-stat wgt-today">
+      <div className="wgt-stat-value">{formatDuration(total)}</div>
+      {!compact && (
+        <div className="wgt-stat-label">{t('widgets.todayStudyTime.studiedToday')}</div>
+      )}
+      {/* The split replaces the character line only once the watch channel has something
+          to say. A reading-only day keeps the widget exactly as it has always looked. */}
+      {split ? (
+        <>
+          <div
+            className="wgt-split"
+            role="img"
+            aria-label={t('widgets.todayStudyTime.splitAria', {
+              read: formatDuration(read),
+              watched: formatDuration(watched),
+            })}
+          >
+            {read > 0 && <span className="wgt-split-seg" style={{ flexGrow: read }} />}
+            <span className="wgt-split-seg watch" style={{ flexGrow: watched }} />
+          </div>
+          <div className="wgt-split-legend">
+            {read > 0 && (
+              <span
+                className="wgt-split-key"
+                title={t('widgets.todayStudyTime.readValue', {
+                  duration: formatDuration(read),
+                })}
+              >
+                <i className="wgt-split-dot" aria-hidden="true" />
+                {compact
+                  ? formatDuration(read)
+                  : t('widgets.todayStudyTime.readValue', { duration: formatDuration(read) })}
+              </span>
+            )}
+            <span
+              className="wgt-split-key"
+              title={t('widgets.todayStudyTime.watchedValue', {
+                duration: formatDuration(watched),
+              })}
+            >
+              <i className="wgt-split-dot watch" aria-hidden="true" />
+              {compact
+                ? formatDuration(watched)
+                : t('widgets.todayStudyTime.watchedValue', {
+                    duration: formatDuration(watched),
+                  })}
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="wgt-stat-sub">
+          {t('widgets.todayStudyTime.characters', { count: formatNumber(s.todayChars) })}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Storm battle placeholder artwork">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#1c254d"/>
+      <stop offset=".55" stop-color="#3e3368"/>
+      <stop offset="1" stop-color="#15182a"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fffbb7"/>
+      <stop offset="1" stop-color="#8ce9ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#bg)"/>
+  <path d="M0 46c53-30 106-25 159 14 54 39 108 40 161 4v116H0z" fill="#2c2c58" opacity=".7"/>
+  <path d="M231 5l-45 63 30-2-53 90 19-69-31 5 50-87z" fill="url(#bolt)"/>
+  <path d="M54 149c12-42 31-65 58-65 22 0 43 22 61 65z" fill="#111625"/>
+  <circle cx="112" cy="68" r="21" fill="#d5996b"/>
+  <path d="M91 65c7-23 34-29 46-5-18-6-30-4-46 5z" fill="#12192d"/>
+  <text x="18" y="28" fill="#fff" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700">STORM FRONT</text>
+  <text x="19" y="47" fill="#c8cfff" font-family="sans-serif" font-size="10" letter-spacing="2">EPISODE 03</text>
+</svg>

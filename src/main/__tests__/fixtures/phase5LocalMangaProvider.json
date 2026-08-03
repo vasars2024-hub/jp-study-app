@@ -1,0 +1,12 @@
+{
+  "id": "phase5-local-manga-proof",
+  "name": "Phase 5 Local Manga Proof",
+  "description": "Deterministic localhost manga provider used only for the Phase 5 live reading-boundary proof.",
+  "manifestURI": "",
+  "version": "1.0.0",
+  "author": "Study OS",
+  "type": "manga-provider",
+  "language": "javascript",
+  "lang": "ja",
+  "payload": "class Provider {\n  getSettings() {\n    return { supportsMultiScanlator: true, supportsMultiLanguage: true };\n  }\n\n  async search(options) {\n    return [{\n      provider: \"phase5-local-manga-proof\",\n      id: \"phase5-local-manga\",\n      title: options.query || \"Phase 5 Local Manga\",\n      image: \"http://127.0.0.1:18846/phase5-cover.jpg\",\n      searchRating: 1\n    }];\n  }\n\n  async findChapters(id) {\n    return [\n      {\n        provider: \"phase5-local-manga-proof\",\n        id: id + \"$chapter-2$ja\",\n        url: \"http://127.0.0.1:18846/manga/\" + id + \"/2\",\n        title: \"Chapter 2 - \\u7b2c\\u4e8c\\u8a71\",\n        chapter: \"2\",\n        index: 1,\n        scanlator: \"Phase5 Group\",\n        language: \"ja\"\n      },\n      {\n        provider: \"phase5-local-manga-proof\",\n        id: id + \"$chapter-1$ja\",\n        url: \"http://127.0.0.1:18846/manga/\" + id + \"/1\",\n        title: \"Chapter 1 - \\u7b2c\\u4e00\\u8a71\",\n        chapter: \"1\",\n        index: 0,\n        scanlator: \"Phase5 Group\",\n        language: \"ja\"\n      }\n    ];\n  }\n\n  async findChapterPages(id) {\n    return [\n      {\n        provider: \"phase5-local-manga-proof\",\n        url: \"http://127.0.0.1:18846/manga/\" + id + \"/page-2.jpg\",\n        index: 1,\n        headers: { \"X-Phase5-Proof\": \"manga-page-header\" }\n      },\n      {\n        provider: \"phase5-local-manga-proof\",\n        url: \"http://127.0.0.1:18846/manga/\" + id + \"/page-1.jpg\",\n        index: 0,\n        headers: { \"X-Phase5-Proof\": \"manga-page-header\" }\n      }\n    ];\n  }\n}\n"
+}

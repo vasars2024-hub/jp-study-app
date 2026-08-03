@@ -84,6 +84,72 @@
           // "Kanjium not installed" branch, which is the honest harness answer.
           dictPitch: function () { return Promise.resolve({ available: false, entries: [] }); },
         };
+
+        // --- Collected tools / App Drawer stub (Pillar 3, added 2026-07-22) ---
+        //
+        // The catch-all proxy's Promise.resolve(undefined) is fatal here too —
+        // every tools* caller reads .ok/.tools/.folders off the result. Unlike
+        // the read-only stubs above, this one needs to actually behave like the
+        // store (add/remove/list) for the App Drawer's create-folder/add-item/
+        // move/launch flow to be exercisable in the harness at all, so it is a
+        // tiny in-memory version of src/main/collectedTools.ts rather than a
+        // fixed response.
+        (function () {
+          var toolsStore = { tools: [], folders: [] };
+          var nextId = 1;
+          function genId(prefix) { return prefix + '-' + nextId++; }
+          explicit.toolsList = function () {
+            return Promise.resolve({ version: 1, tools: toolsStore.tools.slice(), folders: toolsStore.folders.slice() });
+          };
+          explicit.toolsAdd = function (input) {
+            var tool = {
+              id: genId('tool'),
+              url: input.url,
+              name: input.name || input.url,
+              note: input.note,
+              tags: input.tags,
+              favicon: input.favicon,
+              addedAt: Date.now(),
+              source: input.source === 'extension' ? 'extension' : 'app',
+              kind: input.kind || 'link',
+              folderId: input.folderId || null,
+            };
+            toolsStore.tools.unshift(tool);
+            return Promise.resolve({ ok: true, tool: tool, duplicate: false });
+          };
+          explicit.toolsRemove = function (id) {
+            toolsStore.tools = toolsStore.tools.filter(function (t) { return t.id !== id; });
+            return Promise.resolve({ ok: true, store: toolsStore });
+          };
+          explicit.toolsUpdate = function (id, patch) {
+            var tool = toolsStore.tools.filter(function (t) { return t.id === id; })[0];
+            if (!tool) return Promise.resolve({ ok: false, error: 'Not found' });
+            if (patch && typeof patch.name === 'string') tool.name = patch.name;
+            if (patch && typeof patch.note === 'string') tool.note = patch.note;
+            if (patch && patch.folderId !== undefined) tool.folderId = patch.folderId;
+            return Promise.resolve({ ok: true, tool: tool });
+          };
+          explicit.toolsMoveItem = function (id, folderId) {
+            return explicit.toolsUpdate(id, { folderId: folderId });
+          };
+          explicit.toolsAddFolder = function (name, parentFolderId) {
+            var folder = { id: genId('folder'), name: name, parentFolderId: parentFolderId || null, order: toolsStore.folders.length };
+            toolsStore.folders.push(folder);
+            return Promise.resolve({ ok: true, folder: folder });
+          };
+          explicit.toolsRenameFolder = function (id, name) {
+            var folder = toolsStore.folders.filter(function (f) { return f.id === id; })[0];
+            if (!folder) return Promise.resolve({ ok: false, error: 'Not found' });
+            folder.name = name;
+            return Promise.resolve({ ok: true, folder: folder });
+          };
+          explicit.toolsRemoveFolder = function (id) {
+            toolsStore.folders = toolsStore.folders.filter(function (f) { return f.id !== id; });
+            toolsStore.tools.forEach(function (t) { if (t.folderId === id) t.folderId = null; });
+            return Promise.resolve({ ok: true, store: toolsStore });
+          };
+        })();
+
         window.api = new Proxy(explicit, {
           get: function (target, prop) {
             if (prop in target) return target[prop];

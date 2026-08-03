@@ -34,9 +34,16 @@ import { articleBodyHtml, fetchReadableArticle } from '../../wikiArticle';
 import {
   clearLookupHighlight,
   isLookupClick,
+  lookupHitFromText,
   lookupWordFromMouseUp,
   noteLookupPointerDown,
 } from '../../wordLookup';
+import {
+  IMMERSION_CONFIG_CHANNEL,
+  IMMERSION_LOOKUP_CHANNEL,
+  createGuestLookupGate,
+  validateGuestLookupMessage,
+} from '../../../shared/immersionGuestBridge';
 import { highlightEl, recolorEl, resetHighlightRoot, WK_HIGHLIGHT_CSS } from '../../wordHighlight';
 import { recordReading } from '../../stats';
 import { getTokenizer, tokenizerReady } from '../../tokenizer';
@@ -54,7 +61,16 @@ type PopupState =
 
 const STATS_FLUSH_MS = 5000;
 
-/** Electron <webview> is not in React's DOM typings; create via createElement. */
+/**
+ * Electron <webview> is not in React's DOM typings; create via createElement.
+ *
+ * Note what is deliberately absent: no `preload`, no `webpreferences`, no
+ * `nodeintegration`, no `disablewebsecurity`. The guest's privileges — including
+ * the study bridge preload added in slice 70 — are set in the main process, in
+ * `attachNavGuards`'s `will-attach-webview` handler, which also strips those
+ * attributes if they ever appear here. Adding one to this bag would not grant
+ * it; it would just be deleted.
+ */
 export function createWebview(src: string, setRef: (el: HTMLElement | null) => void) {
   return createElement('webview', {
     ref: setRef,
@@ -66,6 +82,12 @@ export function createWebview(src: string, setRef: (el: HTMLElement | null) => v
   } as Record<string, unknown>);
 }
 
+/** The subset of the `<webview>` element this file drives. */
+type ImmersionWebview = HTMLElement & {
+  send?: (channel: string, payload: unknown) => void;
+  getBoundingClientRect: () => DOMRect;
+};
+
 function ensureProtocol(raw: string): string {
   const n = normalizeImmersionUrl(raw);
   if (n) return n;
@@ -76,7 +98,7 @@ function ensureProtocol(raw: string): string {
 }
 
 export function useImmersion() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const MODE_LABELS: Record<ImmersionMode, string> = {
     live: t('immersion.mode.live'),
     reader: t('immersion.mode.reader'),
@@ -96,6 +118,8 @@ export function useImmersion() {
   const [popup, setPopup] = useState<PopupState>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
+  /** Slice 70: study lookup on the LIVE guest page, not just Reader Mode. */
+  const [liveLookup, setLiveLookup] = useState(true);
 
   const readerRef = useRef<HTMLDivElement>(null);
   const webviewRef = useRef<HTMLElement | null>(null);
@@ -105,6 +129,12 @@ export function useImmersion() {
   const activeStatsId = useRef('');
   const activeTitle = useRef('Immersion');
   const pageOpenAt = useRef(Date.now());
+  // Host-side rate limit on the guest channel. The guest limits itself too, but
+  // that limiter runs in the process we are defending against — this one is the
+  // enforcement. Kept in a ref so it survives re-render but resets per page.
+  const guestGate = useRef(createGuestLookupGate());
+  /** One notice per page when a guest misbehaves — the notice must not spam either. */
+  const guestNoticed = useRef(false);
 
   // Stable innerHTML object — React 19 re-applies dangerouslySetInnerHTML when the
   // prop reference changes, which wipes hand-injected .wk highlight spans on click.
@@ -275,6 +305,9 @@ export function useImmersion() {
       setTitle(url);
       setPopup(null);
       clearLookupHighlight();
+      // A new page gets a fresh lookup budget and a fresh right to warn once.
+      guestGate.current = createGuestLookupGate();
+      guestNoticed.current = false;
 
       const forceLive = shouldUseLiveImmersionMode(raw, url);
       let nextMode = opts?.mode ?? mode;
@@ -426,6 +459,94 @@ export function useImmersion() {
     setPopup({ kind: 'dict', query: hit.query, x: hit.x, y: hit.y, context: hit.context });
   };
 
+  // ----- Live guest lookup (slice 70) -----
+  //
+  // Reader Mode looks words up in the host's own DOM (above). The live guest
+  // page is a different, untrusted process, so the host cannot reach into it
+  // and it cannot be handed the dictionary. Instead the guest preload sends a
+  // narrow, enumerated message — text + offset, or text + selection — and the
+  // result is resolved and RENDERED HERE, in the host, by the same
+  // `wordLookup` module and the same `DictionaryPopup` the Reader uses.
+  //
+  // Nothing is injected into the guest document: no popup markup to fight the
+  // page's CSS or CSP, and no host UI living inside untrusted content.
+  const noteGuestAbuse = useCallback(
+    (message: string) => {
+      if (guestNoticed.current) return;
+      guestNoticed.current = true;
+      setStatus(message);
+    },
+    [],
+  );
+
+  const onGuestLookupMessage = useCallback(
+    (event: Event) => {
+      const ev = event as { channel?: string; args?: unknown[] };
+      // A guest can only reach the embedder element, and only on this channel.
+      // Anything else it tries to say is not listened for at all.
+      if (ev.channel !== IMMERSION_LOOKUP_CHANNEL) return;
+
+      if (!guestGate.current.accept(Date.now())) {
+        noteGuestAbuse(t('immersion.liveLookupThrottled'));
+        return;
+      }
+
+      const parsed = validateGuestLookupMessage(ev.args?.[0]);
+      if (!parsed.ok) {
+        noteGuestAbuse(t('immersion.liveLookupRejected'));
+        return;
+      }
+
+      // Guest viewport coordinates → host coordinates. The popup is a host
+      // element positioned over the webview, so it needs the element's origin.
+      const rect = (webviewRef.current as ImmersionWebview | null)?.getBoundingClientRect();
+      const hit = lookupHitFromText({
+        text: parsed.value.text,
+        offset: parsed.value.offset,
+        selection: parsed.value.kind === 'selection' ? parsed.value.query : undefined,
+        x: (rect?.left ?? 0) + parsed.value.x,
+        y: (rect?.top ?? 0) + parsed.value.y,
+      });
+      if (!hit) return;
+
+      if (hit.translate) {
+        setPopup({ kind: 'translate', query: hit.query });
+        return;
+      }
+      setPopup({ kind: 'dict', query: hit.query, x: hit.x, y: hit.y, context: hit.context });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `lang`, never `t`:
+    // `t`'s identity is stable by design, so depending on it goes silently
+    // stale after a language switch instead of erroring (CLAUDE.md §6).
+    [lang, noteGuestAbuse],
+  );
+
+  useEffect(() => {
+    const wv = webviewRef.current as ImmersionWebview | null;
+    if (!wv || !showWebview) return;
+    const pushConfig = () => {
+      try {
+        wv.send?.(IMMERSION_CONFIG_CHANNEL, { enabled: liveLookup });
+      } catch {
+        /* guest not attached yet — dom-ready will push again */
+      }
+    };
+    wv.addEventListener('ipc-message', onGuestLookupMessage);
+    wv.addEventListener('dom-ready', pushConfig);
+    pushConfig();
+    return () => {
+      wv.removeEventListener('ipc-message', onGuestLookupMessage);
+      wv.removeEventListener('dom-ready', pushConfig);
+    };
+  }, [showWebview, currentUrl, liveLookup, onGuestLookupMessage]);
+
+  // The tokenizer is what makes a hover land on a word instead of a character
+  // run; warm it as soon as live lookup is actually reachable.
+  useEffect(() => {
+    if (!liveLookup || !showWebview) return;
+    void getTokenizer().catch(() => undefined);
+  }, [liveLookup, showWebview]);
+
   // ----- Actions -----
   const saveCurrentSite = async () => {
     if (!currentUrl) return;
@@ -560,6 +681,7 @@ export function useImmersion() {
     readerHtml, readerHtmlProp,
     sites, history, histIdx, popup, setPopup,
     captureBusy, railOpen, setRailOpen,
+    liveLookup, setLiveLookup,
     showChrome, showReader, showWebview, splitView, showRail,
     readerRef, webviewRef, urlBarRef,
     navigate, goBack, goForward, reload, applyMode, cycleMode, setMode,
@@ -572,7 +694,8 @@ export type ImmersionState = ReturnType<typeof useImmersion>;
 
 /** Classic (non-aero) toolbar — reused by Study OS's plain path and Blanc. */
 export function ImmersionToolbar({ state }: { state: ImmersionState }) {
-  const { t, mode, MODE_LABELS, urlInput, setUrlInput, histIdx, history, showRail, captureBusy } = state;
+  const { t, mode, MODE_LABELS, urlInput, setUrlInput, histIdx, history, showRail, captureBusy, liveLookup } =
+    state;
   return (
     <div className="immersion-toolbar">
       <button type="button" className="btn small icon-btn" title={t('immersion.back')} onClick={state.goBack} disabled={histIdx <= 0}>
@@ -620,6 +743,15 @@ export function ImmersionToolbar({ state }: { state: ImmersionState }) {
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        className={`btn small icon-btn${liveLookup ? ' active' : ''}`}
+        aria-pressed={liveLookup}
+        title={liveLookup ? t('immersion.liveLookupOn') : t('immersion.liveLookupOff')}
+        onClick={() => state.setLiveLookup((v) => !v)}
+      >
+        <Icon name="dictionary" size={14} />
+      </button>
       <button type="button" className="btn small icon-btn" title={t('immersion.saveSite')} onClick={() => void state.saveCurrentSite()}>
         <Icon name="bookmark" size={14} />
       </button>

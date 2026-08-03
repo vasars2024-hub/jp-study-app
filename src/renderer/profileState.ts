@@ -4,7 +4,9 @@
 // only ever reads snapshots and relays mutation requests over IPC.
 
 import type { ProfileId, ProfileSnapshot, StudyProfile } from '../shared/profiles';
-import { PROFILE_IDS, SEED_PROFILES } from '../shared/profiles';
+import { DEFAULT_PROFILE_ID, PROFILE_IDS, SEED_PROFILES } from '../shared/seedProfiles';
+
+export { DEFAULT_PROFILE_ID };
 
 export const PROFILE_EVENT = 'profile-changed';
 
@@ -61,7 +63,8 @@ export async function updateProfile(
 }
 
 /** Seed default — cannot be deleted from the UI. */
-export const DEFAULT_PROFILE_ID: ProfileId = 'p1-ja-focus';
+// From the seed catalog rather than re-declared: two constants for one id is how they
+// drift apart. Re-exported so existing importers of this module keep working.
 
 export function getActiveProfileId(): ProfileId {
   return snapshot.activeProfileId;

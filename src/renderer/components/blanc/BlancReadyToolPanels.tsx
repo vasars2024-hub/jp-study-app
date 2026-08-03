@@ -26,7 +26,6 @@ import {
 import { getLevel } from '../../knownWords';
 import { getTokenizer, tokenizeSync } from '../../tokenizer';
 import { parseSubtitles, type Cue } from '../../subtitles';
-import { addDeckCards , loadDeck } from '../../flashcardDeck';
 import { loadSaved } from '../../savedWords';
 
 import { fuzzyScore } from '../../fuzzySearch';
@@ -34,6 +33,72 @@ import { KANJI_RADICALS } from '../../../shared/kanjiRadicals';
 import { useAssets, type AssetView } from '../../assetStore';
 import { useT } from '../../i18n';
 import type { TVars } from '../../../shared/i18n/core';
+import type {
+  AgentExecutionEvent,
+  AgentTask,
+  AgentTaskStep,
+  AgentToolHandlers,
+} from '../../../shared/localAgent';
+import { selectAgentMemoryContext } from '../../../shared/localAgentMemory';
+import { loadLocalAgentMemory } from '../../localAgentMemoryStore';
+import { loadLocalAgentSettings, saveLocalAgentSettings } from '../../localAgentSettingsStore';
+import type { LocalAgentSettings } from '../../../shared/localAgentSettings';
+import {
+  addDeckCards,
+  createDeckFolder,
+  deleteDeckFolder,
+  loadDeck,
+  loadDeckFolders,
+  updateDeckCard,
+  type DeckFlashcard,
+} from '../../flashcardDeck';
+import { addEvent, deleteEvent, loadEvents, type CalendarEvent } from '../../calendar';
+import { DEFAULT_LOCAL_AGENT_SETTINGS } from '../../../shared/localAgentSettings';
+import {
+  loadLocalAgentAutomations,
+  onLocalAgentAutomationsChanged,
+  removeLocalAgentAutomation,
+  saveLocalAgentAutomation,
+} from '../../localAgentAutomationStore';
+import type { AgentAutomation } from '../../../shared/localAgentAutomation';
+import type { LocalAgentModelInfo, LocalAgentRuntimeStatus } from '../../../shared/localAgentRuntime';
+import {
+  cancelAgentQueueItem,
+  enqueueAgentTask,
+  pauseAgentQueueItem,
+  prioritizeAgentQueueItem,
+  resumeAgentQueueItem,
+  type AgentTaskQueue,
+} from '../../../shared/localAgentTaskQueue';
+import { loadLocalAgentTaskQueue, saveLocalAgentTaskQueue } from '../../localAgentTaskQueueStore';
+import {
+  applyAgentRunToQueue,
+  pendingAgentTaskStep,
+  runAgentTaskStep,
+  selectAgentQueueRun,
+  type AgentQueueRunRefusal,
+} from '../../localAgentQueueRun';
+import { searchAgentKnowledge } from '../../../shared/localAgentKnowledge';
+import { buildLocalAgentKnowledgeSnapshot } from '../../localAgentKnowledge';
+import { applyBlancTheme } from '../../blancThemeApply';
+import { applyBlancCustomCss } from '../../blancCustomCssApply';
+import { loadToolboxSettings, saveToolboxSettings } from '../../toolboxSettings';
+import { recordBlancThemeHistory, undoBlancThemeHistory } from '../../blancThemeHistoryStore';
+import { presetById, sanitizeThemeOverrides } from '../../../shared/blancTheme';
+import { sanitizeCustomCss } from '../../../shared/blancCustomCss';
+import {
+  effectiveAgentPermission,
+  getActiveAgentProfile,
+  type AgentProfileStore,
+} from '../../../shared/localAgentProfiles';
+import { recommendedLocalAgentModels } from '../../../shared/localAgentModels';
+import {
+  createLocalAgentProfile,
+  loadLocalAgentProfiles,
+  saveLocalAgentProfiles,
+} from '../../localAgentProfilesStore';
+import { createStudyAgentHandlers } from '../../studyAgentHandlers';
+import { AgentProfileOperationsEditor, agentPermissionLabelKey } from './AgentProfileOperations';
 
 // This panel renders Study OS class names, whose rules live in styles.css.
 // Imported here rather than in the boot entry so the 468 KB sheet rides this
@@ -65,14 +130,14 @@ function formatYtDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function notificationTime(ts: number): string {
+function notificationTime(ts: number, t: (key: string, vars?: TVars) => string): string {
   const elapsed = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (elapsed < 60) return 'just now';
+  if (elapsed < 60) return t('notifications.time.justNow');
   const minutes = Math.floor(elapsed / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t('notifications.time.minutes', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return t('notifications.time.hours', { count: hours });
+  return t('notifications.time.days', { count: Math.floor(hours / 24) });
 }
 
 function openSection(id: string): void {
@@ -145,43 +210,45 @@ function assetStatusLine(
 }
 
 export function NotificationCenterPanel() {
+  const { t, lang } = useT();
   const [, tick] = useState(0);
   useEffect(() => onNotificationsChanged(() => tick((n) => n + 1)), []);
   const items = getNotifications();
+  const timeAgo = useCallback((ts: number) => notificationTime(ts, t), [lang]);
 
   return (
     <div className="blanc-tool-detail">
       <fieldset>
-        <legend>Task Center</legend>
+        <legend>{t('notifications.blanc.title')}</legend>
         <div className="blanc-row-actions">
           <button type="button" onClick={() => clearAll()} disabled={!items.length}>
-            Clear all
+            {t('notifications.clearAll')}
           </button>
-          <span className="blanc-status">{items.length} entries</span>
+          <span className="blanc-status">{t('notifications.blanc.entries', { count: items.length })}</span>
         </div>
         {!items.length ? (
-          <p className="blanc-note">No notifications yet.</p>
+          <p className="blanc-note">{t('notifications.empty')}</p>
         ) : (
           <div className="blanc-table-wrap">
             <table className="blanc-table">
               <thead>
                 <tr>
-                  <th>When</th>
-                  <th>Message</th>
+                  <th>{t('notifications.blanc.when')}</th>
+                  <th>{t('notifications.blanc.message')}</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
                 {items.slice(0, 50).map((item: ShellNotification) => (
                   <tr key={item.id}>
-                    <td>{notificationTime(item.ts)}</td>
+                    <td>{timeAgo(item.ts)}</td>
                     <td>
                       {item.title ? <strong>{item.title}: </strong> : null}
                       {item.message}
                     </td>
                     <td>
                       <button type="button" onClick={() => dismiss(item.id)}>
-                        Dismiss
+                        {t('notifications.dismiss')}
                       </button>
                     </td>
                   </tr>
@@ -190,6 +257,593 @@ export function NotificationCenterPanel() {
             </table>
           </div>
         )}
+      </fieldset>
+    </div>
+  );
+}
+
+// These three live at module scope, so they cannot call `useT()`. They return i18n
+// *keys*, resolved with `t()` at the render site — the pattern CLAUDE.md prescribes
+// for module-level data (see `widgets/registry.tsx`).
+function agentStepLabelKey(status: AgentTask['steps'][number]['status']): string {
+  if (status === 'completed') return 'blanc.agent.step.completed';
+  if (status === 'running') return 'blanc.agent.step.running';
+  if (status === 'waiting-confirmation') return 'blanc.agent.step.waitingConfirmation';
+  if (status === 'failed') return 'blanc.agent.step.failed';
+  if (status === 'skipped') return 'blanc.agent.step.skipped';
+  return 'blanc.agent.step.queued';
+}
+
+/** Why a queued plan could not be started, in the panel's own voice. */
+const QUEUE_REFUSAL_KEYS: Record<AgentQueueRunRefusal, string> = {
+  'no-runnable-item': 'blanc.agent.refusal.noRunnableItem',
+  'item-not-found': 'blanc.agent.refusal.itemNotFound',
+  'item-not-runnable': 'blanc.agent.refusal.itemNotRunnable',
+  'no-pending-step': 'blanc.agent.refusal.noPendingStep',
+};
+
+const AGENT_WEEKDAY_KEYS = [
+  'common.weekday.sun',
+  'common.weekday.mon',
+  'common.weekday.tue',
+  'common.weekday.wed',
+  'common.weekday.thu',
+  'common.weekday.fri',
+  'common.weekday.sat',
+] as const;
+
+export function LocalAgentPanel() {
+  const { t, lang } = useT();
+  const [settings, setSettings] = useState(() => loadLocalAgentSettings());
+  const [objective, setObjective] = useState('');
+  const [task, setTask] = useState<AgentTask | null>(null);
+  const [taskQueue, setTaskQueue] = useState<AgentTaskQueue>(() => loadLocalAgentTaskQueue());
+  const [summary, setSummary] = useState('');
+  const [model, setModel] = useState('');
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [events, setEvents] = useState<AgentExecutionEvent[]>([]);
+  const [automations, setAutomations] = useState<AgentAutomation[]>(() => loadLocalAgentAutomations());
+  const [automationName, setAutomationName] = useState('');
+  const [automationObjective, setAutomationObjective] = useState('');
+  const [automationTime, setAutomationTime] = useState('09:00');
+  const [automationFrequency, setAutomationFrequency] = useState<AgentAutomation['frequency']>('daily');
+  const [automationWeekday, setAutomationWeekday] = useState(1);
+  const [runtimeStatus, setRuntimeStatus] = useState<LocalAgentRuntimeStatus>({ loaded: false, busy: false });
+  const [availableModels, setAvailableModels] = useState<LocalAgentModelInfo[]>([]);
+  const [profileStore, setProfileStore] = useState<AgentProfileStore>(() => loadLocalAgentProfiles());
+  const [newProfileName, setNewProfileName] = useState('');
+  const activeProfile = useMemo(() => getActiveAgentProfile(profileStore), [profileStore]);
+  const recommendedModels = useMemo(() => recommendedLocalAgentModels(settings.modelMode), [settings.modelMode]);
+
+  const updateSettings = (patch: Partial<LocalAgentSettings>): void => {
+    setSettings(saveLocalAgentSettings(patch));
+  };
+
+  const plan = async (scheduledObjective = objective): Promise<void> => {
+    const request = scheduledObjective.trim();
+    if (!request) {
+      setStatus(t('blanc.agent.status.describeFirst'));
+      return;
+    }
+    setBusy(true);
+    setStatus(t('blanc.agent.status.planning'));
+    setTask(null);
+    setSummary('');
+    setEvents([]);
+    try {
+      const memory = loadLocalAgentMemory();
+      const response = await window.api.localAgentPlan({
+        objective: request,
+        settings,
+        profile: activeProfile,
+        memories: settings.memoryEnabled
+          ? selectAgentMemoryContext(memory, request, { maxCharacters: 4_000 })
+          : [],
+      });
+      if (!response.ok) {
+        setStatus(response.error ?? t('blanc.agent.status.planFailed'));
+        return;
+      }
+      setSummary(response.summary ?? t('blanc.agent.status.planReady'));
+      setTask(response.task ?? null);
+      if (response.task) setTaskQueue((previous) => saveLocalAgentTaskQueue(enqueueAgentTask(previous, response.task as AgentTask)));
+      setModel(response.modelFileName ?? '');
+      setStatus(response.task ? t('blanc.agent.status.planReadyReview') : t('blanc.agent.status.noApprovedAction'));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : t('blanc.agent.status.planFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    window.api.localAgentSyncAutomations(automations);
+    return onLocalAgentAutomationsChanged(setAutomations);
+  }, [automations]);
+
+  useEffect(() => window.api.onLocalAgentTrigger((entry) => {
+    if (!settings.enabled) {
+      setStatus(t('blanc.agent.status.scheduledReady', { name: entry.name }));
+      return;
+    }
+    setObjective(entry.objective);
+    setStatus(t('blanc.agent.status.runningScheduled', { name: entry.name }));
+    void plan(entry.objective);
+  }), [plan, settings.enabled]);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = (): void => {
+      void window.api.localAgentStatus().then((next) => {
+        if (active) setRuntimeStatus(next);
+      }).catch(() => undefined);
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 5_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = (): void => {
+      void window.api.localAgentModels().then((models) => {
+        if (active) setAvailableModels(models);
+      }).catch(() => undefined);
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 15_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const addAutomation = (): void => {
+    const name = automationName.trim();
+    const scheduledObjective = automationObjective.trim();
+    if (!name || !scheduledObjective) {
+      setStatus(t('blanc.agent.status.scheduleNeedsNameAndTask'));
+      return;
+    }
+    const entry: AgentAutomation = {
+      id: `agent-auto-${Date.now().toString(36)}`,
+      name,
+      objective: scheduledObjective,
+      frequency: automationFrequency,
+      time: automationTime,
+      ...(automationFrequency === 'weekly' ? { weekday: automationWeekday } : {}),
+      enabled: true,
+      permission: effectiveAgentPermission(settings.permission, activeProfile),
+      createdAt: Date.now(),
+    };
+    setAutomations(saveLocalAgentAutomation(entry));
+    setAutomationName('');
+    setAutomationObjective('');
+    setStatus(t('blanc.agent.status.scheduled', { name }));
+  };
+
+  const removeAutomation = (id: string): void => {
+    setAutomations(removeLocalAgentAutomation(id));
+    setStatus(t('blanc.agent.status.scheduleRemoved'));
+  };
+
+  const changeProfile = (id: string): void => {
+    setProfileStore(saveLocalAgentProfiles({ ...profileStore, activeProfileId: id }));
+  };
+
+  const addCustomProfile = (): void => {
+    setProfileStore(createLocalAgentProfile(newProfileName));
+    setNewProfileName('');
+    setStatus(t('blanc.agent.status.profileCreated'));
+  };
+
+  const handlers: AgentToolHandlers = useMemo(() => {
+    const textArg = (arguments_: Readonly<Record<string, unknown>>, name: string): string => {
+      const value = arguments_[name];
+      if (typeof value !== 'string' || !value.trim()) throw new Error(t('blanc.agent.error.needsArgument', { name }));
+      return value.trim().slice(0, 500);
+    };
+    const safeCardPatch = (value: unknown): Partial<DeckFlashcard> => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(t('blanc.agent.error.cardPatchObject'));
+      const raw = value as Record<string, unknown>;
+      const patch: Partial<DeckFlashcard> = {};
+      for (const key of ['word', 'reading', 'meaning', 'sentence', 'front', 'back', 'folder', 'jlptLevel', 'sceneReference']) {
+        if (typeof raw[key] === 'string') patch[key as keyof DeckFlashcard] = raw[key] as never;
+      }
+      return patch;
+    };
+    const safeCalendarEntry = (arguments_: Readonly<Record<string, unknown>>): Omit<CalendarEvent, 'id' | 'createdAt'> => ({
+      title: textArg(arguments_, 'title'),
+      description: typeof arguments_.description === 'string' ? arguments_.description.slice(0, 500) : undefined,
+      date: /^\d{4}-\d{2}-\d{2}$/.test(textArg(arguments_, 'date')) ? textArg(arguments_, 'date') : (() => { throw new Error(t('blanc.agent.error.calendarDate')); })(),
+      startTime: typeof arguments_.startTime === 'string' ? arguments_.startTime.slice(0, 5) : undefined,
+      endTime: typeof arguments_.endTime === 'string' ? arguments_.endTime.slice(0, 5) : undefined,
+      allDay: arguments_.allDay === true,
+      color: typeof arguments_.color === 'string' ? arguments_.color.slice(0, 20) : '#6c7bff',
+      category: arguments_.category === 'reminder' ? 'reminder' : 'study',
+      reminder: 'none',
+      recurrence: 'none',
+    });
+    return {
+      ...createStudyAgentHandlers(),
+      'dictionary.lookup': async (arguments_) => window.api.lookupTerm(textArg(arguments_, 'term')),
+      'dictionary.explain-grammar': async (arguments_) => window.api.lookupTerm(textArg(arguments_, 'term')),
+      'dictionary.analyze-sentence': async (arguments_) => window.api.lookupTerm(textArg(arguments_, 'term')),
+      'dictionary.search-knowledge': async (arguments_) => {
+        const query = textArg(arguments_, 'query');
+        const [deck, media, library] = await Promise.all([
+          Promise.resolve(loadDeck()),
+          window.api.listMedia(),
+          window.api.listLibrary(),
+        ]);
+        const snapshot = buildLocalAgentKnowledgeSnapshot({
+          deck,
+          media,
+          library,
+          calendar: loadEvents(),
+          memory: loadLocalAgentMemory(),
+        });
+        return searchAgentKnowledge(snapshot, query, {
+          limit: typeof arguments_.limit === 'number' ? arguments_.limit : 20,
+        });
+      },
+      'flashcard.list-decks': () => ({ folders: loadDeckFolders(), cards: loadDeck().length }),
+      'flashcard.create-deck': (arguments_) => ({ folders: createDeckFolder(textArg(arguments_, 'name')) }),
+      'flashcard.add-cards': (arguments_) => {
+        if (!Array.isArray(arguments_.cards) || arguments_.cards.length < 1) throw new Error(t('blanc.agent.error.needsCards'));
+        const cards = arguments_.cards.slice(0, 50).map((raw) => {
+          if (!raw || typeof raw !== 'object') throw new Error(t('blanc.agent.error.cardObject'));
+          const card = raw as Record<string, unknown>;
+          return {
+            word: textArg(card, 'word'),
+            reading: typeof card.reading === 'string' ? card.reading.slice(0, 200) : '',
+            meaning: typeof card.meaning === 'string' ? card.meaning.slice(0, 500) : '',
+            sentence: typeof card.sentence === 'string' ? card.sentence.slice(0, 500) : undefined,
+            source: 'import' as const,
+            folder: typeof card.folder === 'string' ? card.folder.slice(0, 120) : undefined,
+          };
+        });
+        return { cards: addDeckCards(cards).length };
+      },
+      'flashcard.modify-cards': (arguments_) => ({ cards: updateDeckCard(textArg(arguments_, 'id'), safeCardPatch(arguments_.patch)).length }),
+      'flashcard.schedule-reviews': () => ({ queued: true, cards: loadDeck().length }),
+      'flashcard.delete-deck': (arguments_) => deleteDeckFolder(textArg(arguments_, 'name')),
+      'calendar.list': () => ({ events: loadEvents().slice(0, 100) }),
+      'calendar.schedule-session': (arguments_) => addEvent(safeCalendarEntry(arguments_)),
+      'calendar.create-reminder': (arguments_) => addEvent({ ...safeCalendarEntry(arguments_), category: 'reminder' }),
+      'calendar.delete-event': (arguments_) => ({ events: deleteEvent(textArg(arguments_, 'id')) }),
+      'settings.read': () => loadLocalAgentSettings(),
+      'settings.change-preference': (arguments_) => {
+        const key = textArg(arguments_, 'key') as keyof LocalAgentSettings;
+        const allowed: Array<keyof LocalAgentSettings> = ['enabled', 'modelFileName', 'modelMode', 'contextSize', 'memoryLimitMb', 'resourceMode', 'cpuLimitPct', 'gpuLimitPct', 'maxConcurrentTasks', 'backgroundProcessing', 'permission', 'memoryEnabled', 'privacyMode', 'debugMode'];
+        if (!allowed.includes(key)) throw new Error(t('blanc.agent.error.preferenceLocked'));
+        return saveLocalAgentSettings({ [key]: arguments_.value } as Partial<LocalAgentSettings>);
+      },
+      'settings.configure-module': (arguments_) => {
+        const key = textArg(arguments_, 'key') as keyof LocalAgentSettings;
+        if (!['enabled', 'memoryEnabled', 'privacyMode', 'debugMode'].includes(key)) throw new Error(t('blanc.agent.error.moduleLocked'));
+        return saveLocalAgentSettings({ [key]: arguments_.value } as Partial<LocalAgentSettings>);
+      },
+      'settings.reset': () => saveLocalAgentSettings(DEFAULT_LOCAL_AGENT_SETTINGS),
+      'settings.preview-theme': (arguments_) => {
+        const current = loadToolboxSettings();
+        const preset = typeof arguments_.preset === 'string' && presetById(arguments_.preset) ? arguments_.preset : current.themePreset;
+        const overrides = sanitizeThemeOverrides(arguments_.overrides);
+        applyBlancTheme(preset, overrides);
+        return { preview: true, preset, overrides };
+      },
+      'settings.apply-theme': (arguments_) => {
+        const current = loadToolboxSettings();
+        const preset = typeof arguments_.preset === 'string' && presetById(arguments_.preset) ? arguments_.preset : current.themePreset;
+        const overrides = sanitizeThemeOverrides(arguments_.overrides);
+        recordBlancThemeHistory(current);
+        const next = saveToolboxSettings({ themePreset: preset, themeOverrides: overrides });
+        applyBlancTheme(next.themePreset, next.themeOverrides);
+        return { applied: true, preset: next.themePreset, overrides: next.themeOverrides };
+      },
+      'settings.reset-theme': () => {
+        recordBlancThemeHistory(loadToolboxSettings());
+        const next = saveToolboxSettings({ themePreset: 'default', themeOverrides: {} });
+        applyBlancTheme(next.themePreset, next.themeOverrides);
+        return { reset: true };
+      },
+      'settings.undo-theme': () => {
+        const previous = undoBlancThemeHistory();
+        if (!previous) throw new Error(t('blanc.agent.error.noThemeHistory'));
+        const next = saveToolboxSettings({ themePreset: previous.preset, themeOverrides: previous.overrides });
+        applyBlancTheme(next.themePreset, next.themeOverrides);
+        return { restored: true, preset: next.themePreset, overrides: next.themeOverrides };
+      },
+      'settings.preview-css': (arguments_) => {
+        const css = sanitizeCustomCss(arguments_.css);
+        applyBlancCustomCss(css);
+        return { preview: true, characters: css.length };
+      },
+      'settings.apply-css': (arguments_) => {
+        const css = sanitizeCustomCss(arguments_.css);
+        const next = saveToolboxSettings({ customCss: css });
+        applyBlancCustomCss(next.customCss);
+        return { applied: true, characters: next.customCss.length };
+      },
+      'settings.reset-css': () => {
+        const next = saveToolboxSettings({ customCss: '' });
+        applyBlancCustomCss(next.customCss);
+        return { reset: true };
+      },
+      'media.search': async (arguments_) => {
+        const query = typeof arguments_.query === 'string' ? arguments_.query.toLocaleLowerCase().trim() : '';
+        const items = await window.api.listMedia();
+        return items.filter((item) => !query || `${item.title} ${item.path}`.toLocaleLowerCase().includes(query)).slice(0, 100);
+      },
+      'media.add-item': async (arguments_) => {
+        if (!Array.isArray(arguments_.paths) || !arguments_.paths.length) throw new Error(t('blanc.agent.error.needsPaths'));
+        const paths = arguments_.paths.filter((value): value is string => typeof value === 'string').slice(0, 20);
+        if (!paths.length) throw new Error(t('blanc.agent.error.noValidPaths'));
+        return window.api.importPaths(paths);
+      },
+      'media.delete-item': (arguments_) => window.api.removeMedia(textArg(arguments_, 'id')),
+    };
+    // `lang`, never `t` — `t`'s identity is stable by design, so depending on it would
+    // leave these operation errors frozen in the language the panel first mounted in.
+  }, [lang]);
+
+  /**
+   * The panel's one execution call. All three verbs — run next, confirm, and running an item
+   * out of the persisted queue — funnel through here, so the profile allow-list is supplied in
+   * exactly one place and they cannot drift apart. That drift is the defect slice 47e fixed
+   * between the plan and execution boundaries; a third verb was not going to reopen it.
+   */
+  const runStep = async (source: AgentTask, step: AgentTaskStep, confirmed: boolean): Promise<void> => {
+    setBusy(true);
+    setStatus(confirmed ? t('blanc.agent.status.runningConfirmed') : t('blanc.agent.status.runningNext'));
+    try {
+      const result = await runAgentTaskStep(taskQueue, source, step, {
+        permission: effectiveAgentPermission(settings.permission, activeProfile),
+        // Re-checked at EXECUTION, not only when the plan was built: a queued task outlives
+        // the profile that authorized it, so narrowing a profile must take effect on work
+        // already sitting in the queue.
+        allowedOperations: activeProfile?.enabledOperations,
+        handlers,
+        ...(confirmed ? { confirmedCallIds: new Set([step.request.callId]) } : {}),
+      });
+      setTask(result.task);
+      // Folded into the freshest queue, not the one captured before the await: Pause and Cancel
+      // stay clickable while a step is in flight and must not be reverted by its write-back.
+      setTaskQueue((previous) => saveLocalAgentTaskQueue(applyAgentRunToQueue(previous, result.task)));
+      setEvents((previous) => [...previous, ...result.events]);
+      const latest = result.task.steps.find((candidate) => candidate.id === step.id);
+      if (latest?.status === 'waiting-confirmation') setStatus(t('blanc.agent.status.confirmationRequired'));
+      else if (latest?.status === 'failed') setStatus(latest.error ?? t('blanc.agent.status.stepFailed'));
+      else if (result.task.status === 'completed') setStatus(t('blanc.agent.status.taskCompleted'));
+      else setStatus(t('blanc.agent.status.stepCompleted'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runNext = async (): Promise<void> => {
+    if (!task) return;
+    const step = pendingAgentTaskStep(task, 'next');
+    if (step) await runStep(task, step, false);
+  };
+
+  const confirmAndRun = async (): Promise<void> => {
+    if (!task) return;
+    const step = pendingAgentTaskStep(task, 'confirm');
+    if (step) await runStep(task, step, true);
+  };
+
+  /**
+   * The path the persisted queue never had: an item becomes the live task, and then runs. Given
+   * no id this takes the highest-priority queued item, which is what `nextRunnableAgentQueueItem`
+   * was written for and never got to do. A step that needs confirmation still only reaches
+   * `waiting-confirmation` here — the user confirms it afterwards on the now-live task.
+   */
+  const runQueued = async (id?: string): Promise<void> => {
+    const selection = selectAgentQueueRun(taskQueue, id);
+    if (!selection.ok) {
+      setStatus(t(QUEUE_REFUSAL_KEYS[selection.reason]));
+      return;
+    }
+    setSummary(selection.item.task.objective);
+    setEvents([]);
+    setTask(selection.item.task);
+    await runStep(selection.item.task, selection.step, false);
+  };
+
+  return (
+    <div className="blanc-tool-detail">
+      <fieldset>
+        <legend>{t('blanc.agent.title')}</legend>
+        <p className="blanc-note">{t('blanc.agent.intro')}</p>
+        <div className="blanc-form-grid">
+          <label>
+            {t('blanc.agent.field.profile')}
+            <select value={activeProfile.id} onChange={(event) => changeProfile(event.currentTarget.value)}>
+              {profileStore.profiles.filter((profile) => profile.enabled).map((profile) => (
+                <option key={profile.id} value={profile.id}>{profile.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t('blanc.agent.field.newProfile')}
+            <input value={newProfileName} maxLength={100} placeholder={t('blanc.agent.placeholder.customTutor')} onChange={(event) => setNewProfileName(event.currentTarget.value)} />
+          </label>
+          <label>
+            <span>{t('blanc.agent.field.enabled')}</span>
+            <input type="checkbox" checked={settings.enabled} onChange={(event) => updateSettings({ enabled: event.currentTarget.checked })} />
+          </label>
+          <label>
+            {t('blanc.agent.field.permission')}
+            <select value={settings.permission} onChange={(event) => updateSettings({ permission: event.currentTarget.value as LocalAgentSettings['permission'] })}>
+              <option value="read-only">{t('blanc.agent.permission.readOnly')}</option>
+              <option value="limited-actions">{t('blanc.agent.permission.limitedActions')}</option>
+              <option value="full-automation">{t('blanc.agent.permission.fullAutomation')}</option>
+            </select>
+          </label>
+          <label>
+            {t('blanc.agent.field.modelFile')}
+            <input list="local-agent-model-files" value={settings.modelFileName} placeholder="Qwen3-1.7B.gguf" onChange={(event) => updateSettings({ modelFileName: event.currentTarget.value })} />
+            <datalist id="local-agent-model-files">{availableModels.map((entry) => <option key={entry.fileName} value={entry.fileName} />)}</datalist>
+          </label>
+          <label>
+            {t('blanc.agent.field.resourceMode')}
+            <select value={settings.resourceMode} onChange={(event) => updateSettings({ resourceMode: event.currentTarget.value as LocalAgentSettings['resourceMode'] })}>
+              <option value="battery-saver">{t('blanc.agent.resource.batterySaver')}</option>
+              <option value="balanced">{t('blanc.agent.resource.balanced')}</option>
+              <option value="maximum-intelligence">{t('blanc.agent.resource.maximumIntelligence')}</option>
+            </select>
+          </label>
+          <label>
+            {t('blanc.agent.field.modelStack')}
+            <select value={settings.modelMode} onChange={(event) => updateSettings({ modelMode: event.currentTarget.value as LocalAgentSettings['modelMode'] })}>
+              <option value="lite">{t('blanc.agent.stack.lite')}</option>
+              <option value="standard">{t('blanc.agent.stack.standard')}</option>
+              <option value="power">{t('blanc.agent.stack.power')}</option>
+            </select>
+          </label>
+          <label>
+            {t('blanc.agent.field.maxTasks')}
+            <input type="number" min={1} max={3} value={settings.maxConcurrentTasks} onChange={(event) => updateSettings({ maxConcurrentTasks: Number(event.currentTarget.value) })} />
+          </label>
+          <label>
+            {t('blanc.agent.field.cpuLimit', { pct: settings.cpuLimitPct })}
+            <input type="range" min={10} max={100} step={5} value={settings.cpuLimitPct} onChange={(event) => updateSettings({ cpuLimitPct: Number(event.currentTarget.value) })} />
+          </label>
+          <label>
+            {t('blanc.agent.field.gpuLimit', { pct: settings.gpuLimitPct })}
+            <input type="range" min={10} max={100} step={5} value={settings.gpuLimitPct} onChange={(event) => updateSettings({ gpuLimitPct: Number(event.currentTarget.value) })} />
+          </label>
+          <label>
+            {t('blanc.agent.field.backgroundProcessing')}
+            <input type="checkbox" checked={settings.backgroundProcessing} onChange={(event) => updateSettings({ backgroundProcessing: event.currentTarget.checked })} />
+          </label>
+          <label>
+            <span>{t('blanc.agent.field.privateContext')}</span>
+            <input type="checkbox" checked={settings.privacyMode} onChange={(event) => updateSettings({ privacyMode: event.currentTarget.checked })} />
+          </label>
+        </div>
+        <div className="blanc-row-actions">
+          <button type="button" onClick={addCustomProfile} disabled={!newProfileName.trim()}>{t('blanc.agent.action.createProfile')}</button>
+          <span className="blanc-note">
+            {activeProfile.description} · {t('blanc.agent.approvedTools.count', { count: activeProfile.enabledOperations.length })}
+            {' · '}
+            {t('blanc.agent.effectivePermission', { permission: t(agentPermissionLabelKey(effectiveAgentPermission(settings.permission, activeProfile))) })}
+          </span>
+        </div>
+        {/*
+          Slice 63. The count above used to be the WHOLE surface for the allow-list: the
+          per-operation refusal was proven end-to-end in Phase 7 and could only be configured by
+          hand-editing localStorage. This is the editor that closes that.
+        */}
+        <AgentProfileOperationsEditor
+          store={profileStore}
+          profileId={activeProfile.id}
+          onStoreChange={setProfileStore}
+        />
+        <p className="blanc-note">{t('blanc.agent.permissionNote', { permission: t(agentPermissionLabelKey(settings.permission)) })}</p>
+        <label>
+          {t('blanc.agent.field.request')}
+          <textarea rows={4} value={objective} maxLength={500} placeholder={t('blanc.agent.placeholder.request')} onChange={(event) => setObjective(event.currentTarget.value)} />
+        </label>
+        <div className="blanc-row-actions">
+          <button type="button" onClick={() => void plan()} disabled={busy || !settings.enabled || !objective.trim()}>
+            {busy ? t('blanc.agent.action.working') : t('blanc.agent.action.createPlan')}
+          </button>
+          <button type="button" onClick={() => void runNext()} disabled={busy || !task || task.status === 'completed' || task.status === 'failed'}>
+            {t('blanc.agent.action.runNext')}
+          </button>
+          <button type="button" onClick={() => void confirmAndRun()} disabled={busy || !task || !task.steps.some((step) => step.status === 'waiting-confirmation')}>
+            {t('blanc.agent.action.confirmStep')}
+          </button>
+          <button type="button" onClick={() => void runQueued()} disabled={busy || !selectAgentQueueRun(taskQueue).ok}>
+            {t('blanc.agent.action.runQueued')}
+          </button>
+        </div>
+        {model && <p className="blanc-note">{t('blanc.agent.modelLine', { model })}</p>}
+        <p className="blanc-note" role="status">
+          {t('blanc.agent.runtime.label')}: {runtimeStatus.loaded ? t('blanc.agent.runtime.loaded') : t('blanc.agent.runtime.notLoaded')}
+          {runtimeStatus.busy ? ` · ${t('blanc.agent.runtime.working')}` : ''}
+          {runtimeStatus.contextSize ? ` · ${t('blanc.agent.runtime.context', { size: runtimeStatus.contextSize })}` : ''}
+          {runtimeStatus.lastError ? ` · ${runtimeStatus.lastError}` : ''}
+        </p>
+        <p className="blanc-note">
+          {t('blanc.agent.modelsFound', {
+            list: availableModels.length
+              ? availableModels.map((entry) => `${entry.fileName} (${formatBytes(entry.sizeBytes)}, ${entry.location === 'downloads' ? t('blanc.agent.location.downloads') : t('blanc.agent.location.appModels')})`).join(' · ')
+              : t('blanc.agent.none'),
+          })}
+        </p>
+        <p className="blanc-note">
+          {t('blanc.agent.recommendedStack', {
+            mode: t(`blanc.agent.mode.${settings.modelMode}`),
+            list: recommendedModels.map((entry) => `${entry.name} (${entry.roles.join(', ')})`).join(' · ') || t('blanc.agent.recommendedFallback'),
+          })}
+        </p>
+        {status && <p className="blanc-status" role="status">{status}</p>}
+      </fieldset>
+      {summary && <fieldset><legend>{t('blanc.agent.section.planSummary')}</legend><p className="blanc-result-box">{summary}</p></fieldset>}
+      {task && (
+        <fieldset>
+          <legend>{t('blanc.agent.section.taskPlan')}</legend>
+          <div className="blanc-table-wrap">
+            <table className="blanc-table">
+              <thead><tr><th>{t('blanc.agent.table.step')}</th><th>{t('blanc.agent.table.operation')}</th><th>{t('blanc.agent.table.status')}</th><th>{t('blanc.agent.table.result')}</th></tr></thead>
+              <tbody>
+                {task.steps.map((step) => (
+                  <tr key={step.id}>
+                    <td>{step.label}</td>
+                    <td>{step.request.operation}</td>
+                    <td>{t(agentStepLabelKey(step.status))}</td>
+                    <td>{step.error ?? (step.result ? JSON.stringify(step.result).slice(0, 240) : '—')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </fieldset>
+      )}
+      {events.length > 0 && (
+        <fieldset>
+          <legend>{t('blanc.agent.section.executionLog')}</legend>
+          <ul className="blanc-note-list">
+            {events.slice(-20).map((event, index) => <li key={`${event.timestamp}-${index}`}>{event.type} · {event.operation}{event.error ? ` · ${event.error}` : ''}{event.durationMs != null ? ` · ${event.durationMs}ms` : ''}</li>)}
+          </ul>
+        </fieldset>
+      )}
+      <fieldset>
+        <legend>{t('blanc.agent.section.taskQueue')}</legend>
+        <p className="blanc-note">{t('blanc.agent.queueNote')}</p>
+        {taskQueue.items.length === 0 ? <p className="blanc-note">{t('blanc.agent.queueEmpty')}</p> : (
+          <div className="blanc-table-wrap"><table className="blanc-table"><thead><tr><th>{t('blanc.agent.table.plan')}</th><th>{t('blanc.agent.table.status')}</th><th>{t('blanc.agent.table.priority')}</th><th /></tr></thead><tbody>
+            {taskQueue.items.slice().reverse().slice(0, 20).map((item) => (
+              <tr key={item.id}><td>{item.task.objective.slice(0, 80)}</td><td>{t(`blanc.agent.queueStatus.${item.status}`)}</td><td>{item.priority}</td><td><div className="blanc-row-actions">
+                {item.status === 'queued' && <button type="button" disabled={busy} onClick={() => void runQueued(item.id)}>{t('blanc.agent.action.run')}</button>}
+                {item.status === 'queued' && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(pauseAgentQueueItem(taskQueue, item.id)))}>{t('common.pause')}</button>}
+                {item.status === 'paused' && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(resumeAgentQueueItem(taskQueue, item.id)))}>{t('common.resume')}</button>}
+                {(item.status === 'queued' || item.status === 'paused') && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(cancelAgentQueueItem(taskQueue, item.id)))}>{t('common.cancel')}</button>}
+                {item.status === 'queued' && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(prioritizeAgentQueueItem(taskQueue, item.id)))}>{t('blanc.agent.action.prioritize')}</button>}
+              </div></td></tr>
+            ))}
+          </tbody></table></div>
+        )}
+      </fieldset>
+      <fieldset>
+        <legend>{t('blanc.agent.section.scheduled')}</legend>
+        <p className="blanc-note">{t('blanc.agent.scheduleNote')}</p>
+        <div className="blanc-form-grid">
+          <label>{t('blanc.agent.field.name')}<input value={automationName} maxLength={120} onChange={(event) => setAutomationName(event.currentTarget.value)} /></label>
+          <label>{t('blanc.agent.field.time')}<input type="time" value={automationTime} onChange={(event) => setAutomationTime(event.currentTarget.value)} /></label>
+          <label>{t('blanc.agent.field.frequency')}<select value={automationFrequency} onChange={(event) => setAutomationFrequency(event.currentTarget.value as AgentAutomation['frequency'])}><option value="daily">{t('blanc.agent.frequency.daily')}</option><option value="weekly">{t('blanc.agent.frequency.weekly')}</option></select></label>
+          {automationFrequency === 'weekly' && <label>{t('blanc.agent.field.day')}<select value={automationWeekday} onChange={(event) => setAutomationWeekday(Number(event.currentTarget.value))}>{[1, 2, 3, 4, 5, 6, 0].map((day) => <option key={day} value={day}>{t(AGENT_WEEKDAY_KEYS[day])}</option>)}</select></label>}
+        </div>
+        <label>{t('blanc.agent.field.scheduledRequest')}<textarea rows={2} maxLength={500} value={automationObjective} placeholder={t('blanc.agent.placeholder.scheduledRequest')} onChange={(event) => setAutomationObjective(event.currentTarget.value)} /></label>
+        <div className="blanc-row-actions"><button type="button" onClick={addAutomation} disabled={!settings.enabled}>{t('blanc.agent.action.addSchedule')}</button><span className="blanc-note">{t('blanc.agent.scheduledCount', { count: automations.length })}</span></div>
+        {automations.length > 0 && <div className="blanc-table-wrap"><table className="blanc-table"><thead><tr><th>{t('blanc.agent.table.name')}</th><th>{t('blanc.agent.table.when')}</th><th>{t('blanc.agent.field.permission')}</th><th /></tr></thead><tbody>{automations.map((entry) => <tr key={entry.id}><td>{entry.name}</td><td>{t('blanc.agent.scheduleWhen', { frequency: t(`blanc.agent.frequency.${entry.frequency}`), time: entry.time })}{entry.frequency === 'weekly' && entry.weekday != null ? ` · ${t(AGENT_WEEKDAY_KEYS[entry.weekday])}` : ''}</td><td>{t(agentPermissionLabelKey(entry.permission))}</td><td><button type="button" onClick={() => removeAutomation(entry.id)}>{t('common.remove')}</button></td></tr>)}</tbody></table></div>}
       </fieldset>
     </div>
   );
@@ -894,23 +1548,27 @@ export function BlancModelsPanel() {
   );
 }
 
-const WORKSPACE_LAUNCHER_KEY = 'jp-study.blanc.toolbox.workspaces.v1';
+// Exported so BlancAppDrawerPanel's one-time migration can read this store
+// without duplicating the parser — workspace-launcher is retired in favour of
+// the App Drawer (BLANC_REFINEMENT_PLAN.md, Pillar 3), and the migration reads
+// this exact key non-destructively (it is never written here again).
+export const WORKSPACE_LAUNCHER_KEY = 'jp-study.blanc.toolbox.workspaces.v1';
 
 /** One launchable target inside a workspace. */
-interface WorkspaceTarget {
+export interface WorkspaceTarget {
   id: string;
   /** Absolute path from the native picker, or an http(s) URL. */
   target: string;
   label: string;
 }
 
-interface Workspace {
+export interface Workspace {
   id: string;
   name: string;
   targets: WorkspaceTarget[];
 }
 
-function readWorkspaces(): Workspace[] {
+export function readWorkspaces(): Workspace[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(WORKSPACE_LAUNCHER_KEY) ?? '[]') as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -934,18 +1592,6 @@ function readWorkspaces(): Workspace[] {
   } catch {
     return [];
   }
-}
-
-function writeWorkspaces(value: Workspace[]): void {
-  try {
-    window.localStorage.setItem(WORKSPACE_LAUNCHER_KEY, JSON.stringify(value));
-  } catch {
-    /* ignore */
-  }
-}
-
-function isLaunchableUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value.trim());
 }
 
 type BatchImageFormat = 'image/png' | 'image/jpeg' | 'image/webp';
@@ -1149,207 +1795,6 @@ export function BatchConverterPanel() {
               </tbody>
             </table>
           </div>
-        </fieldset>
-      )}
-    </div>
-  );
-}
-
-export function WorkspaceLauncherPanel() {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => readWorkspaces());
-  const [selectedId, setSelectedId] = useState('');
-  const [newName, setNewName] = useState('');
-  const [urlDraft, setUrlDraft] = useState('');
-  const [status, setStatus] = useState('');
-  const [launching, setLaunching] = useState(false);
-
-  const selected = workspaces.find((workspace) => workspace.id === selectedId) ?? workspaces[0] ?? null;
-
-  const commit = useCallback((next: Workspace[]): void => {
-    setWorkspaces(next);
-    writeWorkspaces(next);
-  }, []);
-
-  const updateSelected = useCallback((patch: (workspace: Workspace) => Workspace): void => {
-    if (!selected) return;
-    commit(workspaces.map((workspace) => (workspace.id === selected.id ? patch(workspace) : workspace)));
-  }, [commit, selected, workspaces]);
-
-  const addWorkspace = (): void => {
-    const name = newName.trim();
-    if (!name) return;
-    const workspace: Workspace = { id: `ws-${Date.now()}`, name, targets: [] };
-    commit([...workspaces, workspace]);
-    setSelectedId(workspace.id);
-    setNewName('');
-    setStatus(`Created "${name}".`);
-  };
-
-  const removeWorkspace = (): void => {
-    if (!selected) return;
-    commit(workspaces.filter((workspace) => workspace.id !== selected.id));
-    setSelectedId('');
-    setStatus(`Removed "${selected.name}".`);
-  };
-
-  const addPickedTarget = async (): Promise<void> => {
-    if (!selected) return;
-    const picked = await window.api.pickShortcut();
-    if (!picked) return;
-    updateSelected((workspace) => ({
-      ...workspace,
-      targets: [...workspace.targets, { id: `t-${Date.now()}`, target: picked.target, label: picked.name || picked.target }],
-    }));
-    setStatus(`Added ${picked.name || picked.target}.`);
-  };
-
-  const addUrlTarget = (): void => {
-    if (!selected) return;
-    const url = urlDraft.trim();
-    if (!isLaunchableUrl(url)) {
-      setStatus('Enter a full http:// or https:// address.');
-      return;
-    }
-    updateSelected((workspace) => ({
-      ...workspace,
-      targets: [...workspace.targets, { id: `t-${Date.now()}`, target: url, label: url }],
-    }));
-    setUrlDraft('');
-    setStatus('Added link.');
-  };
-
-  const removeTarget = (targetId: string): void => {
-    updateSelected((workspace) => ({ ...workspace, targets: workspace.targets.filter((entry) => entry.id !== targetId) }));
-  };
-
-  const moveTarget = (index: number, delta: number): void => {
-    updateSelected((workspace) => {
-      const next = [...workspace.targets];
-      const swap = index + delta;
-      if (swap < 0 || swap >= next.length) return workspace;
-      [next[index], next[swap]] = [next[swap], next[index]];
-      return { ...workspace, targets: next };
-    });
-  };
-
-  const launchOne = async (entry: WorkspaceTarget): Promise<string> => {
-    const error = await window.api.launchTarget(entry.target);
-    return error ? `${entry.label}: ${error}` : '';
-  };
-
-  const launchAll = async (): Promise<void> => {
-    if (!selected?.targets.length) return;
-    setLaunching(true);
-    setStatus(`Launching ${selected.targets.length} targets...`);
-    const failures: string[] = [];
-    for (const entry of selected.targets) {
-      const failure = await launchOne(entry);
-      if (failure) failures.push(failure);
-    }
-    setLaunching(false);
-    const opened = selected.targets.length - failures.length;
-    setStatus(failures.length
-      ? `Opened ${opened} of ${selected.targets.length}. Failed — ${failures.join('; ')}`
-      : `Opened all ${opened} targets.`);
-  };
-
-  return (
-    <div className="blanc-tool-detail">
-      <fieldset>
-        <legend>Workspaces</legend>
-        <p className="blanc-note">
-          Group the apps, files, and links you always open together, then start them in one click. Targets are added through the
-          Windows picker or as full http(s) links.
-        </p>
-        <div className="blanc-row-actions">
-          <input
-            type="text"
-            value={newName}
-            placeholder="New workspace name"
-            onChange={(event) => setNewName(event.target.value)}
-            onKeyDown={(event) => { if (event.key === 'Enter') addWorkspace(); }}
-          />
-          <button type="button" disabled={!newName.trim()} onClick={addWorkspace}>Create</button>
-        </div>
-        {workspaces.length > 0 && (
-          <div className="blanc-form-grid">
-            <label>
-              Workspace
-              <select value={selected?.id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
-                {workspaces.map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>
-                    {workspace.name} ({workspace.targets.length})
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
-        {status && <p className="blanc-note">{status}</p>}
-      </fieldset>
-
-      {selected ? (
-        <fieldset>
-          <legend>{selected.name}</legend>
-          <div className="blanc-row-actions">
-            <button type="button" disabled={launching || !selected.targets.length} onClick={() => void launchAll()}>
-              {launching ? 'Launching...' : `Launch all (${selected.targets.length})`}
-            </button>
-            <button type="button" disabled={launching} onClick={() => void addPickedTarget()}>Add app or file</button>
-            <button type="button" disabled={launching} onClick={removeWorkspace}>Delete workspace</button>
-          </div>
-          <div className="blanc-row-actions">
-            <input
-              type="text"
-              value={urlDraft}
-              placeholder="https://example.com"
-              onChange={(event) => setUrlDraft(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Enter') addUrlTarget(); }}
-            />
-            <button type="button" disabled={!urlDraft.trim()} onClick={addUrlTarget}>Add link</button>
-          </div>
-          {selected.targets.length ? (
-            <div className="blanc-table-wrap">
-              <table className="blanc-table">
-                <thead>
-                  <tr>
-                    <th>Target</th>
-                    <th>Path</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {selected.targets.map((entry, index) => (
-                    <tr key={entry.id}>
-                      <td>{entry.label}</td>
-                      <td className="blanc-note">{entry.target}</td>
-                      <td>
-                        <div className="blanc-row-actions">
-                          <button type="button" disabled={index === 0} onClick={() => moveTarget(index, -1)}>Up</button>
-                          <button type="button" disabled={index === selected.targets.length - 1} onClick={() => moveTarget(index, 1)}>Down</button>
-                          <button
-                            type="button"
-                            disabled={launching}
-                            onClick={() => { void launchOne(entry).then((failure) => setStatus(failure || `Opened ${entry.label}.`)); }}
-                          >
-                            Open
-                          </button>
-                          <button type="button" onClick={() => removeTarget(entry.id)}>Remove</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="blanc-note">No targets yet. Add an app, file, or link above.</p>
-          )}
-        </fieldset>
-      ) : (
-        <fieldset>
-          <legend>No workspaces</legend>
-          <p className="blanc-note">Create a workspace to start grouping targets.</p>
         </fieldset>
       )}
     </div>

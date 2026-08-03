@@ -44,11 +44,23 @@ import {
   DIRECTSTREAM_MEDIA_REPORT_ONLY,
   DIRECTSTREAM_MEDIA_SILENCE_MS,
   directstreamMediaVerdict,
+  directstreamOpenPresumedDead,
   directstreamOpenReopened,
   directstreamOpenVerdict,
   type DirectstreamMediaProgress,
   type DirectstreamOpenProgress,
-} from '../shared/directstreamOpenRecovery';
+} from './directstreamOpenRecovery';
+import {
+  directstreamOpenChannelIdle,
+  directstreamOpenGenerationFor,
+  directstreamOpenGenerationsIdle,
+  directstreamOpenRequest,
+  directstreamOpenSettled,
+  directstreamOpenSupersede,
+  type DirectstreamOpenChannel,
+  type DirectstreamOpenGenerations,
+  type DirectstreamOpenTicket,
+} from '../shared/directstreamOpenChannel';
 import { t as translateUi } from '../renderer/i18n';
 import {
   normalizeVideoCoreResumePositions,
@@ -58,7 +70,7 @@ import {
   VIDEO_CORE_RESUME_STORAGE_KEY,
   videoCoreResumeKey,
 } from '../shared/videoCoreStudy';
-import { resumeWriteAction } from '../shared/videoCoreResumeWrite';
+import { resumeWriteAction } from './videoCoreResumeWrite';
 import {
   createWatchTimeState,
   watchTimeFlush,
@@ -225,13 +237,49 @@ function loadResumePosition(
 }
 
 /**
+ * The open channel, and the generation counter that goes on the wire with it — slice 44.
+ *
+ * **Module-scoped, and that is the point, not an oversight.** `settled` has to mean the
+ * SERVER answered; an aborted `fetch` abandons the response and never the work, and effect
+ * cleanup is where aborts come from. State held in a ref would be torn down by the very
+ * cleanup that issues the abort, so the channel would forget an open the sidecar is still
+ * preparing — which is the race the channel exists to close. `seanimeSocketPool` is
+ * module-scoped for the same reason. One realm is one window is one `clientId`, and
+ * `AcceptOpenGeneration` orders each client id independently, so this needs no key.
+ */
+let openChannel: DirectstreamOpenChannel = directstreamOpenChannelIdle;
+let openGenerations: DirectstreamOpenGenerations = directstreamOpenGenerationsIdle;
+
+/**
+ * The server answered the POST this ticket issued — with a 200, a 500, or a transport error
+ * that is not an abort. Guarded by ticket IDENTITY, which makes it both idempotent (a `!ok`
+ * response settles here and then throws into the caller's `catch`) and supersession-safe: a
+ * late answer to an open the user has already moved off must not clear the channel that is
+ * now holding the CURRENT open's POST.
+ */
+function settleDirectstreamOpen(ticket: DirectstreamOpenTicket): void {
+  if (openChannel.outstanding !== ticket) return;
+  // `issue` is always null here: the launch path supersedes rather than queues, so nothing
+  // is ever waiting. The queueing door stays open in the module, tested and unwired, for a
+  // session that can measure it — see `directstreamOpenSupersede`'s header.
+  openChannel = directstreamOpenSettled(openChannel).channel;
+}
+
+/**
  * The one place a local-file open is issued. Both callers — the launch effect and the
  * recovery below it — go through here, so a header or a body that drifts drifts for both.
+ *
+ * `generation` is the client's own order over its opens, refused by the sidecar when it is
+ * older than one already accepted for this client id
+ * (`patches/seanime/0004-directstream-open-generation.patch`). It is NOT the request id —
+ * see `DirectstreamOpenGenerations` for the Blanc hash that rules that out. On an unpatched
+ * sidecar, which is every sidecar this app currently launches, the field is ignored.
  */
 function postDirectstreamOpen(
   conn: SeanimeConnection,
   clientId: string,
   localFilePath: string,
+  generation: number,
   signal: AbortSignal,
 ): Promise<Response> {
   return fetch(`${conn.baseUrl}/api/v1/directstream/play/localfile`, {
@@ -244,7 +292,7 @@ function postDirectstreamOpen(
       'X-Seanime-Client-Platform': __clientPlatform__,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ path: localFilePath, clientId }),
+    body: JSON.stringify({ path: localFilePath, clientId, generation }),
   });
 }
 
@@ -493,7 +541,7 @@ function ResumeTracker({
     /**
      * The furthest this session actually got. `resumeWriteAction` needs it to tell a
      * deliberate rewind to 0:00 from a session that never started — see
-     * `shared/videoCoreResumeWrite.ts` for why the two must not write the same thing.
+     * `./videoCoreResumeWrite.ts` for why the two must not write the same thing.
      */
     let sessionMaxSec = 0;
     /**
@@ -712,21 +760,56 @@ function StudyPlayerSession({
     }
 
     // Armed BEFORE the request, not in its `then`: a 200 is not evidence the preparation
-    // survived (see `shared/directstreamOpenRecovery.ts`), and the sidecar's first message
+    // survived (see `./directstreamOpenRecovery.ts`), and the sidecar's first message
     // can land before the fetch promise resolves.
     openProgressRef.current = {
       requestId: playbackRequest.requestId,
       progress: { attempts: 1, lastSignalAt: Date.now(), playbackArrived: false },
     };
 
-    void postDirectstreamOpen(conn, clientId, playbackRequest.localFilePath, controller.signal)
+    // A launch SUPERSEDES rather than queues: it is the newest intent there is, so it is
+    // already in the right order behind an older POST, and making the user wait behind one
+    // that may never answer buys ordering that is correct anyway at the price of a play
+    // button that does nothing. The queueing door is the stricter rule and stays unwired —
+    // `directstreamOpenSupersede`'s header says which observation would justify reaching
+    // for it. This also closes the recovery door behind the launch: every stage-1 recovery
+    // for the file the user just left now drops as `superseded`.
+    const ticket: DirectstreamOpenTicket = {
+      requestId: playbackRequest.requestId,
+      kind: 'launch',
+    };
+    openChannel = directstreamOpenSupersede(openChannel, ticket);
+    // Minted here and ONLY here. Every recovery for this request re-sends this same number,
+    // which is the equal-generation case `AcceptOpenGeneration` accepts on purpose.
+    openGenerations = directstreamOpenGenerationFor(openGenerations, playbackRequest.requestId);
+
+    void postDirectstreamOpen(
+      conn,
+      clientId,
+      playbackRequest.localFilePath,
+      openGenerations.generation,
+      controller.signal,
+    )
       .then(async (response) => {
+        // The server ANSWERED — whatever it said. This, and never the abort below, is what
+        // frees the channel; see the hole named at the top of `directstreamOpenChannel.ts`.
+        settleDirectstreamOpen(ticket);
         if (!response.ok) {
           throw new Error(describeLocalOpenFailure(response.status, await response.text()));
         }
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          // Deliberately does NOT settle. An aborted fetch abandons the RESPONSE, never the
+          // work: `PlayLocalFile` has already called `BeginOpen` and runs to completion. The
+          // channel keeps holding this ticket so nothing races the preparation we walked away
+          // from, and only a real answer — or, for a queued launch, the module's own deadline
+          // — can release it.
+          return;
+        }
+        // A transport failure IS an end to the exchange, so it settles. Idempotent: a `!ok`
+        // response already settled this ticket in the branch above.
+        settleDirectstreamOpen(ticket);
         // A refused open reports itself, so the silence watchdog has nothing left to do.
         openProgressRef.current = null;
         setState({
@@ -747,7 +830,7 @@ function StudyPlayerSession({
   /**
    * The recovery. A local open that the sidecar cancelled mid-preparation answers 200 and
    * then says nothing at all, so silence is the only symptom there is — see
-   * `shared/directstreamOpenRecovery.ts` for the measured sequence and why the cancel comes
+   * `./directstreamOpenRecovery.ts` for the measured sequence and why the cancel comes
    * from adopted code we do not edit.
    *
    * Deliberately its own effect. Folding it into the launch effect would tie the deadline
@@ -765,31 +848,69 @@ function StudyPlayerSession({
       // already armed a fresh record for the new one.
       if (!outstanding || outstanding.requestId !== playbackRequest.requestId) return;
 
-      switch (directstreamOpenVerdict(outstanding.progress, Date.now())) {
+      const now = Date.now();
+      const stall = (): void => {
+        openProgressRef.current = null;
+        setState({
+          active: true,
+          playbackInfo: null,
+          playbackError: translateUi('mediaWorkspace.openStalled'),
+          loadingState: null,
+        });
+      };
+
+      switch (directstreamOpenVerdict(outstanding.progress, now)) {
         case 'playing':
           openProgressRef.current = null;
           break;
         case 'waiting':
           break;
-        case 'reopen':
+        case 'reopen': {
+          // THE GATE — slice 44. The verdict decides whether this open looks dead; the
+          // channel decides whether a POST about it may leave. A recovery is dropped and
+          // never queued, because by the time the channel frees, the situation that formed
+          // the opinion has moved, and a POST that outlives its justification is the whole
+          // defect (`directstreamOpenChannel.ts`, rule 3).
+          const { channel, decision } = directstreamOpenRequest(openChannel, {
+            requestId: playbackRequest.requestId,
+            kind: 'recovery',
+          });
+          openChannel = channel;
+          if (decision.action !== 'issue') {
+            // No attempt is counted and no clock is re-armed: nothing was sent, so the stage
+            // must be free to re-form the same opinion on the next tick, which is exactly
+            // what happens the moment the outstanding POST answers. What must NOT survive
+            // that is silence — a gate that can withhold the POST may not also withhold the
+            // report, so a refusal that outlives the deadline still speaks.
+            if (directstreamOpenPresumedDead(outstanding.progress, now)) stall();
+            break;
+          }
           // Counted and re-armed together, so the next tick reads `waiting` rather than
           // firing a second request into the first one's window.
-          outstanding.progress = directstreamOpenReopened(outstanding.progress, Date.now());
+          outstanding.progress = directstreamOpenReopened(outstanding.progress, now);
+          // The SAME generation the launch minted. A recovery is a re-open of the same
+          // request, which `AcceptOpenGeneration` accepts as equal; minting a new one here
+          // would raise the bar on the sidecar and refuse the user's next real launch.
+          const recoveryTicket = decision.ticket;
           void postDirectstreamOpen(
-            conn, clientId, playbackRequest.localFilePath, controller.signal,
-          ).catch(() => {
-            // A failed re-open is not reported here: the record stays armed and the next
-            // silence window reaches `failed`, which is the one place this speaks.
-          });
+            conn,
+            clientId,
+            playbackRequest.localFilePath,
+            openGenerations.generation,
+            controller.signal,
+          )
+            .then(() => settleDirectstreamOpen(recoveryTicket))
+            .catch(() => {
+              // A failed re-open is not reported here: the record stays armed and the next
+              // silence window reaches `failed`, which is the one place this speaks. The
+              // channel is settled only for a real answer — an abort leaves the sidecar
+              // working, so this holds, exactly as the launch path does.
+              if (!controller.signal.aborted) settleDirectstreamOpen(recoveryTicket);
+            });
           break;
+        }
         case 'failed':
-          openProgressRef.current = null;
-          setState({
-            active: true,
-            playbackInfo: null,
-            playbackError: translateUi('mediaWorkspace.openStalled'),
-            loadingState: null,
-          });
+          stall();
           break;
       }
     }, 1_000);
@@ -816,7 +937,7 @@ function StudyPlayerSession({
    * destructive mechanism is absent by construction rather than by argument.
    *
    * What it buys is the part that never needed a POST: a forever-spinner becomes a stated
-   * error. See `shared/directstreamOpenRecovery.ts` for the full history before changing it.
+   * error. See `./directstreamOpenRecovery.ts` for the full history before changing it.
    */
   React.useEffect(() => {
     if (proofConfig || !playbackRequest || playbackRequest.kind !== 'local' || !clientId) {

@@ -20,7 +20,20 @@ function filePath(): string {
 export function loadProfileRules(): ProfileRulesStore {
   try {
     const raw = fs.readFileSync(filePath(), 'utf8');
-    return normalizeProfileRulesStore(JSON.parse(raw));
+    const parsed = JSON.parse(raw) as { schemaVersion?: unknown };
+    const next = normalizeProfileRulesStore(parsed);
+    if (parsed.schemaVersion !== next.schemaVersion) {
+      try {
+        const file = filePath();
+        const temporary = `${file}.tmp`;
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(temporary, JSON.stringify(next, null, 2), 'utf8');
+        fs.renameSync(temporary, file);
+      } catch (error) {
+        console.warn('[profile-rules] migration could not be persisted:', error);
+      }
+    }
+    return next;
   } catch {
     return { ...EMPTY_PROFILE_RULES, rules: [] };
   }

@@ -10,7 +10,13 @@ export interface VirtualGridProps<T> {
   items: T[];
   minColWidth: number;
   gap: number;
-  rowHeight: number;
+  /**
+   * Fixed row height, or a function of the resolved column width. Aspect-ratio
+   * cards (a 2:3 poster plus its caption) can only be sized once the responsive
+   * column math has run, and that math lives in here — so they pass a callback
+   * rather than duplicating the `columns` formula at every call site.
+   */
+  rowHeight: number | ((colWidth: number) => number);
   overscan?: number;
   className?: string;
   style?: React.CSSProperties;
@@ -44,12 +50,25 @@ export default function VirtualGrid<T>({
   }, [containerRef]);
 
   const columns = Math.max(1, Math.floor((size.width + gap) / (minColWidth + gap)));
+  // Mirrors the `repeat(columns, 1fr)` track below, so a callback row height sees
+  // the same width the cards will actually render at. Falls back to minColWidth
+  // until ResizeObserver reports a width, which keeps the first paint sane.
+  const colWidth = size.width > 0
+    ? Math.max(1, (size.width - gap * (columns - 1)) / columns)
+    : minColWidth;
+  const resolvedRowHeight = Math.max(
+    1,
+    typeof rowHeight === 'function' ? rowHeight(colWidth) : rowHeight,
+  );
   const rowCount = Math.ceil(items.length / columns);
   const viewportH = size.height || 0;
-  const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
-  const visibleRows = Math.ceil(viewportH / rowHeight) + overscan * 2;
+  const startRow = Math.max(0, Math.floor(scrollTop / resolvedRowHeight) - overscan);
+  // Until ResizeObserver reports a height, render every row so a collapsed
+  // flex parent doesn't blank the grid (zero-height viewport → zero cards).
+  const visibleRows =
+    viewportH > 0 ? Math.ceil(viewportH / resolvedRowHeight) + overscan * 2 : Math.max(rowCount, 1);
   const endRow = Math.min(rowCount, startRow + visibleRows);
-  const totalHeight = rowCount * rowHeight;
+  const totalHeight = rowCount * resolvedRowHeight;
 
   const rows = useMemo(() => {
     const out: { row: number; slice: T[] }[] = [];
@@ -70,10 +89,10 @@ export default function VirtualGrid<T>({
                 key={row}
                 style={{
                   position: 'absolute',
-                  top: row * rowHeight,
+                  top: row * resolvedRowHeight,
                   left: 0,
                   right: 0,
-                  height: rowHeight,
+                  height: resolvedRowHeight,
                   display: 'grid',
                   gridTemplateColumns: `repeat(${columns}, 1fr)`,
                   gap,

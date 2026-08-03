@@ -1,13 +1,13 @@
 import { app, dialog, ipcMain, BrowserWindow, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import AdmZip from 'adm-zip';
 import { mt } from './i18n';
 import { extractEpubTitleFromOpf } from './epubMeta';
 import type {
   AiApiKeysSet,
   AiEngineConfig,
+  AiEngineKind,
   AiEnrichmentRequest,
   AiEnrichmentResult,
   AiDeckGenerationRequest,
@@ -25,9 +25,16 @@ import type {
   MiningEnrichProgress,
   NameTag,
   TraditionalMiningConfig,
-  DEFAULT_TRADITIONAL_MINING_CONFIG,
+  // DEFAULT_TRADITIONAL_MINING_CONFIG is a value, and is imported as one below. It
+  // was listed here too, inside `import type`, which TypeScript erases — the value
+  // import is the only reason it worked at runtime.
 } from '../shared/mining';
 import { buildAiPromptPreview, renderAiTemplate } from '../shared/aiPromptBuilder';
+// Used at the EPUB deck-export call site but never imported — a latent ReferenceError
+// that predated this change and only surfaced once tsc could see past the duplicate
+// DEFAULT_TRADITIONAL_MINING_CONFIG import above. Taken from the defining module
+// rather than the mining barrel, per the bundle note in shared/mining.ts.
+import { buildEpubDeckExport } from '../shared/epubDeck';
 import { callAiProvider, parseAiJson } from './aiProviderClient';
 import {
   needsEnrichmentLookup,
@@ -62,6 +69,7 @@ import {
   DEFAULT_TRADITIONAL_MINING_CONFIG,
   applyLanguageOptionsToFormat,
   languageOptionsForProfile,
+  normalizeAiEngineKind,
   normalizeLanguageOptions,
   providerById,
   providerKeyBucket,
@@ -69,6 +77,10 @@ import {
 } from '../shared/mining';
 import type { LibraryItem } from '../shared/types';
 import { getProfileStore } from './profiles';
+import {
+  getMainJapaneseTokenizer,
+  type MainKuromojiToken as KuromojiToken,
+} from './japaneseTokenizer';
 
 interface FrequencyDictionaryFile {
   summary: FrequencyDictionarySummary;
@@ -82,6 +94,7 @@ interface MiningConfigFile extends AiLanguageOptions {
   cardCount: number;
   outputFormat: 'anki' | 'csv';
   providerId: AiProviderId;
+  engine: AiEngineKind;
 }
 
 function languageOptionsFromRaw(raw?: Partial<MiningConfigFile>): AiLanguageOptions {
@@ -241,11 +254,13 @@ function aiEngineConfigFromFile(config: MiningConfigFile): AiEngineConfig {
   return {
     apiKeysSet,
     apiKeySet: Boolean(readApiKeyForProvider(providerId)),
+    engine: config.engine ?? 'cloud',
     providerId,
     selectedPresetId: config.selectedPresetId,
     selectedFormatId: config.selectedFormatId,
     cardCount: config.cardCount,
     outputFormat: config.outputFormat,
+    localModelAvailable: false, // filled in ai:getConfig below
     ...lang,
   };
 }
@@ -260,6 +275,11 @@ export function getConfiguredAiProvider(): { providerId: AiProviderId; apiKey: s
   return { providerId, apiKey: readApiKeyForProvider(providerId) };
 }
 
+/** Cloud vs local-Qwen — shared by Card Studio and sentence analysis. */
+export function getConfiguredAiEngine(): AiEngineKind {
+  return readMiningConfig().engine ?? 'cloud';
+}
+
 interface TokenCandidate {
   expression: string;
   reading: string;
@@ -269,15 +289,6 @@ interface TokenCandidate {
   /** True when `reading` came from an unconjugated surface (surface === lemma). */
   readingFromLemma?: boolean;
 }
-
-type KuromojiToken = {
-  surface_form: string;
-  basic_form: string;
-  reading?: string;
-  pos: string;
-  pos_detail_1: string;
-  pos_detail_2: string;
-};
 
 let analyzeCancelRequested = false;
 
@@ -328,9 +339,6 @@ function inferForeignNameTag(expression: string, reading: string): NameTag {
   if (matchesRussianNameHeuristic(expression, reading)) return 'ru-name';
   return null;
 }
-
-let kuromojiTokenizerPromise: Promise<{ tokenize(text: string): KuromojiToken[] } | null> | null = null;
-const localRequire = createRequire(__filename);
 
 function miningRoot(): string {
   return path.join(app.getPath('userData'), 'mining');
@@ -416,6 +424,7 @@ function readMiningConfig(): MiningConfigFile {
       cardCount: Math.max(1, Math.min(50, Math.round(raw.cardCount ?? selectedFormat.cardTemplates.length))),
       outputFormat: raw.outputFormat === 'csv' ? 'csv' : selectedFormat.outputFormat,
       providerId: providerIdFromRaw(raw.providerId),
+      engine: normalizeAiEngineKind(raw.engine),
       ...languageOptionsFromRaw(raw),
     };
   } catch {
@@ -427,6 +436,7 @@ function readMiningConfig(): MiningConfigFile {
       cardCount: defaultFormat.cardTemplates.length,
       outputFormat: defaultFormat.outputFormat,
       providerId: DEFAULT_AI_PROVIDER_ID,
+      engine: 'cloud',
       ...DEFAULT_AI_LANGUAGE_OPTIONS,
     };
   }
@@ -434,30 +444,6 @@ function readMiningConfig(): MiningConfigFile {
 
 function writeMiningConfig(config: MiningConfigFile): void {
   atomicWrite(configPath(), JSON.stringify(config, null, 2));
-}
-
-async function getKuromojiTokenizer(): Promise<{ tokenize(text: string): KuromojiToken[] } | null> {
-  if (!kuromojiTokenizerPromise) {
-    kuromojiTokenizerPromise = (async () => {
-      try {
-        const mod = await import('kuromoji');
-        const dictPath = path.join(path.dirname(localRequire.resolve('kuromoji')), '..', 'dict');
-        return await new Promise<{ tokenize(text: string): KuromojiToken[] }>((resolve, reject) => {
-          mod.builder({ dicPath: dictPath }).build((err: Error | null, tokenizer: unknown) => {
-            if (err || !tokenizer) {
-              reject(err ?? new Error('Could not build kuromoji tokenizer.'));
-              return;
-            }
-            resolve(tokenizer as { tokenize(text: string): KuromojiToken[] });
-          });
-        });
-      } catch (error) {
-        console.error('[mining] kuromoji unavailable:', error);
-        return null;
-      }
-    })();
-  }
-  return kuromojiTokenizerPromise;
 }
 
 function stripHtml(raw: string): string {
@@ -603,7 +589,7 @@ function resolveLemmaReading(
 }
 
 async function tokenizeJapanese(text: string): Promise<Map<string, TokenCandidate>> {
-  const tokenizer = await getKuromojiTokenizer();
+  const tokenizer = await getMainJapaneseTokenizer();
   if (!tokenizer) return tokenizeJapaneseSimple(text);
   const byExpression = new Map<string, TokenCandidate>();
   for (const sentence of splitSentences(text)) {
@@ -1131,11 +1117,20 @@ function buildGeneratedCards(
 
 async function enrichWithAi(req: AiEnrichmentRequest): Promise<AiEnrichmentResult> {
   const config = readMiningConfig();
+  const engine = config.engine ?? 'cloud';
   const providerId = req.providerId ?? config.providerId ?? DEFAULT_AI_PROVIDER_ID;
   const provider = providerById(providerId);
-  const apiKey = readApiKeyForProvider(providerId);
-  if (!apiKey) {
+  const apiKey = engine === 'cloud' ? readApiKeyForProvider(providerId) : '';
+  if (engine === 'cloud' && !apiKey) {
     throw new Error(`Add a ${provider.label} API key before using AI enrichment.`);
+  }
+  if (engine === 'local-qwen') {
+    const { isTranslateAvailable } = await import('./translate');
+    if (!isTranslateAvailable()) {
+      throw new Error(
+        'Local Qwen model not found. Install Qwen3-1.7B via Translate, or switch the engine to Cloud.',
+      );
+    }
   }
   const preset = presetById(req.presetId);
   const format = formatById(req.formatId, preset.id);
@@ -1164,8 +1159,14 @@ async function enrichWithAi(req: AiEnrichmentRequest): Promise<AiEnrichmentResul
     targetLang: profile.targetLang,
     sampleTerm: req,
   });
-  const text = await callAiProvider(providerId, apiKey, prompt, buildSchema());
-  const parsed = JSON.parse(text) as Partial<AiEnrichmentResult>;
+  const text =
+    engine === 'local-qwen'
+      ? await (await import('./translate')).runLocalQwenPrompt(
+          `${prompt}\n\nRespond with a single JSON object only — no markdown fences.`,
+          { maxTokens: 2048, timeoutMs: 120_000 },
+        )
+      : await callAiProvider(providerId, apiKey, prompt, buildSchema());
+  const parsed = parseAiJson<Partial<AiEnrichmentResult>>(text, engine === 'local-qwen' ? 'Local Qwen' : provider.label);
   const image = await findImageHtml(parsed.imageQuery || req.term, preset.label);
   const values = {
     expression: parsed.expression || req.term,
@@ -1289,11 +1290,20 @@ async function buildEnrichmentResult(
 
 async function generateDeckWithAi(req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]> {
   const config = readMiningConfig();
+  const engine = config.engine ?? 'cloud';
   const providerId = req.providerId ?? config.providerId ?? DEFAULT_AI_PROVIDER_ID;
   const provider = providerById(providerId);
-  const apiKey = readApiKeyForProvider(providerId);
-  if (!apiKey) {
+  const apiKey = engine === 'cloud' ? readApiKeyForProvider(providerId) : '';
+  if (engine === 'cloud' && !apiKey) {
     throw new Error(`Add a ${provider.label} API key before generating cards.`);
+  }
+  if (engine === 'local-qwen') {
+    const { isTranslateAvailable } = await import('./translate');
+    if (!isTranslateAvailable()) {
+      throw new Error(
+        'Local Qwen model not found. Install Qwen3-1.7B via Translate, or switch the engine to Cloud.',
+      );
+    }
   }
   const preset = presetById(req.presetId);
   const format = formatById(req.formatId, preset.id);
@@ -1390,12 +1400,18 @@ async function generateDeckWithAi(req: AiDeckGenerationRequest): Promise<AiEnric
       inventBatch:
         inventBatches > 1 ? { index: batchIndex + 1, total: inventBatches } : undefined,
     });
-    const text = await callAiProvider(providerId, apiKey, prompt, buildBatchSchema(), {
-      itemCount: chunkCount,
-    });
+    const text =
+      engine === 'local-qwen'
+        ? await (await import('./translate')).runLocalQwenPrompt(
+            `${prompt}\n\nRespond with a single JSON object only — no markdown fences.`,
+            { maxTokens: Math.min(8192, Math.max(2048, chunkCount * 450)), timeoutMs: 180_000 },
+          )
+        : await callAiProvider(providerId, apiKey, prompt, buildBatchSchema(), {
+            itemCount: chunkCount,
+          });
     const parsed = parseAiJson<{ items?: Partial<AiEnrichmentResult>[] }>(
       text,
-      provider.label,
+      engine === 'local-qwen' ? 'Local Qwen' : provider.label,
     );
     const chunkItems = Array.isArray(parsed.items) ? parsed.items : [];
     if (!chunkItems.length) {
@@ -1867,7 +1883,11 @@ export function registerMiningIpc(): void {
     const extension = (ext ?? 'csv').replace(/^\./, '') || 'csv';
     return saveTextFileWithName(content, `${safe}.${extension}`, extension);
   });
-  bind('ai:getConfig', (): AiEngineConfig => aiEngineConfigFromFile(readMiningConfig()));
+  bind('ai:getConfig', async (): Promise<AiEngineConfig> => {
+    const base = aiEngineConfigFromFile(readMiningConfig());
+    const { isTranslateAvailable } = await import('./translate');
+    return { ...base, localModelAvailable: isTranslateAvailable() };
+  });
   bind('ai:setApiKey', (_e, raw: unknown) => {
     try {
       const { bucket, apiKey } = parseApiKeyPayload(raw);
@@ -1907,6 +1927,17 @@ export function registerMiningIpc(): void {
       providerId: nextProvider,
       apiKeySet: Boolean(readApiKeyForProvider(nextProvider)),
       apiKeysSet: readApiKeysSet(),
+    };
+  });
+  bind('ai:setEngine', async (_e, engineRaw: unknown) => {
+    const current = readMiningConfig();
+    const engine = normalizeAiEngineKind(engineRaw);
+    writeMiningConfig({ ...current, engine });
+    const { isTranslateAvailable } = await import('./translate');
+    return {
+      ok: true as const,
+      ...aiEngineConfigFromFile(readMiningConfig()),
+      localModelAvailable: isTranslateAvailable(),
     };
   });
   bind('ai:listPresets', (): AiPromptPreset[] => [...AI_PROMPT_PRESETS]);

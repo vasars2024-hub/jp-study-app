@@ -7,11 +7,13 @@ import type {
   MiningEnrichProgress,
 } from '../../shared/mining';
 import {
+  mergeEnrichedCandidates,
+} from '../../shared/mining';
+import {
   buildEpubDeckExport,
   describeEpubFilterPipeline,
   filterEpubCandidates,
-  mergeEnrichedCandidates,
-} from '../../shared/mining';
+} from '../../shared/epubDeck';
 import { buildSimpleEpubConfig, type SimpleEpubFilterMode } from '../../shared/simpleEpubMining';
 import { useT } from '../i18n';
 import EpubFilterPipelinePanel from './EpubFilterPipelinePanel';

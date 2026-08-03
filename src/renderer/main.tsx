@@ -19,8 +19,6 @@ import { bootCustomCss } from './customCss';
 import { runStorageMigrations } from './storage/migrationRunner';
 import { initProfileState } from './profileState';
 import { initDesktopState } from './desktopState';
-import { initCityState } from './cityState';
-import { startCitySession } from './citySession';
 import { installKeyboardShortcuts } from './keyboardShortcuts';
 import { clearOnExitIfConfigured } from './clipboardHistory';
 import { startReleaseCheck } from './releaseCheck';
@@ -80,6 +78,9 @@ import { registerWiredArchiveSoundPack } from './audio/wiredArchivePack';
 import { bootWiredArchiveSettings } from './terminalModeSettings';
 import { installWiredArchiveLifecycle } from './wiredArchiveLifecycle';
 import { applyBlancModeClass, isBlancWindow } from './blancMode';
+import { syncLocalAgentAutomations } from './localAgentAutomationStore';
+
+syncLocalAgentAutomations();
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 
@@ -248,9 +249,6 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
   runWhenIdle(() => {
     initProfileState().catch((err) => console.error('[profileState] init failed:', err));
     initDesktopState().catch((err) => console.error('[desktopState] init failed:', err));
-    initCityState()
-      .then(() => startCitySession())
-      .catch((err) => console.error('[cityState] init failed:', err));
   }, 3500);
 
   prewarmTokenizerLater();
@@ -266,7 +264,7 @@ if (container) {
   // paint English and then flip once the chunk landed, a visible flash on every
   // boot in a non-English UI. English is the default and is already loaded, so
   // for most sessions this costs a microtask, not a fetch.
-  void initI18n().then(() => {
+  void initI18n().then(async () => {
     if (isSysDictOverlay) {
       // Profile state powers the popup's Anki mining target; nothing else boots.
       initProfileState().catch((err) => console.error('[profileState] init failed:', err));
@@ -288,6 +286,9 @@ if (container) {
         </React.StrictMode>,
       );
     } else {
+      await import('./levelLists')
+        .then(({ restoreLevelListsFromIdb }) => restoreLevelListsFromIdb())
+        .catch((err) => console.warn('[level-lists] startup restore skipped:', err));
       createRoot(container).render(
         <React.StrictMode>
           <AppErrorBoundary>

@@ -89,7 +89,9 @@ export interface EnvironmentSettings {
   /** Experimental: companions on the real Windows desktop (not implemented in L0). */
   companionsOnOsDesktop: boolean;
   /** Which companion types are active. */
-  companionTypes: Array<'study-buddy' | 'critter' | 'timekeeper' | 'noctis' | 'miko-shimeji' | 'wired-navi'>;
+  companionTypes: Array<
+    'study-buddy' | 'critter' | 'timekeeper' | 'miko-shimeji' | 'wired-navi'
+  >;
   companionReactivity: 'quiet' | 'normal' | 'playful';
   /** 0–1 wander / sprite / bob speed. Default 0.4 (calmer than classic shimeji). */
   companionActiveness: number;
@@ -175,7 +177,7 @@ export const DEFAULT_ENVIRONMENT: EnvironmentSettings = {
   matchParticleSuggestions: true,
   companionsEnabled: false,
   companionsOnOsDesktop: false,
-  companionTypes: ['study-buddy', 'critter', 'timekeeper', 'noctis', 'miko-shimeji', 'wired-navi'],
+  companionTypes: ['study-buddy', 'critter', 'timekeeper', 'miko-shimeji', 'wired-navi'],
   companionReactivity: 'normal',
   companionActiveness: 0.4,
   companionCelebrate: true,

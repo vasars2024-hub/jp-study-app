@@ -422,37 +422,6 @@
   border-bottom: 1px solid var(--glass-border);
 }
 
-:root[data-materials='aero'] .aero-flash-search {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 7px;
-  margin-right: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: 3px;
-  background: color-mix(in srgb, #ffffff 62%, transparent);
-  color: var(--muted);
-}
-
-:root[data-materials='aero'] .aero-flash-search:focus-within {
-  border-color: var(--accent);
-}
-
-:root[data-materials='aero'] .aero-flash-search input {
-  width: 150px;
-  border: 0;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  outline: none;
-}
-
-:root[data-materials='aero'] .aero-flash-search input::-webkit-search-cancel-button {
-  display: none;
-}
-
 :root[data-materials='aero'] .aero-flash-layout {
   flex: 1;
   min-height: 0;
@@ -927,9 +896,15 @@
 @media (max-width: 1080px) {
   :root[data-materials='aero'] .aero-flash-layout {
     grid-template-columns: 166px minmax(320px, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
   :root[data-materials='aero'] .aero-flash-inspector {
-    display: none;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: 260px;
+    overflow: auto;
+    border-top: 1px solid var(--glass-border);
   }
 }
 
@@ -1308,7 +1283,10 @@
     grid-template-columns: 1fr;
   }
   :root[data-materials='aero'] .aero-immersion-rail {
-    display: none;
+    display: block;
+    max-height: 240px;
+    overflow: auto;
+    border-top: 1px solid var(--glass-border);
   }
 }
 
@@ -2265,7 +2243,8 @@
   min-height: 0;
   gap: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0.08)),
     color-mix(in srgb, var(--panel) 88%, #ffffff);
@@ -2278,7 +2257,8 @@
 :root[data-materials='aero'] .aero-media-chrome .media-toolbar,
 :root[data-materials='aero'] .aero-media-chrome .media-yt,
 :root[data-materials='aero'] .aero-media-chrome .media-watch,
-:root[data-materials='aero'] .aero-media-chrome .media-lib-head {
+:root[data-materials='aero'] .aero-media-chrome .media-lib-head,
+:root[data-materials='aero'] .aero-media-chrome .media-collapsible-head {
   flex: none;
   gap: 5px;
   margin: 0;
@@ -2340,14 +2320,27 @@
   background: rgba(4, 12, 18, 0.82);
 }
 
-:root[data-materials='aero'] .aero-media-chrome .media-lib-head h2 {
+:root[data-materials='aero'] .aero-media-chrome .media-lib-head h2,
+:root[data-materials='aero'] .aero-media-chrome .media-lib-section .media-collapsible-title {
   margin: 0;
   font-size: var(--font-size-md);
 }
 
+:root[data-materials='aero'] .aero-media-chrome .media-lib-section {
+  flex: 1 1 34%;
+  min-height: 180px;
+  margin: 0;
+  overflow: hidden;
+}
+
+:root[data-materials='aero'] .aero-media-chrome .media-lib-section .media-collapsible-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
 :root[data-materials='aero'] .aero-media-chrome .media-lib-panel {
-  flex: 0 1 34%;
-  min-height: 140px;
+  flex: 1;
+  min-height: 0;
   margin: 0;
   border-width: 0;
   border-radius: 0;
@@ -2359,7 +2352,10 @@
 }
 
 :root[data-materials='aero'] .aero-media-chrome .media-lib-grid-wrap {
-  min-height: 0;
+  flex: 1;
+  height: auto;
+  max-height: none;
+  min-height: 160px;
 }
 
 :root[data-materials='aero'] .aero-media-chrome .media-card {
@@ -2575,7 +2571,12 @@
 }
 :root[data-materials='aero'] .os-set-nav-item.active {
   background: var(--app-selection);
-  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  /* WCAG 1.4.11: the selection was marked by --app-selection FILL alone, which on this light
+     theme is rgb(144,204,230) on rgb(232,242,246) -> 1.54:1 (measured 2026-08-03). The glass
+     highlight stays; a --state-indicator bar is added so the selected row has a boundary that
+     actually reads, matching the pattern .os-set-nav-item.active already uses on the dark
+     themes. #00697f scores 5.55:1 against this backdrop. */
+  box-shadow: inset 2px 0 0 0 var(--state-indicator), inset 0 1px 0 var(--glass-highlight);
 }
 :root[data-materials='aero'] .os-set-nav-group { margin-top: 6px; }
 :root[data-materials='aero'] .os-set-nav-group-label {
@@ -2938,8 +2939,11 @@
 :root[data-materials='aero'] .aero-library-tree-row.active,
 :root[data-materials='aero'] .aero-library-tree-row.dragover {
   background: var(--app-selection);
+  /* The border was --accent at 45% mixed into --glass-border: rgb(143,204,231) on
+     rgb(228,240,244) -> 1.51:1 measured. A 45% mix of a LIGHT accent on a LIGHT surface cannot
+     reach 3:1 whatever the hue. Same fix as the settings nav above. */
   border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+  box-shadow: inset 2px 0 0 0 var(--state-indicator), inset 0 1px 0 rgba(255,255,255,0.72);
 }
 
 :root[data-materials='aero'] .aero-library-tree-row span {
@@ -3244,9 +3248,14 @@
 @media (max-width: 980px) {
   :root[data-materials='aero'] .aero-library-workbench {
     grid-template-columns: 170px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
   :root[data-materials='aero'] .aero-library-inspector {
-    display: none;
+    display: block;
+    grid-column: 1 / -1;
+    max-height: 300px;
+    overflow: auto;
+    border-top: 1px solid var(--glass-border);
   }
   :root[data-materials='aero'] .aero-library-row {
     grid-template-columns: minmax(160px, 1fr) 72px 76px;
@@ -3841,10 +3850,25 @@
   :root[data-materials='aero'] .aero-novels-workbench {
     grid-template-columns: 156px minmax(300px, 1fr);
   }
-  :root[data-materials='aero'] .aero-resources-inspector,
-  :root[data-materials='aero'] .aero-stats-knowledge,
-  :root[data-materials='aero'] .aero-novels-inspector {
-    display: none;
+  :root[data-materials='aero'] .aero-resources-workbench {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  :root[data-materials='aero'] .aero-resources-inspector {
+    display: block;
+    grid-column: 1 / -1;
+    max-height: 180px;
+    overflow: auto;
+    border-top: 1px solid var(--glass-border);
+  }
+  :root[data-materials='aero'] .aero-stats-workbench {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  :root[data-materials='aero'] .aero-stats-knowledge {
+    display: block;
+    grid-column: 1 / -1;
+    max-height: 260px;
+    overflow: auto;
+    border-top: 1px solid var(--glass-border);
   }
   :root[data-materials='aero'] .aero-resource-row {
     grid-template-columns: minmax(140px, 1fr) 64px 110px;
@@ -3859,112 +3883,6 @@
   :root[data-materials='aero'] .aero-novel-row > span:nth-child(5) {
     display: none;
   }
-}
-
-/* ---------- Noctis placeholder: native module stub, not a landing card ------ */
-:root[data-materials='aero'] .aero-noctis-chrome .ui-app-chrome__body {
-  min-height: 0;
-  overflow: hidden;
-  background: var(--app-work-surface);
-}
-
-:root[data-materials='aero'] .aero-noctis-placeholder {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-:root[data-materials='aero'] .aero-noctis-toolbar {
-  min-height: 32px;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
-:root[data-materials='aero'] .aero-noctis-workbench {
-  display: grid;
-  grid-template-columns: 166px minmax(0, 1fr);
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-:root[data-materials='aero'] .aero-noctis-nav {
-  display: grid;
-  align-content: start;
-  gap: 2px;
-  min-height: 0;
-  overflow: auto;
-  padding: 6px;
-  border-right: 1px solid var(--glass-border);
-  background:
-    linear-gradient(90deg, rgba(255,255,255,0.54), rgba(255,255,255,0.18)),
-    color-mix(in srgb, var(--app-nav-surface) 84%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-noctis-nav button {
-  min-height: 25px;
-  padding: 3px 7px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  text-align: left;
-}
-
-:root[data-materials='aero'] .aero-noctis-nav button.active {
-  background: var(--app-selection);
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--glass-border));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.74);
-}
-
-:root[data-materials='aero'] .aero-noctis-nav button:disabled {
-  color: var(--muted);
-  opacity: 0.72;
-}
-
-:root[data-materials='aero'] .aero-noctis-main {
-  min-height: 0;
-  overflow: auto;
-  padding: 6px;
-}
-
-:root[data-materials='aero'] .aero-noctis-panel {
-  border: 1px solid var(--glass-border);
-  background: color-mix(in srgb, var(--panel) 86%, #ffffff);
-}
-
-:root[data-materials='aero'] .aero-noctis-panel + .aero-noctis-panel {
-  margin-top: 8px;
-}
-
-:root[data-materials='aero'] .aero-noctis-panel header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 26px;
-  padding: 4px 7px;
-  border-bottom: 1px solid var(--glass-border);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.78), rgba(224,238,242,0.78)),
-    var(--panel);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
-:root[data-materials='aero'] .aero-noctis-panel p,
-:root[data-materials='aero'] .aero-noctis-panel ul {
-  margin: 0;
-  padding: 9px 11px;
-  color: color-mix(in srgb, var(--text) 78%, var(--muted));
-  font-size: var(--font-size-sm);
-  line-height: 1.55;
-}
-
-:root[data-materials='aero'] .aero-noctis-panel ul {
-  padding-left: 26px;
 }
 
 /* ---------- Phase 4.75 M6: embedded utility subpanels -----------------------
@@ -5069,7 +4987,6 @@
 :root[data-materials='aero'] .aero-stats-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-translate-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-novels-chrome .ui-app-chrome__body,
-:root[data-materials='aero'] .aero-noctis-chrome .ui-app-chrome__body,
 :root[data-materials='aero'] .aero-gram-chrome .ui-app-chrome__body {
   background:
     linear-gradient(180deg, rgba(75, 170, 238, 0.36) 0, rgba(180, 229, 251, 0.26) 56px, transparent 116px),
@@ -5088,8 +5005,7 @@
 :root[data-materials='aero'] .aero-stats,
 :root[data-materials='aero'] .aero-translate,
 :root[data-materials='aero'] .aero-novels,
-:root[data-materials='aero'] .aero-gram,
-:root[data-materials='aero'] .aero-noctis-placeholder {
+:root[data-materials='aero'] .aero-gram {
   background: transparent;
 }
 
@@ -5103,8 +5019,7 @@
 :root[data-materials='aero'] .aero-resource-group,
 :root[data-materials='aero'] .aero-resources-inspector,
 :root[data-materials='aero'] .aero-translate-pane,
-:root[data-materials='aero'] .aero-novels-detail,
-:root[data-materials='aero'] .aero-noctis-panel {
+:root[data-materials='aero'] .aero-novels-detail {
   border: 1px solid var(--vista-app-line);
   border-radius: 2px;
   background:
@@ -5156,8 +5071,7 @@
 :root[data-materials='aero'] .aero-stats-knowledge,
 :root[data-materials='aero'] .aero-novels-tree,
 :root[data-materials='aero'] .aero-gram-nav,
-:root[data-materials='aero'] .os-set-nav-v2,
-:root[data-materials='aero'] .aero-noctis-nav {
+:root[data-materials='aero'] .os-set-nav-v2 {
   border: 1px solid var(--vista-app-line);
   border-radius: 2px;
   background:
@@ -5198,7 +5112,16 @@
 :root[data-materials='aero'] input,
 :root[data-materials='aero'] textarea,
 :root[data-materials='aero'] select {
-  border-color: rgba(104, 166, 196, 0.95);
+  /* WCAG 1.4.11 (3:1 for a control affordance). THIS is aero's input border — it sets
+     border-color DIRECTLY on every input/textarea/select, so the --control-edge token (which
+     repoints --border) can never reach it. Probed on the packaged app 2026-08-03: the element
+     resolves --border=#767380 and --control-edge=#767380 and uses NEITHER; it paints
+     rgba(104,166,196,0.95), which over these backgrounds composites to rgb(111,170,199) and
+     matches the pixel sampler's rgb(117,174,201) within antialiasing. Measured 2.03:1 and 2.12:1.
+     #4f7a9b is the same blue family, opaque and deeper: 4.58:1 on white, 4.48:1 on the settings
+     field's tint. Opaque on purpose — a translucent boundary cannot clear 3:1 here, the same
+     finding --control-edge, --focus-ring-color and --state-indicator all record. */
+  border-color: #4f7a9b;
   border-radius: 3px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.92), rgba(238, 248, 253, 0.92)),
@@ -6135,7 +6058,15 @@
 :root[data-materials='aero'] .gram-search,
 :root[data-materials='aero'] .gram-x-preset-name,
 :root[data-materials='aero'] .gram-x-preset-select {
-  border: 1px solid rgba(160, 200, 226, 0.85);
+  /* WCAG 1.4.11 (3:1 for a control affordance). Measured 2026-08-03 by pixel sampling the
+     packaged aero theme: rgba(160,200,226,0.85) over this white gradient composites to
+     rgb(174,208,230) -> 1.63:1, and a text field whose border is invisible has nothing left
+     saying "you can type here" (fillRatio is ~1 against the page).
+     This rule outranks the --control-edge token in styles.css, so the token could not reach it.
+     #4f7a9b is the same blue family, opaque and deeper: 4.58:1 on white, 4.28:1 on the gradient's
+     far stop, 3.85:1 on --chrome. Opaque on purpose — a translucent boundary cannot clear 3:1
+     here, the same finding --control-edge and --focus-ring-color both record. */
+  border: 1px solid #4f7a9b;
   border-radius: 8px;
   color: #17324a;
   background: linear-gradient(180deg, #ffffff, #f2f8fd);

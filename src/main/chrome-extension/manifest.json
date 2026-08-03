@@ -14,7 +14,8 @@
     "open_in_tab": true
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -43,6 +44,9 @@
     },
     "bulk-tabs": {
       "description": "Open the reading list (assign a shortcut in the browser if desired)"
+    },
+    "analyze-selection": {
+      "description": "AI analysis of the selected sentence (assign a shortcut in the browser if desired)"
     }
   }
 }

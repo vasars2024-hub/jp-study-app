@@ -2,9 +2,16 @@ import React from 'react';
 import { useAtomValue } from 'jotai';
 import {
   vc_audioManager,
+  vc_mediaCaptionsManager,
   vc_subtitleManager,
 } from '@/app/(main)/_features/video-core/video-core';
-import { vc_videoElement } from '@/app/(main)/_features/video-core/video-core-atoms';
+import type {
+  MediaCaptionsTrackSelectedEvent,
+} from '@/app/(main)/_features/video-core/video-core-media-captions';
+import {
+  vc_paused,
+  vc_videoElement,
+} from '@/app/(main)/_features/video-core/video-core-atoms';
 import type { VideoCore_VideoPlaybackInfo } from '@/app/(main)/_features/video-core/video-core.atoms';
 import type {
   NormalizedTrackInfo,
@@ -30,6 +37,8 @@ import {
   noteLookupPointerDown,
 } from '../renderer/wordLookup';
 import { translate } from '../renderer/translator';
+import { registerCommandHandler } from '../renderer/keyboardShortcuts';
+import { t as translateUi, useT } from '../renderer/i18n';
 import { getStudyLang, setStudyLang } from '../renderer/studyEnvironment';
 import {
   loadWhisperDevice,
@@ -48,18 +57,39 @@ import {
   adjacentStudyCue,
   clampStudyPlaybackRate,
   cuePlaybackStartSec,
+  dismissVideoCoreComprehensionSuggestion,
+  dismissVideoCoreShadowingSuggestion,
+  dismissVideoCoreTimingRepair,
   evaluateVideoCoreDictation,
   isCueEndTransition,
   nextVideoCoreWhisperTrackNumber,
   normalizeVideoCoreStudyPreferences,
   PLAYER_PREFERENCES_STORAGE_KEY,
+  recordVideoCoreComprehensionEvent,
+  recordVideoCoreCueReplay,
+  recordVideoCoreTimingAdjustment,
   resolveStudyLoopSeekSec,
+  shouldSuggestVideoCoreComprehensionRescue,
+  shouldSuggestVideoCoreShadowing,
+  shouldSuggestVideoCoreTimingRepair,
   stripAssCueText,
+  VIDEO_CORE_TIMING_APPLY_STEP_SEC,
+  videoCoreDriftDelaySec,
+  videoCoreRescueScene,
+  videoCoreTimingDrift,
   whisperCuesToVideoCoreEvents,
+  type VideoCoreComprehensionEvent,
+  type VideoCoreComprehensionSignal,
+  type VideoCoreCueReplaySignal,
   type VideoCoreDictationEvaluation,
   type VideoCoreStudyPreferences,
+  type VideoCoreTimingSignal,
 } from '../shared/videoCoreStudy';
 import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
+import {
+  mediaCaptionCues,
+  normalizeMediaCaptionTracks,
+} from './mediaCaptionStudyAdapter';
 import VideoCoreMiningPanel from './VideoCoreMiningPanel';
 
 const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
@@ -89,6 +119,9 @@ type CuePopup = {
   context: string;
 };
 
+/** One enum over the two mutually exclusive stored booleans. See `setPracticeMode`. */
+type PracticeMode = 'off' | 'dictation' | 'shadowing';
+
 interface Props {
   playbackInfo: VideoCore_VideoPlaybackInfo | null;
   onManagerReady?: (managerClass: string) => void;
@@ -105,9 +138,18 @@ function loadPreferences(): VideoCoreStudyPreferences {
   }
 }
 
-function trackLabel(track: NormalizedTrackInfo): string {
-  const identity = track.label || track.languageIETF || track.language || `Track ${track.number}`;
-  const flags = [track.default ? 'default' : '', track.forced ? 'forced' : '']
+function trackLabel(
+  track: NormalizedTrackInfo,
+  t: ReturnType<typeof useT>['t'],
+): string {
+  const identity = track.label
+    || track.languageIETF
+    || track.language
+    || t('mediaWorkspace.study.track', { number: track.number });
+  const flags = [
+    track.default ? t('mediaWorkspace.study.trackDefault') : '',
+    track.forced ? t('mediaWorkspace.study.trackForced') : '',
+  ]
     .filter(Boolean)
     .join(', ');
   return `${identity}${flags ? ` (${flags})` : ''}`;
@@ -145,9 +187,12 @@ export default function VideoCoreStudyOverlay({
   onManagerReady,
   onCueChange,
 }: Props): React.ReactElement {
+  const { t } = useT();
   const manager = useAtomValue(vc_subtitleManager);
+  const mediaCaptionsManager = useAtomValue(vc_mediaCaptionsManager);
   const audioManager = useAtomValue(vc_audioManager);
   const video = useAtomValue(vc_videoElement);
+  const playerPaused = useAtomValue(vc_paused);
   const [preferences, setPreferences] = React.useState(loadPreferences);
   const [activeCues, setActiveCues] = React.useState<VideoCoreActiveCue[]>([]);
   const [allCues, setAllCues] = React.useState<VideoCoreActiveCue[]>([]);
@@ -181,9 +226,21 @@ export default function VideoCoreStudyOverlay({
   const whisperWorkerRef = React.useRef<Worker | null>(null);
   const whisperGenerationRef = React.useRef(0);
   const whisperCuesRef = React.useRef<Array<{ start: number; end: number; text: string }>>([]);
+  const ignoredPauseRef = React.useRef(false);
+  const ignoredSeekTargetRef = React.useRef<number | null>(null);
+  const seekOriginRef = React.useRef<number | null>(null);
+  const lastPlaybackTimeRef = React.useRef(0);
   const [shadowRecording, setShadowRecording] = React.useState(false);
   const [shadowAudioUrl, setShadowAudioUrl] = React.useState('');
   const [shadowError, setShadowError] = React.useState('');
+  const [replaySignal, setReplaySignal] =
+    React.useState<VideoCoreCueReplaySignal | null>(null);
+  const [comprehensionSignal, setComprehensionSignal] =
+    React.useState<VideoCoreComprehensionSignal | null>(null);
+  const [timingSignal, setTimingSignal] =
+    React.useState<VideoCoreTimingSignal | null>(null);
+  const [driftTracking, setDriftTracking] = React.useState(false);
+  const subtitleDelayRef = React.useRef(0);
   const [whisperModel, setWhisperModel] = React.useState<WhisperModelTier>(
     () => loadWhisperModelTier(getStudyLang()),
   );
@@ -197,14 +254,59 @@ export default function VideoCoreStudyOverlay({
   const [whisperMessage, setWhisperMessage] = React.useState('');
   const [whisperProgress, setWhisperProgress] = React.useState(0);
   const [whisperError, setWhisperError] = React.useState('');
+  // Collapsed by default. The dock's job during playback is the cue loop; tracks,
+  // A–B and the Whisper pipeline are set once and then only get in the way.
+  const [controlsExpanded, setControlsExpanded] = React.useState(false);
 
   const activeCue = activeCues[0] ?? null;
+  // Mirrored so the keyboard listener does not have to rebind on every cue change.
+  const activeCueRef = React.useRef(activeCue);
+  activeCueRef.current = activeCue;
+  // Same reason: the three toggle commands read the current value without the command
+  // registrations having to rebind every time one of the preferences changes.
+  const preferencesRef = React.useRef(preferences);
+  preferencesRef.current = preferences;
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
   const secondaryText = activeSecondaryCues
     .map((cue) => stripAssCueText(cue.text))
     .filter(Boolean)
     .join(' ');
   const miningSource = miningSourceFromPlayback(playbackInfo);
+  const showShadowingSuggestion = shouldSuggestVideoCoreShadowing(
+    replaySignal,
+    activeCue,
+    preferences.shadowingMode,
+  );
+  const rescueScene = activeCue
+    ? videoCoreRescueScene(allCues, activeCue, subtitleDelaySec)
+    : null;
+  const showComprehensionRescue = !showShadowingSuggestion
+    && Boolean(rescueScene)
+    && shouldSuggestVideoCoreComprehensionRescue(
+      comprehensionSignal,
+      activeCue,
+      playerPaused,
+    );
+  const timingDrift = React.useMemo(
+    () => videoCoreTimingDrift(timingSignal),
+    [timingSignal],
+  );
+  const showTimingRepair = !showShadowingSuggestion
+    && !showComprehensionRescue
+    && shouldSuggestVideoCoreTimingRepair(timingSignal, timingDrift, driftTracking);
+
+  const recordComprehension = React.useCallback(
+    (event: VideoCoreComprehensionEvent, cue = activeCue): void => {
+      if (!cue) return;
+      setComprehensionSignal((current) =>
+        recordVideoCoreComprehensionEvent(current, event, cue));
+    },
+    [activeCue],
+  );
+
+  const markProgrammaticSeek = React.useCallback((targetSec: number): void => {
+    ignoredSeekTargetRef.current = targetSec;
+  }, []);
 
   const updatePreference = React.useCallback(
     <K extends keyof VideoCoreStudyPreferences>(
@@ -233,6 +335,7 @@ export default function VideoCoreStudyOverlay({
 
   React.useEffect(() => {
     if (!manager) {
+      if (mediaCaptionsManager) return;
       setActiveCues([]);
       setAllCues([]);
       setTracks([]);
@@ -257,6 +360,7 @@ export default function VideoCoreStudyOverlay({
         && video
         && isCueEndTransition(video.currentTime, previous, subtitleDelaySec)
       ) {
+        if (!video.paused) ignoredPauseRef.current = true;
         video.pause();
       }
       previousCueRef.current = next ?? previous;
@@ -291,9 +395,107 @@ export default function VideoCoreStudyOverlay({
     };
   }, [
     manager,
+    mediaCaptionsManager,
     onCueChange,
     onManagerReady,
     preferences.autoPause,
+    subtitleDelaySec,
+    video,
+  ]);
+
+  React.useEffect(() => {
+    if (manager || !mediaCaptionsManager) return;
+    let cancelled = false;
+    let selectedCues: VideoCoreActiveCue[] = [];
+    let lastCueSignature = '';
+
+    onManagerReady?.(mediaCaptionsManager.constructor.name);
+
+    const syncTracks = (): void => {
+      if (cancelled) return;
+      setTracks(normalizeMediaCaptionTracks(mediaCaptionsManager, playbackInfo));
+      setSelectedTrack(mediaCaptionsManager.getSelectedTrackIndexOrNull());
+    };
+    const syncActive = (): void => {
+      if (cancelled) return;
+      const currentTime = video?.currentTime ?? 0;
+      const cues = activeStudyCuesAtTime(
+        selectedCues,
+        currentTime,
+        subtitleDelaySec,
+      );
+      setActiveCues(cues);
+      const signature = cues
+        .map((cue) => `${cue.trackNumber}:${cue.index}:${cue.startMs}:${cue.endMs}`)
+        .join('|');
+      if (signature === lastCueSignature) return;
+      lastCueSignature = signature;
+      onCueChange?.(new CustomEvent('cuechange', {
+        detail: {
+          cues,
+          currentTimeMs: Math.round(currentTime * 1_000),
+        },
+      }) as SubtitleManagerCueChangeEvent);
+    };
+    const loadSelectedTrack = async (trackNumber: number | null): Promise<void> => {
+      if (trackNumber == null) {
+        selectedCues = [];
+        setAllCues([]);
+        syncActive();
+        return;
+      }
+      try {
+        const cues = await mediaCaptionCues(mediaCaptionsManager, trackNumber);
+        if (cancelled || mediaCaptionsManager.getSelectedTrackIndexOrNull() !== trackNumber) {
+          return;
+        }
+        selectedCues = cues;
+        setAllCues(cues);
+        syncActive();
+      } catch {
+        if (cancelled) return;
+        selectedCues = [];
+        setAllCues([]);
+        syncActive();
+      }
+    };
+    const handleTrackSelected = (event: MediaCaptionsTrackSelectedEvent): void => {
+      const trackNumber = event.detail.trackIndex;
+      setSelectedTrack(trackNumber);
+      void loadSelectedTrack(trackNumber);
+    };
+    const handleTrackDeselected = (): void => {
+      setSelectedTrack(null);
+      void loadSelectedTrack(null);
+    };
+    const handleTracksLoaded = (): void => {
+      syncTracks();
+      void loadSelectedTrack(mediaCaptionsManager.getSelectedTrackIndexOrNull());
+    };
+
+    syncTracks();
+    void loadSelectedTrack(mediaCaptionsManager.getSelectedTrackIndexOrNull());
+    mediaCaptionsManager.addEventListener('trackselected', handleTrackSelected);
+    mediaCaptionsManager.addEventListener('trackdeselected', handleTrackDeselected);
+    mediaCaptionsManager.addEventListener('tracksloaded', handleTracksLoaded);
+    video?.addEventListener('timeupdate', syncActive);
+    video?.addEventListener('seeked', syncActive);
+    video?.addEventListener('loadeddata', syncActive);
+    return () => {
+      cancelled = true;
+      mediaCaptionsManager.removeEventListener('trackselected', handleTrackSelected);
+      mediaCaptionsManager.removeEventListener('trackdeselected', handleTrackDeselected);
+      mediaCaptionsManager.removeEventListener('tracksloaded', handleTracksLoaded);
+      video?.removeEventListener('timeupdate', syncActive);
+      video?.removeEventListener('seeked', syncActive);
+      video?.removeEventListener('loadeddata', syncActive);
+    };
+  }, [
+    manager,
+    mediaCaptionsManager,
+    onCueChange,
+    onManagerReady,
+    playbackInfo,
     subtitleDelaySec,
     video,
   ]);
@@ -380,6 +582,7 @@ export default function VideoCoreStudyOverlay({
         },
       );
       if (seekTo == null) return;
+      markProgrammaticSeek(seekTo);
       video.currentTime = seekTo;
       if (video.paused) void video.play();
     };
@@ -390,39 +593,199 @@ export default function VideoCoreStudyOverlay({
     abLoop,
     abStartSec,
     activeCue,
+    markProgrammaticSeek,
     preferences.loopLine,
     subtitleDelaySec,
     video,
   ]);
 
+  React.useEffect(() => {
+    if (!video) return;
+    lastPlaybackTimeRef.current = video.currentTime;
+    const handleTimeUpdate = (): void => {
+      if (!video.seeking) lastPlaybackTimeRef.current = video.currentTime;
+    };
+    const handleSeeking = (): void => {
+      if (seekOriginRef.current == null) {
+        seekOriginRef.current = lastPlaybackTimeRef.current;
+      }
+    };
+    const handleSeeked = (): void => {
+      const origin = seekOriginRef.current ?? lastPlaybackTimeRef.current;
+      const target = video.currentTime;
+      const ignoredTarget = ignoredSeekTargetRef.current;
+      const ignored = ignoredTarget != null && Math.abs(ignoredTarget - target) <= 0.25;
+      ignoredSeekTargetRef.current = null;
+      seekOriginRef.current = null;
+      lastPlaybackTimeRef.current = target;
+      if (!ignored && origin - target >= 0.75) {
+        recordComprehension('rewind', manager?.getActiveCues()[0] ?? activeCue);
+      }
+    };
+    const handlePause = (): void => {
+      if (ignoredPauseRef.current) {
+        ignoredPauseRef.current = false;
+        return;
+      }
+      recordComprehension('pause', manager?.getActiveCues()[0] ?? activeCue);
+    };
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('seeking', handleSeeking);
+    video.addEventListener('seeked', handleSeeked);
+    video.addEventListener('pause', handlePause);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('seeking', handleSeeking);
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('pause', handlePause);
+    };
+  }, [activeCue, manager, recordComprehension, video]);
+
   const seekCue = React.useCallback(
     (cue: VideoCoreActiveCue | null): void => {
       if (!cue || !video) return;
-      video.currentTime = cuePlaybackStartSec(cue, subtitleDelaySec);
+      const target = cuePlaybackStartSec(cue, subtitleDelaySec);
+      markProgrammaticSeek(target);
+      video.currentTime = target;
       void video.play();
     },
-    [subtitleDelaySec, video],
+    [markProgrammaticSeek, subtitleDelaySec, video],
+  );
+
+  const replayCue = React.useCallback(
+    (cue: VideoCoreActiveCue | null): void => {
+      if (!cue) return;
+      setReplaySignal((current) => recordVideoCoreCueReplay(current, cue));
+      recordComprehension('rewind', cue);
+      seekCue(cue);
+    },
+    [recordComprehension, seekCue],
   );
 
   const jumpCue = React.useCallback(
     (direction: -1 | 1): void => {
       if (!video) return;
       const sourceTimeMs = (video.currentTime - subtitleDelaySec) * 1000;
-      seekCue(adjacentStudyCue(allCues, sourceTimeMs, direction));
+      const target = adjacentStudyCue(allCues, sourceTimeMs, direction);
+      if (direction < 0 && target) recordComprehension('rewind', target);
+      seekCue(target);
     },
-    [allCues, seekCue, subtitleDelaySec, video],
+    [allCues, recordComprehension, seekCue, subtitleDelaySec, video],
   );
 
+  /** The explicit ±0.1s control. Only this path may create timing evidence. */
   const changeSubtitleDelay = React.useCallback(
     (delta: number): void => {
       const next = Math.round(
         Math.max(-10, Math.min(10, subtitleDelaySec + delta)) * 10,
       ) / 10;
+      subtitleDelayRef.current = next;
       setSubtitleDelaySec(next);
       void manager?.setSubtitleDelay(next);
+      if (selectedTrack == null || !video) return;
+      const positionSec = video.currentTime;
+      setTimingSignal((current) =>
+        recordVideoCoreTimingAdjustment(current, selectedTrack, positionSec, next));
     },
-    [manager, subtitleDelaySec],
+    [manager, selectedTrack, subtitleDelaySec, video],
   );
+
+  /**
+   * Study-loop keyboard shortcuts — registered as app commands, slice 19.
+   *
+   * The adopted player already owns a full keybinding map (`vc_defaultKeybindings` in
+   * `video-core.atoms.ts`) plus hardcoded Space/Enter/Home/End/Escape and Comma/Period
+   * for 24fps frame stepping. None of it addresses a *cue*, which is the unit this
+   * overlay works in — so these actions had to be reached with the mouse.
+   *
+   * They used to be a `document` keydown switch on `event.code`, right here. The ten
+   * `video.*` rows in `COMMAND_CATALOG` meanwhile still pointed at the LEGACY player's
+   * handlers, which slice 16 left acting on an unattached `videoRef` — so the app had two
+   * owners for the same six capabilities, one invisible and unrebindable and one visible
+   * and dead. Registering the catalog's own ids is what collapses that into one owner.
+   *
+   * Two consequences worth stating rather than discovering later:
+   *
+   * - `registerCommandHandler` dispatches off `chordFromEvent`, which reads `event.key`,
+   *   not `event.code`. On a non-QWERTY layout the physical keys move — which is the
+   *   normal behaviour for every other shortcut in this app, and the reason a rebindable
+   *   row beats a hardcoded scancode.
+   * - The dispatcher's own `isTypingTarget()` check replaces the INPUT/TEXTAREA/SELECT/
+   *   contentEditable guard this switch carried, so dictation and the mining form are
+   *   still safe.
+   *
+   * The DEFAULTS live in the catalog, not here; they are the same five codes this switch
+   * used (R/W/S/;/'), chosen from what the adopted map leaves free.
+   */
+  React.useEffect(() => {
+    const offs = [
+      registerCommandHandler('video.replayLine', () => replayCue(activeCueRef.current)),
+      registerCommandHandler('video.prevLine', () => jumpCue(-1)),
+      registerCommandHandler('video.nextLine', () => jumpCue(1)),
+      registerCommandHandler('video.subEarlier', () => changeSubtitleDelay(-0.1)),
+      registerCommandHandler('video.subLater', () => changeSubtitleDelay(0.1)),
+      registerCommandHandler('video.subEarlierLarge', () => changeSubtitleDelay(-0.5)),
+      registerCommandHandler('video.subLaterLarge', () => changeSubtitleDelay(0.5)),
+      registerCommandHandler('video.toggleAutoPause', () => {
+        updatePreference('autoPause', !preferencesRef.current.autoPause);
+      }),
+      registerCommandHandler('video.toggleLoop', () => {
+        const next = !preferencesRef.current.loopLine;
+        updatePreference('loopLine', next);
+        // The checkbox clears the A–B loop when line-loop goes on, because the two
+        // compete for the same timeupdate handler. A shortcut that skipped this could
+        // reach a state the UI cannot express.
+        if (next) setAbLoop(false);
+      }),
+      registerCommandHandler('video.toggleFurigana', () => {
+        updatePreference('furigana', !preferencesRef.current.furigana);
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [changeSubtitleDelay, jumpCue, replayCue, updatePreference]);
+
+  /**
+   * While tracking, the measured drift — not the user — supplies the delay. These
+   * writes deliberately bypass `changeSubtitleDelay`, so the tracker can never
+   * feed its own corrections back in as fresh evidence.
+   */
+  React.useEffect(() => {
+    if (!driftTracking || !timingDrift || !video || !manager) return undefined;
+    const apply = (): void => {
+      const next = videoCoreDriftDelaySec(timingDrift, video.currentTime);
+      if (Math.abs(next - subtitleDelayRef.current) < VIDEO_CORE_TIMING_APPLY_STEP_SEC) return;
+      subtitleDelayRef.current = next;
+      setSubtitleDelaySec(next);
+      void manager.setSubtitleDelay(next);
+    };
+    apply();
+    video.addEventListener('timeupdate', apply);
+    return () => video.removeEventListener('timeupdate', apply);
+  }, [driftTracking, manager, timingDrift, video]);
+
+  /** A different subtitle track is a different timing problem. */
+  React.useEffect(() => {
+    setTimingSignal(null);
+    setDriftTracking(false);
+  }, [selectedTrack]);
+
+  /**
+   * A manual correction while tracking re-anchors the line. If it contradicts the
+   * measurement outright, the user has overruled it — stop rather than keep
+   * applying a rate the evidence no longer supports.
+   */
+  React.useEffect(() => {
+    if (driftTracking && !timingDrift) setDriftTracking(false);
+  }, [driftTracking, timingDrift]);
+
+  const stopDriftTracking = React.useCallback((): void => {
+    setDriftTracking(false);
+    setTimingSignal((current) => dismissVideoCoreTimingRepair(current));
+    if (!timingDrift) return;
+    subtitleDelayRef.current = timingDrift.anchorDelaySec;
+    setSubtitleDelaySec(timingDrift.anchorDelaySec);
+    void manager?.setSubtitleDelay(timingDrift.anchorDelaySec);
+  }, [manager, timingDrift]);
 
   const translateCue = React.useCallback(
     async (text = plainText): Promise<void> => {
@@ -431,7 +794,7 @@ export default function VideoCoreStudyOverlay({
       try {
         setTranslation(await translate(text, getStudyLang()));
       } catch {
-        setTranslation('Offline translation is unavailable.');
+        setTranslation(translateUi('mediaWorkspace.study.translationUnavailable'));
       } finally {
         setTranslationBusy(false);
       }
@@ -448,7 +811,11 @@ export default function VideoCoreStudyOverlay({
         return;
       }
       if (hit) {
-        if (pauseOnLookup) video?.pause();
+        recordComprehension('lookup');
+        if (pauseOnLookup && video) {
+          if (!video.paused) ignoredPauseRef.current = true;
+          video.pause();
+        }
         setPopup({
           query: hit.query,
           x: hit.x,
@@ -459,7 +826,7 @@ export default function VideoCoreStudyOverlay({
         setPopup(null);
       }
     },
-    [pauseOnLookup, plainText, translateCue, video],
+    [pauseOnLookup, plainText, recordComprehension, translateCue, video],
   );
 
   const checkDictation = React.useCallback((): void => {
@@ -484,6 +851,21 @@ export default function VideoCoreStudyOverlay({
     if (recorder?.state === 'recording') recorder.stop();
   }, []);
 
+  /**
+   * Dictation and Shadowing are mutually exclusive and always were — each checkbox's
+   * onChange cleared the other. Projecting the two stored booleans onto one enum leaves
+   * the persisted preference shape untouched while letting the UI be a radio group, so
+   * the exclusivity is announced rather than only enforced.
+   */
+  const practiceMode: PracticeMode = preferences.dictationMode
+    ? 'dictation'
+    : preferences.shadowingMode ? 'shadowing' : 'off';
+  const setPracticeMode = React.useCallback((mode: PracticeMode): void => {
+    updatePreference('dictationMode', mode === 'dictation');
+    updatePreference('shadowingMode', mode === 'shadowing');
+    if (mode !== 'shadowing') stopShadowRecording();
+  }, [stopShadowRecording, updatePreference]);
+
   const startShadowRecording = React.useCallback(async (): Promise<void> => {
     if (shadowRecorderRef.current?.state === 'recording') return;
     setShadowError('');
@@ -491,7 +873,7 @@ export default function VideoCoreStudyOverlay({
     const generation = shadowGenerationRef.current;
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-        throw new Error('Microphone recording is not supported in this player.');
+        throw new Error(translateUi('mediaWorkspace.study.micUnsupported'));
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -517,7 +899,7 @@ export default function VideoCoreStudyOverlay({
         if (event.data.size) chunks.push(event.data);
       };
       recorder.onerror = () => {
-        setShadowError('The microphone recording stopped unexpectedly.');
+        setShadowError(translateUi('mediaWorkspace.study.micStopped'));
       };
       recorder.onstop = () => {
         if (shadowStopTimerRef.current != null) {
@@ -547,7 +929,7 @@ export default function VideoCoreStudyOverlay({
       setShadowError(
         recordingError instanceof Error
           ? recordingError.message
-          : 'Could not start microphone recording.',
+          : translateUi('mediaWorkspace.study.micStartFailed'),
       );
     }
   }, [clearShadowRecording]);
@@ -589,7 +971,7 @@ export default function VideoCoreStudyOverlay({
     const localFilePath = playbackInfo?.localFile?.path;
     if (!manager || !localFilePath) {
       setWhisperState('error');
-      setWhisperError('Whisper generation requires a local Seanime library file.');
+      setWhisperError(translateUi('mediaWorkspace.study.whisperLocalOnly'));
       return;
     }
 
@@ -598,32 +980,38 @@ export default function VideoCoreStudyOverlay({
     setWhisperError('');
     setWhisperProgress(0);
     setWhisperState('extracting');
-    setWhisperMessage('Extracting 16 kHz mono audio with ffmpeg…');
+    setWhisperMessage(translateUi('mediaWorkspace.study.extractingAudio'));
 
     let audio: Float32Array;
     try {
       const buffer = await window.api.seanimeExtractAudio(localFilePath);
       if (generation !== whisperGenerationRef.current) return;
       audio = new Float32Array(buffer);
-      if (!audio.length) throw new Error('No audio track was found.');
+      if (!audio.length) {
+        throw new Error(translateUi('mediaWorkspace.study.noAudioTrack'));
+      }
     } catch (error) {
       if (generation !== whisperGenerationRef.current) return;
       setWhisperState('error');
       setWhisperError(
-        error instanceof Error ? error.message : 'Audio extraction failed.',
+        error instanceof Error
+          ? error.message
+          : translateUi('mediaWorkspace.study.audioExtractionFailed'),
       );
       return;
     }
 
     setWhisperState('loading');
-    setWhisperMessage('Loading the local Whisper model…');
+    setWhisperMessage(translateUi('mediaWorkspace.study.loadingWhisper'));
     let worker: Worker;
     try {
       worker = new WhisperWorker();
     } catch (error) {
       setWhisperState('error');
       setWhisperError(
-        error instanceof Error ? error.message : 'The Whisper worker could not start.',
+        error instanceof Error
+          ? error.message
+          : translateUi('mediaWorkspace.study.whisperStartFailed'),
       );
       return;
     }
@@ -647,9 +1035,10 @@ export default function VideoCoreStudyOverlay({
         && typeof message.progress === 'number'
       ) {
         const file = message.file?.split('/').pop() || 'model';
-        setWhisperMessage(
-          `Downloading ${file} — ${Math.round(message.progress)}%`,
-        );
+        setWhisperMessage(translateUi('mediaWorkspace.study.downloadProgress', {
+          file,
+          progress: Math.round(message.progress),
+        }));
         return;
       }
       if (message.type === 'status' && message.status === 'transcribing') {
@@ -657,7 +1046,13 @@ export default function VideoCoreStudyOverlay({
         markTierDownloaded(whisperModel, device, whisperDevice);
         setWhisperState('transcribing');
         setWhisperMessage(
-          `Transcribing on ${device === 'webgpu' ? 'the GPU' : 'the CPU'}…`,
+          translateUi('mediaWorkspace.study.whisperOnDevice', {
+            device: translateUi(
+              device === 'webgpu'
+                ? 'mediaWorkspace.study.gpu'
+                : 'mediaWorkspace.study.cpu',
+            ),
+          }),
         );
         return;
       }
@@ -669,7 +1064,7 @@ export default function VideoCoreStudyOverlay({
         return;
       }
       if (message.type === 'error') {
-        fail(message.message || 'Whisper subtitle generation failed.');
+        fail(message.message || translateUi('mediaWorkspace.study.whisperFailed'));
         return;
       }
       if (message.type !== 'done') return;
@@ -683,7 +1078,7 @@ export default function VideoCoreStudyOverlay({
           trackNumber,
         ) as MKVParser_SubtitleEvent[];
         if (!subtitleEvents.length) {
-          fail('Whisper completed without producing subtitle cues.');
+          fail(translateUi('mediaWorkspace.study.noWhisperCues'));
           return;
         }
         const track: MKVParser_TrackInfo = {
@@ -691,7 +1086,7 @@ export default function VideoCoreStudyOverlay({
           uid: trackNumber,
           type: 'subtitle',
           codecID: 'S_TEXT/ASS',
-          name: 'Whisper (generated)',
+          name: translateUi('mediaWorkspace.study.whisperGenerated'),
           language: whisperLanguage,
           languageIETF: whisperLanguage,
           default: false,
@@ -708,17 +1103,23 @@ export default function VideoCoreStudyOverlay({
           setAllCues(manager.getCues());
           setActiveCues(manager.getActiveCues());
           setWhisperState('done');
-          setWhisperMessage(`Generated ${subtitleEvents.length} subtitle lines.`);
+          setWhisperMessage(translateUi('mediaWorkspace.study.generatedLines', {
+            count: subtitleEvents.length,
+          }));
           setWhisperProgress(1);
           worker.terminate();
           if (whisperWorkerRef.current === worker) whisperWorkerRef.current = null;
         } catch (error) {
-          fail(error instanceof Error ? error.message : 'Could not mount Whisper cues.');
+          fail(
+            error instanceof Error
+              ? error.message
+              : translateUi('mediaWorkspace.study.whisperMountFailed'),
+          );
         }
       })();
     };
     worker.onerror = (error) => {
-      fail(error.message || 'The Whisper worker failed to start.');
+      fail(error.message || translateUi('mediaWorkspace.study.whisperStartFailed'));
     };
     try {
       worker.postMessage(
@@ -731,7 +1132,11 @@ export default function VideoCoreStudyOverlay({
         [audio.buffer],
       );
     } catch (error) {
-      fail(error instanceof Error ? error.message : 'Audio could not be sent to Whisper.');
+      fail(
+        error instanceof Error
+          ? error.message
+          : translateUi('mediaWorkspace.study.audioSendFailed'),
+      );
     }
   }, [
     manager,
@@ -783,13 +1188,22 @@ export default function VideoCoreStudyOverlay({
           />
         ) : (
           <span className="study-cue-status">
-            {preferences.dictationMode && activeCue ? 'Listen, then type the cue' : 'Waiting for subtitle'}
+            {t(
+              preferences.dictationMode && activeCue
+                ? 'mediaWorkspace.study.listenType'
+                : 'mediaWorkspace.study.waitingSubtitle',
+            )}
           </span>
         )}
 
         {activeCue && (
           <span className="study-cue-timing">
-            Cue {activeCue.index + 1} · track {activeCue.trackNumber} · {activeCue.startMs}–{activeCue.endMs} ms
+            {t('mediaWorkspace.mining.cueMeta', {
+              cue: activeCue.index + 1,
+              track: activeCue.trackNumber,
+              start: activeCue.startMs,
+              end: activeCue.endMs,
+            })}
           </span>
         )}
 
@@ -806,61 +1220,218 @@ export default function VideoCoreStudyOverlay({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') checkDictation();
               }}
-              placeholder="Type what you hear"
-              aria-label="Dictation answer"
+              placeholder={t('mediaWorkspace.study.typeWhatYouHear')}
+              aria-label={t('mediaWorkspace.study.dictationAnswer')}
               autoComplete="off"
             />
             <button type="button" disabled={!dictationInput.trim()} onClick={checkDictation}>
-              Check
+              {t('mediaWorkspace.study.check')}
             </button>
             <button type="button" onClick={() => setDictationRevealed(true)}>
-              Reveal
+              {t('mediaWorkspace.study.reveal')}
             </button>
             {dictationResult && (
               <span className={dictationResult.exact ? 'is-correct' : ''} role="status">
-                {dictationResult.exact ? 'Exact match' : `${dictationResult.score}% match`}
+                {dictationResult.exact
+                  ? t('mediaWorkspace.study.exactMatch')
+                  : t('mediaWorkspace.study.matchScore', {
+                      score: dictationResult.score,
+                    })}
               </span>
             )}
           </div>
         )}
 
+        {showShadowingSuggestion && activeCue && replaySignal && (
+          <section
+            className="study-shadowing-suggestion"
+            aria-label={t('mediaWorkspace.study.shadowRecommendation')}
+            data-shadowing-suggestion="visible"
+            data-replay-count={replaySignal.replayCount}
+          >
+            <div>
+              <strong>{t('mediaWorkspace.study.shadowWorth')}</strong>
+              <span>
+                {t('mediaWorkspace.study.replayedTimes', {
+                  count: replaySignal.replayCount,
+                })}
+              </span>
+            </div>
+            <div className="study-shadowing-suggestion-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setReplaySignal((current) =>
+                    dismissVideoCoreShadowingSuggestion(current));
+                  updatePreference('dictationMode', false);
+                  updatePreference('shadowingMode', true);
+                }}
+              >
+                {t('mediaWorkspace.study.startShadowing')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaySignal((current) =>
+                  dismissVideoCoreShadowingSuggestion(current))}
+              >
+                {t('mediaWorkspace.study.notNow')}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {showComprehensionRescue && activeCue && comprehensionSignal && rescueScene && (
+          <section
+            className="study-shadowing-suggestion study-comprehension-rescue"
+            aria-label={t('mediaWorkspace.study.comprehensionRescue')}
+            data-comprehension-rescue="visible"
+            data-lookup-count={comprehensionSignal.lookupCount}
+            data-rewind-count={comprehensionSignal.rewindCount}
+            data-pause-count={comprehensionSignal.pauseCount}
+            data-scene-first-cue={rescueScene.firstCueIndex}
+            data-scene-last-cue={rescueScene.lastCueIndex}
+          >
+            <div>
+              <strong>{t('mediaWorkspace.study.slowerPass')}</strong>
+              <span>
+                {t('mediaWorkspace.study.activityCluster', {
+                  lookups: comprehensionSignal.lookupCount,
+                  rewinds: comprehensionSignal.rewindCount,
+                })}
+              </span>
+            </div>
+            <div className="study-shadowing-suggestion-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!video) return;
+                  setComprehensionSignal((current) =>
+                    dismissVideoCoreComprehensionSuggestion(current));
+                  setAbStartSec(rescueScene.startSec);
+                  setAbEndSec(rescueScene.endSec);
+                  setAbLoop(true);
+                  updatePreference('loopLine', false);
+                  markProgrammaticSeek(rescueScene.startSec);
+                  video.currentTime = rescueScene.startSec;
+                  void video.play();
+                }}
+              >
+                {t('mediaWorkspace.study.loopScene', {
+                  count: rescueScene.cueCount,
+                })}
+              </button>
+              <button
+                type="button"
+                onClick={() => setComprehensionSignal((current) =>
+                  dismissVideoCoreComprehensionSuggestion(current))}
+              >
+                {t('mediaWorkspace.study.notNow')}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {showTimingRepair && timingSignal && timingDrift && (
+          <section
+            className="study-shadowing-suggestion study-timing-repair"
+            aria-label={t('mediaWorkspace.study.timingRepair')}
+            data-timing-repair="visible"
+            data-timing-changes={timingSignal.changeCount}
+            data-timing-drift-ms={timingDrift.msPerMinute}
+            data-timing-span-sec={timingDrift.spanSec}
+          >
+            <div>
+              <strong>{t('mediaWorkspace.study.timingDrifts')}</strong>
+              <span>
+                {t('mediaWorkspace.study.timingDriftEvidence', {
+                  count: timingSignal.changeCount,
+                  minutes: Math.max(1, Math.round(timingDrift.spanSec / 60)),
+                  rate: (Math.abs(timingDrift.msPerMinute) / 1000).toFixed(2),
+                })}
+              </span>
+            </div>
+            <div className="study-shadowing-suggestion-actions">
+              <button type="button" onClick={() => setDriftTracking(true)}>
+                {t('mediaWorkspace.study.trackDrift')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimingSignal((current) =>
+                  dismissVideoCoreTimingRepair(current))}
+              >
+                {t('mediaWorkspace.study.notNow')}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {driftTracking && timingDrift && (
+          <section
+            className="study-shadowing-suggestion study-timing-repair"
+            aria-label={t('mediaWorkspace.study.timingTracking')}
+            data-timing-tracking="active"
+            data-timing-delay={subtitleDelaySec.toFixed(2)}
+          >
+            <div>
+              <strong>{t('mediaWorkspace.study.timingTracking')}</strong>
+              <span>
+                {t('mediaWorkspace.study.timingTrackingNote', {
+                  rate: (Math.abs(timingDrift.msPerMinute) / 1000).toFixed(2),
+                  delay: `${subtitleDelaySec >= 0 ? '+' : ''}${subtitleDelaySec.toFixed(2)}`,
+                })}
+              </span>
+            </div>
+            <div className="study-shadowing-suggestion-actions">
+              <button type="button" onClick={stopDriftTracking}>
+                {t('mediaWorkspace.study.stopTrackingDrift')}
+              </button>
+            </div>
+          </section>
+        )}
+
         {preferences.shadowingMode && activeCue && (
           <section
             className="study-shadowing"
-            aria-label="Shadowing practice"
+            aria-label={t('mediaWorkspace.study.shadowPractice')}
             data-shadow-recording={shadowRecording ? 'recording' : 'idle'}
             data-shadow-response={shadowAudioUrl ? 'ready' : 'none'}
           >
             <div className="study-shadowing-copy">
-              <strong>Shadowing practice</strong>
-              <span>Replay the original line, then record your response for comparison.</span>
+              <strong>{t('mediaWorkspace.study.shadowPractice')}</strong>
+              <span>{t('mediaWorkspace.study.shadowInstructions')}</span>
             </div>
             <div className="study-shadowing-actions">
-              <button type="button" onClick={() => seekCue(activeCue)}>
-                Replay original
+              <button type="button" onClick={() => replayCue(activeCue)}>
+                {t('mediaWorkspace.study.replayOriginal')}
               </button>
               {!shadowRecording ? (
                 <button type="button" onClick={() => void startShadowRecording()}>
-                  {shadowAudioUrl ? 'Record again' : 'Record response'}
+                  {t(
+                    shadowAudioUrl
+                      ? 'mediaWorkspace.study.recordAgain'
+                      : 'mediaWorkspace.study.recordResponse',
+                  )}
                 </button>
               ) : (
                 <button type="button" onClick={stopShadowRecording}>
-                  Stop recording
+                  {t('mediaWorkspace.study.stopRecording')}
                 </button>
               )}
               {shadowAudioUrl && (
                 <button type="button" onClick={clearShadowRecording}>
-                  Discard response
+                  {t('mediaWorkspace.study.discardResponse')}
                 </button>
               )}
               {shadowRecording && (
-                <span className="study-shadowing-live">Recording · 60 second limit</span>
+                <span className="study-shadowing-live">
+                  {t('mediaWorkspace.study.recordingLimit')}
+                </span>
               )}
             </div>
             {shadowAudioUrl && (
               <audio
                 className="study-shadowing-audio"
-                aria-label="Shadowing response playback"
+                aria-label={t('mediaWorkspace.study.shadowPlayback')}
                 controls
                 preload="metadata"
                 src={shadowAudioUrl}
@@ -875,65 +1446,100 @@ export default function VideoCoreStudyOverlay({
         {translation && <p className="study-cue-translation">{translation}</p>}
       </aside>
 
-      <section className="study-control-dock" aria-label="Study playback controls">
-        <div className="study-control-row">
-          <button
-            type="button"
-            data-study-action="previous-cue"
-            disabled={!allCues.length}
-            onClick={() => jumpCue(-1)}
-          >
-            Previous line
-          </button>
-          <button
-            type="button"
-            data-study-action="replay-cue"
-            disabled={!activeCue}
-            onClick={() => seekCue(activeCue)}
-          >
-            Replay line
-          </button>
-          <button
-            type="button"
-            data-study-action="next-cue"
-            disabled={!allCues.length}
-            onClick={() => jumpCue(1)}
-          >
-            Next line
-          </button>
-          <button
-            type="button"
-            disabled={!video}
-            onClick={() => {
-              if (!video) return;
-              video.pause();
-              video.currentTime = Math.max(0, video.currentTime - 1 / 30);
-            }}
-          >
-            Frame −
-          </button>
-          <button
-            type="button"
-            disabled={!video}
-            onClick={() => {
-              if (!video) return;
-              video.pause();
-              video.currentTime = Math.min(
-                Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER,
-                video.currentTime + 1 / 30,
-              );
-            }}
-          >
-            Frame +
-          </button>
+      <section
+        className="study-control-dock"
+        aria-label={t('mediaWorkspace.study.controls')}
+        data-study-controls={controlsExpanded ? 'expanded' : 'collapsed'}
+      >
+        {/*
+          Primary row — the cue loop, and nothing else. Everything below used to sit in
+          this same flat scroller: four rows of ~35 controls inside a 7.5rem box, so the
+          Whisper row was permanently below an invisible fold and "Furigana" carried the
+          same visual weight as a transcription pipeline.
+        */}
+        <div className="study-control-row study-control-primary">
+          <div className="study-control-cluster" role="group" aria-label={t('mediaWorkspace.study.cueNavigation')}>
+            <button
+              type="button"
+              data-study-action="previous-cue"
+              disabled={!allCues.length}
+              title={t('mediaWorkspace.study.shortcutHint', { key: 'W' })}
+              onClick={() => jumpCue(-1)}
+            >
+              {t('mediaWorkspace.study.previousLine')}
+            </button>
+            <button
+              type="button"
+              data-study-action="replay-cue"
+              disabled={!activeCue}
+              title={t('mediaWorkspace.study.shortcutHint', { key: 'R' })}
+              onClick={() => replayCue(activeCue)}
+            >
+              {t('mediaWorkspace.study.replayLine')}
+            </button>
+            <button
+              type="button"
+              data-study-action="next-cue"
+              disabled={!allCues.length}
+              title={t('mediaWorkspace.study.shortcutHint', { key: 'S' })}
+              onClick={() => jumpCue(1)}
+            >
+              {t('mediaWorkspace.study.nextLine')}
+            </button>
+          </div>
 
-          <button type="button" onClick={() => changeSubtitleDelay(-0.1)}>−0.1s subs</button>
-          <output aria-label="Subtitle offset">{subtitleDelaySec >= 0 ? '+' : ''}{subtitleDelaySec.toFixed(1)}s</output>
-          <button type="button" onClick={() => changeSubtitleDelay(0.1)}>+0.1s subs</button>
+          <div className="study-control-cluster" role="group" aria-label={t('mediaWorkspace.study.frameStep')}>
+            <button
+              type="button"
+              disabled={!video}
+              onClick={() => {
+                if (!video) return;
+                video.pause();
+                video.currentTime = Math.max(0, video.currentTime - 1 / 30);
+              }}
+            >
+              {t('mediaWorkspace.study.frameBack')}
+            </button>
+            <button
+              type="button"
+              disabled={!video}
+              onClick={() => {
+                if (!video) return;
+                video.pause();
+                video.currentTime = Math.min(
+                  Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER,
+                  video.currentTime + 1 / 30,
+                );
+              }}
+            >
+              {t('mediaWorkspace.study.frameForward')}
+            </button>
+          </div>
+
+          <div className="study-control-cluster" role="group" aria-label={t('mediaWorkspace.study.subtitleOffset')}>
+            <button
+              type="button"
+              title={t('mediaWorkspace.study.shortcutHint', { key: ';' })}
+              onClick={() => changeSubtitleDelay(-0.1)}
+            >
+              {t('mediaWorkspace.study.subsOffsetStep', { amount: '−0.1' })}
+            </button>
+            {/* Was silent to screen readers: the value changed with no announcement. */}
+            <output aria-label={t('mediaWorkspace.study.subtitleOffset')} aria-live="polite">
+              {subtitleDelaySec >= 0 ? '+' : ''}{subtitleDelaySec.toFixed(1)}s
+            </output>
+            <button
+              type="button"
+              title={t('mediaWorkspace.study.shortcutHint', { key: "'" })}
+              onClick={() => changeSubtitleDelay(0.1)}
+            >
+              {t('mediaWorkspace.study.subsOffsetStep', { amount: '+0.1' })}
+            </button>
+          </div>
 
           <select
             value={preferences.playbackRate}
-            aria-label="Playback speed"
+            aria-label={t('mediaWorkspace.study.playbackSpeed')}
             onChange={(event) => updatePreference(
               'playbackRate',
               clampStudyPlaybackRate(Number(event.currentTarget.value)),
@@ -943,41 +1549,82 @@ export default function VideoCoreStudyOverlay({
               <option key={rate} value={rate}>{rate.toFixed(2)}x</option>
             ))}
           </select>
+
+          <button
+            type="button"
+            className="study-control-more"
+            data-study-action="toggle-study-controls"
+            aria-expanded={controlsExpanded}
+            onClick={() => setControlsExpanded((value) => !value)}
+          >
+            {t(controlsExpanded
+              ? 'mediaWorkspace.study.fewerControls'
+              : 'mediaWorkspace.study.moreControls')}
+          </button>
         </div>
 
-        <div className="study-control-row">
-          <label><input type="checkbox" checked={preferences.autoPause} onChange={(event) => updatePreference('autoPause', event.currentTarget.checked)} /> Auto-pause</label>
-          <label><input type="checkbox" checked={preferences.loopLine} onChange={(event) => {
+        {controlsExpanded && (
+        <div className="study-control-advanced">
+        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.displayGroup')}>
+          <span className="study-control-legend">{t('mediaWorkspace.study.displayGroup')}</span>
+          <label><input type="checkbox" checked={preferences.primarySubs} onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)} /> {t('mediaWorkspace.study.japaneseSubs')}</label>
+          <label><input type="checkbox" checked={preferences.dualSubs} onChange={(event) => updatePreference('dualSubs', event.currentTarget.checked)} /> {t('mediaWorkspace.study.dualSubs')}</label>
+          {/*
+            The three `data-study-pref` hooks are the observable for the three toggle
+            shortcuts (`video.toggleFurigana` / `-AutoPause` / `-Loop`). Those rows ship
+            unbound, so the only way to test them is bind-then-press, and their effect is a
+            preference rather than a seek or a subtitle offset — neither of the instruments
+            the other video.* rows are proven with. Matching these boxes by their label text
+            would key the assertion to one of four UI languages.
+          */}
+          <label><input type="checkbox" data-study-pref="furigana" checked={preferences.furigana} onChange={(event) => updatePreference('furigana', event.currentTarget.checked)} /> {t('mediaWorkspace.study.furigana')}</label>
+          <label><input type="checkbox" data-study-pref="autoPause" checked={preferences.autoPause} onChange={(event) => updatePreference('autoPause', event.currentTarget.checked)} /> {t('mediaWorkspace.study.autoPause')}</label>
+          <label><input type="checkbox" data-study-pref="loopLine" checked={preferences.loopLine} onChange={(event) => {
             updatePreference('loopLine', event.currentTarget.checked);
             if (event.currentTarget.checked) setAbLoop(false);
-          }} /> Loop line</label>
-          <label><input type="checkbox" checked={preferences.furigana} onChange={(event) => updatePreference('furigana', event.currentTarget.checked)} /> Furigana</label>
-          <label><input type="checkbox" checked={preferences.primarySubs} onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)} /> Japanese subtitles</label>
-          <label><input type="checkbox" checked={preferences.dualSubs} onChange={(event) => updatePreference('dualSubs', event.currentTarget.checked)} /> Dual subtitles</label>
-          <label><input type="checkbox" checked={pauseOnLookup} onChange={(event) => setPauseOnLookup(event.currentTarget.checked)} /> Pause on lookup</label>
-          <label><input type="checkbox" checked={preferences.dictationMode} onChange={(event) => {
-            updatePreference('dictationMode', event.currentTarget.checked);
-            if (event.currentTarget.checked) {
-              updatePreference('shadowingMode', false);
-              stopShadowRecording();
-            }
-          }} /> Dictation</label>
-          <label><input type="checkbox" checked={preferences.shadowingMode} onChange={(event) => {
-            updatePreference('shadowingMode', event.currentTarget.checked);
-            if (event.currentTarget.checked) updatePreference('dictationMode', false);
-            else stopShadowRecording();
-          }} /> Shadowing</label>
+          }} /> {t('mediaWorkspace.study.loopLine')}</label>
+          <label><input type="checkbox" checked={pauseOnLookup} onChange={(event) => setPauseOnLookup(event.currentTarget.checked)} /> {t('mediaWorkspace.study.pauseOnLookup')}</label>
+        </div>
+
+        {/*
+          Dictation and Shadowing were two checkboxes that each cleared the other on
+          change — a radio group wearing checkbox clothes. Modelled as one now, so the
+          exclusivity is announced instead of merely enforced.
+        */}
+        <div className="study-control-row" role="radiogroup" aria-label={t('mediaWorkspace.study.practiceMode')}>
+          <span className="study-control-legend">{t('mediaWorkspace.study.practiceMode')}</span>
+          {(['off', 'dictation', 'shadowing'] as const).map((mode) => (
+            <label key={mode} className="study-control-mode">
+              <input
+                type="radio"
+                name="study-practice-mode"
+                value={mode}
+                checked={practiceMode === mode}
+                onChange={() => setPracticeMode(mode)}
+              />
+              {t(mode === 'off'
+                ? 'common.off'
+                : mode === 'dictation'
+                  ? 'mediaWorkspace.study.dictation'
+                  : 'mediaWorkspace.study.shadowing')}
+            </label>
+          ))}
           <button type="button" disabled={!activeCue || translationBusy} onClick={() => void translateCue()}>
-            {translationBusy ? 'Translating…' : 'Translate line'}
+            {t(
+              translationBusy
+                ? 'mediaWorkspace.study.translating'
+                : 'mediaWorkspace.study.translateLine',
+            )}
           </button>
         </div>
 
-        <div className="study-control-row">
+        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.loopGroup')}>
+          <span className="study-control-legend">{t('mediaWorkspace.study.loopGroup')}</span>
           <button type="button" disabled={!video} onClick={() => setAbStartSec(video?.currentTime ?? null)}>
-            A {abStartSec == null ? 'set' : `${abStartSec.toFixed(2)}s`}
+            A {abStartSec == null ? t('mediaWorkspace.study.set') : `${abStartSec.toFixed(2)}s`}
           </button>
           <button type="button" disabled={!video || abStartSec == null} onClick={() => setAbEndSec(video?.currentTime ?? null)}>
-            B {abEndSec == null ? 'set' : `${abEndSec.toFixed(2)}s`}
+            B {abEndSec == null ? t('mediaWorkspace.study.set') : `${abEndSec.toFixed(2)}s`}
           </button>
           <label>
             <input
@@ -989,7 +1636,7 @@ export default function VideoCoreStudyOverlay({
                 if (event.currentTarget.checked) updatePreference('loopLine', false);
               }}
             />
-            A–B loop
+            {t('mediaWorkspace.study.abLoop')}
           </label>
           {(abStartSec != null || abEndSec != null) && (
             <button type="button" onClick={() => {
@@ -997,29 +1644,44 @@ export default function VideoCoreStudyOverlay({
               setAbEndSec(null);
               setAbLoop(false);
             }}>
-              Clear A–B
+              {t('mediaWorkspace.study.clearAb')}
             </button>
           )}
+        </div>
 
+        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.trackGroup')}>
+          <span className="study-control-legend">{t('mediaWorkspace.study.trackGroup')}</span>
           <label>
-            Subtitle track
+            {t('mediaWorkspace.study.subtitleTrack')}
             <select
               value={selectedTrack ?? ''}
               onChange={(event) => {
                 const value = event.currentTarget.value;
-                if (!value) manager?.setNoTrack();
-                else void manager?.selectTrack(Number(value));
+                if (!value) {
+                  if (manager) manager.setNoTrack();
+                  else mediaCaptionsManager?.setNoTrack();
+                } else if (manager) {
+                  void manager.selectTrack(Number(value));
+                } else {
+                  void mediaCaptionsManager?.selectTrack(Number(value));
+                }
               }}
             >
-              <option value="">Off</option>
+              <option value="">{t('common.off')}</option>
               {tracks.map((track) => (
-                <option key={track.number} value={track.number}>{trackLabel(track)}</option>
+                <option key={track.number} value={track.number}>{trackLabel(track, t)}</option>
               ))}
             </select>
           </label>
 
-          <label>
-            Secondary subtitles
+          <label
+            // The control is inert until Dual subtitles is on; say so rather than
+            // leaving a greyed-out select with no explanation.
+            title={preferences.dualSubs
+              ? undefined
+              : t('mediaWorkspace.study.secondaryNeedsDual')}
+          >
+            {t('mediaWorkspace.study.secondarySubs')}
             <select
               value={secondaryTrack ?? ''}
               disabled={!preferences.dualSubs}
@@ -1028,25 +1690,27 @@ export default function VideoCoreStudyOverlay({
                 setSecondaryTrack(value ? Number(value) : null);
               }}
             >
-              <option value="">Off</option>
+              <option value="">{t('common.off')}</option>
               {tracks
                 .filter((track) => track.type === 'event' && track.number !== selectedTrack)
                 .map((track) => (
-                  <option key={track.number} value={track.number}>{trackLabel(track)}</option>
+                  <option key={track.number} value={track.number}>{trackLabel(track, t)}</option>
                 ))}
             </select>
           </label>
 
           {!!audioTracks.length && (
             <label>
-              Audio track
+              {t('mediaWorkspace.study.audioTrack')}
               <select
                 value={selectedAudioTrack ?? ''}
                 onChange={(event) => audioManager?.selectTrack(Number(event.currentTarget.value))}
               >
                 {audioTracks.map((track) => (
                   <option key={track.number} value={track.number}>
-                    {track.name || track.language || `Track ${track.number}`}
+                    {track.name
+                      || track.language
+                      || t('mediaWorkspace.study.track', { number: track.number })}
                   </option>
                 ))}
               </select>
@@ -1054,11 +1718,16 @@ export default function VideoCoreStudyOverlay({
           )}
         </div>
 
-        <div className="study-control-row study-whisper-controls">
+        <div
+          className="study-control-row study-whisper-controls"
+          role="group"
+          aria-label={t('mediaWorkspace.study.whisperGroup')}
+        >
+          <span className="study-control-legend">{t('mediaWorkspace.study.whisperGroup')}</span>
           <label>
-            Whisper device
+            {t('mediaWorkspace.study.whisperDevice')}
             <select
-              aria-label="Whisper device"
+              aria-label={t('mediaWorkspace.study.whisperDevice')}
               value={whisperDevice}
               disabled={whisperBusy}
               onChange={(event) => {
@@ -1066,14 +1735,14 @@ export default function VideoCoreStudyOverlay({
                 persistWhisperDevice(device);
               }}
             >
-              <option value="auto">Auto (GPU, then CPU)</option>
-              <option value="cpu">CPU</option>
+              <option value="auto">{t('mediaWorkspace.study.autoGpuCpu')}</option>
+              <option value="cpu">{t('mediaWorkspace.study.cpu')}</option>
             </select>
           </label>
           <label>
-            Whisper model
+            {t('mediaWorkspace.study.whisperModel')}
             <select
-              aria-label="Whisper model"
+              aria-label={t('mediaWorkspace.study.whisperModel')}
               value={whisperModel}
               disabled={whisperBusy}
               onChange={(event) => {
@@ -1088,9 +1757,9 @@ export default function VideoCoreStudyOverlay({
             </select>
           </label>
           <label>
-            Transcription language
+            {t('mediaWorkspace.study.transcriptionLanguage')}
             <select
-              aria-label="Whisper language"
+              aria-label={t('mediaWorkspace.study.transcriptionLanguage')}
               value={whisperLanguage}
               disabled={whisperBusy}
               onChange={(event) => {
@@ -1099,8 +1768,8 @@ export default function VideoCoreStudyOverlay({
                 setStudyLang(language);
               }}
             >
-              <option value="ja">Japanese</option>
-              <option value="zh">Chinese</option>
+              <option value="ja">{t('mediaCenter.settings.japanese')}</option>
+              <option value="zh">{t('mediaCenter.settings.chinese')}</option>
             </select>
           </label>
           <button
@@ -1108,26 +1777,32 @@ export default function VideoCoreStudyOverlay({
             disabled={whisperBusy || !manager || !playbackInfo?.localFile?.path}
             onClick={() => void runWhisperGeneration()}
           >
-            Generate subtitles
+            {t('mediaWorkspace.study.generateSubs')}
           </button>
           {whisperBusy && (
-            <button type="button" onClick={stopWhisperGeneration}>Stop generation</button>
+            <button type="button" onClick={stopWhisperGeneration}>
+              {t('mediaWorkspace.study.stopGeneration')}
+            </button>
           )}
           <output
             className={whisperState === 'error' ? 'study-whisper-error' : ''}
-            aria-label="Whisper status"
+            aria-label={t('mediaWorkspace.study.whisperStatus')}
             aria-live="polite"
           >
-            {whisperError || whisperMessage || `Device: ${whisperDevice}`}
+            {whisperError
+              || whisperMessage
+              || t('mediaWorkspace.study.deviceStatus', { device: whisperDevice })}
           </output>
           {whisperBusy && (
             <progress
-              aria-label="Whisper progress"
+              aria-label={t('mediaWorkspace.study.whisperProgress')}
               max={1}
               value={whisperProgress}
             />
           )}
         </div>
+        </div>
+        )}
       </section>
 
       <VideoCoreMiningPanel

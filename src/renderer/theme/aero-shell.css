@@ -1418,6 +1418,40 @@
   box-shadow: inset 0 1px 0 var(--glass-highlight),
     0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
 }
+/* WCAG 1.4.11 — the active task had no CRISP boundary here, only that 1px top highlight and a
+   BLURRED 12px glow, so a pixel sample found nothing but the taskbar's own gradient:
+   rgb(14,59,151) on rgb(23,79,183) -> 1.36:1 (measured 2026-08-03).
+   The accent underline that marks active tasks on the dark themes is scoped
+   `:where(html:not([data-materials='aero']))` in shell.css:911 and therefore EXCLUDES aero —
+   the same exclusion that hid the .gram-level-btn fix. This is aero's copy.
+   WHITE, not --state-indicator: this taskbar is a DARK surface inside a light theme, and the dark
+   teal reads 1.17:1 on it. White against the gradient's bottom, where a bottom-anchored bar
+   actually sits, is 10.17:1.
+   Note the strict "weakest adjacent colour" metric may still flag it: white against the gradient's
+   TOP stop is 2.96:1, so no flat colour clears 3:1 across the whole span. bestPairRatio is the
+   reading that reflects what a user sees. */
+/* The ::after below is absolutely positioned, so its parent must establish a containing block.
+   shell.css:866 sets `position: relative` on .os-task-win — but under the SAME
+   `:where(html:not([data-materials='aero']))` guard as the underline, so aero inherits neither.
+   Without this the bar would anchor to .os-taskbar and `left: 50%` would centre it on the whole
+   taskbar instead of the button. */
+:root[data-materials='aero'] .os-taskbar .os-task-win,
+:root[data-materials='aero'] .os-taskbar .os-desktop-switch {
+  position: relative;
+}
+:root[data-materials='aero'] .os-taskbar .os-task-win.active::after,
+:root[data-materials='aero'] .os-taskbar .os-desktop-switch.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 16px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
 
 /* ---------- Tray + clock: compact, two-line, legible ---------------------- */
 :root[data-materials='aero'] .os-tray {
@@ -1657,7 +1691,14 @@
   border-color: var(--border);
   box-shadow: none;
 }
+/* The pack icon IS the plate, so it fills the slot instead of floating inside
+   a 38px square at 21px. An <img> icon keeps the old inset — see the
+   `:has(> img)` rule below. */
 :root[data-materials='aero'] .os-desk-icon-img svg {
+  width: 34px;
+  height: 34px;
+}
+:root[data-materials='aero'] .os-desk-icon-img img {
   width: 21px;
   height: 21px;
 }
@@ -1670,7 +1711,13 @@
   text-shadow: 0 1px 2px rgba(5, 27, 39, 0.72);
 }
 
-/* ---------- Desktop icons: flat, muted plates (no gloss / candy gradients) - */
+/* ---------- Desktop icons: the icon pack draws the plate (Phase 5 · M7) ----
+   Phase 4.5 tinted a flat CSS square behind a monochrome line glyph, because
+   there was no icon pack yet. There is one now (theme/aeroIconPack.ts) and it
+   draws its own glass plate with the family gradient and sheen, so the
+   container must get out of the way — otherwise every icon wears two plates.
+   The per-app `--icon-c*` families below still drive the taskbar line glyphs,
+   which stay monochrome at 18px and under. */
 :root[data-materials='aero'] .os-desk-icon-img,
 :root[data-materials='aero'] .os-start-app-ic,
 :root[data-materials='aero'] .os-start-aero-ic {
@@ -1678,11 +1725,26 @@
   --icon-c2: #3d5560;
   --icon-c3: #c8d6dc;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   color: #e8eef1;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Icons sit on wallpaper, so they carry their own contact shadow rather than
+   relying on a plate behind them. */
+:root[data-materials='aero'] .os-desk-icon-img > svg,
+:root[data-materials='aero'] .os-start-app-ic > svg,
+:root[data-materials='aero'] .os-start-aero-ic > svg {
+  filter: drop-shadow(0 1px 1.5px rgba(6, 26, 38, 0.42));
+}
+
+/* A user-supplied <img> icon has no plate of its own — keep one for it. */
+:root[data-materials='aero'] .os-desk-icon-img:has(> img) {
   background: color-mix(in srgb, var(--icon-c2) 70%, var(--panel));
   border-color: color-mix(in srgb, var(--border) 80%, transparent);
-  box-shadow: none;
+  overflow: hidden;
 }
 
 :root[data-materials='aero'] .os-desk-icon-img::after,

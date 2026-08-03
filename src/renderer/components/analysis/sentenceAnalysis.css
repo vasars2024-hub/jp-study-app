@@ -1,0 +1,550 @@
+/* Whole-sentence AI annotation.
+ *
+ * Theme-neutral by construction: every colour is a var with a dark fallback, so
+ * dropping the view into the Reading Lens (which sets --lens-* on .lens-root)
+ * inherits the lens palette, while an in-app host can override --sa-* instead.
+ *
+ * The category hues are the load-bearing part. They appear in three places for
+ * the same span — the highlight, the legend dot, the detail card's badge and
+ * edge — so they are defined once as --sa-c-<category> and every consumer
+ * derives from that single value with color-mix. Changing a hue here changes it
+ * everywhere it is used, which is the only way a colour code stays a code.
+ */
+
+.sa-view {
+  --sa-ink: var(--lens-ink, #f4f4f6);
+  --sa-accent: var(--lens-accent, #b23b47);
+  --sa-dim: rgba(244, 244, 246, 0.66);
+  --sa-faint: rgba(244, 244, 246, 0.42);
+  --sa-rule: rgba(255, 255, 255, 0.08);
+  --sa-panel: rgba(255, 255, 255, 0.04);
+
+  /* Category hues — chosen to stay distinguishable at highlight opacity and to
+     keep a legible contrast against both the dark panel and its own tint. */
+  --sa-c-grammar: #5b9dff;
+  --sa-c-vocabulary: #4fbf87;
+  --sa-c-particle: #e0a33c;
+  --sa-c-expression: #a98bf5;
+  --sa-c-idiom: #ef7fa8;
+  --sa-c-name: #45c2c2;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--sa-ink);
+  font-size: 12.5px;
+  line-height: 1.5;
+  /* The detail card goes two-column on width, and the width that matters is the
+     panel it was dropped into — a docked lens rail, a page popup — never the
+     viewport. Container queries are the only thing that measures that. */
+  container-type: inline-size;
+}
+
+/* ---- category colour resolution ---- */
+
+.sa-cat-grammar {
+  --sa-c: var(--sa-c-grammar);
+}
+.sa-cat-vocabulary {
+  --sa-c: var(--sa-c-vocabulary);
+}
+.sa-cat-particle {
+  --sa-c: var(--sa-c-particle);
+}
+.sa-cat-expression {
+  --sa-c: var(--sa-c-expression);
+}
+.sa-cat-idiom {
+  --sa-c: var(--sa-c-idiom);
+}
+.sa-cat-name {
+  --sa-c: var(--sa-c-name);
+}
+.sa-cat-edge-grammar {
+  --sa-c: var(--sa-c-grammar);
+}
+.sa-cat-edge-vocabulary {
+  --sa-c: var(--sa-c-vocabulary);
+}
+.sa-cat-edge-particle {
+  --sa-c: var(--sa-c-particle);
+}
+.sa-cat-edge-expression {
+  --sa-c: var(--sa-c-expression);
+}
+.sa-cat-edge-idiom {
+  --sa-c: var(--sa-c-idiom);
+}
+.sa-cat-edge-name {
+  --sa-c: var(--sa-c-name);
+}
+
+/* ---- cards ---- */
+
+.sa-card {
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: var(--sa-panel);
+  border: 1px solid var(--sa-rule);
+}
+
+.sa-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.sa-head {
+  margin: 0;
+  flex: 1;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--sa-faint);
+}
+
+.sa-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--sa-faint);
+}
+
+.sa-field + .sa-field {
+  margin-top: 9px;
+}
+
+.sa-prose {
+  margin: 0;
+  color: var(--sa-dim);
+  white-space: pre-wrap;
+}
+
+.sa-dim {
+  color: var(--sa-dim);
+}
+
+.sa-band {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--sa-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--sa-accent) 18%, transparent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+.sa-band-formality {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---- the annotated sentence ---- */
+
+.sa-sentence {
+  margin: 0;
+  font-size: 17px;
+  line-height: 2.1;
+  font-family: 'Yu Gothic', 'Meiryo', 'MS Gothic', sans-serif;
+  word-break: break-word;
+}
+
+/* A highlight has to read as part of the sentence, not as a button dropped into
+   it: no border, no background box in the resting state, just a tinted underline
+   that thickens on hover and fills in when selected. */
+.sa-seg {
+  padding: 1px 3px;
+  margin: 0 -1px;
+  border: 0;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--sa-c) 13%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--sa-c) 65%, transparent);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.sa-seg:hover {
+  background: color-mix(in srgb, var(--sa-c) 24%, transparent);
+}
+.sa-seg.active {
+  background: color-mix(in srgb, var(--sa-c) 34%, transparent);
+  box-shadow: inset 0 -2px 0 var(--sa-c);
+}
+.sa-seg:focus-visible {
+  outline: 2px solid var(--sa-c);
+  outline-offset: 1px;
+}
+
+.sa-sentence-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--sa-faint);
+}
+
+.sa-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 10.5px;
+  color: var(--sa-faint);
+}
+.sa-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sa-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sa-c);
+}
+
+/* ---- translations ---- */
+
+.sa-translation {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.sa-literal {
+  color: var(--sa-dim);
+  font-style: italic;
+}
+
+.sa-more {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: color-mix(in srgb, var(--sa-c-grammar) 88%, var(--sa-ink));
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.sa-more:hover {
+  text-decoration: underline;
+}
+
+.sa-translations {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sa-translations li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--sa-dim);
+}
+.sa-lang-tag {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--sa-faint);
+}
+.sa-paraphrase-tag {
+  font-size: 10px;
+  color: var(--sa-faint);
+  font-style: italic;
+}
+
+/* ---- detail card ---- */
+
+.sa-detail {
+  border-left: 3px solid var(--sa-c);
+}
+
+.sa-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--sa-rule);
+}
+
+.sa-detail-term {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 600;
+  font-family: 'Yu Gothic', 'Meiryo', 'MS Gothic', sans-serif;
+  word-break: break-word;
+}
+
+.sa-icon-btn {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--sa-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sa-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sa-cat-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--sa-c) 45%, transparent);
+  background: color-mix(in srgb, var(--sa-c) 14%, transparent);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.sa-cat-badge::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sa-c);
+}
+
+/* Two columns when there is room — meta on the left, the explanation on the
+   right, as in a dictionary entry. Collapses to one column in a narrow panel. */
+.sa-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding-top: 11px;
+}
+@container (min-width: 560px) {
+  .sa-detail-body {
+    grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.4fr);
+  }
+  .sa-detail-main {
+    padding-left: 14px;
+    border-left: 1px solid var(--sa-rule);
+  }
+}
+
+.sa-point-headword {
+  font-size: 14.5px;
+  font-weight: 600;
+  font-family: 'Yu Gothic', 'Meiryo', 'MS Gothic', sans-serif;
+}
+.sa-point-reading {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--sa-dim);
+}
+
+.sa-level-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sa-c);
+}
+
+.sa-detail-main .sa-head {
+  margin-bottom: 5px;
+}
+.sa-detail-main .sa-head + .sa-prose {
+  margin-bottom: 10px;
+}
+.sa-detail-main .sa-examples + .sa-head,
+.sa-detail-main .sa-prose + .sa-head {
+  margin-top: 12px;
+}
+
+.sa-examples,
+.sa-vocab,
+.sa-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sa-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sa-examples li {
+  position: relative;
+  padding-left: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sa-examples li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sa-c) 80%, transparent);
+}
+.sa-example-src {
+  font-family: 'Yu Gothic', 'Meiryo', 'MS Gothic', sans-serif;
+  font-size: 13px;
+}
+.sa-example-dst {
+  color: var(--sa-dim);
+  font-size: 11.5px;
+}
+
+.sa-vocab {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sa-vocab li {
+  position: relative;
+  padding-left: 13px;
+}
+.sa-vocab li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--sa-faint);
+}
+.sa-vocab-term {
+  font-family: 'Yu Gothic', 'Meiryo', 'MS Gothic', sans-serif;
+  font-weight: 600;
+}
+.sa-vocab-reading {
+  font-weight: 400;
+  color: var(--sa-dim);
+}
+.sa-vocab-gloss {
+  color: var(--sa-dim);
+}
+
+/* ---- notes ---- */
+
+.sa-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sa-notes li {
+  position: relative;
+  padding-left: 13px;
+  color: var(--sa-dim);
+}
+.sa-notes li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--sa-faint);
+}
+.sa-notes-warn li::before {
+  background: var(--sa-c-particle);
+}
+
+/* ---- actions ---- */
+
+.sa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--sa-rule);
+}
+.sa-actions button {
+  flex: 1 1 auto;
+  min-width: 92px;
+  padding: 7px 12px;
+  border: 1px solid var(--sa-rule);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--sa-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.sa-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.13);
+}
+.sa-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+/* ---- secondary action row + deck hint ---- */
+
+.sa-actions-secondary {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: 0;
+  align-items: center;
+}
+.sa-deck-hint {
+  flex: none;
+  font-size: 11px;
+  color: var(--sa-faint);
+  white-space: nowrap;
+}
+
+/* ---- keyboard legend ---- */
+
+.sa-shortcuts ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 4px 10px;
+  font-size: 11px;
+  color: var(--sa-faint);
+}
+.sa-shortcuts li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sa-shortcuts kbd {
+  flex: none;
+  min-width: 22px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--sa-rule);
+  background: rgba(255, 255, 255, 0.07);
+  font-family: inherit;
+  font-size: 10px;
+  text-align: center;
+  color: var(--sa-dim);
+}

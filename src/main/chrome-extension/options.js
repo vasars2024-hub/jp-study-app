@@ -93,6 +93,7 @@ const $ = (id) => document.getElementById(id);
 const RANGES = [
   ['hover-delay', 'hover-delay-val', (v) => `${v} ms`],
   ['scan-length', 'scan-length-val', (v) => `${v} chars`],
+  ['ai-min-chars', 'ai-min-chars-val', (v) => `${v} chars`],
   ['popup-width', 'popup-width-val', (v) => `${v} px`],
   ['popup-font', 'popup-font-val', (v) => `${v} px`],
 ];
@@ -114,6 +115,9 @@ function readForm() {
     closeOnRelease: $('close-on-release').checked,
     clickLookup: $('click-lookup').checked,
     lookupInEditable: $('lookup-editable').checked,
+    aiOnHighlight: $('ai-on-highlight').checked,
+    aiOnOcr: $('ai-on-ocr').checked,
+    aiMinChars: Number($('ai-min-chars').value),
     popupWidth: Number($('popup-width').value),
     popupFontSize: Number($('popup-font').value),
     popupCompact: $('popup-compact').checked,
@@ -151,6 +155,9 @@ function fillForm(s) {
   $('close-on-release').checked = !!s.closeOnRelease;
   $('click-lookup').checked = s.clickLookup !== false;
   $('lookup-editable').checked = !!s.lookupInEditable;
+  $('ai-on-highlight').checked = !!s.aiOnHighlight;
+  $('ai-on-ocr').checked = !!s.aiOnOcr;
+  $('ai-min-chars').value = String(s.aiMinChars ?? 6);
   $('popup-width').value = String(s.popupWidth);
   $('popup-font').value = String(s.popupFontSize);
   $('popup-compact').checked = !!s.popupCompact;

@@ -350,7 +350,7 @@ describe('against the shipped corpus', () => {
   });
 
   it('does not deal a card the record cannot support', () => {
-    // The Mazii pattern index is half the corpus and much of it has no
+    // The supplemental pattern index is half the corpus and much of it has no
     // examples; none of it may produce a cloze card.
     const plan = buildSession(
       GRAMMAR,

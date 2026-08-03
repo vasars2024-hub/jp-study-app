@@ -1,0 +1,112 @@
+{
+  "gate": "packaged-offline-gate.mjs",
+  "question": "Does the packaged app boot and stay usable on a FIRST RUN with no internet, while the loopback sidecar is still reachable?",
+  "startedAt": "2026-08-03T03:55:30.468Z",
+  "mode": "control (internet REACHABLE)",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "blocked": [],
+  "wouldHaveBlocked": [],
+  "allowedLoopback": 0,
+  "steps": [
+    {
+      "name": "0 the packaged window exists",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "1 CONTROL: nothing is blocked; off-machine requests are recorded and let through",
+      "result": "PASS",
+      "detail": "no --host-resolver-rules, Fetch continues every request"
+    },
+    {
+      "name": "2 the desktop shell mounts with no internet",
+      "result": "PASS",
+      "detail": "{\"ready\":\"complete\",\"desktop\":true,\"api\":true}"
+    },
+    {
+      "name": "3 local study machinery answers offline",
+      "result": "MEASURED",
+      "detail": "{\"errors\":[],\"lookupTerm\":3,\"lookupTermOffline\":3,\"dictAvailableLangs\":3}"
+    },
+    {
+      "name": "3b a network-dependent surface degrades instead of hanging",
+      "result": "PASS",
+      "detail": "{\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2746}"
+    },
+    {
+      "name": "3c the RENDERER was given something off-machine to fetch (discover cover art)",
+      "result": "MEASURED",
+      "detail": "{\"kind\":\"ran\",\"typed\":\"typed\",\"totalImgs\":3,\"remoteImgs\":0,\"sample\":[],\"rendererRequestsDuringStep\":0,\"elapsedMs\":11524}"
+    },
+    {
+      "name": "4 the shell is still standing after the failures land",
+      "result": "PASS",
+      "detail": "{\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}"
+    },
+    {
+      "name": "5 CONTROL: the unblocked run reaches the internet, so the block has something to cut",
+      "result": "PASS",
+      "detail": "renderer: 0 external request(s) would have been blocked across 0 host(s) [none], 0 local; main process: searchDiscovery {\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2746}"
+    }
+  ],
+  "exeBuiltAt": "2026-08-02T20:07:46.347Z",
+  "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-offline-20260803035530-control-8828",
+  "hostResolverRules": null,
+  "mounted": {
+    "ready": "complete",
+    "desktop": true,
+    "api": true
+  },
+  "consentDismissed": 1,
+  "localCapabilities": {
+    "errors": [],
+    "lookupTerm": 3,
+    "lookupTermOffline": 3,
+    "dictAvailableLangs": 3
+  },
+  "networkSurface": {
+    "kind": "resolved",
+    "count": 6,
+    "elapsedMs": 2746
+  },
+  "rendererSurface": {
+    "kind": "ran",
+    "typed": "typed",
+    "totalImgs": 3,
+    "remoteImgs": 0,
+    "sample": [],
+    "rendererRequestsDuringStep": 0,
+    "elapsedMs": 11524
+  },
+  "health": {
+    "stillMounted": true,
+    "visibleErrorText": "",
+    "bodyChildren": 2
+  },
+  "mainProcessLogTail": [
+    "DevTools listening on ws://127.0.0.1:51579/devtools/browser/649c27bf-4622-4a05-80ef-ddc41f8700b6",
+    "[yomitan] Seeding bundled Kanjium pitch data…",
+    "[extensionServer] listening on 127.0.0.1:18765",
+    "[yomitan] Kanjium pitch seeded (107978 entries).",
+    "[yomitan] Downloading JMdict (Japanese–English)…",
+    "[yomitan] JMdict (Japanese–English) ready (305255 terms).",
+    "[yomitan] Downloading JMdict (Japanese–Russian)…",
+    "[yomitan] JMdict (Japanese–Russian) ready (93355 terms).",
+    "[yomitan] Downloading Moedict (Chinese monolingual)…",
+    "[yomitan] Moedict (Chinese monolingual) ready (70589 terms)."
+  ],
+  "blockedHosts": [],
+  "verdict": "CONTROL-REACHED-THE-INTERNET",
+  "result": "CONTROL-REACHED-THE-INTERNET",
+  "finishedAt": "2026-08-03T03:56:19.382Z",
+  "log": [
+    "[offline] PASS — 0 the packaged window exists: app://bundle/index.html",
+    "[offline] PASS — 1 CONTROL: nothing is blocked; off-machine requests are recorded and let through: no --host-resolver-rules, Fetch continues every request",
+    "[offline] PASS — 2 the desktop shell mounts with no internet: {\"ready\":\"complete\",\"desktop\":true,\"api\":true}",
+    "[offline] MEASURED — 3 local study machinery answers offline: {\"errors\":[],\"lookupTerm\":3,\"lookupTermOffline\":3,\"dictAvailableLangs\":3}",
+    "[offline] PASS — 3b a network-dependent surface degrades instead of hanging: {\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2746}",
+    "[offline] MEASURED — 3c the RENDERER was given something off-machine to fetch (discover cover art): {\"kind\":\"ran\",\"typed\":\"typed\",\"totalImgs\":3,\"remoteImgs\":0,\"sample\":[],\"rendererRequestsDuringStep\":0,\"elapsedMs\":11524}",
+    "[offline] PASS — 4 the shell is still standing after the failures land: {\"stillMounted\":true,\"visibleErrorText\":\"\",\"bodyChildren\":2}",
+    "[offline] PASS — 5 CONTROL: the unblocked run reaches the internet, so the block has something to cut: renderer: 0 external request(s) would have been blocked across 0 host(s) [none], 0 local; main process: searchDiscovery {\"kind\":\"resolved\",\"count\":6,\"elapsedMs\":2746}"
+  ]
+}

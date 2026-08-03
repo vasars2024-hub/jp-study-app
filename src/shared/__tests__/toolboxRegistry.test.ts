@@ -33,13 +33,19 @@ describe('toolbox registry', () => {
     expect(blancIds).toContain('kanji-inspector');
     expect(blancIds).toContain('youtube-library');
     expect(blancIds).toContain('batch-converter');
-    expect(blancIds).toContain('workspace-launcher');
+    expect(blancIds).toContain('app-drawer');
   });
 
   it('retired unknown-word-detector into difficulty-analyzer', () => {
     expect(TOOLBOX_MODULES.map((module) => module.id)).not.toContain('unknown-word-detector');
     expect(getToolboxModule('difficulty-analyzer')?.status).toBe('ready');
     expect(getToolboxModule('difficulty-analyzer')?.label).toBe('Level & Difficulty Checker');
+  });
+
+  it('retired workspace-launcher into app-drawer (Pillar 3)', () => {
+    expect(TOOLBOX_MODULES.map((module) => module.id)).not.toContain('workspace-launcher');
+    expect(getToolboxModule('app-drawer')?.status).toBe('ready');
+    expect(getToolboxModule('app-drawer')?.appearsInBlanc).toBe(true);
   });
 
   it('keeps planned GitHub-friendly adapters out of the live Blanc tab', () => {

@@ -1576,11 +1576,22 @@ function broadcastVolumeProgress(p: MangaOcrVolumeProgress): void {
   }
 }
 
+/**
+ * Translate a page's regions, reporting how many actually came back translated.
+ *
+ * The count is what the caller needs, and it used to be impossible to recover.
+ * When nothing translated this returned the page *unchanged* — i.e. holding its
+ * original Japanese — which the caller then persisted as the page's translation
+ * cache, so `refreshMangaOcrMeta` counted the page as translated and the reader
+ * showed the same Japanese under both "Show original" and "Show translation".
+ * Nothing surfaced, because `runTranslationBatch` reports a failed item as an
+ * empty string rather than throwing.
+ */
 async function translateMokuroPage(
   page: MokuroPage,
   targetLang: string,
   shouldCancel: () => boolean,
-): Promise<MokuroPage> {
+): Promise<{ page: MokuroPage; requested: number; translated: number }> {
   const items: Array<{ id: string; text: string; source: string; target: string }> = [];
   for (const block of page.blocks) {
     if (block.kind === 'ignore') continue;
@@ -1590,18 +1601,30 @@ async function translateMokuroPage(
     if (!text) continue;
     items.push({ id, text, source: 'ja', target: targetLang });
   }
-  if (!items.length) return page;
+  if (!items.length) return { page, requested: 0, translated: 0 };
   const results = await runTranslationBatch(items, { shouldCancel });
-  const byId = new Map(results.filter((r) => r.text.trim()).map((r) => [r.id, r.text.trim()]));
-  if (!byId.size) return page;
+  const sourceById = new Map(items.map((i) => [i.id, i.text]));
+  const byId = new Map(
+    results
+      .map((r) => [r.id, r.text.trim()] as const)
+      // `runTranslationBatch` already rejects an echoed source, but the check is
+      // repeated here on purpose: this function decides what gets *persisted* as
+      // a translation, and that decision should not depend on a distant module
+      // continuing to validate. An echo is not a translation.
+      .filter(([id, text]) => text && text !== sourceById.get(id)?.trim()),
+  );
   return {
-    ...page,
-    blocks: page.blocks.map((b) => {
-      const id = b.regionId ?? '';
-      const tr = byId.get(id);
-      if (!tr) return b;
-      return { ...b, lines: [tr], vertical: false };
-    }),
+    page: {
+      ...page,
+      blocks: page.blocks.map((b) => {
+        const id = b.regionId ?? '';
+        const tr = byId.get(id);
+        if (!tr) return b;
+        return { ...b, lines: [tr], vertical: false };
+      }),
+    },
+    requested: items.length,
+    translated: byId.size,
   };
 }
 
@@ -1611,15 +1634,22 @@ async function translateMokuroPage(
  */
 export async function analyzeMangaVolume(
   req: MangaOcrVolumeRequest,
-): Promise<{ ok: boolean; cancelled?: boolean; error?: string; ocrMeta?: NonNullable<LibraryItem['ocrMeta']> }> {
+): Promise<{
+  ok: boolean;
+  cancelled?: boolean;
+  error?: string;
+  /** Set when OCR succeeded but one or more pages produced no translation. */
+  warning?: string;
+  ocrMeta?: NonNullable<LibraryItem['ocrMeta']>;
+}> {
   const itemId = req.itemId;
   const force = !!req.force;
   const doTranslate = req.translate !== false;
   const targetLang = (req.targetLang || 'en').trim() || 'en';
   volumeCancel.delete(itemId);
 
-  const pages = listMangaPageUrls(itemId);
-  if (!pages.length) return { ok: false, error: 'No manga pages found.' };
+  const allPages = listMangaPageUrls(itemId);
+  if (!allPages.length) return { ok: false, error: 'No manga pages found.' };
 
   if (doTranslate && !isTranslateAvailable()) {
     return {
@@ -1629,28 +1659,35 @@ export async function analyzeMangaVolume(
     };
   }
 
+  const last = allPages.length - 1;
+  const startPage = Math.min(last, Math.max(0, Math.floor(req.startPage ?? 0)));
+  const endPage = Math.min(last, Math.max(startPage, Math.floor(req.endPage ?? last)));
+  const pages = allPages.slice(startPage, endPage + 1);
   const pageTotal = pages.length;
+  /** Pages that had text but came back with nothing translated. */
+  let translateFailures = 0;
   try {
-    for (let i = 0; i < pages.length; i++) {
+    for (let offset = 0; offset < pages.length; offset++) {
+      const i = startPage + offset;
       if (volumeCancel.has(itemId)) {
         const ocrMeta = await refreshMangaOcrMeta(itemId, { targetLang });
         broadcastVolumeProgress({
           itemId,
           phase: 'cancelled',
-          pageIndex: i,
+          pageIndex: offset,
           pageTotal,
           ocrMeta,
         });
         return { ok: false, cancelled: true, ocrMeta };
       }
-      const mediaUrl = pages[i];
+      const mediaUrl = pages[offset];
       broadcastVolumeProgress({
         itemId,
         phase: 'ocr',
-        pageIndex: i,
+        pageIndex: offset,
         pageTotal,
         mediaUrl,
-        message: `OCR ${i + 1}/${pageTotal}`,
+        message: `OCR ${i + 1}/${allPages.length}`,
       });
       const page = await scanMangaPage({
         itemId,
@@ -1665,7 +1702,7 @@ export async function analyzeMangaVolume(
           broadcastVolumeProgress({
             itemId,
             phase: 'cancelled',
-            pageIndex: i,
+            pageIndex: offset,
             pageTotal,
             ocrMeta,
           });
@@ -1675,42 +1712,62 @@ export async function analyzeMangaVolume(
         broadcastVolumeProgress({
           itemId,
           phase: 'translate',
-          pageIndex: i,
+          pageIndex: offset,
           pageTotal,
           mediaUrl,
-          message: `Translate ${i + 1}/${pageTotal}`,
+          message: `Translate ${i + 1}/${allPages.length}`,
         });
-        let translated =
+        const cached =
           !force && resolved
             ? await loadMangaOcrTranslateCache(itemId, mediaUrl, targetLang)
             : null;
-        if (!translated) {
-          translated = await translateMokuroPage(page, targetLang, () => volumeCancel.has(itemId));
-          if (resolved) {
-            await writeTranslateCache(itemId, resolved.stem, targetLang, translated);
+        if (!cached) {
+          const result = await translateMokuroPage(page, targetLang, () =>
+            volumeCancel.has(itemId),
+          );
+          // Only a page that gained at least one real translation is cached.
+          // Writing the untranslated page is what made `translatedPages` count
+          // it and made the reader show Japanese as its own translation.
+          if (resolved && result.translated > 0) {
+            await writeTranslateCache(itemId, resolved.stem, targetLang, result.page);
+          }
+          if (result.requested > 0 && result.translated === 0) {
+            translateFailures += 1;
+            console.error(
+              `[mangaOcr] no region on page ${i + 1} could be translated to "${targetLang}"; not caching it`,
+            );
           }
         }
       }
 
       // Periodic meta so the library badge can show partial progress.
-      if (i === 0 || i === pages.length - 1 || i % 3 === 2) {
+      if (offset === 0 || offset === pages.length - 1 || offset % 3 === 2) {
         await refreshMangaOcrMeta(itemId, { targetLang, broadcast: true });
       }
     }
 
+    const volumeTotal = allPages.length;
     const ocrMeta = await refreshMangaOcrMeta(itemId, {
       targetLang,
-      markComplete: doTranslate,
+      // Only mark the volume complete when this pass covered every page.
+      markComplete: doTranslate && startPage === 0 && endPage === last,
       broadcast: true,
     });
     // If translate was skipped, still mark OCR-complete when all pages scanned.
-    if (!doTranslate && ocrMeta.ocrPages >= pageTotal) {
+    if (!doTranslate && ocrMeta.ocrPages >= volumeTotal) {
       const doneMeta = { ...ocrMeta, completedAt: undefined, updatedAt: Date.now() };
       updateLibraryOcrMeta(itemId, doneMeta);
     }
-    if (doTranslate && ocrMeta.ocrPages >= pageTotal && ocrMeta.translatedPages >= pageTotal) {
+    if (doTranslate && ocrMeta.ocrPages >= volumeTotal && ocrMeta.translatedPages >= volumeTotal) {
       // refreshMangaOcrMeta already set completedAt when markComplete
     }
+
+    const warning =
+      translateFailures > 0
+        ? translateFailures === pageTotal
+          ? `OCR finished, but the translation model produced nothing usable for any of the ${pageTotal} page(s). They are cached as OCR only.`
+          : `OCR finished, but ${translateFailures} of ${pageTotal} page(s) could not be translated. Those pages are cached as OCR only.`
+        : undefined;
 
     broadcastVolumeProgress({
       itemId,
@@ -1718,8 +1775,9 @@ export async function analyzeMangaVolume(
       pageIndex: pageTotal,
       pageTotal,
       ocrMeta,
+      ...(warning ? { warning } : null),
     });
-    return { ok: true, ocrMeta };
+    return { ok: true, ocrMeta, ...(warning ? { warning } : null) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     broadcastVolumeProgress({
@@ -1914,11 +1972,18 @@ export function registerMangaOcrIpc(): void {
     if (!req || typeof req !== 'object') throw new Error('Invalid volume request');
     const r = req as MangaOcrVolumeRequest;
     if (typeof r.itemId !== 'string' || !r.itemId) throw new Error('Invalid volume request');
+    const startPage =
+      typeof r.startPage === 'number' && Number.isFinite(r.startPage) ? Math.floor(r.startPage) : undefined;
+    const endPage =
+      typeof r.endPage === 'number' && Number.isFinite(r.endPage) ? Math.floor(r.endPage) : undefined;
     return analyzeMangaVolume({
       itemId: r.itemId,
       force: !!r.force,
       translate: r.translate !== false,
       targetLang: typeof r.targetLang === 'string' ? r.targetLang : 'en',
+      detectionSensitivity: r.detectionSensitivity,
+      startPage,
+      endPage,
     });
   });
 

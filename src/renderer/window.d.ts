@@ -14,6 +14,7 @@ import type {
 } from '../shared/types';
 import type {
   AnkiLinkStatus,
+  DeleteMinedNotesResult,
   EnsureModelResult,
   IntervalSnapshot,
   MineNoteRequest,
@@ -40,6 +41,24 @@ import type {
   MiningCandidate,
   TraditionalMiningConfig,
 } from '../shared/mining';
+import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from '../shared/localAgentRuntime';
+import type { AgentAutomation } from '../shared/localAgentAutomation';
+import type {
+  StudyAnalysisRequest,
+  StudyAnkiExportResult,
+  StudyAnkiPreview,
+  StudyAnkiUndoResult,
+  StudyOpportunity,
+  StudyOpportunityStatus,
+  StudyOrchestratorDocument,
+  StudyLookupPackRequest,
+  StudyLookupPackResult,
+  StudyPreparationResult,
+  StudyTranscriptionQueueResult,
+  StudyVocabularyCandidate,
+  StudyVocabularyFilters,
+  StudyVocabularyWorkspace,
+} from '../shared/mediaStudyOrchestrator';
 import type { ProfileId, ProfileSnapshot, StudyProfile } from '../shared/profiles';
 import type { ProfileRulesStore } from '../shared/profileRules';
 import type {
@@ -71,7 +90,6 @@ import type {
   JitenSourceProfile,
   JitenStore,
 } from '../shared/jiten';
-import type { CityStateMessage } from '../main/city/ipc/channels';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from '../main/readingLens';
 import type { LensOcrResult, RegionRect } from '../main/screenOcr';
 
@@ -87,6 +105,13 @@ declare global {
       ): Promise<import('../shared/toolboxFileSearch').ToolboxFileSearchResponse>;
       listLibrary(): Promise<LibraryItem[]>;
       importFiles(): Promise<LibraryItem[]>;
+      /** Imports a `.cbz`/`.zip` the caller already has a path for. */
+      importArchivePath(filePath: string): Promise<{
+        ok: boolean;
+        item?: LibraryItem;
+        alreadyPresent?: boolean;
+        error?: string;
+      }>;
       importFolder(): Promise<LibraryItem[]>;
       removeItem(id: string): Promise<LibraryItem[]>;
       getLibraryFolders(): Promise<string[]>;
@@ -227,6 +252,8 @@ declare global {
         ok: boolean;
         cancelled?: boolean;
         error?: string;
+        /** OCR succeeded but one or more pages produced no translation. */
+        warning?: string;
         ocrMeta?: import('../shared/types').LibraryItem['ocrMeta'];
       }>;
       mangaOcrCancelVolume(itemId: string): Promise<{ ok: boolean }>;
@@ -278,10 +305,15 @@ declare global {
       ankiLinkState(): Promise<AnkiLinkStatus>;
       onAnkiLinkChanged(cb: (s: AnkiLinkStatus) => void): () => void;
       ankiMineNote(req: MineNoteRequest): Promise<MineNoteResult>;
-      ankiDeleteNotes(noteIds: number[]): Promise<{ ok: boolean; error?: string }>;
+      ankiDeleteNotes(
+        noteIds: number[],
+        mediaFilenames?: string[],
+      ): Promise<DeleteMinedNotesResult>;
       ankiEnsureModel(id?: ProfileId): Promise<EnsureModelResult>;
       ankiModelFields(modelName: string): Promise<{ ok: boolean; fields: string[]; error?: string }>;
       ankiGetIntervals(opts?: { maxAgeMs?: number }): Promise<IntervalSnapshot>;
+      /** Review state for named notes only — see the note in `preload.ts`. */
+      ankiGetIntervalsForNotes(noteIds: readonly number[]): Promise<IntervalSnapshot>;
       /** Read-only week-ahead due counts from Anki's own scheduler. */
       ankiDueForecast(): Promise<DueForecast>;
       /** Structured pitch-accent data for a term. */
@@ -317,6 +349,62 @@ declare global {
       blancIsOpen(): Promise<boolean>;
       blancSetFullScreen(on: boolean): Promise<{ ok: boolean }>;
       blancSetGlobalShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
+      appToggle(): Promise<{ ok: boolean }>;
+      appSetToggleShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
+      appSetRestartShortcut(chord: string): Promise<{ ok: boolean; error?: string }>;
+      osHotkeyStatus(): Promise<{
+        supported: boolean;
+        installed: boolean;
+        running: boolean;
+        hotkey: string;
+        restartHotkey?: string;
+        openCount: number;
+        error?: string;
+      }>;
+      osHotkeyInstall(bindings?: {
+        toggle?: string;
+        restart?: string;
+        opens?: { section: string; chord: string }[];
+      } | string): Promise<{
+        ok: boolean;
+        error?: string;
+        status: {
+          supported: boolean;
+          installed: boolean;
+          running: boolean;
+          hotkey: string;
+          restartHotkey?: string;
+          openCount: number;
+        };
+      }>;
+      osHotkeySync(bindings?: {
+        toggle?: string;
+        restart?: string;
+        opens?: { section: string; chord: string }[];
+      } | string): Promise<{
+        ok: boolean;
+        error?: string;
+        status: {
+          supported: boolean;
+          installed: boolean;
+          running: boolean;
+          hotkey: string;
+          restartHotkey?: string;
+          openCount: number;
+        };
+      }>;
+      osHotkeyUninstall(): Promise<{
+        ok: boolean;
+        error?: string;
+        status: {
+          supported: boolean;
+          installed: boolean;
+          running: boolean;
+          hotkey: string;
+          restartHotkey?: string;
+          openCount: number;
+        };
+      }>;
       lockscreenOpen(size?: { width?: number; height?: number }): Promise<{ ok: boolean }>;
       lockscreenUnlock(): Promise<{ ok: boolean }>;
       lockscreenSetSize(size: { width: number; height: number }): Promise<{ ok: boolean }>;
@@ -403,6 +491,23 @@ declare global {
         id: string,
         patch: import('../shared/collectedTools').UpdateToolInput,
       ): Promise<{ ok: boolean; tool?: import('../shared/collectedTools').CollectedTool; error?: string }>;
+      toolsMoveItem(
+        id: string,
+        folderId: string | null,
+      ): Promise<{ ok: boolean; tool?: import('../shared/collectedTools').CollectedTool; error?: string }>;
+      toolsAddFolder(
+        name: string,
+        parentFolderId?: string | null,
+      ): Promise<{ ok: boolean; folder?: import('../shared/collectedTools').CollectedFolder; error?: string }>;
+      toolsRenameFolder(
+        id: string,
+        name: string,
+      ): Promise<{ ok: boolean; folder?: import('../shared/collectedTools').CollectedFolder; error?: string }>;
+      toolsRemoveFolder(id: string): Promise<{
+        ok: boolean;
+        store?: import('../shared/collectedTools').CollectedToolsStore;
+        error?: string;
+      }>;
       statsPing(): Promise<{ ok: boolean; sent: boolean }>;
       statsCounts(): Promise<import('../shared/stats').CountryCounts | null>;
       translateRun(req: {
@@ -413,11 +518,19 @@ declare global {
       }): Promise<{ ok: boolean; text?: string; error?: string }>;
       translateRunBatch(req: {
         items: Array<{ id: string; text: string; source: string; target: string }>;
-      }): Promise<{ ok: boolean; results?: Array<{ id: string; text: string }>; error?: string }>;
+      }): Promise<{
+        ok: boolean;
+        results?: Array<{ id: string; text: string }>;
+        error?: string;
+        cancelled?: boolean;
+      }>;
+      translateCancelBatch(): Promise<{ ok: boolean }>;
       translateStatus(): Promise<{ ready: boolean; modelFound: boolean; modelPath: string | null }>;
+      translateEnsureReady(): Promise<{ ok: boolean; error?: string }>;
       onTranslateModelProgress(
         cb: (p: { status?: string; file?: string; progress?: number }) => void,
       ): () => void;
+      onTranslateBatchProgress(cb: (p: { done: number; total: number }) => void): () => void;
       onTranslatePartial(cb: (p: { id: number; progress: number }) => void): () => void;
       translateAnalyze(
         req: import('../shared/translateAnalysisCore').TranslateAnalyzeRequest,
@@ -426,10 +539,83 @@ declare global {
         result?: import('../shared/translateAnalysisCore').TranslateAnalysisResult;
         error?: string;
       }>;
+      // Whole-sentence AI annotation — AI OCR mode in the Lens and the extension.
+      sentenceAnalyze(
+        req: import('../shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
+      ): Promise<import('../main/sentenceAnalysis').SentenceAnalyzeResponse>;
+      sentenceGetPrefs(): Promise<import('../shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs>;
+      sentenceSetPrefs(
+        prefs: import('../shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs,
+      ): Promise<import('../shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs>;
+      onSentencePrefsChanged(
+        cb: (prefs: import('../shared/sentenceAnalysisPrefs').SentenceAnalysisPrefs) => void,
+      ): () => void;
+      onSentenceSnapshot(
+        cb: (payload: import('../shared/analysisSnapshot').AnalysisSnapshot) => void,
+      ): () => void;
       listMedia(): Promise<MediaItem[]>;
+      scanMediaStorage(paths: string[]): Promise<{ totalBytes: number; files: Array<{ path: string; size: number; modifiedAt: number }> }>;
+      updateMediaMetadata(id: string, metadata: Partial<Pick<MediaItem, 'title' | 'artist' | 'genres' | 'actors' | 'year' | 'lang' | 'category' | 'jlptLevel' | 'vocabularyCount' | 'kanjiCount' | 'metadataSource'>>): Promise<MediaItem | null>;
+      previewMediaOrganization(id: string, root: string): Promise<import('../../shared/mediaHub').MediaOrganizationPreview | null>;
+      organizeMedia(preview: import('../../shared/mediaHub').MediaOrganizationPreview, choice?: import('../../shared/mediaHub').MediaDuplicateChoice): Promise<{ ok: boolean; path?: string; error?: string }>;
+      backupMedia(): Promise<import('../../shared/mediaHub').MediaBackupContract>;
+      listMediaRelationships(fromId?: string): Promise<import('../../shared/mediaHub').MediaRelationship[]>;
+      addMediaRelationship(relationship: Omit<import('../../shared/mediaHub').MediaRelationship, 'id' | 'createdAt'>): Promise<import('../../shared/mediaHub').MediaRelationship>;
+      mediaPathExists(filePath: string): Promise<boolean>;
       coverArt(id: string): Promise<string | null>;
+      /** Library artwork as a `playfile://` URL; null when there is none. */
+      mediaArtwork(id: string, variant?: 'poster' | 'banner' | 'still'): Promise<string | null>;
+      setMediaItemState(
+        id: string,
+        patch: Partial<Pick<MediaItem, 'favorite' | 'studyQueue' | 'note' | 'collections'>>,
+      ): Promise<MediaItem | null>;
+      runSubtitleDiscovery(
+        request?: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryRequest,
+      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryResult>;
+      cancelSubtitleDiscovery(mediaId?: string): Promise<void>;
+      subtitleDiscoveryStatus(): Promise<{ running: boolean }>;
+      getSubtitleDiscoverySettings(): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
+      saveSubtitleDiscoverySettings(
+        settings: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings,
+      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
+      subtitleProviderCredentials(): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
+      setSubtitleProviderKey(
+        id: string,
+        key: string,
+      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
+      testSubtitleProvider(
+        id: string,
+      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderTestResult>;
+      readSubtitleRecord(mediaId: string, recordId: string): Promise<SubtitlePick | null>;
+      onSubtitleDiscoveryProgress(
+        cb: (p: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,
+      ): () => void;
+      runMediaMetadata(
+        request?: import('../../shared/mediaMetadataIpc').MediaMetadataRequest,
+      ): Promise<import('../../shared/mediaMetadataIpc').MediaMetadataResult>;
+      cancelMediaMetadata(seriesKey?: string): Promise<void>;
+      mediaMetadataStatus(): Promise<{ running: boolean }>;
+      searchMediaMetadata(
+        query: string,
+      ): Promise<import('../../shared/mediaMetadataIpc').MediaMetadataSearchHit[]>;
+      clearMediaMetadataCache(): Promise<void>;
+      searchDiscovery(
+        query: string,
+      ): Promise<import('../shared/mediaDiscovery').DiscoveryCandidate[]>;
+      browseDiscovery(
+        feed: import('../shared/mediaDiscovery').DiscoveryFeedId,
+        page?: number,
+      ): Promise<import('../shared/mediaDiscovery').DiscoveryFeedResult>;
+      discoveryDetail(
+        id: number,
+      ): Promise<import('../shared/mediaDiscovery').DiscoveryCandidate | null>;
+      onMediaMetadataProgress(
+        cb: (p: import('../../shared/mediaMetadataIpc').MediaMetadataProgress) => void,
+      ): () => void;
       pickMedia(): Promise<MediaOpen | null>;
+      addMediaFolder(): Promise<{ items: MediaItem[]; added: number }>;
       openMedia(id: string): Promise<MediaOpen | null>;
+      handoffMedia(handoff: import('../shared/externalPlayer').PlaybackHandoff, profile: import('../shared/externalPlayer').ExternalPlayerProfile): Promise<string | null>;
       removeMedia(id: string): Promise<MediaItem[]>;
       pruneMedia(): Promise<{ removed: number; items: MediaItem[] }>;
       clearMediaLibrary(): Promise<MediaItem[]>;
@@ -437,15 +623,25 @@ declare global {
       setMediaSubOffset(id: string, sec: number): Promise<void>;
       extractAudio(url: string): Promise<ArrayBuffer>;
       seanimeExtractAudio(localFilePath: string): Promise<ArrayBuffer>;
+      /** Phase 6: read-only Seanime library projection for Study Mode. */
+      seanimeStudyLibrary(): Promise<
+        | { ok: true; files: import('../shared/seanimeStudyLibrary').SeanimeLibraryFile[] }
+        | { ok: false; error: string }
+      >;
       convertMedia(url: string): Promise<MediaOpen | null>;
       downloadYouTube(url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }>;
       onYoutubeProgress(cb: (p: { stage: string; percent: number }) => void): () => void;
       pickSubtitle(): Promise<SubtitlePick | null>;
+      fetchYoutubeSubs(
+        id: string,
+        preferLang?: string,
+      ): Promise<{ ok: true; name: string; text: string } | { ok: false; error: string }>;
       getMediaWatchFolder(): Promise<string | null>;
       setMediaWatchFolder(): Promise<{ folder: string | null; items: MediaItem[] }>;
       clearMediaWatchFolder(): Promise<null>;
       onMediaChanged(cb: (items: MediaItem[]) => void): () => void;
       ytList(): Promise<import('../shared/ytPlaylists').YtPlaylistsStore>;
+      ytListChannels(): Promise<import('../shared/ytPlaylists').YtChannel[]>;
       ytSaveFolders(
         folders: import('../shared/ytPlaylists').YtPlaylistFolder[],
       ): Promise<import('../shared/ytPlaylists').YtPlaylistsStore>;
@@ -481,8 +677,33 @@ declare global {
           sortDefault: import('../shared/ytPlaylists').YtPlaylistSort;
           folderId: string | null;
           title: string;
+          channelId: string;
+          channelTitle: string;
+          channelIconUrl: string;
+          subscriptionStatus: import('../shared/ytPlaylists').YtSubscriptionStatus;
+          updateFrequencyHours: number;
         }>,
       ): Promise<import('../shared/ytPlaylists').YtPlaylistsStore | { error: string }>;
+      ytSetChannelPrefs(
+        channelId: string,
+        prefs: Partial<{
+          title: string;
+          iconUrl: string;
+          subscriptionStatus: import('../shared/ytPlaylists').YtSubscriptionStatus;
+          updateFrequencyHours: number;
+        }>,
+      ): Promise<import('../shared/ytPlaylists').YtPlaylistsStore | { error: string }>;
+      ytRefreshChannel(
+        channelId: string,
+      ): Promise<
+        | {
+            store: import('../shared/ytPlaylists').YtPlaylistsStore;
+            channel: import('../shared/ytPlaylists').YtChannel;
+            refreshedPlaylistIds: string[];
+            errors: string[];
+          }
+        | { error: string }
+      >;
       ytDownloadVideos(videoIds: string[]): Promise<{
         store: import('../shared/ytPlaylists').YtPlaylistsStore;
         results: Array<{ videoId: string; ok: boolean; error?: string; mediaItemId?: string }>;
@@ -501,6 +722,26 @@ declare global {
         newVideoIds: string[];
         errors: Array<{ playlistId: string; title: string; error: string }>;
       }>;
+      ytDiscoverySearch(
+        query: string,
+        limit?: number,
+      ): Promise<import('../shared/youtubeDiscovery').YoutubeSearchResult>;
+      ytDiscoveryChannel(
+        channel: string,
+        limit?: number,
+      ): Promise<import('../shared/youtubeDiscovery').YoutubeSearchResult>;
+      ytDiscoveryProbe(
+        videoId: string,
+      ): Promise<import('../shared/youtubeDiscovery').YoutubeProbeResult>;
+      ytCachedCaptionText(
+        youtubeId: string,
+      ): Promise<{ text: string | null; file: string | null }>;
+      ytAddVideoByUrl(
+        url: string,
+      ): Promise<
+        | { ok: true; playlistId: string; videoId: string; youtubeId: string; duplicate?: boolean }
+        | { ok: false; error: string }
+      >;
       ytAddToPlanToWatch(
         videoIds: string[],
       ): Promise<import('../shared/ytPlaylists').YtPlaylistsStore>;
@@ -573,6 +814,11 @@ declare global {
         ext?: string,
       ): Promise<{ ok: boolean; path?: string; error?: string }>;
       aiGetConfig(): Promise<AiEngineConfig>;
+      localAgentPlan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse>;
+      localAgentStatus(): Promise<LocalAgentRuntimeStatus>;
+      localAgentModels(): Promise<LocalAgentModelInfo[]>;
+      localAgentSyncAutomations(entries: AgentAutomation[]): void;
+      onLocalAgentTrigger(cb: (entry: AgentAutomation) => void): () => void;
       aiSetApiKey(payload: string | {
         provider?: AiProviderKeyBucket;
         apiKey?: string;
@@ -583,6 +829,7 @@ declare global {
         apiKeySet: boolean;
         apiKeysSet: { gemini: boolean; deepseek: boolean };
       }>;
+      aiSetEngine(engine: import('../shared/mining').AiEngineKind): Promise<AiEngineConfig & { ok: boolean }>;
       aiListPresets(): Promise<AiPromptPreset[]>;
       aiListFormats(): Promise<AiMiningCardFormat[]>;
       aiSelectPreset(presetId: string): Promise<{
@@ -613,7 +860,200 @@ declare global {
       aiGenerateDeck(req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]>;
       onAiGenerateProgress(cb: (p: import('../../shared/mining').AiGenerationProgress) => void): () => void;
       aiSaveCsv(csv: string): Promise<{ ok: boolean; path?: string; error?: string }>;
+      mediaStudyAssist(
+        req: import('../shared/mediaStudyAssistant').MediaStudyAssistantRequest,
+      ): Promise<{
+        ok: boolean;
+        result?: import('../shared/mediaStudyAssistant').MediaStudyAssistantResult;
+        error?: string;
+        cached?: boolean;
+      }>;
+      studyGet(): Promise<StudyOrchestratorDocument>;
+      studyMigrateLegacy(value: unknown): Promise<StudyOrchestratorDocument>;
+      studyPrepare(request: StudyAnalysisRequest): Promise<StudyPreparationResult>;
+      studyCreateLookupPack(request: StudyLookupPackRequest): Promise<StudyLookupPackResult>;
+      studyQueueTranscription(mediaId: string): Promise<StudyTranscriptionQueueResult>;
+      studyWorkspacePage(
+        workspaceId: string,
+        offset?: number,
+        limit?: number,
+      ): Promise<{ items: StudyVocabularyCandidate[]; total: number; selected: number }>;
+      studyApplyFilters(
+        workspaceId: string,
+        filters: Partial<StudyVocabularyFilters>,
+      ): Promise<StudyVocabularyWorkspace>;
+      studyUndoFilter(workspaceId: string): Promise<StudyVocabularyWorkspace>;
+      studyUpdateWorkspace(workspace: StudyVocabularyWorkspace): Promise<StudyVocabularyWorkspace>;
+      studyListOpportunities(): Promise<StudyOpportunity[]>;
+      studySyncOpportunities(
+        opportunities: StudyOpportunity[],
+        retireMissingActive?: boolean,
+      ): Promise<StudyOrchestratorDocument>;
+      studySetOpportunityStatus(
+        opportunityId: string,
+        status: StudyOpportunityStatus,
+        snoozedUntil?: number,
+      ): Promise<StudyOrchestratorDocument>;
+      studyPreviewAnki(workspaceId: string): Promise<StudyAnkiPreview>;
+      studyExportAnki(workspaceId: string): Promise<StudyAnkiExportResult>;
+      studyUndoAnkiExport(workspaceId: string): Promise<StudyAnkiUndoResult>;
+      onStudyChanged(cb: (document: StudyOrchestratorDocument) => void): () => void;
       immersionListSites(): Promise<ImmersionSitesStore>;
+      visualNovelList(): Promise<import('../shared/visualNovel').VisualNovelDatabase>;
+      visualNovelSearchSource(query: string): Promise<{
+        ok: boolean;
+        results?: import('../shared/visualNovel').VisualNovelSourceResult[];
+        error?: string;
+      }>;
+      visualNovelSourceDetails(providerId: string): Promise<{
+        ok: boolean;
+        details?: import('../shared/visualNovel').VisualNovelSourceDetails;
+        error?: string;
+      }>;
+      visualNovelPickExecutable(): Promise<string | null>;
+      visualNovelDiscoverFolder(): Promise<import('../shared/visualNovel').VisualNovelDiscoveryCandidate[]>;
+      visualNovelExportLibrary(): Promise<{
+        ok: boolean;
+        path?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      visualNovelImportLibrary(): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        addedEntries?: number;
+        addedCaptures?: number;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      visualNovelExportCommunityBundle(
+        title: string,
+        content: string,
+      ): Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
+      visualNovelPickCommunityBundle(): Promise<{
+        ok: boolean;
+        content?: string;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      visualNovelAdd(
+        input: import('../shared/visualNovel').VisualNovelCreateInput,
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        error?: string;
+      }>;
+      visualNovelImportDiscovered(
+        candidates: import('../shared/visualNovel').VisualNovelCreateInput[],
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        imported?: number;
+        error?: string;
+      }>;
+      visualNovelRemove(id: string): Promise<import('../shared/visualNovel').VisualNovelDatabase>;
+      visualNovelUpdateProgress(
+        id: string,
+        patch: import('../shared/visualNovel').VisualNovelProgressPatch,
+      ): Promise<import('../shared/visualNovel').VisualNovelDatabase>;
+      visualNovelUpdateMetadata(
+        id: string,
+        patch: import('../shared/visualNovel').VisualNovelMetadataPatch,
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        error?: string;
+      }>;
+      visualNovelUpdateRoutes(
+        id: string,
+        routes: import('../shared/visualNovel').VisualNovelRouteInput[],
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        error?: string;
+      }>;
+      visualNovelReadClipboard(): Promise<string>;
+      visualNovelHookState(
+        id: string,
+      ): Promise<import('../shared/visualNovelHook').VisualNovelHookState>;
+      visualNovelStartHook(id: string): Promise<{
+        ok: boolean;
+        state?: import('../shared/visualNovelHook').VisualNovelHookState;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      visualNovelStopHook(
+        id: string,
+      ): Promise<import('../shared/visualNovelHook').VisualNovelHookState>;
+      onVisualNovelHookChanged(
+        cb: (state: import('../shared/visualNovelHook').VisualNovelHookState) => void,
+      ): () => void;
+      visualNovelPickScripts(id: string): Promise<{
+        ok: boolean;
+        lines?: import('../shared/visualNovelScriptExtraction').VisualNovelScriptLine[];
+        canceled?: boolean;
+        error?: string;
+      }>;
+      visualNovelImportScriptLines(
+        id: string,
+        lines: import('../shared/visualNovelScriptExtraction').VisualNovelScriptLine[],
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        imported?: number;
+        error?: string;
+      }>;
+      visualNovelSessionState(id: string): Promise<{ startedAt: number | null }>;
+      visualNovelStopSession(id: string): Promise<{
+        database: import('../shared/visualNovel').VisualNovelDatabase;
+        stopped: boolean;
+      }>;
+      visualNovelCaptureText(
+        input: import('../shared/visualNovel').VisualNovelCaptureInput,
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        error?: string;
+      }>;
+      visualNovelCaptureMany(
+        inputs: import('../shared/visualNovel').VisualNovelCaptureInput[],
+        options?: import('../shared/visualNovel').VisualNovelCaptureBatchOptions,
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        imported?: number;
+        error?: string;
+      }>;
+      visualNovelUpdateCapture(
+        id: string,
+        patch: import('../shared/visualNovel').VisualNovelCapturePatch,
+      ): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        error?: string;
+      }>;
+      visualNovelRemoveCapture(id: string): Promise<import('../shared/visualNovel').VisualNovelDatabase>;
+      visualNovelReadCaptureImage(
+        filePath: string,
+      ): Promise<{ ok: boolean; dataUrl?: string; error?: string }>;
+      visualNovelAttachCaptureAudio(id: string): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        canceled?: boolean;
+        error?: string;
+      }>;
+      visualNovelRemoveCaptureAudio(id: string): Promise<{
+        ok: boolean;
+        database?: import('../shared/visualNovel').VisualNovelDatabase;
+        error?: string;
+      }>;
+      visualNovelReadCaptureAudio(
+        filePath: string,
+      ): Promise<{ ok: boolean; dataUrl?: string; filename?: string; error?: string }>;
+      visualNovelLaunch(id: string): Promise<{ ok: boolean; error?: string; startedAt?: number }>;
+      onVisualNovelChanged(
+        cb: (database: import('../shared/visualNovel').VisualNovelDatabase) => void,
+      ): () => void;
       immersionSaveSite(
         input: ImmersionSaveSiteInput,
       ): Promise<{ ok: boolean; site?: ImmersionSite; error?: string }>;
@@ -686,7 +1126,10 @@ declare global {
       lensOpen(mode?: LensOpenMode): Promise<void>;
       lensGetInit(): Promise<LensInit | null>;
       lensOcr(
-        region: RegionRect & { engine?: 'auto' | 'manga' | 'web' },
+        region: RegionRect & {
+          engine?: 'auto' | 'manga' | 'web';
+          includeScreenshot?: boolean;
+        },
       ): Promise<LensOcrResult>;
       lensSetInteractive(interactive: boolean): void;
       lensClose(): Promise<void>;
@@ -708,10 +1151,6 @@ declare global {
       onAssetUnload(cb: (id: string) => void): () => void;
       setUiLang(lang: string): void;
 
-      // Noctis Civilization Module (read-only mirror, refreshed by push).
-      cityGetState(): Promise<CityStateMessage>;
-      cityRecordSession(packet: import('../main/city/ipc/channels').CitySessionPacket): Promise<CityStateMessage>;
-      onCityChanged(cb: (message: CityStateMessage) => void): () => void;
       extensionStatus(): Promise<{
         running: boolean;
         port: number;
@@ -792,6 +1231,37 @@ declare global {
         id: string,
         entries: Array<{ id: string; type: string; text: string; createdAt: number }>,
       ): void;
+      enqueueTranscription(
+        request: import('../../shared/transcriptionIpc').TranscriptionRequest,
+      ): Promise<import('../../shared/transcriptionIpc').TranscriptionResult>;
+      /** Windows Live Captions background capture (see main/liveCaptions.ts). */
+      liveCaptionsStatus(): Promise<import('../main/liveCaptions').LiveCaptionsStatus>;
+      liveCaptionsStart(): Promise<{
+        ok: boolean;
+        error?: string;
+        status: import('../main/liveCaptions').LiveCaptionsStatus;
+      }>;
+      liveCaptionsStop(): Promise<{
+        ok: boolean;
+        status: import('../main/liveCaptions').LiveCaptionsStatus;
+      }>;
+      liveCaptionsScripts(): Promise<import('../shared/liveCaptions').CaptionScript[]>;
+      liveCaptionsClear(): Promise<{
+        ok: boolean;
+        status: import('../main/liveCaptions').LiveCaptionsStatus;
+      }>;
+      onLiveCaptionsChanged(
+        cb: (status: import('../main/liveCaptions').LiveCaptionsStatus) => void,
+      ): () => void;
+      cancelTranscription(mediaId?: string): Promise<void>;
+      transcriptionQueue(): Promise<import('../../shared/transcriptionIpc').TranscriptionJob[]>;
+      onTranscriptionProgress(
+        cb: (p: import('../../shared/transcriptionIpc').TranscriptionProgress) => void,
+      ): () => void;
+      onTranscriptionChunkRequest(
+        cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,
+      ): () => void;
+      replyTranscriptionChunk(payload: { id: string; ok: boolean; text?: string; error?: string }): void;
       onExtensionTranscribeRequest(cb: (payload: { id: string; pcmBase64: string }) => void): () => void;
       replyExtensionTranscribe(
         id: string,
@@ -799,6 +1269,113 @@ declare global {
       ): void;
       profileRulesGet(): Promise<ProfileRulesStore>;
       profileRulesSet(store: unknown): Promise<ProfileRulesStore>;
+
+      // ---- scraper backend ----
+      scraperCapabilities(): Promise<import('../shared/scraperIpc').ScraperMethod[]>;
+      scraperSystemStats(): Promise<import('../shared/scraperResults').SystemStats>;
+      scraperListDownloads(
+        input: import('../shared/scraperIpc').ScraperQbitInput,
+      ): Promise<import('../shared/scraperResults').DownloadRow[]>;
+      scraperListExports(): Promise<import('../shared/scraperResults').ExportRecord[]>;
+      scraperListPlugins(
+        enabledIds: string[],
+      ): Promise<import('../shared/scraperIpc').ScraperPluginInfo[]>;
+      scraperWriteExport(
+        request: import('../shared/scraperIpc').ScraperExportInput & {
+          content: string;
+          defaultName: string;
+          recordCount: number;
+          openAfter?: boolean;
+        },
+      ): Promise<import('../shared/scraperResults').ExportRecord | null>;
+      scraperStartScrape(
+        input: import('../shared/scraperIpc').ScraperStartInput,
+      ): Promise<string>;
+      scraperCancelScrape(jobId: string): Promise<void>;
+      scraperListJobs(): Promise<import('../shared/scraperResults').ScrapeJobSummary[]>;
+      scraperGetResult(
+        jobId: string,
+      ): Promise<import('../shared/scraperResults').ScrapeResult | null>;
+      scraperOnJobEvent(
+        jobId: string,
+        cb: (event: import('../shared/scraperResults').ScrapeJobEvent) => void,
+      ): () => void;
+      scraperSyncScheduler(
+        input: import('../shared/scraperIpc').ScraperSchedulerSyncInput,
+      ): Promise<import('../shared/scraperIpc').ScraperSchedulerState>;
+      scraperRunSchedule(entryId: string): Promise<string | null>;
+      scraperOnSchedulerState(
+        cb: (state: import('../shared/scraperIpc').ScraperSchedulerState) => void,
+      ): () => void;
+      scraperOnNotice(
+        cb: (notice: import('../shared/scraperNotices').ScraperNotice) => void,
+      ): () => void;
+      scraperQbitTest(
+        input: import('../shared/scraperIpc').ScraperQbitInput,
+      ): Promise<import('../shared/scraperResults').QbitStatusReport>;
+      scraperQbitTransfers(
+        input: import('../shared/scraperIpc').ScraperQbitInput,
+      ): Promise<import('../shared/scraperResults').QbitTransferRow[]>;
+      scraperQbitSend(
+        input: import('../shared/scraperIpc').ScraperQbitSendInput,
+      ): Promise<import('../shared/scraperResults').QbitSendReport>;
+      scraperSetCredential(
+        ref: string,
+        secret: string,
+      ): Promise<import('../shared/scraperIpc').ScraperCredentialResult>;
+      scraperHasCredential(ref: string): Promise<boolean>;
+      scraperClearCredential(ref: string): Promise<void>;
+      scraperSearchTorrents(
+        input: import('../shared/scraperIpc').ScraperTorrentSearchInput,
+      ): Promise<import('../shared/scraperResults').TorrentRow[]>;
+      scraperListSources(
+        entries: import('../shared/scraperSourceSettings').ScraperSourceEntry[],
+      ): Promise<import('../shared/scraperResults').SourceStatus[]>;
+      scraperListAcquisitionProviders(): Promise<
+        import('../shared/acquisition').AcquisitionProviderInventory
+      >;
+      scraperGetAcquisitionSnapshot(): Promise<
+        import('../shared/acquisition').AcquisitionBackendSnapshot
+      >;
+      scraperRunAcquisitionAction(
+        action: import('../shared/acquisition').AcquisitionAction,
+      ): Promise<import('../shared/acquisition').AcquisitionActionResult>;
+      scraperProbeSource(
+        input: import('../shared/scraperIpc').ScraperProbeInput,
+      ): Promise<import('../shared/scraperResults').SourceStatus>;
+      scraperMalUnits(
+        input: import('../shared/malDownload').MalUnitsInput,
+      ): Promise<import('../shared/malDownload').MalUnitsResult>;
+
+      // ---- reading (Phase 5: provider-backed manga over the canonical model) ----
+      readingMangaEntry(
+        input: import('../shared/readingIpc').ReadingMangaEntryInput,
+      ): Promise<import('../shared/readingIpc').ReadingEntryResponse>;
+      readingMangaChapters(
+        input: import('../shared/readingIpc').ReadingMangaChaptersInput,
+      ): Promise<import('../shared/readingIpc').ReadingChaptersResponse>;
+      readingMangaChapterPages(
+        input: import('../shared/readingIpc').ReadingMangaPagesInput,
+      ): Promise<import('../shared/readingIpc').ReadingPagesResponse>;
+      readingMangaProviders(): Promise<
+        import('../shared/readingIpc').ReadingProvidersResponse
+      >;
+      readingMangaPageImage(
+        input: import('../shared/readingIpc').ReadingPageImageInput,
+      ): Promise<import('../shared/readingIpc').ReadingPageImageResponse>;
+      readingMangaSearch(
+        input: import('../shared/readingIpc').ReadingMangaSearchInput,
+      ): Promise<import('../shared/readingIpc').ReadingMangaSearchResponse>;
+      readingMangaDownloadChapter(
+        input: import('../shared/readingIpc').ReadingMangaDownloadInput,
+      ): Promise<import('../shared/readingIpc').ReadingMangaDownloadResponse>;
+      scraperFetchHttp(
+        request: import('../shared/scraperIpc').ScraperHttpProbeRequest,
+      ): Promise<import('../shared/scraperIpc').ScraperHttpProbeResult>;
+      scraperTailLogs(
+        cb: (line: import('../shared/scraperResults').LogLine) => void,
+        backlog?: number,
+      ): () => void;
 
       // ---- Seanime sidecar (Phase 1 dev-only proof) ----
       seanimeStatus(): Promise<import('../shared/seanime').SeanimeStatus>;

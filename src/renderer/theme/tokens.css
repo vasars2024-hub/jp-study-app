@@ -114,6 +114,64 @@
   --z-tooltip: 1700;
   --z-max: 2147483000;
 
+  /* ---------- Shell layer scale ----------------------------------------
+     The scale above is the ui/* COMPONENT tier: every layer in it lives inside
+     one view and tops out at 1700. This tier is the SHELL — surfaces that
+     belong to the whole app and have to stay usable no matter which view is on
+     screen. The two tiers never compare, which is why they are numbered far
+     apart rather than interleaved.
+
+     The ordering is the point; the numbers only encode it:
+
+       view content  <  a full-screen VIEW  <  shell-global overlays  <  OS chrome
+
+     A full-screen view sorts BELOW the shell because it is a view, not chrome.
+     `.seanime-host` (the adopted media workspace) is the first one the app ever
+     had, and it is what exposed the rule: it is opaque and covers the viewport,
+     so a layer beneath it is not "behind", it is gone. The command palette sat
+     at 1201 and therefore mounted, took focus and swallowed keystrokes while
+     completely invisible — with slice 7's Continue-watching group inside it,
+     the one surface whose whole job is to reach the player from elsewhere.
+
+     Gaps are deliberate: 9999 -> 20000 holds the view-overlay tier below, and
+     30000 -> 100000 keeps the lock screen and the dev perf HUD on top of
+     everything a normal session can raise. */
+  --z-shell-view: 9999;             /* opaque full-screen view (media workspace) */
+  --z-shell-view-affordance: 9998;  /* the control that opens it, just beneath   */
+
+  /* View-scoped overlays. Not shell tokens, and deliberately named apart: a
+     modal that belongs to ONE view, not to the app. It outranks the whole ui/*
+     tier (which tops out at 1700) so a dropdown inside the view cannot punch
+     through it, and it stays under every shell-global surface — the palette, a
+     toast, the taskbar and this window's own title bar all stay reachable,
+     because a view's dialog is not a gate on the app.
+
+     Both surfaces here were raw numbers until now, and one of them was numbered
+     as if it were chrome: `.lib-import` (the library's import dialog) sat at
+     300000/300001, above `--z-window-chrome`. In shells that nest it inside a
+     window (`.fwin` declares `contain: layout style paint`) that number was
+     inert and local; in the Focus shell it was not, and the dialog really did
+     paint over the custom title bar and the drag region in it. 12500 is the
+     value `.reading-source-backdrop` already used, kept so this tier lands
+     where the gap above says it does. */
+  --z-view-overlay-backdrop: 12500; /* scrim under a view-scoped modal           */
+  --z-view-overlay: 12501;          /* the modal it dims the view for            */
+
+  --z-shell-overlay-backdrop: 20000; /* click-catching scrim under an overlay    */
+  --z-shell-overlay: 20001;         /* command palette, clipboard history        */
+  --z-shell-feedback: 30000;        /* toasts reporting what an overlay just did */
+  /* Blocking chrome: a gate the user has to answer before the app is usable. It
+     outranks every overlay above because those are things you reach for, and this
+     is the one thing you are not allowed to reach past. `.consent` sat at 9000 —
+     under the media workspace, and under the palette the moment this scale raised
+     it to 20001, which put a working command surface on top of an unanswered
+     first-launch gate. Only the lock screen goes higher. */
+  --z-shell-blocking: 40000;        /* first-launch consent gate                 */
+  --z-shell-lock: 100000;           /* lock screen — covers the whole session    */
+  --z-shell-chrome: 200000;         /* taskbar and the flyout backdrop           */
+  --z-shell-chrome-raised: 200001;  /* start menu / flyouts above the taskbar    */
+  --z-window-chrome: 250000;        /* this OS window's own title bar            */
+
   /* ---------- Interaction-state alphas --------------------------------- */
   --alpha-hover: 0.08;
   --alpha-pressed: 0.16;
@@ -133,8 +191,21 @@
   --glass-highlight: color-mix(in srgb, var(--sheen) 40%, transparent);
   --glass-blur: var(--blur-lg);
 
-  /* ---------- Focus ring (consumed by a11y in M8 + ui/* now) ----------- */
-  --focus-ring-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  /* ---------- Focus ring (consumed by a11y in M8 + ui/* now) -----------
+     OPAQUE on purpose. This was `color-mix(in srgb, var(--accent) 70%, transparent)`, which
+     composites to rgb(186, 39, 64) on the taskbar's --panel and measures 2.89:1 — under the 3:1
+     that WCAG 1.4.11 requires of a focus indicator. Measured on the packaged app across a real
+     Tab walk: 23 of 52 ringed stops failed, every one of them in .os-taskbar
+     (.os-start-btn, .os-desktop-switch, .os-tray-btn, .os-task-win); the same token over darker
+     backdrops landed 3.09–3.38:1, i.e. it was passing only where the surface happened to be
+     darker. Full accent measures 4.80:1 on that same taskbar backdrop.
+
+     Worth knowing WHY this went unnoticed: Chrome computes color-mix() to `color(srgb r g b / a)`,
+     which the a11y gate's colour parser could not read, so 50 of the 52 stops scored as having NO
+     ring rather than a weak one. B3 reported PASS off the two stops that happened to use plain
+     rgb(). A silent parse failure reads exactly like a clean bill of health.
+     See proof/packaged-a11y-deep-20260802slice60e. */
+  --focus-ring-color: var(--accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
