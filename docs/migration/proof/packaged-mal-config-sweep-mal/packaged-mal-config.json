@@ -1,0 +1,105 @@
+{
+  "stamp": "sweep-mal",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "steps": [
+    {
+      "name": "1 control: an app with no client id reports itself unconfigured",
+      "result": "PASS",
+      "detail": "{\"configured\":false}"
+    },
+    {
+      "name": "2 control: beginAuth is refused with not-configured",
+      "result": "PASS",
+      "detail": "{\"ok\":false,\"code\":\"not-configured\"}"
+    },
+    {
+      "name": "3 armed: status() reports configured:true",
+      "result": "PASS",
+      "detail": "{\"configured\":true}"
+    },
+    {
+      "name": "4 armed: the not-configured error path no longer fires",
+      "result": "PASS",
+      "detail": "{\"ok\":true,\"code\":null}"
+    },
+    {
+      "name": "5 armed: the authorize URL has the right SHAPE (values never asserted)",
+      "result": "PASS",
+      "detail": "{\"origin\":\"https://myanimelist.net\",\"pathname\":\"/v1/oauth2/authorize\",\"params\":[\"client_id\",\"code_challenge\",\"code_challenge_method\",\"response_type\",\"state\"],\"responseType\":\"code\",\"codeChallengeMethod\":\"plain\",\"redirectUri\":null,\"clientIdPresent\":true,\"clientIdLength\":32,\"codeChallengeLength\":86,\"stateLength\":32,\"stateMatchesReturned\":true}"
+    },
+    {
+      "name": "6 the two arms actually differ (a verdict is a difference, not an absence)",
+      "result": "PASS",
+      "detail": "{\"control\":false,\"armed\":true}"
+    },
+    {
+      "name": "7 OAuth completion and list writes",
+      "result": "NOT-REACHABLE",
+      "detail": "completeAuth needs a human to approve in a browser and paste the code back — there is no loopback listener and no protocol handler. mal:updateEntry mutates the real list and is never called here by design."
+    }
+  ],
+  "arms": {
+    "control": {
+      "profile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-mal-cfg-sweep-mal-control-20708",
+      "hasApi": true,
+      "status": {
+        "ok": true,
+        "data": {
+          "configured": false,
+          "connected": false,
+          "tokensEncrypted": true
+        }
+      },
+      "statusThrew": null,
+      "beginOk": false,
+      "beginErrorCode": "not-configured",
+      "beginMessage": "No MyAnimeList client id is configured, so the app cannot identify itself to MAL.",
+      "beginThrew": null,
+      "authorizeUrlRedacted": null,
+      "returnedState": null
+    },
+    "armed": {
+      "profile": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-mal-cfg-sweep-mal-armed-20708",
+      "hasApi": true,
+      "status": {
+        "ok": true,
+        "data": {
+          "configured": true,
+          "connected": false,
+          "tokensEncrypted": true
+        }
+      },
+      "statusThrew": null,
+      "beginOk": true,
+      "beginErrorCode": null,
+      "beginMessage": null,
+      "beginThrew": null,
+      "authorizeUrlRedacted": "https://myanimelist.net/v1/oauth2/authorize?response_type=code&client_id=%3Credacted+len%3D32%3E&code_challenge=vSOt1yW0gRvG6erJkb5CMlKxlQ0WFnAg4OBlS2NffBxaV8xx3OvegSV-UOTwiRuPT2YeR6Kk3he5QtsSnwHMFA&code_challenge_method=plain&state=BcIS5LsJ1L81Hja8k8-hZPGqaEgBUKs0",
+      "returnedState": {
+        "length": 32
+      },
+      "shape": {
+        "origin": "https://myanimelist.net",
+        "pathname": "/v1/oauth2/authorize",
+        "params": [
+          "client_id",
+          "code_challenge",
+          "code_challenge_method",
+          "response_type",
+          "state"
+        ],
+        "responseType": "code",
+        "codeChallengeMethod": "plain",
+        "redirectUri": null,
+        "clientIdPresent": true,
+        "clientIdLength": 32,
+        "codeChallengeLength": 86,
+        "stateLength": 32,
+        "stateMatchesReturned": true
+      }
+    }
+  },
+  "exeBuiltAt": "2026-08-03T09:11:57.736Z",
+  "clientIdVisibleToThisProcess": true,
+  "clientIdLength": 32
+}

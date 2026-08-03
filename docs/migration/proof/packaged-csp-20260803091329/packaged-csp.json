@@ -1,0 +1,117 @@
+{
+  "gate": "packaged-csp-gate.mjs",
+  "question": "Does a PACKAGED build actually receive the Content-Security-Policy, and does it actually constrain the renderer?",
+  "startedAt": "2026-08-03T09:13:29.571Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "steps": [
+    {
+      "name": "0 the packaged window is on the app: origin",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "0b the document finished loading",
+      "result": "PASS",
+      "detail": "{\"ready\":\"complete\",\"head\":true}"
+    },
+    {
+      "name": "1 the document answers with a Content-Security-Policy header",
+      "result": "PASS",
+      "detail": "527 chars"
+    },
+    {
+      "name": "2 script-src is self only, with no unsafe-eval anywhere",
+      "result": "PASS",
+      "detail": "script-src [\"'self'\"]; unsafe-eval present: false"
+    },
+    {
+      "name": "3 the policy is ENFORCED, not merely present: an inline script is refused",
+      "result": "PASS",
+      "detail": "violatedDirective script-src-elem, inline script ran: false"
+    }
+  ],
+  "exeBuiltAt": "2026-08-03T09:11:57.736Z",
+  "documentUrl": "app://bundle/index.html",
+  "documentReady": {
+    "ready": "complete",
+    "head": true
+  },
+  "header": "default-src 'self' app: media: playfile: localfile:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' app: media: playfile: localfile: data: blob: https://cdn.myanimelist.net https://*.anilist.co; media-src 'self' app: media: playfile: localfile: blob: http://127.0.0.1:*; font-src 'self' app: data:; connect-src 'self' app: media: playfile: localfile: http://127.0.0.1:* ws://127.0.0.1:* https://huggingface.co https://*.huggingface.co https://*.hf.co; object-src 'none'; base-uri 'self'; form-action 'none'",
+  "directives": {
+    "default-src": [
+      "'self'",
+      "app:",
+      "media:",
+      "playfile:",
+      "localfile:"
+    ],
+    "script-src": [
+      "'self'"
+    ],
+    "style-src": [
+      "'self'",
+      "'unsafe-inline'"
+    ],
+    "img-src": [
+      "'self'",
+      "app:",
+      "media:",
+      "playfile:",
+      "localfile:",
+      "data:",
+      "blob:",
+      "https://cdn.myanimelist.net",
+      "https://*.anilist.co"
+    ],
+    "media-src": [
+      "'self'",
+      "app:",
+      "media:",
+      "playfile:",
+      "localfile:",
+      "blob:",
+      "http://127.0.0.1:*"
+    ],
+    "font-src": [
+      "'self'",
+      "app:",
+      "data:"
+    ],
+    "connect-src": [
+      "'self'",
+      "app:",
+      "media:",
+      "playfile:",
+      "localfile:",
+      "http://127.0.0.1:*",
+      "ws://127.0.0.1:*",
+      "https://huggingface.co",
+      "https://*.huggingface.co",
+      "https://*.hf.co"
+    ],
+    "object-src": [
+      "'none'"
+    ],
+    "base-uri": [
+      "'self'"
+    ],
+    "form-action": [
+      "'none'"
+    ]
+  },
+  "enforcement": {
+    "violatedDirective": "script-src-elem",
+    "inlineScriptRan": false
+  },
+  "offMachineFetch": "rejected:TypeError",
+  "verdict": "PASS",
+  "result": "PASS",
+  "finishedAt": "2026-08-03T09:13:38.430Z",
+  "log": [
+    "[packaged-csp] PASS — 0 the packaged window is on the app: origin: app://bundle/index.html",
+    "[packaged-csp] PASS — 0b the document finished loading: {\"ready\":\"complete\",\"head\":true}",
+    "[packaged-csp] PASS — 1 the document answers with a Content-Security-Policy header: 527 chars",
+    "[packaged-csp] PASS — 2 script-src is self only, with no unsafe-eval anywhere: script-src [\"'self'\"]; unsafe-eval present: false",
+    "[packaged-csp] PASS — 3 the policy is ENFORCED, not merely present: an inline script is refused: violatedDirective script-src-elem, inline script ran: false"
+  ]
+}

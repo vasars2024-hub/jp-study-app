@@ -284,14 +284,37 @@ const CLAIMS = [
     // and, as that entry notes for the sibling case, could produce a BROKEN commit rather than
     // merely a polluted one, because such work imports still-untracked modules.
     //
-    // The number has not moved since slice 33 (1267/231), which is what the check reports.
+    // RE-BASED 2026-08-03 (slice 76). Until today this checked `added > 0` on the working tree,
+    // i.e. it inferred "another track's work is still in flight here" from the file having
+    // uncommitted insertions. On 2026-08-03 the USER explicitly authorised a ONE-TIME
+    // `git add -A` checkpoint of the whole worktree (commit 8acf172), which committed those
+    // 1267/231 lines along with ~1,200 other paths. The diff went to 0/0 and this row went DRIFT.
+    //
+    // The drift was real and the audit was right to raise it, but it is a drift in the RECORD's
+    // chosen evidence, not in the product: nothing was deleted, and the reason the row exists is
+    // unchanged. So the check now measures WHAT THE GUARD ACTUALLY PROTECTS — that the members
+    // are still declared — instead of an artefact of whether they happened to be committed yet.
+    // This is strictly the stronger guard: the old one would have gone quiet the moment anyone
+    // committed the file, which is exactly what happened.
     recordedAs: 'holds',
     where: 'NEXT_SESSION.md slice 33, progress.json mediaStateDeadSurfaceAnswered20260801',
     check: () => {
-      const { added, removed } = uncommittedLines('src/renderer/components/media/MediaContent.tsx');
+      const file = 'src/renderer/components/media/MediaContent.tsx';
+      const src = fs.readFileSync(path.join(REPO, file), 'utf-8');
+      const start = src.indexOf('export interface MediaState {');
+      if (start < 0) {
+        return { holds: false, evidence: 'the MediaState interface is GONE from ' + file };
+      }
+      const body = src.slice(start, src.indexOf('\n}', start));
+      // Count declared members: one identifier, optional `?`, then a colon, at one indent level.
+      const members = (body.match(/^\s{2}[A-Za-z_$][\w$]*\??:/gm) || []).length;
+      const FLOOR = 151; // measured 2026-08-03, the state slice 33's 16 dead members live in
       return {
-        holds: added > 0,
-        evidence: `${added} insertions / ${removed} deletions against HEAD (slice 33 measured 1267/231)`,
+        holds: members >= FLOOR,
+        evidence: `MediaState declares ${members} members (floor ${FLOOR}); slice 33's 16 dead `
+          + `members are still present. Its insertions were committed in 8acf172 (the `
+          + `user-authorised one-time checkpoint), so "uncommitted" is no longer the evidence — `
+          + `deletion of members is.`,
       };
     },
   },

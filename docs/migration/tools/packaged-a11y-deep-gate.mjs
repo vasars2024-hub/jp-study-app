@@ -1632,9 +1632,27 @@ async function main() {
    * must be set and the document RELOADED — setting it on a running page changes nothing that has
    * already been stamped onto <html>.
    *
-   * The applied value is read back off the DOM rather than trusted: `applyThemeAttributes` only
-   * stamps `data-materials` when the theme actually registered, so a typo'd id would otherwise
-   * silently measure the default palette and report it as aero.
+   * The applied value is read back off the DOM rather than trusted, because `applyTheme`
+   * (`theme/engine.ts:145`) falls back to the DEFAULT theme when an id is not registered — so a
+   * typo'd id would otherwise silently measure the default palette and report it as aero.
+   *
+   * WHICH ATTRIBUTE IS THE EVIDENCE — corrected 2026-08-03, slice 76.
+   *
+   * This check used to require `data-materials`. That is only stamped when a theme declares a
+   * `materialSet` (`engine.ts:127`), and **no base theme declares one** — it exists for the glass
+   * aesthetics. So the check passed for `frutiger-aero`, which is the only theme it was ever tried
+   * on, and hard-failed all twelve base themes *even when the theme had applied perfectly*. The
+   * first sweep run (`classic-light`) reported
+   * `{"storedId":"classic-light","materials":null,"themeAttr":"classic-light"}` as a FAILURE and
+   * threw, which would have aborted all twelve runs and reported twelve phantom defects.
+   *
+   * The real evidence is `data-theme`, which `applyTheme` sets to the resolved theme's own id
+   * (`engine.ts:150`) and REMOVES for the default (`:148`). A typo therefore cannot pass: it
+   * resolves to the default and the attribute goes absent. `storedId` alone is NOT sufficient —
+   * `loadThemeId()` (`:107`) returns the default when the stored id is unregistered, so localStorage
+   * can hold the typo while the screen shows the default palette. Both are checked.
+   * `materials` is still recorded, because for aero it is the difference between the glass
+   * material set loading and not — it is simply no longer a pass condition for every theme.
    */
   if (THEME) {
     await cdp.evaluate(`(() => { localStorage.setItem('jp-os-theme', ${JSON.stringify(THEME)}); return 1; })()`)
@@ -1658,7 +1676,12 @@ async function main() {
         materials: document.documentElement.getAttribute('data-materials'),
         themeAttr: document.documentElement.getAttribute('data-theme') })`,
     ));
-    const applied = out.theme.storedId === THEME && !!out.theme.materials;
+    // `data-theme` is absent for the default theme by design, present and equal to the id for
+    // every other. Both branches are spelled out so the default can be swept too.
+    const isDefaultTheme = THEME === 'study-os';
+    out.theme.expectedThemeAttr = isDefaultTheme ? null : THEME;
+    const applied = out.theme.storedId === THEME
+      && (isDefaultTheme ? out.theme.themeAttr === null : out.theme.themeAttr === THEME);
     step('0a the requested THEME is the one on screen', applied ? 'PASS' : 'FAIL',
       JSON.stringify(out.theme));
     if (!applied) throw new Error(`theme ${THEME} did not apply; every number below would be about a different palette`);

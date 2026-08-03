@@ -1,0 +1,429 @@
+{
+  "gate": "phase7-queue-refusal-live-gate.mjs",
+  "question": "47e's original story, driven live for the first time: does narrowing a profile take effect on work that was already planned, queued and survived a process restart?",
+  "startedAt": "2026-08-03T09:40:13.945Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "preferredOperation": "dictionary.search-knowledge",
+  "chosenOperation": "dictionary.search-knowledge",
+  "objective": "Search my local knowledge using the query \"neko\" and show what you find.",
+  "steps": [
+    {
+      "name": "P0 every page-side probe compiles",
+      "result": "PASS",
+      "detail": "7 expressions parsed"
+    },
+    {
+      "name": "0 the model precondition",
+      "result": "OK",
+      "detail": "~/Downloads holds Qwen_Qwen3-1.7B-Q4_K_M.gguf — resolveModelPath searches there",
+      "gguf": [
+        "Qwen_Qwen3-1.7B-Q4_K_M.gguf"
+      ]
+    },
+    {
+      "name": "1 the agent panel rendered",
+      "result": "PASS",
+      "detail": "found by shape (a full-automation option), 4 action buttons, 2 objective textarea(s) — no UI prose was matched"
+    },
+    {
+      "name": "2 the profile store is ON DISK, so there is something to narrow",
+      "result": "PASS",
+      "detail": "persisted:study-tutor via media-assistant (4 profiles); active profile study-tutor carries 19 operations. The operation under test is chosen from the plan the model produces, not asserted here.",
+      "activeProfileOps": [
+        "dictionary.lookup",
+        "dictionary.explain-grammar",
+        "dictionary.analyze-sentence",
+        "dictionary.search-knowledge",
+        "flashcard.list-decks",
+        "flashcard.add-cards",
+        "flashcard.create-deck",
+        "calendar.list",
+        "calendar.schedule-session",
+        "study.get-context",
+        "study.list-opportunities",
+        "study.filter-vocabulary",
+        "study.undo-filter",
+        "study.preview-cards",
+        "study.create-cards",
+        "study.preview-anki",
+        "study.export-anki",
+        "study.resume-session",
+        "study.open-context"
+      ]
+    },
+    {
+      "name": "3 a LIVE plan was produced by the real local model",
+      "result": "PASS",
+      "detail": "queued item agent-1785750025308 \"Search my local knowledge using the query \"neko\" and show what you find.\" with 1 step(s): dictionary.search-knowledge[pending] (after 1 attempt(s))",
+      "item": {
+        "id": "agent-1785750025308",
+        "status": "queued",
+        "priority": 0,
+        "objective": "Search my local knowledge using the query \"neko\" and show what you find.",
+        "steps": [
+          {
+            "id": "agent-1785750025308-step-1",
+            "status": "pending",
+            "operation": "dictionary.search-knowledge",
+            "error": null,
+            "args": {
+              "query": "neko"
+            },
+            "argCount": 1
+          }
+        ]
+      },
+      "planAttempts": [
+        {
+          "attempt": 1,
+          "planClick": "clicked",
+          "status": null,
+          "produced": true,
+          "operation": "dictionary.search-knowledge",
+          "argCount": 1,
+          "args": {
+            "query": "neko"
+          },
+          "usable": true
+        }
+      ]
+    },
+    {
+      "name": "4 the operation under test, chosen from the plan the model actually produced",
+      "result": "PASS",
+      "detail": "dictionary.search-knowledge (\"Search local knowledge\", minimum read-only, no confirmation) — it is in the plan, in the profile's allow-list, and runnable at limited-actions, so the control arm can complete it and the only thing separating the arms is the narrowing",
+      "candidates": [
+        "dictionary.search-knowledge"
+      ]
+    },
+    {
+      "name": "5 the process that planned the task has exited",
+      "result": "OK",
+      "detail": "the app exited cleanly, so the queue must now come back from disk rather than from component state"
+    },
+    {
+      "name": "6 the persisted profile was forked into two identical copies",
+      "result": "OK",
+      "detail": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-sweep-phase7-25328\\narrowed and C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-sweep-phase7-25328\\control — both restart from the SAME plan, so the only variable below is whether the operation was removed"
+    },
+    {
+      "name": "7 the queued task SURVIVED the process restart",
+      "result": "PASS",
+      "detail": "narrowed arm: row present, status queued; control arm: row present, status queued. Without this, nothing below is about persistence."
+    },
+    {
+      "name": "8 the narrowing actually took, AND SURVIVED THE RESTART",
+      "result": "PASS",
+      "detail": "narrowed arm: narrowed:19->18, dictionary.search-knowledge enabled = false before the restart and false after it; control arm untouched, enabled = true after its restart. The post-restart reading is the one that matters: the panel reads the profile store once, in a useState initializer, so a narrowing applied to a RUNNING panel is not the narrowing the run will see."
+    },
+    {
+      "name": "9 the queued row was RUN, not merely listed",
+      "result": "PASS",
+      "detail": "narrowed arm click -> clicked:Run; control arm click -> clicked:Run. Before slice 51 there was no such button to click."
+    },
+    {
+      "name": "10 THE DIFFERENTIAL — same plan, same restart, one variable",
+      "result": "PASS",
+      "detail": "narrowed: step dictionary.search-knowledge -> failed, error \"Search local knowledge is not enabled for the active agent profile.\"; control: step dictionary.search-knowledge -> completed, error null. The allow-list refusal appears in the narrowed arm and the control arm COMPLETED the very same step from the very same persisted plan — the strong form: the narrowing is the only thing that can account for the difference."
+    }
+  ],
+  "arms": {
+    "narrowed": {
+      "dir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-sweep-phase7-25328\\narrowed",
+      "narrowResult": "narrowed:19->18",
+      "targetEnabledAfterNarrow": false,
+      "activeProfileOpsAfterNarrow": [
+        "dictionary.lookup",
+        "dictionary.explain-grammar",
+        "dictionary.analyze-sentence",
+        "flashcard.list-decks",
+        "flashcard.add-cards",
+        "flashcard.create-deck",
+        "calendar.list",
+        "calendar.schedule-session",
+        "study.get-context",
+        "study.list-opportunities",
+        "study.filter-vocabulary",
+        "study.undo-filter",
+        "study.preview-cards",
+        "study.create-cards",
+        "study.preview-anki",
+        "study.export-anki",
+        "study.resume-session",
+        "study.open-context"
+      ],
+      "narrowSessionForced": false,
+      "queueSurvivedRestart": true,
+      "rowAtRestart": {
+        "id": "agent-1785750025308",
+        "status": "queued",
+        "priority": 0,
+        "objective": "Search my local knowledge using the query \"neko\" and show what you find.",
+        "steps": [
+          {
+            "id": "agent-1785750025308-step-1",
+            "status": "pending",
+            "operation": "dictionary.search-knowledge",
+            "error": null,
+            "args": {
+              "query": "neko"
+            },
+            "argCount": 1
+          }
+        ]
+      },
+      "targetEnabledAfterRestart": false,
+      "clicked": "clicked:Run",
+      "rowAfterRun": {
+        "id": "agent-1785750025308",
+        "status": "failed",
+        "priority": 0,
+        "objective": "Search my local knowledge using the query \"neko\" and show what you find.",
+        "steps": [
+          {
+            "id": "agent-1785750025308-step-1",
+            "status": "failed",
+            "operation": "dictionary.search-knowledge",
+            "error": "Search local knowledge is not enabled for the active agent profile.",
+            "args": {
+              "query": "neko"
+            },
+            "argCount": 1
+          }
+        ]
+      },
+      "status": [
+        "Search local knowledge is not enabled for the active agent profile."
+      ],
+      "events": [
+        "tool-started · dictionary.search-knowledge",
+        "tool-failed · dictionary.search-knowledge · Search local knowledge is not enabled for the active agent profile. · 0ms"
+      ],
+      "planRows": [
+        [
+          "Search local knowledge",
+          "dictionary.search-knowledge",
+          "Failed",
+          "Search local knowledge is not enabled for the active agent profile."
+        ]
+      ]
+    },
+    "control": {
+      "dir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-sweep-phase7-25328\\control",
+      "narrowResult": "not-narrowed",
+      "targetEnabledAfterNarrow": true,
+      "activeProfileOpsAfterNarrow": [
+        "dictionary.lookup",
+        "dictionary.explain-grammar",
+        "dictionary.analyze-sentence",
+        "dictionary.search-knowledge",
+        "flashcard.list-decks",
+        "flashcard.add-cards",
+        "flashcard.create-deck",
+        "calendar.list",
+        "calendar.schedule-session",
+        "study.get-context",
+        "study.list-opportunities",
+        "study.filter-vocabulary",
+        "study.undo-filter",
+        "study.preview-cards",
+        "study.create-cards",
+        "study.preview-anki",
+        "study.export-anki",
+        "study.resume-session",
+        "study.open-context"
+      ],
+      "narrowSessionForced": false,
+      "queueSurvivedRestart": true,
+      "rowAtRestart": {
+        "id": "agent-1785750025308",
+        "status": "queued",
+        "priority": 0,
+        "objective": "Search my local knowledge using the query \"neko\" and show what you find.",
+        "steps": [
+          {
+            "id": "agent-1785750025308-step-1",
+            "status": "pending",
+            "operation": "dictionary.search-knowledge",
+            "error": null,
+            "args": {
+              "query": "neko"
+            },
+            "argCount": 1
+          }
+        ]
+      },
+      "targetEnabledAfterRestart": true,
+      "clicked": "clicked:Run",
+      "rowAfterRun": {
+        "id": "agent-1785750025308",
+        "status": "completed",
+        "priority": 0,
+        "objective": "Search my local knowledge using the query \"neko\" and show what you find.",
+        "steps": [
+          {
+            "id": "agent-1785750025308-step-1",
+            "status": "completed",
+            "operation": "dictionary.search-knowledge",
+            "error": null,
+            "args": {
+              "query": "neko"
+            },
+            "argCount": 1
+          }
+        ]
+      },
+      "status": [
+        "Task completed."
+      ],
+      "events": [
+        "tool-started · dictionary.search-knowledge",
+        "tool-completed · dictionary.search-knowledge · 12ms"
+      ],
+      "planRows": [
+        [
+          "Search local knowledge",
+          "dictionary.search-knowledge",
+          "Completed",
+          "[]"
+        ]
+      ]
+    }
+  },
+  "exeBuiltAt": "2026-08-03T09:11:57.736Z",
+  "scratchRoot": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-sweep-phase7-25328",
+  "planAttempts": [
+    {
+      "attempt": 1,
+      "planClick": "clicked",
+      "status": null,
+      "produced": true,
+      "operation": "dictionary.search-knowledge",
+      "argCount": 1,
+      "args": {
+        "query": "neko"
+      },
+      "usable": true
+    }
+  ],
+  "panelAfterPlan": {
+    "panel": true,
+    "actions": [
+      {
+        "i": 0,
+        "text": "Create local plan",
+        "disabled": false
+      },
+      {
+        "i": 1,
+        "text": "Run next approved step",
+        "disabled": false
+      },
+      {
+        "i": 2,
+        "text": "Confirm sensitive step",
+        "disabled": true
+      },
+      {
+        "i": 3,
+        "text": "Run next queued plan",
+        "disabled": false
+      }
+    ],
+    "queueRows": [
+      {
+        "objective": "Search my local knowledge using the query \"neko\" and show what you find.",
+        "cells": [
+          "Search my local knowledge using the query \"neko\" and show what you find.",
+          "Queued",
+          "0",
+          "RunPauseCancelPrioritize"
+        ],
+        "buttons": [
+          {
+            "text": "Run",
+            "disabled": false
+          },
+          {
+            "text": "Pause",
+            "disabled": false
+          },
+          {
+            "text": "Cancel",
+            "disabled": false
+          },
+          {
+            "text": "Prioritize",
+            "disabled": false
+          }
+        ]
+      }
+    ],
+    "planRows": [
+      [
+        "Search local knowledge",
+        "dictionary.search-knowledge",
+        "Queued",
+        "—"
+      ]
+    ],
+    "status": [
+      "Plan ready. Review it before running."
+    ],
+    "events": [],
+    "textareas": 2
+  },
+  "operationCandidates": [
+    {
+      "operation": "dictionary.search-knowledge",
+      "inProfile": true,
+      "def": {
+        "id": "dictionary.search-knowledge",
+        "category": "dictionary",
+        "label": "Search local knowledge",
+        "minimumPermission": "read-only",
+        "confirmation": null
+      }
+    }
+  ],
+  "seedForced": false,
+  "refusal": "Search local knowledge is not enabled for the active agent profile.",
+  "controlStep": {
+    "id": "agent-1785750025308-step-1",
+    "status": "completed",
+    "operation": "dictionary.search-knowledge",
+    "error": null,
+    "args": {
+      "query": "neko"
+    },
+    "argCount": 1
+  },
+  "verdict": "PASS",
+  "result": "PASS",
+  "finishedAt": "2026-08-03T09:42:09.698Z",
+  "log": [
+    "[phase7-refusal] PASS — P0 every page-side probe compiles: 7 expressions parsed",
+    "[phase7-refusal] OK — 0 the model precondition: ~/Downloads holds Qwen_Qwen3-1.7B-Q4_K_M.gguf — resolveModelPath searches there",
+    "[phase7-refusal] PASS — 1 the agent panel rendered: found by shape (a full-automation option), 4 action buttons, 2 objective textarea(s) — no UI prose was matched",
+    "[phase7-refusal] PASS — 2 the profile store is ON DISK, so there is something to narrow: persisted:study-tutor via media-assistant (4 profiles); active profile study-tutor carries 19 operations. The operation under test is chosen from the plan the model produces, not asserted here.",
+    "[phase7-refusal] plan attempt 1/5 -> clicked",
+    "[phase7-refusal]   attempt 1: plan produced — dictionary.search-knowledge args={\"query\":\"neko\"} (USABLE)",
+    "[phase7-refusal] PASS — 3 a LIVE plan was produced by the real local model: queued item agent-1785750025308 \"Search my local knowledge using the query \"neko\" and show what you find.\" with 1 step(s): dictionary.search-knowledge[pending] (after 1 attempt(s))",
+    "[phase7-refusal] PASS — 4 the operation under test, chosen from the plan the model actually produced: dictionary.search-knowledge (\"Search local knowledge\", minimum read-only, no confirmation) — it is in the plan, in the profile's allow-list, and runnable at limited-actions, so the control arm can complete it and the only thing separating the arms is the narrowing",
+    "[phase7-refusal] seed: exited cleanly (code 3221226505)",
+    "[phase7-refusal] OK — 5 the process that planned the task has exited: the app exited cleanly, so the queue must now come back from disk rather than from component state",
+    "[phase7-refusal] OK — 6 the persisted profile was forked into two identical copies: C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-sweep-phase7-25328\\narrowed and C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-p7ref-sweep-phase7-25328\\control — both restart from the SAME plan, so the only variable below is whether the operation was removed",
+    "[phase7-refusal] narrowed: narrowed:19->18, dictionary.search-knowledge enabled=false",
+    "[phase7-refusal] narrowed/narrow: exited cleanly (code 0)",
+    "[phase7-refusal] narrowed: restart row=queued targetEnabled=false click=clicked:Run -> [{\"id\":\"agent-1785750025308-step-1\",\"status\":\"failed\",\"operation\":\"dictionary.search-knowledge\",\"error\":\"Search local knowledge is not enabled for the active agent profile.\",\"args\":{\"query\":\"neko\"},\"argCount\":1}]",
+    "[phase7-refusal] narrowed/run: exited cleanly (code 0)",
+    "[phase7-refusal] control: not-narrowed, dictionary.search-knowledge enabled=true",
+    "[phase7-refusal] control/narrow: exited cleanly (code 0)",
+    "[phase7-refusal] control: restart row=queued targetEnabled=true click=clicked:Run -> [{\"id\":\"agent-1785750025308-step-1\",\"status\":\"completed\",\"operation\":\"dictionary.search-knowledge\",\"error\":null,\"args\":{\"query\":\"neko\"},\"argCount\":1}]",
+    "[phase7-refusal] control/run: exited cleanly (code 0)",
+    "[phase7-refusal] PASS — 7 the queued task SURVIVED the process restart: narrowed arm: row present, status queued; control arm: row present, status queued. Without this, nothing below is about persistence.",
+    "[phase7-refusal] PASS — 8 the narrowing actually took, AND SURVIVED THE RESTART: narrowed arm: narrowed:19->18, dictionary.search-knowledge enabled = false before the restart and false after it; control arm untouched, enabled = true after its restart. The post-restart reading is the one that matters: the panel reads the profile store once, in a useState initializer, so a narrowing applied to a RUNNING panel is not the narrowing the run will see.",
+    "[phase7-refusal] PASS — 9 the queued row was RUN, not merely listed: narrowed arm click -> clicked:Run; control arm click -> clicked:Run. Before slice 51 there was no such button to click.",
+    "[phase7-refusal] PASS — 10 THE DIFFERENTIAL — same plan, same restart, one variable: narrowed: step dictionary.search-knowledge -> failed, error \"Search local knowledge is not enabled for the active agent profile.\"; control: step dictionary.search-knowledge -> completed, error null. The allow-list refusal appears in the narrowed arm and the control arm COMPLETED the very same step from the very same persisted plan — the strong form: the narrowing is the only thing that can account for the difference."
+  ]
+}

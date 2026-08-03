@@ -47,6 +47,88 @@ Two more things that cost time in the same session, both now fixed in that harne
 > a stale record from an identically-named directory and reported `n/a` about a run that had
 > just measured the answer.
 
+## SLICE 76 — THE SCHEDULED SWEEP: PIXELS DISAGREE WITH CSS ON THE DEFAULT THEME, AND THE STOP HOOK LEAKED INTO THE WORKERS
+
+**Full write-up: `SLICE_76_PRACTICAL_SWEEP.md`. Required deliverable:
+`USER_VERIFICATION_CHECKLIST.md`, ranked by risk.** Coordinator `claude-primary`; workers
+`claude-x` (slice 74) and `claude-backup` (slice 75, **stood down mid-run at the user's request** —
+its themes were finished by the coordinator).
+
+**Gates, all measured by the coordinator:** `npx vitest run` **375 files / 4833 tests** (was 374 /
+4815; slice 74 adds 1 file / 18 tests), i18n **exit 0 / 6688 keys**, architecture **"Nothing new"**,
+`audit-carried-items.mjs` **exit 0**, phase-7 queue refusal **exit 0**, CSP **exit 0**, offline
+**both arms exit 0**, MAL config **exit 0**, surface sweep **exit 0**.
+
+**PART 0 landed: commit `8acf172`**, the user-authorised one-time `git add -A` of this worktree.
+1346 files, +532,590/−42,903. Gates were re-run green *before* committing. Not pushed, no stash
+touched, the other two worktrees untouched. Includes the **11 NOCTIS deletions** deliberately —
+flagged in the checklist so the user can object.
+
+### The finding that matters most
+
+> **On the DEFAULT theme, the painted-pixel step B2p FAILS where the CSS-derived B2 passes.**
+> B2: 107 scored of 234, **0 load-bearing**. B2p: **206 scored of 234, 184 below 3:1, 66
+> LOAD-BEARING** (`identity` 48, `state` 18). The CSS path skips 126 controls as "declares no
+> boundary"; the pixel path finds they paint one anyway. The sampler self-tested **29/29** offline
+> before any of that was believed. **Not fixed** — it is a token/palette decision, and this track
+> has learned four times that a token change means nothing until it is rebuilt and re-measured.
+
+### Two instruments that were wrong, both caught before they became findings
+
+1. **Step 0a hard-failed every base theme.** It required `data-materials`, which only themes
+   declaring a `materialSet` stamp (`engine.ts:127`) — and **no base theme declares one**. It had
+   only ever run against `frutiger-aero`, which has one. `classic-light` applied *perfectly*
+   (`data-theme="classic-light"`) and was reported as a theme-application FAILURE that **threw**,
+   which would have aborted all twelve base themes and produced twelve phantom defects. Re-based
+   onto `data-theme`, which `applyTheme` sets to the resolved id and *removes* for the default, so a
+   typo still cannot pass. **There are FIFTEEN themes, not twelve** (13 `BASE_THEMES` + aero +
+   wired-archive).
+2. **My own surface sweep reported five defects that were all mine.** `dictionary` (205 chars of
+   real UI, **15 short of the threshold**), `translate`, a correctly-blank `note` editor, and
+   `player`/`video` showing the deliberate *"The media workspace is open in front of this window /
+   Bring it forward"* handoff. Caught by reading what they rendered instead of trusting the bucket.
+   Classifier fixed, all five pinned as regression cases in `--selfcheck`.
+
+### Every light theme is bad, and it is the same shape every time
+
+| theme | B1 real / belowAA / samples | B2 load-bearing |
+|---|---|---|
+| `study-os` (dark default) | **0** / 4 / 336 | 0 |
+| `soft-sepia` | **174** / 178 / 343 | 16 |
+| `rose-pine` | **166** / 170 / 309 | 16 |
+| `mint-green` | **90** / 94 / 335 | 16 |
+| `paper` | **64** / 68 / 346 | 16 |
+| `ocean-blue` | **23** / 27 / 343 | 16 |
+| `classic-light` | **16** / 20 / 344 | 16 |
+
+The focus ring is the same `rgb(255,46,77)` everywhere: 4.8–5.4:1 on the dark default, **3.41:1** on
+white — passing with almost no margin. `wired-archive` is **low-coverage** (90 text samples vs ~340,
+5 ringed stops vs 52) and its row must not be read as a good result.
+
+### READ THIS BEFORE DISPATCHING WORKERS AGAIN — the harness defect that cost the most
+
+**`JP_SWEEP_ACTIVE` leaks into every `nohup claude -p` worker**, so *their* Stop hooks fire, tell
+them "the scheduled sweep is NOT finished, re-read the brief and continue", and loop them. Worse,
+**the runaway counter `%TEMP%/jp-sweep-blocks.count` is shared and unkeyed**: the workers drove it
+0→13, and later to **41 — past the 40-block release** — on blocks the coordinator never made. The
+guard is meant to catch a runaway; leaked blocks invert it into a mechanism that lets the real run
+stop early. It was reset to 0 twice, and both resets are recorded rather than silent.
+
+A looping worker is also told to run **PART 0**, which is the `git add -A` commit. `HEAD` was
+checked and never moved, but nothing in the harness prevented it.
+
+**Fix:** `env -u JP_SWEEP_ACTIVE CLAUDE_CONFIG_DIR=… nohup claude -p …`, and key the counter per
+session (`jp-sweep-blocks.$PPID.count`). `claude-x` behaved impeccably under this: across **40
+firings** it refused to create the sentinel, on the grounds that it was not the owner of the run.
+
+### One more thing the workers proved again
+
+**Five of five gate invocations were refused for `claude-backup`** by its permission layer, and it
+reported `UNTESTED` for all 13 themes rather than inventing numbers — the correct call, and it
+diagnosed the cause (an `ENV=value node …` prefix makes a different command string than an
+allow-rule matches). A one-argument wrapper, `docs/migration/tools/sweep-theme-a11y.mjs`, exists now
+so one allow-rule covers the whole sweep.
+
 ## SLICE 71 — PHASE 8 ITEM 3: YOUTUBE DISCOVERY, AND "AVANT-GARDE" WAS NEVER A FEATURE
 
 **Full write-up: `SLICE_71_YOUTUBE_DISCOVERY.md`.** Gates measured by the coordinator (its own were

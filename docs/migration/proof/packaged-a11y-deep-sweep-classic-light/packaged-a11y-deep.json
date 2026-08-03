@@ -1,0 +1,60 @@
+{
+  "gate": "packaged-a11y-deep-gate.mjs",
+  "question": "Keyboard walk, contrast, artwork surfaces and the player overlay — the four accessibility items slice 47k recorded as NOT covered.",
+  "startedAt": "2026-08-03T09:27:58.199Z",
+  "exe": "C:\\Users\\Arseniy\\Projects\\jp-study-app\\out\\jp-study-app-win32-x64\\jp-study-app.exe",
+  "viewportRequested": {
+    "width": 1600,
+    "height": 1000
+  },
+  "steps": [
+    {
+      "name": "P0 every page-side probe compiles",
+      "result": "PASS",
+      "detail": "8 expressions parsed"
+    },
+    {
+      "name": "P1 artwork fixture",
+      "result": "SKIPPED",
+      "detail": "no --fixture: a throwaway profile has no library, so any artwork number below describes an empty app and must not be quoted as coverage"
+    },
+    {
+      "name": "0 the packaged desktop is up",
+      "result": "PASS",
+      "detail": "app://bundle/index.html"
+    },
+    {
+      "name": "0a the requested THEME is the one on screen",
+      "result": "FAIL",
+      "detail": "{\"requested\":\"classic-light\",\"storedId\":\"classic-light\",\"materials\":null,\"themeAttr\":\"classic-light\"}"
+    }
+  ],
+  "keyboard": [],
+  "contrast": null,
+  "artwork": null,
+  "player": null,
+  "pageExpressionsCompiled": true,
+  "exeBuiltAt": "2026-08-03T09:11:57.736Z",
+  "userDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-a11y-deep-sweep-classic-light-48384",
+  "fixtureRequested": false,
+  "seanimeDataDir": "C:\\Users\\Arseniy\\AppData\\Local\\Temp\\jp-a11y-deep-sweep-classic-light-48384\\seanime-scratch",
+  "theme": {
+    "requested": "classic-light",
+    "storedId": "classic-light",
+    "materials": null,
+    "themeAttr": "classic-light"
+  },
+  "result": "ERROR",
+  "error": "theme classic-light did not apply; every number below would be about a different palette",
+  "finishedAt": "2026-08-03T09:28:07.929Z",
+  "log": [
+    "[a11y-deep] PASS — P0 every page-side probe compiles: 8 expressions parsed",
+    "[a11y-deep] SKIPPED — P1 artwork fixture: no --fixture: a throwaway profile has no library, so any artwork number below describes an empty app and must not be quoted as coverage",
+    "[a11y-deep] PASS — 0 the packaged desktop is up: app://bundle/index.html",
+    "[a11y-deep] FAIL — 0a the requested THEME is the one on screen: {\"requested\":\"classic-light\",\"storedId\":\"classic-light\",\"materials\":null,\"themeAttr\":\"classic-light\"}",
+    "[a11y-deep] ERROR theme classic-light did not apply; every number below would be about a different palette"
+  ],
+  "failedSteps": [
+    "0a the requested THEME is the one on screen"
+  ]
+}

@@ -25,6 +25,7 @@ import {
   type ExtensionContentCategory,
   type ExtensionMineMode,
 } from '../shared/extensionCapture';
+import { extensionContractManifest } from '../shared/extensionContract';
 import { extractReadableFromHtml, htmlToText } from './readabilityExtract';
 import { importGeneratedArticle, importMangaFromImageUrls } from './library';
 import { mineNote } from './anki';
@@ -999,11 +1000,17 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
   }
 
   if (req.method === 'GET' && (pathname === '/v1/health' || pathname === '/health')) {
+    // `contract` is additive: existing clients read `ok`/`version`/`port` and
+    // ignore the rest. It publishes the shared identity tables so a client can
+    // feature-detect this build instead of assuming a command exists and
+    // discovering otherwise when the user presses it. See
+    // src/shared/extensionContract.ts for why those tables are shared at all.
     json(res, 200, {
       ok: true,
       version: 1,
       port: bridgeState?.port ?? EXTENSION_PORT,
       features: { sentenceAnalysis: true },
+      contract: extensionContractManifest(),
     });
     return;
   }
