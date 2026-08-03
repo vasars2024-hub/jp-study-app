@@ -253,17 +253,31 @@ In a minimised window **every box measures 0×0**, and a naive check — "is any
 "is the contrast ratio acceptable?", "does it fit?" — **scores 0×0 as perfect**. This is a
 silent pass, the worst kind.
 
-Check first and **refuse rather than record zeros**:
+Check first and **refuse rather than record zeros**.
+
+> **`.fwin` carries NO `data-id`.** Corrected 2026-08-04 — an earlier draft of this section used
+> `.fwin[data-id="settings"]`, which **matches nothing**: the element is
+> `<section className={`fwin …`} style={{…}}>` with no data attributes
+> (`src/renderer/components/DesktopShell.tsx:2698-2702`), and `data-id` appears nowhere in
+> `src/**`. That selector always returned `{refuse:'section not found'}` — and **a guard that
+> always refuses is indistinguishable from one that works.** Match on the window title instead:
+> `.fwin-title-text` holds it (`DesktopShell.tsx:2713`).
 
 ```js
 (() => {
-  const s = document.querySelector('.fwin[data-id="settings"]');
-  if (!s) return { refuse: 'section not found' };
-  const d = getComputedStyle(s).display;
-  if (d === 'none') return { refuse: 'window not displayed — measurement invalid' };
-  return { ok: true, rect: s.getBoundingClientRect().toJSON() };
+  const win = (name) => [...document.querySelectorAll('.fwin')].find(
+    (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(name));
+  const s = win('Settings');
+  if (!s) return { refuse: 'no .fwin titled Settings — is it open?' };
+  if (getComputedStyle(s).display === 'none') return { refuse: 'window not displayed — measurement invalid' };
+  const r = s.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return { refuse: 'zero-size box — measurement invalid' };
+  return { ok: true, rect: r.toJSON() };
 })()
 ```
+
+The zero-size check is not redundant with the `display` check: a window can be laid out and
+still measure 0×0. Refuse on either.
 
 `/health` also reports `minimized` per window — check it before a measurement pass and use
 `/focus` (which restores) rather than measuring through it.
