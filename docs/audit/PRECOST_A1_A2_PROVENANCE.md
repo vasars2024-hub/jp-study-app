@@ -76,9 +76,15 @@ triggers a multi-hundred-megabyte download.
 ### Why this outranks the npm work
 
 `LICENSING_PLAN.md` and `license-audit-gate.mjs` cover **623 npm packages** and the study
-**data** files. Neither covers `public/`. **The gate can report exit 0 while ~94% of the
-packaged payload sits outside what it audits** — a green check whose denominator was never
-stated, which is the defect class this whole audit is about.
+**data** files. Neither covers `public/`. The gate can report exit 0 while a third of the
+packaged payload sits outside what it audits.
+
+> **CORRECTION 2026-08-04.** This section originally read "**~94%** of the packaged payload".
+> That figure was asserted without measuring the denominator — the exact defect this audit
+> exists to find, committed by the audit, for the second time. **Measured: the packaged
+> artifact is 3,901 MB and `resources/public` is 1,389 MB — 35.6%.** A1's independent figure
+> was 34.9%. The finding is unchanged in kind and smaller in size; it is still the largest
+> single un-audited block, and one third is not one twentieth.
 
 ---
 

@@ -87,26 +87,27 @@ exact paths.
 fix them and do not treat them as your failure. If you want to show you added none, measure the
 total before and after — never quote the raw number as if it were yours.
 
-### Known-failing suites — do not spend a pass on them
+### Known-failing suites — THERE ARE NONE. The suite is green.
 
-- `src/shared/__tests__/architectureBaseline.test.ts`
-- `src/renderer/__tests__/flashcardSearch.test.ts`
+> **CORRECTED 2026-08-04, and this entry is why the hedge below it existed.** An earlier
+> version named `architectureBaseline.test.ts` and `flashcardSearch.test.ts` as known-failing,
+> carried from a stale note. **Measured on this tree: `npx vitest run` → 375 files, 4,833
+> tests, 0 failed.** Both named suites run and pass (12 named tests between them).
 
-Both files exist and are inside the `vitest.config.ts` globs, so they do run. They fail on a
-clean tree; seeing them red is not a signal, and fixing them is not your job unless the dispatch
-says it is.
+**Any red suite is a real signal.** Do not assume a failure is pre-existing, and do not skip a
+suite because a document told you it fails. If something is red, either your change caused it
+or the tree moved — establish which before reporting.
 
-> Carried from the dispatch and **not independently re-run here** — treat "these two, and only
-> these two, fail" as the claim to check against your own first run, not as a guarantee. If a
-> third suite is red, that is yours to explain.
+The general rule stands regardless of this entry's contents: **check a "known-failing" claim
+against your own first run before relying on it.** This one did not survive that check.
 
 ## 5. Report measured totals, never an uncaused delta
 
 Test counts and i18n counts drift for reasons unrelated to your change — other agents are
 committing in adjacent trees during your run.
 
-> **Say:** `npx vitest run` → *&lt;N&gt;* passed, *&lt;M&gt;* failed (`architectureBaseline`,
-> `flashcardSearch`) — quoting the totals **you measured this run**. No baseline count is
+> **Say:** `npx vitest run` → *&lt;N&gt;* files, *&lt;M&gt;* tests, *&lt;K&gt;* failed — quoting
+> the totals **you measured this run**, and naming any failing suite. No baseline count is
 > reproduced here on purpose: a number written into a skill goes stale and then gets quoted as
 > current by someone who never ran the suite.
 >
