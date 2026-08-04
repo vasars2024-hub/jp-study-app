@@ -240,6 +240,299 @@ Three senses returned, from two real sources (`JMdict (Japanese–English)` ×2,
 `JMdict (Japanese–Russian)` ×1). **The reason chain is genuinely translated, not
 English-in-disguise.** This is the strongest positive result of the run.
 
+### 4.5 Anki collection unchanged, measured at both ends
+
+```
+START OF RUN  deckNames -> 84   modelNames -> 35
+END OF RUN    deckNames -> 84   modelNames -> 35
+```
+
+Identical. This is the positive check on §2's claim, not a restatement of it.
+
 ---
 
-*(sections 5–9 continue below as the run proceeds)*
+## 5. The three claims that needed more than a grep
+
+### 5.1 The real i18n holes, confirmed live under `ui-lang=ja`
+
+Four files in the cluster have **zero** i18n adoption (§4.2 table). Three were confirmed
+rendering English in a Japanese UI, each beside correctly-translated siblings in the same
+viewport — which is what makes it a differential rather than an absence:
+
+| file | strings observed in English under `ja` | translated sibling in the same viewport |
+|---|---|---|
+| `DictionaryView.tsx` | subtitle, placeholder, `Search`, tip | window title **辞書**, Start-menu label **辞書** |
+| `JitenMiningPanel.tsx` | *"Jiten vocab mining"*, *"Mine a Jiten media deck…"*, *"Refresh"*, *"Plan a Jiten title in Novels first…"* | `シンプルEPUBマイニング`, `詳細EPUB`, `CSVツール`, `AIカードスタジオ`, `辞書を復習（1）` |
+| `FieldMappingEditor.tsx` + `AnkiCardPreview.tsx` | *"Field templates"*, *"Variable palette"*, *"Card styling (CSS)"*, *"Card preview"*, `FRONT`/`BACK`, 4× *"Leave blank for automatic mapping"*, *"Sample content for this profile…"* | `学習プロフィール`, `接続済み — デッキ84個、ノートタイプ35個。`, `手動でカードを追加` |
+
+The sharpest single instance is **not** in one of those four files. `FlashcardsContent.tsx` has
+86 `t()` calls, and at `:1055-1059` one ternary does this:
+
+```tsx
+{epubMiningUi === 'simple'   ? t('flash.mining.simpleLead')
+ : epubMiningUi === 'advanced' ? t('flash.mining.advancedLead')
+ : 'Download a Jiten vocabulary deck for a planned title and save it into your local deck library.'}
+```
+
+Two arms keyed, the third hardcoded, and no `flash.mining.jitenLead` key exists. That is an
+oversight rather than a scope decision.
+
+**The structural point, which outlives any individual string:** `node tools/i18n-check.cjs`
+compares catalogs against each other, so it can only see a key that already exists in `en.ts`. A
+file that never adopted `t()` at all contributes no keys and is therefore **invisible to the
+gate** — as is the `vitest` "catalog hygiene" block, which enforces the same comparison. Both
+gates would pass on all four files forever. A `useT`-adoption check over `views/` and
+`components/` is the missing instrument.
+
+### 5.2 Tatoeba attribution — the credit works, and the Dictionary omits it
+
+The "only attribution string" half is **CONFIRMED**, re-derived rather than repeated:
+
+```
+grep -niE "'[^']*(licen[cs]ed|CC-BY|CC BY|attribution|courtesy of|©)" src/shared/i18n/catalogs/en.ts
+  -> exactly one hit: en.ts:2407 'grammar.examples.tatoebaCredit'
+rg "tatoebaCredit" src   -> 1 render site (GrammarContent.tsx:151) + the 4 catalog entries
+```
+
+**Grammar (control arm).** Clicked *"+ More examples from Tatoeba"*; 10 examples loaded and the
+credit appeared:
+
+```
+creditRendered : true
+creditText     : "Example sentences from Tatoeba, licensed CC-BY 2.0 FR"
+creditHref     : "https://tatoeba.org/"
+```
+
+It is gated at `GrammarContent.tsx:147` on examples actually being Tatoeba-sourced, which is why
+it is absent until they load. Correct behaviour.
+
+**Dictionary (test arm).** Clicked *"Example sentences"* on 猫. Six real Tatoeba sentences
+rendered — `猫だ！`/"Cat!", `猫万歳！`/"Cats forever!", `猫に小判。`/"Cast pearls before swine." —
+and the panel's own copy names the source (*"the first N Tatoeba hits per language"*). Measured
+on that surface:
+
+```
+mentionsTatoeba : true
+mentionsLicence : false
+links           : []
+```
+
+Same corpus, same licence obligation, attribution on one surface and absent on the other. The
+Dictionary is the higher-traffic surface, and its examples are mined onto Anki cards, which
+carries the omission outward. The fix is a render site, not new work: the key and its four
+translations already exist.
+
+### 5.3 Schema 18 — settled with a real fixture, not statically
+
+The dispatch allowed "static-only" if a fixture was impossible. A fixture was possible, so this
+is a live differential. Script: `<scratchpad>/schema18-fixture.mjs` (temp only — **no file was
+added to the repo**, and no `.apkg` was imported into Anki). It builds real SQLite collections
+with `sql.js` resolved from the repo's own `node_modules`, then runs **the exact queries from
+`apkgImport.ts:104` and `:109-114`** and the real field-selection logic. Every arm uses a note
+type whose term sits at **ord 1, not ord 0** — if field selection falls back to "first field",
+the arm must return the reading `ねこ` instead of the term `猫`.
+
+```
+Expected term for every arm: 猫  (field ord 1, NOT first)
+
+ARM A — schema 18, col.models = ''   (what Anki actually writes)
+  models resolved: 1  modelFound=true   ord=1  picked="猫"   -> CORRECT
+ARM B — schema 18, col.models = '{}'  (non-empty but model-less)
+  models resolved: 0  modelFound=false  ord=0  picked="ねこ"  -> WRONG
+ARM C — legacy schema 11, col.models populated
+  models resolved: 1  modelFound=true   ord=1  picked="猫"   -> CORRECT
+```
+
+**ARM B is the positive control** — it proves the fixture is capable of showing the defect, so
+ARM A's pass carries information (`claim-check` §5). Readings:
+
+- The claim's **mechanism is wrong**: `apkgImport.ts:106` guards on `modelsJson.trim()`, and real
+  schema-18 collections leave `col.models` empty, so the `notetypes`/`fields` branch at
+  `:108-122` runs and resolves the model correctly.
+- The claim's **effect is real through a narrower door**: `'{}'` is non-empty after `.trim()`, so
+  the legacy branch is taken, `parseModels` returns `{}`, `pickExpressionOrd(undefined)` returns
+  `0` (`apkgParse.ts:89`) and `extractExpressions` reads `fields[0]` (`:177`) — silently.
+- **Unverified, and I am not asserting it:** whether real Anki ever writes `'{}'` into
+  `col.models`. Establishing that needs a real schema-18 export; I did not open the user's
+  collection to check.
+
+Transcription fidelity was checked rather than assumed: `FIELD_SEP` is `String.fromCharCode(0x1f)`
+(`apkgParse.ts:7`) and the fixture's separator is codepoint 31. The repo's own suite for these
+functions passes — `npx vitest run src/shared/__tests__/apkgParse.test.ts` → **1 file, 17 tests,
+0 failed**. That suite covers `modelsFromNormalizedRows` (`:99-111`) but **not the branch
+selection**, and `readNotes` is not exported, so the branch has no unit test at all.
+
+---
+
+## 6. What I drove, and the side effect each rested on
+
+### 6.1 Anki view — connected arm
+
+Status read `接続済み — デッキ84個、ノートタイプ35個。` The number was **not** trusted because the
+app printed it; it was checked against an independent oracle (direct AnkiConnect `deckNames` /
+`modelNames` → 84 / 35, exact match), and the deck `<select>` carried 84 options.
+
+### 6.2 Anki view — disconnected arm (a real two-arm differential)
+
+`claim-check` §3: a conclusion about something *not* happening needs two runs on identical input
+differing in one variable. The variable here was **`ankiUrl` in my scratch profile only** —
+`%TEMP%\jp-p7-scratch\profiles.json`, `8765` → `8799` (confirmed dead:
+`Test-NetConnection 127.0.0.1 -Port 8799` → `TcpTestSucceeded: False`) — then a full app restart.
+**Anki itself was never stopped, reconfigured or touched.** The file was restored afterwards.
+
+| | connected (8765) | disconnected (8799) |
+|---|---|---|
+| status | `接続済み — デッキ84個、ノートタイプ35個。` | `Ankiに接続されていません。` |
+| deck `<select>` | present, **84** options | **absent** |
+| `<select>` count | 2 | 1 |
+| action button | `Ankiに作成` | `再試行` |
+| recovery guidance | — | 4 numbered steps incl. add-on code `2055492159` |
+
+The arms differ on every axis, so the connected reading is a measurement rather than an
+assumption. **The error state is genuinely good** — it names the cause, gives a numbered recovery
+path and offers Retry. That is well above the bar `honesty-probe` §3 D sets.
+
+**One defect inside it.** The headline is translated (`Ankiに接続されていません。`) and the recovery
+steps are translated, but sandwiched between them is raw English:
+
+> `Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.`
+
+Source: `ANKI_UNREACHABLE_MSG`, a hardcoded constant at `src/shared/anki.ts:8-9`, produced in the
+main process (`main/anki/client.ts:129`) and surfaced verbatim. Its sibling
+`ANKI_COLLECTION_UNAVAILABLE_MSG` (`:12-13`) has the same shape. Neither is a catalog key
+(`grep "Can't reach Anki" src/shared/i18n/catalogs/` → no hits); the two are referenced 16 times
+across the tree. Main-process strings cannot call the renderer's `useT()`, so this needs the
+`mt()` mechanism the dialog titles already use (`main/anki/index.ts` uses `mt('dialog.…')`).
+Corroborating screenshot: `debug/shots/win1-1785809233699.png` — the English line renders in red
+directly beneath the translated headline.
+
+### 6.3 Dictionary → Flashcards, the full chain
+
+1. Searched 猫 → 10 entries from `JMdict (Japanese–English)` and `JMdict (Japanese–Russian)`.
+2. Clicked the ★ (hit-test `match`). `localStorage` key count **15 → 16**; new key
+   `jp-saved-words-ja` holding the real entry.
+3. `/reload` → key read back byte-identical. **An update that survives a reload.**
+4. Flashcards `Dictionary (0)` → `Dictionary (1)`; *Review dictionary* went `disabled: true` →
+   `disabled: false`, relabelled `Review dictionary (1)`.
+5. Review mode rendered `猫 / ねこ`, `0 / 1`; grading produced *"Session complete — You reviewed 1
+   card."*
+
+**A selector trap worth recording.** `document.querySelector('.dict-star')` returns a **clipboard**
+button titled *"Copy to clipboard history"* — two different controls share the class `dict-star`
+and only the second is the star. Reading the markup before clicking is what stopped this becoming
+a false finding of the form "two shipping strings claim the star saves to Flashcards and it does
+not". The copy is accurate; the class name is not.
+
+### 6.4 Mining panels — control-type histograms (probe F)
+
+Measured live on a fresh profile, per panel:
+
+| panel | buttons | selects | inputs | checkboxes | textareas | primary action present |
+|---|---|---|---|---|---|---|
+| Simple EPUB | 13 | 1 | 5 | 1 | 0 | *Analyze EPUB* / *Save to flashcards* |
+| Advanced EPUB | 44 | 4 | 12 | 7 | 0 | *Analyze EPUB* / *Download Deck* |
+| Jiten | 10 | 0 | 0 | 0 | 0 | *Refresh* |
+| CSV tool | 30 | 5 | 13 | 2 | 33 | *Import to flashcards* |
+| AI card studio | 30 | 8 | 10 | 3 | 0 | *Generate* (step 3) |
+
+**13 checkboxes out of 218 controls** — 127 buttons + 18 selects + 40 inputs + 33 textareas.
+Two counting rules, stated because the ratio depends on them: the checkbox column is a **subset**
+of `inputs` (the selector was `input[type=checkbox]` against `input`), so it is not added twice;
+and the button column includes 4 window-chrome buttons per panel plus the shared navigation strip,
+which inflates it. Excluding window chrome the total is 198 and the ratio moves to 13/198 — the
+reading does not change either way.
+
+The "settings page pretending to be a feature" shape is overwhelmingly checkboxes with no primary
+action; this is the opposite. Per `honesty-probe` §7 I am not ranking the polish — the counts are
+the finding.
+
+### 6.5 Counts re-derived rather than quoted
+
+| figure | source of the claim | re-derived | result |
+|---|---|---|---|
+| `AppChrome` render sites | dispatch §6 says 23 | `rg -l "<AppChrome" src \| wc -l` → 19; `rg -o "<AppChrome" src \| wc -l` → 23 | **CONFIRMED** |
+| Anki decks | dispatch §1 says "~82" | AnkiConnect `deckNames` → **84** | close, corrected |
+| Anki note types | — | `modelNames` → **35** | recorded |
+| Flashcards surfaces | census: 5 modes + 2 tabs | `FlashcardsContent.tsx:86-88` → 3 unions, **10** surfaces | **census short by 3** |
+| Study profiles | — | profile `<select>` → **28** options | recorded |
+| `dict.results.*` keys | — | 34 in each of en/ja/zh/ru | complete |
+| `deinflect.*` keys | — | 25 in each of en/ja/zh/ru | complete |
+
+---
+
+## 7. What I could not verify, stated plainly
+
+- **Every Anki write path** (`P7-A2`, `P7-A3`, `P7-A4`). Not measured, by design. Measuring them
+  needs a disposable Anki profile on a non-default port — the user's call to set up.
+- **Whether real Anki writes `'{}'` into `col.models`** (§5.3 ARM B). The code path is proven; its
+  real-world reachability is not.
+- **The reading-lens render site** of `DictionaryResults` (`LensReaderPanel.tsx:186`). Needs
+  OS-level screen capture, which `jp-bridge` §11 forbids.
+- **The "no dictionaries installed" first-run surface.** It does not occur on a fresh profile
+  (§4.3); it would need a boot with the network down.
+- **Behaviour on the user's populated profile.** Only the scratch profile was used (§1).
+- **`zh` and `ru` UI rendering.** I drove `en` and `ja` and verified `zh`/`ru` catalog coverage
+  statically (34 and 25 keys each). I did not render either.
+- **The AI card studio generate path.** It needs a cloud API key or a local Qwen3 model; the panel
+  claimed *"Qwen3 model found — runs locally, no API key needed"* and I did **not** verify that
+  claim or generate a card. Flagged as unmeasured rather than passed.
+
+## 8. Defects noticed in code I do not own
+
+Recorded, not fixed (`jp-dispatch` §1).
+
+1. **`src/shared/anki.ts:8-9` and `:12-13`** — two user-facing error strings hardcoded in English,
+   outside the i18n system, 16 references (§6.2).
+2. **`src/renderer/components/DictionaryResults.tsx`** — two distinct controls share the class
+   `dict-star`; neither has an accessible name (both SVGs `aria-hidden="true"`, no `aria-label`,
+   name carried only by `title`) (§6.3).
+3. **Start menu** — `Game Arena` renders untranslated under `ui-lang=ja` while the other 20
+   entries translate. Outside this cluster.
+4. **Desktop status bar** — `Seanime sidecar · stopped` renders untranslated under `ja` (visible
+   in the §6.2 screenshot). Outside this cluster.
+5. **`docs/audit/CENSUS_SURFACES.md`** — Flashcards `EpubMiningUi` (3 surfaces) omitted; the
+   depth-2/3 totals are short by 3 (`P7-F5`).
+6. **Anki collection contamination from an earlier session** — five `JP Study App::*` note types
+   exist in the user's real collection, two of them obvious test residue including one named
+   *"Phase 5 manga probe (temporary)"*. Undeletable via AnkiConnect (§2). **Only the user can
+   remove these**, from Anki's own Note Types dialog.
+7. **Another agent committed this handoff mid-run.** `c5325e1` (*"audit(stage-b): B6 promise
+   register"*) swept up **`docs/audit/HANDOFF_P7_DICT_ANKI.md` (245 lines, my file, in progress)**
+   and `DISPATCH_P7_DICT_ANKI.md` alongside its own three files. That is the `git add -A` pattern
+   `jp-dispatch` §2 forbids ("explicit paths only. Never `git add -A`"). No harm done here — I
+   verified my subsequent edits are purely additive (`git diff` → 286 insertions, 1 deletion, and
+   the single deletion is a placeholder line I wrote myself) — but a mid-run snapshot of another
+   agent's working file is now in history, and the next such collision may not be additive.
+   **I did not commit anything**, per my own dispatch §2.
+8. **`profiles.json` snapshot-level `ankiUrl` has no UI control** — `renderer/profileState.ts:20`
+   seeds it and `shared/profiles.ts:169` defaults it, but `rg "ankiUrl" src/renderer` returns one
+   hit and no settings page writes it. Shape matches `CENSUS_SETTINGS.md` §3's "consumer, no way
+   to change it" case. Not filed as a finding row — it is a setting, and probe E on it was not in
+   this cluster's scope.
+
+## 9. Gate results
+
+Only one suite was run, because this run changed **no source** — the two files it created are
+Markdown under `docs/audit/`.
+
+```
+npx vitest run src/shared/__tests__/apkgParse.test.ts
+  -> 1 file, 17 tests, 0 failed   (duration 270ms)
+```
+
+Run as evidence for §5.3, not as a change gate. The full suite was **not** run and no total is
+quoted for it; per `jp-dispatch` §5 an unmeasured baseline is not reported as one.
+
+## 10. Open questions for the user
+
+1. **The five `JP Study App::*` note types in your real Anki collection** — two look like
+   leftovers (`Custom::lol`, `Custom::Phase 5 manga probe (temporary)`). AnkiConnect cannot delete
+   note types, so removing them is a manual step in Anki. Do you want them gone?
+2. **`KNOWN_ISSUES.md` still does not exist.** `honesty-probe` §6 says its location is your call.
+   `docs/` root is the obvious candidate but is not a verified convention.
+3. **Anki write-path coverage.** Three controls are permanently unmeasurable while the audit rule
+   is "never write to the real collection". If you want them covered, the clean way is a throwaway
+   Anki profile on a non-default port plus a UI control (or env override) for `ankiUrl`, which
+   today has no writer.
+4. **The i18n gate cannot see an unconverted file** (§5.1). Whether to add a `useT`-adoption check
+   is a project decision, not an audit finding.
