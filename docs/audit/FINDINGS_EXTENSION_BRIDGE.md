@@ -63,7 +63,42 @@ This is worth re-asserting rather than assuming, because **`npm run package` run
 `sync-extension-mirror.cjs`, which can write into `src/main/chrome-extension/` as a build side
 effect.** The mirror is a thing that can silently drift; it has not.
 
-## E4 — The browser-side half: prerequisite confirmed, not driven
+## E4 — The browser-side half: **DRIVEN, and `LIVE`**
+
+*(Originally filed as not-attempted; completed in the same session. The original reasoning is kept
+below because its trap list is what made the run succeed.)*
+
+Driven against `%LOCALAPPDATA%\ms-playwright\chromium-1228\chrome-win64\chrome.exe` with
+`--load-extension` + `--disable-extensions-except`, profile in the **OS temp dir**, over CDP on
+port 9222.
+
+**No dependency was installed.** Node 24 ships a native `WebSocket`, so a ~40-line CDP client in
+the scratchpad was enough. Adding `ws` or Playwright to the repo to audit the repo would have
+dirtied the tree it was measuring.
+
+| Check | Result |
+|---|---|
+| Service worker registers | **PASS** — `chrome-extension://nimngppppgpldedpaepkpobiebicmcba/background.js` |
+| **Identified by `chrome.runtime.getManifest().name`** | **`GrammarX — Reader Companion` v3.2.0** — exact match to `extension/manifest.json` |
+| Content script injects on a real page | **PASS** — `https://example.com/`, `#jp-study-fab` present, **4** `jp-study*` nodes: `jp-study-fab`, `jp-study-level-badge`, `jp-study-comp-badge`, `jp-study-fab-status` |
+
+**The identification step is the point, not a formality.** The CDP target list showed **two**
+service workers — ours and `chrome-extension://nkeimhogjdpnpccoofpliimaahmaaome/thunk.js`, a Chrome
+component extension. Reasoning from the URL alone would have been inference; the record says a
+component extension has already been reported as a pass once in this project. Evaluating
+`getManifest().name` inside the worker is what turns it into identification.
+
+### The three harness traps, as encountered
+
+1. **Profile in the OS temp dir** — honoured. A profile under the Vite-watched repo kills the dev
+   server with `EBUSY` on `Network/Cookies`.
+2. **`chrome.kill()` does not kill the tree** — confirmed concretely: **13** Playwright Chromium
+   processes were alive. They were terminated by matching `ExecutablePath` against the Playwright
+   binary, which left the user's **20 real Chrome processes untouched**. Port 9222 released;
+   scratch profile removed.
+3. **Identify by manifest name** — done, and it mattered (see above).
+
+## E4-original — prerequisite confirmed, not driven
 
 `%LOCALAPPDATA%\ms-playwright\chromium-1228\chrome-win64\chrome.exe` is **present**.
 
