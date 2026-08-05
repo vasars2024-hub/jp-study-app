@@ -59,7 +59,7 @@ npx tsc --noEmit | grep -c "error TS" # 328
 | C1-5 | F16 "Bring it forward" | NOT STARTED |
 | C1-6 | T6 pin/warn on asset hashes | NOT STARTED |
 | C1-7 | Archive root docs + write `FEATURES.md` | **(a) DONE · (b) NOT STARTED** |
-| C1-8 | U6 confirm `soft-sepia` vs `rose-pine` | NOT STARTED |
+| C1-8 | U6 confirm `soft-sepia` vs `rose-pine` | **DONE — U6 closed working-as-intended** |
 | C1-9 | U8 Whisper first-use download | NOT STARTED |
 
 ---
@@ -275,13 +275,144 @@ entries, `settingsRegistry.ts`, `toolboxRegistry.ts`, `games/engine.ts`,
 entry and a reachability + honesty verdict per entry. Not started — do not read
 (a) being done as any progress on it.
 
+### Live-app verification of C1-2 · DONE
+
+Driven through the debug bridge on the user's running app (port 39273). **Said
+plainly, as `jp-bridge` requires: this was the user's real workspace and real
+profile, not a copy.** Full `%APPDATA%\jp-study-app` backed up first —
+`C:\Users\Arseniy\AppData\Local\Temp\jp-userdata-backup-20260805-123256`
+(67,484 entries, 107 JSON state files).
+
+The renderer had already hot-reloaded my C1-2 edits (`/logs` showed
+`hot updated: /src/renderer/views/LibraryView.tsx`, `…/MiniShell.tsx` — mine, no
+foreign paths), so the running app *was* the fixed build.
+
+**The measured A/B, in the live renderer, with the host locale as the control:**
+
+| | |
+|---|---|
+| Host locale (`Intl.DateTimeFormat().resolvedOptions().locale`) | **en-US** |
+| OLD code — `toLocaleDateString([], {month:'short',day:'numeric'})` | **`Aug 5`** |
+| OLD code — `toLocaleDateString(undefined, …)` | **`Aug 5`** |
+| NEW code — `toLocaleDateString('ru', …)` | **`5 авг.`** |
+| **Actually rendered in the taskbar** | **`12:36 PM \| 5 авг.`** |
+| `renderedMatchesNew` / `renderedMatchesOld` | **true / false** |
+
+Repeated for Japanese: rendered **`午後12:40 | 8月5日`**, old would have been
+`Aug 5`, matchesNew true / matchesOld false. Screenshot in `debug/shots/`
+(`win1-1785922770997.png`) shows `5 авг.` in the taskbar with the whole shell in
+Russian (`Пуск`, `Стол 1`, `Скрапер`).
+
+This is the difference-between-two-runs evidence `jp-dispatch` §9.4 asks for: the
+host locale never changed, so the rendered date changing with the *UI* language is
+the fix working, and `Aug 5` is what the old code would still be showing.
+
+**State restored and verified:** `ui-lang` was originally **absent**; it was
+removed again and re-read as `null`, `htmlLang` back to `en`, clock back to
+`Aug 5`. The welcome tour re-displayed on reload — I did **not** click
+`Пропустить`/`Далее`, so nothing was persisted; it was hidden with an ephemeral
+inline style only, which the next reload cleared.
+
+### C1-8 — U6, `soft-sepia` vs `rose-pine` · DONE · **close as working-as-intended**
+
+Theme ids CONFIRMED at exactly `engine.ts:73` (`soft-sepia`) and `:77`
+(`rose-pine`), as the dispatch states.
+
+**Instrument first.** The contrast parser was positive-controlled before any
+number was quoted (`css-measure` §1): black/white 21.00, white/white 1.00,
+`#767676`/white 4.54, `rgb()` 4.54, and crucially `color(srgb 0.87 0.49 0.50)` on
+white → **2.86**. My first draft asserted 3.16 for that control; hand-computing it
+(linear 0.72930/0.20487/0.21401 → L 0.31702 → 1.05/0.36702) showed **2.86 was
+right and my expectation was invented**. A `color(srgb 1 1 1)` vs black control
+returns 21.00, which is what separates a correct 0..1 parser from one reading the
+channels as 8-bit.
+
+**§0 governing check — the number moves with the palette.** Two unrelated palettes
+were measured alongside the pair, because soft-sepia and rose-pine agree to within
+0.04 and that is precisely the shape of the trap that once turned 0 real failures
+into a headline 66:
+
+| role | soft-sepia | rose-pine | study-os (dark) | high-contrast |
+|---|---|---|---|---|
+| `--text` worst | 7.30 | 7.26 | **15.99** | **17.72** |
+| `--muted` worst | 4.62 | 4.60 | **6.18** | **18.14** |
+| `--border` worst | 1.40 | 1.18 | 1.26 | **19.03** |
+
+It moves. Independent cross-check: this parser gives study-os `--muted` on
+`--panel` = **6.18:1**, the exact figure `css-measure` §6 records from the shipped
+sampler.
+
+**Tokens verified on the artifact, not just the stylesheet** (`css-measure` §10 —
+a token is advisory until proven). Applied each theme live and read
+`getComputedStyle(document.documentElement)`: every value matched the stylesheet
+exactly, and `<html>`'s inline style (which *does* carry `--shadow-card`,
+`--shadow-toolbar` and ~40 others) overrides **none** of the colour tokens.
+Confirmed application via `data-theme`, **not** `data-materials` — base themes
+stamp no material set, and `css-measure` §9 records a guard that hard-failed every
+base theme for exactly that reason. Observed here: `data-materials` was empty on
+both themes and `aero` on the user's own.
+
+**Verdict: neither theme is broken. U6's premise does not survive measurement.**
+
+1. **They measure identically by construction, not by coincidence.** Both `--muted`
+   values were retuned in the same 2026-08-03 pass to just clear 4.5:1 on
+   `--panel-2`, and the stylesheet says so in both places —
+   `styles.css:782-787` ("Now 4.62:1 on --panel-2") and `:859`
+   ("3.65:1 -> 4.60:1"). Measuring 4.62 and 4.60 is the tuning landing, not a
+   defect hiding.
+2. **A number *does* separate them — on `--border`, 1.40 vs 1.18.** But the dark
+   default `study-os` sits at **1.26**, between the two. A faint hairline is this
+   app's uniform design language across light *and* dark themes, so rose-pine's
+   border is in line with the default rather than an outlier.
+3. **`--border` is not what identifies the app's controls.** Measured 61 real
+   controls live in rose-pine with alpha compositing: **34 paint no boundary at
+   all**, and of the 27 that do, the one unambiguous *affordance* case — the
+   search `INPUT` (`.scr-search-input`) — takes its border from
+   `rgb(118, 115, 128)`, **not** from `--border`, and scores **4.05:1** against its
+   own fill. It passes 3:1 comfortably.
+
+So `soft-sepia` is **correct by design** — a deliberately soft warm palette whose
+body and muted text both clear AA — and `rose-pine` is the same. **No token is
+wrong, and there is no fix to invent.** Recommend closing U6 as
+working-as-intended.
+
+**Screenshots, both themes on the identical screen** (same Scraper window, same
+widgets, same wallpaper), in `debug/shots/`: `win1-1785923125441.png`
+(soft-sepia), `win1-1785923164324.png` (rose-pine). Both render legibly; the
+difference is hue, not readability.
+
+> **A false finding I generated and then killed.** A first live sampler walked up
+> for each text node's "effective background" and reported 8 of 18 body pairs
+> under 4.5:1 in soft-sepia, including `--text` at **1.94:1 on `rgb(27,27,33)`**.
+> The screenshot refuted it: the Scraper renders light and perfectly readable. The
+> walk was passing *through* translucent panels to the dark wallpaper behind the
+> desktop. Those numbers are discarded and form no part of the verdict above,
+> which rests on token values confirmed live plus alpha-composited control
+> measurements. This is the §0 lesson repeating: the screenshot was what caught it.
+
+**Not claimed:** I did not re-score the 25 sub-3:1 control borders. Per
+`css-measure` §6 a raw count like that is a finding generator — the borderless
+ones must be re-scored from the mark inside, and that is slice-77 B2P work, not
+U6's question.
+
+**State restored:** the user's theme was **`frutiger-aero`**; it was recorded
+before the run and restored after, verified `storedTheme=frutiger-aero`,
+`data-theme=frutiger-aero`, `data-materials=aero`. **No top-level `.json` state
+file in `%APPDATA%\jp-study-app` differs from the pre-run backup.**
+
 ## 4. What I could not verify
 
-- **Nothing in C1-1 or C1-2 was verified by driving the live app.** Per
-  `jp-dispatch` §9.2 these are "implemented", not "works". The Reading Lens tests
-  stub Electron entirely — they prove the module's logic and its failure handling,
+- **C1-2 is now verified against the live app** (see above) — it has earned
+  "works". **C1-1 has not, and cannot be by this route.** The Reading Lens tests
+  stub Electron entirely: they prove the module's logic and its failure handling,
   **not** that a real `Ctrl+Shift+Space` press OCRs a real screen. No test here
-  exercises a real `desktopCapturer` capture, and none should.
+  exercises a real `desktopCapturer` capture, and none should. Confirming the Lens
+  end-to-end means pressing the global hotkey and OCR'ing the actual desktop,
+  which is neither a bridge operation nor something to do on the user's live
+  session unannounced. **C1-1 remains "implemented", not "works".**
+- **C1-7(a) has no visual surface** — moving 33 files changes nothing a user can
+  see. It was verified from the git index instead (4 root `.md`, 33 in
+  `archive/`, renames recorded, `check-ignore` proving the R4 block inert).
 - The renderer render tests cover each surface's **default/idle** state only. The
   post-scan hotspot UI, the drag-selection rectangle, and the Anki mining path in
   `LensReaderPanel` are **not** covered. The 20–255 char renders are real but
