@@ -18,6 +18,7 @@ import {
 } from '../../notificationStore';
 import { openExtensionSettings } from '../../extensionBridgeUi';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 
 const TOGGLE_EVENT = 'shell:toggleNotifications';
 
@@ -44,7 +45,7 @@ function useTimeAgo() {
 }
 
 export default function NotificationCenter() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const wired = useWiredMaterials();
   const timeAgo = useTimeAgo();
   const [open, setOpen] = useState(false);
@@ -156,7 +157,7 @@ export default function NotificationCenter() {
                   </div>
                 )}
                 <span>{n.message}</span>
-                <div className="os-notif-time type-status">{wired ? new Date(n.ts).toLocaleTimeString() : timeAgo(n.ts)}</div>
+                <div className="os-notif-time type-status">{wired ? new Date(n.ts).toLocaleTimeString(LANG_TAGS[lang]) : timeAgo(n.ts)}</div>
                 {n.actionUrl || n.clientAction === 'extension-settings' ? (
                   <div className="os-notif-actions" style={{ marginTop: 8 }}>
                     <button

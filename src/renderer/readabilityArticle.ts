@@ -17,6 +17,8 @@ import {
   type BlockProbe,
   type ListItemProbe,
 } from '../shared/readabilityClean';
+import { getUiLang } from './i18n';
+import { LANG_TAGS } from '../shared/i18n/core';
 import { isNhkNewsArticleUrl, nhkArticleLooksHydrated } from '../shared/nhkArticle';
 import { NHK_WEBVIEW_EXTRACT_SCRIPT } from './nhkWebviewScript';
 
@@ -49,7 +51,14 @@ function formatPublished(iso: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    // Rendered into the reader's own chrome, so it follows the UI language.
+    // Not a component and not called during render, hence `getUiLang()` rather
+    // than `useT()`; `undefined` here would follow the OS regional setting.
+    return d.toLocaleDateString(LANG_TAGS[getUiLang()], {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   } catch {
     return iso;
   }

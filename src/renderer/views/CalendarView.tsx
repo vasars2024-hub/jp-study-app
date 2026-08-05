@@ -19,9 +19,10 @@ import {
   type ViewMode,
 } from '../components/calendar/CalendarContent';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 
 export default function CalendarView() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const aero = useAeroMaterials();
   const state = useCalendar();
   const {
@@ -97,9 +98,9 @@ export default function CalendarView() {
       {aero && (
         <aside className="aero-cal-sidebar" aria-label="Calendar navigator">
           <div className="aero-cal-date-card">
-            <span>{today.toLocaleDateString([], { weekday: 'short' })}</span>
+            <span>{today.toLocaleDateString(LANG_TAGS[lang], { weekday: 'short' })}</span>
             <strong>{today.getDate()}</strong>
-            <small>{today.toLocaleDateString([], { month: 'long', year: 'numeric' })}</small>
+            <small>{today.toLocaleDateString(LANG_TAGS[lang], { month: 'long', year: 'numeric' })}</small>
           </div>
           <button type="button" className="aero-cal-nav-row" onClick={goToday}>
             <Icon name="calendar" size={15} />
@@ -156,7 +157,7 @@ export default function CalendarView() {
             <ul className="aero-cal-list">
               {agendaUpcoming.slice(0, 8).map((ev) => (
                 <li key={`upcoming-${ev.id}-${ev.occurrenceDate}`}>
-                  <span className="aero-cal-date">{new Date(ev.occurrenceDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                  <span className="aero-cal-date">{new Date(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}</span>
                   <EventChip ev={ev} onClick={() => openEdit(ev)} />
                 </li>
               ))}

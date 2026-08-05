@@ -14,6 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import AeroBootGlobe from './AeroBootGlobe';
 import {
   getSecretLifecycleState,
@@ -90,7 +91,7 @@ function primaryControlKey(phase: SecretLifecyclePhase): string {
 }
 
 export default function AeroBootOverlay() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [lifecycle, setLifecycle] = useState(getSecretLifecycleState);
 
   useEffect(() => subscribeSecretLifecycle(setLifecycle), []);
@@ -132,8 +133,8 @@ export default function AeroBootOverlay() {
   const exiting = phase === 'reveal' || phase === 'waking';
   const isSystemClose = phase === 'shutting-down' || phase === 'sleeping';
   const showBootSteps = BOOT_ORDER.includes(phase);
-  const now = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  const date = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const now = new Date().toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' });
+  const date = new Date().toLocaleDateString(LANG_TAGS[lang], { weekday: 'short', month: 'short', day: 'numeric' });
   const classes = [
     'os-aero-boot',
     `phase-${phase}`,

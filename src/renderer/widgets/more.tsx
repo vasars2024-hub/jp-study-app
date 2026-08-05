@@ -4,6 +4,7 @@ import { readSetting } from './types';
 import { useNow } from './hooks';
 import { getSummary, formatDuration } from '../stats';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import WorldHeatMap from '../components/resources/WorldHeatMap';
 import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
 import { sendTelemetryPingIfNeeded } from '../telemetryPing';
@@ -20,7 +21,7 @@ const DEFAULT_ZONES: Zone[] = [
   { id: 'z3', label: 'New York', tz: 'America/New_York' },
 ];
 export function WorldClock({ settings, setSettings }: WidgetProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const now = useNow(1000);
   const zones = readSetting<Zone[]>(settings, 'zones', DEFAULT_ZONES);
   const [tz, setTz] = useState('');
@@ -37,7 +38,7 @@ export function WorldClock({ settings, setSettings }: WidgetProps) {
         {zones.map((z) => {
           let time = 'â€”';
           try {
-            time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: z.tz });
+            time = now.toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit', timeZone: z.tz });
           } catch {
             time = t('widgets.worldClock.badTz');
           }

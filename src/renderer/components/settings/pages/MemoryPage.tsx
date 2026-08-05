@@ -4,6 +4,7 @@ import SettingsCard from '../SettingsCard';
 import { confirmDialog } from '../../ui';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
+import { LANG_TAGS } from '../../../../shared/i18n/core';
 import {
   clearSettingsDomain,
   exportAllData,
@@ -73,7 +74,7 @@ function tierLabel(tier: DomainInventoryItem['tier'], t: TFn): string {
 }
 
 export default function MemoryPage() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const { focusSettingId } = useSettings();
   const [domains, setDomains] = useState<DomainInventoryItem[]>([]);
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
@@ -537,7 +538,7 @@ export default function MemoryPage() {
                   <td><strong>{entry.key}</strong></td>
                   <td className="memory-detail">{entry.value}</td>
                   <td className="muted">
-                    {entry.updatedAt ? new Date(entry.updatedAt).toLocaleDateString() : '—'}
+                    {entry.updatedAt ? new Date(entry.updatedAt).toLocaleDateString(LANG_TAGS[lang]) : '—'}
                   </td>
                   <td>
                     <div className="memory-actions">

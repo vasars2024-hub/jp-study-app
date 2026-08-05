@@ -301,6 +301,9 @@ export function isDuplicateMetadataLine(
     try {
       const d = new Date(opts.publishedTime);
       if (!Number.isNaN(d.getTime())) {
+        // i18n-locale-arg-ignore: not display — this string is compared against
+        // text scraped from the page to decide whether a node duplicates the
+        // byline. Forcing the UI language here would change what gets stripped.
         const short = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
         if (t === short || t.includes(short)) return true;
       }

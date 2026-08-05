@@ -29,6 +29,7 @@ import {
   type ReminderOffset,
 } from '../../calendar';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 
 export type ViewMode = 'month' | 'week' | 'day' | 'agenda';
 
@@ -314,14 +315,15 @@ export function useCalendar() {
   const agendaOverdue = useMemo(() => getOverdueReminders(), [events]);
 
   const headerLabel = useMemo(() => {
-    if (mode === 'month') return cursor.toLocaleDateString([], { month: 'long', year: 'numeric' });
+    const locale = LANG_TAGS[lang];
+    if (mode === 'month') return cursor.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     if (mode === 'week') {
       const s = startOfWeek(cursor);
       const e = new Date(s);
       e.setDate(e.getDate() + 6);
-      return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      return `${s.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
-    if (mode === 'day') return cursor.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    if (mode === 'day') return cursor.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     return t('calendar.mode.agenda');
     // `t` is intentionally left out of the deps: its identity is stable, `lang`
     // is what actually needs to trigger a redo.
@@ -414,7 +416,7 @@ export function CalendarNav({ state }: { state: CalendarState }) {
 
 /** The month / week / day / agenda body for the current mode. */
 export function CalendarBody({ state }: { state: CalendarState }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const {
     mode,
     cursor,
@@ -475,7 +477,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
           return (
             <div key={i} className={`cal-week-col ${isToday ? 'today' : ''}`}>
               <div className="cal-week-daylabel">
-                {d.toLocaleDateString([], { weekday: 'short' })} <span className="muted">{d.getDate()}</span>
+                {d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'short' })} <span className="muted">{d.getDate()}</span>
               </div>
               <div className="cal-week-events">
                 {dayEvents.map((ev) => (
@@ -527,7 +529,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
           <ul className="cal-agenda-list">
             {agendaUpcoming.map((ev) => (
               <li key={`${ev.id}-${ev.occurrenceDate}`}>
-                <span className="muted cal-agenda-date">{new Date(ev.occurrenceDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                <span className="muted cal-agenda-date">{new Date(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}</span>
                 <EventChip ev={ev} onClick={() => openEdit(ev)} />
               </li>
             ))}

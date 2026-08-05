@@ -20,6 +20,7 @@ import type { NormalizedGrammarPoint } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
 import { addDeckCards, createDeckFolder } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import {
   applyGrade,
   loadFamiliarity,
@@ -469,7 +470,7 @@ export default function GrammarTestModal({
                   <ul className="gx-test-history-list">
                     {history.slice(0, 5).map((r) => (
                       <li key={r.at}>
-                        {new Date(r.at).toLocaleDateString()} · {r.correct}/{r.delivered} ·{' '}
+                        {new Date(r.at).toLocaleDateString(LANG_TAGS[lang])} · {r.correct}/{r.delivered} ·{' '}
                         {t(DIRECTION_KEY[r.direction])}
                       </li>
                     ))}

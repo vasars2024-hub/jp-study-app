@@ -9,19 +9,21 @@ import {
   type EventOccurrence,
 } from '../calendar';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 
 // ---------- Digital clock ----------
 export function DigitalClock({ settings, size }: WidgetProps) {
+  const { lang } = useT();
   const now = useNow(1000);
   const h24 = readSetting(settings, 'hour24', true);
   const showSeconds = readSetting(settings, 'showSeconds', true);
-  const time = now.toLocaleTimeString([], {
+  const time = now.toLocaleTimeString(LANG_TAGS[lang], {
     hour: '2-digit',
     minute: '2-digit',
     second: showSeconds ? '2-digit' : undefined,
     hour12: !h24,
   });
-  const date = now.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+  const date = now.toLocaleDateString(LANG_TAGS[lang], { weekday: 'long', month: 'short', day: 'numeric' });
   const big = Math.min(size.w / (showSeconds ? 7.2 : 5.2), size.h / 3.2);
   return (
     <div className="wgt wgt-clock-digital">
@@ -88,7 +90,7 @@ export function AnalogClock({ size }: WidgetProps) {
 // the full Calendar app on click. Never duplicates calendar logic — the month
 // grid here is pure display, events/recurrence live only in calendar.ts.
 export function CalendarWidget() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [view, setView] = useState(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() };
@@ -106,7 +108,7 @@ export function CalendarWidget() {
     for (let d = 1; d <= days; d++) out.push(d);
     return out;
   }, [view]);
-  const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString([], { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString(LANG_TAGS[lang], { month: 'long', year: 'numeric' });
   const shift = (delta: number, e: MouseEvent) => {
     e.stopPropagation();
     const m = view.m + delta;
@@ -139,7 +141,7 @@ export function CalendarWidget() {
               <span className="wgt-cal-dot" style={{ background: ev.color || CATEGORY_COLORS[ev.category] }} />
               <span className="wgt-cal-ev-title">{ev.title}</span>
               <span className="muted wgt-cal-ev-date">
-                {new Date(ev.occurrenceDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                {new Date(ev.occurrenceDate).toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}
               </span>
             </li>
           ))}

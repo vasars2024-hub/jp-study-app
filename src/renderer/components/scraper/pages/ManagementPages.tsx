@@ -4,7 +4,8 @@ import { Button, Toggle } from '../../ui';
 import ScrCard from '../ScrCard';
 import StatusDot from '../StatusDot';
 import { useScraper } from '../ScraperContext';
-import { sx } from '../strings';
+import { useT } from '../../../i18n';
+import { LANG_TAGS, type UiLang } from '../../../../shared/i18n/core';
 import { useScraperPort } from '../data/scraperPort';
 import type { PluginInfo } from '../data/scraperPort';
 import { parsePluginManifest } from '../data/pluginManifest';
@@ -31,6 +32,21 @@ import {
 import type { ScraperScheduleEntry } from '../../../../shared/scraperOutputSettings';
 import type { ScraperSchedulerState } from '../../../../shared/scraperIpc';
 import { isValidCron, nextCronRun, parseCron } from '../../../../shared/scraperCron';
+
+/**
+ * These four pages translate through shared/i18n rather than the Scraper app's
+ * own `sx()` table in ../strings.ts (audit F7 / dispatch W4).
+ *
+ * ../strings.ts records a deliberate decision to defer the Scraper from the
+ * app-chrome sweep, and anticipates the eventual migration as "move this map
+ * into catalogs/{en,ja,zh,ru}.ts and swap sx() for useT()'s t()". That is what
+ * this file does — one file rather than the whole app at once, so the Scraper
+ * currently runs both systems. The six scheduler strings this file used to read
+ * through `sx()` now live under `scraperMgmt.held.*` / `scraperMgmt.sched.empty`
+ * in shared/i18n/scraperUi; the `sx()` originals stay put for the ~30 Scraper
+ * files still on that table.
+ */
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 function PageHead({
   page,
@@ -59,6 +75,7 @@ function PageHead({
 
 export function ProfilesPage() {
   const ctl = useScraper();
+  const { t, lang } = useT();
   const [document, setDocument] = useState<ScraperSettingsDocument>(() =>
     loadScraperSettingsDocument(),
   );
@@ -76,6 +93,9 @@ export function ProfilesPage() {
     setDocument(chooseScraperPreset(preset));
   };
 
+  // The generated name is a seed value the user immediately renames, so it stays
+  // literal — CLAUDE.md i18n rule 4 exempts "default seed values a user can
+  // rename" from the chrome sweep, along with the profile names themselves.
   const duplicate = () => {
     const active = document.profiles.find((profile) => profile.id === document.activeProfileId);
     setDocument(
@@ -85,24 +105,43 @@ export function ProfilesPage() {
     );
   };
 
+  // Depends on `lang`, never on `t` — `t`'s identity is stable by design, so a
+  // memo that lists it goes stale after a language switch instead of erroring
+  // (CLAUDE.md i18n rule 6).
+  const comparisonRows = useMemo(
+    () =>
+      [
+        [t('scraperMgmt.compare.concurrentRequests'), (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.network.concurrentRequests],
+        [t('scraperMgmt.compare.requestTimeout'), (profile: ScraperSettingsDocument['profiles'][number]) => `${Math.round(profile.settings.network.requestTimeoutMs / 1_000)}s`],
+        [t('scraperMgmt.compare.retryAttempts'), (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.network.retryAttempts],
+        // Was browser.javascriptWaitMs, which no scrape has ever read.
+        // Crawl delay is the pacing value safetyPolicy.ts actually enforces.
+        [t('scraperMgmt.compare.crawlDelay'), (profile: ScraperSettingsDocument['profiles'][number]) => `${(profile.settings.safety.crawlDelayMs / 1_000).toFixed(1)}s`],
+        [t('scraperMgmt.compare.parallelJobs'), (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.performance.maxParallelJobs],
+        [t('scraperMgmt.compare.batchSize'), (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.performance.batchSize],
+      ] as const,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lang],
+  );
+
   return (
     <div className="scr-page">
       <PageHead
         page="profiles"
-        title="Profiles"
-        subtitle="Saved configurations for fast checks, balanced scraping, and exhaustive archive runs."
+        title={t('scraperMgmt.profiles.title')}
+        subtitle={t('scraperMgmt.profiles.subtitle')}
         actions={
           <Button size="sm" leftIcon={<Icon name="plus" size={13} />} onClick={duplicate}>
-            Duplicate active
+            {t('scraperMgmt.profiles.duplicateActive')}
           </Button>
         }
       />
 
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Saved profiles</span><span className="scr-tile-value">{document.profiles.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Active preset</span><span className="scr-tile-value scr-tile-value--text">{activeProfile?.preset ?? 'custom'}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Saved revisions</span><span className="scr-tile-value">{revisionCount}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Site overrides</span><span className="scr-tile-value">{Object.keys(document.siteOverrides).length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.profiles.tile.saved')}</span><span className="scr-tile-value">{document.profiles.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.profiles.tile.activePreset')}</span><span className="scr-tile-value scr-tile-value--text">{t(`scraperMgmt.preset.${activeProfile?.preset ?? 'custom'}`)}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.profiles.tile.revisions')}</span><span className="scr-tile-value">{revisionCount}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.profiles.tile.overrides')}</span><span className="scr-tile-value">{Object.keys(document.siteOverrides).length}</span></div>
       </div>
 
       <div className="scr-profile-grid">
@@ -116,19 +155,19 @@ export function ProfilesPage() {
               description={profile.description}
               statusId="page.profiles"
               className={active ? 'scr-card--active' : ''}
-              trailing={active ? <span className="scr-pill scr-pill--good">Active</span> : null}
+              trailing={active ? <span className="scr-pill scr-pill--good">{t('scraperMgmt.profiles.active')}</span> : null}
             >
               <div className="scr-profile-stats">
-                <span><b>{profile.settings.network.concurrentRequests}</b> requests</span>
-                <span><b>{Math.round(profile.settings.network.requestTimeoutMs / 1_000)}s</b> timeout</span>
-                <span><b>{profile.settings.sources.mode}</b> sources</span>
+                <span><b>{profile.settings.network.concurrentRequests}</b> {t('scraperMgmt.profiles.stat.requests')}</span>
+                <span><b>{Math.round(profile.settings.network.requestTimeoutMs / 1_000)}s</b> {t('scraperMgmt.profiles.stat.timeout')}</span>
+                <span><b>{profile.settings.sources.mode}</b> {t('scraperMgmt.profiles.stat.sources')}</span>
               </div>
               <div className="scr-page-actions">
                 <Button size="sm" variant={active ? 'primary' : 'default'} onClick={() => activate(profile.id)}>
-                  {active ? 'Selected' : 'Use profile'}
+                  {active ? t('scraperMgmt.profiles.selected') : t('scraperMgmt.profiles.use')}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => ctl.openDrawer('network')}>
-                  Edit settings
+                  {t('scraperMgmt.profiles.editSettings')}
                 </Button>
               </div>
             </ScrCard>
@@ -138,8 +177,8 @@ export function ProfilesPage() {
 
       <ScrCard
         id="profile-presets"
-        title="Preset library"
-        description="Applying a preset updates the matching profile while keeping a revision in its history."
+        title={t('scraperMgmt.presets.title')}
+        description={t('scraperMgmt.presets.description')}
         statusId="set.profiles"
       >
         <div className="scr-preset-row">
@@ -147,14 +186,8 @@ export function ProfilesPage() {
             <button key={preset} type="button" className="scr-preset" onClick={() => applyPreset(preset)}>
               <Icon name={preset === 'fast' ? 'flame' : preset === 'balanced' ? 'shield' : 'scan'} size={18} />
               <span>
-                <b>{preset[0].toUpperCase() + preset.slice(1)}</b>
-                <small>
-                  {preset === 'fast'
-                    ? 'Quick metadata and episode checks'
-                    : preset === 'balanced'
-                      ? 'Reliable default for everyday use'
-                      : 'Maximum retries, mirrors, and validation'}
-                </small>
+                <b>{t(`scraperMgmt.preset.${preset}`)}</b>
+                <small>{t(`scraperMgmt.preset.${preset}.hint`)}</small>
               </span>
             </button>
           ))}
@@ -163,34 +196,25 @@ export function ProfilesPage() {
 
       <ScrCard
         id="profile-comparison"
-        title="Profile comparison"
-        description="The settings that most directly affect runtime, site load, and extraction coverage."
+        title={t('scraperMgmt.compare.title')}
+        description={t('scraperMgmt.compare.description')}
         statusId="set.profiles"
       >
-        <div className="scr-profile-compare" role="table" aria-label="Profile settings comparison">
+        <div className="scr-profile-compare" role="table" aria-label={t('scraperMgmt.compare.tableLabel')}>
           <div
             className="scr-profile-compare-row is-head"
             role="row"
             style={{ gridTemplateColumns: `minmax(160px, .9fr) repeat(${document.profiles.length}, minmax(120px, 1fr))` }}
           >
-            <span role="columnheader">Setting</span>
+            <span role="columnheader">{t('scraperMgmt.compare.setting')}</span>
             {document.profiles.map((profile) => (
               <span key={profile.id} role="columnheader">
                 {profile.name}
-                {profile.id === document.activeProfileId && <small>Active</small>}
+                {profile.id === document.activeProfileId && <small>{t('scraperMgmt.profiles.active')}</small>}
               </span>
             ))}
           </div>
-          {[
-            ['Concurrent requests', (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.network.concurrentRequests],
-            ['Request timeout', (profile: ScraperSettingsDocument['profiles'][number]) => `${Math.round(profile.settings.network.requestTimeoutMs / 1_000)}s`],
-            ['Retry attempts', (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.network.retryAttempts],
-            // Was browser.javascriptWaitMs, which no scrape has ever read.
-            // Crawl delay is the pacing value safetyPolicy.ts actually enforces.
-            ['Crawl delay', (profile: ScraperSettingsDocument['profiles'][number]) => `${(profile.settings.safety.crawlDelayMs / 1_000).toFixed(1)}s`],
-            ['Parallel jobs', (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.performance.maxParallelJobs],
-            ['Batch size', (profile: ScraperSettingsDocument['profiles'][number]) => profile.settings.performance.batchSize],
-          ].map(([label, read]) => (
+          {comparisonRows.map(([label, read]) => (
             <div
               className="scr-profile-compare-row"
               role="row"
@@ -209,37 +233,31 @@ export function ProfilesPage() {
   );
 }
 
-const STARTER_SCHEDULES: ScraperScheduleEntry[] = [
-  {
-    id: 'weekly-one-piece',
-    label: 'One Piece weekly update',
-    cron: '0 19 * * 0',
-    targetUrl: 'https://example-anime-site.com/anime/one-piece',
-    profileId: 'balanced',
-    enabled: true,
-    lastRunAt: '2026-07-19T19:00:00.000Z',
-    nextRunAt: '2026-07-26T19:00:00.000Z',
-  },
-  {
-    id: 'monthly-archive',
-    label: 'Archive integrity scan',
-    cron: '0 3 1 * *',
-    targetUrl: 'https://example-anime-site.com/library',
-    profileId: 'thorough',
-    enabled: false,
-    lastRunAt: '2026-07-01T03:00:00.000Z',
-    nextRunAt: '2026-08-01T03:00:00.000Z',
-  },
-];
+/*
+ * There are deliberately no starter schedules.
+ *
+ * This used to seed every fresh install with two entries against
+ * `example-anime-site.com` — a domain that does not exist — carrying
+ * `lastRunAt` / `nextRunAt` dates for runs that never happened. One was
+ * `enabled: true`, so a new user's Schedules page opened claiming an armed
+ * weekly job with a run history. Pressing "Run now" did not fail either: the
+ * engine fell through to AniList and answered from there without ever saying
+ * the target had been substituted. Audit F3.
+ *
+ * `addSchedule` below is the honest shape and always was — it leaves both
+ * timestamps `null` because "the scheduler computes the first run from the
+ * cron, so a hand-written date here could only ever be wrong." An empty list
+ * is the correct starting state; the page renders an empty state for it.
+ */
 
-/** Held-reason → what the user should read on the screen. */
-const HELD_LABEL: Record<ScraperSchedulerState['heldBy'], string> = {
-  '': sx('sched.held.armed'),
-  disabled: sx('sched.held.disabled'),
-  'quiet-hours': sx('sched.held.quietHours'),
-  'on-battery': sx('sched.held.onBattery'),
-  concurrency: sx('sched.held.concurrency'),
-  'nothing-due': sx('sched.held.armed'),
+/** Held-reason → the key for what the user should read on the screen. */
+const HELD_KEY: Record<ScraperSchedulerState['heldBy'], string> = {
+  '': 'scraperMgmt.held.armed',
+  disabled: 'scraperMgmt.held.disabled',
+  'quiet-hours': 'scraperMgmt.held.quietHours',
+  'on-battery': 'scraperMgmt.held.onBattery',
+  concurrency: 'scraperMgmt.held.concurrency',
+  'nothing-due': 'scraperMgmt.held.armed',
 };
 
 function formatRunAt(iso: string | null, empty: string): string {
@@ -259,14 +277,16 @@ function formatRunAt(iso: string | null, empty: string): string {
  * firings rather than trying to translate the expression back into prose —
  * concrete dates are what people actually check the field against.
  */
-function describeCron(expression: string): string {
+function describeCron(expression: string, t: Translate): string {
   const parsed = parseCron(expression);
-  if (!parsed.ok) return `Invalid: ${parsed.error}`;
+  if (!parsed.ok) return t('scraperMgmt.cron.invalid', { error: parsed.error });
   const first = nextCronRun(expression, Date.now());
-  if (first === null) return 'Valid, but this date never occurs.';
+  if (first === null) return t('scraperMgmt.cron.never');
   const second = nextCronRun(expression, first);
   const show = (ms: number) => formatRunAt(new Date(ms).toISOString(), '—');
-  return second === null ? `Next: ${show(first)}` : `Next: ${show(first)}, then ${show(second)}`;
+  return second === null
+    ? t('scraperMgmt.cron.next', { first: show(first) })
+    : t('scraperMgmt.cron.nextThen', { first: show(first), second: show(second) });
 }
 
 interface WeekDay {
@@ -281,7 +301,15 @@ interface WeekDay {
  * the cron forward per entry rather than reading nextRunAt, because nextRunAt
  * only ever holds the *first* upcoming run.
  */
-function buildUpcomingWeek(entries: ScraperScheduleEntry[], enabled: boolean, nowMs: number): WeekDay[] {
+function buildUpcomingWeek(
+  entries: ScraperScheduleEntry[],
+  enabled: boolean,
+  nowMs: number,
+  t: Translate,
+  // Module-level, so it cannot call `useT()`: the weekday abbreviations below
+  // would otherwise come from the OS locale rather than the UI language.
+  lang: UiLang,
+): WeekDay[] {
   const days: WeekDay[] = [];
   const start = new Date(nowMs);
   start.setHours(0, 0, 0, 0);
@@ -311,8 +339,8 @@ function buildUpcomingWeek(entries: ScraperScheduleEntry[], enabled: boolean, no
     const runs = counts.get(key) ?? 0;
     days.push({
       key,
-      label: `${day.toLocaleDateString([], { weekday: 'short' }).toUpperCase()} ${String(day.getDate()).padStart(2, '0')}`,
-      title: runs === 1 ? '1 scheduled run' : `${runs} scheduled runs`,
+      label: `${day.toLocaleDateString(LANG_TAGS[lang], { weekday: 'short' }).toUpperCase()} ${String(day.getDate()).padStart(2, '0')}`,
+      title: t('scraperMgmt.week.runs', { count: runs }),
       runs,
     });
   }
@@ -321,10 +349,11 @@ function buildUpcomingWeek(entries: ScraperScheduleEntry[], enabled: boolean, no
 
 export function ScheduledPage() {
   const port = useScraperPort();
+  const { t, lang } = useT();
   const initial = loadScraperSettingsDocument().profiles.find(
     (profile) => profile.id === loadScraperSettingsDocument().activeProfileId,
   )?.settings.scheduler;
-  const seededSchedules = initial?.entries.length ? initial.entries : STARTER_SCHEDULES;
+  const seededSchedules = initial?.entries ?? [];
   const [schedules, setSchedules] = useState<ScraperScheduleEntry[]>(seededSchedules);
   const [selectedId, setSelectedId] = useState(seededSchedules[0]?.id ?? '');
   const [runNotice, setRunNotice] = useState('');
@@ -344,19 +373,23 @@ export function ScheduledPage() {
 
   // The soonest run across every entry — the same number the shell's status bar
   // shows, derived from the same records.
+  //
+  // `lang` and not `t` in the dependency list: see ProfilesPage above.
   const nextRunLabel = useMemo(() => {
     const soonest = runState.entries.reduce<number | null>((best, entry) => {
       const ms = entry.nextRunAt ? Date.parse(entry.nextRunAt) : NaN;
       if (!Number.isFinite(ms)) return best;
       return best === null || ms < best ? ms : best;
     }, null);
-    if (soonest === null) return 'None';
-    return formatRunAt(new Date(soonest).toISOString(), 'None');
-  }, [runState]);
+    if (soonest === null) return t('scraperMgmt.sched.none');
+    return formatRunAt(new Date(soonest).toISOString(), t('scraperMgmt.sched.none'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runState, lang]);
 
   const upcomingWeek = useMemo(
-    () => buildUpcomingWeek(schedules, schedulerEnabled, Date.now()),
-    [schedules, schedulerEnabled],
+    () => buildUpcomingWeek(schedules, schedulerEnabled, Date.now(), t, lang),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [schedules, schedulerEnabled, lang],
   );
 
   // Every edit is pushed straight down; the reply carries the recomputed next
@@ -397,6 +430,8 @@ export function ScheduledPage() {
       ...schedules,
       {
         id,
+        // Seed values the user renames in the editor below, so they stay
+        // literal (CLAUDE.md i18n rule 4), same as the profile copy name.
         label: 'New scheduled scrape',
         cron: '0 20 * * 5',
         targetUrl: 'https://anilist.co/anime/21/ONE-PIECE',
@@ -410,7 +445,7 @@ export function ScheduledPage() {
     ];
     persist(next);
     setSelectedId(id);
-    setRunNotice('New schedule added and selected.');
+    setRunNotice(t('scraperMgmt.sched.added'));
   };
 
   const patchSelected = (patch: Partial<ScraperScheduleEntry>) => {
@@ -420,14 +455,14 @@ export function ScheduledPage() {
 
   const runSelected = () => {
     if (!selected) return;
-    setRunNotice(`Starting ${selected.label}…`);
+    setRunNotice(t('scraperMgmt.sched.starting', { label: selected.label }));
     void port
       .runSchedule(selected.id)
       .then((jobId) => {
         setRunNotice(
           jobId
-            ? `${selected.label} started job ${jobId}.`
-            : `${selected.label} could not start — no scheduler backend is attached.`,
+            ? t('scraperMgmt.sched.started', { label: selected.label, jobId })
+            : t('scraperMgmt.sched.noBackend', { label: selected.label }),
         );
       })
       .catch((error: unknown) => {
@@ -449,32 +484,35 @@ export function ScheduledPage() {
       },
     ]);
     setSelectedId(id);
-    setRunNotice('Schedule duplicated in a paused state.');
+    setRunNotice(t('scraperMgmt.sched.duplicated'));
   };
 
   return (
     <div className="scr-page">
       <PageHead
         page="scheduled"
-        title="Scheduled Tasks"
-        subtitle="Recurring scrape jobs with visible timing, power, and network requirements."
+        title={t('scraperMgmt.sched.title')}
+        subtitle={t('scraperMgmt.sched.subtitle')}
         actions={
           <Button size="sm" variant="primary" leftIcon={<Icon name="plus" size={13} />} onClick={addSchedule}>
-            New schedule
+            {t('scraperMgmt.sched.new')}
           </Button>
         }
       />
 
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Schedules</span><span className="scr-tile-value">{schedules.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Enabled</span><span className="scr-tile-value">{schedules.filter((entry) => entry.enabled).length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Next run</span><span className="scr-tile-value scr-tile-value--format">{nextRunLabel}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Scheduler</span><span className="scr-tile-value scr-tile-value--format">{HELD_LABEL[runState.heldBy]}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.sched.tile.schedules')}</span><span className="scr-tile-value">{schedules.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.sched.tile.enabled')}</span><span className="scr-tile-value">{schedules.filter((entry) => entry.enabled).length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.sched.tile.nextRun')}</span><span className="scr-tile-value scr-tile-value--format">{nextRunLabel}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.sched.tile.scheduler')}</span><span className="scr-tile-value scr-tile-value--format">{t(HELD_KEY[runState.heldBy])}</span></div>
       </div>
 
       <div className="scr-schedule-workspace">
-        <ScrCard id="scheduled-list" title="Schedules" statusId="page.scheduled">
+        <ScrCard id="scheduled-list" title={t('scraperMgmt.sched.listTitle')} statusId="page.scheduled">
           <div className="scr-schedule-list">
+            {schedules.length === 0 && (
+              <p className="scr-muted">{t('scraperMgmt.sched.empty')}</p>
+            )}
             {schedules.map((entry) => (
               <div
                 key={entry.id}
@@ -482,7 +520,7 @@ export function ScheduledPage() {
               >
                 <Toggle
                   checked={entry.enabled}
-                  aria-label={`Enable ${entry.label}`}
+                  aria-label={t('scraperMgmt.sched.enableEntry', { label: entry.label })}
                   onChange={(event) =>
                     persist(
                       schedules.map((item) =>
@@ -502,10 +540,10 @@ export function ScheduledPage() {
                   <span className="scr-list-cell">{entry.profileId}</span>
                   <span className="scr-list-cell scr-muted">
                     {!entry.enabled
-                      ? 'Paused'
+                      ? t('scraperMgmt.sched.paused')
                       : !isValidCron(entry.cron)
-                        ? 'Invalid cron'
-                        : formatRunAt(recordFor(entry.id)?.nextRunAt ?? null, 'Not scheduled')}
+                        ? t('scraperMgmt.sched.invalidCron')
+                        : formatRunAt(recordFor(entry.id)?.nextRunAt ?? null, t('scraperMgmt.sched.notScheduled'))}
                   </span>
                 </button>
               </div>
@@ -515,57 +553,57 @@ export function ScheduledPage() {
 
         <ScrCard
           id="schedule-editor"
-          title="Schedule editor"
-          description="Changes are validated and saved to the active scraper profile."
+          title={t('scraperMgmt.sched.editorTitle')}
+          description={t('scraperMgmt.sched.editorDescription')}
           statusId="set.scheduler"
-          trailing={selected ? <span className={`scr-pill ${selected.enabled ? 'scr-pill--good' : 'scr-pill--quiet'}`}>{selected.enabled ? 'Enabled' : 'Paused'}</span> : null}
+          trailing={selected ? <span className={`scr-pill ${selected.enabled ? 'scr-pill--good' : 'scr-pill--quiet'}`}>{selected.enabled ? t('scraperMgmt.sched.enabled') : t('scraperMgmt.sched.paused')}</span> : null}
         >
           {selected && (
             <>
               <div className="scr-fields">
                 <label className="scr-field">
-                  <span className="scr-field-label">Name</span>
+                  <span className="scr-field-label">{t('scraperMgmt.sched.field.name')}</span>
                   <input className="scr-input" value={selected.label} onChange={(event) => patchSelected({ label: event.target.value })} />
                 </label>
                 <label className="scr-field">
-                  <span className="scr-field-label">Target URL</span>
+                  <span className="scr-field-label">{t('scraperMgmt.sched.field.targetUrl')}</span>
                   <input className="scr-input" value={selected.targetUrl} onChange={(event) => patchSelected({ targetUrl: event.target.value })} />
                 </label>
                 <label className="scr-field">
-                  <span className="scr-field-label">Cron expression</span>
+                  <span className="scr-field-label">{t('scraperMgmt.sched.field.cron')}</span>
                   <input
                     className={`scr-input scr-input--mono${isValidCron(selected.cron) ? '' : ' is-invalid'}`}
                     value={selected.cron}
                     onChange={(event) => patchSelected({ cron: event.target.value })}
                   />
-                  <span className="scr-field-hint">{describeCron(selected.cron)}</span>
+                  <span className="scr-field-hint">{describeCron(selected.cron, t)}</span>
                 </label>
                 <label className="scr-field">
-                  <span className="scr-field-label">Profile</span>
+                  <span className="scr-field-label">{t('scraperMgmt.sched.field.profile')}</span>
                   <select className="scr-input" value={selected.profileId} onChange={(event) => patchSelected({ profileId: event.target.value })}>
-                    <option value="fast">Fast</option>
-                    <option value="balanced">Balanced</option>
-                    <option value="thorough">Thorough</option>
+                    {(['fast', 'balanced', 'thorough'] as const).map((preset) => (
+                      <option key={preset} value={preset}>{t(`scraperMgmt.preset.${preset}`)}</option>
+                    ))}
                   </select>
                 </label>
               </div>
               <div className="scr-schedule-timing">
                 <span>
-                  <small>Last run</small>
-                  <b>{formatRunAt(recordFor(selected.id)?.lastRunAt ?? null, 'Never')}</b>
+                  <small>{t('scraperMgmt.sched.lastRun')}</small>
+                  <b>{formatRunAt(recordFor(selected.id)?.lastRunAt ?? null, t('scraperMgmt.sched.never'))}</b>
                 </span>
                 <span>
-                  <small>Next run</small>
-                  <b>{formatRunAt(recordFor(selected.id)?.nextRunAt ?? null, 'Not scheduled')}</b>
+                  <small>{t('scraperMgmt.sched.nextRun')}</small>
+                  <b>{formatRunAt(recordFor(selected.id)?.nextRunAt ?? null, t('scraperMgmt.sched.notScheduled'))}</b>
                 </span>
                 <span>
-                  <small>Last job</small>
+                  <small>{t('scraperMgmt.sched.lastJob')}</small>
                   <b>{recordFor(selected.id)?.lastJobId ?? '—'}</b>
                 </span>
               </div>
               <div className="scr-page-actions">
-                <Button size="sm" variant="primary" leftIcon={<Icon name="player" size={13} />} onClick={runSelected}>Run now</Button>
-                <Button size="sm" onClick={duplicateSelected}>Duplicate</Button>
+                <Button size="sm" variant="primary" leftIcon={<Icon name="player" size={13} />} onClick={runSelected}>{t('scraperMgmt.sched.runNow')}</Button>
+                <Button size="sm" onClick={duplicateSelected}>{t('scraperMgmt.sched.duplicate')}</Button>
                 {runNotice && <span className="scr-muted" role="status">{runNotice}</span>}
               </div>
             </>
@@ -574,35 +612,35 @@ export function ScheduledPage() {
       </div>
 
       <div className="scr-grid">
-        <ScrCard title="Scheduler policy" statusId="set.scheduler">
+        <ScrCard title={t('scraperMgmt.policy.title')} statusId="set.scheduler">
           <div className="scr-setting-summary">
-            <span>Scheduler <b>{schedulerEnabled ? 'On' : 'Off'}</b></span>
-            <span>Maximum concurrent tasks <b>{policy.maxConcurrentScheduled}</b></span>
-            <span>Missed run policy <b>{policy.missedRunPolicy}</b></span>
+            <span>{t('scraperMgmt.policy.scheduler')} <b>{schedulerEnabled ? t('scraperMgmt.policy.on') : t('scraperMgmt.policy.off')}</b></span>
+            <span>{t('scraperMgmt.policy.maxConcurrent')} <b>{policy.maxConcurrentScheduled}</b></span>
+            <span>{t('scraperMgmt.policy.missedRun')} <b>{t(`scraperMgmt.policy.missed.${policy.missedRunPolicy}`)}</b></span>
             <span>
-              Quiet hours{' '}
+              {t('scraperMgmt.policy.quietHours')}{' '}
               <b>
                 {policy.quietHoursStart && policy.quietHoursEnd
                   ? `${policy.quietHoursStart}–${policy.quietHoursEnd}`
-                  : 'Off'}
+                  : t('scraperMgmt.policy.off')}
               </b>
             </span>
-            <span>Running now <b>{runState.runningJobIds.length}</b></span>
+            <span>{t('scraperMgmt.policy.runningNow')} <b>{runState.runningJobIds.length}</b></span>
           </div>
           <div className="scr-page-actions">
             <Toggle
               checked={schedulerEnabled}
-              aria-label="Enable the scheduler"
+              aria-label={t('scraperMgmt.policy.enableLabel')}
               onChange={(event) => persist(schedules, event.target.checked)}
             />
             <span className="scr-muted">
               {schedulerEnabled
-                ? 'Enabled schedules fire on their cron, window open or not.'
-                : 'Nothing fires until the scheduler is turned on.'}
+                ? t('scraperMgmt.policy.enabledHint')
+                : t('scraperMgmt.policy.disabledHint')}
             </span>
           </div>
         </ScrCard>
-        <ScrCard title="Next seven days" statusId="page.scheduled">
+        <ScrCard title={t('scraperMgmt.week.title')} statusId="page.scheduled">
           <div className="scr-calendar-strip">
             {upcomingWeek.map((day) => (
               <span key={day.key} className={day.runs ? 'has-job' : ''} title={day.title}>
@@ -631,6 +669,7 @@ function newSiteRule(): ScraperSiteRule {
 export function SiteRulesPage() {
   const ctl = useScraper();
   const port = useScraperPort();
+  const { t, lang } = useT();
   const [rules, setRules] = useState<ScraperSiteRule[]>(
     () => getActiveScraperSettings().extraction.siteRules,
   );
@@ -643,6 +682,25 @@ export function SiteRulesPage() {
   const problems = selected ? validateSiteRule(selected) : [];
   const problemFor = (field: SiteRuleProblem['field']) =>
     problems.find((problem) => problem.field === field)?.message ?? '';
+
+  // Placeholders stay literal: they are CSS/XPath selector samples and example
+  // hosts, i.e. format examples rather than chrome (CLAUDE.md i18n rule 4).
+  // `lang`, never `t`, in the dependency list — see ProfilesPage.
+  const ruleFields = useMemo(
+    () =>
+      [
+        [t('scraperMgmt.rule.host'), 'host', 'example.com', false],
+        [t('scraperMgmt.rule.sampleUrl'), 'sampleUrl', 'https://example.com/anime/one-piece', false],
+        [t('scraperMgmt.rule.episodeRow'), 'episodeSelector', '.ep-list > li', true],
+        [t('scraperMgmt.rule.episodeTitle'), 'titleSelector', '.title', true],
+        [t('scraperMgmt.rule.episodeLink'), 'linkSelector', 'a', true],
+        [t('scraperMgmt.rule.linkAttribute'), 'linkAttribute', 'href', true],
+        [t('scraperMgmt.rule.numberCell'), 'numberSelector', 'th', true],
+        [t('scraperMgmt.rule.numberPattern'), 'numberPattern', 'E(\\d+)', true],
+      ] as const,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lang],
+  );
 
   const persist = (next: ScraperSiteRule[]) => {
     setRules(next);
@@ -688,17 +746,21 @@ export function SiteRulesPage() {
     if (!selected) return;
     const blocking = validateSiteRule(selected);
     if (blocking.length) {
-      setNotice(blocking[0]?.message ?? 'This rule is incomplete.');
+      setNotice(blocking[0]?.message ?? t('scraperMgmt.rule.incomplete'));
       return;
     }
     setBusy(true);
-    setNotice(`Fetching ${selected.sampleUrl}…`);
+    setNotice(t('scraperMgmt.rule.fetching', { url: selected.sampleUrl }));
     void port
       .fetchHttp({ method: 'GET', url: selected.sampleUrl, headers: {} })
       .then((response) => {
         if (response.status >= 400) {
           setExtraction(null);
-          setNotice(`${selected.sampleUrl} answered ${response.status} ${response.statusText}.`);
+          setNotice(t('scraperMgmt.rule.answered', {
+            url: selected.sampleUrl,
+            status: response.status,
+            statusText: response.statusText,
+          }));
           return;
         }
         const doc = new DOMParser().parseFromString(response.body, 'text/html');
@@ -712,9 +774,11 @@ export function SiteRulesPage() {
           setNotice(result.error);
           return;
         }
-        setNotice(
-          `${response.status} · ${response.body.length.toLocaleString()} bytes · ${result.rows.length} row(s) matched.`,
-        );
+        setNotice(t('scraperMgmt.rule.validated', {
+          status: response.status,
+          bytes: response.body.length.toLocaleString(),
+          rows: result.rows.length,
+        }));
         patchRule({
           lastValidatedAt: new Date().toISOString(),
           lastMatchCount: result.rows.length,
@@ -733,35 +797,32 @@ export function SiteRulesPage() {
     <div className="scr-page">
       <PageHead
         page="site-rules"
-        title="Site Rules"
-        subtitle="Per-site extraction selectors, validated against the page the site actually serves."
+        title={t('scraperMgmt.rules.title')}
+        subtitle={t('scraperMgmt.rules.subtitle')}
         actions={
           <>
-            <Button size="sm" onClick={() => ctl.navigate('selector-tester')}>Open selector tester</Button>
+            <Button size="sm" onClick={() => ctl.navigate('selector-tester')}>{t('scraperMgmt.rules.openTester')}</Button>
             <Button size="sm" variant="primary" leftIcon={<Icon name="plus" size={13} />} onClick={addRule}>
-              New rule
+              {t('scraperMgmt.rules.new')}
             </Button>
           </>
         }
       />
 
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Site rules</span><span className="scr-tile-value">{rules.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Enabled</span><span className="scr-tile-value">{rules.filter((rule) => rule.enabled).length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Validated</span><span className="scr-tile-value">{validatedCount}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.rules.tile.rules')}</span><span className="scr-tile-value">{rules.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.rules.tile.enabled')}</span><span className="scr-tile-value">{rules.filter((rule) => rule.enabled).length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.rules.tile.validated')}</span><span className="scr-tile-value">{validatedCount}</span></div>
         <div className="scr-tile">
-          <span className="scr-tile-label">Last match count</span>
+          <span className="scr-tile-label">{t('scraperMgmt.rules.tile.lastMatch')}</span>
           <span className="scr-tile-value">{(selected?.lastMatchCount ?? 0).toLocaleString()}</span>
         </div>
       </div>
 
       <div className="scr-rule-layout">
-        <ScrCard title="Sites" statusId="page.site-rules">
+        <ScrCard title={t('scraperMgmt.rules.sites')} statusId="page.site-rules">
           {rules.length === 0 ? (
-            <p className="scr-muted">
-              No site rules yet. Add one for a site that lists episodes in its own markup —
-              catalogue-backed titles do not need a rule.
-            </p>
+            <p className="scr-muted">{t('scraperMgmt.rules.empty')}</p>
           ) : (
             <div className="scr-rule-sites">
               {rules.map((rule) => (
@@ -773,11 +834,14 @@ export function SiteRulesPage() {
                 >
                   <span className={`scr-state-dot${rule.enabled ? '' : ' is-off'}`} />
                   <span>
-                    <b>{rule.host || 'Unnamed rule'}</b>
+                    <b>{rule.host || t('scraperMgmt.rules.unnamed')}</b>
                     <small>
                       {rule.lastValidatedAt
-                        ? `${rule.lastMatchCount.toLocaleString()} matched · ${formatRunAt(rule.lastValidatedAt, '')}`
-                        : 'Never validated'}
+                        ? t('scraperMgmt.rules.matchedAt', {
+                            count: rule.lastMatchCount,
+                            when: formatRunAt(rule.lastValidatedAt, ''),
+                          })
+                        : t('scraperMgmt.rules.neverValidated')}
                     </small>
                   </span>
                 </button>
@@ -788,29 +852,20 @@ export function SiteRulesPage() {
 
         {selected && (
           <ScrCard
-            title={selected.host || 'New rule'}
-            description="A rule can only be enabled once it has matched rows on its sample page."
+            title={selected.host || t('scraperMgmt.rules.newRule')}
+            description={t('scraperMgmt.rules.enableHint')}
             statusId="page.site-rules"
             trailing={
               <Toggle
                 checked={selected.enabled}
-                aria-label="Enable this rule"
+                aria-label={t('scraperMgmt.rules.enableThis')}
                 disabled={!selected.lastValidatedAt || selected.lastMatchCount === 0}
                 onChange={(event) => patch({ enabled: event.target.checked })}
               />
             }
           >
             <div className="scr-fields">
-              {([
-                ['Host', 'host', 'example.com', false],
-                ['Sample URL', 'sampleUrl', 'https://example.com/anime/one-piece', false],
-                ['Episode row', 'episodeSelector', '.ep-list > li', true],
-                ['Episode title (in row)', 'titleSelector', '.title', true],
-                ['Episode link (in row)', 'linkSelector', 'a', true],
-                ['Link attribute', 'linkAttribute', 'href', true],
-                ['Episode number cell (in row)', 'numberSelector', 'th', true],
-                ['Episode number pattern', 'numberPattern', 'E(\\d+)', true],
-              ] as const).map(([label, field, placeholder, mono]) => {
+              {ruleFields.map(([label, field, placeholder, mono]) => {
                 const problem = problemFor(field as SiteRuleProblem['field']);
                 return (
                   <label key={field} className="scr-field">
@@ -828,9 +883,9 @@ export function SiteRulesPage() {
             </div>
             <div className="scr-page-actions">
               <Button size="sm" variant="primary" disabled={busy} onClick={validate}>
-                {busy ? 'Validating…' : 'Validate against sample'}
+                {busy ? t('scraperMgmt.rules.validating') : t('scraperMgmt.rules.validate')}
               </Button>
-              <Button size="sm" onClick={removeSelected}>Delete</Button>
+              <Button size="sm" onClick={removeSelected}>{t('scraperMgmt.rules.delete')}</Button>
               {notice && <span className="scr-muted" role="status">{notice}</span>}
             </div>
           </ScrCard>
@@ -839,14 +894,14 @@ export function SiteRulesPage() {
 
       <div className="scr-grid">
         <ScrCard
-          title="Extraction preview"
-          description={`The first ${PREVIEW_ROWS} rows the current selector set produced.`}
+          title={t('scraperMgmt.preview.title')}
+          description={t('scraperMgmt.preview.description', { rows: PREVIEW_ROWS })}
           statusId="page.site-rules"
           className="scr-card--wide"
         >
           {!extraction || !extraction.rows.length ? (
             <p className="scr-muted">
-              {extraction?.error || 'Validate a rule to see the rows it extracts.'}
+              {extraction?.error || t('scraperMgmt.preview.empty')}
             </p>
           ) : (
             <div className="scr-rule-preview">
@@ -854,21 +909,21 @@ export function SiteRulesPage() {
                 <div key={row.index}>
                   <span className="scr-match-index">{row.number ?? row.index}</span>
                   <span className="scr-list-main">
-                    <b>{row.title || '(no title)'}</b>
-                    <small>{row.number === null ? 'no episode number' : `episode ${row.number}`}</small>
+                    <b>{row.title || t('scraperMgmt.preview.noTitle')}</b>
+                    <small>{row.number === null ? t('scraperMgmt.preview.noNumber') : t('scraperMgmt.preview.episode', { number: row.number })}</small>
                   </span>
-                  <code>{row.rawLink || '(no link)'}</code>
+                  <code>{row.rawLink || t('scraperMgmt.preview.noLink')}</code>
                   <span className={`scr-pill ${row.title && row.rawLink ? 'scr-pill--good' : 'scr-pill--warn'}`}>
-                    {row.title && row.rawLink ? 'matched' : 'partial'}
+                    {row.title && row.rawLink ? t('scraperMgmt.preview.matched') : t('scraperMgmt.preview.partial')}
                   </span>
                 </div>
               ))}
             </div>
           )}
         </ScrCard>
-        <ScrCard title="Validation report" statusId="page.site-rules">
+        <ScrCard title={t('scraperMgmt.report.title')} statusId="page.site-rules">
           {!extraction || !extraction.checks.length ? (
-            <p className="scr-muted">No validation run yet.</p>
+            <p className="scr-muted">{t('scraperMgmt.report.empty')}</p>
           ) : (
             <div className="scr-validation-list">
               {extraction.checks.map((item) => (
@@ -881,8 +936,8 @@ export function SiteRulesPage() {
           )}
           <p className="scr-muted">
             {selected?.lastValidatedAt
-              ? `Last validated ${formatRunAt(selected.lastValidatedAt, '')}`
-              : 'Never validated'}
+              ? t('scraperMgmt.report.lastValidated', { when: formatRunAt(selected.lastValidatedAt, '') })
+              : t('scraperMgmt.rules.neverValidated')}
           </p>
         </ScrCard>
       </div>
@@ -892,6 +947,7 @@ export function SiteRulesPage() {
 
 export function PluginsPage() {
   const port = useScraperPort();
+  const { t, lang } = useT();
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const [filter, setFilter] = useState('all');
   const [notice, setNotice] = useState('');
@@ -924,6 +980,19 @@ export function PluginsPage() {
     [plugins],
   );
 
+  // `lang`, never `t` — see ProfilesPage.
+  const filterChips = useMemo(
+    () =>
+      [
+        ['all', t('scraperMgmt.plugins.filter.all')],
+        ['enabled', t('scraperMgmt.plugins.filter.enabled')],
+        ['updates', t('scraperMgmt.plugins.filter.updates')],
+        ['incompatible', t('scraperMgmt.plugins.filter.incompatible')],
+      ] as const,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lang],
+  );
+
   const applyUpdates = () => {
     const updates = plugins.filter((plugin) => plugin.updateAvailable).length;
     setPlugins((current) =>
@@ -933,7 +1002,7 @@ export function PluginsPage() {
           : plugin,
       ),
     );
-    setNotice(updates ? `Updated ${updates} adapter${updates === 1 ? '' : 's'}.` : 'All adapters are current.');
+    setNotice(updates ? t('scraperMgmt.plugins.updated', { count: updates }) : t('scraperMgmt.plugins.allCurrent'));
   };
 
   const installPlugin = async (file: File | undefined) => {
@@ -945,9 +1014,11 @@ export function PluginsPage() {
         ...current.filter((plugin) => plugin.id !== installed.id),
       ]);
       setFilter('all');
-      setNotice(`${installed.name} v${installed.version} installed from ${file.name}.`);
+      setNotice(t('scraperMgmt.plugins.installed', { name: installed.name, version: installed.version, file: file.name }));
     } catch (error) {
-      setNotice(error instanceof Error ? `Could not install plugin: ${error.message}` : 'Could not install plugin manifest.');
+      setNotice(error instanceof Error
+        ? t('scraperMgmt.plugins.installFailedDetail', { detail: error.message })
+        : t('scraperMgmt.plugins.installFailed'));
     } finally {
       if (installInput.current) installInput.current.value = '';
     }
@@ -957,8 +1028,8 @@ export function PluginsPage() {
     <div className="scr-page">
       <PageHead
         page="plugins"
-        title="Plugins"
-        subtitle="Provider adapters with explicit compatibility and permission details."
+        title={t('scraperMgmt.plugins.title')}
+        subtitle={t('scraperMgmt.plugins.subtitle')}
         actions={
           <>
             <input
@@ -966,29 +1037,24 @@ export function PluginsPage() {
               className="scr-visually-hidden"
               type="file"
               accept=".json,application/json"
-              aria-label="Plugin manifest file"
+              aria-label={t('scraperMgmt.plugins.manifestLabel')}
               onChange={(event) => void installPlugin(event.target.files?.[0])}
             />
             <Button size="sm" leftIcon={<Icon name="plus" size={13} />} onClick={() => installInput.current?.click()}>
-              Install from file
+              {t('scraperMgmt.plugins.installFromFile')}
             </Button>
           </>
         }
       />
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
       <div className="scr-tile-row">
-        <div className="scr-tile"><span className="scr-tile-label">Installed</span><span className="scr-tile-value">{plugins.length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Enabled</span><span className="scr-tile-value">{plugins.filter((plugin) => plugin.enabled).length}</span></div>
-        <div className="scr-tile"><span className="scr-tile-label">Updates</span><span className="scr-tile-value">{plugins.filter((plugin) => plugin.updateAvailable).length}</span></div>
-        <div className={`scr-tile${plugins.some((plugin) => !plugin.compatible) ? ' is-bad' : ''}`}><span className="scr-tile-label">Incompatible</span><span className="scr-tile-value">{plugins.filter((plugin) => !plugin.compatible).length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.plugins.tile.installed')}</span><span className="scr-tile-value">{plugins.length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.plugins.tile.enabled')}</span><span className="scr-tile-value">{plugins.filter((plugin) => plugin.enabled).length}</span></div>
+        <div className="scr-tile"><span className="scr-tile-label">{t('scraperMgmt.plugins.tile.updates')}</span><span className="scr-tile-value">{plugins.filter((plugin) => plugin.updateAvailable).length}</span></div>
+        <div className={`scr-tile${plugins.some((plugin) => !plugin.compatible) ? ' is-bad' : ''}`}><span className="scr-tile-label">{t('scraperMgmt.plugins.tile.incompatible')}</span><span className="scr-tile-value">{plugins.filter((plugin) => !plugin.compatible).length}</span></div>
       </div>
       <div className="scr-chip-row">
-        {[
-          ['all', 'All'],
-          ['enabled', 'Enabled'],
-          ['updates', 'Updates'],
-          ['incompatible', 'Incompatible'],
-        ].map(([id, label]) => (
+        {filterChips.map(([id, label]) => (
           <button key={id} type="button" className={`scr-chip${filter === id ? ' is-on' : ''}`} onClick={() => setFilter(id)}>
             {label}
           </button>
@@ -1019,8 +1085,8 @@ export function PluginsPage() {
             <div className="scr-plugin-meta">
               <span>v{plugin.version}</span>
               <span>{plugin.publisher}</span>
-              {plugin.updateAvailable && <span className="scr-pill scr-pill--accent">v{plugin.updateAvailable} available</span>}
-              {!plugin.compatible && <span className="scr-pill scr-pill--bad">Incompatible</span>}
+              {plugin.updateAvailable && <span className="scr-pill scr-pill--accent">{t('scraperMgmt.plugins.versionAvailable', { version: plugin.updateAvailable })}</span>}
+              {!plugin.compatible && <span className="scr-pill scr-pill--bad">{t('scraperMgmt.plugins.incompatible')}</span>}
             </div>
             <div className="scr-permission-list">
               {plugin.permissions.map((permission) => <code key={permission}>{permission}</code>)}
@@ -1030,35 +1096,35 @@ export function PluginsPage() {
       </div>
       <div className="scr-plugin-operations">
         <ScrCard
-          title="Permission audit"
-          description="Capability groups requested by the currently installed adapter set."
+          title={t('scraperMgmt.permissions.title')}
+          description={t('scraperMgmt.permissions.description')}
           statusId="page.plugins"
         >
           <div className="scr-permission-audit">
-            <span><Icon name="globe" size={14} /><b>{permissionCounts.network}</b><small>Network access</small></span>
-            <span><Icon name="scan" size={14} /><b>{permissionCounts.browser}</b><small>Browser control</small></span>
-            <span><Icon name="drive" size={14} /><b>{permissionCounts.storage}</b><small>Storage access</small></span>
-            <span className={permissionCounts.broad ? 'is-risk' : ''}><Icon name="warning" size={14} /><b>{permissionCounts.broad}</b><small>Broad access</small></span>
+            <span><Icon name="globe" size={14} /><b>{permissionCounts.network}</b><small>{t('scraperMgmt.permissions.network')}</small></span>
+            <span><Icon name="scan" size={14} /><b>{permissionCounts.browser}</b><small>{t('scraperMgmt.permissions.browser')}</small></span>
+            <span><Icon name="drive" size={14} /><b>{permissionCounts.storage}</b><small>{t('scraperMgmt.permissions.storage')}</small></span>
+            <span className={permissionCounts.broad ? 'is-risk' : ''}><Icon name="warning" size={14} /><b>{permissionCounts.broad}</b><small>{t('scraperMgmt.permissions.broad')}</small></span>
           </div>
-          <p className="scr-muted">Legacy AniX remains disabled because it requests wildcard network and direct filesystem access.</p>
+          <p className="scr-muted">{t('scraperMgmt.permissions.anixNote')}</p>
         </ScrCard>
         <ScrCard
-          title="Update center"
-          description="Adapter updates are staged independently from the desktop application."
+          title={t('scraperMgmt.updates.title')}
+          description={t('scraperMgmt.updates.description')}
           statusId="page.plugins"
-          trailing={<span className="scr-pill scr-pill--accent">{plugins.filter((plugin) => plugin.updateAvailable).length} available</span>}
+          trailing={<span className="scr-pill scr-pill--accent">{t('scraperMgmt.updates.available', { count: plugins.filter((plugin) => plugin.updateAvailable).length })}</span>}
         >
           <div className="scr-plugin-update">
             <div>
-              <b>{plugins.find((plugin) => plugin.updateAvailable)?.name ?? 'Adapters are current'}</b>
+              <b>{plugins.find((plugin) => plugin.updateAvailable)?.name ?? t('scraperMgmt.updates.allCurrent')}</b>
               <small>
                 {plugins.find((plugin) => plugin.updateAvailable)
                   ? `v${plugins.find((plugin) => plugin.updateAvailable)?.version} → v${plugins.find((plugin) => plugin.updateAvailable)?.updateAvailable}`
-                  : 'No pending adapter packages'}
+                  : t('scraperMgmt.updates.nonePending')}
               </small>
             </div>
             <Button size="sm" leftIcon={<Icon name="refresh" size={13} />} onClick={applyUpdates}>
-              Update all
+              {t('scraperMgmt.updates.updateAll')}
             </Button>
           </div>
         </ScrCard>

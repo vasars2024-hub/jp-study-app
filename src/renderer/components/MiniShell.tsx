@@ -33,6 +33,7 @@ import {
 import { ClipboardWidget } from '../widgets/system';
 import { useAeroMaterials, useWiredMaterials } from './ui';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 
 /** Base craft window size — height follows from locked aspect ratio. */
 const BASE_W = 352;
@@ -86,13 +87,16 @@ function saveScale(s: number): void {
 }
 
 function useClock(enabled: boolean): string {
+  // A hook, so it can read the UI language itself rather than take it as an
+  // argument — without this the clock follows the OS locale, not the app's.
+  const { lang } = useT();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     if (!enabled) return;
     const t = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(t);
   }, [enabled]);
-  return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return now.toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' });
 }
 
 /** Fill to 9 slots for a full 3×3 craft grid (empty slots stay locked empty). */

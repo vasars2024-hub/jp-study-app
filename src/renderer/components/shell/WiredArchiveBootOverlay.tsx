@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import {
   getWiredArchiveLifecycleState,
   requestWiredArchiveWake,
@@ -35,7 +36,7 @@ function phaseTitleKey(phase: WiredArchivePhase): string {
 }
 
 export default function WiredArchiveBootOverlay() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [lifecycle, setLifecycle] = useState(getWiredArchiveLifecycleState);
 
   useEffect(() => subscribeWiredArchiveLifecycle(setLifecycle), []);
@@ -98,8 +99,8 @@ export default function WiredArchiveBootOverlay() {
           <span>WIRED ARCHIVE</span>
           <span>TERMINAL ID: LAYER-09</span>
           <span>
-            {now.toLocaleDateString([], { year: '2-digit', month: '2-digit', day: '2-digit' })} /{' '}
-            {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {now.toLocaleDateString(LANG_TAGS[lang], { year: '2-digit', month: '2-digit', day: '2-digit' })} /{' '}
+            {now.toLocaleTimeString(LANG_TAGS[lang], { hour: '2-digit', minute: '2-digit' })}
           </span>
         </header>
         <div className="wired-boot-map" aria-hidden="true">

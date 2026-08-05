@@ -336,3 +336,11 @@ export function registerReadingLensIpc(): void {
 
   ipcMain.handle('lens:close', (): void => closeLens());
 }
+
+export const __readingLensTestables = {
+  loadSettings,
+  toAccelerator,
+  statePath,
+  DEFAULTS,
+  currentAccelerator: (): string | null => currentAccelerator,
+};

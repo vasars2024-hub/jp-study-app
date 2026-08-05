@@ -64,6 +64,42 @@ const EMPTY = (over: Partial<LensOcrResult>): LensOcrResult => ({
 });
 
 /**
+ * Convert a display-local DIP region into a crop rect in thumbnail pixels,
+ * clamped to the thumbnail, or `null` when nothing usable remains.
+ *
+ * Split out of `captureRegion` so the clamping is testable without Electron.
+ * Every input here crosses an IPC boundary from a renderer, so it is treated as
+ * untrusted: non-finite values (`NaN` from a `Number()` coercion, `Infinity`
+ * from a runaway drag) must reject rather than reach `nativeImage.crop`, which
+ * is native code with no contract for them. `NaN <= 1` is `false`, so the
+ * dimension check below is not on its own sufficient — the finite guard is.
+ */
+function regionToPixels(
+  region: RegionRect,
+  scaleFactor: number,
+  size: { width: number; height: number },
+): { x: number; y: number; width: number; height: number } | null {
+  const finite = (n: number): boolean => Number.isFinite(n);
+  if (!finite(region.x) || !finite(region.y) || !finite(region.width) || !finite(region.height)) {
+    return null;
+  }
+  if (!finite(scaleFactor) || scaleFactor <= 0) return null;
+  if (!finite(size.width) || !finite(size.height)) return null;
+
+  const x = Math.max(0, Math.round(region.x * scaleFactor));
+  const y = Math.max(0, Math.round(region.y * scaleFactor));
+  // A region whose origin is already past the thumbnail has no overlap at all.
+  if (x >= size.width || y >= size.height) return null;
+
+  // Clamp the crop to the actual thumbnail so a region straddling an edge is safe.
+  const width = Math.min(Math.round(region.width * scaleFactor), size.width - x);
+  const height = Math.min(Math.round(region.height * scaleFactor), size.height - y);
+  if (width <= 1 || height <= 1) return null;
+
+  return { x, y, width, height };
+}
+
+/**
  * Grab `region` (display-local DIP) from `displayId` as a PNG data URL at full
  * physical resolution. Returns the crop and the display's scale factor so the
  * caller can map pixel boxes back to DIP.
@@ -88,17 +124,8 @@ async function captureRegion(
   if (!source || source.thumbnail.isEmpty()) return null;
 
   const full = source.thumbnail;
-  const size = full.getSize();
-  const px = {
-    x: Math.max(0, Math.round(region.x * scaleFactor)),
-    y: Math.max(0, Math.round(region.y * scaleFactor)),
-    width: Math.round(region.width * scaleFactor),
-    height: Math.round(region.height * scaleFactor),
-  };
-  // Clamp the crop to the actual thumbnail so a region straddling an edge is safe.
-  px.width = Math.min(px.width, size.width - px.x);
-  px.height = Math.min(px.height, size.height - px.y);
-  if (px.width <= 1 || px.height <= 1) return null;
+  const px = regionToPixels(region, scaleFactor, full.getSize());
+  if (!px) return null;
 
   const crop = full.crop(px);
   if (crop.isEmpty()) return null;
@@ -311,3 +338,13 @@ function boundedScreenshotDataUrl(image: Electron.NativeImage): string {
   }
   return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
 }
+
+export const __screenOcrTestables = {
+  regionToPixels,
+  decideZoom,
+  scaleLines,
+  betterPass,
+  medianGlyphPx,
+  meanConfidence,
+  totalChars,
+};

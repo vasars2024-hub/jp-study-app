@@ -71,6 +71,7 @@ import {
   type UserWallpaper,
 } from '../wallpaperLibrary';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 
 type WinSection =
   | 'library' | 'novels' | 'dictionary' | 'grammar' | 'notebook' | 'translate'
@@ -2511,6 +2512,7 @@ function TaskbarClock({
   hour12: boolean;
   showDate: boolean;
 }) {
+  const { lang } = useT();
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => {
     const ms = showSeconds ? 1000 : 15000;
@@ -2520,7 +2522,7 @@ function TaskbarClock({
   return (
     <div className="os-clock">
       <span>
-        {clock.toLocaleTimeString([], {
+        {clock.toLocaleTimeString(LANG_TAGS[lang], {
           hour: '2-digit',
           minute: '2-digit',
           second: showSeconds ? '2-digit' : undefined,
@@ -2529,7 +2531,7 @@ function TaskbarClock({
       </span>
       {showDate && (
         <span className="os-clock-date">
-          {clock.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+          {clock.toLocaleDateString(LANG_TAGS[lang], { month: 'short', day: 'numeric' })}
         </span>
       )}
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useT } from '../i18n';
+import { useT, getUiLang } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import CollapsibleSection from './CollapsibleSection';
 
 export type AiStudioLogLine = {
@@ -59,8 +60,21 @@ export default function AiStudioConfigLog({
   );
 }
 
+/**
+ * Not a component, and called from event handlers rather than during render, so
+ * it reads the language through `getUiLang()` instead of `useT()`. `undefined`
+ * as the locale would follow the OS regional setting, not the UI language.
+ *
+ * The stamp is baked in at append time and never re-formatted — which matches
+ * the rest of the line, whose text the callers have already resolved through
+ * `t()`. A past log entry keeps the language it was written in.
+ */
 export function formatLogTime(date = new Date()): string {
-  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return date.toLocaleTimeString(LANG_TAGS[getUiLang()], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 export function appendStudioLog(

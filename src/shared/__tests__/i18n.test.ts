@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CATALOGS, en } from '../i18n/catalogs/all';
 import {
@@ -6,6 +7,7 @@ import {
   isUiLang,
   resetMissingWarnings,
   translate,
+  type CatalogEntry,
   type UiLang,
 } from '../i18n/core';
 
@@ -174,13 +176,12 @@ describe('catalog hygiene', () => {
     /*
      * Key-presence checks (this file's test above, and tools/i18n-check.cjs)
      * both report clean when a block is spread into all four catalogs as one
-     * shared object — GAME_ARENA_CHROME does exactly that, leaving 105 games.*
-     * keys as English in ja/zh/ru while every checker says "fully translated".
+     * shared object.
      *
      * The taxonomy block is authored as four separate per-language records
-     * specifically to avoid that. This asserts it stayed that way. Scoped to
-     * grammar.* on purpose: it is a guard for the block that was written
-     * correctly, not a claim that the rest of the catalog is clean.
+     * specifically to avoid that. This asserts it stayed that way. The
+     * catalog-wide version of this check is the next test — this one stays as
+     * the narrow, named guard for the block that got it right first.
      */
     const taxonomyKeys = Object.keys(en).filter(
       (k) =>
@@ -198,6 +199,114 @@ describe('catalog hygiene', () => {
     expect(
       untranslated,
       `these grammar keys are still English in every language: ${untranslated.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('does not let a new block of English be spread into every catalog', () => {
+    /*
+     * The catalog-wide form of the check above, added 2026-08-04 for audit F8.
+     *
+     * The comment this replaced said it plainly: GAME_ARENA_CHROME left "105
+     * games.* keys as English in ja/zh/ru while every checker says fully
+     * translated", and the guard was scoped to grammar.* on purpose because the
+     * rest of the catalog was not clean. Measured at the time: 309 such keys —
+     * GAME_ARENA_CHROME (109) plus MOONCAP_PHASE_LORE (200) — both since split
+     * into per-language modules under src/shared/i18n/{gameArena,mooncapLore}/.
+     *
+     * ~110 keys per language are legitimately identical to English (product
+     * names, pure format strings, the Frutiger Aero easter egg), so this is a
+     * ratchet, not a zero: the accepted set lives in
+     * tools/i18n-untranslated-baseline.json — the same file tools/i18n-check.cjs
+     * reads, so the CLI gate and this test can never disagree — and anything
+     * NEW fails here. Adding a whole block to that baseline at once is the
+     * exact move that produced F8; add entries one at a time, with a reason.
+     */
+    const baseline = JSON.parse(
+      readFileSync(new URL('../../../tools/i18n-untranslated-baseline.json', import.meta.url), 'utf8'),
+    ) as Record<string, string[]>;
+
+    const valueOf = (entry: CatalogEntry): string =>
+      typeof entry === 'string' ? entry : JSON.stringify(entry);
+
+    const enKeys = Object.keys(en);
+    for (const lang of UI_LANGS) {
+      if (lang === 'en') continue;
+      const accepted = new Set(baseline[lang] ?? []);
+      const offenders = enKeys.filter(
+        (k) =>
+          CATALOGS[lang][k] !== undefined &&
+          valueOf(CATALOGS[lang][k]) === valueOf(en[k]) &&
+          !accepted.has(k),
+      );
+      expect(
+        offenders,
+        `${lang} renders these ${offenders.length} keys as English verbatim — either translate ` +
+          `them, or if they are genuinely identical in ${lang} add them to ` +
+          `tools/i18n-untranslated-baseline.json one at a time: ${offenders.slice(0, 20).join(', ')}`,
+      ).toEqual([]);
+    }
+  });
+
+  it('does not let a new component render UI text without adopting i18n', () => {
+    /*
+     * Audit F7's second half. Everything above compares the catalogs against
+     * each other, so none of it can see a component that hardcodes every
+     * string: a file contributing no keys contributes nothing to compare, and
+     * both gates passed forever while four components (904 lines) rendered
+     * English beside a fully-translated sibling in the same viewport.
+     *
+     * The scan lives in tools/i18n-hardcoded-check.cjs and is imported rather
+     * than reimplemented, so the CLI and this gate cannot drift apart. Ratchet
+     * over a recorded baseline, like the check above — the app has 60 such
+     * files today; this fails only on a new one.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-var-requires -- CJS tool, intentionally shared
+    const { scan } = require('../../../tools/i18n-hardcoded-check.cjs') as {
+      scan: () => { fresh: { file: string; count: number }[] };
+    };
+    const { fresh } = scan();
+    expect(
+      fresh.map((o) => `${o.file} (${o.count} strings)`),
+      'route these through useT()/t() per CLAUDE.md "i18n workflow", or baseline them ' +
+        'with `node tools/i18n-hardcoded-check.cjs --update-baseline` and say why',
+    ).toEqual([]);
+  });
+
+  it('does not let a date or time be formatted in the OS locale', () => {
+    /*
+     * Audit C1-2, and a third blind spot in the same shape as the two above.
+     * `toLocaleDateString()` with no locale argument formats in the *host*
+     * locale, so a Russian UI renders "Wed, Aug 5" — but no date is a catalog
+     * key, so neither the catalog comparison nor the adoption check can see it.
+     * All 32 sites this was written for sat in files already calling `t()` on
+     * every string around them.
+     *
+     * Two tiers, mirroring the CLI: date/time is a hard zero, `toLocaleString`
+     * (number formatting, much lower stakes) is a per-file count ratchet. The
+     * scan is imported from tools/i18n-locale-arg-check.cjs rather than
+     * reimplemented, so the CLI and this gate cannot drift apart.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-var-requires -- CJS tool, intentionally shared
+    const { scan } = require('../../../tools/i18n-locale-arg-check.cjs') as {
+      scan: () => {
+        strict: { file: string; line: number; method: string }[];
+        grown: { file: string; was: number; now: number }[];
+      };
+    };
+    const { strict, grown } = scan();
+
+    expect(
+      strict.map((s) => `${s.file}:${s.line} .${s.method}()`),
+      'pass LANG_TAGS[lang] (shared/i18n/core) with `lang` from useT(); a module-level ' +
+        'helper takes `lang` as a parameter. If the host locale is genuinely correct — ' +
+        'the string is compared, not shown — mark the site with a reasoned ' +
+        '`// i18n-locale-arg-ignore: <why>` comment',
+    ).toEqual([]);
+
+    expect(
+      grown.map((g) => `${g.file} (was ${g.was}, now ${g.now})`),
+      'these files gained bare toLocaleString() calls; pass LANG_TAGS[lang] or re-record ' +
+        'with `node tools/i18n-locale-arg-check.cjs --update-baseline` and say why',
     ).toEqual([]);
   });
 });

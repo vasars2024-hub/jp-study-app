@@ -151,3 +151,74 @@ harness-dist/
 src/renderer/assets/reading-garden/audio/*.opus
 src/renderer/assets/reading-garden/audio/*.webm
 !src/renderer/assets/reading-garden/audio/.gitkeep
+
+# --- Publication prep: internal doc corpus (ruling R4, docs/audit/RULINGS_2026-08-04.md) ---
+#
+# DELIBERATELY COMMENTED OUT. This block belongs to the .gitignore of the NEW
+# public repo that ruling R2 creates — NOT to this private repo.
+#
+# It was briefly active on 2026-08-04 and immediately did harm here: `docs/audit/`
+# matches *untracked* files, so six audit documents (four authored that day) went
+# invisible to `git status` and could never have been committed. R2 keeps this
+# private repo WITH FULL HISTORY, so silently dropping the audit trail from it is
+# the opposite of what was ruled. Verified before and after with:
+#     git check-ignore -q -- docs/audit/FINDINGS_P2C_GRAMMARX_PROBE_F.md
+#
+# Note also that .gitignore never untracks what is already tracked: the 50 files
+# in `git ls-files docs/audit` would have stayed in history regardless. Exclusion
+# only works from a repo's first commit, which is exactly the R2 flow.
+#
+# TO USE: paste the block below into the fresh public repo's .gitignore BEFORE its
+# first `git add`. Why exclusion rather than sanitizing (R4): these carry absolute
+# machine paths, account addresses, agent dispatch text, and detailed findings
+# about defects with no shipped fix. Sanitizing 50+ documents is larger, more
+# error-prone, and one miss is a permanent disclosure.
+#
+#   docs/audit/
+#   docs/migration/
+#   .coordination/
+#   src/.coordination/
+#   CLAUDE.md
+#   .claude/skills/
+#   DISPATCH_*.md
+#   HANDOFF_*.md
+#   FINDINGS_*.md
+#   /grammar-audit.json
+#   archive/
+#
+#
+# --- RESOLVED 2026-08-05 (C1-7): the 36 root-level docs are now one line ---
+#
+# The `archive/` entry added to the block above replaces the whole measurement
+# that used to live here. On 2026-08-05, 33 of the 37 tracked root-level `.md`
+# files were `git mv`d into `archive/`, leaving only PROJECT.md, TASKS.md,
+# AGENTS.md, CLAUDE.md and (new) FEATURES.md at the root. CLAUDE.md is already
+# listed above; the rest are documents a public repo reasonably has.
+#
+# So the 36-file publication decision this section used to describe is now a
+# single pattern, which is the point of the move.
+#
+#   git ls-files -- '*.md' | grep -v /      # 4 files, was 37
+#
+# STILL TRUE AND STILL THE OWNER'S CALL: whether PROJECT.md, TASKS.md, AGENTS.md
+# and FEATURES.md ship. Nothing here is active.
+#
+# The four files that carried content the 2026-07-28 scrub or R4 would remove are
+# all inside `archive/` now, so they are covered by the one pattern:
+#
+#   archive/GRAMMARX_REDESIGN_PLAN.md              32 x pre-de-branding module name
+#   archive/UI_MIGRATION_DEBT.md                    5 x absolute C:\\Users\\<user> paths
+#   archive/REPOSITORY_RECOVERY.md                  4 x absolute C:\\Users\\<user> paths
+#   archive/REPOSITORY_STABILIZATION_MANIFEST.md    2 x absolute C:\\Users\\<user> paths
+#
+# READ THIS BEFORE ASSUMING THE MOVE ACHIEVED PRIVACY. Moving a file does NOT
+# remove it from git history. Every one of these 33 documents remains in this
+# repo's history at its old root path, forever, exactly as before. `archive/`
+# makes FUTURE publication clean; it scrubs nothing retroactively. A genuinely
+# clean public repo means a fresh repo with no imported history — which is what
+# R2/R4 already anticipate, and is the only flow in which this block does its job.
+#
+# `/grammar-audit.json` is listed for two reasons: it is reproducible
+# (`node tools/grammar-audit.cjs --compare` rewrites it), and the committed copy
+# still carries pre-de-branding source-module identifiers that the 2026-07-28
+# scrub removed everywhere else — see F21 in AUDIT_2026-08.md.

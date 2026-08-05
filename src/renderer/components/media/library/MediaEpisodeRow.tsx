@@ -1,6 +1,7 @@
 /** One episode row in the detail drawer: still, number, title, runtime, watched. */
 import Icon from '../../Icons';
 import { useT } from '../../../i18n';
+import { LANG_TAGS } from '../../../../shared/i18n/core';
 import MediaStatusPill from './MediaStatusPill';
 import { useMediaArtwork } from './useMediaArtwork';
 import { isWatched, providerEpisodeTitle, watchedFraction } from '../../../../shared/mediaLibraryEntries';
@@ -28,7 +29,7 @@ export interface MediaEpisodeRowProps {
 }
 
 export default function MediaEpisodeRow({ item, ordinal, active, status = null, onOpen }: MediaEpisodeRowProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const { url } = useMediaArtwork(item.id, 'still');
   const watched = isWatched(item);
   const progress = watchedFraction(item);
@@ -37,9 +38,11 @@ export default function MediaEpisodeRow({ item, ordinal, active, status = null, 
   // one — "Roger Smith" rather than "The Big O - 01 [BDRip 1440x1080 x265]".
   const label = providerEpisodeTitle(item) ?? item.title?.trim() ?? item.fileName;
   const percent = progress !== null ? Math.round(progress * 100) : null;
-  // Locale-formatted so a Japanese or Russian UI does not read US dates.
+  // Formatted in the UI language so a Japanese or Russian UI does not read US
+  // dates. `undefined` here would follow the OS regional setting instead, which
+  // is what this line used to do despite the comment claiming otherwise.
   const aired = typeof item.airedAt === 'number' && Number.isFinite(item.airedAt)
-    ? new Date(item.airedAt).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' })
+    ? new Date(item.airedAt).toLocaleDateString(LANG_TAGS[lang], { year: 'numeric', month: '2-digit', day: '2-digit' })
     : null;
 
   return (

@@ -25,6 +25,7 @@ import {
 } from '../bookLevelEstimate';
 import { openExtensionSettings, openYoutubePlaylists } from '../extensionBridgeUi';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import { INBOX_FOLDER } from '../../shared/inboxMeta';
 import {
   effectiveLang,
@@ -1020,7 +1021,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                   </div>
                   <div>
                     <dt>{t('library.inspector.added')}</dt>
-                    <dd>{new Date(selectedItem.createdAt).toLocaleDateString()}</dd>
+                    <dd>{new Date(selectedItem.createdAt).toLocaleDateString(LANG_TAGS[lang])}</dd>
                   </div>
                 </dl>
                 <div className="aero-library-inspector-actions">

@@ -14,6 +14,7 @@ import type {
   StudyVocabularyWorkspace,
 } from '../../../shared/mediaStudyOrchestrator';
 import type { IntervalSnapshot } from '../../../shared/anki';
+import { openGrammarPractice } from '../../extensionBridgeUi';
 import type { MediaStudyDatabase } from '../../../shared/mediaStudyDatabase';
 import {
   createEmptyStudyOrchestratorDocument,
@@ -127,6 +128,7 @@ import {
   onMediaStudyDatabaseChanged,
 } from '../../mediaStudyStore';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 
 interface StudyOrchestratorWorkspaceProps {
   /**
@@ -996,12 +998,12 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
   };
 
   const practiceGrammarWeakness = (pointId: string, pattern: string, level: string): void => {
-    window.dispatchEvent(new CustomEvent('os:open', { detail: 'grammar' }));
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('grammar:open-practice', {
-        detail: { lang: 'ja', level, query: pattern, pointId },
-      }));
-    }, 80);
+    // Handoff-backed, so a cold `GrammarView` still receives it — the
+    // `setTimeout(80)` this replaces missed the mount by ~600 ms on first use
+    // in a session and the link was delivered to nobody (audit F22). The
+    // `pointId` drop downstream is tested design, not a defect
+    // (`grammarPracticeDeepLink.test.ts:5-16`), so it is still passed.
+    openGrammarPractice({ lang: 'ja', level, query: pattern, pointId });
   };
 
   const previewProperNames = (opportunity: StudyOpportunity): void => {
@@ -2881,7 +2883,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
             {(activeJob || isLookupPack) && (
               <small>
                 {t('study.production.realState', {
-                  time: new Date(workspace?.updatedAt ?? activeJob?.updatedAt ?? 0).toLocaleTimeString(),
+                  time: new Date(workspace?.updatedAt ?? activeJob?.updatedAt ?? 0).toLocaleTimeString(LANG_TAGS[lang]),
                 })}
               </small>
             )}

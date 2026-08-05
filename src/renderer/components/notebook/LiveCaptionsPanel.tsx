@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
+import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import type { LiveCaptionsStatus } from '../../../main/liveCaptions';
 import {
   type CaptionLang,
@@ -36,16 +37,21 @@ const LANG_LABEL_KEYS: Record<CaptionLang, string> = {
   und: 'notebook.liveCaptions.lang.und',
 };
 
-function formatRange(script: CaptionScript): string {
+/**
+ * Module-level, so it cannot call `useT()` — the UI language comes in as an
+ * argument. A bare `toLocaleDateString()` here would follow the OS locale and
+ * render an English date inside a Russian panel.
+ */
+function formatRange(script: CaptionScript, lang: UiLang): string {
   const start = new Date(script.startedAt);
   const end = new Date(script.endedAt);
   const hhmm = (d: Date) =>
     `${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`;
-  return `${start.toLocaleDateString()} ${hhmm(start)}–${hhmm(end)}`;
+  return `${start.toLocaleDateString(LANG_TAGS[lang])} ${hhmm(start)}–${hhmm(end)}`;
 }
 
 export default function LiveCaptionsPanel() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [status, setStatus] = useState<LiveCaptionsStatus | null>(null);
   const [scripts, setScripts] = useState<CaptionScript[]>([]);
   const [openId, setOpenId] = useState('');
@@ -215,7 +221,7 @@ export default function LiveCaptionsPanel() {
                         {scriptTitle(script, Date.now(), sameDayIndex.get(script.id) ?? 0)}
                       </span>
                       <span className="muted gx-lc-item-meta">
-                        {formatRange(script)} ·{' '}
+                        {formatRange(script, lang)} ·{' '}
                         {t('notebook.liveCaptions.lineCount', { count: script.lines.length })}
                       </span>
                     </button>
