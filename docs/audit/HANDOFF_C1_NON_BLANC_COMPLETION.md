@@ -55,7 +55,7 @@ npx tsc --noEmit | grep -c "error TS" # 328
 | C1-1 | Reading Lens test coverage | **DONE** |
 | C1-2 | Bare `toLocale*String()` + regression gate | **DONE** |
 | C1-3 | F4 recent-anime → Results, via a real schedule | NOT STARTED |
-| C1-4 | B1–B5 design-system debt | NOT STARTED |
+| C1-4 | B1–B5 design-system debt | **B2 measured & CORRECTED upward; deliberately not "fixed" — see below** |
 | C1-5 | F16 "Bring it forward" | **DONE — already fixed, row closed, no code written** |
 | C1-6 | T6 pin/warn on asset hashes | NOT STARTED |
 | C1-7 | Archive root docs + write `FEATURES.md` | **(a) DONE · (b) NOT STARTED** |
@@ -443,6 +443,40 @@ since catalogs are not my paths this run.
 > they had "never been run against a live app". `eval.ps1` (incl. `-Health`),
 > `shot.ps1` and `click.ps1` all worked; `click.ps1`'s refusal path is confirmed
 > real, not decorative. That caveat in the skill can be lifted.
+
+### C1-4 / B2 — measured, CORRECTED upward, and deliberately left alone
+
+**B2's claim CONFIRMED and then some.** The audit says `.ui-card` "has zero
+consumers… appears exactly once in all TSX (`Surfaces.tsx:14`)". Reproduced
+exactly. But the finding is **larger than the row states**:
+
+`Surfaces.tsx` exports three primitives — `Card` (`:14`), `GlassCard` (`:18`),
+`Panel` (`:22`) — and **all three have zero consumers**, not just `Card`:
+
+- `GlassCard` appears exactly once outside its definition, in a **doc comment**
+  (`ui/index.ts:4`, `Import from here: import { Button, GlassCard, Dialog } …`) —
+  an example of usage that nothing actually does.
+- Every `<Card …>` in the tree is `SeanimeWatchLoopPanel.tsx`'s **own local**
+  `function Card(` at `:358`, not the primitive.
+- Every `Panel` hit is a local variable (`ImmersionView.tsx:131,135`).
+
+So the whole module is dead, and B3 ("15 of 30 shared primitives have no consumer
+outside `components/ui/`") understates it for this file: it is 3 of 3.
+
+**I did not change it, and that is the finding, not an omission.** The dispatch
+picked B2 because "zero consumers = zero blast radius". That same property means
+**a fix to it has no visual surface at all** — nothing renders `.ui-card`, so no
+before/after screenshot can exist and no measurement can move. Rewriting the rule
+would produce a diff that reads like a repair and changes nothing observable,
+which is the exact shape `css-measure` §10 warns about ("dead CSS that reads like
+a fix is worse than the defect"). Correcting a primitive is only worth doing as
+part of adopting it; adopting it is B3's work, not B2's.
+
+**Recommendation:** fold B2 into B3 — either adopt `Surfaces` somewhere real and
+fix the rule as part of that, or delete the module. Both are decisions with
+consequences beyond this run's scope.
+
+**B1, B4, B5 not started.**
 
 ## 4. What I could not verify
 
