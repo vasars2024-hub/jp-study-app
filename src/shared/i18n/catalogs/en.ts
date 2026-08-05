@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_EN } from '../mooncapLore/en';
 import { MINING_UI_EN } from '../miningUi/en';
 import { MAL_SYNC_EN } from '../malSync/en';
 import { SCRAPER_UI_EN } from '../scraperUi/en';
+import { ANIME_SCHEDULE_EN } from '../animeSchedule/en';
 
 export const en: Catalog = {
   // Common actions
@@ -713,6 +714,7 @@ export const en: Catalog = {
   ...MINING_UI_EN,
   ...MAL_SYNC_EN,
   ...SCRAPER_UI_EN,
+  ...ANIME_SCHEDULE_EN,
   ...GRAMMAR_TAXONOMY_EN,
 
   // Settings navigation

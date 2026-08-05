@@ -70,6 +70,12 @@ import { onScraperLog, recentScraperLogs, scraperLog } from './logBus';
 import { listSources, probeSource } from './sources';
 import { scraperSystemStats, setActiveJobCounter } from './stats';
 import { searchTorrents } from './torrents';
+import { loadAnimeSchedule } from './animeSchedule';
+import {
+  ANIME_SCHEDULE_CHANNEL,
+  type AnimeScheduleRequest,
+  type AnimeScheduleResponse,
+} from '../../shared/animeSchedule';
 import { listSeanimeAcquisitionProviders } from './seanimeSources';
 import {
   getSeanimeAcquisitionSnapshot,
@@ -198,6 +204,16 @@ export function registerScraperIpc(): void {
     SCRAPER_CHANNELS.searchTorrents,
     async (_event, input: ScraperTorrentSearchInput): Promise<TorrentRow[]> =>
       searchTorrents(input),
+  );
+
+  // Audit C1-3. Deliberately not a port method: `ScraperPort` is implemented by
+  // the renderer's sample-data port too, and this read has no sample form — a
+  // fabricated schedule is exactly the "412 GB" failure F1 records. The page
+  // calls it directly and renders the unreachable case instead.
+  ipcMain.handle(
+    ANIME_SCHEDULE_CHANNEL,
+    async (_event, input: AnimeScheduleRequest): Promise<AnimeScheduleResponse> =>
+      loadAnimeSchedule(input),
   );
 
   ipcMain.handle(

@@ -149,3 +149,82 @@ live session unannounced.
 ```bash
 npx vitest run src/main/__tests__/readingLens.test.ts src/main/__tests__/screenOcr.test.ts
 ```
+
+---
+
+## KI-7 · The default Japanese Whisper model is gated — first-use transcription fails
+
+**Where:** `src/shared/whisperModels.ts:38-43` (`hfId: 'onnx-community/kotoba-whisper-v2.0'`,
+`preferFor: ['ja']`), selected by `defaultWhisperTier('ja')` via
+`src/renderer/whisperSettings.ts:45-53`
+
+`kotoba-whisper-v2.0` is the **default** Japanese tier — it is what every user gets
+who has never opened the model dropdown (`localStorage['jp-study-whisper-model']`
+absent). That HuggingFace repo now answers **401** to an anonymous request, so
+Transformers.js cannot fetch `config.json` and transcription fails immediately.
+
+Driven live on 2026-08-05 through the debug bridge, with the preference key
+confirmed **absent** first (so this is the default path, not a stale user choice):
+
+```
+transcribePcm(<3.71 s of 16 kHz ja speech>, 'ja')
+  -> { ok: false, error: 'Unauthorized access to file:
+       "https://huggingface.co/onnx-community/kotoba-whisper-v2.0/resolve/main/config.json"' }
+```
+
+Confirmed with an instrument outside the app, so it is not an app-side auth bug:
+
+```bash
+curl -sI -o /dev/null -w '%{http_code}\n' https://huggingface.co/onnx-community/kotoba-whisper-v2.0/resolve/main/config.json  # 401
+curl -sI -o /dev/null -w '%{http_code}\n' https://huggingface.co/Xenova/whisper-base/resolve/main/config.json                # 200
+```
+
+**Why not fixed:** the fix is to choose a *different Japanese model*, which is a
+product decision (kotoba-whisper is a Japanese-specific fine-tune; substituting a
+generic Whisper tier changes accuracy and download size), and picking it is not in
+C1-9's scope — C1-9 was scoped to exercise the download path. It is otherwise a
+one-field change at `whisperModels.ts:39`.
+
+---
+
+## KI-8 · The default WebGPU path returns degenerate Japanese transcripts
+
+**Where:** `src/renderer/whisperWorker.ts:73-78` —
+`dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4' }`
+
+With a reachable model (`Xenova/whisper-base`), the **same audio through the same
+code path** transcribes correctly on CPU and degenerately on the default WebGPU
+device. Device is the only variable; `loadWhisperDevice()` defaults to `'auto'`
+(= WebGPU) at `src/renderer/whisperSettings.ts:20-26`.
+
+Ground truth spoken: 「こんにちは。今日はいい天気ですね。」 (SAPI *Microsoft Haruka
+Desktop*, 16 kHz mono, 3.71 s, peak 89 % FS, −19.1 dBFS RMS — a healthy signal).
+
+| device | dtype | result | wall clock |
+|---|---|---|---|
+| `auto` → **webgpu** (default) | fp16 encoder / **q4** decoder | `て。` | 8.2 s (cached) |
+| `cpu` → **wasm** | **fp32** | `こんにちは 今日はいい天気ですね` | 54.4 s (incl. download) |
+
+The WebGPU result was reproduced **twice**. The q4-quantised decoder is the
+mechanistic suspect — `whisperWorker.ts:41-44` already documents that the quantised
+variants are problematic on the WASM backend; this row records that q4 also costs
+correctness on the GPU backend, for Japanese.
+
+**Why not fixed:** raising the decoder off q4 trades away the speed the comment at
+`:75` is explicitly buying (8 s vs 54 s here), so it is a quality-vs-speed decision
+for the user, not a defect with one right answer. Noted rather than changed.
+
+**Reproduce** (app running, bridge up). Set the device, transcribe 16 kHz mono
+float32 PCM, compare:
+
+```powershell
+.\.claude\skills\jp-bridge\scripts\eval.ps1 -Js "(() => { localStorage.setItem('jp-study-whisper-model','whisper-base'); localStorage.removeItem('jp-study-whisper-device'); return 'webgpu'; })()"
+# then import('/src/renderer/whisperTranscribePcm.ts').transcribePcm(pcm, 'ja')
+# repeat with localStorage.setItem('jp-study-whisper-device','cpu')
+```
+
+> **A trap worth repeating.** The first two runs of this probe returned
+> `。。。。。…` and `て。`, and both were **my instrument, not the app**: a WAV read
+> with a hardcoded 44-byte header offset. SAPI writes an 18-byte `fmt ` chunk, so
+> the data begins at **46** — two bytes off byte-swaps every `int16` sample into
+> noise. Parse the `data` chunk; never assume 44.

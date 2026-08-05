@@ -21,7 +21,7 @@ import { scraperRequest } from './http';
 import { scraperLog } from './logBus';
 
 /** Trackers attached to a magnet when the feed does not carry its own. */
-const DEFAULT_TRACKERS = [
+export const DEFAULT_TRACKERS = [
   'udp://tracker.opentrackr.org:1337/announce',
   'udp://open.stealth.si:80/announce',
   'udp://exodus.desync.com:6969/announce',

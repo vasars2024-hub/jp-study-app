@@ -11,6 +11,11 @@ import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { LensOcrResult, RegionRect } from './main/screenOcr';
 import type { ReverifyOutcome, AssetIntegrity } from './main/downloads';
+import {
+  ANIME_SCHEDULE_CHANNEL,
+  type AnimeScheduleRequest,
+  type AnimeScheduleResponse,
+} from './shared/animeSchedule';
 import type {
   AnkiAddRequest,
   AnkiAddResult,
@@ -1749,6 +1754,16 @@ const api = {
     ipcRenderer.on('assets:unload', handler);
     return () => ipcRenderer.removeListener('assets:unload', handler);
   },
+
+  /**
+   * Audit C1-3: the airing schedule, with torrent-index releases matched onto it.
+   *
+   * One call does both halves so the renderer cannot render a half-matched
+   * screen, and so the pacing between index requests stays in main where it
+   * cannot be raced by a re-render.
+   */
+  animeSchedule: (input: AnimeScheduleRequest): Promise<AnimeScheduleResponse> =>
+    ipcRenderer.invoke(ANIME_SCHEDULE_CHANNEL, input),
 
   // Tells the main process which UI language is active, so native dialog
   // titles/filters (file pickers) aren't stuck in English. See main/i18n.ts.

@@ -15,6 +15,7 @@ import { MOONCAP_PHASE_LORE_ZH } from '../mooncapLore/zh';
 import { MINING_UI_ZH } from '../miningUi/zh';
 import { MAL_SYNC_ZH } from '../malSync/zh';
 import { SCRAPER_UI_ZH } from '../scraperUi/zh';
+import { ANIME_SCHEDULE_ZH } from '../animeSchedule/zh';
 
 export const zh: Catalog = {
   'common.download': '下载',
@@ -617,6 +618,7 @@ export const zh: Catalog = {
   ...MINING_UI_ZH,
   ...MAL_SYNC_ZH,
   ...SCRAPER_UI_ZH,
+  ...ANIME_SCHEDULE_ZH,
   ...GRAMMAR_TAXONOMY_ZH,
 
   'settings.appTitle': '设置',

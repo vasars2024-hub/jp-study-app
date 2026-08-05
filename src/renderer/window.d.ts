@@ -20,6 +20,7 @@ import type {
   MineNoteRequest,
   MineNoteResult,
 } from '../shared/anki';
+import type { AnimeScheduleRequest, AnimeScheduleResponse } from '../shared/animeSchedule';
 import type { DueForecast } from '../shared/reviewForecast';
 import type { PitchLookup } from '../shared/pitchAccent';
 import type { ApkgImportResult } from '../shared/apkgParse';
@@ -1162,6 +1163,9 @@ declare global {
       onAssetStatus(cb: (status: AssetStatus) => void): () => void;
       onAssetUnload(cb: (id: string) => void): () => void;
       setUiLang(lang: string): void;
+
+      /** Audit C1-3: airing schedule with torrent-index releases matched onto it. */
+      animeSchedule(input: AnimeScheduleRequest): Promise<AnimeScheduleResponse>;
 
       extensionStatus(): Promise<{
         running: boolean;

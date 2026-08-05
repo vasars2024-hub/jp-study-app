@@ -24,6 +24,7 @@ import { useScraper } from '../ScraperContext';
 import { sx, sxn, sxs } from '../strings';
 import { scraperArtwork } from '../artwork';
 import { discoveryCandidateId } from '../../../../shared/mediaDiscovery';
+import AiringSchedulePanel from './AiringSchedulePanel';
 
 /** How many shortlisted titles the shelf shows before the count pill takes over. */
 const SHELF_LIMIT = 3;
@@ -99,6 +100,11 @@ export default function DiscoverPage() {
         </div>
       </header>
       {notice && <p className="scr-action-notice" role="status">{notice}</p>}
+
+      {/* Audit C1-3. Sits above the shortlist because it answers a different,
+          time-sensitive question — "what aired, and can I get it yet?" —
+          whereas the shelf below is what the user already chose to follow. */}
+      <AiringSchedulePanel />
 
       <section className="scr-discover-featured" aria-labelledby="scr-discover-featured-title">
         <div className="scr-dashboard-block-head">
