@@ -4,6 +4,7 @@ import {
   REGISTRY_SCHEMA,
   SIZE_TOLERANCE,
   TEMP_OVERHEAD_FACTOR,
+  assetPinCoverage,
   assetsForLang,
   canTransition,
   findAsset,
@@ -271,5 +272,51 @@ describe('formatBytes', () => {
     expect(formatBytes(1024)).toBe('1 KB');
     expect(formatBytes(147_951_465)).toBe('141 MB');
     expect(formatBytes(1_533_763_059)).toBe('1.4 GB');
+  });
+});
+
+describe('sha256 pin coverage (audit T6)', () => {
+  /*
+   * `AssetSpec.sha256` is optional on purpose — a wrong pin fails every install
+   * unrecoverably, so an unconfirmed hash is omitted rather than guessed. The
+   * cost of that design is that the catalog can drift to entirely unpinned
+   * without a single test failing, and it did: 0 of 21 when T6 was measured on
+   * 2026-08-04, so every real install verified by plausible size and the strong
+   * path was exercised only by the fixtures in this file.
+   *
+   * **Raised to 1 on 2026-08-05 (C1-6).** `comic-text-detector` is now pinned.
+   * Its hash was not guessed — it was recorded from three sources that agree: a
+   * fresh download from the URL, the sha256 of the installed copy on disk, and
+   * the hash already in the install record. See the comment on that spec.
+   *
+   * **1 of 21 is the correct ceiling here, not a shortfall.** The other 20 URLs
+   * are mutable (HuggingFace `/resolve/main/`, GitHub `raw/main/` and
+   * `releases/latest/`, regenerated MDBG and Tatoeba exports), and pinning a
+   * moving target turns every legitimate upstream release into a
+   * `checksumMismatch` on a good file — a recurring tax that ends with the check
+   * switched off. `comic-text-detector` is the only spec whose URL names an
+   * immutable release tag. Do not "improve" this number by pinning the rest;
+   * `assetsReverify` / `assetsIntegrity` in main/downloads.ts are what cover
+   * those, by comparing against what was actually installed.
+   *
+   * This is a ratchet, not a target: it guarantees the number only ever moves
+   * the right way.
+   */
+  const PINNED_BASELINE = 1;
+
+  it('never loses a pin it already had', () => {
+    const { pinned, total, unpinned } = assetPinCoverage();
+    expect(total).toBeGreaterThan(0);
+    expect(
+      pinned,
+      `pin coverage fell to ${pinned}/${total}. Unpinned: ${unpinned.join(', ')}`,
+    ).toBeGreaterThanOrEqual(PINNED_BASELINE);
+  });
+
+  it('states the pinned count honestly rather than implying the strong path is live', () => {
+    // If this fails because someone pinned an asset: good — raise
+    // PINNED_BASELINE to the new number and update the comment above.
+    const { pinned, total } = assetPinCoverage();
+    expect({ pinned, total }).toEqual({ pinned: 1, total: 21 });
   });
 });

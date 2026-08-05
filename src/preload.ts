@@ -10,6 +10,7 @@ import {
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { LensOcrResult, RegionRect } from './main/screenOcr';
+import type { ReverifyOutcome, AssetIntegrity } from './main/downloads';
 import type {
   AnkiAddRequest,
   AnkiAddResult,
@@ -117,6 +118,9 @@ const api = {
   relaunchApp: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:relaunch'),
   launchAutomationBuilder: (): Promise<import('./shared/automationBuilder').AutomationBuilderLaunchResult> =>
     ipcRenderer.invoke('toolbox:launchAutomationBuilder'),
+  // Resolved from this install, not a constant. Null when the script is absent.
+  automationBuilderCommand: (): Promise<string | null> =>
+    ipcRenderer.invoke('toolbox:automationBuilderCommand'),
   toolboxPickSearchFolder: (): Promise<string | null> => ipcRenderer.invoke('toolbox:pickSearchFolder'),
   toolboxFileSearch: (
     request: import('./shared/toolboxFileSearch').ToolboxFileSearchRequest,
@@ -700,12 +704,20 @@ const api = {
   // Remote Resources catalogue (fetched from GitHub, cached in userData)
   catalogGet: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>
     ipcRenderer.invoke('catalog:get'),
-  catalogRefresh: (): Promise<import('./shared/resourcesCatalog').ResourcesCatalog | null> =>
-    ipcRenderer.invoke('catalog:refresh'),
+  // Refresh reports its source, so the UI can tell a real saved copy from the
+  // bundled fallback rather than calling both "offline". See F23.
+  catalogRefresh: (): Promise<
+    import('./shared/resourcesCatalog').CatalogResult<
+      import('./shared/resourcesCatalog').ResourcesCatalog
+    >
+  > => ipcRenderer.invoke('catalog:refresh'),
   novelsGet: (): Promise<import('./shared/resourcesCatalog').NovelsCatalog | null> =>
     ipcRenderer.invoke('novels:get'),
-  novelsRefresh: (): Promise<import('./shared/resourcesCatalog').NovelsCatalog | null> =>
-    ipcRenderer.invoke('novels:refresh'),
+  novelsRefresh: (): Promise<
+    import('./shared/resourcesCatalog').CatalogResult<
+      import('./shared/resourcesCatalog').NovelsCatalog
+    >
+  > => ipcRenderer.invoke('novels:refresh'),
 
   // Jiten-backed novel catalogue, source staging, and deck mining
   jitenGetStore: (): Promise<JitenStore> => ipcRenderer.invoke('jiten:getStore'),
@@ -1720,6 +1732,10 @@ const api = {
   assetsIsInstalled: (id: string): Promise<boolean> => ipcRenderer.invoke('assets:isInstalled', id),
   assetsPath: (id: string): Promise<string | null> => ipcRenderer.invoke('assets:path', id),
   assetsReadText: (id: string): Promise<string | null> => ipcRenderer.invoke('assets:readText', id),
+  /** Audit T6: rehash an installed asset on disk against its install record. */
+  assetsReverify: (id: string): Promise<ReverifyOutcome> => ipcRenderer.invoke('assets:reverify', id),
+  /** Audit T6: per-asset verifyMode / pinned state, so the UI can label it honestly. */
+  assetsIntegrity: (): Promise<AssetIntegrity[]> => ipcRenderer.invoke('assets:integrity'),
   assetsFreeSpace: (): Promise<number> => ipcRenderer.invoke('assets:freeSpace'),
   assetsRoot: (): Promise<string> => ipcRenderer.invoke('assets:root'),
   onAssetStatus: (cb: (status: AssetStatus) => void): (() => void) => {

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
-import { useAssets, type AssetView } from '../../../assetStore';
+import { useAssets, useAssetIntegrity, type AssetView } from '../../../assetStore';
+import type { AssetIntegrity, ReverifyOutcome } from '../../../../main/downloads';
 import { formatBytes, isBusy, type AssetKind } from '../../../../shared/assetRegistry';
 import { useT } from '../../../i18n';
 import type { TVars } from '../../../../shared/i18n/core';
@@ -77,9 +78,71 @@ function statusLine(view: AssetView, t: (key: string, vars?: TVars) => string): 
   }
 }
 
+/**
+ * How an installed asset was actually checked, plus the last re-verify result.
+ *
+ * Audit T6's non-negotiable: **an asset checked by size must not read as one
+ * checked by hash.** `size` verification only asks "is this a plausible,
+ * non-truncated payload" — it compares nothing against upstream — so the copy
+ * says exactly that rather than borrowing the word "verified". 20 of the 21
+ * catalog URLs are mutable and cannot be pinned without turning every upstream
+ * release into a failure, so `size` is the honest normal case, not a defect.
+ */
+function IntegrityLine({
+  integrity,
+  result,
+  checking,
+}: {
+  integrity: AssetIntegrity | undefined;
+  result: ReverifyOutcome | undefined;
+  checking: boolean;
+}) {
+  const { t } = useT();
+  if (!integrity) return null;
+
+  const how = integrity.pinned
+    ? t('storage.integrity.pinned')
+    : t('storage.integrity.sizeChecked');
+
+  let outcome: string | null = null;
+  let isError = false;
+  if (checking) outcome = t('storage.integrity.checking');
+  else if (result?.state === 'ok') outcome = t('storage.integrity.matches');
+  else if (result?.state === 'changed') {
+    outcome = t('storage.integrity.mismatch');
+    isError = true;
+  } else if (result?.state === 'missing') {
+    outcome = t('storage.integrity.fileMissing');
+    isError = true;
+  } else if (result?.state === 'no-record') outcome = t('storage.integrity.noRecord');
+  else if (result?.state === 'error') {
+    outcome = t('storage.integrity.checkFailed');
+    isError = true;
+  }
+
+  // Reuses `.asset-status` / `.muted`, the classes the sibling rows already use,
+  // rather than introducing new ones — `src/renderer/styles.css` is shared by
+  // every package and belongs to one run at a time (jp-dispatch §1).
+  return (
+    <div className={`asset-status ${isError ? 'is-error' : ''}`}>
+      <span className="muted">{how}</span>
+      {integrity.contentChangedSinceInstall && (
+        <> · <span>{t('storage.integrity.upstreamChanged')}</span></>
+      )}
+      {outcome && <> · <span>{outcome}</span></>}
+    </div>
+  );
+}
+
 export default function StoragePage() {
   const { focusSettingId } = useSettings();
   const { views, loading, freeSpace, start, pause, cancel, remove } = useAssets();
+  const {
+    byId: integrityFor,
+    reverify,
+    checking,
+    results: reverifyResults,
+  } = useAssetIntegrity();
   const { t } = useT();
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -176,6 +239,13 @@ export default function StoragePage() {
                         />
                       </div>
                     )}
+                    {status.state === 'installed' && (
+                      <IntegrityLine
+                        integrity={integrityFor(spec.id)}
+                        result={reverifyResults[spec.id]}
+                        checking={checking === spec.id}
+                      />
+                    )}
                   </div>
 
                   <div className="asset-actions">
@@ -206,6 +276,16 @@ export default function StoragePage() {
                         onClick={() => cancel(spec.id)}
                       >
                         {t('common.cancel')}
+                      </button>
+                    )}
+                    {status.state === 'installed' && (
+                      <button
+                        type="button"
+                        className="btn small"
+                        disabled={checking !== null}
+                        onClick={() => void reverify(spec.id)}
+                      >
+                        {t('storage.integrity.reverify')}
                       </button>
                     )}
                     {status.state === 'installed' && (

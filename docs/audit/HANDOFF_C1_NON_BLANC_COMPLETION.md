@@ -2,7 +2,7 @@
 
 Answers `docs/audit/DISPATCH_C1_NON_BLANC_COMPLETION.md`.
 
-> **Status: PARTIAL — 4.5 of 9 rows landed.** Written incrementally per
+> **Status: PARTIAL — 5.5 of 9 rows landed.** Written incrementally per
 > `jp-dispatch` §7. Rows are marked DONE / NOT STARTED. Anything not marked DONE
 > has not been started, whatever the surrounding prose says — there is no
 > half-finished work in the tree.
@@ -57,7 +57,7 @@ npx tsc --noEmit | grep -c "error TS" # 328
 | C1-3 | F4 recent-anime → Results, via a real schedule | NOT STARTED |
 | C1-4 | B1–B5 design-system debt | **B2 measured & CORRECTED upward; deliberately not "fixed" — see below** |
 | C1-5 | F16 "Bring it forward" | **DONE — already fixed, row closed, no code written** |
-| C1-6 | T6 pin/warn on asset hashes | NOT STARTED |
+| C1-6 | T6 pin/warn on asset hashes | **DONE (both halves) — UI not live-verifiable, see below** |
 | C1-7 | Archive root docs + write `FEATURES.md` | **(a) DONE · (b) NOT STARTED** |
 | C1-8 | U6 confirm `soft-sepia` vs `rose-pine` | **DONE — U6 closed working-as-intended** |
 | C1-9 | U8 Whisper first-use download | NOT STARTED |
@@ -277,11 +277,31 @@ entry and a reachability + honesty verdict per entry. Not started — do not rea
 
 ### Live-app verification of C1-2 · DONE
 
-Driven through the debug bridge on the user's running app (port 39273). **Said
-plainly, as `jp-bridge` requires: this was the user's real workspace and real
-profile, not a copy.** Full `%APPDATA%\jp-study-app` backed up first —
-`C:\Users\Arseniy\AppData\Local\Temp\jp-userdata-backup-20260805-123256`
-(67,484 entries, 107 JSON state files).
+Driven through the debug bridge on the running app (port 39273).
+
+> **CORRECTION — I got the profile wrong, and it matters.** I stated during this
+> run that I was driving "the user's real workspace and real profile". **I was
+> not.** Asking the app itself (`window.api.assetsRoot()`) returned
+> `C:\Users\Arseniy\AppData\Local\Temp\jp-p4b-reading\models` — the running dev
+> app uses a **scratch profile** at `%TEMP%\jp-p4b-reading`, which holds 6 JSON
+> files and no installed models. The real profile at `%APPDATA%\jp-study-app`
+> (15 model dirs, 107 JSON files) was **never touched by the running app**.
+>
+> Consequences, stated rather than smoothed over:
+> - The full `%APPDATA%\jp-study-app` backup I took
+>   (`…\Temp\jp-userdata-backup-20260805-123256`, 67,484 entries) was real and is
+>   still there, but it backed up a directory the app was not writing to. "No
+>   userData JSON differs from the pre-run backup" was **true and nearly
+>   vacuous** as a safety claim about this run.
+> - What my run actually mutated is the *scratch* profile: its
+>   `desktop-layout.json` was rewritten when I opened and closed the Media
+>   window, exactly as `jp-bridge` §2 warns.
+> - The theme and `ui-lang` values I changed and restored were the scratch
+>   profile's renderer storage, not the user's.
+>
+> Net effect: **safer than I claimed**, but the claim was wrong. `jp-bridge` §1
+> says to assert the profile; I asserted it only at the end, by accident, while
+> debugging something else. Assert it *first*, with `window.api.assetsRoot()`.
 
 The renderer had already hot-reloaded my C1-2 edits (`/logs` showed
 `hot updated: /src/renderer/views/LibraryView.tsx`, `…/MiniShell.tsx` — mine, no
@@ -477,6 +497,83 @@ fix the rule as part of that, or delete the module. Both are decisions with
 consequences beyond this run's scope.
 
 **B1, B4, B5 not started.**
+
+### C1-6 — T6 pin the pinnable, warn on the rest · DONE
+
+**Every claim in the dispatch CONFIRMED against real data.** `models/state.json`
+in the real profile holds 14 installed assets and **every single one records
+`verifyMode: "size"`** — so nothing has ever been checksum-verified against
+upstream, and each carries an `sha256` that no code read back. `verifyAsset`
+(`assetRegistry.ts:240-247`) already compares `spec.sha256` when present; the
+mechanism worked and nothing used it.
+
+**(a) Pinned the one immutable URL.** `comic-text-detector` is frozen at release
+tag `beta-0.2.1` (`assetRegistry.ts:401`). The hash was **not guessed** — three
+independent sources agree:
+
+| source | sha256 | bytes |
+|---|---|---|
+| fresh download from the pinned URL (5.3 s) | `1a86ace7…71d718f` | 94,669,756 |
+| sha256 of the installed copy on disk | `1a86ace7…71d718f` | 94,669,756 |
+| the `sha256` already in `models/state.json` | `1a86ace7…71d718f` | 94,669,756 |
+
+The catalog's `sizeBytes` matches too. It is now `sha256:` on that spec and is the
+**only** pin — the other 20 URLs are mutable and deliberately left unpinned.
+
+`src/shared/__tests__/assetRegistry.test.ts` already ratcheted this at
+`PINNED_BASELINE = 0` and **failed when I pinned** — which is the ratchet working.
+Its own comment says *"If this fails because someone pinned an asset: good — raise
+PINNED_BASELINE"*, so it is now 1, with the reasoning for why 1 of 21 is the
+correct ceiling rather than a shortfall.
+
+**(b) Record-and-warn + re-verify.** In `src/main/downloads.ts`:
+
+- `reverifyAsset(id)` rehashes the file **on disk** against the install record →
+  `ok` / `changed` / `missing` / `no-record` / `error`. Catches local corruption
+  and post-install tampering; needs no upstream cooperation.
+- `compareWithRecordedHash(id, fresh)` on a **re-download** reports whether
+  upstream's bytes changed. **Warns, never blocks** — logs and flags it, and the
+  install proceeds, because on a mutable URL a change is usually a legitimate
+  release and a hard failure there is the same trap as pinning one.
+- `listIntegrity()` surfaces `verifyMode` **verbatim** plus `pinned` from the
+  catalog. There is deliberately **no boolean** that would let a UI collapse
+  `size` into "verified".
+
+Exposed as `assets:reverify` / `assets:integrity`, through `preload.ts` and
+`window.d.ts`, consumed by a new `useAssetIntegrity()` in `assetStore.ts` and
+rendered per installed asset in `StoragePage.tsx` — a "Re-verify" button and an
+honest line reading either *"Checksum pinned — contents checked on every
+download."* or *"Checked by size only — contents not compared against the
+source."* Ten keys, all four languages (`i18n-check` clean, 8164 → 8174), and no
+new CSS class — it reuses `.asset-status`/`.muted` because `styles.css` is shared
+and belongs to one run at a time.
+
+**15 tests** in `src/main/__tests__/downloadsIntegrity.test.ts`. Positive controls,
+all three seen red then restored byte-identical:
+
+| control | result |
+|---|---|
+| `reverifyAsset` stops comparing hashes | red: *detects a file whose bytes changed after installation* |
+| add a `verified: Boolean(record)` flag to `listIntegrity` | red: *never collapses size-verification into "verified"* |
+| remove the `sha256` pin | red: `expected [] to deeply equal [ 'comic-text-detector' ]` |
+
+**Verified against real data, not only fixtures.** The re-verify comparison was
+run over all 14 really-installed assets: **14 ok, 0 changed, 0 missing**, every
+one reporting `verifyMode=size`.
+
+> **What I could NOT verify live, and why.** The new Storage UI does not render in
+> the running app, for two independent reasons — neither a defect:
+> 1. `registerDownloadIpc` runs in the **main process**, and main-process changes
+>    need an app restart. HMR only reloads the renderer. Proved it rather than
+>    assumed: `window.api.assetsIntegrity` exists (preload reloaded) but the call
+>    rejects with **`No handler registered for 'assets:integrity'`**.
+> 2. The running app is on the scratch profile, where **zero assets are
+>    installed** — and the integrity row only renders for installed assets. Even
+>    after a restart, that profile has nothing to show it on.
+>
+> So the UI is **"implemented", not "works"** (`jp-dispatch` §9.2). Confirming it
+> needs an app restart on a profile with installed assets, which is the user's
+> call. The backend half *is* verified against real installed data, above.
 
 ## 4. What I could not verify
 

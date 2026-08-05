@@ -24,6 +24,7 @@ import type { DueForecast } from '../shared/reviewForecast';
 import type { PitchLookup } from '../shared/pitchAccent';
 import type { ApkgImportResult } from '../shared/apkgParse';
 import type { AssetError, AssetSpec, AssetStatus } from '../shared/assetRegistry';
+import type { ReverifyOutcome, AssetIntegrity } from '../main/downloads';
 import type {
   AiEngineConfig,
   AiDeckGenerationRequest,
@@ -99,6 +100,7 @@ declare global {
     api: {
       relaunchApp(): Promise<{ ok: boolean }>;
       launchAutomationBuilder(): Promise<import('../shared/automationBuilder').AutomationBuilderLaunchResult>;
+      automationBuilderCommand(): Promise<string | null>;
       toolboxPickSearchFolder(): Promise<string | null>;
       toolboxFileSearch(
         request: import('../shared/toolboxFileSearch').ToolboxFileSearchRequest,
@@ -452,9 +454,17 @@ declare global {
       appVersion(): Promise<string>;
       checkAppRelease(): Promise<AppReleaseInfo | null>;
       catalogGet(): Promise<import('../shared/resourcesCatalog').ResourcesCatalog | null>;
-      catalogRefresh(): Promise<import('../shared/resourcesCatalog').ResourcesCatalog | null>;
+      catalogRefresh(): Promise<
+        import('../shared/resourcesCatalog').CatalogResult<
+          import('../shared/resourcesCatalog').ResourcesCatalog
+        >
+      >;
       novelsGet(): Promise<import('../shared/resourcesCatalog').NovelsCatalog | null>;
-      novelsRefresh(): Promise<import('../shared/resourcesCatalog').NovelsCatalog | null>;
+      novelsRefresh(): Promise<
+        import('../shared/resourcesCatalog').CatalogResult<
+          import('../shared/resourcesCatalog').NovelsCatalog
+        >
+      >;
       jitenGetStore(): Promise<JitenStore>;
       jitenUpdateConfig(patch: Partial<JitenConfig>): Promise<JitenStore>;
       jitenSetSourceProfiles(profiles: JitenSourceProfile[]): Promise<JitenStore>;
@@ -1145,7 +1155,9 @@ declare global {
       assetsIsInstalled(id: string): Promise<boolean>;
       assetsPath(id: string): Promise<string | null>;
       assetsReadText(id: string): Promise<string | null>;
-      assetsFreeSpace(): Promise<number>;
+      assetsReverify(id: string): Promise<ReverifyOutcome>;
+    assetsIntegrity(): Promise<AssetIntegrity[]>;
+    assetsFreeSpace(): Promise<number>;
       assetsRoot(): Promise<string>;
       onAssetStatus(cb: (status: AssetStatus) => void): () => void;
       onAssetUnload(cb: (id: string) => void): () => void;

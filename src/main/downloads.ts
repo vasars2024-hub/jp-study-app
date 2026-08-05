@@ -203,6 +203,162 @@ export function assetPath(id: string): string | null {
   return spec.file ? path.join(dir, spec.file) : dir;
 }
 
+// ---- Integrity: re-verify and change detection (audit T6) ----------------
+//
+// Every install already stores the real hash of what it fetched (`recordInstall`
+// below writes `sha256` and `verifyMode`). Until this section existed **nothing
+// ever read it back**, so the record was write-only bookkeeping.
+//
+// Two uses, deliberately different in severity:
+//
+//   - `reverifyAsset` rehashes the file ON DISK against the record. That catches
+//     local corruption and post-install tampering, and needs no cooperation from
+//     upstream — it is the one real integrity guarantee available for a floating
+//     URL. This is the honest answer to "is my copy still what I installed?".
+//   - `compareWithRecordedHash` is for a RE-download: it says whether the bytes
+//     upstream is serving now differ from the bytes installed earlier. It
+//     **warns, never blocks** — on a mutable URL a change is usually a legitimate
+//     upstream release, and a hard failure there is the same trap as pinning
+//     (see the `sha256` comment on `comic-text-detector` in assetRegistry.ts).
+
+/**
+ * Assets whose upstream bytes changed on the most recent re-download, so the UI
+ * can say so. In-memory on purpose: it describes *this* session's observation,
+ * and the durable record is `state.json`'s `sha256`, which has already been
+ * updated to the new value by the time anyone reads this.
+ */
+const contentChanged = new Map<string, { previous: string; current: string; at: number }>();
+
+export function getContentChange(id: string): { previous: string; current: string; at: number } | undefined {
+  return contentChanged.get(id);
+}
+
+export type ReverifyOutcome =
+  | { id: string; state: 'ok'; mode: VerifyMode; sha256: string; bytes: number }
+  /** File on disk no longer hashes to what was recorded — corruption or tampering. */
+  | { id: string; state: 'changed'; mode: VerifyMode; expected: string; actual: string; bytes: number }
+  | { id: string; state: 'missing' }
+  /** Installed before integrity records existed, so there is nothing to compare. */
+  | { id: string; state: 'no-record' }
+  | { id: string; state: 'error'; message: string };
+
+async function sha256OfFile(file: string): Promise<{ hash: string; bytes: number }> {
+  const hash = crypto.createHash('sha256');
+  let bytes = 0;
+  const stream = fs.createReadStream(file);
+  for await (const chunk of stream) {
+    hash.update(chunk as Buffer);
+    bytes += (chunk as Buffer).length;
+  }
+  return { hash: hash.digest('hex'), bytes };
+}
+
+/**
+ * Rehash an installed asset on disk and compare against its install record.
+ *
+ * Note this reports `mode` from the record: an asset recorded as `size` was
+ * never checksum-verified *against upstream*, and saying otherwise would be the
+ * dishonesty T6 is about. What this proves is narrower and still worth having —
+ * that the bytes have not changed since installation.
+ */
+export async function reverifyAsset(id: string): Promise<ReverifyOutcome> {
+  const spec = catalog.find((a) => a.id === id);
+  if (!spec) return { id, state: 'error', message: 'unknown asset' };
+  const record = readState()[id];
+  if (!record) return { id, state: 'no-record' };
+
+  const dir = installDirFor(spec);
+  const file = spec.file ? path.join(dir, spec.file) : null;
+  if (!file) return { id, state: 'no-record' };
+
+  try {
+    await fsp.access(file);
+  } catch {
+    return { id, state: 'missing' };
+  }
+
+  try {
+    const { hash, bytes } = await sha256OfFile(file);
+    if (hash.toLowerCase() === String(record.sha256).toLowerCase()) {
+      return { id, state: 'ok', mode: record.verifyMode, sha256: hash, bytes };
+    }
+    return {
+      id,
+      state: 'changed',
+      mode: record.verifyMode,
+      expected: String(record.sha256),
+      actual: hash,
+      bytes,
+    };
+  } catch (err) {
+    return { id, state: 'error', message: err instanceof Error ? err.message : 'reverify failed' };
+  }
+}
+
+/**
+ * Did upstream's bytes change since this asset was installed?
+ *
+ * `null` when there is nothing to compare (never installed, or no recorded
+ * hash). Returning a shape rather than a boolean so the caller can name both
+ * hashes in the message it shows.
+ */
+/**
+ * What the UI needs to describe an asset's integrity **honestly**.
+ *
+ * `verifyMode` is surfaced verbatim rather than collapsed into a boolean,
+ * because the two modes mean very different things and T6's rule is that they
+ * must not read alike:
+ *
+ *   `sha256` — the bytes were compared against a hash pinned in the catalog.
+ *   `size`   — only "is this a plausible, non-truncated payload". **Not
+ *              verified**, and any UI that labels it "verified" is lying.
+ *
+ * `pinned` says whether the *catalog* carries a hash at all, which is the thing
+ * that decides whether a future download can be checked. Measured 2026-08-05:
+ * 1 of 21 specs is pinned, and all 14 installed assets recorded `size`.
+ */
+export interface AssetIntegrity {
+  id: string;
+  installed: boolean;
+  /** Catalog pins a sha256 for this spec, so downloads are hard-checked. */
+  pinned: boolean;
+  /** How the installed copy was actually checked at download time. */
+  verifyMode: VerifyMode | null;
+  recordedSha256: string | null;
+  bytes: number | null;
+  installedAt: number | null;
+  /** Set when a re-download this session brought different bytes. */
+  contentChangedSinceInstall: { previous: string; current: string; at: number } | null;
+}
+
+export function listIntegrity(): AssetIntegrity[] {
+  const state = readState();
+  return catalog.map((spec) => {
+    const record = state[spec.id];
+    return {
+      id: spec.id,
+      installed: isInstalled(spec.id),
+      pinned: Boolean(spec.sha256),
+      verifyMode: record?.verifyMode ?? null,
+      recordedSha256: record?.sha256 ?? null,
+      bytes: record?.bytes ?? null,
+      installedAt: record?.installedAt ?? null,
+      contentChangedSinceInstall: contentChanged.get(spec.id) ?? null,
+    };
+  });
+}
+
+export function compareWithRecordedHash(
+  id: string,
+  freshSha256: string,
+): { changed: boolean; previous: string; current: string } | null {
+  const record = readState()[id];
+  if (!record?.sha256) return null;
+  const previous = String(record.sha256).toLowerCase();
+  const current = String(freshSha256).toLowerCase();
+  return { changed: previous !== current, previous, current };
+}
+
 /** Find a readable text payload inside an installed asset (CEDICT `.u8`, etc.). */
 async function findTextFile(root: string): Promise<string | null> {
   const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
@@ -581,6 +737,22 @@ async function run(id: string): Promise<void> {
       return;
     }
 
+    // Audit T6: a RE-download of an already-installed asset compares the new
+    // bytes against the recorded ones. Warn, never block — on a floating URL a
+    // change is usually a legitimate upstream release, so failing here would be
+    // the same trap as pinning a mutable URL. The pinned spec (if any) has
+    // already had its hard check run above by `verifyAsset`.
+    const drift = compareWithRecordedHash(id, outcome.actualSha256);
+    if (drift?.changed) {
+      contentChanged.set(id, { previous: drift.previous, current: drift.current, at: Date.now() });
+      console.warn(
+        `[downloads] ${id}: upstream content changed since install ` +
+          `(was ${drift.previous.slice(0, 12)}…, now ${drift.current.slice(0, 12)}…)`,
+      );
+    } else {
+      contentChanged.delete(id);
+    }
+
     await installFromPartial(spec, file);
     recordInstall(id, {
       version: spec.version,
@@ -869,6 +1041,17 @@ export function registerDownloadIpc(): void {
   ipcMain.handle('assets:readText', (_e, id: unknown) =>
     typeof id === 'string' ? readAssetText(id) : null,
   );
+  // Audit T6. `assets:reverify` rehashes the file on disk against its install
+  // record — the one integrity guarantee that needs no upstream cooperation.
+  // `assets:integrity` is the read-only view the UI reads to label each asset
+  // honestly: an asset checked by size must never be shown as "verified".
+  ipcMain.handle('assets:reverify', (_e, id: unknown) =>
+    typeof id === 'string'
+      ? reverifyAsset(id)
+      : Promise.resolve({ id: '', state: 'error' as const, message: 'unknown asset' }),
+  );
+  ipcMain.handle('assets:integrity', (): AssetIntegrity[] => listIntegrity());
+
   ipcMain.handle('assets:freeSpace', () => freeBytesOnVolume(modelsRoot()));
   ipcMain.handle('assets:root', () => modelsRoot());
 }

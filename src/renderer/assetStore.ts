@@ -4,6 +4,7 @@ import {
   type AssetSpec,
   type AssetStatus,
 } from '../shared/assetRegistry';
+import type { AssetIntegrity, ReverifyOutcome } from '../main/downloads';
 
 // Renderer-side view of the download manager. The main process owns the truth;
 // this just mirrors it and pushes status events into React state.
@@ -70,6 +71,78 @@ export function useAssets() {
     cancel: (id: string) => window.api.assetsCancel(id),
     remove: (id: string) => window.api.assetsRemove(id),
   };
+}
+
+/**
+ * Free bytes on the volume the app writes to, for callers that need the number
+ * without the whole asset list.
+ *
+ * `null` means "not answered yet"; a non-finite value means the main process
+ * could not measure it (`downloads.ts:313` returns `Infinity` rather than
+ * inventing one on a filesystem without `statfs`). Callers must render nothing
+ * in both cases — the Scraper's preflight and download pages previously
+ * hardcoded `412 GB` on a machine with 42.7 GB free, and derived a
+ * storage-pressure warning from that invented number.
+ */
+/**
+ * Integrity state per asset, plus an on-demand re-verify (audit T6).
+ *
+ * Kept out of `useAssets` deliberately. Re-verify rehashes the file on disk —
+ * hundreds of MB for the OCR models — so it must be something the user asks for,
+ * never something a settings page does on mount.
+ */
+export function useAssetIntegrity() {
+  const [rows, setRows] = useState<AssetIntegrity[]>([]);
+  const [checking, setChecking] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, ReverifyOutcome>>({});
+
+  const refresh = useCallback(async () => {
+    const next = await window.api.assetsIntegrity().catch(() => [] as AssetIntegrity[]);
+    setRows(next);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const reverify = useCallback(async (id: string) => {
+    setChecking(id);
+    try {
+      const outcome = await window.api.assetsReverify(id);
+      setResults((prev) => ({ ...prev, [id]: outcome }));
+      return outcome;
+    } finally {
+      setChecking(null);
+    }
+  }, []);
+
+  const byId = useCallback(
+    (id: string): AssetIntegrity | undefined => rows.find((r) => r.id === id),
+    [rows],
+  );
+
+  return { rows, byId, reverify, checking, results, refresh };
+}
+
+export function useFreeSpace(): number | null {
+  const [freeSpace, setFreeSpace] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void window.api.assetsFreeSpace().then((bytes) => {
+      if (alive) setFreeSpace(bytes);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return freeSpace;
+}
+
+/** True when the number is safe to show a user. Mirrors `StoragePage.tsx`. */
+export function hasMeasuredFreeSpace(freeSpace: number | null): freeSpace is number {
+  return freeSpace !== null && Number.isFinite(freeSpace);
 }
 
 /**

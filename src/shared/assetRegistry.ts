@@ -193,7 +193,15 @@ export type VerifyMode = 'sha256' | 'size';
 export interface VerifyOutcome {
   ok: boolean;
   mode: VerifyMode;
-  /** The hash we actually computed — recorded on install so later integrity checks have a baseline. */
+  /**
+   * The hash we actually computed.
+   *
+   * `recordInstall` persists it (`main/downloads.ts:587`) — but **nothing reads
+   * it back**, so today it is write-only (audit T6, 2026-08-04). The claim that
+   * it gives "later integrity checks a baseline" was aspirational; there is no
+   * later integrity check in the tree. Left recorded because it is the thing a
+   * re-verification pass would need, but do not cite it as a guarantee.
+   */
   actualSha256: string;
   reason?: AssetError;
 }
@@ -204,8 +212,16 @@ export interface VerifyOutcome {
  * With a pinned hash this is a real integrity check. Without one, catalog
  * `sizeBytes` is only an estimate used for the Storage UI and disk pre-flight
  * — GitHub `latest` release zips and HuggingFace remuxes drift constantly, so
- * rejecting on a tight size match discarded otherwise-good installs. We still
- * compute the hash so it can be stored for later integrity checks.
+ * rejecting on a tight size match discarded otherwise-good installs.
+ *
+ * **Measured 2026-08-04 (audit T6): 21 of 21 shipped assets omit `sha256`**, so
+ * every real install today takes the `'size'` branch and the strong path is
+ * exercised only by fixtures in `__tests__/assetRegistry.test.ts` (4 pinned).
+ * That is a coverage fact, not a bug in this function — but it means "verified"
+ * in the Storage UI currently means "plausible size", and
+ * `assetPinCoverage()` below exists so the number cannot drift unnoticed again.
+ * Pinning needs each URL downloaded and its hash confirmed upstream; a *wrong*
+ * pin fails every install unrecoverably, which is why the field stays optional.
  *
  * Truncation guard: empty payloads and tiny bodies (captive-portal HTML) when
  * the catalog expects a large artifact are still rejected.
@@ -384,6 +400,25 @@ export const ASSET_CATALOG: AssetSpec[] = [
     // ONNX lives on the manga-image-translator release that first shipped it.
     url: 'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.2.1/comictextdetector.pt.onnx',
     sizeBytes: 94_669_756,
+    /*
+     * The ONE pinned asset, and the only spec where a hard checksum failure is
+     * the correct behaviour (audit T6).
+     *
+     * 20 of the 21 asset URLs are mutable — HuggingFace `/resolve/main/`, GitHub
+     * `raw/main/` and `releases/latest/`, plus regenerated MDBG and Tatoeba
+     * exports. Pinning those turns every legitimate upstream release into a
+     * `checksumMismatch` on a good file, and it stays broken until someone
+     * re-records the hash and ships a build — a recurring tax that ends with the
+     * check being switched off. This URL is different: it names an immutable
+     * release TAG (`beta-0.2.1`), so it will serve identical bytes forever.
+     *
+     * Recorded 2026-08-05 from three independent sources that agree:
+     *   1. fresh download from the URL above — 94,669,756 bytes
+     *   2. sha256 of the installed copy on disk
+     *   3. the `sha256` already in the install record (`models/state.json`)
+     * `verifyAsset` (:240-247) compares this on every download.
+     */
+    sha256: '1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f',
     version: '2',
     installDir: 'comic-text-detector',
     file: 'comictextdetector.onnx',
@@ -551,6 +586,23 @@ export const ASSET_CATALOG: AssetSpec[] = [
 
 export function findAsset(assets: AssetSpec[], id: string): AssetSpec | undefined {
   return assets.find((a) => a.id === id);
+}
+
+/**
+ * How many assets actually carry a pinned hash (audit T6).
+ *
+ * `sha256` is optional by design — see the field's comment — which means the
+ * registry can drift to all-unpinned without anything failing, and did: **0 of
+ * 21 pinned** when this was written. A count is the cheapest way to keep that
+ * visible, and `assetRegistry.test.ts` asserts it never gets *worse*.
+ */
+export function assetPinCoverage(assets: AssetSpec[] = ASSET_CATALOG): {
+  total: number;
+  pinned: number;
+  unpinned: string[];
+} {
+  const unpinned = assets.filter((a) => !a.sha256).map((a) => a.id);
+  return { total: assets.length, pinned: assets.length - unpinned.length, unpinned };
 }
 
 /** Assets a given study language needs before its features light up. */
