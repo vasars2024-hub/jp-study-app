@@ -2,7 +2,7 @@
 
 Answers `docs/audit/DISPATCH_C1_NON_BLANC_COMPLETION.md`.
 
-> **Status: PARTIAL — 2.5 of 9 rows landed.** Written incrementally per
+> **Status: PARTIAL — 4.5 of 9 rows landed.** Written incrementally per
 > `jp-dispatch` §7. Rows are marked DONE / NOT STARTED. Anything not marked DONE
 > has not been started, whatever the surrounding prose says — there is no
 > half-finished work in the tree.
@@ -56,7 +56,7 @@ npx tsc --noEmit | grep -c "error TS" # 328
 | C1-2 | Bare `toLocale*String()` + regression gate | **DONE** |
 | C1-3 | F4 recent-anime → Results, via a real schedule | NOT STARTED |
 | C1-4 | B1–B5 design-system debt | NOT STARTED |
-| C1-5 | F16 "Bring it forward" | NOT STARTED |
+| C1-5 | F16 "Bring it forward" | **DONE — already fixed, row closed, no code written** |
 | C1-6 | T6 pin/warn on asset hashes | NOT STARTED |
 | C1-7 | Archive root docs + write `FEATURES.md` | **(a) DONE · (b) NOT STARTED** |
 | C1-8 | U6 confirm `soft-sepia` vs `rose-pine` | **DONE — U6 closed working-as-intended** |
@@ -400,6 +400,50 @@ before the run and restored after, verified `storedTheme=frutiger-aero`,
 `data-theme=frutiger-aero`, `data-materials=aero`. **No top-level `.json` state
 file in `%APPDATA%\jp-study-app` differs from the pre-run backup.**
 
+### C1-5 — F16 "Bring it forward" · DONE · **already fixed; I wrote no code**
+
+The dispatch said to drive it before changing it, and not to "fix" working code.
+Driven. **F16 does not reproduce, and neither does its sibling F15.**
+
+**Code reading first.** `MediaWorkspaceSectionView.tsx:121-144` now reads `isOpen`
+from the overlay's published state rather than inferring it from sidecar
+availability (that inference *was* F15), renders
+`mediaWorkspace.section.closed` + an `mediaWorkspace.section.open.action` button
+when closed, and has a `reachError` branch for the case F16 named. The old
+`'Bring it forward'` string still exists in all four catalogs
+(`en.ts:6897` and siblings) but has **zero call sites** — retired, as the comment
+at `en.ts:6891-6893` claims. That comment checks out; the keys are simply dead.
+
+**Driven, on the live app — the two-state proof:**
+
+| step | overlay `.seanime-host` present? | what the section says |
+|---|---|---|
+| opened `player` section | **yes** — 1264×821, z 9999, visible, "MEDIA WORKSPACE · sidecar ready" | "The media workspace is open in front of this window." |
+| clicked the workspace's **own Close** | **no** | "The media workspace is closed." + button "Open the media workspace" |
+| clicked **"Open the media workspace"** | **yes** — 1264×821, chrome complete | "…open in front of this window." |
+
+The middle row is exactly the state F15 recorded as broken — *"after clicking the
+workspace's own Close, two windows assert it is open in front of them."* The claim
+now tracks the real overlay, in both directions. And F16's "produces no workspace"
+is refuted directly: the button produced a full-viewport workspace
+(`docs/audit/evidence/C1/F16_workspace_opened_by_button.png`).
+
+**Recommend closing F15 and F16.** The only residue is 4 dead catalog keys
+(`mediaWorkspace.section.reopen` × en/ja/zh/ru) — recorded in §5, not removed,
+since catalogs are not my paths this run.
+
+> **The hit-test guard earned its keep.** The first click on
+> `.media-workspace-section-button` was **refused** by `click.ps1`: the tour bubble
+> (`tour-bubble__title`) was stacked over the point. Had it clicked anyway it would
+> have landed on the tour and produced "the button did nothing" — the precise false
+> finding `jp-bridge` §6 exists to prevent. Hiding the tour and retrying gave
+> `hitTest: match`.
+
+> **All three bridge scripts are now exercised live.** `jp-bridge`'s own note says
+> they had "never been run against a live app". `eval.ps1` (incl. `-Health`),
+> `shot.ps1` and `click.ps1` all worked; `click.ps1`'s refusal path is confirmed
+> real, not decorative. That caveat in the skill can be lifted.
+
 ## 4. What I could not verify
 
 - **C1-2 is now verified against the live app** (see above) — it has earned
@@ -450,6 +494,11 @@ file in `%APPDATA%\jp-study-app` differs from the pre-run backup.**
   clean) rather than ship a change outside my paths — `jp-dispatch` §1/§2. The file
   is documented as reproducible, so nothing is lost. Whoever owns F21 should just
   run the gate and commit the result.
+
+- **4 dead catalog keys:** `mediaWorkspace.section.reopen` ("Bring it forward" /
+  「手前に表示」/ «Показать поверх» / 「移到前方」) in `catalogs/{en,ja,zh,ru}.ts`.
+  Retired with F16 and referenced by no code. Catalogs are not my paths this run,
+  so recorded rather than removed.
 
 - **Another run's work was already staged in the index when I arrived**, and would
   have been swept into my commit:
@@ -502,7 +551,7 @@ Compare-Object $base $now -PassThru | Where-Object { $_.SideIndicator -eq '=>' }
 Both directions empty. (An intermediate state did add one — TS1378 from the
 `await import()` idiom — which is how I know the comparison has teeth.)
 
-## 7. The six rows I did not start
+## 7. The four rows I did not start
 
 Not started, not attempted, nothing left half-built in the tree. In the dispatch's
 own priority order:
@@ -511,18 +560,15 @@ own priority order:
 |---|---|---|
 | **C1-3** F4 recent-anime → Results | Verify by **driving the app** first (the dispatch is explicit: it could not be confirmed from code and may already work), then build AniList-schedule-spine + nyaa matching | Needs live app |
 | **C1-4** B1–B5 design debt | Start at **B2** (`.ui-card`, zero consumers, zero blast radius), then B5's 12 live cells. Constrained by the B7 ruling: `blanc-native.css:18-28`/`:35-44` re-skin Study OS classes by name and prefix, so renaming any class those rules reach breaks Blanc | No — but read `HANDOFF_B7_BOXES.md` first |
-| **C1-5** F16 "Bring it forward" | Drive `MediaWorkspaceHost.tsx:85` before changing it | Needs live app |
 | **C1-6** T6 asset hashing | (a) pin `comictextdetector.pt.onnx` sha256 (`assetRegistry.ts:401`, the one immutable URL); (b) record-and-warn + re-verify for the other 20, reading back the hash `downloads.ts:585-588` already writes and nothing reads. i18n in all four languages | No |
 | **C1-7(b)** `FEATURES.md` | The document the user actually asked for. Full tree walk, `file:line` per entry, grouped by surface, reachability + honesty verdict per entry, ready-vs-planned split respected | No |
-| **C1-8** U6 theme verdict | Bridge is **live on 127.0.0.1:39273** (`debug/bridge.json`, pid 54464) with `eval.ps1`/`click.ps1`/`shot.ps1` present. Needs the real-profile discipline in `jp-bridge/SKILL.md` — assert profile before and after, and say plainly that the user's live workspace is being driven | Instrument available |
-| **C1-9** U8 Whisper download | Several hundred MB. Use `tiny`/`base` (`assetRegistry.ts:300-336`). Prove disk-space pre-flight, **resume after a mid-download kill**, atomic install, and that transcription then actually runs | Needs live app |
+| **C1-9** U8 Whisper download | Several hundred MB. Use `tiny`/`base` (`assetRegistry.ts:300-336`). Prove disk-space pre-flight, **resume after a mid-download kill**, atomic install, and that transcription then actually runs | Needs live app + a real large fetch |
 
-**Four of the six touch the user's running app.** It is up on port 5173 with 6
-Electron processes and the bridge answering on 39273 — so they are *reachable*, not
-blocked on tooling. I stopped short of driving it because `jp-dispatch` §3 and
-`jp-bridge` both require the live-workspace/profile discipline to be applied and
-declared, and that is a decision to state to the user rather than assume, even
-though the dispatch pre-authorises U6 and U8.
+**C1-3 and C1-9 are the two remaining app-driven rows.** The bridge is proven
+working end to end, so neither is blocked on tooling — C1-3 is blocked only on
+effort (it is a build, not just a verification), and C1-9 on the deliberate choice
+to run a several-hundred-MB download once, carefully, rather than at the tail of a
+long session.
 
 ## 8. Open questions for the user
 
