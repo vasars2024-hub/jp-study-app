@@ -61,6 +61,11 @@ import {
   type DirectstreamOpenGenerations,
   type DirectstreamOpenTicket,
 } from '../shared/directstreamOpenChannel';
+import {
+  ensureSeanimeLibraryCovers,
+  normalizeLibraryPath,
+  parentFolderOf,
+} from './seanimeLibrary';
 import { t as translateUi } from '../renderer/i18n';
 import {
   normalizeVideoCoreResumePositions,
@@ -759,11 +764,58 @@ function StudyPlayerSession({
       };
     }
 
+    const localRequest = playbackRequest;
+    void (async () => {
+    /*
+      The sidecar resolves a local path against its OWN `local_files` table, not
+      the disk, so a folder it has never scanned answers 200 and then aborts the
+      preparation over the socket — `could not find local file`, for a file that
+      is right there. See `./seanimeLibrary.ts` for the measurement.
+
+      Ahead of the channel bookkeeping below, deliberately. A first scan takes
+      real time, and the ticket, the generation and the silence watchdog are all
+      armed on the premise that a POST has just gone out; holding them open
+      across a scan would have the watchdog time out a launch that is working.
+      Nothing here touches the open protocol — it runs before it starts.
+    */
+    await ensureSeanimeLibraryCovers(localRequest.localFilePath, {
+      /*
+        This app's library already carries the AniList id for the file, matched
+        once and stored. Seanime's scanner re-derives it from the filename and,
+        for a short generic title, gets it wrong. Handing over what is already
+        known beats asking it to guess again.
+      */
+      seedMediaIds: async () => {
+        const folder = normalizeLibraryPath(parentFolderOf(localRequest.localFilePath));
+        const library = await window.api.listMedia();
+        return [...new Set(
+          library
+            .filter((item) => normalizeLibraryPath(parentFolderOf(item.path ?? '')) === folder)
+            .map((item) => item.anilistId)
+            .filter((id): id is number => typeof id === 'number' && id > 0),
+        )];
+      },
+      request: (path, init) => fetch(`${conn.baseUrl}${path}`, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          'X-Seanime-Token': conn.token,
+          'X-Seanime-Client-Id': clientId,
+          'X-Seanime-Client-Id-Proof': getClientIdProof(),
+          'X-Seanime-Client-Platform': __clientPlatform__,
+          'Content-Type': 'application/json',
+          ...init?.headers,
+        },
+      }),
+      signal: controller.signal,
+    });
+    if (controller.signal.aborted) return;
+
     // Armed BEFORE the request, not in its `then`: a 200 is not evidence the preparation
     // survived (see `./directstreamOpenRecovery.ts`), and the sidecar's first message
     // can land before the fetch promise resolves.
     openProgressRef.current = {
-      requestId: playbackRequest.requestId,
+      requestId: localRequest.requestId,
       progress: { attempts: 1, lastSignalAt: Date.now(), playbackArrived: false },
     };
 
@@ -775,18 +827,18 @@ function StudyPlayerSession({
     // for it. This also closes the recovery door behind the launch: every stage-1 recovery
     // for the file the user just left now drops as `superseded`.
     const ticket: DirectstreamOpenTicket = {
-      requestId: playbackRequest.requestId,
+      requestId: localRequest.requestId,
       kind: 'launch',
     };
     openChannel = directstreamOpenSupersede(openChannel, ticket);
     // Minted here and ONLY here. Every recovery for this request re-sends this same number,
     // which is the equal-generation case `AcceptOpenGeneration` accepts on purpose.
-    openGenerations = directstreamOpenGenerationFor(openGenerations, playbackRequest.requestId);
+    openGenerations = directstreamOpenGenerationFor(openGenerations, localRequest.requestId);
 
-    void postDirectstreamOpen(
+    await postDirectstreamOpen(
       conn,
       clientId,
-      playbackRequest.localFilePath,
+      localRequest.localFilePath,
       openGenerations.generation,
       controller.signal,
     )
@@ -819,9 +871,11 @@ function StudyPlayerSession({
           loadingState: null,
         });
       });
+    })();
+
     return () => {
       controller.abort();
-      if (launchedRequestRef.current === playbackRequest.requestId) {
+      if (launchedRequestRef.current === localRequest.requestId) {
         launchedRequestRef.current = null;
       }
     };
