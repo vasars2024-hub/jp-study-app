@@ -24121,10 +24121,96 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
 }
 .mal-dl-failures ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
 
+/* Subtitle harvest — sits below the episode list inside the dialog body, so it
+   inherits the body's padding and only owns its own internal rhythm. */
+.mal-dl-subs {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.mal-dl-subs-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.mal-dl-subs-plan {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--font-size-xs, 12px);
+}
+.mal-dl-subs-key { display: flex; align-items: center; gap: 6px; }
+.mal-dl-subs-result { display: grid; gap: 10px; }
+/* Headline numbers first: how much dialogue this actually is decides whether
+   the frequency table below is worth trusting. */
+.mal-dl-subs-stats { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.mal-dl-subs-stats > span { display: flex; flex-direction: column; line-height: 1.25; }
+.mal-dl-subs-stats b { font-size: var(--font-size-sm, 13px); font-variant-numeric: tabular-nums; }
+.mal-dl-subs-stats small { color: var(--muted); font-size: var(--font-size-2xs, 11px); }
+.mal-dl-subs-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-size-2xs, 11px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* A season's tail is thousands of words seen once. The list scrolls rather than
+   growing the dialog, so the counts stay readable against a fixed viewport. */
+.mal-dl-subs-freq {
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.mal-dl-subs-freq > li {
+  display: grid;
+  grid-template-columns: auto auto 3.5ch 1fr;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  font-size: var(--font-size-xs, 12px);
+}
+.mal-dl-subs-freq > li:last-child { border-bottom: 0; }
+/* Words already known are dimmed, not hidden — seeing that the top of the list
+   is vocabulary you have is how you judge whether a show is at your level. */
+.mal-dl-subs-freq > li.is-known { opacity: 0.5; }
+.mal-dl-subs-reading { color: var(--muted); font-size: var(--font-size-2xs, 11px); }
+.mal-dl-subs-count { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.mal-dl-subs-sentence {
+  color: var(--muted);
+  font-size: var(--font-size-2xs, 11px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mal-dl-subs-grammar { margin: 0; color: var(--muted); font-size: var(--font-size-2xs, 11px); }
+.mal-dl-subs-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: var(--font-size-2xs, 11px);
+}
+
 @media (max-width: 720px) {
   .mal-dl-footer { align-items: stretch; flex-direction: column; }
   .mal-dl-actions { flex-wrap: wrap; }
   .mal-dl-actions .disc-btn { flex: 1; justify-content: center; }
+  /* The sentence column is the first thing to go when there is no room for it;
+     the word and its count are what the list is for. */
+  .mal-dl-subs-freq > li { grid-template-columns: auto auto 3.5ch; }
+  .mal-dl-subs-sentence { display: none; }
 }
 
 /* Phase 6 — Study Mode over the unified library. Study OS chrome, so it uses the app

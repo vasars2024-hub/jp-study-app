@@ -11,7 +11,12 @@
  * everywhere it is used, which is the only way a colour code stays a code.
  */
 
-.sa-view {
+/* The palette is separated from the view's own layout so a host can paint
+   category-coloured spans OUTSIDE a .sa-view — the video player highlights the
+   live subtitle line in place, and it needs the same hues the panel's legend
+   and detail cards use or the colour code would mean two different things. */
+.sa-view,
+.sa-palette {
   --sa-ink: var(--lens-ink, #f4f4f6);
   --sa-accent: var(--lens-accent, #b23b47);
   --sa-dim: rgba(244, 244, 246, 0.66);
@@ -27,7 +32,9 @@
   --sa-c-expression: #a98bf5;
   --sa-c-idiom: #ef7fa8;
   --sa-c-name: #45c2c2;
+}
 
+.sa-view {
   display: flex;
   flex-direction: column;
   gap: 10px;

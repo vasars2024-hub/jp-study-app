@@ -15,12 +15,28 @@ interface Props {
   y: number;
   /** Sentence the word came from — attached to Anki exports. */
   context?: string;
+  /**
+   * Width, in CSS px, of a panel occupying the right edge that the popup must
+   * not open over — the video player's transcript rail, when it is open.
+   *
+   * Clamping to the viewport alone is not enough: the rail is *inside* the
+   * viewport, so a lookup near the right of the picture opens directly on top of
+   * the transcript the reader is using to follow along.
+   */
+  rightInsetPx?: number;
   onClose: () => void;
 }
 
 const POPUP_W = 340;
 
-export default function DictionaryPopup({ query, x, y, context, onClose }: Props) {
+export default function DictionaryPopup({
+  query,
+  x,
+  y,
+  context,
+  rightInsetPx = 0,
+  onClose,
+}: Props) {
   const style: CSSProperties = useMemo(() => {
     // App zoom is on #root (see appZoom.ts). Selection / client coords are
     // visual; fixed layout uses pre-zoom CSS pixels — divide by zoom factor.
@@ -29,7 +45,11 @@ export default function DictionaryPopup({ query, x, y, context, onClose }: Props
     const vh = window.innerHeight / z;
     const lx = x / z;
     const ly = y / z;
-    const left = Math.max(8, Math.min(lx, vw - POPUP_W - 8));
+    // Never let the reserved strip push the popup off the left edge: on a narrow
+    // window the rail can be most of the width, and a popup at a negative left is
+    // worse than one that overlaps.
+    const rightLimit = Math.max(POPUP_W + 16, vw - rightInsetPx) - POPUP_W - 8;
+    const left = Math.max(8, Math.min(lx, rightLimit));
     const margin = 8;
     const spaceBelow = vh - ly - 18 - margin;
     const spaceAbove = ly - 18 - margin;
@@ -41,7 +61,7 @@ export default function DictionaryPopup({ query, x, y, context, onClose }: Props
     return placeAbove
       ? { left, bottom: Math.max(margin, vh - ly + 18), width: POPUP_W, maxHeight }
       : { left, top: Math.min(ly + 12, vh - 120), width: POPUP_W, maxHeight };
-  }, [x, y]);
+  }, [x, y, rightInsetPx]);
 
   const lang = getStudyLang() as DictLang;
 

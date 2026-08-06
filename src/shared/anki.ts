@@ -111,6 +111,18 @@ export interface MineNoteRequest {
   audioBase64?: string;
   /** Filename for storeMediaFile (e.g. jp-ext-audio-….webm). */
   audioFilename?: string;
+  /**
+   * Optional video clip (base64, no data: prefix) of the moment the sentence was
+   * said, attached as `[sound:…]` — which is how Anki plays video, the same tag
+   * it uses for audio, dispatched on the file's extension rather than the tag.
+   *
+   * Kept separate from `audioBase64` rather than reusing it because a card can
+   * legitimately want both: the pronunciation of the word AND the scene it came
+   * from. Sharing one slot would make them mutually exclusive.
+   */
+  clipBase64?: string;
+  /** Filename for storeMediaFile (e.g. jp-clip-….webm). */
+  clipFilename?: string;
   /** Named frequency ranks for tokens like {frequency:BCCWJ}. */
   frequencies?: Record<string, string | number>;
   extraTags?: string[];
@@ -178,12 +190,19 @@ export function mediaFilenamesFromAnkiMarkup(...markups: readonly string[]): str
 export function appendUnreferencedMediaToFields(
   fields: Readonly<Record<string, string>>,
   fieldNames: readonly string[],
-  media: Readonly<{ image?: string; audio?: string }>,
+  media: Readonly<{ image?: string; audio?: string; clip?: string }>,
 ): Record<string, string> {
   const pending = [
     {
       markup: media.image?.trim() ?? '',
       namePattern: /image|picture|screenshot|snapshot|画像|写真/i,
+    },
+    {
+      // Ordered before audio deliberately: a clip is also `[sound:…]` markup, and
+      // a field called "Audio" would otherwise swallow it and leave the real
+      // pronunciation audio to fall through to the sentence field.
+      markup: media.clip?.trim() ?? '',
+      namePattern: /clip|video|movie|動画|映像/i,
     },
     {
       markup: media.audio?.trim() ?? '',
@@ -387,7 +406,7 @@ export interface MiningVar {
   /** One-line description of what the variable resolves to. */
   hint: string;
   /** Which source content this variable pulls from (informational). */
-  content: CardContent | 'audio' | 'sentenceTranslation' | 'frequency' | 'image';
+  content: CardContent | 'audio' | 'sentenceTranslation' | 'frequency' | 'image' | 'clip';
 }
 
 /**
@@ -416,6 +435,12 @@ export const MINING_VARS: readonly MiningVar[] = [
   { key: 'frequency', label: 'Frequency', hint: 'Frequency rank (from an imported/bundled dictionary)', content: 'frequency' },
   { key: 'audio', label: 'Audio', hint: 'Native-speaker audio [sound:…]', content: 'audio' },
   { key: 'image', label: 'Image', hint: 'Image grabbed from your clipboard', content: 'image' },
+  {
+    key: 'clip',
+    label: 'Video clip',
+    hint: 'The moment the sentence was said, as a playable clip',
+    content: 'clip',
+  },
 ];
 
 /** Languages with configurable `{example-sentence:lang}` counts when mining. */
@@ -690,6 +715,9 @@ export const MINING_VAR_ALIASES: Readonly<Record<string, string>> = {
   audio: 'audio',
   image: 'image',
   picture: 'image',
+  clip: 'clip',
+  video: 'clip',
+  movie: 'clip',
 };
 
 /** The value bag a template renders against — keyed by canonical variable. */

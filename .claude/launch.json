@@ -19,6 +19,13 @@
       "runtimeArgs": ["vite", "--config", "vite.renderer.config.ts"],
       "autoPort": true,
       "port": 5185
+    },
+    {
+      "name": "video-study-harness",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--config", "vite.renderer.config.ts", "--port", "5186", "--strictPort"],
+      "port": 5186,
+      "url": "http://localhost:5186"
     }
   ]
 }

@@ -272,7 +272,13 @@ export function chapterLabel(raw: string, number: number): string {
  */
 export function releaseCoversEpisode(name: string, number: number): boolean {
   if (!Number.isInteger(number) || number < 0) return false;
-  const digits = `0*${number}(?:v\\d+)?(?![\\d.])`;
+  // `(?!\d)` stops `20` matching inside `205`. The second lookahead is narrower
+  // than it looks: it rejects a *fractional* episode (`- 2.5` is not episode 2)
+  // while still admitting a dot that begins a suffix. Rejecting every following
+  // dot — which is what this used to do — also rejected every subtitle file
+  // name, because `Show - 20.ja.srt` puts the extension straight against the
+  // number where a torrent name would have a space or a bracket.
+  const digits = `0*${number}(?:v\\d+)?(?!\\d)(?!\\.\\d)`;
   const patterns = [
     // `S01E07` first: it also satisfies the bare-`E07` rule, and matching it
     // here keeps the intent readable.

@@ -17,6 +17,7 @@ import {
   cuePlaybackStartSec,
   type VideoCoreStudyCue,
 } from '../shared/videoCoreStudy';
+import { videoClipFilename } from '../shared/videoClip';
 import { findMinedCueEntry } from '../shared/seanimeWatchLoop';
 import { MINING_HISTORY_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
 import { t as translateUi, useT } from '../renderer/i18n';
@@ -34,6 +35,12 @@ interface Props {
   source: VideoCoreMiningSource | null;
   video: HTMLVideoElement | null;
   subtitleDelaySec: number;
+  /**
+   * Incremented by the `video.mineCurrentLine` shortcut. A counter rather than a
+   * boolean so mining the same line twice in a row is two events, not one edge
+   * that never falls back.
+   */
+  mineSignal?: number;
 }
 
 function loadHistory(): VideoCoreMiningHistoryEntry[] {
@@ -133,13 +140,14 @@ export default function VideoCoreMiningPanel({
   source,
   video,
   subtitleDelaySec,
+  mineSignal = 0,
 }: Props): React.ReactElement {
   const { t } = useT();
   const [draft, setDraft] = React.useState<VideoCoreMiningDraft | null>(null);
   const [selectedCue, setSelectedCue] = React.useState<VideoCoreStudyCue | null>(null);
   const [history, setHistory] = React.useState<VideoCoreMiningHistoryEntry[]>(loadHistory);
   const [decks, setDecks] = React.useState<string[]>([]);
-  const [busy, setBusy] = React.useState<'screenshot' | 'audio' | 'mine' | 'undo' | null>(null);
+  const [busy, setBusy] = React.useState<'screenshot' | 'audio' | 'clip' | 'mine' | 'undo' | null>(null);
   const [message, setMessage] = React.useState('');
   // The panel is an absolute overlay on the video. It has always been open, always this
   // tall, and always in the way; collapsing it is the difference between a study player
@@ -244,6 +252,53 @@ export default function VideoCoreMiningPanel({
     }
   };
 
+  /*
+    A clip is cut from the file by ffmpeg in main, not recorded off the element
+    like cue audio: recording is real time and takes the player with it, and
+    mining a four-second line should not cost four seconds of hijacked playback.
+    Streams have no file to cut, so the control says so rather than failing.
+  */
+  const onClip = async (): Promise<void> => {
+    if (!draft || !selectedCue) return;
+    const filePath = draft.provenance.source.localFilePath ?? '';
+    if (!filePath) {
+      setMessage(t('mediaWorkspace.mining.clipNeedsLocalFile'));
+      return;
+    }
+    setBusy('clip');
+    setMessage(t('mediaWorkspace.mining.clipping'));
+    try {
+      const startSec = cuePlaybackStartSec(selectedCue, subtitleDelaySec);
+      const result = await window.api.extractVideoClip({
+        filePath,
+        startSec,
+        endSec: cuePlaybackEndSec(selectedCue, subtitleDelaySec),
+      });
+      if (!result.ok || !result.base64) {
+        setMessage(result.error || t('mediaWorkspace.mining.clipFailed'));
+        return;
+      }
+      const asset = {
+        filename: videoClipFilename(
+          `${selectedCue.trackNumber}-${selectedCue.index}`,
+          startSec,
+        ),
+        mimeType: result.mimeType ?? 'video/mp4',
+        bytes: result.bytes ?? 0,
+      };
+      setDraft((current) => current
+        ? withVideoCoreMiningAsset(current, 'clip', { base64: result.base64 ?? '', asset })
+        : current);
+      setMessage(t('mediaWorkspace.mining.clipAttached', {
+        size: Math.round((result.bytes ?? 0) / 1024),
+      }));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t('mediaWorkspace.mining.clipFailed'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const onMine = async (): Promise<void> => {
     if (!draft || !draft.term.trim()) {
       setMessage(t('mediaWorkspace.mining.missingText'));
@@ -286,6 +341,20 @@ export default function VideoCoreMiningPanel({
       setBusy(null);
     }
   };
+
+  /*
+    The shortcut fires into a ref rather than into the effect's closure: `onMine`
+    is rebuilt on every render, so an effect that depended on it would re-run —
+    and re-mine — every time the draft changed. Depending on the signal alone
+    with a stale `onMine` would instead export whatever the draft was when the
+    shortcut was first registered. The ref is the only version that mines the
+    line actually on screen.
+  */
+  const onMineRef = React.useRef(onMine);
+  onMineRef.current = onMine;
+  React.useEffect(() => {
+    if (mineSignal > 0) void onMineRef.current();
+  }, [mineSignal]);
 
   const onUndo = async (entry: VideoCoreMiningHistoryEntry): Promise<void> => {
     if (!entry.noteId || typeof window.api?.ankiDeleteNotes !== 'function') return;
@@ -467,6 +536,25 @@ export default function VideoCoreMiningPanel({
               ? t('mediaWorkspace.mining.replaceAudio')
               : t('mediaWorkspace.mining.attachAudio')}
         </button>
+        <button
+          type="button"
+          data-study-action="capture-clip"
+          disabled={busy != null}
+          onClick={() => void onClip()}
+        >
+          {busy === 'clip'
+            ? t('mediaWorkspace.mining.clipping')
+            : draft.clip
+              ? t('mediaWorkspace.mining.replaceClip')
+              : t('mediaWorkspace.mining.attachClip')}
+        </button>
+        <span>
+          {draft.clip
+            ? t('mediaWorkspace.mining.clipReady', {
+                size: Math.round(draft.clip.bytes / 1024),
+              })
+            : t('mediaWorkspace.mining.noClip')}
+        </span>
         <span>
           {draft.screenshot
             ? t('mediaWorkspace.mining.screenshotReady', {
@@ -485,8 +573,17 @@ export default function VideoCoreMiningPanel({
 
       {/* A byte count is not a preview. Both assets go straight to Anki, so what is
           actually attached has to be inspectable before Mine, not after Undo. */}
-      {(draft.screenshotBase64 || draft.audioBase64) && (
+      {(draft.screenshotBase64 || draft.audioBase64 || draft.clipBase64) && (
         <div className="study-mining-preview">
+          {draft.clipBase64 && (
+            <video
+              controls
+              preload="metadata"
+              className="study-mining-clip"
+              aria-label={t('mediaWorkspace.mining.clipPreview')}
+              src={`data:${draft.clip?.mimeType || 'video/mp4'};base64,${draft.clipBase64}`}
+            />
+          )}
           {draft.screenshotBase64 && (
             <img
               src={`data:${draft.screenshot?.mimeType || 'image/png'};base64,${draft.screenshotBase64}`}

@@ -227,6 +227,21 @@ describe('releaseCoversEpisode', () => {
   it('accepts a zero-padded number for an unpadded episode', () => {
     expect(releaseCoversEpisode('[Group] Show - 007 [1080p]', 7)).toBe(true);
   });
+
+  // Subtitle files put the extension straight against the number, where a
+  // torrent name has a space or a bracket. This matcher is shared with the
+  // subtitle harvest, so a guard that rejected any following dot rejected
+  // every file name it was asked about.
+  it('reads an episode number a file extension is attached to', () => {
+    expect(releaseCoversEpisode('Frieren - 20.ja.srt', 20)).toBe(true);
+    expect(releaseCoversEpisode('[Group] Frieren - 07.ass', 7)).toBe(true);
+    expect(releaseCoversEpisode('Frieren S01E07.srt', 7)).toBe(true);
+  });
+
+  it('still refuses a fractional episode', () => {
+    expect(releaseCoversEpisode('[Group] Show - 2.5 [1080p]', 2)).toBe(false);
+    expect(releaseCoversEpisode('Show - 07.5.ja.srt', 7)).toBe(false);
+  });
 });
 
 describe('coveredByBatchRange', () => {

@@ -5,6 +5,7 @@ import {
   buildMediaStudyCorpus,
   buildMediaStudyFlashcardDrafts,
   type MediaStudyCorpus,
+  type MediaStudyExtractionOptions,
 } from '../shared/mediaStudyExtraction';
 import {
   difficultyBandFromJlpt,
@@ -49,9 +50,24 @@ function rankGrammar(sentences: MediaStudyCorpus['sentences']): GrammarMatchHit[
     .map((entry) => entry.hit);
 }
 
-export async function analyzeMediaStudyCues(cues: readonly Cue[]): Promise<MediaStudyAnalysis> {
+/**
+ * Bounds for a corpus that is a whole season rather than one episode.
+ *
+ * `buildMediaStudyCorpus` defaults to 800 cues / 60,000 characters, which is
+ * generous for the episode it was written for and stops around episode three of
+ * a season harvest — the remaining twenty would be dropped with nothing but a
+ * `truncated` flag to say so, and a frequency table built from an eighth of the
+ * dialogue is wrong rather than partial. These are sized above a long season
+ * (a 26-episode run is roughly 9,000 cues) and are still a real ceiling.
+ */
+export const SEASON_STUDY_LIMITS = { maxCues: 50_000, maxCharacters: 2_000_000 } as const;
+
+export async function analyzeMediaStudyCues(
+  cues: readonly Cue[],
+  options: MediaStudyExtractionOptions = {},
+): Promise<MediaStudyAnalysis> {
   await getTokenizer();
-  const corpus = buildMediaStudyCorpus(cues, tokenizeSync);
+  const corpus = buildMediaStudyCorpus(cues, tokenizeSync, options);
   const [level, comprehensibility] = await Promise.all([
     estimateLevelFromText(corpus.text, 'ja'),
     scoreTextComprehensibility(corpus.text),
@@ -183,8 +199,14 @@ export function createMediaLanguageProfile(
   };
 }
 
+/**
+ * `{ id, title }` rather than a full `MediaItem`: those are the only two fields
+ * used, and widening the parameter lets the subtitle harvest — which mines a
+ * catalogue entry that has no local media file — reuse this instead of forking
+ * a second, drifting copy of the same deck write. `MediaItem` still satisfies it.
+ */
 export function addMediaStudyFlashcards(
-  item: MediaItem,
+  item: Pick<MediaItem, 'id' | 'title'>,
   analysis: MediaStudyAnalysis,
   limit = 30,
 ): number {

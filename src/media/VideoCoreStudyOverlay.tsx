@@ -56,7 +56,6 @@ import {
   activeStudyCuesAtTime,
   adjacentStudyCue,
   clampStudyPlaybackRate,
-  cuePlaybackStartSec,
   dismissVideoCoreComprehensionSuggestion,
   dismissVideoCoreShadowingSuggestion,
   dismissVideoCoreTimingRepair,
@@ -73,6 +72,7 @@ import {
   shouldSuggestVideoCoreShadowing,
   shouldSuggestVideoCoreTimingRepair,
   stripAssCueText,
+  transcriptSeekSec,
   VIDEO_CORE_TIMING_APPLY_STEP_SEC,
   videoCoreDriftDelaySec,
   videoCoreRescueScene,
@@ -91,8 +91,30 @@ import {
   normalizeMediaCaptionTracks,
 } from './mediaCaptionStudyAdapter';
 import VideoCoreMiningPanel from './VideoCoreMiningPanel';
+import VideoCoreGrammarPanel from './VideoCoreGrammarPanel';
+import VideoCoreTranscriptPanel from './VideoCoreTranscriptPanel';
+import { useCueAnalysis } from './useCueAnalysis';
 
 const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
+
+/** Run-up when jumping to a transcript line. See `seekTranscriptCue`. */
+const TRANSCRIPT_LEAD_IN_SEC = 1;
+
+/** Fallback rail reservation, for the 24rem column at this workspace's 16px root. */
+const TRANSCRIPT_RAIL_PX = 25 * 16;
+
+/**
+ * How much of the right edge the rail is holding, so a dictionary lookup can
+ * open beside it rather than under it.
+ *
+ * Measured rather than declared: the column narrows to 19rem below 1180px, and a
+ * second copy of that number here is exactly how the popup ends up 80px wrong on
+ * the window where the room is tightest. The gutter is the rail's own `right`.
+ */
+function transcriptRailInsetPx(): number {
+  const width = document.querySelector('.study-side-rail')?.getBoundingClientRect().width ?? 0;
+  return width > 0 ? Math.round(width) + 16 : TRANSCRIPT_RAIL_PX;
+}
 
 type WhisperGenerationState =
   | 'idle'
@@ -126,6 +148,24 @@ interface Props {
   playbackInfo: VideoCore_VideoPlaybackInfo | null;
   onManagerReady?: (managerClass: string) => void;
   onCueChange?: (event: SubtitleManagerCueChangeEvent) => void;
+}
+
+/**
+ * Size and background for one subtitle line.
+ *
+ * At 0% the box is genuinely absent rather than a transparent rectangle — no
+ * background and no padding — so the text sits on the picture the way a burned-in
+ * subtitle does. The text shadow in the stylesheet is what keeps it legible over
+ * a bright frame, which is why the background can be dropped entirely.
+ */
+function cueBoxStyle(fontSizePx: number, bgOpacity: number): React.CSSProperties {
+  const style: React.CSSProperties = { fontSize: `${fontSizePx}px` };
+  if (bgOpacity > 0) {
+    style.backgroundColor = `rgba(0, 0, 0, ${bgOpacity / 100})`;
+    style.padding = '0.1em 0.4em';
+    style.borderRadius = '0.35em';
+  }
+  return style;
 }
 
 function loadPreferences(): VideoCoreStudyPreferences {
@@ -187,7 +227,7 @@ export default function VideoCoreStudyOverlay({
   onManagerReady,
   onCueChange,
 }: Props): React.ReactElement {
-  const { t } = useT();
+  const { t, lang: uiLang } = useT();
   const manager = useAtomValue(vc_subtitleManager);
   const mediaCaptionsManager = useAtomValue(vc_mediaCaptionsManager);
   const audioManager = useAtomValue(vc_audioManager);
@@ -215,7 +255,10 @@ export default function VideoCoreStudyOverlay({
   const [abStartSec, setAbStartSec] = React.useState<number | null>(null);
   const [abEndSec, setAbEndSec] = React.useState<number | null>(null);
   const [abLoop, setAbLoop] = React.useState(false);
+  /** Bumped by the mine shortcut; the mining panel owns the actual export. */
+  const [mineSignal, setMineSignal] = React.useState(0);
   const popupOpenOnDownRef = React.useRef(false);
+  const dockRef = React.useRef<HTMLElement | null>(null);
   const previousCueRef = React.useRef<VideoCoreActiveCue | null>(null);
   const secondaryCuesRef = React.useRef<VideoCoreActiveCue[]>([]);
   const shadowRecorderRef = React.useRef<MediaRecorder | null>(null);
@@ -266,12 +309,79 @@ export default function VideoCoreStudyOverlay({
   // registrations having to rebind every time one of the preferences changes.
   const preferencesRef = React.useRef(preferences);
   preferencesRef.current = preferences;
+  /*
+    Publish the dock's height so the rest of the surface can stay off it.
+
+    The dock is bottom-anchored and grows from one row to six when the viewer
+    expands it — from ~56px to its 22rem cap. Everything above it (the subtitle
+    line, the grammar card, the side rail) used to be positioned against a
+    constant that only described the collapsed dock, so expanding the controls
+    drew a 275px panel straight over the subtitle: measured at 644×69px of the
+    cue line covered, and the dock is a layer above it, so the line was simply
+    gone. CSS cannot ask an element how tall it is; this is that answer.
+
+    Written on the slice rather than on `:root` so two workspaces (main window
+    and pop-out) never overwrite each other's value, and removed on unmount so a
+    stale height cannot outlive the dock that produced it.
+  */
+  React.useEffect(() => {
+    const dock = dockRef.current;
+    if (!dock) return;
+    const slice = dock.closest('.study-player-slice') ?? dock.parentElement;
+    if (!(slice instanceof HTMLElement)) return;
+    const publish = (): void => {
+      const height = Math.round(dock.getBoundingClientRect().height);
+      if (height > 0) slice.style.setProperty('--study-dock-height', `${height}px`);
+    };
+    publish();
+    // jsdom has no ResizeObserver. Falling back to the one-shot measurement is
+    // right rather than fatal: the stylesheet's own default is the collapsed
+    // height, so the worst case is the layout this change replaced.
+    if (typeof ResizeObserver !== 'function') return () => {
+      slice.style.removeProperty('--study-dock-height');
+    };
+    const observer = new ResizeObserver(publish);
+    observer.observe(dock);
+    return () => {
+      observer.disconnect();
+      slice.style.removeProperty('--study-dock-height');
+    };
+  }, []);
+
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
   const secondaryText = activeSecondaryCues
     .map((cue) => stripAssCueText(cue.text))
     .filter(Boolean)
     .join(' ');
   const miningSource = miningSourceFromPlayback(playbackInfo);
+  // Whose transcript this is. A Whisper track and a downloaded track both arrive
+  // here as tracks, so naming the track is the only thing that tells them apart.
+  const selectedTrackEntry = tracks.find((entry) => entry.number === selectedTrack);
+  const selectedTrackLabel = selectedTrackEntry
+    ? trackLabel(selectedTrackEntry, t)
+    : t('mediaWorkspace.study.transcriptNoTrack');
+
+  /*
+    Grammar highlight. `auto` is the pause state, not the toggle: the toggle says
+    the viewer wants highlighting, the pause says they stopped on THIS line. See
+    useCueAnalysis for why analyzing every cue as it goes past is not an option.
+  */
+  const studyLang = getStudyLang();
+  const cueAnalysis = useCueAnalysis({
+    text: plainText,
+    lang: studyLang,
+    uiLang,
+    auto: preferences.grammarHighlight && playerPaused,
+    errorLabel: t('mediaWorkspace.study.grammarError'),
+  });
+  const annotated = preferences.grammarHighlight && cueAnalysis.state.kind === 'ready'
+    ? cueAnalysis.state.result
+    : null;
+  const [selectedAnnotation, setSelectedAnnotation] = React.useState(0);
+  // The panel resets its own selection when the sentence changes, but the
+  // highlighted cue is drawn even when the panel is not, so the reset cannot
+  // live there alone.
+  React.useEffect(() => setSelectedAnnotation(0), [plainText]);
   const showShadowingSuggestion = shouldSuggestVideoCoreShadowing(
     replaySignal,
     activeCue,
@@ -642,14 +752,40 @@ export default function VideoCoreStudyOverlay({
   }, [activeCue, manager, recordComprehension, video]);
 
   const seekCue = React.useCallback(
-    (cue: VideoCoreActiveCue | null): void => {
+    (cue: VideoCoreActiveCue | null, leadInSec = 0): void => {
       if (!cue || !video) return;
-      const target = cuePlaybackStartSec(cue, subtitleDelaySec);
+      const target = transcriptSeekSec(cue, subtitleDelaySec, leadInSec);
       markProgrammaticSeek(target);
       video.currentTime = target;
       void video.play();
     },
     [markProgrammaticSeek, subtitleDelaySec, video],
+  );
+
+  /*
+    Jumping to a transcript line lands slightly before it, not exactly on it.
+    Seeking to the cue's own start clips the first mora — the decoder settles on
+    the following keyframe and the line is already speaking when audio resumes.
+    A second of run-up also gives the sentence its intonation contour, which is
+    most of why someone clicked a line they had already heard.
+
+    Cue navigation (⟨ ⟩ and replay) deliberately does NOT take this: those are
+    used mid-study to sit exactly on a line, and a run-up there would replay the
+    tail of the previous one every time.
+  */
+  const seekTranscriptCue = React.useCallback(
+    (cue: VideoCoreActiveCue): void => seekCue(cue, TRANSCRIPT_LEAD_IN_SEC),
+    [seekCue],
+  );
+
+  /** Relative seek for the rewind / fast-forward shortcuts, clamped to the file. */
+  const seekBy = React.useCallback(
+    (deltaSec: number): void => {
+      if (!video) return;
+      const duration = Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER;
+      video.currentTime = Math.max(0, Math.min(duration, video.currentTime + deltaSec));
+    },
+    [video],
   );
 
   const replayCue = React.useCallback(
@@ -740,9 +876,25 @@ export default function VideoCoreStudyOverlay({
       registerCommandHandler('video.toggleFurigana', () => {
         updatePreference('furigana', !preferencesRef.current.furigana);
       }),
+      /*
+        Seeks are NOT marked programmatic. The comprehension tracker treats a
+        backward seek as evidence the viewer did not follow the line, and a
+        hand-driven rewind is exactly that — suppressing it here would make the
+        shortcut the one way to rewind that the tracker cannot see.
+
+        Step comes from the ref rather than the render closure so re-binding does
+        not depend on the preference, and so changing it mid-episode takes effect
+        on the next press instead of the next mount.
+      */
+      registerCommandHandler('video.seekBack', () => seekBy(-preferencesRef.current.seekStepSec)),
+      registerCommandHandler('video.seekForward', () => seekBy(preferencesRef.current.seekStepSec)),
+      registerCommandHandler('video.mineCurrentLine', () => {
+        if (!activeCueRef.current) return;
+        setMineSignal((n) => n + 1);
+      }),
     ];
     return () => offs.forEach((off) => off());
-  }, [changeSubtitleDelay, jumpCue, replayCue, updatePreference]);
+  }, [changeSubtitleDelay, jumpCue, replayCue, seekBy, updatePreference]);
 
   /**
    * While tracking, the measured drift — not the user — supplies the delay. These
@@ -1174,11 +1326,24 @@ export default function VideoCoreStudyOverlay({
         data-secondary-track={secondaryTrack ?? undefined}
         data-secondary-cue-count={secondaryCues.length}
         data-secondary-active-cue={activeSecondaryCues[0]?.index}
+        data-grammar-highlight={annotated ? 'on' : 'off'}
       >
         {activeCue && preferences.primarySubs && (!preferences.dictationMode || dictationRevealed) ? (
           <SubtitleCueLine
-            className="study-cue-text"
-            text={plainText}
+            /*
+              `sa-palette` carries the category hues from sentenceAnalysis.css so
+              a highlighted span means the same colour here as in the panel's
+              legend. The background sits on the LINE, not on the overlay
+              wrapper — the wrapper also holds the timing readout, the dictation
+              box and the shadowing controls, and boxing all of that in one black
+              rectangle is not what a subtitle background is.
+            */
+            className="study-cue-text sa-palette"
+            style={cueBoxStyle(preferences.subtitleFontSize, preferences.subtitleBgOpacity)}
+            text={annotated ? annotated.sentence : plainText}
+            annotations={annotated?.annotations}
+            selectedAnnotation={selectedAnnotation}
+            onSelectAnnotation={setSelectedAnnotation}
             furigana={preferences.furigana}
             onMouseDown={(event) => {
               popupOpenOnDownRef.current = !!popup;
@@ -1208,7 +1373,15 @@ export default function VideoCoreStudyOverlay({
         )}
 
         {preferences.dualSubs && secondaryText && (
-          <p className="study-cue-secondary">{secondaryText}</p>
+          <p
+            className="study-cue-secondary"
+            style={cueBoxStyle(
+              Math.round(preferences.subtitleFontSize * 0.8),
+              preferences.subtitleBgOpacity,
+            )}
+          >
+            {secondaryText}
+          </p>
         )}
 
         {preferences.dictationMode && activeCue && (
@@ -1447,6 +1620,7 @@ export default function VideoCoreStudyOverlay({
       </aside>
 
       <section
+        ref={dockRef}
         className="study-control-dock"
         aria-label={t('mediaWorkspace.study.controls')}
         data-study-controls={controlsExpanded ? 'expanded' : 'collapsed'}
@@ -1584,6 +1758,52 @@ export default function VideoCoreStudyOverlay({
             if (event.currentTarget.checked) setAbLoop(false);
           }} /> {t('mediaWorkspace.study.loopLine')}</label>
           <label><input type="checkbox" checked={pauseOnLookup} onChange={(event) => setPauseOnLookup(event.currentTarget.checked)} /> {t('mediaWorkspace.study.pauseOnLookup')}</label>
+          <label><input type="checkbox" data-study-pref="grammarHighlight" checked={preferences.grammarHighlight} onChange={(event) => updatePreference('grammarHighlight', event.currentTarget.checked)} /> {t('mediaWorkspace.study.grammarHighlight')}</label>
+          <label><input type="checkbox" data-study-pref="transcriptPanel" checked={preferences.transcriptPanel} onChange={(event) => updatePreference('transcriptPanel', event.currentTarget.checked)} /> {t('mediaWorkspace.study.transcript')}</label>
+        </div>
+
+        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.subtitleAppearanceGroup')}>
+          <span className="study-control-legend">{t('mediaWorkspace.study.subtitleAppearanceGroup')}</span>
+          <label className="study-control-slider">
+            {t('mediaWorkspace.study.subtitleFontSize')}
+            <input
+              type="range"
+              min={16}
+              max={48}
+              value={preferences.subtitleFontSize}
+              onChange={(event) => updatePreference('subtitleFontSize', Number(event.currentTarget.value))}
+              aria-label={t('mediaWorkspace.study.subtitleFontSize')}
+            />
+            <span>
+              {t('mediaWorkspace.study.subtitleFontSizeValue', {
+                size: preferences.subtitleFontSize,
+              })}
+            </span>
+          </label>
+          <label className="study-control-slider">
+            {t('mediaWorkspace.study.seekStep')}
+            <input
+              type="range"
+              min={1}
+              max={60}
+              value={preferences.seekStepSec}
+              onChange={(event) => updatePreference('seekStepSec', Number(event.currentTarget.value))}
+              aria-label={t('mediaWorkspace.study.seekStep')}
+            />
+            <span>{t('mediaWorkspace.study.seekStepValue', { seconds: preferences.seekStepSec })}</span>
+          </label>
+          <label className="study-control-slider">
+            {t('mediaWorkspace.study.subtitleBgOpacity')}
+            <input
+              type="range"
+              min={0}
+              max={90}
+              value={preferences.subtitleBgOpacity}
+              onChange={(event) => updatePreference('subtitleBgOpacity', Number(event.currentTarget.value))}
+              aria-label={t('mediaWorkspace.study.subtitleBgOpacity')}
+            />
+            <span>{preferences.subtitleBgOpacity}%</span>
+          </label>
         </div>
 
         {/*
@@ -1805,13 +2025,62 @@ export default function VideoCoreStudyOverlay({
         )}
       </section>
 
-      <VideoCoreMiningPanel
-        cue={activeCue}
-        displayText={plainText}
-        source={miningSource}
-        video={video}
-        subtitleDelaySec={subtitleDelaySec}
-      />
+      {preferences.grammarHighlight && activeCue && plainText && (
+        <VideoCoreGrammarPanel
+          state={cueAnalysis.state}
+          lang={studyLang}
+          selectedIndex={selectedAnnotation}
+          onSelectedIndexChange={setSelectedAnnotation}
+          onAnalyzeNow={cueAnalysis.analyzeNow}
+          onLookup={(surface, context) => {
+            // Anchored to the grammar panel's own edge, not the middle of the
+            // screen: the lookup was opened from that panel, and a card that
+            // appears dead-centre over the picture reads as a modal rather than
+            // as an answer to what was just clicked.
+            const panel = document.querySelector('.study-grammar-panel');
+            const rect = panel?.getBoundingClientRect();
+            setPopup({
+              query: surface,
+              x: rect ? rect.right + 12 : 24,
+              y: rect ? rect.top + 24 : 96,
+              context,
+            });
+          }}
+        />
+      )}
+
+      {/*
+        Mining and the transcript are one column, not two panels that each
+        claimed the right edge.
+
+        As siblings they both anchored to `top: 1rem; right: 1rem`, and the rail
+        opening shoved mining left by its own width — into the grammar panel,
+        measured as a 12px collision at a 1024px window with all three up. A
+        column stacks them instead: mining takes what it needs, the transcript
+        takes the rest, and the surface spends one gutter on the pair rather
+        than two on one each.
+      */}
+      <div className="study-side-rail">
+        <VideoCoreMiningPanel
+          cue={activeCue}
+          displayText={plainText}
+          source={miningSource}
+          video={video}
+          subtitleDelaySec={subtitleDelaySec}
+          mineSignal={mineSignal}
+        />
+
+        {preferences.transcriptPanel && (
+          <VideoCoreTranscriptPanel
+            cues={allCues}
+            activeIndex={activeCue?.index ?? null}
+            lang={studyLang}
+            trackLabel={selectedTrackLabel}
+            onSeek={seekTranscriptCue}
+            onClose={() => updatePreference('transcriptPanel', false)}
+          />
+        )}
+      </div>
 
       {popup && (
         <DictionaryPopup
@@ -1819,6 +2088,8 @@ export default function VideoCoreStudyOverlay({
           x={popup.x}
           y={popup.y}
           context={popup.context}
+          // Keep the lookup off the transcript when the rail is open.
+          rightInsetPx={preferences.transcriptPanel ? transcriptRailInsetPx() : 0}
           onClose={() => setPopup(null)}
         />
       )}

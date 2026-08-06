@@ -1,4 +1,12 @@
-import { useEffect, useImperativeHandle, useMemo, useState, type ReactNode, type Ref } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useT } from '../../i18n';
 import {
   primaryTranslation,
@@ -69,6 +77,14 @@ interface Props {
   actionState?: AnalysisActionStates;
   /** Renders the keyboard legend under the panel. */
   showShortcuts?: boolean;
+  /**
+   * Controlled selection. Omitted, the view owns which span is open — which is
+   * what the Lens and the extension want. The video player passes it because
+   * the sentence is also drawn on the subtitle overlay, and two copies of the
+   * same sentence disagreeing about which word is open reads as a bug.
+   */
+  selectedIndex?: number;
+  onSelectedIndexChange?: (index: number) => void;
   ref?: Ref<SentenceAnalysisHandle>;
 }
 
@@ -79,17 +95,27 @@ export default function SentenceAnalysisView({
   actions,
   actionState,
   showShortcuts,
+  selectedIndex,
+  onSelectedIndexChange,
   ref,
 }: Props) {
   const { t, lang: uiLang } = useT();
   // Opening on the first annotation means the card is never an empty frame, and
   // the first span is the one the reader's eye is already on.
-  const [selected, setSelected] = useState(0);
+  const [internalSelected, setInternalSelected] = useState(0);
+  const selected = selectedIndex ?? internalSelected;
+  const select = useCallback(
+    (index: number) => {
+      setInternalSelected(index);
+      onSelectedIndexChange?.(index);
+    },
+    [onSelectedIndexChange],
+  );
   const [showTranslations, setShowTranslations] = useState(false);
   useEffect(() => {
-    setSelected(0);
+    select(0);
     setShowTranslations(false);
-  }, [result.sentence]);
+  }, [result.sentence, select]);
 
   const pieces = useMemo(
     () => sentencePieces(result.sentence, result.annotations),
@@ -107,17 +133,17 @@ export default function SentenceAnalysisView({
         const count = result.annotations.length;
         if (typeof command === 'object') {
           if (command.select >= count) return false;
-          setSelected(command.select);
+          select(command.select);
           return true;
         }
         switch (command) {
           case 'next':
             if (!count) return false;
-            setSelected((i) => (i + 1) % count);
+            select((selected + 1) % count);
             return true;
           case 'prev':
             if (!count) return false;
-            setSelected((i) => (i - 1 + count) % count);
+            select((selected - 1 + count) % count);
             return true;
           case 'translations':
             setShowTranslations((v) => !v);
@@ -155,7 +181,7 @@ export default function SentenceAnalysisView({
         }
       },
     }),
-    [result, active, actions],
+    [result, active, actions, selected, select],
   );
 
   return (
@@ -178,7 +204,7 @@ export default function SentenceAnalysisView({
                 }`}
                 aria-pressed={piece.index === selected}
                 title={piece.annotation.meaning}
-                onClick={() => setSelected(piece.index)}
+                onClick={() => select(piece.index)}
               >
                 {piece.text}
               </button>

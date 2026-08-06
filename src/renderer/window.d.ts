@@ -550,6 +550,10 @@ declare global {
         result?: import('../shared/translateAnalysisCore').TranslateAnalysisResult;
         error?: string;
       }>;
+      // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
+      extractVideoClip(
+        req: import('../shared/videoClip').VideoClipRequest,
+      ): Promise<import('../main/videoClipExtract').VideoClipResult>;
       // Whole-sentence AI annotation — AI OCR mode in the Lens and the extension.
       sentenceAnalyze(
         req: import('../shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
@@ -601,6 +605,12 @@ declare global {
       onSubtitleDiscoveryProgress(
         cb: (p: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,
       ): () => void;
+      subtitleHarvestList(
+        input: import('../shared/subtitleHarvest').SubtitleHarvestListInput,
+      ): Promise<import('../shared/subtitleHarvest').SubtitleHarvestListResult>;
+      subtitleHarvestFetch(
+        ids: string[],
+      ): Promise<import('../shared/subtitleHarvest').SubtitleHarvestFetchResult>;
       runMediaMetadata(
         request?: import('../../shared/mediaMetadataIpc').MediaMetadataRequest,
       ): Promise<import('../../shared/mediaMetadataIpc').MediaMetadataResult>;
@@ -1292,6 +1302,13 @@ declare global {
       scraperListDownloads(
         input: import('../shared/scraperIpc').ScraperQbitInput,
       ): Promise<import('../shared/scraperResults').DownloadRow[]>;
+      /** Japanese subtitles for a catalogue entry — see main/subtitleHarvest.ts. */
+      subtitleHarvestList(
+        input: import('../shared/subtitleHarvest').SubtitleHarvestListInput,
+      ): Promise<import('../shared/subtitleHarvest').SubtitleHarvestListResult>;
+      subtitleHarvestFetch(
+        ids: string[],
+      ): Promise<import('../shared/subtitleHarvest').SubtitleHarvestFetchResult>;
       scraperListExports(): Promise<import('../shared/scraperResults').ExportRecord[]>;
       scraperListPlugins(
         enabledIds: string[],

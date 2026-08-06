@@ -5,6 +5,7 @@ import {
   clampStudyPlaybackRate,
   cuePlaybackEndSec,
   cuePlaybackStartSec,
+  transcriptSeekSec,
   dismissVideoCoreComprehensionSuggestion,
   dismissVideoCoreShadowingSuggestion,
   evaluateVideoCoreDictation,
@@ -43,6 +44,28 @@ describe('videoCoreStudy', () => {
     expect(cuePlaybackStartSec(cues[1], 0.25)).toBe(3.25);
     expect(cuePlaybackEndSec(cues[1], -0.5)).toBe(4);
     expect(cues[1].startMs).toBe(3000);
+  });
+
+  it('lands a transcript jump before the line, and never before the file', () => {
+    // cues[1] starts at 3s: a 1s run-up puts playback at 2s.
+    expect(transcriptSeekSec(cues[1], 0, 1)).toBe(2);
+    // The run-up is applied after the delay, not instead of it.
+    expect(transcriptSeekSec(cues[1], 0.25, 1)).toBe(2.25);
+    // A line inside the first second cannot seek negative.
+    expect(transcriptSeekSec({ startMs: 400 }, 0, 1)).toBe(0);
+    // Cue navigation passes no run-up and must be unaffected.
+    expect(transcriptSeekSec(cues[1], 0.25, 0)).toBe(cuePlaybackStartSec(cues[1], 0.25));
+  });
+
+  it('clamps the seek step to a range a shortcut can actually use', () => {
+    // The user picks this (5s -> 7s, say); the clamp is what stops a hand-edited
+    // preferences file producing a shortcut that seeks to the end of the episode.
+    expect(normalizeVideoCoreStudyPreferences({ seekStepSec: 7 }).seekStepSec).toBe(7);
+    expect(normalizeVideoCoreStudyPreferences({ seekStepSec: 0 }).seekStepSec).toBe(1);
+    expect(normalizeVideoCoreStudyPreferences({ seekStepSec: 9999 }).seekStepSec).toBe(60);
+    expect(normalizeVideoCoreStudyPreferences({ seekStepSec: 7.4 }).seekStepSec).toBe(7);
+    expect(normalizeVideoCoreStudyPreferences({}).seekStepSec).toBe(5);
+    expect(normalizeVideoCoreStudyPreferences({ seekStepSec: Number.NaN }).seekStepSec).toBe(5);
   });
 
   it('resolves a secondary track against the same delayed playback clock', () => {

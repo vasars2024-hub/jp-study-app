@@ -222,12 +222,29 @@ describe('the study keys reach a player that exists', () => {
     expect(collisions).toEqual([]);
   });
 
-  it('the overlay owns all ten, and MediaContent owns none', () => {
+  it('the overlay owns all thirteen, and MediaContent owns none', () => {
     const overlay = code(readFileSync(OVERLAY, 'utf8'));
     const registered = [...overlay.matchAll(/registerCommandHandler\('(video\.[a-zA-Z]+)'/g)]
       .flatMap((match) => (match[1] ? [match[1]] : []));
-    expect(registered).toHaveLength(10);
-    expect(registered).toContain('video.toggleLoop');
+    // Named rather than counted: a count alone passes when one command is
+    // renamed into another's place, which is the drift this guard exists for.
+    // Ten cue/subtitle rows, plus the three added with clip mining and seeking.
+    expect(new Set(registered)).toEqual(new Set([
+      'video.replayLine',
+      'video.prevLine',
+      'video.nextLine',
+      'video.subEarlier',
+      'video.subLater',
+      'video.subEarlierLarge',
+      'video.subLaterLarge',
+      'video.toggleAutoPause',
+      'video.toggleLoop',
+      'video.toggleFurigana',
+      'video.seekBack',
+      'video.seekForward',
+      'video.mineCurrentLine',
+    ]));
+    expect(registered).toHaveLength(13);
 
     // And exactly one dispatcher: the hardcoded `event.code` switch is gone, so a keypress
     // cannot fire both the overlay's own handler and the command it is registered under.

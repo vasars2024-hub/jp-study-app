@@ -322,11 +322,25 @@ export function retainedOnForce(records: readonly SubtitleRecord[] | undefined):
 }
 
 /** Whether a previous failed search for this language is still fresh enough to trust. */
+/**
+ * Failure reasons that say nothing about whether the subtitle exists.
+ *
+ * `no-key` is a statement about *this app's configuration*, not about the
+ * provider's catalogue — we never asked. Letting it suppress retries meant that
+ * adding an API key did not take effect for up to `retryAfterDays`: the sweep
+ * kept skipping the provider it had just been given credentials for, recorded
+ * no new failure while doing it, and so offered the user nothing to explain the
+ * silence. Measured on this machine — a Jimaku key added 5.98 days after a
+ * keyless sweep was still being ignored, with a 7-day window.
+ */
+const NON_EVIDENTIAL_FAILURES = new Set(['no-key']);
+
 function recentlyFailed(item: MediaItem, providerId: string, lang: string, retryAfterDays: number): boolean {
   const cutoff = Date.now() - retryAfterDays * DAY_MS;
   return (item.subtitleFailures ?? []).some((failure) =>
     failure.providerId === providerId
     && failure.lang === lang
+    && !NON_EVIDENTIAL_FAILURES.has(failure.reason)
     && failure.attemptedAt > cutoff);
 }
 
@@ -421,7 +435,14 @@ async function discoverForItem(
       continue;
     }
 
-    const wanted = missing.filter((lang) => !recentlyFailed(item, providerId, lang, settings.retryAfterDays));
+    // `force` means the user asked for this search again, explicitly. Honouring
+    // the back-off there would make the one control that exists for "try again
+    // now" do nothing at all — which is what it did before: `force` dropped the
+    // stored records and marked the item eligible, then this gate skipped the
+    // provider anyway, so a forced re-search silently searched nothing.
+    const wanted = force
+      ? missing
+      : missing.filter((lang) => !recentlyFailed(item, providerId, lang, settings.retryAfterDays));
     if (wanted.length === 0) continue;
 
     emit('searching-providers', { providerId });

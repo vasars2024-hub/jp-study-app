@@ -72,6 +72,30 @@ describe('appendUnreferencedMediaToFields', () => {
     expect(fields.Picture).toBe('');
     expect(fields.Audio).toBe('[sound:cue.webm]');
   });
+
+  it('routes a clip to its own field instead of letting Audio swallow it', () => {
+    // Both are [sound:…] markup, so ordering is the only thing separating them:
+    // a card that mines pronunciation AND the scene must not lose one of them.
+    const fields = appendUnreferencedMediaToFields(
+      { Front: '猫', Back: '猫が窓辺で寝ている。', Audio: '', Clip: '' },
+      ['Front', 'Back', 'Audio', 'Clip'],
+      { audio: '[sound:word.mp3]', clip: '[sound:scene.webm]' },
+    );
+
+    expect(fields.Clip).toBe('[sound:scene.webm]');
+    expect(fields.Audio).toBe('[sound:word.mp3]');
+    expect(fields.Back).toBe('猫が窓辺で寝ている。');
+  });
+
+  it('falls back to the last populated field when the model has no clip field', () => {
+    const fields = appendUnreferencedMediaToFields(
+      { Term: '猫', Sentence: '猫が窓辺で寝ている。' },
+      ['Term', 'Sentence'],
+      { clip: '[sound:scene.webm]' },
+    );
+
+    expect(fields.Sentence).toBe('猫が窓辺で寝ている。<br>[sound:scene.webm]');
+  });
 });
 
 describe('mediaFilenamesFromAnkiMarkup', () => {

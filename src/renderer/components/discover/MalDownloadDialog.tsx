@@ -49,6 +49,7 @@ import {
   mangaChapterSourceKey,
 } from '../reading/mangaSourcePresentation';
 import MangaReader from '../../views/MangaReader';
+import SubtitleHarvestPanel from './SubtitleHarvestPanel';
 import { getActiveScraperSettings } from '../../scraperSettingsStore';
 import { showToast } from '../ui/Toast';
 import { notify } from '../../notificationStore';
@@ -141,6 +142,16 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
    * source dropdown.
    */
   const [mangaMode, setMangaMode] = useState<'chapters' | 'releases'>('chapters');
+  /**
+   * Anime's own two shelves.
+   *
+   * `episodes` is the torrent path this dialog has always had. `subtitles`
+   * fetches the Japanese text alone and hands it to the study analysis — a
+   * learner who only wants the vocabulary should not have to download 24 video
+   * files to get it. Same shape as `mangaMode` deliberately: one shelf switch
+   * pattern, not two.
+   */
+  const [animeMode, setAnimeMode] = useState<'episodes' | 'subtitles'>('episodes');
   /** Releases the user ticked in the picker, by id. */
   const [pickedReleases, setPickedReleases] = useState<Set<string>>(() => new Set());
   const [releaseFilter, setReleaseFilter] = useState('');
@@ -479,6 +490,17 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
   const hasOwned = useMemo(() => units.some((unit) => unit.owned), [units]);
   /** True when the surface is a release picker rather than a unit range. */
   const pickingReleases = isManga && mangaMode === 'releases';
+  /** True when the selected episodes are being harvested as text, not fetched. */
+  const harvestingSubs = !isManga && animeMode === 'subtitles';
+  /**
+   * The episode numbers the harvest is asked for — the *same* resolved
+   * selection the torrent path plans against, so "range 20–24" cannot mean one
+   * thing on one shelf and something else on the other.
+   */
+  const selectedEpisodes = useMemo(
+    () => selected.map((unit) => unit.number).filter(Number.isInteger),
+    [selected],
+  );
   const visibleReleases = useMemo(
     () => filterMalReleases(releases, releaseFilter),
     [releases, releaseFilter],
@@ -800,6 +822,29 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
             built-in local-files one fails with a 500 on any online title — must
             still leave the user a way over to the torrent index, which is
             exactly the case where they need it most. */}
+        {!isManga ? (
+          <div
+            className="disc-segment mal-dl-shelf"
+            role="group"
+            aria-label={t('malDownload.shelf')}
+          >
+            {(['episodes', 'subtitles'] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                className={`disc-seg-btn ${animeMode === id ? 'active' : ''}`}
+                disabled={busy}
+                onClick={() => {
+                  setAnimeMode(id);
+                  forgetLastRun();
+                }}
+              >
+                {t(`malDownload.shelf.${id}`)}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {isManga ? (
           <div
             className="disc-segment mal-dl-shelf"
@@ -991,7 +1036,10 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
               ) : null}
             </div>
 
-            {!isManga || pickingReleases ? (
+            {/* The query is what the *release indexes* are searched by. The
+                harvest is keyed on the catalogue id instead, so editing a
+                release query there would be a control with nothing behind it. */}
+            {(!isManga && !harvestingSubs) || pickingReleases ? (
               <label className="disc-field mal-dl-query">
                 <span>{t('malDownload.query')}</span>
                 <input
@@ -1120,6 +1168,22 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
               ) : null}
             </ul>
             )}
+
+            {/* Below the list, not instead of it: the list is how the episodes
+                being harvested are chosen, and hiding it would leave the range
+                controls pointing at nothing the user can see. */}
+            {harvestingSubs ? (
+              <SubtitleHarvestPanel
+                // An `anilist` candidate's id *is* the AniList id; a `jikan`
+                // one's is a MAL id, which main bridges rather than guessing
+                // from the title.
+                anilistId={candidate.provider === 'anilist' ? candidate.id : null}
+                malId={candidate.provider === 'jikan' ? candidate.id : null}
+                title={target?.romajiTitle || target?.title || candidate.title}
+                episodes={selectedEpisodes}
+                sourceId={`harvest:${candidate.provider}:${candidate.id}`}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -1246,6 +1310,10 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
                   ? t('malDownload.action.downloading')
                   : t('malDownload.action.downloadChapters', { count: selected.length })}
               </button>
+            ) : harvestingSubs ? (
+              // The harvest owns its own run button, next to the results it
+              // produces. A second one down here would be a torrent search.
+              null
             ) : !plan ? (
               <button
                 type="button"

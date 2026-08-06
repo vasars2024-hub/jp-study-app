@@ -16,6 +16,7 @@ import { registerDesktopIpc } from './main/desktop';
 import { registerTranslateIpc } from './main/translate';
 import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
 import { registerSentenceAnalysisIpc } from './main/sentenceAnalysis';
+import { registerVideoClipIpc } from './main/videoClip';
 import { registerMediaStudyAssistantIpc } from './main/mediaStudyAssistant';
 import { registerMediaStudyOrchestratorIpc } from './main/mediaStudyOrchestrator';
 import { registerLocalAgentIpc, stopLocalAgentRuntime } from './main/localAgent';
@@ -50,7 +51,10 @@ import {
 import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
 import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
-import type { AutomationBuilderLaunchResult } from './shared/automationBuilder';
+import {
+  automationBuilderDirectCommand,
+  type AutomationBuilderLaunchResult,
+} from './shared/automationBuilder';
 import {
   sanitizeToolboxFileSearchRequest,
   type ToolboxFileSearchRequest,
@@ -326,13 +330,33 @@ function isAllowedSearchRoot(resolvedRoot: string): boolean {
   return false;
 }
 
+/**
+ * Where `automation-builder.ps1` actually is on this machine, or null.
+ *
+ * Shared by the launcher and the command readout so the two cannot disagree.
+ * The readout used to render a constant containing a developer's own home
+ * directory (audit F9) — a path that is wrong for every other install, yet was
+ * offered for copying to the clipboard as if it would work.
+ */
+function resolveAutomationBuilderScript(): string | null {
+  const candidates = [
+    path.join(app.getAppPath(), 'automation-builder.ps1'),
+    path.join(process.cwd(), 'automation-builder.ps1'),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
 function registerToolboxIpc(): void {
+  ipcMain.handle(
+    'toolbox:automationBuilderCommand',
+    (): string | null => {
+      const scriptPath = resolveAutomationBuilderScript();
+      return scriptPath ? automationBuilderDirectCommand(scriptPath) : null;
+    },
+  );
+
   ipcMain.handle('toolbox:launchAutomationBuilder', (): AutomationBuilderLaunchResult => {
-    const candidates = [
-      path.join(app.getAppPath(), 'automation-builder.ps1'),
-      path.join(process.cwd(), 'automation-builder.ps1'),
-    ];
-    const scriptPath = candidates.find((candidate) => fs.existsSync(candidate));
+    const scriptPath = resolveAutomationBuilderScript();
     if (!scriptPath) {
       return { ok: false, error: 'automation-builder.ps1 was not found in the app root.' };
     }
@@ -1440,6 +1464,7 @@ app.whenReady().then(async () => {
   registerTranslateIpc();
   registerTranslateAnalysisIpc();
   registerSentenceAnalysisIpc();
+  registerVideoClipIpc();
   registerMediaStudyAssistantIpc();
   registerMediaStudyOrchestratorIpc();
   registerLocalAgentIpc();

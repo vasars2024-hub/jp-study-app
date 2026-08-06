@@ -833,6 +833,11 @@ const api = {
     result?: import('./shared/translateAnalysisCore').TranslateAnalysisResult;
     error?: string;
   }> => ipcRenderer.invoke('translate:analyze', req),
+  // Cuts a mined sentence's video out of the local episode file (ffmpeg, main side).
+  extractVideoClip: (
+    req: import('./shared/videoClip').VideoClipRequest,
+  ): Promise<import('./main/videoClip').VideoClipResult> =>
+    ipcRenderer.invoke('video:extractClip', req),
   // Cloud-LLM whole-sentence annotation — AI OCR mode (needs an API key)
   sentenceAnalyze: (
     req: import('./shared/sentenceAnalysisCore').SentenceAnalyzeRequest,
@@ -1018,6 +1023,7 @@ const api = {
     ipcRenderer.on('subtitleDiscovery:progress', handler);
     return () => ipcRenderer.removeListener('subtitleDiscovery:progress', handler);
   },
+
   /** Persist per-item user state (favorite / study queue / note / collections). */
   setMediaItemState: (
     id: string,
@@ -2039,6 +2045,17 @@ const api = {
     input: import('./shared/scraperIpc').ScraperQbitInput,
   ): Promise<import('./shared/scraperResults').DownloadRow[]> =>
     ipcRenderer.invoke(SCRAPER_CHANNELS.listDownloads, input),
+  // Subtitle harvest — Japanese subs for a catalogue entry, no local file.
+  // `list` returns ids and names only; the provider URL never crosses this
+  // boundary, so `fetch` can only name something main already listed.
+  subtitleHarvestList: (
+    input: import('./shared/subtitleHarvest').SubtitleHarvestListInput,
+  ): Promise<import('./shared/subtitleHarvest').SubtitleHarvestListResult> =>
+    ipcRenderer.invoke('subtitleHarvest:list', input),
+  subtitleHarvestFetch: (
+    ids: string[],
+  ): Promise<import('./shared/subtitleHarvest').SubtitleHarvestFetchResult> =>
+    ipcRenderer.invoke('subtitleHarvest:fetch', ids),
   scraperListExports: (): Promise<import('./shared/scraperResults').ExportRecord[]> =>
     ipcRenderer.invoke(SCRAPER_CHANNELS.listExports),
   scraperListPlugins: (

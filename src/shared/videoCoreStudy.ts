@@ -23,6 +23,14 @@ export interface VideoCoreStudyPreferences {
   dictationMode: boolean;
   shadowingMode: boolean;
   subtitleFontSize: number;
+  /** Cue background opacity, 0 (fully transparent) to 90. */
+  subtitleBgOpacity: number;
+  /** Colour-code the active cue by grammar/vocab/particle and allow click-to-explain. */
+  grammarHighlight: boolean;
+  /** Show the whole subtitle track as a seekable transcript rail. */
+  transcriptPanel: boolean;
+  /** Seconds the rewind / fast-forward shortcuts move, 1–60. */
+  seekStepSec: number;
   [key: string]: unknown;
 }
 
@@ -163,6 +171,15 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
     dictationMode: raw.dictationMode === true,
     shadowingMode: raw.shadowingMode === true,
     subtitleFontSize: fontSize,
+    subtitleBgOpacity: typeof raw.subtitleBgOpacity === 'number'
+      && Number.isFinite(raw.subtitleBgOpacity)
+      ? Math.round(Math.max(0, Math.min(90, raw.subtitleBgOpacity)))
+      : 35,
+    grammarHighlight: raw.grammarHighlight === true,
+    transcriptPanel: raw.transcriptPanel === true,
+    seekStepSec: typeof raw.seekStepSec === 'number' && Number.isFinite(raw.seekStepSec)
+      ? Math.round(Math.max(1, Math.min(60, raw.seekStepSec)))
+      : 5,
   };
 }
 
@@ -179,6 +196,23 @@ export function cuePlaybackStartSec(
   subtitleDelaySec: number,
 ): number {
   return Math.max(0, cue.startMs / 1000 + subtitleDelaySec);
+}
+
+/**
+ * Where playback lands when a transcript line is clicked: the cue's start, less
+ * a run-up, never before the file.
+ *
+ * Kept here rather than inline in the overlay because the clamp is the whole
+ * content of it — a lead-in applied to a cue in the first second of an episode
+ * produces a negative `currentTime`, which Chromium silently coerces to 0 on
+ * some paths and rejects on others.
+ */
+export function transcriptSeekSec(
+  cue: Pick<VideoCoreStudyCue, 'startMs'>,
+  subtitleDelaySec: number,
+  leadInSec: number,
+): number {
+  return Math.max(0, cuePlaybackStartSec(cue, subtitleDelaySec) - leadInSec);
 }
 
 export function cuePlaybackEndSec(

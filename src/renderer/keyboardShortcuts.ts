@@ -554,6 +554,30 @@ export const COMMAND_CATALOG: AppCommand[] = [
   { id: 'video.toggleAutoPause', label: 'Toggle auto-pause', category: 'Video', defaultKeys: '' },
   { id: 'video.toggleLoop', label: 'Toggle line loop', category: 'Video', defaultKeys: '' },
   { id: 'video.toggleFurigana', label: 'Toggle furigana', category: 'Video', defaultKeys: '' },
+  // Mining and seeking. Unbound by default for the same reason as the rows above:
+  // every free single letter belongs to the adopted player's own keymap, and a
+  // default that collides is worse than one the user binds deliberately.
+  {
+    id: 'video.mineCurrentLine',
+    label: 'Mine the current subtitle line',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Sends the line playing right now to Anki, with whatever the mining panel has armed.',
+  },
+  {
+    id: 'video.seekBack',
+    label: 'Rewind',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Step size is set in the player’s Playback controls, from 1 to 60 seconds.',
+  },
+  {
+    id: 'video.seekForward',
+    label: 'Fast-forward',
+    category: 'Video',
+    defaultKeys: '',
+    note: 'Step size is set in the player’s Playback controls, from 1 to 60 seconds.',
+  },
   // Phase 6 slice 11. Unlike its neighbours this one is a BUILT-IN, not a command
   // a view registers: the point is that it works from anywhere, including from
   // inside the full-screen media workspace, where the palette's Continue-watching

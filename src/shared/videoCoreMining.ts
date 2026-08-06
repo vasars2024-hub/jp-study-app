@@ -39,6 +39,7 @@ export interface VideoCoreCueProvenance {
   assets: {
     screenshot?: VideoCoreMiningAsset;
     audio?: VideoCoreMiningAsset;
+    clip?: VideoCoreMiningAsset;
   };
   capturedAt: number;
 }
@@ -55,6 +56,9 @@ export interface VideoCoreMiningDraft {
   screenshot?: VideoCoreMiningAsset;
   audioBase64?: string;
   audio?: VideoCoreMiningAsset;
+  /** The scene the sentence was said in, for the {clip} variable. */
+  clipBase64?: string;
+  clip?: VideoCoreMiningAsset;
   provenance: VideoCoreCueProvenance;
 }
 
@@ -178,7 +182,7 @@ export function createVideoCoreMiningDraft(
 
 export function withVideoCoreMiningAsset(
   draft: VideoCoreMiningDraft,
-  kind: 'screenshot' | 'audio',
+  kind: 'screenshot' | 'audio' | 'clip',
   input: { base64: string; asset: VideoCoreMiningAsset },
 ): VideoCoreMiningDraft {
   // Capture helpers return `{ base64, filename, mimeType, bytes }`. Structural
@@ -226,6 +230,12 @@ export function buildVideoCoreMineRequest(draft: VideoCoreMiningDraft): MineNote
       ? {
           imageBase64: draft.screenshotBase64,
           imageFilename: draft.screenshot.filename,
+        }
+      : {}),
+    ...(draft.clipBase64 && draft.clip
+      ? {
+          clipBase64: draft.clipBase64,
+          clipFilename: draft.clip.filename,
         }
       : {}),
     ...(draft.audioBase64 && draft.audio

@@ -22,6 +22,7 @@ import {
   registerSubtitleDiscoveryIpc,
   runSubtitleDiscovery,
 } from './subtitleDiscovery';
+import { registerSubtitleHarvestIpc } from './subtitleHarvest';
 import { mt } from './i18n';
 import type { ExternalPlayerProfile, PlaybackHandoff } from '../shared/externalPlayer';
 
@@ -915,6 +916,11 @@ export function registerMediaIpc(): void {
     listItems: () => readDb().items,
     patchItems,
   });
+  // Harvest is the sibling of discovery: same provider clients and credential
+  // store, but keyed on an AniList id rather than on local media, so it takes
+  // no host. Registered here rather than in main.ts to keep both subtitle
+  // surfaces registered from one place.
+  registerSubtitleHarvestIpc();
   registerTranscriptionIpc({
     listItems: () => readDb().items,
     patchItems,

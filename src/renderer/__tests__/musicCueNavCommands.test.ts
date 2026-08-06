@@ -110,7 +110,9 @@ describe('the lyrics pane owns them, and does not own the video ones', () => {
         .flatMap((match) => (match[1] ? [match[1]] : [])),
     );
     // The control: an expression that matched nothing would pass this for any input.
-    expect(overlayIds.size).toBe(10);
+    // Thirteen since clip mining and seeking landed — see deletedPlayerDependents,
+    // which names the whole set rather than counting it.
+    expect(overlayIds.size).toBe(13);
     for (const id of CUE_NAV_IDS) expect(overlayIds.has(id)).toBe(false);
   });
 });
