@@ -72,7 +72,21 @@ const CORE_WALL_PRESETS: WallPreset[] = [
   },
 ];
 
+/**
+ * Every preset the app can RESOLVE, including ones no longer offered in a picker.
+ * The Aero pack stays here on purpose: `getWallPreset` falls back to
+ * `CORE_WALL_PRESETS[0]` for an unknown id, so dropping the nostalgia presets from
+ * this list would silently repaint the whole Secret OS (Aero) rotation — whose
+ * playlist references them by id — as Crimson Veil.
+ */
 export const WALL_PRESETS: WallPreset[] = [...CORE_WALL_PRESETS, ...NOSTALGIC_WALL_PRESETS];
+
+/**
+ * Presets a user may CHOOSE. v1.0 audit §1.1: the five Aero scenery walls were
+ * cut from the selection list. They remain resolvable above so saved state and
+ * the Aero playlist keep working — this is the selection set, not the truth set.
+ */
+export const SELECTABLE_WALL_PRESETS: WallPreset[] = [...CORE_WALL_PRESETS];
 
 export function getWallPreset(id: string | undefined): WallPreset {
   return WALL_PRESETS.find((p) => p.id === id) ?? CORE_WALL_PRESETS[0];

@@ -167,6 +167,7 @@ export default function LockscreenPage() {
         <div className="os-viz-row">
           {(
             [
+              ['auto', 'settings.lock.tint.auto'],
               ['neutral', 'settings.lock.tint.neutral'],
               ['ember', 'settings.lock.tint.ember'],
               ['slate', 'settings.lock.tint.slate'],
@@ -183,6 +184,11 @@ export default function LockscreenPage() {
             </button>
           ))}
         </div>
+        {cfg.tint === 'auto' && (
+          <p className="muted" style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.45 }}>
+            {t('settings.lock.tint.autoHint')}
+          </p>
+        )}
       </SettingsCard>
     </>
   );

@@ -73,7 +73,14 @@ export default function WallpaperStage({
   /** Active layer index; -1 = neither (black gap during 'fade'). */
   const [front, setFront] = useState(0);
   const [layers, setLayers] = useState<[LayerStyle | null, LayerStyle | null]>([null, null]);
+  /** Key of the wall currently COMMITTED to `layers`. */
   const lastKey = useRef<string>('');
+  /**
+   * Key of the wall currently hydrating. Claimed synchronously so two ticks cannot
+   * resolve the same wall twice, and released by the effect cleanup so a torn-down
+   * run never blocks the run that replaces it — see the StrictMode note on `applyResolved`.
+   */
+  const pendingKey = useRef<string>('');
   /** Last *visible* front slot (0|1) — never -1, so fade does not clobber the wrong buffer. */
   const visibleFrontRef = useRef(0);
   const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,19 +93,29 @@ export default function WallpaperStage({
 
   useEffect(() => onEnvironmentChanged(setEnv), []);
 
+  /**
+   * The shell drops its own wallpaper the moment this reports active, so reporting on
+   * *intent* leaves the desktop black whenever rotation cannot produce a wall (empty
+   * playlist, media that fails to hydrate, the first resolve still in flight). Report
+   * only once a layer actually exists — the shell wall then holds until the living wall
+   * is genuinely ready, and never hands over to nothing.
+   */
+  const hasLayer = !!(layers[0] || layers[1]);
+
   useEffect(() => {
-    const active = env.enabled && env.rotationEnabled;
+    const active = env.enabled && env.rotationEnabled && hasLayer;
     onActiveChange?.(active);
     return () => {
       onActiveChange?.(false);
     };
-  }, [env.enabled, env.rotationEnabled, onActiveChange]);
+  }, [env.enabled, env.rotationEnabled, hasLayer, onActiveChange]);
 
   // Hard gate only — soft settings (playlist/rules/transition) read from envRef each tick.
   useEffect(() => {
     if (!env.enabled || !env.rotationEnabled) {
       setLayers([null, null]);
       lastKey.current = '';
+      pendingKey.current = '';
       tickRef.current = () => undefined;
       return;
     }
@@ -107,30 +124,40 @@ export default function WallpaperStage({
 
     const applyResolved = async (resolved: ResolvedWall) => {
       const key = wallItemKey(resolved.item);
-      if (key === lastKey.current) return;
-      lastKey.current = key;
+      // Already on screen, or already being hydrated by an in-flight run.
+      if (key === lastKey.current || key === pendingKey.current) return;
+      pendingKey.current = key;
 
       let layer = itemToLayer(resolved.item, resolved.reason);
       layer = await hydrateMedia(layer, resolved.item);
+      // A cancelled run must NOT claim the key. `lastKey` used to be written before this
+      // await, so StrictMode's mount → cleanup → mount left the key claimed by the run that
+      // was torn down while `layers` was still [null, null]; the second mount then resolved
+      // the same wall, matched the key, and returned early. Nothing ever painted, the shell
+      // had already dropped its own wall, and the desktop stayed black until the resolved
+      // wall happened to change — v1.0 audit §1.4. The cleanup releases `pendingKey`, so
+      // this run simply drops out and leaves the field to its replacement.
       if (cancelled) return;
+      /** Nothing committed yet — this is the very first wall, seeded into slot 0. */
+      const seeding = lastKey.current === '';
+      lastKey.current = key;
+      pendingKey.current = '';
 
       const e = envRef.current;
       const pl = e.playlists.find((p) => p.id === e.activePlaylistId) ?? resolved.playlist;
       const reduceMotion = document.documentElement.classList.contains('reduce-motion');
       const transition = reduceMotion ? 'cut' : pl.transition;
       const ms = reduceMotion ? 0 : pl.transitionMs;
-      const back = visibleFrontRef.current === 0 ? 1 : 0;
+      // The seed always lands in slot 0, so `back` must be 0 for it. Deriving `back` from
+      // `visibleFrontRef` unconditionally gave 1, and the deferred promote then made slot 1
+      // — which is empty — the front: one committed layer, none of them `on`, desktop black.
+      // The old queueMicrotask that forced front back to 0 only won under a `cut` transition;
+      // a crossfade promotes on rAF, which runs after microtasks, so the default day-cycle
+      // playlist always lost the race (v1.0 audit §1.4).
+      const back = seeding ? 0 : visibleFrontRef.current === 0 ? 1 : 0;
 
       setLayers((prev) => {
-        if (!prev[0] && !prev[1]) {
-          queueMicrotask(() => {
-            if (!cancelled) {
-              visibleFrontRef.current = 0;
-              setFront(0);
-            }
-          });
-          return [layer, null];
-        }
+        if (seeding || (!prev[0] && !prev[1])) return [layer, null];
         const next: [LayerStyle | null, LayerStyle | null] = [prev[0], prev[1]];
         next[back] = layer;
         return next;
@@ -147,7 +174,8 @@ export default function WallpaperStage({
         fadeTimer.current = null;
       }
 
-      if (transition === 'cut' || ms <= 0) {
+      // Seeding has nothing to transition *from*; deferring it is what leaves a black gap.
+      if (seeding || transition === 'cut' || ms <= 0) {
         promote();
       } else if (transition === 'fade') {
         setFront(-1);
@@ -173,6 +201,7 @@ export default function WallpaperStage({
     const id = window.setInterval(tick, 30_000);
     return () => {
       cancelled = true;
+      pendingKey.current = '';
       tickRef.current = () => undefined;
       clearInterval(id);
       if (fadeTimer.current) {

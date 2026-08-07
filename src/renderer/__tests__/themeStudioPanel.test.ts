@@ -134,4 +134,41 @@ describe('custom CSS sandbox — now backed by the shared reviewer', () => {
     const { sanitizeUserCss } = await import('../customCss');
     expect(sanitizeUserCss(null as unknown as string).ok).toBe(false);
   });
+
+  // v1.0 audit §2.2. `behavior:` was a plain substring test, so three ordinary modern
+  // properties that merely CONTAIN it were refused — with the message "Blocked
+  // construct: behavior:", which reads as a false accusation rather than a bug.
+  it('no longer refuses properties that merely contain "behavior:"', async () => {
+    const { sanitizeUserCss } = await import('../customCss');
+    for (const css of [
+      'html { scroll-behavior: smooth; }',
+      '.x { transition-behavior: allow-discrete; }',
+      '.os-set-body { overscroll-behavior: contain; }',
+    ]) {
+      expect(sanitizeUserCss(css).ok, css).toBe(true);
+    }
+    // …while IE's real `behavior:` stays blocked.
+    expect(sanitizeUserCss('.a { behavior: url(x); }').ok).toBe(false);
+  });
+
+  // v1.0 audit §2.2. `remote-url` meant "not a data: URI", so a file shipped with the
+  // app was refused with "this stylesheet loads something over the network".
+  it('allows local url() targets and still blocks network ones', async () => {
+    const { sanitizeUserCss } = await import('../customCss');
+    for (const css of [
+      ".desk-icon { background: url('./cat.png'); }",
+      '.desk-icon { background: url(/assets/cat.png); }',
+      '.desk-icon { background: url(file:///C:/x/cat.png); }',
+      '.x { background: url(data:image/png;base64,AAAA); }',
+    ]) {
+      expect(sanitizeUserCss(css).ok, css).toBe(true);
+    }
+    for (const css of [
+      '.a { background: url(https://example.com/x.png); }',
+      '.a { background: url(http://example.com/x.png); }',
+      '.a { background: url(//example.com/x.png); }',
+    ]) {
+      expect(sanitizeUserCss(css).ok, css).toBe(false);
+    }
+  });
 });

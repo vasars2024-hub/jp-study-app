@@ -175,34 +175,74 @@ export function loadPersonalization(): OsPersonalization {
   return { ...DEFAULTS };
 }
 
-export function applyPersonalization(s: OsPersonalization): void {
-  const root = document.documentElement;
-  const st = root.style;
+/**
+ * What a settings object looks like, as data — the tokens and `data-*` attributes it
+ * resolves to, with nothing written anywhere.
+ *
+ * Extracted for v1.0 audit §2.4: the Appearance preview has to render a *draft* of these
+ * settings inside its own document, and the only alternative was a second copy of these
+ * lookup tables, which would quietly drift from the real one. `applyPersonalization`
+ * consumes this too, so the preview and the app can never disagree about what a setting
+ * means.
+ *
+ * `accent` is returned separately because applying it is conditional — Aero and WIRED
+ * ship their own accent palette and must be left alone (see `themeOwnsAccent`).
+ */
+export interface PersonalizationVisuals {
+  tokens: Record<string, string>;
+  accent: Record<string, string>;
+  attrs: Record<string, string>;
+}
+
+export function personalizationVisuals(s: OsPersonalization): PersonalizationVisuals {
   const dens = DENSITY[s.density] ?? DENSITY.comfortable;
   const rad = RADIUS[s.radius] ?? RADIUS.soft;
   const sh = SHADOW[s.shadow] ?? SHADOW.soft;
+  const accentHex = s.accentMode === 'custom'
+    ? (s.customAccent.startsWith('#') ? s.customAccent : `#${s.customAccent}`)
+    : (ACCENT_PRESETS.find((x) => x.id === s.accentPreset) ?? ACCENT_PRESETS[0]).accent;
+  const preset = s.accentMode === 'custom'
+    ? undefined
+    : ACCENT_PRESETS.find((x) => x.id === s.accentPreset) ?? ACCENT_PRESETS[0];
 
-  st.setProperty('--space-xs', dens.xs);
-  st.setProperty('--space-sm', dens.sm);
-  st.setProperty('--space-md', dens.md);
-  st.setProperty('--space-lg', dens.lg);
-  st.setProperty('--space-xl', dens.xl);
-  st.setProperty('--control-pad', dens.pad);
+  return {
+    tokens: {
+      'space-xs': dens.xs,
+      'space-sm': dens.sm,
+      'space-md': dens.md,
+      'space-lg': dens.lg,
+      'space-xl': dens.xl,
+      'control-pad': dens.pad,
+      'radius-sm': rad.sm,
+      'radius-md': rad.md,
+      'radius-lg': rad.lg,
+      'shadow-card': sh.card,
+      'shadow-toolbar': sh.toolbar,
+      'font-body': FONT[s.fontFamily] ?? FONT.segoe,
+      'wallpaper-dim': String(clampDim(s.wallpaperDim)),
+    },
+    accent: {
+      accent: accentHex,
+      'accent-2': preset?.light ?? mixHex(accentHex, 'white', 0.28),
+      red: accentHex,
+      'red-deep': preset?.deep ?? mixHex(accentHex, 'black', 0.22),
+    },
+    attrs: {
+      'data-chrome': s.chrome,
+      'data-density': s.density,
+      'data-radius': s.radius,
+      'data-shadow': s.shadow,
+    },
+  };
+}
 
-  st.setProperty('--radius-sm', rad.sm);
-  st.setProperty('--radius-md', rad.md);
-  st.setProperty('--radius-lg', rad.lg);
+export function applyPersonalization(s: OsPersonalization): void {
+  const root = document.documentElement;
+  const st = root.style;
+  const { tokens, attrs } = personalizationVisuals(s);
 
-  st.setProperty('--shadow-card', sh.card);
-  st.setProperty('--shadow-toolbar', sh.toolbar);
-
-  st.setProperty('--font-body', FONT[s.fontFamily] ?? FONT.segoe);
-  st.setProperty('--wallpaper-dim', String(clampDim(s.wallpaperDim)));
-
-  root.dataset.chrome = s.chrome;
-  root.dataset.density = s.density;
-  root.dataset.radius = s.radius;
-  root.dataset.shadow = s.shadow;
+  for (const [token, value] of Object.entries(tokens)) st.setProperty(`--${token}`, value);
+  for (const [name, value] of Object.entries(attrs)) root.setAttribute(name, value);
 
   applyAccentFromSettings(s);
 

@@ -91,42 +91,10 @@ export default function AtmospherePage() {
         )}
       </SettingsCard>
 
-      <SettingsCard
-        id="rotation"
-        title={t('settings.atmosphere.rotation.title')}
-        description={t('settings.atmosphere.rotation.desc')}
-        highlight={focusSettingId === 'rotation'}
-        trailing={
-          <label className="os-toggle os-toggle-compact">
-            <input
-              type="checkbox"
-              checked={env.rotationEnabled}
-              disabled={!env.enabled}
-              onChange={(e) => patchEnv({ rotationEnabled: e.target.checked })}
-              aria-label={t('settings.atmosphere.enableRotation')}
-            />
-            <span>{env.rotationEnabled ? t('common.on') : t('common.off')}</span>
-          </label>
-        }
-      >
-        {resolved && (
-          <p className="muted os-set-hint">
-            {t('settings.atmosphere.now')} <strong>{resolved.item.label ?? resolved.item.ref}</strong>
-            {' — '}
-            {resolved.reason}
-          </p>
-        )}
-        <label className="os-toggle">
-          <input
-            type="checkbox"
-            checked={env.calendarWallsEnabled}
-            disabled={!env.enabled || !env.rotationEnabled}
-            onChange={(e) => patchEnv({ calendarWallsEnabled: e.target.checked })}
-          />
-          <span>{t('settings.atmosphere.calendarWalls')}</span>
-        </label>
-        <PlaylistEditor env={env} disabled={!env.enabled || !env.rotationEnabled} onChange={patchEnv} />
-      </SettingsCard>
+      {/* v1.0 audit 1.2: the Wallpaper rotation card moved to Settings > Wallpaper
+          (WallpaperRotationCard.tsx) — it is a wallpaper control, not an
+          atmosphere one. It still depends on the living-layer master switch
+          above, which the moved card surfaces as an explicit hint. */}
 
       <SettingsCard
         id="lighting"

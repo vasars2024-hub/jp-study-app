@@ -197,6 +197,15 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'Personalization',
   },
   {
+    // v1.0 audit §2.4 — the Appearance draft preview.
+    id: 'appearance-preview',
+    titleKey: 'settings.preview.card.heading',
+    descKey: 'settings.preview.card.description',
+    keywords: ['preview', 'try', 'draft', 'before', 'appearance', 'look'],
+    pageId: 'appearance',
+    group: 'Personalization',
+  },
+  {
     id: 'theme',
     titleKey: 'search.theme',
     descKey: 'search.theme.desc',
@@ -328,12 +337,22 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'atmosphere',
     group: 'Personalization',
   },
+  // v1.0 audit 1.2 / 1.3: rotation and the Mini backdrop are wallpaper controls
+  // and now live on the Wallpaper page, so search must land there too.
   {
     id: 'rotation',
     titleKey: 'search.rotation',
     descKey: 'search.rotation.desc',
     keywords: ['rotation', 'playlist', 'schedule', 'day cycle', 'calendar walls'],
-    pageId: 'atmosphere',
+    pageId: 'wallpaper',
+    group: 'Personalization',
+  },
+  {
+    id: 'mini-wallpaper',
+    titleKey: 'settings.mini.wall.title',
+    descKey: 'settings.mini.wall.desc',
+    keywords: ['mini wallpaper', 'mini backdrop', 'craft window', 'app icons', 'mosaic', 'blur'],
+    pageId: 'wallpaper',
     group: 'Personalization',
   },
   {

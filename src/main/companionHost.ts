@@ -5,6 +5,7 @@
  */
 import { BrowserWindow, ipcMain, screen, app, powerMonitor } from 'electron';
 import path from 'node:path';
+import { listDisplays, onDisplaysChanged, unionDisplayBounds } from './displays';
 
 let host: BrowserWindow | null = null;
 let latestState: unknown = null;
@@ -30,31 +31,10 @@ export function configureCompanionHost(opts: {
   isDev = opts.isDevServer;
 }
 
-function unionDisplayBounds(useWorkArea: boolean): Electron.Rectangle {
-  const displays = screen.getAllDisplays();
-  if (!displays.length) {
-    return { x: 0, y: 0, width: 1280, height: 800 };
-  }
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const d of displays) {
-    // Prefer workArea so pets climb usable desktop edges (taskbar / dock excluded)
-    // and never sit in the dead gap between mixed-DPI monitors.
-    const b = useWorkArea ? d.workArea : d.bounds;
-    minX = Math.min(minX, b.x);
-    minY = Math.min(minY, b.y);
-    maxX = Math.max(maxX, b.x + b.width);
-    maxY = Math.max(maxY, b.y + b.height);
-  }
-  return {
-    x: minX,
-    y: minY,
-    width: Math.max(1, maxX - minX),
-    height: Math.max(1, maxY - minY),
-  };
-}
+// `unionDisplayBounds` moved to `./displays` so the desktop windows and the pet
+// host compute the same span. It still prefers workArea, so pets climb usable
+// desktop edges (taskbar / dock excluded) and never sit in the dead gap between
+// mixed-DPI monitors.
 
 function placeHost(win: BrowserWindow, mode: 'primary' | 'all' = spanMode): void {
   if (mode === 'all') {
@@ -110,6 +90,21 @@ function createHostWindow(): BrowserWindow {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       webviewTag: false,
+      /**
+       * v1.0 audit §3.1 — the reason "Show on Windows desktop" looked non-functional.
+       *
+       * This window is shown with `showInactive()` and never focused, and Chromium marks
+       * its document **hidden** even while it is painted on screen: measured live as
+       * `document.visibilityState: 'hidden'` on a window `/health` reported as
+       * `visible: true` at 1920×1080. A hidden document is throttled to no frames, so
+       * `requestAnimationFrame` never fired (`rafRan: 0` after ~1.6 s), and the host's
+       * pointer hit-test — which is what turns click-through OFF over a pet — never ran.
+       * The pet was visible and permanently untouchable.
+       *
+       * An always-on-top desktop overlay is exactly the case this flag exists for: it is
+       * never the foreground window and must keep running anyway.
+       */
+      backgroundThrottling: false,
     },
   });
 
@@ -130,7 +125,9 @@ function createHostWindow(): BrowserWindow {
   if (isDev && forwardConsole) forwardConsole(win);
   void win.loadURL(getRendererUrl('companionHost=1'));
 
-  const onDisplay = () => {
+  // One subscription against the shared display service, rather than this
+  // module's own three `screen.on(...)` listeners — same teardown discipline.
+  const offDisplay = onDisplaysChanged(() => {
     if (!host || host.isDestroyed()) return;
     placeHost(host, spanMode);
     // Host renderer remaps pets after multi-monitor plug/unplug
@@ -138,15 +135,8 @@ function createHostWindow(): BrowserWindow {
     if (latestState != null) {
       host.webContents.send('companionHost:state', latestState);
     }
-  };
-  screen.on('display-metrics-changed', onDisplay);
-  screen.on('display-added', onDisplay);
-  screen.on('display-removed', onDisplay);
-  win.on('closed', () => {
-    screen.removeListener('display-metrics-changed', onDisplay);
-    screen.removeListener('display-added', onDisplay);
-    screen.removeListener('display-removed', onDisplay);
   });
+  win.on('closed', offDisplay);
 
   return win;
 }
@@ -156,6 +146,12 @@ export function openCompanionHost(mode?: 'primary' | 'all'): void {
   if (host && !host.isDestroyed()) {
     placeHost(host, spanMode);
     host.showInactive();
+    // `placeHost` re-arms click-through and resets `hostClickThrough` to true. The host
+    // renderer's own `overRef` does not know that, so if the pointer was over a pet it
+    // would not re-send `setClickThrough(false)` until the pointer left and came back —
+    // the pet would go quietly untouchable. `wake` is the renderer's reset signal; the
+    // other two `placeHost` callers already send it.
+    host.webContents.send('companionHost:wake');
     if (latestState != null) {
       host.webContents.send('companionHost:state', latestState);
     }
@@ -212,22 +208,10 @@ export function registerCompanionHostIpc(): void {
 
   ipcMain.handle('companionHost:isOpen', (): boolean => isCompanionHostOpen());
 
-  ipcMain.handle('companionHost:getDisplays', (): {
-    id: number;
-    bounds: Electron.Rectangle;
-    workArea: Electron.Rectangle;
-    primary: boolean;
-    scaleFactor: number;
-  }[] => {
-    const primaryId = screen.getPrimaryDisplay().id;
-    return screen.getAllDisplays().map((d) => ({
-      id: d.id,
-      bounds: d.bounds,
-      workArea: d.workArea,
-      primary: d.id === primaryId,
-      scaleFactor: d.scaleFactor,
-    }));
-  });
+  // Delegates to the shared service. The shape is a superset of what this
+  // channel returned before (`key`, `label` and `virtual` are new), so existing
+  // callers in the host renderer are unaffected.
+  ipcMain.handle('companionHost:getDisplays', () => listDisplays());
 
   /** Host viewport geometry for coordinate mapping in the renderer. */
   ipcMain.handle('companionHost:getViewport', (): {

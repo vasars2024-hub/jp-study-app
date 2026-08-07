@@ -22,11 +22,19 @@ inferred rather than verified, it says so.
 
 ---
 
-## 0. Before you touch anything: is the app yours?
+## 0. Before you touch anything: is one already running?
 
-The dev app on port 5173 belongs to the user, and other agents work in this repo
-(there are two other worktrees on a shared object store). **Never start, restart, or kill the
-app** unless the task explicitly says to.
+**Starting, restarting and stopping the dev app is allowed** (`npm start`) — the user granted
+standing permission on 2026-08-07. What is not allowed is starting a *second* one on top of a
+live instance: two `electron-forge start` processes fight over port 5173 and the Chromium
+profile lock, and the loser dies in a way that reads as "the renderer never became usable".
+
+So the check is for a running instance, not for ownership: if `debug/bridge.json` exists and its
+port answers `/health`, drive that one. Otherwise start your own.
+
+Other agents do work in this repo (two other worktrees share the object store). Read `/logs`
+first — foreign `[vite] hot updated: …` paths for files you are not working on mean someone else
+is editing the tree right now, which is a reason to stop and report.
 
 Read `/logs` first. Foreign `[vite] hot updated: …` paths for files you are not working on mean
 someone else is editing the tree right now. That is a reason to stop and report, not a reason
@@ -65,27 +73,37 @@ Within that scratch root, two profiles, **both copies**:
 
 **The real profile is never opened by a harness.** Copy it, drive the copy.
 
-## 2. Back up all of `%APPDATA%\jp-study-app` before any live run
+## 2. Do NOT back up `%APPDATA%\jp-study-app` — work without a restore point
 
-Every file. Not a subset, not the files you expect to touch.
+> **Standing user instruction, 2026-08-07, given twice:** *"no backup saving, it takes too
+> much space."* This section previously said "every file, not a subset". Do not do that.
+> The directory is **8.6 GB** (5.3 GB of `downloads` alone), so a full copy is minutes of
+> I/O and gigabytes of `%TEMP%` per run. **Take no userData backup.**
 
-That directory currently holds **64 entries, 18 of them `.json` state files** — `config.json`,
-`desktop-layout.json`, `library.json`, `media.json`, `profiles.json`,
-`study-orchestrator-v2.json`, and more. You cannot predict which ones a run touches:
-`desktop-layout.json` is rewritten synchronously the moment a window moves
-(`src/main/desktop.ts:41`, `:46`, `persist()` at `:311` from `:342`/`:356`/`:374`), and moving a
-window is something you do incidentally, not deliberately.
+That changes how you work rather than merely what you skip. **Everything below is the
+compensation for having no restore point:**
 
-```powershell
-$stamp  = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backup = Join-Path $env:TEMP "jp-userdata-backup-$stamp"
-Copy-Item -Recurse -Force "$env:APPDATA\jp-study-app" $backup
-"$backup"   # write this path into your handoff NOW, before the run
-```
+- **Prefer non-persistent probes.** Drive React state by dispatching the app's own
+  `CustomEvent` (`jp-os-environment-changed`, `jp-theme-changed`, …) instead of writing
+  `localStorage`. Assert the stored value is still intact at the end of every sequence.
+- **Read the current value before you change one, and restore it afterwards** — then
+  assert the restore byte-for-byte, not by eye. A settings JSON blob compares exactly.
+- **Know what a control writes before you click it.** `desktop-layout.json` is rewritten
+  synchronously the moment a window moves (`src/main/desktop.ts:41`, `:46`, `persist()` at
+  `:311` from `:342`/`:356`/`:374`), and moving a window is something you do incidentally.
+- **Refuse anything that deletes media.** `downloads`, `models`, `wallpapers`, `library`,
+  `artwork` have no copy anywhere.
+- **Never enter Secret Aero to test something.** `SecretAeroTrigger.toggle()` calls
+  `armLockscreenOnSecretEntry()` (can lock the app behind the PIN), `applyAeroEnvironment`
+  and a shell reboot. The synthetic-event shortcut is worse: the *return* trip fires
+  `restoreStudyEnvironmentAfterAero()`, which writes environment state.
 
-**Renderer storage — localStorage and IndexedDB — has no restore point at all.** A run that
-mutates renderer state mutates it permanently. Know before you click whether the control you
-are about to exercise writes there.
+**Renderer storage — localStorage and IndexedDB — never had a restore point even when
+userData was copied.** That has not changed; it is now simply the rule for everything.
+
+If a specific run genuinely needs a restore point, copy **only** the state that run can
+touch — the top-level `*.json` and `Local Storage` are ~50 MB together — and say in the
+handoff which trees were excluded.
 
 ## 3. Connecting
 
@@ -290,18 +308,40 @@ are different builds. Finish the run, then edit.
 
 ## 10. Restoring afterwards
 
-**Stop the whole process tree first, then hash.** Hashing a runtime file while the app is
-running measures the app writing its own in-memory state back to disk — you get a mismatch that
-has nothing to do with your run, and chase it.
+There is no backup to compare against (§2), so restoration is per-value and happens
+**inside the run**: read the value before you change it, put it back at the end, and
+assert the restored value equals the original exactly.
 
 ```powershell
-# 1. stop everything, and confirm it is stopped
-# 2. only then:
-Get-ChildItem -Recurse "$env:APPDATA\jp-study-app" -File |
-  Get-FileHash | Select-Object Path, Hash
+# before: capture the exact stored blob
+.\.claude\skills\jp-bridge\scripts\eval.ps1 -Js "localStorage.getItem('jp-os-personalization-v1')"
+# after: put it back through the app's own control, then prove it
+.\.claude\skills\jp-bridge\scripts\eval.ps1 -Js "localStorage.getItem('jp-os-personalization-v1') === '<the exact blob>'"
 ```
 
-Compare against the backup from §2. Restore anything that moved and was not supposed to.
+**If you do hash files, stop the whole process tree first.** Hashing a runtime file while
+the app is running measures the app writing its own in-memory state back to disk — a
+mismatch that has nothing to do with your run, and you will chase it.
+
+## 12. A reload needs a readiness poll, not a sleep
+
+`/reload` returns `{ok:true}` immediately; this tree takes **4–8 s** to mount. Fixed
+sleeps of 2 s and 4 s both measured a half-built page, and the `click.ps1` failure that
+follows looks exactly like a missing control. Poll a selector count instead —
+`debug/wait-ready.ps1` does this and fails loudly on timeout.
+
+## 13. When the renderer mounts nothing, ask Vite, not the bridge
+
+A syntax error in an edited module leaves `/logs` looking **clean** — `[vite] connected`
+and nothing else — while `navs: 0`, no `.fwin` and no `.os-taskbar`. The bridge can only
+tell you the page is empty. The dev server has the actual error:
+
+```bash
+curl -s "http://localhost:5173/src/renderer/<path>.tsx" | head -c 1200
+```
+
+A 500 body carries the Babel message with line and column. (The one that produced this
+note: a backtick inside a CSS comment that lived inside a template literal.)
 
 ## 11. Never use desktop remote control
 

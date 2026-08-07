@@ -13,12 +13,13 @@ import {
   type ShadowStrengthId,
 } from '../../../osPersonalization';
 import { clearCustomCss, saveCustomCss } from '../../../customCss';
+import CssPlayground from '../CssPlayground';
+import AppearancePreviewCard from '../AppearancePreviewCard';
 import { loadBlancMode, onBlancModeChanged, setBlancModeEnabled, type BlancModeSettings } from '../../../blancMode';
 import { setUiLang, useT } from '../../../i18n';
 import { LANG_LABELS, LANG_TAGS, UI_LANGS } from '../../../../shared/i18n/core';
 import { loadAppBorderSettings, saveAppBorderSettings, onAppBorderSettingsChanged, type AppBorderStyle } from '../../../appBorderSettings';
 import { loadPillarboxSettings, savePillarboxSettings, onPillarboxSettingsChanged, type PillarboxStyle } from '../../../pillarboxSettings';
-import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../../aeroDiscovery';
 import { exitSecretAero } from '../../../theme/SecretAeroTrigger';
 import { AERO_THEME_ID } from '../../../theme/frutiger-aero';
 import { WIRED_ARCHIVE_THEME_ID } from '../../../theme/wired-archive';
@@ -81,9 +82,24 @@ export default function AppearancePage() {
     [lang],
   );
 
-  const [isAeroDiscovered, setIsAeroDiscovered] = useState(hasDiscoveredAero);
+  /**
+   * v1.0 audit §2.1 — App borders and Pillarbox are shown only while Aero is the
+   * ACTIVE theme, not merely once it has ever been unlocked.
+   *
+   * Both cards are inert outside Aero and always were: every `[data-app-border]`
+   * and `[data-pillarbox]` rule in `theme/aero-shell.css` is prefixed
+   * `:root[data-materials='aero']`, so on any other theme the controls write
+   * localStorage, stamp an attribute, and change nothing on screen.
+   *
+   * `theme === AERO_THEME_ID` is exactly the condition the stylesheets test:
+   * `theme/engine.ts:128` stamps `data-materials` from the active theme's
+   * `materialSet`, and `materialSet: 'aero'` is declared by one theme only
+   * (`theme/frutiger-aero.ts:24`). Reading the context's `theme` rather than the
+   * DOM attribute also keeps this reactive — it re-renders on a theme switch.
+   */
+  const aeroActive = theme === AERO_THEME_ID;
 
-  useEffect(() => onAeroDiscoveryChanged(setIsAeroDiscovered), []);
+  const [playgroundOpen, setPlaygroundOpen] = useState(false);
 
   const themeLabel = (id: string, fallback: string) => {
     const key = `settings.appearance.theme.${id}`;
@@ -99,6 +115,19 @@ export default function AppearancePage() {
 
   return (
     <>
+      {/* v1.0 audit §2.4. Sits above the live controls deliberately: the point of a
+          draft is to be reached before you start changing the real thing. */}
+      <AppearancePreviewCard
+        look={look}
+        theme={theme}
+        seg={seg}
+        highlight={focusSettingId === 'appearance-preview'}
+        onApply={(draft, themeId) => {
+          patchLook(draft);
+          if (themeId !== theme) chooseTheme(themeId);
+        }}
+      />
+
       <SettingsCard
         id="ui-language"
         title={t('settings.language.title')}
@@ -306,7 +335,7 @@ export default function AppearancePage() {
         </div>
       </SettingsCard>
 
-      {isAeroDiscovered && (
+      {aeroActive && (
       <SettingsCard
         id="app-border"
         title={t('settings.appearance.border.title')}
@@ -367,7 +396,7 @@ export default function AppearancePage() {
       </SettingsCard>
       )}
 
-      {isAeroDiscovered && (
+      {aeroActive && (
       <SettingsCard
         id="pillarbox"
         title={t('settings.appearance.pillarbox.title')}
@@ -413,6 +442,23 @@ export default function AppearancePage() {
             />
           </div>
         )}
+        <div className="os-viz-row" style={{ marginTop: 10 }}>
+          <span className="os-viz-label muted">{t('settings.appearance.pillarbox.nativeFill')}</span>
+          {[false, true].map((on) => (
+            <button
+              key={String(on)}
+              type="button"
+              className={seg(pillarboxSettings.nativeFill === on)}
+              onClick={() => {
+                const updated = savePillarboxSettings({ ...pillarboxSettings, nativeFill: on });
+                setPillarboxSettings(updated);
+              }}
+            >
+              {t(on ? 'common.on' : 'common.off')}
+            </button>
+          ))}
+        </div>
+        <p className="muted" style={{ marginTop: 6 }}>{t('settings.appearance.pillarbox.nativeFill.desc')}</p>
       </SettingsCard>
       )}
 
@@ -435,11 +481,28 @@ export default function AppearancePage() {
             <div className="os-set-btns">
               <button
                 type="button"
+                className="btn small"
+                disabled={look.customCssEnabled === false}
+                onClick={() => setPlaygroundOpen(true)}
+              >
+                {t('settings.playground.open')}
+              </button>
+              <button
+                type="button"
                 className="btn small primary"
                 disabled={look.customCssEnabled === false}
                 onClick={() => {
                   const r = saveCustomCss(userCss);
-                  setCssMsg(r.ok ? t('settings.appearance.css.applied') : r.error ?? t('settings.appearance.css.failed'));
+                  setCssMsg(
+                    !r.ok
+                      ? r.error ?? t('settings.appearance.css.failed')
+                      // A silent "CSS applied." was the whole complaint in v1.0 audit §2.2:
+                      // root variable overrides used to lose to the inline personalization
+                      // styles and say nothing. They now win, and the message says so.
+                      : r.promoted
+                        ? t('settings.appearance.css.appliedPromoted', { count: r.promoted })
+                        : t('settings.appearance.css.applied'),
+                  );
                 }}
               >
                 {t('settings.appearance.css.apply')}
@@ -492,6 +555,25 @@ export default function AppearancePage() {
           <span>{t('settings.appearance.css.enable')}</span>
         </label>
       </SettingsCard>
+
+      {/* v1.0 audit §2.3. The playground owns a draft; persistence stays here, so
+          closing it without applying leaves the sandbox exactly as it was. */}
+      <CssPlayground
+        open={playgroundOpen}
+        initialCss={userCss}
+        onClose={() => setPlaygroundOpen(false)}
+        onApply={(css) => {
+          setUserCss(css);
+          const r = saveCustomCss(css);
+          setCssMsg(
+            !r.ok
+              ? r.error ?? t('settings.appearance.css.failed')
+              : r.promoted
+                ? t('settings.appearance.css.appliedPromoted', { count: r.promoted })
+                : t('settings.appearance.css.applied'),
+          );
+        }}
+      />
 
       {/* MASTER_PLAN §20 — theme profiles, the request interpreter, component-level
           settings, and the guarded stylesheet editor. Appended rather than folded into

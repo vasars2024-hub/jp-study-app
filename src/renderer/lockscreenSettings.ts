@@ -8,9 +8,18 @@ export interface LockscreenSettings {
   enabled: boolean;
   /** Obfuscated 4-digit PIN (empty = not set). */
   pinHash: string;
-  /** Soft accent for the lock panel. */
-  tint: 'neutral' | 'ember' | 'slate' | 'moss';
+  /**
+   * Soft accent for the lock panel. `auto` derives it from the live `--accent`
+   * (written inline on <html> by osPersonalization) and the active theme's `--bg`,
+   * so it re-tints on an accent or theme change with no code path at all — the
+   * four fixed tints stay available for anyone who wants to pin one.
+   */
+  tint: LockscreenTint;
 }
+
+export const LOCKSCREEN_TINTS = ['auto', 'neutral', 'ember', 'slate', 'moss'] as const;
+
+export type LockscreenTint = (typeof LOCKSCREEN_TINTS)[number];
 
 const KEY = 'jp-study-lockscreen-v1';
 const EVENT = 'jp-lockscreen-changed';
@@ -23,7 +32,7 @@ export const AERO_ENTRY_LOCKED_EVENT = 'shell:aeroEntryLocked';
 const DEFAULTS: LockscreenSettings = {
   enabled: false,
   pinHash: '',
-  tint: 'neutral',
+  tint: 'auto',
 };
 
 /** Lightweight reversible obfuscation — enough to avoid plain PIN in localStorage dumps. */
@@ -57,10 +66,9 @@ export function loadLockscreen(): LockscreenSettings {
     return {
       enabled: !!p.enabled,
       pinHash: typeof p.pinHash === 'string' ? p.pinHash : '',
-      tint:
-        p.tint === 'ember' || p.tint === 'slate' || p.tint === 'moss' || p.tint === 'neutral'
-          ? p.tint
-          : DEFAULTS.tint,
+      tint: LOCKSCREEN_TINTS.includes(p.tint as LockscreenTint)
+        ? (p.tint as LockscreenTint)
+        : DEFAULTS.tint,
     };
   } catch {
     return { ...DEFAULTS };

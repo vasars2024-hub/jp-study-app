@@ -386,7 +386,20 @@ export type UiCssViolationKind =
  * backs. `</style` and `<script` matter because custom CSS is written into a `<style>`
  * element's text: closing the element early turns a stylesheet into markup.
  */
-const BLOCKED_CONSTRUCTS = ['-moz-binding', 'behavior:', 'vbscript:', '</style', '<script'];
+const BLOCKED_CONSTRUCTS = ['-moz-binding', 'vbscript:', '</style', '<script'];
+
+/**
+ * IE's `behavior:` (which loaded an HTC script) has to stay blocked, but it cannot be a
+ * plain substring test: **`scroll-behavior`, `overscroll-behavior` and
+ * `transition-behavior` all contain it**, so `html { scroll-behavior: smooth }` — about
+ * the most ordinary line a user can type — was refused with "Blocked construct:
+ * behavior:". Measured 2026-08-07 (v1.0 audit §2.2): all three were rejected.
+ *
+ * The property must therefore start at a property boundary: start of input, or a
+ * character that cannot be part of an identifier. `-` is deliberately excluded from the
+ * allowed prefixes, which is what keeps `-moz-behavior`-style vendor spellings out too.
+ */
+const IE_BEHAVIOR_PATTERN = /(^|[^-\w])behavior\s*:/i;
 
 export interface UiCssViolation {
   kind: UiCssViolationKind;
@@ -401,6 +414,28 @@ export interface UiCssReview {
 
 function stripComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+}
+
+/**
+ * The rule the `remote-url` violation actually means: **does this reach the network?**
+ *
+ * It used to mean "is this anything other than `data:`", which refused
+ * `url('./cat.png')` — a file that ships with the app — and told the user their
+ * stylesheet "loads something over the network", which was simply false. Measured
+ * 2026-08-07 (v1.0 audit §2.2).
+ *
+ * A relative or root-relative path resolves against the renderer's own origin —
+ * `http://localhost:5173` in dev, `file://` when packaged — so it is local in both, and
+ * the offline-first rule it exists to protect is untouched. What must stay blocked is an
+ * explicit remote scheme and the protocol-relative `//host/x` form, which is easy to
+ * mistake for a path and is not one.
+ */
+function isNetworkUrl(target: string): boolean {
+  if (!target) return false;
+  if (target.startsWith('//')) return true;
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(target)?.[1]?.toLowerCase();
+  if (!scheme) return false;
+  return scheme !== 'data' && scheme !== 'file';
 }
 
 /**
@@ -424,12 +459,11 @@ export function reviewCustomCss(input: unknown): UiCssReview {
   for (const construct of BLOCKED_CONSTRUCTS) {
     if (lower.includes(construct)) violations.push({ kind: 'blocked-construct', detail: construct });
   }
+  if (IE_BEHAVIOR_PATTERN.test(lower)) violations.push({ kind: 'blocked-construct', detail: 'behavior:' });
 
   for (const match of css.matchAll(/url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi)) {
     const target = match[2].trim();
-    // Local `data:` payloads are fine; anything that reaches the network is not, because
-    // a stylesheet that phones home breaks the offline-first rule and leaks browsing.
-    if (!/^data:/i.test(target)) violations.push({ kind: 'remote-url', detail: target || 'url()' });
+    if (isNetworkUrl(target)) violations.push({ kind: 'remote-url', detail: target || 'url()' });
   }
 
   const opens = (css.match(/\{/g) ?? []).length;

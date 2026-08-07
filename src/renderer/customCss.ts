@@ -48,7 +48,69 @@ export function loadCustomCss(): string {
   }
 }
 
-export function applyCustomCss(css: string): { ok: boolean; error?: string } {
+/** `:root` / `html`, alone or with a qualifier (`:root.dark`, `html[data-theme]`). */
+const ROOT_SELECTOR_PATTERN = /^\s*(:root|html)(?![\w-])/i;
+
+/**
+ * Re-declare the sheet's root-scoped custom properties as `!important`, and report how
+ * many were promoted.
+ *
+ * **Why any of this is needed.** `osPersonalization.applyPersonalization` writes ~44
+ * design tokens — `--accent`, `--space-*`, `--radius-*`, `--shadow-*`, `--font-body`,
+ * `--dur-*`, `--motion-*` — as **inline styles on `documentElement`**, and an inline
+ * declaration beats every selector in an author stylesheet. So the single most natural
+ * thing to type into this sandbox, `:root { --accent: #ff0000 }`, parsed cleanly, passed
+ * the sanitizer, landed in the DOM — and changed nothing, with no error. That is what
+ * "the Custom CSS sandbox is non-functional" turned out to mean (v1.0 audit §2.2;
+ * measured live: the rule's non-variable declarations applied, `--accent` stayed
+ * `#10b981`, `--radius-md` stayed `14px`, `--space-md` stayed `12px`).
+ *
+ * `uiCustomization.profileToCss` already reached the same conclusion for the Theme
+ * Studio path and emits `!important` for exactly this reason; the raw sandbox is now
+ * consistent with it rather than being the one path that silently loses.
+ *
+ * Done through the **CSSOM**, not a regex over the user's text: the browser has already
+ * parsed the sheet, so `rule.style` gives the real declarations, custom-property values
+ * containing `;` or braces cannot corrupt the rewrite, and the user's stored CSS stays
+ * byte-for-byte what they typed. Grouping rules (`@media`, `@supports`, `@layer`) are
+ * walked recursively.
+ *
+ * Only the root element is promoted. `body { --x: y }` already wins for everything it
+ * contains — the inline declaration is on `<html>`, so it only decides `<html>`'s own
+ * computed value — and promoting it would be an override the user never asked for.
+ */
+export function promoteRootVariables(rules: CSSRuleList | undefined): number {
+  if (!rules) return 0;
+  let promoted = 0;
+  for (const rule of Array.from(rules)) {
+    const styleRule = rule as CSSStyleRule;
+    if (typeof styleRule.selectorText === 'string' && styleRule.style) {
+      const targetsRoot = styleRule.selectorText
+        .split(',')
+        .some((selector) => ROOT_SELECTOR_PATTERN.test(selector));
+      if (targetsRoot) {
+        // Snapshot the names first — setProperty mutates the declaration being iterated.
+        const names = Array.from(styleRule.style).filter((name) => name.startsWith('--'));
+        for (const name of names) {
+          if (styleRule.style.getPropertyPriority(name)) continue;
+          styleRule.style.setProperty(name, styleRule.style.getPropertyValue(name), 'important');
+          promoted += 1;
+        }
+      }
+    }
+    // A style rule is ALSO a grouping rule wherever CSS nesting is supported — in
+    // Chromium `CSSStyleRule.cssRules` exists (empty) on every ordinary rule. Testing
+    // for it first and treating the rule as a group therefore skipped every top-level
+    // rule in the sheet: measured live 2026-08-07 as `promoted: 0` with the sheet
+    // parsed, all four rules present and none carrying `!important`. So both branches
+    // run, and neither excludes the other.
+    const nested = (rule as CSSGroupingRule).cssRules;
+    if (nested) promoted += promoteRootVariables(nested);
+  }
+  return promoted;
+}
+
+export function applyCustomCss(css: string): { ok: boolean; error?: string; promoted?: number } {
   const check = sanitizeUserCss(css);
   if (!check.ok) {
     removeStyleNode();
@@ -57,7 +119,7 @@ export function applyCustomCss(css: string): { ok: boolean; error?: string } {
   let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
   if (!check.css.trim()) {
     removeStyleNode();
-    return { ok: true };
+    return { ok: true, promoted: 0 };
   }
   if (!el) {
     el = document.createElement('style');
@@ -66,14 +128,21 @@ export function applyCustomCss(css: string): { ok: boolean; error?: string } {
     document.documentElement.appendChild(el);
   }
   el.textContent = check.css;
-  return { ok: true };
+  let promoted = 0;
+  try {
+    promoted = promoteRootVariables(el.sheet?.cssRules);
+  } catch {
+    // Cross-origin or not-yet-parsed sheets throw on cssRules. The stylesheet is already
+    // applied at this point; losing the promotion is a degraded result, not a failure.
+  }
+  return { ok: true, promoted };
 }
 
 function removeStyleNode(): void {
   document.getElementById(STYLE_ID)?.remove();
 }
 
-export function saveCustomCss(css: string): { ok: boolean; error?: string } {
+export function saveCustomCss(css: string): { ok: boolean; error?: string; promoted?: number } {
   const check = sanitizeUserCss(css);
   if (!check.ok) return { ok: false, error: check.error };
   try {

@@ -198,7 +198,11 @@ export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
       acc += frameDt;
       perfSampleFrame(now, dtMs);
 
-      if (perfIsInteracting()) {
+      // v1.0 audit §1.5: the High desktop tier keeps its particles alive through a
+      // window drag — dropping the whole frame is what made them vanish. Cheaper tiers
+      // still hand the entire frame back so dragging stays at 60 FPS there.
+      const interacting = perfIsInteracting();
+      if (interacting && envRef.current.performanceTier !== 'high') {
         acc = Math.min(acc, FIXED_DT);
         raf = requestAnimationFrame(frame);
         return;
@@ -214,11 +218,15 @@ export default function ParticleLayer({ env }: { env: EnvironmentSettings }) {
         return;
       }
 
-      acc = Math.min(acc, FIXED_DT * MAX_STEPS);
+      // One sub-step while dragging: motion continues at half the simulation cost.
+      // The adaptive budget in perfHub is the real safety net — if frames get
+      // expensive it drops quality to 'low', which halves the draw rate below.
+      const maxSteps = interacting ? 1 : MAX_STEPS;
+      acc = Math.min(acc, FIXED_DT * maxSteps);
       ensurePopulation(particles, cfg);
 
       let steps = 0;
-      while (acc >= FIXED_DT && steps < MAX_STEPS) {
+      while (acc >= FIXED_DT && steps < maxSteps) {
         stepParticles(particles, FIXED_DT, cfg, snow);
         acc -= FIXED_DT;
         steps++;

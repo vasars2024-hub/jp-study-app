@@ -53,7 +53,7 @@ import {
   requestWiredArchiveShutdown,
   requestWiredArchiveSleep,
 } from '../wiredArchiveLifecycle';
-import { EnvironmentStack, WALL_PRESETS, loadEnvironment, onEnvironmentChanged } from '../environment';
+import { EnvironmentStack, SELECTABLE_WALL_PRESETS, loadEnvironment, onEnvironmentChanged } from '../environment';
 import BuddyToast from '../environment/BuddyToast';
 import AeroFindingOverlay from './shell/AeroFindingOverlay';
 import WiredFindingOverlay from './shell/WiredFindingOverlay';
@@ -215,14 +215,15 @@ function wiredModuleLabel(section: WinSection): string {
   return `${meta.code} / ${meta.name}`;
 }
 
-const WALLPAPERS = WALL_PRESETS;
+// Selection set, not the resolution set — v1.0 audit §1.1 cut the Aero scenery
+// walls from the picker while leaving them resolvable (see wallCatalog.ts).
+const WALLPAPERS = SELECTABLE_WALL_PRESETS;
 
 const NOTE_COLORS = ['#fff3a3', '#ffd6a5', '#ffb3ba', '#c9f2c7', '#cfe0ff'];
-const BOOK_DROP = new Set(['.epub', '.pdf', '.cbz', '.zip']);
-const MEDIA_DROP = new Set([
-  '.mp4', '.m4v', '.mov', '.webm', '.mkv', '.avi', '.ogv', '.ts', '.flv', '.wmv',
-  '.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus',
-]);
+// BOOK_DROP / MEDIA_DROP removed with the two-bucket drop handler. The extension
+// tables now live in `shared/mediaKind.ts`, one copy, consulted by
+// `shared/fileRouting.ts` — which is also what the importers accept, so the
+// classifier and the importer can no longer disagree.
 const MIN_W = 260;
 const MIN_H = 170;
 const WIN_SNAP = 26;

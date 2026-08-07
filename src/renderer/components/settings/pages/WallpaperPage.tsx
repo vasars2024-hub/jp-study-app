@@ -2,6 +2,10 @@ import Icon from '../../Icons';
 import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import { useT } from '../../../i18n';
+// v1.0 audit 1.2 / 1.3: rotation and the Mini backdrop moved here from
+// Atmosphere and Mini View, so every wallpaper surface is on one page.
+import WallpaperRotationCard from './WallpaperRotationCard';
+import MiniWallpaperCard from './MiniWallpaperCard';
 
 export default function WallpaperPage() {
   const { t } = useT();
@@ -34,6 +38,7 @@ export default function WallpaperPage() {
     users.some((u) => u.id === wall.id);
 
   return (
+    <>
     <SettingsCard
       id="wallpaper"
       title={t('settings.nav.wallpaper')}
@@ -49,7 +54,11 @@ export default function WallpaperPage() {
             className={`os-wall-swatch ${p.animated ? 'wall-anim' : ''} ${
               wall.kind === 'preset' && s.wallPreset === p.id ? 'active' : ''
             }`}
-            style={{ background: p.css }}
+            // `background` is a shorthand: it resets background-size to `auto`,
+            // which silently defeated `.os-wall-swatch { background-size: cover }`
+            // and tiled every image-backed preset. Restate it here. Animated
+            // presets still win via `.wall-anim`'s !important 300% 300%.
+            style={{ background: p.css, backgroundSize: 'cover' }}
             title={p.label + (p.animated ? t('settings.wallpaper.animatedSuffix') : '')}
             onClick={() => s.onWallPreset(p.id)}
           >
@@ -209,5 +218,9 @@ export default function WallpaperPage() {
         <span className="muted">{Math.round(look.wallpaperDim * 100)}%</span>
       </div>
     </SettingsCard>
+
+    <WallpaperRotationCard />
+    <MiniWallpaperCard />
+    </>
   );
 }

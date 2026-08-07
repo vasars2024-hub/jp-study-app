@@ -10,7 +10,7 @@ export {
   isRotationActive,
 } from './environmentStore';
 export { resolveWall, getActivePlaylist, wallItemKey } from './schedules';
-export { WALL_PRESETS, getWallPreset } from './wallCatalog';
+export { WALL_PRESETS, SELECTABLE_WALL_PRESETS, getWallPreset } from './wallCatalog';
 export { PARTICLE_PRESETS, suggestPresetsFromTags, tierMaxParticles } from './particleEngine';
 export { COMPANION_DEFS, defaultCompanions } from './companionCatalog';
 export {

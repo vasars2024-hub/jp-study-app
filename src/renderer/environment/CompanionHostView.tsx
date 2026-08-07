@@ -37,6 +37,10 @@ interface DisplayInfo {
   scaleFactor: number;
 }
 
+/** Pointer hit-test cadence, ms. 25 Hz is well under a high-polling mouse and the
+ *  `elementFromPoint` it runs touches a handful of elements. */
+const HIT_TEST_MS = 40;
+
 const SIZE = 52;
 const SHIMEJI_SIZE = 96;
 const WIRED_SHIMEJI_SIZE = 100;
@@ -89,7 +93,8 @@ export default function CompanionHostView() {
   const [displays, setDisplays] = useState<DisplayInfo[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
   const overRef = useRef(false);
-  const hitTestRaf = useRef(0);
+  const lastHitAt = useRef(0);
+  const trailingHit = useRef(0);
   const lastMouse = useRef<{ x: number; y: number } | null>(null);
 
   const refreshGeometry = useCallback(() => {
@@ -131,20 +136,50 @@ export default function CompanionHostView() {
   }, [refreshGeometry]);
 
   useEffect(() => {
+    /**
+     * v1.0 audit §3.1 — this hit-test decides whether the window is click-through, so it
+     * is the whole interaction path: no hit-test, no clickable pet.
+     *
+     * It used to be deferred to `requestAnimationFrame`, and **this window gets no
+     * frames** — Chromium reports its document as hidden even while it is painted
+     * (see the `backgroundThrottling` note in `main/companionHost.ts`). rAF never fired,
+     * so click-through was never turned off and the pet could never be clicked.
+     * `backgroundThrottling: false` fixes the frames; running the hit-test off the event
+     * itself makes the interaction path independent of frames altogether, which is the
+     * property that actually matters for an overlay that can be occluded at any moment.
+     *
+     * Throttled by timestamp with a trailing run, because a plain throttle drops the
+     * last move — and the last move is the one that lands on the pet and stops.
+     */
+    const hitTest = (): void => {
+      const point = lastMouse.current;
+      if (!point) return;
+      const el = document.elementFromPoint(point.x, point.y);
+      const over = Boolean(el?.closest?.('.os-companion'));
+      if (over !== overRef.current) {
+        overRef.current = over;
+        window.api.companionHostSetClickThrough(!over);
+      }
+    };
+
     const onMove = (e: MouseEvent) => {
       lastMouse.current = { x: e.clientX, y: e.clientY };
-      if (hitTestRaf.current) return;
-      hitTestRaf.current = window.requestAnimationFrame(() => {
-        hitTestRaf.current = 0;
-        const point = lastMouse.current;
-        if (!point) return;
-        const el = document.elementFromPoint(point.x, point.y);
-        const over = Boolean(el?.closest?.('.os-companion'));
-        if (over !== overRef.current) {
-          overRef.current = over;
-          window.api.companionHostSetClickThrough(!over);
+      const now = performance.now();
+      if (now - lastHitAt.current >= HIT_TEST_MS) {
+        lastHitAt.current = now;
+        if (trailingHit.current) {
+          window.clearTimeout(trailingHit.current);
+          trailingHit.current = 0;
         }
-      });
+        hitTest();
+        return;
+      }
+      if (trailingHit.current) return;
+      trailingHit.current = window.setTimeout(() => {
+        trailingHit.current = 0;
+        lastHitAt.current = performance.now();
+        hitTest();
+      }, HIT_TEST_MS);
     };
     const onVis = () => {
       if (!document.hidden) {
@@ -161,9 +196,9 @@ export default function CompanionHostView() {
       window.removeEventListener('mousemove', onMove);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('resize', onResize);
-      if (hitTestRaf.current) {
-        window.cancelAnimationFrame(hitTestRaf.current);
-        hitTestRaf.current = 0;
+      if (trailingHit.current) {
+        window.clearTimeout(trailingHit.current);
+        trailingHit.current = 0;
       }
       window.api.companionHostSetClickThrough(true);
     };

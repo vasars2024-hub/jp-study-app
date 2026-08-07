@@ -7,6 +7,7 @@ import {
   buildDefaultDayCyclePlaylist,
   buildDefaultRules,
   DAY_CYCLE_PLAYLIST_ID,
+  SELECTABLE_WALL_PRESETS,
   WALL_PRESETS,
   type EnvironmentSettings,
   type RotationRule,
@@ -204,8 +205,10 @@ export default function PlaylistEditor({
     setRenaming(false);
   };
 
+  // Offer list uses the selection set; the render paths above stay on
+  // WALL_PRESETS so an already-saved Aero item still resolves its label and css.
   const availablePresets = useMemo(
-    () => WALL_PRESETS.filter((p) => !active.items.some((i) => i.kind === 'preset' && i.ref === p.id)),
+    () => SELECTABLE_WALL_PRESETS.filter((p) => !active.items.some((i) => i.kind === 'preset' && i.ref === p.id)),
     [active.items],
   );
 
