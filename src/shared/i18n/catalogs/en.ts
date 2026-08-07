@@ -5611,6 +5611,10 @@ export const en: Catalog = {
   'companion.menu.unlock': 'Unlock',
   'companion.menu.hideHour': 'Hide 1 hour',
   'companion.menu.configureRoutines': 'Configure routines',
+  'companion.menu.shortcuts': 'Shortcuts',
+  'companion.menu.bindPrimary': 'Click',
+  'companion.menu.bindSecondary': 'Double-click',
+  'companion.menu.bindHold': 'Hold',
   // The same buddy on the real desktop (companionsOnOsDesktop) — its own
   // minimal host window, hence its own tooltip/menu strings, not the full menu.
   'companion.host.tooltip.hint': 'Click: run routine',

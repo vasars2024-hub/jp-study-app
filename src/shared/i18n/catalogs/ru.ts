@@ -5863,6 +5863,10 @@ export const ru: Catalog = {
   'companion.menu.unlock': 'Открепить',
   'companion.menu.hideHour': 'Скрыть на 1 час',
   'companion.menu.configureRoutines': 'Настроить сценарии',
+  'companion.menu.shortcuts': 'Быстрые действия',
+  'companion.menu.bindPrimary': 'Клик',
+  'companion.menu.bindSecondary': 'Двойной клик',
+  'companion.menu.bindHold': 'Удержание',
   'companion.host.tooltip.hint': 'Клик: запустить сценарий',
   'companion.host.menu.runRoutine': 'Запустить сценарий',
 

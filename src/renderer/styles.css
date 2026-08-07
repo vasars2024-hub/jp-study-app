@@ -13193,6 +13193,40 @@ html.os-interacting .os-companion {
   margin-bottom: 2px;
   line-height: 1.3;
 }
+/* Gesture shortcuts inside the pet's own menu — v1.0 audit §3.4. The menu is
+   anchored to a 96px sprite, so it has to stay narrow: label above control,
+   never side by side, and the select is allowed to be the widest thing here. */
+.os-companion-menu-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+  margin: 2px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.os-companion-menu-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.os-companion-menu-bind {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.os-companion-menu-bind > span {
+  font-size: 11px;
+}
+.os-companion-menu-bind .set-select {
+  width: 100%;
+  min-width: 0;
+  max-width: 200px;
+  font-size: 11px;
+  padding: 2px 4px;
+}
 @keyframes companionBob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }

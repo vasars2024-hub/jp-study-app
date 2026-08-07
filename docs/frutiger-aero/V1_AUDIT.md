@@ -567,7 +567,35 @@ payload showed. A boolean that was already true before the gesture cannot report
 Both cases were re-run from a closed menu, as a differential pair, and only then does
 `false` vs `true` mean anything.
 
-| 3.4 | Routines from Shimeji interface | pending | | | |
+| 3.4 | Routines from Shimeji interface | **DONE** | `.os-companion-menu-bind` inside the pet's own menu, then the gesture itself | Menu 140×431, `overflowsViewport: false`, section label "Shortcuts". Three binds render with the live values: **Click** `br-miko-climb`, **Double-click** `br-miko-cheer`, **Hold** `(menu)` — and Hold is the only one offering the empty "Open the buddy menu" option (3 options vs 2). End-to-end through the pet menu alone: bind Hold → `br-miko-climb`, stored `holdRoutineId: "br-miko-climb"` and still there 2 s later, then a hold produced **`toasts: ["Climb show"]`** with `menuOpen: false` — a different routine from the 3.3 run, so the toast is tracking the binding rather than repeating a stale reading. Restored to `(menu)` through the same control. | — (behaviour) |
+### 3.4 — the same three slots, bound where the pet is
+
+Settings › Companions already had Primary and Secondary pickers (Hold joined them in 3.3),
+but reaching them meant leaving the pet: open Settings, find Companions, pick the buddy type.
+The audit asks for it *"directly from the Shimeji interface"*, so the pet's own menu — the one
+right-click and now hold both open — carries a **Shortcuts** section with the same three
+bindings.
+
+Two differences from the Settings pickers, both deliberate:
+
+- **The pet menu binds this instance; Settings binds every companion of the type.**
+  `assignPrimary` maps over `c.typeId === assignType`; the menu maps over `x.id === c.id`.
+  With one instance per type they are the same edit, and per-instance is the correct meaning
+  of "this pet's shortcut". If a second instance of a type is ever added, the two controls
+  will legitimately disagree, and the menu is the more specific one.
+- **The offer list is `routinesForType`, not the menu-routine list.** `runBuddyRoutine`
+  refuses a routine whose `forType` does not match the companion, so offering anything wider
+  would put entries in the picker that silently do nothing when chosen.
+
+**This item was blocked before 3.3.** Routine assignments were being erased seconds after
+being made — see the 3.3 notes — so a picker here would have written a value the layer never
+read and the autosave then deleted. The fix landed in 3.3; the end-to-end test above is the
+proof it holds through the pet menu too.
+
+The menu is anchored to a 96 px sprite, so the section stacks label-above-control and never
+side by side; measured 140 px wide with the selects at 122 px, and the menu does not leave
+the viewport.
+
 | 3.5 | Mini apps — 3 clickable routines | pending | | | |
 
 ## Section 4 — Icons & Shortcuts

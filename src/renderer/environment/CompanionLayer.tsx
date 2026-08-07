@@ -40,6 +40,7 @@ import {
   resolvePrimaryRoutineId,
   resolveSecondaryRoutineId,
   runBuddyRoutine,
+  routinesForType,
   routinesMatchingTrigger,
   syncBuddyTimeSchedule,
   type BuddyTriggerKind,
@@ -1013,6 +1014,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
         const def = defFor(c.typeId);
         const size = companionSize(c);
         const menuRoutines = resolveMenuRoutineIds(c, routines);
+        // Everything this type can legally run — `runBuddyRoutine` refuses a
+        // routine whose forType does not match, so offering more would be a
+        // picker with dead entries.
+        const bindableRoutines = routinesForType(routines, c.typeId);
         const lockedTreasure = isTreasureLockedBonzi(c);
         return (
           <div
@@ -1103,6 +1108,47 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
                     {t('companion.menu.run', { name: r.name })}
                   </button>
                 ))}
+                <div className="os-companion-menu-shortcuts">
+                  <div className="os-companion-menu-label">{t('companion.menu.shortcuts')}</div>
+                  {(
+                    [
+                      ['primaryRoutineId', 'companion.menu.bindPrimary', resolvePrimaryRoutineId(c)],
+                      [
+                        'secondaryRoutineId',
+                        'companion.menu.bindSecondary',
+                        resolveSecondaryRoutineId(c),
+                      ],
+                      ['holdRoutineId', 'companion.menu.bindHold', resolveHoldRoutineId(c)],
+                    ] as const
+                  ).map(([field, labelKey, value]) => (
+                    <label key={field} className="os-companion-menu-bind">
+                      <span className="muted">{t(labelKey)}</span>
+                      <select
+                        className="set-select"
+                        value={value}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          commitList(
+                            listRef.current.map((x) =>
+                              x.id === c.id ? { ...x, [field]: next } : x,
+                            ),
+                          );
+                        }}
+                      >
+                        {/* Hold is the only slot that may be bound to nothing;
+                            unbound it opens this menu (see resolveHoldRoutineId). */}
+                        {field === 'holdRoutineId' && (
+                          <option value="">{t('settings.companions.holdOpensMenu')}</option>
+                        )}
+                        {bindableRoutines.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
                 <button
                   type="button"
                   className="btn small"

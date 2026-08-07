@@ -5302,6 +5302,10 @@ export const zh: Catalog = {
   'companion.menu.unlock': '取消固定',
   'companion.menu.hideHour': '隐藏1小时',
   'companion.menu.configureRoutines': '配置例程',
+  'companion.menu.shortcuts': '快捷操作',
+  'companion.menu.bindPrimary': '点击',
+  'companion.menu.bindSecondary': '双击',
+  'companion.menu.bindHold': '长按',
   'companion.host.tooltip.hint': '点击：运行例程',
   'companion.host.menu.runRoutine': '运行例程',
 

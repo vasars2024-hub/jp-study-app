@@ -5331,6 +5331,10 @@ export const ja: Catalog = {
   'companion.menu.unlock': '固定を解除',
   'companion.menu.hideHour': '1時間隠す',
   'companion.menu.configureRoutines': 'ルーチンを設定',
+  'companion.menu.shortcuts': 'ショートカット',
+  'companion.menu.bindPrimary': 'クリック',
+  'companion.menu.bindSecondary': 'ダブルクリック',
+  'companion.menu.bindHold': '長押し',
   'companion.host.tooltip.hint': 'クリック: ルーチンを実行',
   'companion.host.menu.runRoutine': 'ルーチンを実行',
 
