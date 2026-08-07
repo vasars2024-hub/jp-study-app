@@ -23218,6 +23218,33 @@ html.lockscreen-widget-root #root {
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 8px;
 }
+
+/*
+ * v1.0 audit 5.8 — the Mining rules visual error.
+ *
+ * Every control in these grids is a `.set-select`, which carries
+ * `min-width: 200px` (styles.css `.set-select`). A grid item's default
+ * `min-width: auto` is its content minimum, so a track declared
+ * `minmax(110px, 1fr)` could never actually be 110px — four of them plus gaps
+ * demand 830px inside a 680px card. Measured before: `scrollWidth` 701 vs
+ * `clientWidth` 680, five elements past the card edge, worst 21px.
+ *
+ * The tracks were always right; the items simply were not allowed to shrink
+ * into them. `min-width: 0` restores that, and `width: 100%` makes each select
+ * fill its own track rather than sit at its intrinsic width.
+ */
+.pr-zone,
+.pr-tester-field,
+.pr-cond-grid .sp-field,
+.pr-zone .sp-field {
+  min-width: 0;
+}
+.pr-tester-row .set-select,
+.pr-cond-grid .set-select,
+.pr-zone .set-select {
+  min-width: 0;
+  width: 100%;
+}
 .pr-flow-arrow {
   display: flex;
   align-items: center;

@@ -118,6 +118,10 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'sparkle',
     group: 'System',
     descKey: 'settings.nav.special.desc',
+    // v1.0 audit 5.5 — WIRED and Aero are easter-egg modules, and this was the
+    // only System page without the flag its neighbours (`scraper`, `visualizer`)
+    // already carry, so it showed in the normal study view.
+    advanced: true,
   },
   {
     id: 'display',

@@ -48,15 +48,33 @@ let pendingPersistence: Promise<void> = Promise.resolve();
 let persistenceError: unknown = null;
 
 /** Reduce a pasted expression to its lemma so it matches knownWords keys. */
+/**
+ * v1.0 audit 5.1 — memoised because this is the hot path of the whole level
+ * system. `listProgress` calls it once per word, `slotCoverage` runs it for
+ * every slot list, and `getLevelReport` used to do all of that twice; the
+ * tokenizer is not cheap and the total measured **3.7 s of blocked main thread**
+ * on every visit to Settings > Profile & dictionary.
+ *
+ * Lemmatisation of a given string is deterministic *once the tokenizer is
+ * loaded*, so the fallback path is deliberately NOT cached — caching `expr`
+ * while `tokenizerReady()` is false would pin the un-lemmatised answer forever.
+ */
+const lemmaCache = new Map<string, string>();
+
 function toLemma(expr: string): string {
   if (!tokenizerReady()) return expr;
+  const hit = lemmaCache.get(expr);
+  if (hit !== undefined) return hit;
+  let out: string;
   try {
     const toks = tokenizeSync(expr);
     const content = toks.find((t) => t.content) ?? toks[0];
-    return content?.lemma || expr;
+    out = content?.lemma || expr;
   } catch {
-    return expr;
+    out = expr;
   }
+  lemmaCache.set(expr, out);
+  return out;
 }
 
 /**

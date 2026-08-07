@@ -791,14 +791,61 @@ concluding anything.
 
 | # | Item | Verdict | Selector measured | Value | Shots |
 |---|---|---|---|---|---|
-| 5.1 | Profile & Dictionary switch lag | pending | | Measure before restructuring. | |
+| 5.1 | Profile & Dictionary switch lag | **DONE** | nav-click → double-`rAF` paint time; a 16 ms `setInterval` gap detector; `PerformanceObserver` `longtask` | Before: **3954 / 3985 ms** to paint, against **43–47 ms** for every other page (Models 25 ms, Reading 30 ms) — a single synchronous **5662 ms** longtask. After: **219 / 214 ms**, worst gap **218 ms**. **18×.** Three causes, each measured separately: the over-encoded deck (5662 → 3665 ms), `slotCoverage` computed twice per report, and an unmemoised tokenizer call per word. | — |
 | 5.2 | Consolidate Display + Monitors | pending | | Confirmed separate nav entries on the live app. | |
 | 5.3 | Scraper settings → Scraper app | pending | | | |
 | 5.4 | Translator + Model + Dictionary | pending | | | |
-| 5.5 | Hide Special from normal view | pending | `.os-set-nav-item` | Confirmed: with Advanced **on**, nav shows 23 items incl. Special. Special has no `advanced: true` in `SETTINGS_NAV`, so it shows with Advanced off too. One-line fix. | |
+| 5.5 | Hide Special from normal view | **DONE** | `.os-set-nav-item` | `special` was the only System page without the `advanced: true` its neighbours `scraper` and `visualizer` already carry. After: Advanced **on** → **23** items, Special present; Advanced **off** → **18**, Special absent (it was 19 with Special before). Advanced restored to its original on. | |
+### 5.1 — the stated remedy would not have worked, and the cause was three things
+
+The item proposes *"restructuring them into logical sub-groups"*. The measurement says that
+could not have helped: the page is **1100 DOM nodes**, the largest card is 132, and the whole
+switch is **one synchronous task** — the `setInterval` gap detector saw a single 3689 ms hole
+and `PerformanceObserver` reported one `longtask` of 3665 ms. Nothing about how the cards are
+grouped changes a blocking computation. The goal ("address lag") is met; the proposed means
+was aimed at a cause that was not there.
+
+**Cause 1 — `jp-flashcard-deck` had been JSON-stringified nine times.** See the Section 6
+notes below; it is a storage-integrity finding that happened to surface here. Repairing it took
+the longtask from **5662 ms to 3665 ms**.
+
+**Cause 2 and 3 — the level meter tokenises every word, twice.** `LevelSettingsSection` calls
+`getLevelReport()` **inside a `useState` initializer** (`LevelMeter.tsx:27`), so it runs during
+render, before paint. That report walked every word of every slot list through
+`listProgress → toLemma → tokenizeSync` — the Japanese morphological tokenizer — and
+`getLevelReport` built the same coverage **twice**: once inside `buildInput`, once for its own
+`slots` field. Fixes: thread `slots` through instead of recomputing, and memoise `toLemma`.
+
+The memo deliberately does **not** cache the `!tokenizerReady()` fallback. That path returns the
+input unchanged, and caching it would pin the un-lemmatised answer for the rest of the session.
+
+**Bisected, not guessed.** Replacing `<LevelSettingsSection />` with a comment took the switch
+from 3689 ms to **64 ms**, which is what identified it; the section was restored before the real
+fix went in.
+
+**A hypothesis that was wrong, kept because it nearly passed.** The 5.2 s `JSON.parse` of the
+37 MB deck looked like the whole answer. After repairing it the switch was still **3809 ms** —
+and patching `Storage.prototype.getItem` and `JSON.parse` to log anything over 15 ms during the
+switch caught **nothing at all**. Re-measuring after a plausible fix is what stopped this being
+reported as solved.
+
+### 5.8 — the tracks were right; the items were not allowed to shrink into them
+
+`.pr-tester-row` is `repeat(auto-fit, minmax(130px, 1fr))` and `.pr-cond-grid` is
+`minmax(110px, 1fr)`. Neither track could ever reach its stated minimum, because every control
+inside is a `.set-select` carrying **`min-width: 200px`**, and a grid item's default
+`min-width: auto` is its content minimum. Four selects plus gaps therefore demand
+`4 × 200 + 3 × 10 = 830 px` inside a 680 px card.
+
+So the grid definitions were never the bug and changing them would have been the wrong repair.
+`min-width: 0` on the items restores the shrink the tracks already assumed, and `width: 100%`
+makes each select fill its own track instead of sitting at its intrinsic width. Scoped to the
+mining-rules containers — `.set-select` is used across the whole app and its 200 px floor is
+correct everywhere it is not inside one of these grids.
+
 | 5.6 | Help tour + offline assistant | pending | `jp-study.onboarding.v1` | **The tour's state machine is NOT broken** — verified live while doing 1.1. Profile read `{"completedAt":null,"replays":8,"lastStepId":null}`, which looks like a broken tour but is not: clicking `Next` persisted `lastStepId:"start"`, and `Skip tour` persisted `completedAt`. Both writes work. `replays:8` with no completion just means the tour was replayed and abandoned 8 times. **Whatever "broken" means in the audit doc, it is not lost state — re-diagnose before writing code.** The tour also auto-shows on renderer reload while `completedAt` is null. Decided for the assistant: search-and-answer over `searchSettings()`, no model. | |
 | 5.7 | Scraper memory persistence | pending | | | |
-| 5.8 | Mining Rules tab visual error | pending | | Defect unidentified in the source doc — screenshot first. | |
+| 5.8 | Mining Rules tab visual error | **DONE** | `.os-set-card[data-setting-id="profile-rules"]` `scrollWidth` vs `clientWidth`, plus every descendant rect against the card rect | The defect the source doc did not name: **the card overflows horizontally**. Before: `scrollWidth` **701** vs `clientWidth` **680**, **5** elements past the right edge, worst a `.set-select` at **+21 px** (the "Page category" control, visibly clipped in the shot). After: `scrollWidth` **680** = `clientWidth`, **0** overflowing elements. | `5.8-before-mining-rules.png`, `5.8-after-mining-rules.png` |
 
 ## Section 6 — Storage integrity audit (added 2026-08-07 by user request, not in the source PDF)
 
@@ -812,6 +859,38 @@ concluding anything.
 | 6.2 | Last-writer-wins erasure between two owners of one key | pending | **A confirmed instance already exists — see item 3.3.** `jp-os-environment-v1.companions` has two writers: Settings › Companions (`patchEnv`) and `CompanionLayer.persist()`. The layer held a stale list and its position autosave wrote that list back over the setting, so `holdRoutineId` / `primaryRoutineId` / `secondaryRoutineId` vanished from the blob within seconds of being chosen. Fixed for those three fields; **the same shape is untested for every other multi-writer key.** |
 | 6.3 | Byte-for-byte round-trip per key | pending | Snapshot → change one field through the real control → change it back through the same control → diff the blob against the snapshot. A key that does not return to its exact bytes is either lossy or has a second writer. Note the known-benign case from 3.3: absent vs `""` compare unequal as text and identically in behaviour, so the report must distinguish *textual* from *behavioural* difference. |
 | 6.4 | Renderer storage has no restore point | pending | `localStorage` and IndexedDB were never covered even when userData backups were being taken, and backups are now discontinued (§ Phase 0). This item is partly *how to audit safely*, not only *what is broken*. |
+
+### 6.A — CONFIRMED, and repaired: two keys were JSON-stringified once per boot
+
+Found while measuring 5.1, and the most serious storage defect in the audit so far.
+
+`migrationRunner.writeLocal` used to re-stringify what `getItem` had already returned as text,
+**adding one escaping layer per boot**. The growth is exponential — roughly 2× per layer.
+Measured live on this profile 2026-08-07:
+
+| Key | Stored | Layers | True payload | Bloat |
+|---|---|---|---|---|
+| `jp-flashcard-deck` | **37.25 MB** | **9** | 1.26 MB — 3,221 cards, 1 folder | **29.6×** |
+| `jp-study-csv-editor-v1` | **11.75 MB** | ≥2 | a 6.16 M-char table | — |
+
+Together they were **49 MB of the 51.6 MB** in `localStorage` across 73 keys.
+
+**The data loss is the part that matters.** `flashcardDeck.readStore()` parses **once**, so it
+got a `string`; `parsed.folders` and `parsed.cards` were both `undefined`, and its guard returned
+`{ folders: [], cards: [] }`. **3,221 flashcards read as an empty deck, silently.** The same
+shape applies to `csvEditorStorage.loadStoredEditor`, which returned `null`.
+
+The write-side guard is already in place (`migrationRunner.ts:31-37` carries a comment describing
+exactly this failure), **but nothing repaired values that had already accumulated layers** — which
+is the general lesson for 6.1: a fixed writer does not fix stored data, and no reader here noticed
+it was reading a corpse.
+
+Repair: `shared/overEncodedJson.ts` peels until a parse fails or the value stops being a string,
+and both readers self-heal once on first read. Measured live: `jp-flashcard-deck` went
+**39,056,392 → 1,320,982 chars, 9 layers → 1**, with all **3,221 cards intact**.
+
+**Stated limit:** peeling is blind, so a payload that is a bare numeric string cannot survive
+(`"42"` → `'42'` → `42`). Both current callers store objects; the module says so, and a test pins it.
 
 **Keys seen so far in this audit**, as a starting inventory rather than a complete one:
 `jp-os-environment-v1`, `jp-os-personalization-v1`, `jp-study-lockscreen-v1`,

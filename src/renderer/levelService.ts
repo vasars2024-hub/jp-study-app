@@ -56,9 +56,15 @@ export function slotCoverage(lang: StudyLang): SlotCoverage[] {
   });
 }
 
-function buildInput(lang: StudyLang): DeriveLevelInput {
+/**
+ * v1.0 audit 5.1 — `slots` is threaded through rather than recomputed. Every
+ * entry costs a tokenizer pass per word (`listProgress` → `toLemma`), and
+ * `getLevelReport` used to build the same coverage twice: once inside
+ * `buildInput` and once for its own `slots` field.
+ */
+function buildInput(lang: StudyLang, slots: SlotCoverage[] = slotCoverage(lang)): DeriveLevelInput {
   const coverageBySlot: Partial<Record<LevelSlotId, number>> = {};
-  for (const c of slotCoverage(lang)) {
+  for (const c of slots) {
     if (c.total > 0) coverageBySlot[c.slot] = c.pct / 100;
   }
 
@@ -83,8 +89,9 @@ export interface LevelReport extends DerivedLevel {
 
 /** Full breakdown for the meter UI. */
 export function getLevelReport(lang: StudyLang = getActiveStudyLang()): LevelReport {
-  const derived = deriveUserLevel(lang, buildInput(lang));
-  return { ...derived, lang, slots: slotCoverage(lang) };
+  const slots = slotCoverage(lang);
+  const derived = deriveUserLevel(lang, buildInput(lang, slots));
+  return { ...derived, lang, slots };
 }
 
 /** The user's level 1..7 for a language (defaults to the active study language). */

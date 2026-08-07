@@ -3,6 +3,7 @@
 import { emptyTable, type CsvTable } from '../../../shared/csvEditor';
 import type { CsvEditorSnapshot } from '../../../shared/csvEditorHistory';
 import { IDB_KEYS, mirrorToIdb } from '../../storage/storage';
+import { isOverEncoded, unwrapOverEncoded } from '../../../shared/overEncodedJson';
 
 const STORAGE_KEY = 'jp-study-csv-editor-v1';
 
@@ -17,13 +18,20 @@ export function loadStoredEditor(): CsvEditorSnapshot | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredCsvEditorState;
+    // v1.0 audit 5.1 — same over-encoding as jp-flashcard-deck: one JSON layer
+    // per boot from the old migration runner. Measured live at 11.75 MB, where
+    // a single parse returns a string and every check below fails silently.
+    const { value, layers } = unwrapOverEncoded<StoredCsvEditorState>(raw);
+    const parsed = value as StoredCsvEditorState | null;
     if (!parsed?.table?.headers || !Array.isArray(parsed.table.rows)) return null;
-    return {
+    const snapshot: CsvEditorSnapshot = {
       table: parsed.table,
       title: parsed.title ?? 'imported-deck',
       hiddenColumns: Array.isArray(parsed.hiddenColumns) ? parsed.hiddenColumns : [],
     };
+    // Self-heal once. saveStoredEditor writes the canonical single-layer shape.
+    if (isOverEncoded(layers)) saveStoredEditor(snapshot);
+    return snapshot;
   } catch {
     return null;
   }

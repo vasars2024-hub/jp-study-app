@@ -55,6 +55,7 @@ interface FlashcardDeckStore {
 }
 
 import { IDB_KEYS, mirrorToIdb } from './storage/storage';
+import { isOverEncoded, unwrapOverEncoded } from '../shared/overEncodedJson';
 import { emitCompanionEvent } from './environment/companionEvents';
 import { logBlanc } from './blancConsole';
 
@@ -69,11 +70,28 @@ function readStore(): FlashcardDeckStore {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { folders: [], cards: [] };
-    const parsed = JSON.parse(raw) as Partial<FlashcardDeckStore>;
-    return {
+    // v1.0 audit 5.1 — this key accumulated one JSON layer per boot from an old
+    // migration-runner bug. A single parse then yields a *string*, both checks
+    // below fail, and a real deck reads as empty (measured: 3,221 cards gone,
+    // 37.25 MB of text, 5.2 s of blocked main thread per read).
+    const { value, layers } = unwrapOverEncoded<Partial<FlashcardDeckStore>>(raw);
+    const parsed = (value ?? {}) as Partial<FlashcardDeckStore>;
+    const store: FlashcardDeckStore = {
       folders: Array.isArray(parsed.folders) ? parsed.folders.filter((f) => typeof f === 'string') : [],
       cards: Array.isArray(parsed.cards) ? parsed.cards.filter((c) => c && typeof c.id === 'string') : [],
     };
+    // Self-heal once, so the cost is paid a single time rather than per read.
+    // Only when peeling actually recovered a deck — never write back an empty
+    // store over a value we simply failed to understand.
+    if (isOverEncoded(layers) && (store.cards.length > 0 || store.folders.length > 0)) {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(store));
+        mirrorToIdb(IDB_KEYS.flashcardDeck, store);
+      } catch {
+        /* quota — the value stays as it was and the next read peels again */
+      }
+    }
+    return store;
   } catch {
     return { folders: [], cards: [] };
   }
