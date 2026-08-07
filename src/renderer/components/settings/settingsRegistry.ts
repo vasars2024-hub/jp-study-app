@@ -448,6 +448,14 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'Desktop',
   },
   {
+    id: 'icon-recommended',
+    titleKey: 'settings.desktop.preset.title',
+    descKey: 'settings.desktop.preset.desc',
+    keywords: ['recommended', 'preset', 'layout', 'arrange', 'placement', 'icons', 'desktop'],
+    pageId: 'desktop-layout',
+    group: 'Desktop',
+  },
+  {
     id: 'taskbar',
     titleKey: 'search.taskbar',
     descKey: 'search.taskbar.desc',

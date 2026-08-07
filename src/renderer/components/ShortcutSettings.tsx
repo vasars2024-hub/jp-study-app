@@ -93,6 +93,13 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
   /** Ordered command ids for stacked macros. */
   const [customStack, setCustomStack] = useState<string[]>([]);
   const [stackPick, setStackPick] = useState(COMMAND_CATALOG[0]?.id ?? 'nav.palette');
+  /**
+   * v1.0 audit 4.2 — every category shipped expanded, so the page was one
+   * 8142 px column of 172 rows. Collapsed is the default and only the
+   * categories in here are open. Not persisted: which groups you had open is a
+   * property of the visit, and a stored set would re-open them weeks later.
+   */
+  const [openCats, setOpenCats] = useState<Set<CommandCategory>>(() => new Set());
   const captureRef = useRef<string | null>(null);
   const modeRef = useRef<CaptureMode>('replace');
   captureRef.current = capturing;
@@ -213,6 +220,13 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       );
     });
   }, [rows, query, lang]);
+
+  const searching = query.trim().length > 0;
+  /** Categories with at least one visible row — what the bulk controls act on. */
+  const shownCats = useMemo(
+    () => CATEGORY_ORDER.filter((cat) => visible.some((r) => r.category === cat)),
+    [visible],
+  );
 
   const doExport = async () => {
     try {
@@ -510,13 +524,61 @@ export default function ShortcutSettings({ embedded = false }: { embedded?: bool
       {msg && <p className="sc-msg muted">{msg}</p>}
       {capturing && holdHint && <p className="sc-msg sc-capture-hint">{holdHint}</p>}
 
+      {shownCats.length > 1 && (
+        <div className="sc-group-bulk">
+          <button
+            type="button"
+            className="btn small"
+            data-sc-expand-all
+            disabled={searching || openCats.size === shownCats.length}
+            onClick={() => setOpenCats(new Set(shownCats))}
+          >
+            {t('settings.shortcuts.expandAll')}
+          </button>
+          <button
+            type="button"
+            className="btn small"
+            data-sc-collapse-all
+            disabled={searching || openCats.size === 0}
+            onClick={() => setOpenCats(new Set())}
+          >
+            {t('settings.shortcuts.collapseAll')}
+          </button>
+          {searching && <span className="muted sc-group-bulk-note">{t('settings.shortcuts.searchExpands')}</span>}
+        </div>
+      )}
+
       {CATEGORY_ORDER.map((cat) => {
         const inCat = visible.filter((r) => r.category === cat);
         if (!inCat.length) return null;
+        // A search that matched rows inside a collapsed group would show the
+        // user nothing and read as "no results". While a query is live every
+        // matching group is open regardless of the toggles.
+        const open = searching || openCats.has(cat);
         return (
-          <div key={cat} className="sc-group">
-            <h3 className="sc-group-title">{commandCategory(cat, t)}</h3>
-            {inCat.map((r) => (
+          <div key={cat} className={`sc-group${open ? ' open' : ''}`} data-sc-category={cat}>
+            <h3 className="sc-group-title">
+              <button
+                type="button"
+                className="sc-group-toggle"
+                aria-expanded={open}
+                data-sc-toggle={cat}
+                disabled={searching}
+                onClick={() =>
+                  setOpenCats((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(cat)) next.delete(cat);
+                    else next.add(cat);
+                    return next;
+                  })
+                }
+              >
+                <span className="sc-group-caret" aria-hidden="true" />
+                <span className="sc-group-name">{commandCategory(cat, t)}</span>
+                <span className="sc-group-count muted">{inCat.length}</span>
+              </button>
+            </h3>
+            {open && inCat.map((r) => (
               // `data-shortcut-id` / `-keys` are the only language-independent handle on a
               // row. Every visible string here goes through `useT()` and the app ships four
               // UI languages, so a driven pass keyed to the English label or to the word

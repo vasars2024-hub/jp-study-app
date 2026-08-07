@@ -679,8 +679,113 @@ in `/logs`.
 
 | # | Item | Verdict | Selector measured | Value | Shots |
 |---|---|---|---|---|---|
-| 4.1 | Recommended icon placements | pending | | | |
-| 4.2 | Collapse "Types of shortcuts" | pending | | | |
+| 4.1 | Recommended icon placements | **DONE** | `.os-set-card[data-setting-id="icon-recommended"]`, `[data-icon-preset]`, then `.os-desk-icon` geometry | Before: Desktop layout listed `icons, taskbar, start-menu, session` — no `icon-recommended`, **0** `[data-icon-preset]`, and **0 desktop icons on both desktops** (layout store `icons: []` for `Study` and `City`). After: card 666×388, 5 presets reading `8 icons / 6 icons / 6 icons / 21 icons / 3 icons`, no raw key and no ICU leak. One click on **Study essentials** → exactly **1** `desktop:apply-icon-preset` and **1** `desktop:icon-preset-applied` (`{presetId:"study",placed:8,kept:0,replaced:0}`), 8 icons at `(16,16) (16,120) (16,224) (16,328) (124,16) (124,120) (124,224) (124,328)` — 2 columns of 4, step **108×104** = `ICON_METRICS.large`. Same preset at `iconSize: small` → step **76×72** = `ICON_METRICS.small`, shape unchanged. Undo → 0 icons, "Restored the previous 0 icons.", button gone. Search "recommended" → 1 result → lands `activeNav: Desktop layout`, `highlighted: icon-recommended`. | `4.1-after-recommended-card.png` |
+| 4.2 | Collapse "Types of shortcuts" | **DONE** | `.sc-group`, `.sc-group-toggle[aria-expanded]`, `.sc-row`, card height | Before: 11 groups, **172 rows**, shortcuts card **8142 px** tall in a 548 px viewport (~15 screens), **0** collapsible controls. After, collapsed default: 11 toggles, **0** expanded, **0** rows, card **608 px** — a **13.4×** reduction — with every header carrying its own count (`Navigation 24, Windows 24, Reader 15, Manga 5, Dictionary 4, Flashcards 6, Immersion 5, Music 8, Video 20, Toolbox 54, Utility 7`). Expanding Dictionary: `aria-expanded=true`, 4 rows, card 814 px, caret `matrix(0,1,-1,0,0,0)` (90°), and **only** that group open. Search "volume" → Music alone, 2 rows (`Volume up`, `Volume down`), every shown group expanded, toggles disabled; "next" → 13 rows across 5 groups with the note rendered. Clearing the box returns to 0 rows / 608 px. | `4.2-after-shortcuts-collapsed.png` |
+
+### 4.1 — "placement configuration" had to mean the icon set too
+
+The source line is *"Add a 'Recommended' section in icon settings offering 5 predefined icon placement
+configurations."* Read as arrangement-only — five ways to re-position whatever is on the desk —
+**all five buttons would have been visible no-ops on this app**: `defaultIcons()` returns `[]`
+(`DesktopShell.tsx`), apps are pinned from Start, and the layout store held `icons: []` for *both*
+desktops. That is the dead control `jp-dispatch` §6 forbids, so the reading was put to the user,
+who chose **curated set + layout**. A preset therefore names both the apps and their positions.
+
+**What a preset does and does not own.** It owns the *app* icons: applying replaces them wholesale.
+It does **not** own icons the user made — `kind !== 'app'` (file shortcuts from `pickShortcut`,
+action icons) are kept and laid out after the preset's apps in the same flow. Deleting someone's
+hand-placed shortcuts to apply a recommendation would be a worse bug than the one being fixed.
+`kept` is reported back in the result event and shows in the status line.
+
+**The arrangement is derived, not hardcoded.** `iconPresetPositions` takes the icon box from
+`ICON_METRICS` and the grid from `deskPrefs`, so the same preset lays out differently at each icon
+size — measured as a differential pair, 108×104 at `large` against 76×72 at `small`, same 2×4
+shape. Rows come from the height that actually fits, and columns grow past the preset's preference
+rather than place an icon below the desktop; every point still goes through `snapClamp`, so the
+snap grid and the bounds have the last word.
+
+`renderer/__tests__/desktopIconPresets.test.ts` (11 tests) pins what a live probe cannot show in one
+run: that `columns: 2` over 8 icons is 4+4 and **not** 7+1 (the bug the first draft had — deriving
+rows from available height alone ignored the preset's shape), that 21 icons asked to fit one column
+become three, that no preset overlaps two icons, that a set grid divides every coordinate, and that
+a 300×200 desktop still contains all 21.
+
+**Undo instead of a confirm dialog.** Applying is reversible from the same card: the shell keeps one
+level of the previous icon list and `desktop:undo-icon-preset` restores it exactly. This is transient
+by design — it is a property of the visit, not something to persist — and the button only exists
+while there is something to undo.
+
+**The result event is the status line's only source.** `RecommendedIconsCard` renders the counts the
+shell reports back, not the counts the preset intended, so the line cannot claim a placement that
+did not happen.
+
+### The apply path was checked for double-firing, and one observation is left unexplained
+
+Mid-run the card showed *"Placed 21 app icons, replacing 21"* with 21 icons on the desk — a preset
+applied twice, and **I had not clicked it**. That is exactly the shape of a StrictMode
+double-invoke, and the first draft did earn it: the result event was dispatched from **inside** the
+`setIcons` updater, which React runs twice. That was fixed before measuring — the updater is pure
+and the handler reads `iconsRef`.
+
+Instrumented afterwards with counters on both events, **one click produced exactly one
+`desktop:apply-icon-preset` and one `desktop:icon-preset-applied`**, twice over, which also rules
+out a double-registered listener (one dispatch, one result). So the mechanism is sound.
+
+**What caused the earlier pair is not established.** It happened in a window that also contained a
+full reload and two HMR updates, and I cannot attribute it to a specific action. Recording it
+rather than dropping it: a reader who sees it recur has the counter technique above and knows the
+1:1 result is what was actually measured.
+
+### The ICU plural shape renders verbatim — and this repo already knew
+
+`'settings.desktop.preset.count'` was first written as `'{count, plural, one {# icon} other {# icons}}'`,
+which is the natural ICU form and is **wrong here**. The card rendered the template literally:
+`{count, plural, one {# icon} other {# icons}}` next to every preset name. `translate()` resolves
+plurals from an *object* and hands a plain string to `interpolate`, whose `/\{(\w+)\}/g` matches
+nothing inside an ICU template. `catalogs/en.ts:6489` carries a comment recording this exact trap
+from a previous slice — twelve keys still ship broken this way — and I reproduced it anyway. The
+correct shape is `{ one: '{count} icon', other: '{count} icons' }`, with Russian carrying the full
+`one/few/many/other` set. **A raw template in the UI is what this looks like; there is no error.**
+
+### 4.2 — collapsed by default, and search had to override it
+
+The "types of shortcuts" are `ShortcutSettings`'s category groups, and all 11 shipped expanded:
+**172 rows in one 8142 px column**, inside a 548 px viewport. Toolbox alone is 54 rows.
+
+Collapsed is now the default and the count moved onto each header, so a shut group still tells you
+what is inside — the page went to **608 px**, one screen, with nothing hidden that is not counted.
+
+**Search overrides the toggles, and that is the load-bearing part.** A query that matches rows
+inside a collapsed group would render the user nothing and read as "no results" — collapse would
+have broken search. While a query is live every matching group is open and the toggles are disabled,
+with a line saying so. Measured both ways: "volume" → Music alone, 2 rows visible; "next" → 13 rows
+across 5 groups; clearing returns to the collapsed default.
+
+**Not persisted.** Which groups you had open is a property of the visit; storing the set would
+re-open them weeks later, and there is no restore point for renderer storage (§2).
+
+**The rows themselves are untouched** — same markup, same `data-shortcut-*` handles, same handlers;
+they are simply not rendered while shut. Proved live rather than argued: expanding Dictionary and
+clicking **Type** on `dictionary.playPronunciation` opened `.sc-manual` pre-filled with its real
+chord `Ctrl+Alt+P`, with `jp-study-shortcuts-v1` still `null` — a live control, and no write.
+
+The capture (click-to-rebind) path could **not** be armed synthetically: it completes on window-level
+`keydown`/`mousedown`, which a dispatched `click` does not produce, so `.capturing` never appeared.
+That is an instrumentation limit, not a finding — the manual path exercises the same row.
+
+### A malformed probe took down the whole shell, and the logs said so
+
+`os:open` carries a **bare section id**, not an object. Dispatching
+`{ detail: { section: 'settings' } }` put the object where a `WinSection` string was expected and
+React tried to render it as a child: *"Objects are not valid as a React child (found: object with
+keys {section})"*. The **entire renderer unmounted** — `#root` empty, 4 divs, no taskbar — which
+reads exactly like the app crashing on its own. `/logs` had the answer immediately.
+
+Two notes worth keeping: the correct shape is `new CustomEvent('os:open', { detail: 'settings' })`
+(`CommandPalette.tsx:77`), and **editing `catalogs/en.ts` triggers a full page reload, not HMR** —
+it is eagerly imported. After that reload the Settings window is closed, so a follow-up probe for
+`.fwin` / `.os-set-nav-item` returns empty and looks like a second crash. Check `.os-taskbar` before
+concluding anything.
 
 ## Section 5 — System & Architecture
 

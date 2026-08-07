@@ -1,4 +1,5 @@
 import SettingsCard from '../SettingsCard';
+import RecommendedIconsCard from './RecommendedIconsCard';
 import { useSettings } from '../SettingsContext';
 import type { IconSizeId, IconTextColorId, SnapGridId, StartColumnsId, TaskbarSizeId } from '../../../desktopPrefs';
 import { useT } from '../../../i18n';
@@ -114,6 +115,8 @@ export default function DesktopLayoutPage() {
           <span>{t('settings.desktop.lockIcons')}</span>
         </label>
       </SettingsCard>
+
+      <RecommendedIconsCard />
 
       <SettingsCard
         id="taskbar"

@@ -17521,6 +17521,64 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--muted);
   margin: 14px 0 4px;
 }
+
+/* v1.0 audit 4.2 — collapsible command categories. */
+.sc-group-bulk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 2px;
+}
+.sc-group-bulk-note {
+  font-size: 12px;
+}
+.sc-group-title:has(.sc-group-toggle) {
+  margin: 0;
+}
+.sc-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  margin: 2px 0 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sc-group-toggle:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+.sc-group-toggle:disabled {
+  cursor: default;
+}
+.sc-group-caret {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid currentColor;
+  transition: transform var(--dur-fast, 120ms) ease;
+}
+.sc-group.open .sc-group-caret {
+  transform: rotate(90deg);
+}
+.sc-group-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sc-group-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
 .sc-row {
   display: flex;
   align-items: center;
@@ -25289,5 +25347,58 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
   border-bottom: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--muted);
+  font-size: 12px;
+}
+
+/* v1.0 audit 4.1 — Recommended icon placements (Settings > Desktop layout). */
+.os-icon-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.os-icon-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast, 120ms) ease, background var(--dur-fast, 120ms) ease;
+}
+.os-icon-preset:hover {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+.os-icon-preset-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.os-icon-preset-name {
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: 13px;
+}
+.os-icon-preset-count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.os-icon-preset-desc {
+  font-size: 12px;
+  line-height: 1.35;
+}
+.os-icon-preset-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
   font-size: 12px;
 }

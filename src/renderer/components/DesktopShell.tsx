@@ -46,6 +46,7 @@ import {
   TASKBAR_HEIGHT,
   type DesktopPrefs,
 } from '../desktopPrefs';
+import { getIconPreset, iconPresetPositions } from '../desktopIconPresets';
 import { requestSecretLifecycleRestart, requestSecretLifecycleSleep } from '../secretLifecycle';
 import { exitSecretAero } from '../theme/SecretAeroTrigger';
 import {
@@ -586,6 +587,11 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   const [winAnim, setWinAnim] = useState<Record<string, WinAnimPhase>>({});
   const winAnimTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [icons, setIcons] = useState<DeskIcon[]>([]);
+  // 4.1: the preset handler must read the current icons and dispatch a result
+  // event. Doing either inside a `setIcons` updater would run twice under
+  // StrictMode, so the updater stays pure and this ref is the read path.
+  const iconsRef = useRef<DeskIcon[]>([]);
+  const iconPresetUndo = useRef<DeskIcon[] | null>(null);
   const [notes, setNotes] = useState<Record<string, NoteData>>({});
   const [widgets, setWidgets] = useState<WidgetSnapshot[]>([]);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -839,6 +845,9 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   useEffect(() => onVizSettingsChanged(setViz), []);
   useEffect(() => onPlayingChanged(setMusicPlaying), []);
   useEffect(() => onDesktopPrefsChanged(setDeskPrefs), []);
+  useEffect(() => {
+    iconsRef.current = icons;
+  }, [icons]);
 
   // Settings → Desktop: re-snap icons when user picks a grid size.
   useEffect(() => {
@@ -858,6 +867,70 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     window.addEventListener('desktop:resnap-icons', onResnap);
     return () => window.removeEventListener('desktop:resnap-icons', onResnap);
   }, [deskPrefs]);
+
+  // v1.0 audit 4.1 — Settings → Desktop layout → Recommended applies a whole
+  // icon arrangement. Settings renders inside this same document, so a
+  // CustomEvent reaches the only owner of `icons`, exactly like resnap above.
+  useEffect(() => {
+    const onApplyPreset = (ev: Event) => {
+      const preset = getIconPreset((ev as CustomEvent<{ presetId?: string }>).detail?.presetId);
+      if (!preset) return;
+      const { w: dw, h: dh } = deskSize();
+      const { w: ICON_W, h: ICON_H } = iconMetrics(deskPrefs);
+      const apps = preset.sections
+        .map((s) => APPS.find((a) => a.id === s))
+        .filter((a): a is AppMeta => Boolean(a));
+      const prev = iconsRef.current;
+      iconPresetUndo.current = prev;
+      // A preset owns the *app* icons only. File shortcuts and action icons the
+      // user placed by hand are kept and laid out after them — a recommended
+      // arrangement must not delete someone's own shortcuts.
+      const kept = prev.filter((i) => i.kind !== 'app');
+      const pos = iconPresetPositions(apps.length + kept.length, {
+        boundW: dw,
+        boundH: dh,
+        iconW: ICON_W,
+        iconH: ICON_H,
+        grid: deskPrefs.snapGrid,
+        columns: preset.columns,
+      });
+      const placed: DeskIcon[] = apps.map((a, i) => ({
+        id: `app-${a.id}`,
+        kind: 'app',
+        section: a.id,
+        // Baked at apply time for the same reason pinning bakes it.
+        name: t(a.labelKey),
+        glyph: a.glyph,
+        x: pos[i].x,
+        y: pos[i].y,
+      }));
+      kept.forEach((ic, i) => {
+        const p = pos[apps.length + i];
+        placed.push({ ...ic, x: p.x, y: p.y });
+      });
+      setIcons(placed);
+      window.dispatchEvent(
+        new CustomEvent('desktop:icon-preset-applied', {
+          detail: { presetId: preset.id, placed: apps.length, kept: kept.length, replaced: prev.length },
+        }),
+      );
+    };
+    const onUndoPreset = () => {
+      const prev = iconPresetUndo.current;
+      if (!prev) return;
+      iconPresetUndo.current = null;
+      setIcons(prev);
+      window.dispatchEvent(
+        new CustomEvent('desktop:icon-preset-applied', { detail: { presetId: null, restored: prev.length } }),
+      );
+    };
+    window.addEventListener('desktop:apply-icon-preset', onApplyPreset);
+    window.addEventListener('desktop:undo-icon-preset', onUndoPreset);
+    return () => {
+      window.removeEventListener('desktop:apply-icon-preset', onApplyPreset);
+      window.removeEventListener('desktop:undo-icon-preset', onUndoPreset);
+    };
+  }, [deskPrefs, t]);
   useEffect(
     () =>
       onPersonalizationChanged((s) => {
