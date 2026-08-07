@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { isOverEncoded, unwrapOverEncoded } from '../overEncodedJson';
+import { QUARANTINE_SUFFIX, isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../overEncodedJson';
+
+function fakeStorage(seed: Record<string, string> = {}) {
+  const map = new Map(Object.entries(seed));
+  return {
+    map,
+    getItem: (k: string) => (map.has(k) ? (map.get(k) as string) : null),
+    setItem: (k: string, v: string) => void map.set(k, v),
+  };
+}
 
 const wrap = (value: unknown, times: number): string => {
   let out = JSON.stringify(value);
@@ -75,5 +84,43 @@ describe('unwrapOverEncoded', () => {
     expect(isOverEncoded(1)).toBe(false);
     expect(isOverEncoded(2)).toBe(true);
     expect(isOverEncoded(2, 2)).toBe(false);
+  });
+});
+
+describe('quarantineIfUnrepaired', () => {
+  it('copies a damaged value aside before the caller lets it be overwritten', () => {
+    const s = fakeStorage({ 'jp-x': 'damaged-blob' });
+    expect(quarantineIfUnrepaired(s, 'jp-x', 5)).toBe('quarantined');
+    expect(s.getItem(`jp-x${QUARANTINE_SUFFIX}`)).toBe('damaged-blob');
+    expect(s.getItem('jp-x')).toBe('damaged-blob');
+  });
+
+  it('does nothing for a healthy single-layer value', () => {
+    const s = fakeStorage({ 'jp-x': '{"a":1}' });
+    expect(quarantineIfUnrepaired(s, 'jp-x', 1)).toBe('skipped');
+    expect(s.getItem(`jp-x${QUARANTINE_SUFFIX}`)).toBeNull();
+  });
+
+  it('keeps the FIRST damaged copy — a re-run must not overwrite it', () => {
+    const s = fakeStorage({ 'jp-x': 'original-damage' });
+    expect(quarantineIfUnrepaired(s, 'jp-x', 6)).toBe('quarantined');
+    s.map.set('jp-x', 'already-defaulted');
+    expect(quarantineIfUnrepaired(s, 'jp-x', 6)).toBe('skipped');
+    expect(s.getItem(`jp-x${QUARANTINE_SUFFIX}`)).toBe('original-damage');
+  });
+
+  it('skips when there is nothing stored', () => {
+    const s = fakeStorage();
+    expect(quarantineIfUnrepaired(s, 'jp-missing', 9)).toBe('skipped');
+  });
+
+  it('reports failure instead of throwing when the write is refused', () => {
+    const s = {
+      getItem: (k: string) => (k.endsWith(QUARANTINE_SUFFIX) ? null : 'damaged'),
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+    };
+    expect(quarantineIfUnrepaired(s, 'jp-x', 4)).toBe('failed');
   });
 });

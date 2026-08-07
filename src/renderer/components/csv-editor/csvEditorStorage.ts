@@ -3,7 +3,7 @@
 import { emptyTable, type CsvTable } from '../../../shared/csvEditor';
 import type { CsvEditorSnapshot } from '../../../shared/csvEditorHistory';
 import { IDB_KEYS, mirrorToIdb } from '../../storage/storage';
-import { isOverEncoded, unwrapOverEncoded } from '../../../shared/overEncodedJson';
+import { isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../../../shared/overEncodedJson';
 
 const STORAGE_KEY = 'jp-study-csv-editor-v1';
 
@@ -23,7 +23,14 @@ export function loadStoredEditor(): CsvEditorSnapshot | null {
     // a single parse returns a string and every check below fails silently.
     const { value, layers } = unwrapOverEncoded<StoredCsvEditorState>(raw);
     const parsed = value as StoredCsvEditorState | null;
-    if (!parsed?.table?.headers || !Array.isArray(parsed.table.rows)) return null;
+    if (!parsed?.table?.headers || !Array.isArray(parsed.table.rows)) {
+      // Returning null here makes the panel fall back to an empty table, and its
+      // first save overwrites whatever was stored. If the value was damaged
+      // rather than merely absent, keep a copy first — this is exactly how the
+      // audit lost a 12.3 MB draft.
+      quarantineIfUnrepaired(localStorage, STORAGE_KEY, layers);
+      return null;
+    }
     const snapshot: CsvEditorSnapshot = {
       table: parsed.table,
       title: parsed.title ?? 'imported-deck',

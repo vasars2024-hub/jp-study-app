@@ -35,8 +35,50 @@ export interface UnwrapResult<T> {
   layers: number;
 }
 
-/** Hard stop so a pathological value cannot spin: 9 layers was the live worst case. */
+/** Hard stop so a pathological value cannot spin: 18 layers was the live worst case. */
 const MAX_LAYERS = 40;
+
+/**
+ * Suffix for a value that was over-encoded and could **not** be recovered into
+ * the shape its reader expects.
+ *
+ * This exists because of a real loss during the audit. `jp-study-csv-editor-v1`
+ * sat at 18 layers / 12.3 MB; peeling produced an object that did not match
+ * `{table:{headers,rows}}`, so the reader returned `null`, the panel fell back
+ * to `defaultEditorSnapshot()`, and the first save wrote a 288-byte empty table
+ * over it. That overwrite is the *pre-existing* behaviour — a single parse
+ * failed the same way — but it means a damaged value is destroyed by the very
+ * act of opening the feature that owns it, with nothing kept.
+ *
+ * Quarantining costs one extra key and makes the failure recoverable by hand
+ * instead of terminal. Renderer storage has no restore point (audit §6.4).
+ */
+export const QUARANTINE_SUFFIX = '.corrupt-backup';
+
+/**
+ * Copy `key` aside before a caller lets a damaged value be overwritten.
+ * No-ops when the value is healthy, when there is nothing stored, or when a
+ * quarantine copy already exists — the *first* damaged value is the one worth
+ * keeping, and re-running must not overwrite it with an already-defaulted one.
+ */
+export function quarantineIfUnrepaired(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+  key: string,
+  layers: number,
+): 'quarantined' | 'skipped' | 'failed' {
+  if (!isOverEncoded(layers)) return 'skipped';
+  try {
+    const raw = storage.getItem(key);
+    if (raw == null || raw === '') return 'skipped';
+    const backupKey = `${key}${QUARANTINE_SUFFIX}`;
+    if (storage.getItem(backupKey) != null) return 'skipped';
+    storage.setItem(backupKey, raw);
+    return 'quarantined';
+  } catch {
+    // Quota is the likely cause, and the damaged value is large by definition.
+    return 'failed';
+  }
+}
 
 export function unwrapOverEncoded<T = unknown>(raw: string | null | undefined): UnwrapResult<T> {
   if (raw == null || raw === '') return { value: null, layers: 0 };

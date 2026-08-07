@@ -792,7 +792,7 @@ concluding anything.
 | # | Item | Verdict | Selector measured | Value | Shots |
 |---|---|---|---|---|---|
 | 5.1 | Profile & Dictionary switch lag | **DONE** | nav-click → double-`rAF` paint time; a 16 ms `setInterval` gap detector; `PerformanceObserver` `longtask` | Before: **3954 / 3985 ms** to paint, against **43–47 ms** for every other page (Models 25 ms, Reading 30 ms) — a single synchronous **5662 ms** longtask. After: **219 / 214 ms**, worst gap **218 ms**. **18×.** Three causes, each measured separately: the over-encoded deck (5662 → 3665 ms), `slotCoverage` computed twice per report, and an unmemoised tokenizer call per word. | — |
-| 5.2 | Consolidate Display + Monitors | pending | | Confirmed separate nav entries on the live app. | |
+| 5.2 | Consolidate Display + Monitors | **BLOCKED** | `git ls-files` | The premise exists only in another track's **uncommitted** work. `MonitorsPage.tsx` is **untracked** and the `monitors` nav entry lives in a foreign hunk of `settingsRegistry.ts`; at `HEAD` there is no Monitors page and no Monitors nav item, only Display. Consolidating them would mean either committing that track's page or shipping a commit that is broken at `HEAD`. **Do after the multi-monitor track lands.** | |
 | 5.3 | Scraper settings → Scraper app | pending | | | |
 | 5.4 | Translator + Model + Dictionary | pending | | | |
 | 5.5 | Hide Special from normal view | **DONE** | `.os-set-nav-item` | `special` was the only System page without the `advanced: true` its neighbours `scraper` and `visualizer` already carry. After: Advanced **on** → **23** items, Special present; Advanced **off** → **18**, Special absent (it was 19 with Special before). Advanced restored to its original on. | |
@@ -855,10 +855,72 @@ correct everywhere it is not inside one of these grids.
 
 | # | Item | Verdict | Notes |
 |---|---|---|---|
-| 6.1 | Field-level write/read reconciliation for every persisted key | pending | For each key, the set of fields **written** by some code path vs the set **present** in the live blob vs the set **read** by some consumer. Three failure classes to name separately: *written-then-erased* (6.2), *read-but-never-written* (a setting that can only ever be its default), *written-but-never-read* (a dead control — the `honesty-probe` verdict vocabulary applies). |
+### 6.B — the key inventory, derived from source rather than from this document
+
+`localStorage.{get,set,remove}Item` literals plus every `*KEY*` constant with a `jp-`/`blanc`
+prefix → **163 keys declared in source**. Live profile → **73 keys**, 63 of them `jp-`/`blanc`
+prefixed.
+
+- **Live but not declared: 6**, and all six are explained rather than orphans —
+  `jp-annotations:<uuid>` ×3 and `jp-bookmarks-<uuid>` are per-book dynamic suffixes,
+  `jp-study-stats-v1-ja` is a per-language suffix. `jp-mooncap-music-v1` is the one worth a
+  second look: `catalogs/mooncapLore.ts` is deleted in the working tree, so this may be a
+  genuine leftover from a removed feature. **Not chased — it belongs to another track's
+  in-flight deletion.**
+- **Declared but absent: 106.** This is the *read-but-never-written* class from 6.1 — settings
+  sitting on their defaults. Expected for an inventory this size; it is only a defect when a
+  control claims to write one and does not, which is 6.1's per-key work and is not finished.
+
+### 6.C — over-encoding scan across every live key (the 6.3 corruption check, completed)
+
+Every one of the 73 live keys was peeled until a parse failed. Exactly **two** were damaged, and
+both are the 6.A defect:
+
+| Key | Layers | Size | Outcome |
+|---|---|---|---|
+| `jp-flashcard-deck` | 9 | 37.25 MB | **repaired** in place → 1.26 MB / 1 layer, 3,221 cards intact |
+| `jp-study-csv-editor-v1` | **18** | 12.3 MB | **not recovered — see below** |
+
+17 keys parse as non-JSON, which is correct: they store bare scalars (`jp-app-zoom` = `1.1`).
+The remaining 54 are single-layer and healthy. **So the corruption is bounded and now named**,
+which is the answer to "see if it's missing" at the whole-store level.
+
+### 6.D — a value was lost during this audit. What happened, and the fix it forced
+
+**Stated plainly because it is the kind of thing an audit exists to surface, not hide.**
+
+`jp-study-csv-editor-v1` was 18 layers and 12.3 MB. I opened the CSV tool to prove the repair
+worked on it. It did not: peeling produced an object that did **not** match
+`{table:{headers,rows}}`, so `loadStoredEditor` returned `null`, `CsvEditorPanel` fell back to
+`defaultEditorSnapshot()`, and the first save wrote a **288-byte empty 4×8 table** over it.
+
+What is and is not known:
+
+- **That overwrite is pre-existing behaviour, not something my change introduced.** Before the
+  repair a single `JSON.parse` returned a string and failed the identical guard, so opening the
+  CSV tool would always have defaulted it. My change did not make it worse — but **I triggered
+  it**, and I cannot now reconstruct what the 12.3 MB held.
+- **The durable copy was already the same default.** `db.ts` calls IndexedDB "the app's durable
+  store for heavy data … CSV drafts". Its `csv-editor` record holds an 8-row / 4-header table
+  with `savedAt: 2026-08-07 17:04` — **before this session began (18:42)** — and is unchanged.
+- **The Phase 0 backup does not contain it.** `jp-study-csv-editor-v1` appears only in the
+  leveldb `MANIFEST`, with no value in any `.ldb`, while `jp-flashcard-deck` does appear in the
+  data files. So there was no restore point for this key at 11:14 either — which is item 6.4,
+  demonstrated the hard way.
+
+**The fix this forced:** `quarantineIfUnrepaired` copies a damaged value to
+`<key>.corrupt-backup` before a reader returns `null` and lets the owner overwrite it. It keeps
+the **first** damaged copy, so re-running cannot replace it with an already-defaulted one. Both
+callers now use it. Five tests pin it, including the quota-refusal path.
+
+> **Method correction for the rest of this audit:** do not open a feature to "prove" a repair on
+> a key whose recovery is unproven. Peel a copy in an `/eval` first and only drive the real UI
+> once the peeled value is known to match the reader's shape.
+
+| 6.1 | Field-level write/read reconciliation for every persisted key | **partial** | For each key, the set of fields **written** by some code path vs the set **present** in the live blob vs the set **read** by some consumer. Three failure classes to name separately: *written-then-erased* (6.2), *read-but-never-written* (a setting that can only ever be its default), *written-but-never-read* (a dead control — the `honesty-probe` verdict vocabulary applies). |
 | 6.2 | Last-writer-wins erasure between two owners of one key | pending | **A confirmed instance already exists — see item 3.3.** `jp-os-environment-v1.companions` has two writers: Settings › Companions (`patchEnv`) and `CompanionLayer.persist()`. The layer held a stale list and its position autosave wrote that list back over the setting, so `holdRoutineId` / `primaryRoutineId` / `secondaryRoutineId` vanished from the blob within seconds of being chosen. Fixed for those three fields; **the same shape is untested for every other multi-writer key.** |
-| 6.3 | Byte-for-byte round-trip per key | pending | Snapshot → change one field through the real control → change it back through the same control → diff the blob against the snapshot. A key that does not return to its exact bytes is either lossy or has a second writer. Note the known-benign case from 3.3: absent vs `""` compare unequal as text and identically in behaviour, so the report must distinguish *textual* from *behavioural* difference. |
-| 6.4 | Renderer storage has no restore point | pending | `localStorage` and IndexedDB were never covered even when userData backups were being taken, and backups are now discontinued (§ Phase 0). This item is partly *how to audit safely*, not only *what is broken*. |
+| 6.3 | Byte-for-byte round-trip per key | **partial** | Snapshot → change one field through the real control → change it back through the same control → diff the blob against the snapshot. A key that does not return to its exact bytes is either lossy or has a second writer. Note the known-benign case from 3.3: absent vs `""` compare unequal as text and identically in behaviour, so the report must distinguish *textual* from *behavioural* difference. |
+| 6.4 | Renderer storage has no restore point | **DEMONSTRATED** | `localStorage` and IndexedDB were never covered even when userData backups were being taken, and backups are now discontinued (§ Phase 0). This item is partly *how to audit safely*, not only *what is broken*. |
 
 ### 6.A — CONFIRMED, and repaired: two keys were JSON-stringified once per boot
 
@@ -896,3 +958,23 @@ and both readers self-heal once on first read. Measured live: `jp-flashcard-deck
 `jp-os-environment-v1`, `jp-os-personalization-v1`, `jp-study-lockscreen-v1`,
 `jp-study.onboarding.v1`, plus the 19 top-level userData JSON files and IndexedDB. Item 6.1
 starts by **deriving** the full key list from source, not from this line.
+
+> **Superseded by 6.B** — the list above is no longer the inventory. 163 keys are declared in
+> source and 73 are live; the derivation is one `grep` over `localStorage.*Item` literals plus
+> `*KEY*` constants.
+
+### What Section 6 still owes
+
+- **6.1 per-key field reconciliation is not done.** The whole-store corruption scan (6.C) is
+  complete and the inventory (6.B) is derived, but the three-way *written / present / read*
+  comparison **per field** has only been done for the keys that other items forced open
+  (`jp-os-environment-v1` in 3.3, `jp-os-desktop-prefs-v1` in 4.1). 106 declared-but-absent keys
+  are unclassified between "default, never touched" and "dead control".
+- **6.2 has one confirmed instance and no systematic sweep.** No key is written by a literal
+  `setItem` from two different source files, which is a real negative result — but it does not
+  cover the shape that actually bit in 3.3, where two owners both went through one exported
+  save function. That needs call-graph work, not grep.
+- **6.3 round-trips are measured only where an item required one** — `jp-os-desktop-prefs-v1`
+  byte-identical after an icon-size change and restore (4.1), `jp-os-personalization-v1` restored
+  (2.2), `jp-study-shortcuts-v1` still `null` throughout 4.2, and the known benign
+  absent-vs-`""` case in 3.3. A systematic pass over all 63 live keys was not run.
