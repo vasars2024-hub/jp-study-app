@@ -442,3 +442,263 @@ export async function qbitSend(input: ScraperQbitSendInput): Promise<QbitSendRep
 export function resetQbitSessions(): void {
   sessions.clear();
 }
+
+// --------------------------------------------------- selective subtitle fetch ---
+//
+// Everything below serves one caller: `subtitleNyaaSource.ts`, which needs a
+// few hundred KB out of a torrent without downloading the rest. The operations
+// above hand a magnet over and forget about it; these follow one through to
+// completed bytes on disk.
+//
+// Two rules shape the whole section:
+//
+//   1. A torrent the user already has is never touched. Setting file
+//      priorities on someone's own transfer would silently stop files they
+//      asked for, and the damage would not show up until they went looking for
+//      an episode that never finished.
+//   2. Everything this adds is tagged, so a user who never wants the app in
+//      their client can find and remove all of it in one filter. The app does
+//      not delete from qBittorrent — that is the user's client and their call.
+
+/** Category and tag applied to every torrent added for a subtitle fetch. */
+export const QBIT_SUBTITLE_CATEGORY = 'jp-study-subtitles';
+
+/** Priority values qBittorrent's `filePrio` takes. */
+export const QBIT_PRIO_SKIP = 0;
+export const QBIT_PRIO_NORMAL = 1;
+
+export interface QbitFileEntry {
+  /** Index qBittorrent addresses the file by in `filePrio`. */
+  index: number;
+  /** Path inside the torrent, e.g. `Show/Subs/ep01.ass`. */
+  name: string;
+  sizeBytes: number;
+  /** 0..1. */
+  progress: number;
+  priority: number;
+}
+
+interface QbitRawFile {
+  index?: number;
+  name?: string;
+  size?: number;
+  progress?: number;
+  priority?: number;
+}
+
+export type QbitOutcome<T> = { ok: true; value: T } | { ok: false; reason: string };
+
+function failureReason(response: { error: LoginResult } | { status: number; body: string }): string {
+  return 'error' in response
+    ? response.error.message
+    : `qBittorrent answered ${response.status}.`;
+}
+
+/**
+ * Whether qBittorrent already knows this hash.
+ *
+ * The gate for rule 1. `torrents/info?hashes=` answers with an empty array for
+ * an unknown hash rather than a 404, so an empty array is the "safe to add"
+ * signal.
+ */
+export async function qbitTorrentInfo(
+  input: ScraperQbitInput,
+  hash: string,
+): Promise<QbitOutcome<QbitTransferRow | null>> {
+  const wanted = hash.trim().toLowerCase();
+  if (!wanted) return { ok: false, reason: 'No info hash.' };
+  const response = await authed(input, `/api/v2/torrents/info?hashes=${encodeURIComponent(wanted)}`);
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response) };
+  }
+  try {
+    const parsed = JSON.parse(response.body) as QbitTorrentInfo[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return { ok: true, value: null };
+    return { ok: true, value: mapTransfer(parsed[0]) };
+  } catch {
+    return { ok: false, reason: 'The torrent list was not valid JSON.' };
+  }
+}
+
+/**
+ * Adds a magnet stopped, so nothing transfers until file priorities are set.
+ *
+ * Deliberately does **not** use `buildAddForm`: that applies the profile's own
+ * add mode, which may be `forced`, and starting a 12 GB batch at full tilt is
+ * the exact outcome this provider exists to prevent. The form here is fixed.
+ *
+ * `paused` was renamed `stopped` in qBittorrent 5; both are sent because
+ * unknown form fields are ignored and guessing the version is worse.
+ */
+export async function qbitAddStopped(
+  input: ScraperQbitInput,
+  magnet: string,
+  hash: string,
+): Promise<QbitOutcome<'added' | 'already-present'>> {
+  if (!input.config.enabled) return { ok: false, reason: 'qBittorrent is not enabled.' };
+  if (!magnet) return { ok: false, reason: 'No magnet link.' };
+
+  const existing = await qbitTorrentInfo(input, hash);
+  if (!existing.ok) return { ok: false, reason: existing.reason };
+  if (existing.value) {
+    // Rule 1. The caller decides whether it can use the transfer as it stands.
+    return { ok: true, value: 'already-present' };
+  }
+
+  const form = new URLSearchParams();
+  form.set('urls', magnet);
+  form.set('paused', 'true');
+  form.set('stopped', 'true');
+  form.set('category', QBIT_SUBTITLE_CATEGORY);
+  form.set('tags', QBIT_SUBTITLE_CATEGORY);
+  // Original layout keeps the paths the torrent declares, which is what the
+  // file list is matched against.
+  form.set('contentLayout', 'Original');
+  form.set('autoTMM', 'false');
+  if (input.config.savePath) form.set('savepath', input.config.savePath);
+
+  const response = await authed(input, '/api/v2/torrents/add', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  });
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response) };
+  }
+  scraperLog('info', 'qbit', `Added a subtitle fetch stopped (${hash.slice(0, 8)}).`);
+  return { ok: true, value: 'added' };
+}
+
+/**
+ * The files inside a torrent.
+ *
+ * `index` is absent on older builds, where the array position is the index —
+ * so position is the fallback rather than an error. Getting this wrong sets
+ * priorities on the wrong files, which is silent and would be very hard to
+ * spot from the outside.
+ */
+export async function qbitFiles(
+  input: ScraperQbitInput,
+  hash: string,
+): Promise<QbitOutcome<QbitFileEntry[]>> {
+  const wanted = hash.trim().toLowerCase();
+  if (!wanted) return { ok: false, reason: 'No info hash.' };
+  const response = await authed(input, `/api/v2/torrents/files?hash=${encodeURIComponent(wanted)}`);
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response) };
+  }
+  try {
+    const parsed = JSON.parse(response.body) as QbitRawFile[];
+    if (!Array.isArray(parsed)) return { ok: false, reason: 'The file list was not a list.' };
+    return {
+      ok: true,
+      value: parsed.map((file, position) => ({
+        index: Number.isFinite(file.index) ? Number(file.index) : position,
+        name: file.name ?? '',
+        sizeBytes: file.size ?? 0,
+        progress: Math.max(0, Math.min(1, file.progress ?? 0)),
+        priority: file.priority ?? QBIT_PRIO_NORMAL,
+      })),
+    };
+  } catch {
+    return { ok: false, reason: 'The file list was not valid JSON.' };
+  }
+}
+
+/** Sets one priority across a set of file indexes. This is Route B's mechanism. */
+export async function qbitSetFilePriorities(
+  input: ScraperQbitInput,
+  hash: string,
+  indexes: readonly number[],
+  priority: number,
+): Promise<QbitOutcome<number>> {
+  if (!indexes.length) return { ok: true, value: 0 };
+  const form = new URLSearchParams();
+  form.set('hash', hash.trim().toLowerCase());
+  form.set('id', indexes.join('|'));
+  form.set('priority', String(priority));
+  const response = await authed(input, '/api/v2/torrents/filePrio', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+  });
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response) };
+  }
+  return { ok: true, value: indexes.length };
+}
+
+/**
+ * Starts a stopped torrent.
+ *
+ * `resume` is the endpoint every 4.x build has and 5.x still honours; `start`
+ * is 5.x's replacement. Trying `resume` first means the common case is one
+ * request, and the fallback covers a future build that finally drops it.
+ */
+export async function qbitStart(
+  input: ScraperQbitInput,
+  hash: string,
+): Promise<QbitOutcome<true>> {
+  const body = new URLSearchParams({ hashes: hash.trim().toLowerCase() }).toString();
+  const headers = { 'content-type': 'application/x-www-form-urlencoded' };
+  let response = await authed(input, '/api/v2/torrents/resume', { method: 'POST', headers, body });
+  if (!('error' in response) && (response.status === 404 || response.status === 405)) {
+    response = await authed(input, '/api/v2/torrents/start', { method: 'POST', headers, body });
+  }
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response) };
+  }
+  return { ok: true, value: true };
+}
+
+export interface QbitAwaitOptions {
+  timeoutMs: number;
+  pollMs?: number;
+  /** Checked between polls so a cancelled discovery stops waiting. */
+  isCancelled?: () => boolean;
+  /** Injected in tests so a wait does not cost real seconds. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * Waits for a set of files to finish, or gives up.
+ *
+ * Bounded by construction: a swarm with no seeds never completes, and a
+ * subtitle fetch that hangs forever would pin the discovery pipeline on one
+ * item. The timeout is a normal outcome here, not an error condition.
+ */
+export async function qbitAwaitFiles(
+  input: ScraperQbitInput,
+  hash: string,
+  indexes: readonly number[],
+  options: QbitAwaitOptions,
+): Promise<QbitOutcome<QbitFileEntry[]>> {
+  const wanted = new Set(indexes);
+  if (!wanted.size) return { ok: false, reason: 'No files were selected.' };
+  const pollMs = options.pollMs ?? 1_000;
+  const sleep = options.sleep ?? defaultSleep;
+  const deadline = Date.now() + Math.max(0, options.timeoutMs);
+
+  for (;;) {
+    if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
+
+    const files = await qbitFiles(input, hash);
+    if (!files.ok) return files;
+
+    const selected = files.value.filter((file) => wanted.has(file.index));
+    if (selected.length && selected.every((file) => file.progress >= 1)) {
+      return { ok: true, value: selected };
+    }
+
+    if (Date.now() >= deadline) {
+      const done = selected.filter((file) => file.progress >= 1).length;
+      return {
+        ok: false,
+        reason: `Timed out with ${done}/${selected.length} subtitle file(s) complete.`,
+      };
+    }
+    await sleep(pollMs);
+  }
+}

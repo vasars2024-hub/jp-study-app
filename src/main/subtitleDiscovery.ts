@@ -29,9 +29,14 @@ import {
 import {
   DEFAULT_SUBTITLE_DISCOVERY_SETTINGS,
   estimateEtaMs,
+  isManualOnlySubtitleProvider,
   isNetworkSubtitleProvider,
+  isRemoteSubtitleProvider,
   normalizeSubtitleDiscoverySettings,
   orderedSubtitleProviders,
+  SUBTITLE_PROVIDER_IDS,
+  type NyaaSubtitleAcceptResult,
+  type NyaaSubtitleListResult,
   type SubtitleDiscoveryPhase,
   type SubtitleDiscoveryProgress,
   type SubtitleDiscoveryRequest,
@@ -57,12 +62,38 @@ import {
   testSubtitleProvider,
   type ProviderSubtitleCandidate,
 } from './subtitleProviderClients';
+import {
+  nyaaAvailability,
+  nyaaFetch,
+  nyaaSearch,
+  rememberNyaaCandidates,
+  takeRememberedNyaaCandidate,
+  type NyaaAcquisitionConfig,
+} from './subtitleNyaaSource';
 import { osdbHashFile } from './osdbHash';
 import { enqueueTranscription } from './transcriptionJobs';
 
 export interface SubtitleDiscoveryHost {
   listItems: () => MediaItem[];
   patchItems: (ids: readonly string[], patch: Partial<MediaItem>) => void;
+}
+
+/**
+ * Narrows the untyped `acquisition` blob off the wire.
+ *
+ * `SubtitleDiscoveryRequest` types it as `unknown` so that module stays a leaf
+ * and does not pull the scraper's settings types into every importer of the
+ * wire shapes. The structural check here is what makes that safe: anything not
+ * carrying all three pieces is treated as absent, which disables the provider
+ * rather than half-configuring it.
+ */
+function asAcquisitionConfig(input: unknown): NyaaAcquisitionConfig | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const value = input as Partial<NyaaAcquisitionConfig>;
+  if (!Array.isArray(value.indexers)) return undefined;
+  if (!value.torrents || typeof value.torrents !== 'object') return undefined;
+  if (!value.qbittorrent || typeof value.qbittorrent !== 'object') return undefined;
+  return value as NyaaAcquisitionConfig;
 }
 
 let host: SubtitleDiscoveryHost | null = null;
@@ -355,6 +386,7 @@ async function discoverForItem(
   languages: string[],
   force: boolean,
   emit: (phase: SubtitleDiscoveryPhase, extra?: Partial<SubtitleDiscoveryProgress>) => void,
+  acquisition?: NyaaAcquisitionConfig,
 ): Promise<{ records: SubtitleRecord[]; failures: SubtitleSearchFailure[]; files: number }> {
   // A forced re-search rediscovers everything the pipeline can produce, so those
   // records are dropped and rebuilt. Machine transcripts are the exception: this
@@ -429,10 +461,26 @@ async function discoverForItem(
       continue;
     }
 
-    if (!isNetworkSubtitleProvider(providerId)) continue;
-    if (!hasSubtitleProviderKey(providerId)) {
+    // Everything past here answers with candidates to score. `isRemote` rather
+    // than `isNetwork` because the two are not the same set: nyaa reaches the
+    // network and has no key, and gating on the key-bearing predicate would
+    // have dropped it out of the loop silently.
+    if (!isRemoteSubtitleProvider(providerId)) continue;
+    if (isNetworkSubtitleProvider(providerId) && !hasSubtitleProviderKey(providerId)) {
       failures.push({ providerId, lang: missing.join(','), attemptedAt: Date.now(), reason: 'no-key' });
       continue;
+    }
+    if (providerId === 'nyaa') {
+      const available = await nyaaAvailability(acquisition);
+      if (!available.ok) {
+        failures.push({
+          providerId,
+          lang: missing.join(','),
+          attemptedAt: Date.now(),
+          reason: available.reason,
+        });
+        continue;
+      }
     }
 
     // `force` means the user asked for this search again, explicitly. Honouring
@@ -452,6 +500,15 @@ async function discoverForItem(
         // Japanese-only provider; asking it for anything else is a wasted request.
         if (!wanted.some((lang) => lang.startsWith('ja'))) continue;
         candidates = await jimakuSearch(item.anilistId, item.seriesTitle ?? item.title, item.episode ?? null);
+      } else if (providerId === 'nyaa') {
+        candidates = await nyaaSearch({
+          // Checked non-null by the availability gate above.
+          config: acquisition as NyaaAcquisitionConfig,
+          title: item.seriesTitle ?? item.title,
+          season: item.season ?? null,
+          episode: item.episode ?? null,
+          languages: wanted,
+        });
       } else {
         const hashed = await osdbHashFile(item.path);
         candidates = await openSubtitlesSearch({
@@ -484,6 +541,14 @@ async function discoverForItem(
       }
       // Only attach automatically for languages the user opted into.
       if (!settings.autoDownloadLanguages.includes(lang)) continue;
+      // Some providers are never attached without the user picking the result,
+      // regardless of the language opt-in. A candidate from a torrent index is
+      // a name match with no curation behind it; auto-attaching one means the
+      // wrong cut plays and the user finds out minutes in.
+      if (isManualOnlySubtitleProvider(providerId)) {
+        failures.push({ providerId, lang, attemptedAt: Date.now(), reason: 'manual-only' });
+        continue;
+      }
 
       emit('downloading', { providerId });
       const text = await fetchSubtitleCandidate(best.candidate);
@@ -588,7 +653,14 @@ export async function runSubtitleDiscovery(
 
       try {
         emit('queued');
-        const outcome = await discoverForItem(item, settings, languages, request.force === true, emit);
+        const outcome = await discoverForItem(
+          item,
+          settings,
+          languages,
+          request.force === true,
+          emit,
+          asAcquisitionConfig(request.acquisition),
+        );
         if (cancelled.has(item.id)) {
           emit('cancelled');
           continue;
@@ -637,11 +709,123 @@ export async function runSubtitleDiscovery(
 // ---------------------------------------------------------------------------
 
 function credentialStates(): SubtitleProviderCredentialState[] {
-  return (['embedded', 'sidecar', 'jimaku', 'opensubtitles'] as SubtitleProviderExecutionId[]).map((id) => ({
+  // Driven off the shared list rather than a literal copy of it: this used to
+  // be its own array, which meant a provider could be registered, enabled and
+  // ordered in settings while never appearing here.
+  return SUBTITLE_PROVIDER_IDS.map((id) => ({
     id,
     requiresKey: isNetworkSubtitleProvider(id),
     hasKey: isNetworkSubtitleProvider(id) ? hasSubtitleProviderKey(id) : true,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Manual nyaa flow
+//
+// The automatic loop never attaches a nyaa result (see
+// `isManualOnlySubtitleProvider`), so this is how one is actually taken: list
+// the ranked releases, let the user pick, then fetch and attach exactly that
+// one. Separated from `discoverForItem` because accepting a candidate starts a
+// transfer in the user's torrent client, and that has to be a decision someone
+// made rather than a step in a sweep.
+// ---------------------------------------------------------------------------
+
+async function listNyaaCandidates(
+  mediaId: string,
+  acquisition: unknown,
+  languages?: string[],
+): Promise<NyaaSubtitleListResult> {
+  const item = host?.listItems().find((entry) => entry.id === mediaId);
+  if (!item) return { ok: false, candidates: [], message: 'That media item is no longer in the library.' };
+
+  const config = asAcquisitionConfig(acquisition);
+  const available = await nyaaAvailability(config);
+  if (!available.ok) return { ok: false, candidates: [], message: available.detail };
+
+  const wanted = languages?.length ? languages : loadDiscoverySettings().autoDownloadLanguages;
+  try {
+    const candidates = await nyaaSearch({
+      config: config as NyaaAcquisitionConfig,
+      title: item.seriesTitle ?? item.title,
+      season: item.season ?? null,
+      episode: item.episode ?? null,
+      languages: wanted.length ? wanted : ['ja'],
+    });
+    rememberNyaaCandidates(candidates);
+    return {
+      ok: true,
+      candidates: candidates.map((candidate) => ({
+        id: candidate.providerItemId,
+        releaseName: candidate.releaseName,
+        route: candidate.route,
+        sizeBytes: candidate.sizeBytes,
+        seeders: candidate.seeders,
+        languages: candidate.language ? [candidate.language] : [],
+        score: candidate.score,
+        reasons: candidate.reasons,
+      })),
+      message: candidates.length ? '' : 'No release on the index looks like it carries subtitles for this title.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      candidates: [],
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function acceptNyaaCandidate(
+  mediaId: string,
+  candidateId: string,
+  acquisition: unknown,
+  lang: string,
+): Promise<NyaaSubtitleAcceptResult> {
+  const item = host?.listItems().find((entry) => entry.id === mediaId);
+  if (!item) return { ok: false, message: 'That media item is no longer in the library.' };
+
+  const config = asAcquisitionConfig(acquisition);
+  if (!config) return { ok: false, message: 'No scraper configuration was supplied.' };
+
+  const candidate = takeRememberedNyaaCandidate(candidateId);
+  if (!candidate) {
+    return { ok: false, message: 'That release is no longer in this session’s listing. Search again.' };
+  }
+
+  const outcome = await nyaaFetch(candidate, config, {
+    isCancelled: () => cancelled.has(mediaId),
+  });
+  if (!outcome.ok) return { ok: false, message: outcome.reason };
+
+  const language = (lang || candidate.language || 'ja').toLowerCase();
+  const relative = writeSubtitleFile(
+    item.id,
+    `nyaa-${language}-${candidate.providerItemId.replace(/[^a-zA-Z0-9]/g, '')}.${outcome.value.format}`,
+    outcome.value.text,
+  );
+  if (!relative) return { ok: false, message: 'The subtitle could not be written to disk.' };
+
+  const record: SubtitleRecord = {
+    id: crypto.randomUUID(),
+    lang: language,
+    source: 'provider',
+    // The format comes from the file that was actually fetched, not from the
+    // guess the search made: the index lists no file names, so until the
+    // torrent metadata arrives nothing knows whether a release ships .ass or
+    // .srt. A record written with the wrong extension parses as nothing.
+    format: outcome.value.format,
+    path: relative,
+    providerId: 'nyaa',
+    providerItemId: candidate.providerItemId,
+    label: outcome.value.fileName || candidate.releaseName,
+    addedAt: Date.now(),
+  };
+
+  host?.patchItems([item.id], {
+    subtitles: [...(item.subtitles ?? []), record],
+    subtitlesCheckedAt: Date.now(),
+  });
+  return { ok: true, message: '', lang: language };
 }
 
 export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHost): void {
@@ -666,6 +850,16 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
     const result = await testSubtitleProvider(id);
     return { id, ...result };
   });
+  ipcMain.handle(
+    'subtitleDiscovery:nyaaList',
+    (_e, mediaId: string, acquisition: unknown, languages?: string[]) =>
+      listNyaaCandidates(mediaId, acquisition, Array.isArray(languages) ? languages : undefined),
+  );
+  ipcMain.handle(
+    'subtitleDiscovery:nyaaAccept',
+    (_e, mediaId: string, candidateId: string, acquisition: unknown, lang: string) =>
+      acceptNyaaCandidate(mediaId, candidateId, acquisition, typeof lang === 'string' ? lang : 'ja'),
+  );
   /** Reads a stored record's cue text, for the player and the study tools. */
   ipcMain.handle('subtitleDiscovery:read', (_e, mediaId: string, recordId: string) => {
     const item = host?.listItems().find((entry) => entry.id === mediaId);

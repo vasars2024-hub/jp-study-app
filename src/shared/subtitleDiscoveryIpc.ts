@@ -36,7 +36,7 @@ export interface SubtitleDiscoveryProgress {
 }
 
 /** The providers this phase can actually execute against. */
-export const SUBTITLE_PROVIDER_IDS = ['embedded', 'sidecar', 'jimaku', 'opensubtitles'] as const;
+export const SUBTITLE_PROVIDER_IDS = ['embedded', 'sidecar', 'jimaku', 'opensubtitles', 'nyaa'] as const;
 export type SubtitleProviderExecutionId = (typeof SUBTITLE_PROVIDER_IDS)[number];
 
 /** Providers that reach the network, and therefore need a key and a health check. */
@@ -44,6 +44,43 @@ export const NETWORK_SUBTITLE_PROVIDERS: SubtitleProviderExecutionId[] = ['jimak
 
 export function isNetworkSubtitleProvider(id: string): id is 'jimaku' | 'opensubtitles' {
   return (NETWORK_SUBTITLE_PROVIDERS as readonly string[]).includes(id);
+}
+
+/**
+ * Providers that answer with candidates to score, rather than reading a local
+ * file.
+ *
+ * Deliberately wider than `NETWORK_SUBTITLE_PROVIDERS`, which means "needs an
+ * API key" and is what the settings panel renders a key field from. `nyaa`
+ * reaches the network but has no account and no key, so conflating the two
+ * would either put a pointless key box in the UI or drop the provider out of
+ * the discovery loop entirely.
+ */
+export const REMOTE_SUBTITLE_PROVIDERS: SubtitleProviderExecutionId[] = [
+  'jimaku',
+  'opensubtitles',
+  'nyaa',
+];
+
+export function isRemoteSubtitleProvider(
+  id: string,
+): id is 'jimaku' | 'opensubtitles' | 'nyaa' {
+  return (REMOTE_SUBTITLE_PROVIDERS as readonly string[]).includes(id);
+}
+
+/**
+ * Providers whose results are never attached without the user choosing them.
+ *
+ * A torrent-sourced subtitle is a name match against a release, with no
+ * curation and no hash check behind it — materially lower-trust than Jimaku,
+ * where a human uploaded a file for a known series. Attaching one silently is
+ * how a user ends up watching with subtitles for a different cut and only finds
+ * out several minutes in.
+ */
+export const MANUAL_ONLY_SUBTITLE_PROVIDERS: SubtitleProviderExecutionId[] = ['nyaa'];
+
+export function isManualOnlySubtitleProvider(id: string): boolean {
+  return (MANUAL_ONLY_SUBTITLE_PROVIDERS as readonly string[]).includes(id);
 }
 
 export interface SubtitleProviderSetting {
@@ -86,6 +123,10 @@ export const DEFAULT_SUBTITLE_DISCOVERY_SETTINGS: SubtitleDiscoverySettings = {
     { id: 'sidecar', enabled: true, priority: 1 },
     { id: 'jimaku', enabled: true, priority: 2 },
     { id: 'opensubtitles', enabled: true, priority: 3 },
+    // Off by default and last. It reaches a torrent index and, on acceptance,
+    // puts a transfer into the user's own qBittorrent — neither of which should
+    // start happening because they updated the app.
+    { id: 'nyaa', enabled: false, priority: 4 },
   ],
   retryAfterDays: 7,
 };
@@ -111,6 +152,23 @@ export interface SubtitleDiscoveryRequest {
   force?: boolean;
   /** Restrict to these languages instead of the configured set. */
   languages?: string[];
+  /**
+   * Scraper configuration for the `nyaa` provider: torrent indexes to search
+   * and the qBittorrent to fetch through.
+   *
+   * Carried on the request rather than read from a copy in main because
+   * scraper settings live in the renderer, per profile — the same reason every
+   * other scraper entry point is handed its settings per call.
+   *
+   * Omitting it disables the provider for that run, which is what the
+   * automatic sweep on media import does. Adding transfers to someone's
+   * torrent client and then waiting on a swarm is not a thing that should
+   * happen unattended.
+   *
+   * Typed loosely here so this wire module stays a leaf; the provider
+   * validates the shape it needs.
+   */
+  acquisition?: unknown;
 }
 
 export interface SubtitleDiscoveryResult {
@@ -122,6 +180,45 @@ export interface SubtitleDiscoveryResult {
   /** Subtitle files written in total. */
   files: number;
   error?: string;
+}
+
+/**
+ * One nyaa release offered to the user.
+ *
+ * Carries size and swarm health, which a curated provider's candidate never
+ * needs to: this is the only provider where accepting means starting a
+ * transfer in the user's own torrent client, so the two numbers that decide
+ * whether that is a good idea have to be on screen before the click.
+ */
+export interface NyaaSubtitleCandidateView {
+  id: string;
+  releaseName: string;
+  /** `sub-pack` takes the whole torrent; `batch-sidecar` takes selected files. */
+  route: 'sub-pack' | 'batch-sidecar';
+  sizeBytes: number;
+  seeders: number;
+  languages: string[];
+  score: number;
+  /** Why it ranked where it did, shown so a wrong-looking order is explicable. */
+  reasons: string[];
+}
+
+export interface NyaaSubtitleListResult {
+  ok: boolean;
+  candidates: NyaaSubtitleCandidateView[];
+  /**
+   * Why the list is empty, when it is. A misconfiguration and a title with no
+   * subtitle releases are different problems and must not both read as
+   * "nothing found".
+   */
+  message: string;
+}
+
+export interface NyaaSubtitleAcceptResult {
+  ok: boolean;
+  message: string;
+  /** Language of the attached record, so the caller can refresh the right row. */
+  lang?: string;
 }
 
 export { MIN_SAMPLES_FOR_ETA, estimateEtaMs } from './jobEta';

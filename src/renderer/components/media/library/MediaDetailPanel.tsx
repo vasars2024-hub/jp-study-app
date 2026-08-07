@@ -16,6 +16,7 @@ import MediaEpisodeRow from './MediaEpisodeRow';
 import MediaStudyPanel from './MediaStudyPanel';
 import MediaStatusPill from './MediaStatusPill';
 import MediaMatchDialog from './MediaMatchDialog';
+import NyaaSubtitleDialog from './NyaaSubtitleDialog';
 import { useMediaJobs } from './useMediaJobs';
 import { episodesBySeason, providerEpisodeTitle, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
@@ -70,6 +71,7 @@ export default function MediaDetailPanel({
   const [pendingQueue, setPendingQueue] = useState<boolean | null>(null);
   const [matching, setMatching] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [nyaaOpen, setNyaaOpen] = useState(false);
   const { transcribing } = useMediaJobs();
 
   const entryId = entry?.id ?? null;
@@ -80,6 +82,7 @@ export default function MediaDetailPanel({
     setPendingFavorite(null);
     setPendingQueue(null);
     setMatching(false);
+    setNyaaOpen(false);
     setNote(entry?.primary.note ?? '');
   }, [entryId, entry?.primary.note]);
 
@@ -308,6 +311,9 @@ export default function MediaDetailPanel({
               <Button size="sm" disabled={searching} onClick={() => void search()}>
                 {searching ? t('media.subtitles.searching') : t('media.subtitles.search')}
               </Button>
+              <Button size="sm" onClick={() => setNyaaOpen(true)}>
+                {t('media.subtitles.nyaa.open')}
+              </Button>
               <Button
                 size="sm"
                 disabled={transcribing.has(entry.primary.id)}
@@ -321,6 +327,20 @@ export default function MediaDetailPanel({
                   : t('media.subtitles.transcribe')}
               </Button>
             </div>
+            {nyaaOpen && (
+              <NyaaSubtitleDialog
+                mediaId={entry.primary.id}
+                languages={[]}
+                onCancel={() => setNyaaOpen(false)}
+                onAttached={(attachedLang) => {
+                  setNyaaOpen(false);
+                  showToast({
+                    message: t('media.subtitles.nyaa.attached', { lang: attachedLang }),
+                    kind: 'success',
+                  });
+                }}
+              />
+            )}
             {tracks.length === 0 ? (
               <p className="muted">
                 {entry.primary.subtitlesCheckedAt

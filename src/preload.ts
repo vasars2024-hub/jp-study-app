@@ -1010,6 +1010,24 @@ const api = {
     id: string,
   ): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleProviderTestResult> =>
     ipcRenderer.invoke('subtitleDiscovery:test', id),
+  /**
+   * Ranked nyaa releases for one media item. Separate from `runSubtitleDiscovery`
+   * because a torrent-sourced subtitle is never attached automatically — the
+   * user picks the release, then accepts it below.
+   */
+  listNyaaSubtitles: (
+    mediaId: string,
+    acquisition: import('./shared/subtitleNyaa').NyaaAcquisitionConfig,
+    languages?: string[],
+  ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleListResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:nyaaList', mediaId, acquisition, languages),
+  acceptNyaaSubtitle: (
+    mediaId: string,
+    candidateId: string,
+    acquisition: import('./shared/subtitleNyaa').NyaaAcquisitionConfig,
+    lang: string,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:nyaaAccept', mediaId, candidateId, acquisition, lang),
   /** Cue text for one stored subtitle record. */
   readSubtitleRecord: (mediaId: string, recordId: string): Promise<SubtitlePick | null> =>
     ipcRenderer.invoke('subtitleDiscovery:read', mediaId, recordId),

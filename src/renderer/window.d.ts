@@ -601,6 +601,17 @@ declare global {
       testSubtitleProvider(
         id: string,
       ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderTestResult>;
+      listNyaaSubtitles(
+        mediaId: string,
+        acquisition: import('../../shared/subtitleNyaa').NyaaAcquisitionConfig,
+        languages?: string[],
+      ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleListResult>;
+      acceptNyaaSubtitle(
+        mediaId: string,
+        candidateId: string,
+        acquisition: import('../../shared/subtitleNyaa').NyaaAcquisitionConfig,
+        lang: string,
+      ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
       readSubtitleRecord(mediaId: string, recordId: string): Promise<SubtitlePick | null>;
       onSubtitleDiscoveryProgress(
         cb: (p: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,
