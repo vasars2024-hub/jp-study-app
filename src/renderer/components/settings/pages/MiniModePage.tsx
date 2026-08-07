@@ -7,16 +7,22 @@ import {
   MINI_APP_CATALOG,
   MINI_MAX_APPS,
   MINI_MIN_APPS,
+  MINI_MAX_ROUTINES,
   MINI_THEME_TINTS,
   setMiniModeEnabled,
   addMiniApp,
   removeMiniApp,
   moveMiniApp,
+  addMiniRoutine,
+  removeMiniRoutine,
+  moveMiniRoutine,
   availableMiniApps,
   type MiniAppId,
   type MiniDensity,
   type MiniThemeTint,
 } from '../../../miniMode';
+import { offerableMiniRoutines, resolveMiniRoutines } from '../../../miniRoutines';
+import { loadEnvironment } from '../../../environment/environmentStore';
 import { useT } from '../../../i18n';
 
 const TINT_KEY: Partial<Record<MiniThemeTint, string>> = {
@@ -37,6 +43,7 @@ export default function MiniModePage() {
   const { mini, patchMini, focusSettingId } = useSettings();
   const aeroMini = useAeroMaterials();
   const [addPick, setAddPick] = useState<MiniAppId | ''>('');
+  const [addRoutinePick, setAddRoutinePick] = useState('');
   const [note, setNote] = useState('');
 
   const appLabel = (id: MiniAppId): string => {
@@ -50,6 +57,18 @@ export default function MiniModePage() {
 
   const choices = useMemo(() => availableMiniApps(mini.apps), [mini.apps]);
   const pick = addPick && choices.some((c) => c.id === addPick) ? addPick : choices[0]?.id ?? '';
+
+  const pinnedRoutines = useMemo(() => resolveMiniRoutines(mini.routines), [mini.routines]);
+  const routineChoices = useMemo(() => {
+    const pinned = new Set(mini.routines);
+    return offerableMiniRoutines(loadEnvironment().companions ?? []).filter(
+      (r) => !pinned.has(r.id),
+    );
+  }, [mini.routines]);
+  const routinePick =
+    addRoutinePick && routineChoices.some((r) => r.id === addRoutinePick)
+      ? addRoutinePick
+      : routineChoices[0]?.id ?? '';
 
   const flash = (text: string) => {
     setNote(text);
@@ -83,6 +102,23 @@ export default function MiniModePage() {
     }
     patchMini({ apps: next });
     flash(t('settings.mini.msg.removed', { name: appLabel(id) }));
+  };
+
+  const onAddRoutine = (id: string) => {
+    const next = addMiniRoutine(mini.routines, id);
+    if (!next) {
+      flash(t('settings.mini.msg.maxRoutines', { max: MINI_MAX_ROUTINES }));
+      return;
+    }
+    patchMini({ routines: next });
+    const def = routineChoices.find((r) => r.id === id);
+    flash(t('settings.mini.msg.added', { name: def ? def.name : id }));
+  };
+
+  const onRemoveRoutine = (id: string) => {
+    const def = pinnedRoutines.find((r) => r.id === id);
+    patchMini({ routines: removeMiniRoutine(mini.routines, id) });
+    flash(t('settings.mini.msg.removed', { name: def ? def.name : id }));
   };
 
   const tintLabel = (id: MiniThemeTint) => {
@@ -225,6 +261,89 @@ export default function MiniModePage() {
         {note && (
           <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
             {note}
+          </p>
+        )}
+      </SettingsCard>
+
+      {/* v1.0 audit 3.5 — the same three slots are also bindable from the widget's
+          own drawer (MiniShell), which is where they are clicked. */}
+      <SettingsCard
+        id="mini-routines"
+        title={t('settings.mini.routines.title', {
+          count: mini.routines.length,
+          max: MINI_MAX_ROUTINES,
+        })}
+        description={t('settings.mini.routines.desc', { max: MINI_MAX_ROUTINES })}
+        highlight={focusSettingId === 'mini-routines'}
+      >
+        <div className="mini-add-box mini-add-box-settings">
+          <span className="muted" style={{ fontSize: 12 }}>
+            {t('settings.mini.routines.add')}
+          </span>
+          <div className="mini-add-row">
+            <select
+              className="mini-add-select"
+              value={routinePick}
+              disabled={!routineChoices.length}
+              onChange={(e) => setAddRoutinePick(e.target.value)}
+            >
+              {!routineChoices.length && (
+                <option value="">{t('settings.mini.routines.noneAvailable')}</option>
+              )}
+              {routineChoices.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn small primary"
+              disabled={!routineChoices.length || !routinePick}
+              onClick={() => onAddRoutine(routinePick)}
+            >
+              {t('settings.mini.routines.pin')}
+            </button>
+          </div>
+        </div>
+
+        <ul className="mini-app-manage" style={{ marginTop: 12 }}>
+          {mini.routines.map((id, i) => {
+            const def = pinnedRoutines.find((r) => r.id === id);
+            return (
+              <li key={id} className="mini-app-manage-row">
+                <span className="mini-app-manage-name">
+                  <Icon name="sparkle" size={14} /> <span className="muted">{i + 1}.</span>{' '}
+                  {def ? def.name : id}
+                </span>
+                <span className="mini-app-manage-acts">
+                  <button
+                    type="button"
+                    className="btn small"
+                    disabled={i === 0}
+                    onClick={() => patchMini({ routines: moveMiniRoutine(mini.routines, id, -1) })}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn small"
+                    disabled={i === mini.routines.length - 1}
+                    onClick={() => patchMini({ routines: moveMiniRoutine(mini.routines, id, 1) })}
+                  >
+                    ↓
+                  </button>
+                  <button type="button" className="btn small" onClick={() => onRemoveRoutine(id)}>
+                    {t('settings.mini.remove')}
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        {!mini.routines.length && (
+          <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+            {t('settings.mini.routines.empty')}
           </p>
         )}
       </SettingsCard>

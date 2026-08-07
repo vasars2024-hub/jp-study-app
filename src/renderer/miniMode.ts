@@ -61,6 +61,8 @@ export interface MiniModeSettings {
   enabled: boolean;
   /** Ordered app ids (6–9). */
   apps: MiniAppId[];
+  /** Ordered buddy-routine ids clickable straight from the widget (0–3). */
+  routines: string[];
   density: MiniDensity;
   /** Show a small clock in the mini header. */
   showClock: boolean;
@@ -118,10 +120,13 @@ const DEFAULT_APPS: MiniAppId[] = [
 
 export const MINI_MIN_APPS = 6;
 export const MINI_MAX_APPS = 9;
+/** v1.0 audit 3.5 — clickable buddy routines pinned to the widget. */
+export const MINI_MAX_ROUTINES = 3;
 
 const DEFAULTS: MiniModeSettings = {
   enabled: false,
   apps: DEFAULT_APPS,
+  routines: [],
   density: 'comfortable',
   showClock: true,
   tint: 'neutral',
@@ -168,6 +173,50 @@ function sanitizeApps(list: unknown): MiniAppId[] {
   return out;
 }
 
+/**
+ * Structural only — an id is deliberately not checked against the routine
+ * catalog here. Routines live in `env.buddyRoutines`, are user-editable, and can
+ * be renamed or deleted after being pinned; an id that no longer resolves is
+ * dropped at render time instead of being silently rewritten out of the setting.
+ */
+function sanitizeRoutines(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const out: string[] = [];
+  for (const raw of list) {
+    if (typeof raw !== 'string' || !raw.trim()) continue;
+    const id = raw.trim();
+    if (out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= MINI_MAX_ROUTINES) break;
+  }
+  return out;
+}
+
+/** Pin one routine if under max and not already pinned. */
+export function addMiniRoutine(routines: string[], id: string): string[] | null {
+  if (!id.trim()) return null;
+  if (routines.includes(id)) return null;
+  if (routines.length >= MINI_MAX_ROUTINES) return null;
+  return [...routines, id];
+}
+
+/** Unpin one routine. Unlike apps there is no minimum — zero is a valid state. */
+export function removeMiniRoutine(routines: string[], id: string): string[] {
+  return routines.filter((r) => r !== id);
+}
+
+export function moveMiniRoutine(routines: string[], id: string, dir: -1 | 1): string[] {
+  const i = routines.indexOf(id);
+  if (i < 0) return routines;
+  const j = i + dir;
+  if (j < 0 || j >= routines.length) return routines;
+  const next = [...routines];
+  const tmp = next[i]!;
+  next[i] = next[j]!;
+  next[j] = tmp;
+  return next;
+}
+
 /** Apps not yet pinned (for Add app picker). */
 export function availableMiniApps(pinned: MiniAppId[]): typeof MINI_APP_CATALOG {
   const set = new Set(pinned);
@@ -204,11 +253,12 @@ export function moveMiniApp(apps: MiniAppId[], id: MiniAppId, dir: -1 | 1): Mini
 export function loadMiniMode(): MiniModeSettings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULTS, apps: [...DEFAULT_APPS] };
+    if (!raw) return { ...DEFAULTS, apps: [...DEFAULT_APPS], routines: [] };
     const p = JSON.parse(raw) as Partial<MiniModeSettings>;
     return {
       enabled: !!p.enabled,
       apps: sanitizeApps(p.apps),
+      routines: sanitizeRoutines(p.routines),
       density:
         p.density === 'compact' || p.density === 'spacious' || p.density === 'comfortable'
           ? p.density
@@ -231,7 +281,7 @@ export function loadMiniMode(): MiniModeSettings {
       monoMode: !!p.monoMode,
     };
   } catch {
-    return { ...DEFAULTS, apps: [...DEFAULT_APPS] };
+    return { ...DEFAULTS, apps: [...DEFAULT_APPS], routines: [] };
   }
 }
 
@@ -241,6 +291,7 @@ export function saveMiniMode(patch: Partial<MiniModeSettings>): MiniModeSettings
     ...cur,
     ...patch,
     apps: patch.apps !== undefined ? sanitizeApps(patch.apps) : cur.apps,
+    routines: patch.routines !== undefined ? sanitizeRoutines(patch.routines) : cur.routines,
     wallpaperBlur:
       patch.wallpaperBlur !== undefined ? clampBlur(patch.wallpaperBlur) : cur.wallpaperBlur,
   };

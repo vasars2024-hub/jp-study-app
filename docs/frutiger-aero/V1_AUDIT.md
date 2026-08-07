@@ -596,7 +596,84 @@ The menu is anchored to a 96 px sprite, so the section stacks label-above-contro
 side by side; measured 140 px wide with the selects at 122 px, and the menu does not leave
 the viewport.
 
-| 3.5 | Mini apps — 3 clickable routines | pending | | | |
+| 3.5 | Mini apps — 3 clickable routines | **DONE** | `.mini-routine-btn[data-routine-id]`, `.mini-routine-status`, `window.innerHeight`, `popoutListOpen()` | **Before: Mini could not run a routine at all** — with Mini active, `buddy:run {c-bonzi, br-miko-cheer}` gave `toasts: []` and no mood change, while the identical dispatch on the desktop gave `["Cheer"]`. Widget DOM had **0** routine controls. After: 2 of the catalog's 11 routines offered (the two the live `miko-shimeji` accepts), pinned through the widget's own drawer → stored `["br-miko-climb","br-miko-cheer"]`, two buttons rendered. Clicking **Climb show** → `toasts: ["Climb show"]`, mini toast `"Climb show"`, and **both** mood steps observed live in order — `["Scaling the desktop frame","Still climbing"]` — with `{curious, Climbing the frame}` → `{happy, Still climbing}` persisted to `env.companions`. Clicking **Cheer** → `["Cheer"]` and `["Secret OS discovered","Climbing the frame"]`: a **different** routine, so each button tracks its own binding. `os:open` from inside the widget moved `popoutListOpen()` `[]` → `["calendar"]`. | — (behaviour) |
+
+### 3.5 — the buttons were the easy half; nothing in Mini could run a routine
+
+The audit asks to *"update 'Mini apps' to include up to 3 clickable routines directly from
+the widget"*, which reads like a rendering task. It is not. **While Mini is on there is no
+`CompanionLayer` anywhere**: the main window renders `MiniMainBridge` instead of
+`DesktopShell` (`App.tsx:717`), and the floating widget is a window of its own that never
+mounted the living layer. Measured, with Mini active: `[data-companion-id]` count **0** in
+both windows, and a `buddy:run` for a real companion and a real routine produced
+`toasts: []` with the stored mood unchanged. The same dispatch on the desktop produced
+`["Cheer"]` — so the empty reading is a real absence, not a broken probe.
+
+That rules out the obvious design. The OS pet host relays clicks as `buddy:run` and lets the
+main renderer do the work (`companionHost.ts:254-261`); a widget that copied it would be
+posting to a listener that is not there. So `miniRoutines.ts` gives the widget its own
+`BuddyRunContext` and the engine is untouched.
+
+**Three bridges, because a routine reaches the app through events the desktop shell owns.**
+`openApp` dispatches `os:open`, the `clipboard` step dispatches `clipboard:open`, and every
+depth-0 routine toasts through `buddy:toast` — and `BuddyToast` is mounted only in
+`DesktopShell`. Without listeners for those three, a pinned routine would run its steps into
+nothing and read as a dead button. MiniShell now listens for all three and routes them to
+what Mini has: `os:open` → the widget's existing pop-out launcher, `clipboard:open` → the
+inline stage, `buddy:toast` → the mini toast.
+
+**`setMood` is the step that would have stayed invisible.** Both miko routines are nothing
+*but* mood steps, so with only the toast bridged the buttons would look like they did
+nothing after the first line. `patchCompanion` therefore drives a `.mini-routine-status`
+caption as well as persisting, which is what made the two-step sequences above measurable.
+`speechBubble` is deliberately *not* persisted — it is a bubble over a pet Mini does not
+draw, and storing one would leave it hanging when the desktop comes back.
+
+Two rules carried over rather than reinvented: the offer list is `routinesForType` per live
+companion (3.4's rule — `runBuddyRoutine` refuses a mismatched `forType`, so a wider list
+pins buttons that silently do nothing), and `persistCompanionPatch` re-reads `companions`
+from storage on every call instead of holding a list from mount, which is the shape that
+erased routine assignments before 3.3.
+
+### The 320 px window floor made the layout constant look inert
+
+`ASPECT_ROUTINES` was added so the row does not squeeze the slot grid, and at default scale
+it appears to do nothing: the frame measured **318 px tall with and without the row**, and
+`clientHeight === scrollHeight` either way. The cause is `MINI_MIN_H = 320` (`main.ts:575`) —
+the requested height (`352 × 0.56 + 4 = 201`, or `237` with the row) is below the floor in
+both cases, so `mini:setSize` clamps and `.mini-craft`'s `flex: 1` absorbs the slack.
+
+It only starts to matter above `scale ≈ 1.34`, which is where the measurement had to be
+taken. At `scale 1.55`: **372 px with the row pinned** — exactly
+`352 × (0.56 + 0.115) × 1.55 + 4` — against **320 px** (the floor) with the same scale and the
+row removed. Not clipped in either case, nor with the inline clipboard stage open on top of
+both (382 px, `scrollHeight === clientHeight`). Reporting the default-scale reading alone
+would have said the constant was dead code.
+
+### A stub that was silently rejected, and the pop-outs it opened
+
+Verifying the `os:open` bridge by replacing `window.api.popOut` with a recording stub
+returned `calls: []` — which reads exactly like "the listener never fired". It is the
+opposite. **`window.api` is a frozen `contextBridge` object, so the assignment was a silent
+no-op**, the real `popOut` ran, and `/health` showed three genuine pop-out windows
+(`flashcards`, `grammar`, `notebook`) that the probe had opened and not accounted for. They
+were closed through `popoutControl('close')`.
+
+The lesson is the general one: **never assert on a stub without proving the stub took.**
+The re-measurement used the app's own observable instead — `popoutListOpen()` before and
+after a single dispatch, `[]` → `["calendar"]`. `grammar` and `notebook` are not `MiniAppId`s,
+so that accident also confirmed the non-pinnable branch reaches the main process.
+
+Both surfaces were driven, not just the widget: Settings › Mini View gained a `mini-routines`
+card between `mini-apps` and `mini-look` (984×252, "Routines (2/3)", rows `1. Climb show` /
+`2. Cheer`), and its own Remove and Pin buttons were clicked through 2/3 → 1/3 → 0/3 → 1/3
+with the stored list agreeing at every step.
+
+**Restoration.** `jp-study-mini-mode-v1` and `jp-mini-frame-scale-v1` were both *absent*
+before this run and are absent after. `c-bonzi` is back at `{mood: curious, status: "Climbing
+the frame"}` with `primaryRoutineId`/`secondaryRoutineId` unset and `holdRoutineId: ""` —
+byte-identical to the pre-run read. 11 routines, 1 companion, env flags unchanged, 0 errors
+in `/logs`.
 
 ## Section 4 — Icons & Shortcuts
 

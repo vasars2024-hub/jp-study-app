@@ -18967,6 +18967,112 @@ html[data-taskbar-size='large'] .os-tray-btn {
   opacity: 0.72;
 }
 
+/* v1.0 audit 3.5 — pinned buddy routines, clickable from the widget itself. */
+.mini-routines {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px 5px;
+  background: transparent;
+}
+.mini-routine-row {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: calc(3px + 2px * var(--mini-scale, 1));
+  width: 100%;
+  max-width: calc(76px * 3 + 14px * 2 * var(--mini-scale, 1));
+}
+.mini-routine-btn {
+  appearance: none;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: calc(3px + 1px * var(--mini-scale, 1));
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--mini-caption);
+  font-size: calc(9px + 1px * var(--mini-scale, 1));
+  font-weight: 500;
+  line-height: 1.2;
+  padding: calc(3px + 1px * var(--mini-scale, 1)) 5px;
+  cursor: pointer;
+  transition:
+    background 0.18s var(--mini-ease),
+    color 0.18s var(--mini-ease),
+    border-color 0.18s var(--mini-ease),
+    transform 0.18s var(--mini-ease);
+}
+.mini-routine-btn:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+.mini-routine-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.mini-routine-btn.is-running {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+  opacity: 1;
+}
+.mini-routine-btn:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 1px;
+}
+.mini-routine-btn svg {
+  flex-shrink: 0;
+}
+/* The row is fixed at three across, so a long routine name truncates rather
+   than wrapping the button onto a second line the frame has no height for. */
+.mini-routine-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-routine-status {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--mini-caption);
+  opacity: 0.78;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-routine-manage {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mini-routine-manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.mini-routine-manage-name {
+  font-size: 10.5px;
+  color: var(--mini-label, #eef0f6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-routine-manage-acts {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
 .mini-stage {
   flex: 1;
   min-height: 0;

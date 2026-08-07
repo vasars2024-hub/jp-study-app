@@ -18,10 +18,15 @@ import {
   availableMiniApps,
   miniAppMeta,
   miniAppLaunch,
+  isMiniAppId,
   isMiniSlotActive,
   resolveMiniDesktopWallpaper,
   onMiniDesktopWallpaperChanged,
   MINI_THEME_TINTS,
+  MINI_MAX_ROUTINES,
+  addMiniRoutine,
+  removeMiniRoutine,
+  moveMiniRoutine,
   type MiniAppId,
   type MiniDensity,
   type MiniModeSettings,
@@ -30,10 +35,19 @@ import {
   type MiniDesktopWall,
   miniAppLabel,
 } from '../miniMode';
+import {
+  offerableMiniRoutines,
+  resolveMiniRoutines,
+  runMiniRoutine,
+  type MiniCompanionPatch,
+} from '../miniRoutines';
+import { BUDDY_TOAST_EVENT, type BuddyRoutine } from '../environment/buddyRoutines';
+import { loadEnvironment } from '../environment/environmentStore';
 import { ClipboardWidget } from '../widgets/system';
 import { useAeroMaterials, useWiredMaterials } from './ui';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
+import type { DesktopWinSection } from '../../shared/desktop';
 
 /** Base craft window size — height follows from locked aspect ratio. */
 const BASE_W = 352;
@@ -41,6 +55,8 @@ const BASE_W = 352;
 const ASPECT_GRID = 0.56;
 /** Extra height when an inline widget panel is open. */
 const ASPECT_INLINE = 0.4;
+/** Extra height for the pinned-routine row — measured, not eyeballed (see 3.5). */
+const ASPECT_ROUTINES = 0.115;
 const SCALE_MIN = 0.72;
 const SCALE_MAX = 1.55;
 const SCALE_KEY = 'jp-mini-frame-scale-v1';
@@ -112,7 +128,7 @@ export default function MiniShell({
   /** True when running inside the dedicated transparent OS widget window. */
   widgetMode?: boolean;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [cfg, setCfg] = useState<MiniModeSettings>(() => loadMiniMode());
   const [panelOpen, setPanelOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -122,6 +138,9 @@ export default function MiniShell({
   const [activeInline, setActiveInline] = useState<MiniInlineWidget | null>(null);
   const [desktopWall, setDesktopWall] = useState<MiniDesktopWall>({ kind: 'none' });
   const [scale, setScale] = useState(loadScale);
+  const [runningRoutine, setRunningRoutine] = useState<string | null>(null);
+  const [routineStatus, setRoutineStatus] = useState<string | null>(null);
+  const [routinePick, setRoutinePick] = useState('');
   const resizing = useRef(false);
   const resizeStart = useRef({ y: 0, scale: 1 });
   const clock = useClock(cfg.showClock);
@@ -218,6 +237,89 @@ export default function MiniShell({
     openApp(cfg.apps[0]!);
   }, [cfg.enabled, cfg.autoOpenFirst, cfg.apps]);
 
+  /*
+    Routine side effects, routed to the things Mini actually has.
+
+    `runBuddyRoutine` reaches the rest of the app through window events the
+    desktop shell owns — `os:open`, `clipboard:open`, and the buddy toast. None of
+    them has a listener while Mini is on, so without these three bridges a pinned
+    routine would run its steps into nothing and read as a dead button.
+  */
+  const openAppRef = useRef(openApp);
+  openAppRef.current = openApp;
+
+  useEffect(() => {
+    const onToast = (ev: Event) => {
+      const d = (ev as CustomEvent<{ title?: string; body?: string }>).detail;
+      if (!d?.title) return;
+      setMsg(d.body ? `${d.title} — ${d.body}` : d.title);
+      window.setTimeout(() => setMsg(''), 2000);
+    };
+    const onOpen = (ev: Event) => {
+      const id = (ev as CustomEvent<string>).detail;
+      if (typeof id !== 'string' || !id) return;
+      if (isMiniAppId(id)) {
+        openAppRef.current(id);
+        return;
+      }
+      // Not pinnable in Mini, but still pop-out capable: the main process
+      // validates the section and ignores anything that is not.
+      void window.api.popOut(id as DesktopWinSection);
+    };
+    const onClipboard = () => setActiveInline('clipboard');
+    window.addEventListener(BUDDY_TOAST_EVENT, onToast);
+    window.addEventListener('os:open', onOpen);
+    window.addEventListener('clipboard:open', onClipboard);
+    return () => {
+      window.removeEventListener(BUDDY_TOAST_EVENT, onToast);
+      window.removeEventListener('os:open', onOpen);
+      window.removeEventListener('clipboard:open', onClipboard);
+    };
+  }, []);
+
+  const routineDefs = useMemo(() => resolveMiniRoutines(cfg.routines), [cfg.routines]);
+
+  // Read the companion list when the drawer opens rather than on every render —
+  // it lives in another store and only the picker needs it.
+  const routineChoices = useMemo(() => {
+    if (!panelOpen) return [] as BuddyRoutine[];
+    const pinned = new Set(cfg.routines);
+    return offerableMiniRoutines(loadEnvironment().companions ?? []).filter(
+      (r) => !pinned.has(r.id),
+    );
+  }, [panelOpen, cfg.routines]);
+
+  const runRoutine = useCallback(
+    async (routine: BuddyRoutine) => {
+      setRunningRoutine(routine.id);
+      const res = await runMiniRoutine(routine, (patch: MiniCompanionPatch) => {
+        if (patch.status) setRoutineStatus(patch.status);
+      });
+      setRunningRoutine(null);
+      if (!res.ok) {
+        setRoutineStatus(null);
+        setMsg(
+          res.error === 'companionsOff'
+            ? t('settings.mini.routines.err.companionsOff')
+            : res.error === 'noCompanion'
+              ? t('settings.mini.routines.err.noCompanion')
+              : t('settings.mini.routines.err.failed'),
+        );
+        window.setTimeout(() => setMsg(''), 2000);
+      }
+    },
+    // `lang`, never `t` — `t`'s identity is stable, so this would go stale.
+    [lang], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // The status a routine last set is the only sign in Mini that a mood-only
+  // routine did anything, so it lingers past the run and then clears itself.
+  useEffect(() => {
+    if (!routineStatus) return;
+    const h = window.setTimeout(() => setRoutineStatus(null), 4000);
+    return () => window.clearTimeout(h);
+  }, [routineStatus]);
+
   const slots = useMemo(() => craftSlots(cfg.apps), [cfg.apps]);
   const freeSlots = MINI_MAX_APPS - cfg.apps.length;
   const canAdd = freeSlots > 0 && availableMiniApps(cfg.apps).length > 0;
@@ -234,7 +336,8 @@ export default function MiniShell({
   }, [addChoices, addPick]);
 
   const frameW = Math.round(BASE_W * scale);
-  const aspect = ASPECT_GRID + (activeInline ? ASPECT_INLINE : 0);
+  const aspect =
+    ASPECT_GRID + (activeInline ? ASPECT_INLINE : 0) + (routineDefs.length ? ASPECT_ROUTINES : 0);
   const frameH = Math.round(BASE_W * aspect * scale);
 
   // Keep the OS widget window tightly wrapped around the craft panel.
@@ -298,6 +401,20 @@ export default function MiniShell({
     }
     setCfg(saveMiniMode({ apps: next }));
     flash(`Removed ${miniAppLabel(id)}`);
+  };
+
+  const doAddRoutine = (id: string) => {
+    const next = addMiniRoutine(cfg.routines, id);
+    if (!next) {
+      flash(t('settings.mini.msg.maxRoutines', { max: MINI_MAX_ROUTINES }));
+      return;
+    }
+    setCfg(saveMiniMode({ routines: next }));
+    setRoutinePick('');
+  };
+
+  const doRemoveRoutine = (id: string) => {
+    setCfg(saveMiniMode({ routines: removeMiniRoutine(cfg.routines, id) }));
   };
 
   const selectSlot = (id: MiniAppId | null) => {
@@ -623,6 +740,34 @@ export default function MiniShell({
           </div>
         </div>
 
+        {/* v1.0 audit 3.5 — up to three buddy routines, one click each.
+            Routine names are user-renamable content, so they are not translated. */}
+        {routineDefs.length > 0 && (
+          <div className="mini-routines mini-no-drag" aria-label={t('settings.mini.routines.aria')}>
+            <div className="mini-routine-row">
+              {routineDefs.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className={`mini-routine-btn${runningRoutine === r.id ? ' is-running' : ''}`}
+                  data-routine-id={r.id}
+                  title={r.name}
+                  disabled={!!runningRoutine}
+                  onClick={() => void runRoutine(r)}
+                >
+                  <Icon name="sparkle" size={11} />
+                  <span className="mini-routine-name">{r.name}</span>
+                </button>
+              ))}
+            </div>
+            {routineStatus && (
+              <span className="mini-routine-status" role="status">
+                {routineStatus}
+              </span>
+            )}
+          </div>
+        )}
+
         {activeInline === 'clipboard' && (
           <section className="mini-stage mini-no-drag" aria-label="Clipboard">
             <div className="mini-stage-bar">
@@ -700,6 +845,83 @@ export default function MiniShell({
                 aria-label={t('a11y.slider.miniWindowSize')}
               />
               <p className="muted mini-panel-note">Scale only — width and height stay locked together.</p>
+            </section>
+
+            {/* v1.0 audit 3.5 — pinned here as well as in Settings › Mini View, so a
+                routine can be bound without leaving the widget it runs from. */}
+            <section className="mini-panel-block">
+              <h3 className="mini-panel-title">
+                {t('settings.mini.routines.title', { count: cfg.routines.length, max: MINI_MAX_ROUTINES })}
+              </h3>
+              <div className="mini-panel-row">
+                <select
+                  className="mini-add-select"
+                  value={routinePick}
+                  disabled={!routineChoices.length}
+                  onChange={(e) => setRoutinePick(e.target.value)}
+                >
+                  <option value="">
+                    {routineChoices.length
+                      ? t('settings.mini.routines.choose')
+                      : t('settings.mini.routines.noneAvailable')}
+                  </option>
+                  {routineChoices.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="mini-chip"
+                  disabled={!routinePick}
+                  onClick={() => doAddRoutine(routinePick)}
+                >
+                  {t('settings.mini.routines.pin')}
+                </button>
+              </div>
+              <ul className="mini-routine-manage">
+                {cfg.routines.map((id, i) => {
+                  const def = routineDefs.find((r) => r.id === id);
+                  return (
+                    <li key={id} className="mini-routine-manage-row">
+                      <span className="mini-routine-manage-name">{def ? def.name : id}</span>
+                      <span className="mini-routine-manage-acts">
+                        <button
+                          type="button"
+                          className="mini-chip"
+                          disabled={i === 0}
+                          onClick={() =>
+                            setCfg(saveMiniMode({ routines: moveMiniRoutine(cfg.routines, id, -1) }))
+                          }
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="mini-chip"
+                          disabled={i === cfg.routines.length - 1}
+                          onClick={() =>
+                            setCfg(saveMiniMode({ routines: moveMiniRoutine(cfg.routines, id, 1) }))
+                          }
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="mini-chip"
+                          onClick={() => doRemoveRoutine(id)}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="muted mini-panel-note">
+                {t('settings.mini.routines.hint', { max: MINI_MAX_ROUTINES })}
+              </p>
             </section>
 
             <section className="mini-panel-block">
