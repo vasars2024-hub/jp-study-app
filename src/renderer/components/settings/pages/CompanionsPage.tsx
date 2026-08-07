@@ -10,6 +10,7 @@ import {
 import {
   getDefaultBuddyRoutines,
   resetBuiltinRoutines,
+  resolveHoldRoutineId,
   resolvePrimaryRoutineId,
   resolveSecondaryRoutineId,
   runBuddyRoutine,
@@ -198,6 +199,15 @@ export default function CompanionsPage() {
   const assignSecondary = (routineId: string) => {
     const companions = (env.companions ?? []).map((c) =>
       c.typeId === assignType ? { ...c, secondaryRoutineId: routineId } : c,
+    );
+    patchEnv({ companions });
+  };
+
+  // '' is a real value here, not "unset by accident": it means press-and-hold
+  // opens the buddy menu rather than running a routine, which is the default.
+  const assignHold = (routineId: string) => {
+    const companions = (env.companions ?? []).map((c) =>
+      c.typeId === assignType ? { ...c, holdRoutineId: routineId } : c,
     );
     patchEnv({ companions });
   };
@@ -436,6 +446,21 @@ export default function CompanionsPage() {
               value={resolveSecondaryRoutineId(sample)}
               onChange={(e) => assignSecondary(e.target.value)}
             >
+              {typeRoutines.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="pl-field">
+            <span className="muted">{t('settings.companions.holdPress')}</span>
+            <select
+              className="set-select"
+              value={resolveHoldRoutineId(sample)}
+              onChange={(e) => assignHold(e.target.value)}
+            >
+              <option value="">{t('settings.companions.holdOpensMenu')}</option>
               {typeRoutines.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}

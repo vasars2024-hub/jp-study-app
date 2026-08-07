@@ -5293,7 +5293,7 @@ export const zh: Catalog = {
 
   // Desktop companion layer chrome (the on-desktop buddy itself, not its
   // settings page — see settings.companions.* below for that).
-  'companion.tooltip.hint': '点击：运行 · 右键：菜单',
+  'companion.tooltip.hint': '点击：运行 · 双击：第二例程 · 长按：菜单 · 右键：菜单',
   'companion.treasure.locked': '你得先找到我的宝藏。',
   'companion.treasure.seeking': '正在寻找宝藏…',
   'companion.menu.button': '伙伴菜单',
@@ -5343,6 +5343,8 @@ export const zh: Catalog = {
   'settings.companions.buddyType': '伙伴类型',
   'settings.companions.primaryClick': '主操作（点击）',
   'settings.companions.secondaryDoubleClick': '次操作（双击）',
+  'settings.companions.holdPress': '长按操作（按住）',
+  'settings.companions.holdOpensMenu': '打开伙伴菜单',
   'settings.companions.editRoutine': '编辑例程',
   'settings.companions.builtinSuffix': '（内置）',
   'settings.companions.newRoutine': '新建例程',

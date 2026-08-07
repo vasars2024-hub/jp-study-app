@@ -35,6 +35,7 @@ import { companionPhysics, loadMotionPrefs, onMotionPrefsChanged } from '../moti
 import {
   BUDDY_RUN_EVENT,
   getDefaultBuddyRoutines,
+  resolveHoldRoutineId,
   resolveMenuRoutineIds,
   resolvePrimaryRoutineId,
   resolveSecondaryRoutineId,
@@ -49,6 +50,14 @@ import {
   clampThrowVelocity,
   updateShimejiMotion,
 } from './shimejiPhysics';
+import {
+  HOLD_MS,
+  clearPending,
+  decideClick,
+  emptyClickGestureState,
+  noteDragEnd,
+  noteHold,
+} from './companionClickGesture';
 import { BUDDY_SPEECH_EVENT, speakBeepLine, voiceForType, type BuddySpeechDetail } from './beepSpeech';
 import { pickDialogueLine, type DialogueContext } from './dialoguePools';
 import { getUserLevel, onLevelChange } from '../levelService';
@@ -187,7 +196,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   } | null>(null);
   const dirtyRef = useRef(false);
   const menuIdRef = useRef<string | null>(null);
-  const lastClickRef = useRef<{ id: string; t: number } | null>(null);
+  // Left-button arbitration between drag / single click / double click.
+  const gestureRef = useRef(emptyClickGestureState());
+  const clickTimerRef = useRef(0);
+  const holdTimerRef = useRef(0);
 
   const patchCompanion = useCallback(
     (id: string, patch: { mood?: CompanionMood; status?: string; speechBubble?: string | null }) => {
@@ -372,6 +384,48 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     setList(next);
     dirtyRef.current = true;
   }, [env.enabled, env.companionsEnabled, env.companionTypes?.join(','), aeroDiscovered, wiredDiscovered]);
+
+  // Routine assignments are edited in Settings › Companions, which writes them
+  // into `env.companions`. The resync effect above deliberately does NOT depend
+  // on `env.companions` — it would re-seed on every wander autosave — so the
+  // layer kept a list with no assignment on it, and `persist()` then wrote that
+  // stale list straight back over the setting. Measured: a hold routine chosen
+  // in Settings was gone from `jp-os-environment-v1` seconds later, and the
+  // pet went on opening the menu. Primary and secondary go through the same
+  // `patchEnv({ companions })` path and were lost the same way.
+  const routineAssignmentKey = (env.companions ?? [])
+    .map(
+      (c) =>
+        `${c.id}:${c.primaryRoutineId ?? ''}:${c.secondaryRoutineId ?? ''}:${c.holdRoutineId ?? ''}`,
+    )
+    .join('|');
+  useEffect(() => {
+    const byId = new Map((env.companions ?? []).map((c) => [c.id, c]));
+    let changed = false;
+    const next = listRef.current.map((c) => {
+      const src = byId.get(c.id);
+      if (!src) return c;
+      if (
+        src.primaryRoutineId === c.primaryRoutineId &&
+        src.secondaryRoutineId === c.secondaryRoutineId &&
+        src.holdRoutineId === c.holdRoutineId
+      ) {
+        return c;
+      }
+      changed = true;
+      return {
+        ...c,
+        primaryRoutineId: src.primaryRoutineId,
+        secondaryRoutineId: src.secondaryRoutineId,
+        holdRoutineId: src.holdRoutineId,
+      };
+    });
+    if (!changed) return;
+    listRef.current = next;
+    setList(next);
+    dirtyRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routineAssignmentKey]);
 
   // Wander: DOM-only motion. Disk persist is rare (was every 2s → UI freezes).
   useEffect(() => {
@@ -753,6 +807,44 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
     [patchCompanion, lang],
   );
 
+  const cancelHold = () => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = 0;
+    }
+  };
+
+  /**
+   * Press-and-hold, still pressed. The hold ends the press it grew out of: the
+   * drag is dropped so the pet does not slide out from under the menu, and the
+   * `click` that release will fire is swallowed by the same suppression a drag
+   * uses. Unassigned hold opens the buddy menu (see `resolveHoldRoutineId`).
+   */
+  const fireHold = (c: CompanionInstance) => {
+    holdTimerRef.current = 0;
+    if (isTreasureLockedBonzi(c)) return;
+    const d = dragRef.current;
+    if (d && d.id === c.id) {
+      dragRef.current = null;
+      setDraggingId(null);
+      clearDragStretch(
+        rootRef.current?.querySelector(`[data-companion-id="${c.id}"]`) as HTMLElement | null,
+      );
+    }
+    gestureRef.current = noteHold(gestureRef.current, c.id, Date.now());
+    if (clickTimerRef.current) {
+      window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = 0;
+    }
+    const holdId = resolveHoldRoutineId(c);
+    if (holdId) {
+      setMenuId(null);
+      runRoutine(c, holdId);
+    } else {
+      setMenuId(c.id);
+    }
+  };
+
   const onPointerDown = (c: CompanionInstance) => (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     if (isTreasureLockedBonzi(c)) {
@@ -760,6 +852,10 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       rejectTreasureBonzi(c);
       return;
     }
+    // Armed before the `locked` bail-out: a locked pet cannot be dragged, but it
+    // can still be held.
+    cancelHold();
+    holdTimerRef.current = window.setTimeout(() => fireHold(c), HOLD_MS);
     if (c.locked) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -775,6 +871,11 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       const dx = (e.clientX - d.sx) / z;
       const dy = (e.clientY - d.sy) / z;
       if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      // Past the threshold this press is a drag, so it can no longer be a hold.
+      if (holdTimerRef.current) {
+        window.clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = 0;
+      }
       d.moved = true;
       const root = rootRef.current;
       const w = root?.clientWidth ?? 900;
@@ -801,9 +902,22 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       }
     };
     const up = () => {
+      if (holdTimerRef.current) {
+        window.clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = 0;
+      }
       const d = dragRef.current;
       if (!d) return;
       dragRef.current = null;
+      // `click` is dispatched after `pointerup`, by which point `dragRef` is
+      // already null — so the drag outcome is handed to the arbiter here rather
+      // than read back in the click handler, where it is never visible.
+      const drag = noteDragEnd(gestureRef.current, d.id, d.moved, Date.now());
+      gestureRef.current = drag.next;
+      if (drag.cancelPending && clickTimerRef.current) {
+        window.clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = 0;
+      }
       setDraggingId(null);
       clearDragStretch(
         rootRef.current?.querySelector(`[data-companion-id="${d.id}"]`) as HTMLElement | null,
@@ -841,23 +955,36 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
       rejectTreasureBonzi(c);
       return;
     }
-    if (dragRef.current?.moved) return;
-    // Ignore click that completed a drag
-    const d = dragRef.current;
-    if (d?.id === c.id && d.moved) return;
+    const { action, next } = decideClick(gestureRef.current, c.id, Date.now());
+    gestureRef.current = next;
 
-    const now = Date.now();
-    const prev = lastClickRef.current;
-    if (prev && prev.id === c.id && now - prev.t < 320) {
-      lastClickRef.current = null;
-      setMenuId(null);
+    if (action.kind === 'ignore') return;
+
+    setMenuId(null);
+    if (clickTimerRef.current) {
+      window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = 0;
+    }
+    if (action.kind === 'runSecondary') {
       runRoutine(c, resolveSecondaryRoutineId(c));
       return;
     }
-    lastClickRef.current = { id: c.id, t: now };
-    setMenuId(null);
-    runRoutine(c, resolvePrimaryRoutineId(c));
+    // The primary waits out the double-click window. Running it immediately is
+    // what made a double click fire primary-then-secondary.
+    clickTimerRef.current = window.setTimeout(() => {
+      clickTimerRef.current = 0;
+      gestureRef.current = clearPending(gestureRef.current);
+      runRoutine(c, resolvePrimaryRoutineId(c));
+    }, action.delayMs);
   };
+
+  useEffect(
+    () => () => {
+      if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+      if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    },
+    [],
+  );
 
   const onBuddyContext = (c: CompanionInstance) => (e: RMouseEvent) => {
     e.preventDefault();

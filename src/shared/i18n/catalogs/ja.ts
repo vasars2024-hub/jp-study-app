@@ -5322,7 +5322,7 @@ export const ja: Catalog = {
 
   // Desktop companion layer chrome (the on-desktop buddy itself, not its
   // settings page — see settings.companions.* below for that).
-  'companion.tooltip.hint': 'クリック: 実行 ・ 右クリック: メニュー',
+  'companion.tooltip.hint': 'クリック: 実行 ・ ダブルクリック: 2番目のルーチン ・ 長押し: メニュー ・ 右クリック: メニュー',
   'companion.treasure.locked': 'まずは私の宝物を見つけてね。',
   'companion.treasure.seeking': '宝物を探し中…',
   'companion.menu.button': 'バディメニュー',
@@ -5373,6 +5373,8 @@ export const ja: Catalog = {
   'settings.companions.buddyType': 'バディの種類',
   'settings.companions.primaryClick': 'プライマリ（クリック）',
   'settings.companions.secondaryDoubleClick': 'セカンダリ（ダブルクリック）',
+  'settings.companions.holdPress': 'ホールド（長押し）',
+  'settings.companions.holdOpensMenu': 'バディメニューを開く',
   'settings.companions.editRoutine': 'ルーチンを編集',
   'settings.companions.builtinSuffix': '（組み込み）',
   'settings.companions.newRoutine': '新しいルーチン',

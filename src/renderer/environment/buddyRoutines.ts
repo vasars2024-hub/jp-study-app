@@ -532,6 +532,16 @@ export function resolveSecondaryRoutineId(
   return c.secondaryRoutineId || defaultRoutineIdsForType(c.typeId).secondary;
 }
 
+/**
+ * Press-and-hold. Unlike primary/secondary there is no per-type default routine
+ * — inventing a third builtin for every companion would be fabricating content
+ * — so an unset slot returns `''` and the caller opens the buddy menu instead.
+ * Assign one in Settings › Companions to override that.
+ */
+export function resolveHoldRoutineId(c: { holdRoutineId?: string }): string {
+  return c.holdRoutineId || '';
+}
+
 export function resolveMenuRoutineIds(
   c: { typeId: CompanionTypeId; menuRoutineIds?: string[] },
   all: BuddyRoutine[],

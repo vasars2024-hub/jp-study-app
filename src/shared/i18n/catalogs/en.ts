@@ -5602,7 +5602,7 @@ export const en: Catalog = {
 
   // Desktop companion layer chrome (the on-desktop buddy itself, not its
   // settings page — see settings.companions.* below for that).
-  'companion.tooltip.hint': 'Click: run · Right-click: menu',
+  'companion.tooltip.hint': 'Click: run · Double-click: second routine · Hold: menu · Right-click: menu',
   'companion.treasure.locked': 'You have to first find my treasure.',
   'companion.treasure.seeking': 'Find my treasure…',
   'companion.menu.button': 'Buddy menu',
@@ -5660,6 +5660,8 @@ export const en: Catalog = {
   'settings.companions.buddyType': 'Buddy type',
   'settings.companions.primaryClick': 'Primary (click)',
   'settings.companions.secondaryDoubleClick': 'Secondary (double-click)',
+  'settings.companions.holdPress': 'Hold (press and hold)',
+  'settings.companions.holdOpensMenu': 'Open the buddy menu',
   'settings.companions.editRoutine': 'Edit routine',
   'settings.companions.builtinSuffix': ' (built-in)',
   'settings.companions.newRoutine': 'New routine',

@@ -5854,7 +5854,7 @@ export const ru: Catalog = {
 
   // Desktop companion layer chrome (the on-desktop buddy itself, not its
   // settings page — see settings.companions.* below for that).
-  'companion.tooltip.hint': 'Клик: запустить · Правый клик: меню',
+  'companion.tooltip.hint': 'Клик: запустить · Двойной клик: второй сценарий · Удержание: меню · Правый клик: меню',
   'companion.treasure.locked': 'Сначала найди мой клад.',
   'companion.treasure.seeking': 'Ищу свой клад…',
   'companion.menu.button': 'Меню питомца',
@@ -5910,6 +5910,8 @@ export const ru: Catalog = {
   'settings.companions.buddyType': 'Тип питомца',
   'settings.companions.primaryClick': 'Основной (клик)',
   'settings.companions.secondaryDoubleClick': 'Дополнительный (двойной клик)',
+  'settings.companions.holdPress': 'Удержание (нажать и держать)',
+  'settings.companions.holdOpensMenu': 'Открыть меню питомца',
   'settings.companions.editRoutine': 'Изменить сценарий',
   'settings.companions.builtinSuffix': ' (встроенный)',
   'settings.companions.newRoutine': 'Новый сценарий',

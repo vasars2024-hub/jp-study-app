@@ -114,6 +114,8 @@ export interface CompanionInstance {
   /** Programmable routines (see buddyRoutines.ts). Empty = type defaults. */
   primaryRoutineId?: string;
   secondaryRoutineId?: string;
+  /** Press-and-hold. Empty = open the buddy menu instead of running a routine. */
+  holdRoutineId?: string;
   menuRoutineIds?: string[];
   /** Sprite movement state for Shimeji-style companions. */
   motion?: CompanionMotion;
