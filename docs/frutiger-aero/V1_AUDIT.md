@@ -844,7 +844,7 @@ mining-rules containers — `.set-select` is used across the whole app and its 2
 correct everywhere it is not inside one of these grids.
 
 | 5.6 | Help tour + offline assistant | pending | `jp-study.onboarding.v1` | **The tour's state machine is NOT broken** — verified live while doing 1.1. Profile read `{"completedAt":null,"replays":8,"lastStepId":null}`, which looks like a broken tour but is not: clicking `Next` persisted `lastStepId:"start"`, and `Skip tour` persisted `completedAt`. Both writes work. `replays:8` with no completion just means the tour was replayed and abandoned 8 times. **Whatever "broken" means in the audit doc, it is not lost state — re-diagnose before writing code.** The tour also auto-shows on renderer reload while `completedAt` is null. Decided for the assistant: search-and-answer over `searchSettings()`, no model. | |
-| 5.7 | Scraper memory persistence | pending | | | |
+| 5.7 | Scraper memory persistence | **ROOT CAUSE FIXED** (hardening outstanding) | total `localStorage` size; a non-destructive 64 KB-chunk quota probe; all four `jp-scraper-*` keys | The four scraper keys are structurally **healthy** — `settings` 20,840 chars / 1 layer / 4 fields, `shell` 592 / 1 / 15, `recent-queries` and `advanced` absent (never written). Nothing is wrong with the scraper's own store. What was wrong is that it had nowhere to write: `localStorage` held **51.62 MB**, 49 MB of it the two over-encoded keys from 6.A. After the repair, **1.35 MB** across the same 73 keys, and a probe wrote **12.8 MB** of scratch with no `QuotaExceededError`. | — |
 | 5.8 | Mining Rules tab visual error | **DONE** | `.os-set-card[data-setting-id="profile-rules"]` `scrollWidth` vs `clientWidth`, plus every descendant rect against the card rect | The defect the source doc did not name: **the card overflows horizontally**. Before: `scrollWidth` **701** vs `clientWidth` **680**, **5** elements past the right edge, worst a `.set-select` at **+21 px** (the "Page category" control, visibly clipped in the shot). After: `scrollWidth` **680** = `clientWidth`, **0** overflowing elements. | `5.8-before-mining-rules.png`, `5.8-after-mining-rules.png` |
 
 ## Section 6 — Storage integrity audit (added 2026-08-07 by user request, not in the source PDF)
@@ -962,6 +962,30 @@ starts by **deriving** the full key list from source, not from this line.
 > **Superseded by 6.B** — the list above is no longer the inventory. 163 keys are declared in
 > source and 73 are live; the derivation is one `grep` over `localStorage.*Item` literals plus
 > `*KEY*` constants.
+
+### 5.7 — "the Scraper doesn't remember" was never about the Scraper
+
+The item names the Scraper *"and other new features"*, and that plural is the tell. Every
+scraper key is well-formed and its store parses once, normalises, and stringifies once. The
+defect was **the shared resource**: `localStorage` was carrying **51.62 MB**, of which 49 MB was
+the two over-encoded keys. Anything trying to write a new or growing value was writing into a
+store already far past a normal Chromium origin quota, and *newest* features lose that race
+because their keys are the ones not yet present.
+
+**Why it looked like nothing was wrong.** `localStorage.setItem` appears at **194 non-test call
+sites**, and **158 of them sit inside a `catch` that swallows the error** — 50 with a comment
+explicitly naming quota. So a failed write produces no exception, no log, and no UI signal; the
+value simply is not there next time. That is why this reads as "memory persistence issues"
+across unrelated features rather than as one storage fault.
+
+Fixing 6.A fixed this: **51.62 MB → 1.35 MB**, same 73 keys, and a chunked probe then wrote
+12.8 MB of scratch without a `QuotaExceededError` before being removed.
+
+**Outstanding, and named rather than quietly dropped:** those 158 silent catches are still
+silent. The root cause is gone, so the symptom is gone, but the *class* recurs the moment
+storage fills again. The hardening — routing quota failures to `logBlanc` / a user-visible
+notice instead of `/* ignore */` — is a 158-site change that should be its own pass, not a
+rider on this one.
 
 ### What Section 6 still owes
 
