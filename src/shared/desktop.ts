@@ -6,6 +6,7 @@ export const DESKTOP_CITY: DesktopIndex = 1;
 export const SLIDE_DURATION_MS = 380;
 
 export type DesktopWinSection =
+  | 'agent'
   | 'library'
   | 'novels'
   | 'dictionary'

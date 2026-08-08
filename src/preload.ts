@@ -69,6 +69,8 @@ import type {
 } from './shared/mining';
 import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from './shared/localAgentRuntime';
 import type { AgentAutomation } from './shared/localAgentAutomation';
+import type { AgentWorkspaceState } from './shared/agentWorkspace';
+import type { AgentWorkspaceResult } from './shared/agentWorkspaceBridge';
 import type {
   StudyAnalysisRequest,
   StudyAnkiExportResult,
@@ -1312,6 +1314,17 @@ const api = {
     ipcRenderer.on('localAgent:trigger', handler);
     return () => ipcRenderer.removeListener('localAgent:trigger', handler);
   },
+  // The main-owned Agent workspace store. Its only renderer consumer is
+  // `renderer/agentWorkspaceClient.ts`; see shared/agentWorkspaceBridge.ts for
+  // why failures cross as a code rather than a message.
+  agentWorkspaceLoad: (): Promise<AgentWorkspaceResult> =>
+    ipcRenderer.invoke('agentWorkspace:load'),
+  agentWorkspaceSave: (state: AgentWorkspaceState): Promise<AgentWorkspaceResult> =>
+    ipcRenderer.invoke('agentWorkspace:save', state),
+  agentWorkspaceDeleteConversation: (conversationId: string): Promise<AgentWorkspaceResult> =>
+    ipcRenderer.invoke('agentWorkspace:deleteConversation', conversationId),
+  agentWorkspaceClear: (): Promise<AgentWorkspaceResult> =>
+    ipcRenderer.invoke('agentWorkspace:clear'),
   aiSetApiKey: (
     payload: string | { provider?: AiProviderKeyBucket; apiKey?: string },
   ): Promise<{

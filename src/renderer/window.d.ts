@@ -45,6 +45,8 @@ import type {
 } from '../shared/mining';
 import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from '../shared/localAgentRuntime';
 import type { AgentAutomation } from '../shared/localAgentAutomation';
+import type { AgentWorkspaceState } from '../shared/agentWorkspace';
+import type { AgentWorkspaceResult } from '../shared/agentWorkspaceBridge';
 import type {
   StudyAnalysisRequest,
   StudyAnkiExportResult,
@@ -851,6 +853,10 @@ declare global {
       localAgentModels(): Promise<LocalAgentModelInfo[]>;
       localAgentSyncAutomations(entries: AgentAutomation[]): void;
       onLocalAgentTrigger(cb: (entry: AgentAutomation) => void): () => void;
+      agentWorkspaceLoad(): Promise<AgentWorkspaceResult>;
+      agentWorkspaceSave(state: AgentWorkspaceState): Promise<AgentWorkspaceResult>;
+      agentWorkspaceDeleteConversation(conversationId: string): Promise<AgentWorkspaceResult>;
+      agentWorkspaceClear(): Promise<AgentWorkspaceResult>;
       aiSetApiKey(payload: string | {
         provider?: AiProviderKeyBucket;
         apiKey?: string;

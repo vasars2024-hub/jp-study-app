@@ -124,6 +124,7 @@ function MiniMainBridge() {
 // in the main process (src/main.ts). `player`→Media and `city`→Mooncap match the
 // desktop's app labels.
 const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
+  agent: 'Agent',
   library: 'Library',
   novels: 'Novels',
   reading: 'Reading Finder',

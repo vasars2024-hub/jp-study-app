@@ -13,6 +13,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
+import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
 export { runAgentProviderPrompt } from './agentProviderRouter';
 
@@ -264,6 +265,11 @@ export function registerLocalAgentIpc(): void {
   });
   ipcMain.handle('localAgent:status', (): LocalAgentRuntimeStatus => runtimeStatus());
   ipcMain.handle('localAgent:models', (): LocalAgentModelInfo[] => listAvailableModels());
+  // The workspace bridge registers from here, not from `src/main.ts`: this is
+  // the production Agent main boundary and main.ts already calls it once at
+  // boot, so the store's four channels arrive without touching the shared entry
+  // point another track is mid-rewrite on.
+  registerAgentWorkspaceIpc();
 }
 
 export function stopLocalAgentRuntime(): void {

@@ -1304,6 +1304,7 @@ function registerLockscreenIpc(): void {
 // Sections that may be detached into their own OS window. Mirrors the real apps
 // in the desktop shell; excludes desktop-only trinkets (note/visualizer).
 const POPOUT_SECTIONS = new Set([
+  'agent',
   'library', 'novels', 'reading', 'dictionary', 'grammar', 'notebook', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
   'calendar', 'settings', 'youtube', 'scraper',

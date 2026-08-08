@@ -1,0 +1,505 @@
+/*
+ * Agent workspace — Fluent-leaning surface on the app's own tokens.
+ *
+ * Local `--agent-*` tokens rather than raw theme vars, for the reason
+ * mediaCenter.css records the hard way: a value written once at the top is a
+ * value a theme can move without touching forty rules. Every one of them
+ * resolves through the live theme (`--panel`, `--text`, `--accent`, …), so the
+ * surface follows a theme switch without a second stylesheet.
+ *
+ * `--agent-accent-deep` is the deep red the action buttons fill with. It is the
+ * theme accent mixed toward near-black rather than the accent itself: the raw
+ * `--accent` (#ff2e4d in the default theme) carries white text at roughly
+ * 3.8:1, under the 4.5:1 floor, while the 62% mix lands near 7:1. Mixing toward
+ * a fixed dark keeps that true in the light themes too, where `--accent` stays
+ * put but `--panel` does not.
+ *
+ * No decorative imagery, no emoji, no window title: icons are the monochrome
+ * line glyphs from components/Icons.tsx and the taskbar names the app.
+ */
+
+/*
+ * The wrapper exists only to be the query container. An element cannot match a
+ * `@container` condition against itself, so the size container has to be the
+ * shell's parent rather than the shell.
+ */
+.agent-root {
+  container-type: inline-size;
+  height: 100%;
+  min-height: 0;
+}
+
+.agent-shell {
+  --agent-surface: var(--panel);
+  --agent-surface-2: var(--panel-2);
+  --agent-line: var(--border);
+  --agent-text: var(--text);
+  --agent-muted: var(--muted);
+  --agent-accent: var(--accent);
+  --agent-accent-deep: color-mix(in srgb, var(--accent) 62%, #101018);
+  --agent-accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --agent-gap: var(--space-md, 12px);
+
+  display: grid;
+  grid-template-columns: minmax(200px, 264px) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+  color: var(--agent-text);
+  font-size: var(--font-size-md, 0.875rem);
+  line-height: var(--line-height-normal, 1.5);
+}
+
+/* ---------- Conversation rail ------------------------------------------- */
+
+.agent-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+  min-height: 0;
+  padding: var(--agent-gap);
+  border-right: 1px solid var(--agent-line);
+  background: var(--agent-surface);
+}
+
+.agent-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm, 8px);
+}
+
+/*
+ * The section label, not a window title: 13px, medium, no hero type. The panel
+ * chrome above already says which app is open.
+ */
+.agent-rail-title {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.8125rem);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: var(--letter-spacing-wide, 0.02em);
+  text-transform: uppercase;
+  color: var(--agent-muted);
+}
+
+.agent-rail-count {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.agent-rail-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.agent-rail-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: var(--space-sm, 8px);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--dur-fast, 140ms) var(--ease-standard, ease);
+}
+
+.agent-rail-entry:hover:not(:disabled) {
+  background: var(--agent-surface-2);
+}
+
+.agent-rail-entry.is-selected {
+  background: var(--agent-accent-soft);
+  border-color: color-mix(in srgb, var(--agent-accent) 40%, transparent);
+}
+
+.agent-rail-entry-title {
+  overflow: hidden;
+  font-weight: var(--font-weight-medium, 500);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-rail-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-rail-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs, 6px);
+  padding-top: var(--space-xs, 6px);
+  border-top: 1px solid var(--agent-line);
+}
+
+/* ---------- Controls ----------------------------------------------------- */
+
+.agent-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--agent-surface-2);
+  color: var(--agent-text);
+  font: inherit;
+  font-size: var(--font-size-sm, 0.8125rem);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast, 140ms) var(--ease-standard, ease),
+    border-color var(--dur-fast, 140ms) var(--ease-standard, ease);
+}
+
+.agent-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--agent-accent) 45%, var(--agent-line));
+}
+
+.agent-action-primary,
+.agent-action-danger {
+  border-color: transparent;
+  background: var(--agent-accent-deep);
+  color: #fff;
+}
+
+.agent-action-primary:hover:not(:disabled),
+.agent-action-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--agent-accent) 74%, #101018);
+}
+
+.agent-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--agent-muted);
+  cursor: pointer;
+}
+
+.agent-icon-button:hover:not(:disabled) {
+  background: var(--agent-surface-2);
+  color: var(--agent-text);
+}
+
+.agent-icon-button.is-active {
+  color: var(--agent-accent);
+}
+
+.agent-action:disabled,
+.agent-icon-button:disabled,
+.agent-rail-entry:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* One focus treatment for every control here, and it is never removed. */
+.agent-shell :is(button):focus-visible {
+  outline: 2px solid var(--agent-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Canvas ------------------------------------------------------- */
+
+.agent-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--agent-gap);
+  min-height: 0;
+  padding: var(--agent-gap);
+  overflow-y: auto;
+}
+
+.agent-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 8px);
+  padding: var(--space-sm, 8px) var(--space-md, 12px);
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 45%, var(--agent-line));
+  border-radius: var(--radius-md, 8px);
+  background: var(--agent-accent-soft);
+}
+
+.agent-banner-text {
+  min-width: 0;
+}
+
+.agent-placeholder {
+  margin: 0;
+  color: var(--agent-muted);
+}
+
+.agent-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+  margin: auto;
+  max-width: 42ch;
+  padding: var(--space-xl, 20px);
+  text-align: center;
+}
+
+.agent-empty-title {
+  margin: 0;
+  font-size: var(--font-size-lg, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--agent-text);
+}
+
+.agent-empty-body {
+  margin: 0;
+  color: var(--agent-muted);
+}
+
+/* ---------- Selected conversation ---------------------------------------- */
+
+.agent-conversation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--agent-gap);
+  min-height: 0;
+}
+
+.agent-conversation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 8px);
+  padding-bottom: var(--space-sm, 8px);
+  border-bottom: 1px solid var(--agent-line);
+}
+
+.agent-conversation-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  min-width: 0;
+}
+
+.agent-conversation-title {
+  font-size: var(--font-size-lg, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.agent-conversation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs, 6px);
+}
+
+.agent-subheading {
+  margin: 0 0 4px;
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: var(--letter-spacing-wide, 0.02em);
+  text-transform: uppercase;
+  color: var(--agent-muted);
+}
+
+.agent-context-empty {
+  margin: 0;
+  color: var(--agent-muted);
+}
+
+.agent-context-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs, 6px) var(--space-md, 12px);
+  margin: 0;
+  font-size: var(--font-size-sm, 0.8125rem);
+}
+
+.agent-context-facts dt {
+  color: var(--agent-muted);
+}
+
+.agent-context-facts dd {
+  margin: 0 var(--space-sm, 8px) 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-pill, 999px);
+  font-size: var(--font-size-2xs, 0.6875rem);
+  color: var(--agent-muted);
+  white-space: nowrap;
+}
+
+.agent-chip-cloud,
+.agent-chip-provider {
+  border-color: color-mix(in srgb, var(--agent-accent) 35%, var(--agent-line));
+}
+
+.agent-status-failed {
+  border-color: color-mix(in srgb, var(--agent-accent) 55%, var(--agent-line));
+  color: var(--agent-text);
+}
+
+/* ---------- Messages ----------------------------------------------------- */
+
+.agent-older {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-message {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-sm, 8px) var(--space-md, 12px);
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-md, 8px);
+  background: var(--agent-surface);
+}
+
+.agent-message-user {
+  background: var(--agent-surface-2);
+}
+
+.agent-message-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-message-role {
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: var(--letter-spacing-wide, 0.02em);
+  text-transform: uppercase;
+  color: var(--agent-muted);
+}
+
+.agent-message-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agent-message-error {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.8125rem);
+  color: var(--agent-accent);
+}
+
+.agent-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-sm, 8px);
+  padding: 5px var(--space-sm, 8px);
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--font-size-sm, 0.8125rem);
+}
+
+.agent-card-title {
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.agent-card-summary,
+.agent-card-actions {
+  color: var(--agent-muted);
+}
+
+/* ---------- Scope notice -------------------------------------------------- */
+
+.agent-scope {
+  margin-top: auto;
+  padding-top: var(--space-sm, 8px);
+  border-top: 1px solid var(--agent-line);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-scope p {
+  margin: 0 0 2px;
+}
+
+/* ---------- Narrow pop-outs ---------------------------------------------- */
+
+/*
+ * A container query, not a viewport one: this surface also runs inside a
+ * floating desktop window, whose width has nothing to do with the viewport.
+ */
+@container (max-width: 640px) {
+  .agent-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 40%) minmax(0, 1fr);
+  }
+
+  .agent-rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--agent-line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-shell :is(.agent-action, .agent-rail-entry) {
+    transition: none;
+  }
+}

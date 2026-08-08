@@ -75,6 +75,7 @@ import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 
 type WinSection =
+  | 'agent'
   | 'library' | 'novels' | 'dictionary' | 'grammar' | 'notebook' | 'translate'
   | 'player' | 'video' | 'music' | 'anki' | 'flashcards' | 'stats' | 'resources' | 'settings' | 'note'
   | 'games' | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar' | 'reading' | 'youtube'
@@ -118,6 +119,9 @@ interface NoteData {
 // Reuses CommandPalette's palette.section.* keys — same 15 app names, so one
 // translation serves both surfaces rather than drifting into two catalogs.
 const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
+  // 'chat', not 'sparkle': the Agent is a conversation workspace, and the
+  // Scraper already owns 'sparkle' for its title proposals.
+  { id: 'agent', labelKey: 'palette.section.agent', glyph: 'chat' },
   { id: 'player', labelKey: 'palette.section.player', glyph: 'player' },
   { id: 'video', labelKey: 'palette.section.video', glyph: 'video' },
   { id: 'youtube', labelKey: 'palette.section.youtube', glyph: 'player' },
@@ -158,6 +162,7 @@ const START_PRIMARY_SECTIONS: WinSection[] = [
   'player',
 ];
 const START_HINTS: Partial<Record<WinSection, string>> = {
+  agent: 'Stored Agent conversations',
   player: 'Media Center · Library',
   scraper: 'Find what to watch next',
   video: 'Media Center · Video',
@@ -351,7 +356,7 @@ const START_GROUPS: { id: string; labelKey: string; sections: WinSection[] }[] =
   {
     id: 'study',
     labelKey: 'desktop.startCategory.study',
-    sections: ['dictionary', 'grammar', 'reading', 'translate', 'notebook', 'anki', 'flashcards'],
+    sections: ['agent', 'dictionary', 'grammar', 'reading', 'translate', 'notebook', 'anki', 'flashcards'],
   },
   { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion'] },
   { id: 'media', labelKey: 'desktop.startCategory.media', sections: ['player', 'video', 'youtube', 'music', 'scraper'] },

@@ -6,6 +6,7 @@ import { useVisualizer, VizStage } from './visualizer/VisualizerContent';
 import { WALL_PRESETS } from '../environment/wallCatalog';
 const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 
+const AgentWorkspaceShell = lazy(() => import('./agent/AgentWorkspaceShell'));
 const LibraryView = lazy(() => import('../views/LibraryView'));
 const NovelsView = lazy(() => import('../views/NovelsView'));
 const MediaCenterView = lazy(() => import('../views/MediaCenterView'));
@@ -56,6 +57,9 @@ export default function AppSection({
           onOpenMusicWidget={() => void window.api.popOut('musicwidget')}
         />
       );
+      break;
+    case 'agent':
+      view = <AgentWorkspaceShell />;
       break;
     case 'city':
       view = <ReadingGarden />;

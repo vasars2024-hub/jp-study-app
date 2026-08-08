@@ -331,6 +331,74 @@ Verification boundary:
 - No real provider request was sent and no user content or funds were used. Deterministic SSE fixtures verify endpoint/body shape, chunk delivery, usage, observer isolation and retry-after-partial-output behavior.
 - Provider API contracts were checked against current official Gemini and DeepSeek documentation before implementation.
 
+## Slice 10 — typed Agent workspace bridge and first consuming shell
+
+The exact Claude Opus 5 / extra-high backup assignment completed in the isolated
+`codex/claude-agent-shell` worktree as commit
+`5689ca7d0978e2c8d8987c4efdd31d7c0fb16ad3`. The primary orchestrator reviewed
+the complete 22-path diff, reran its tests, and integrated only its Agent-owned
+hunks into the dirty main tree. Existing localized pop-out work in `App.tsx`
+was preserved and the Agent entry was adapted to that live key map.
+
+Behavior now established:
+
+- Four versioned `load/save/delete/clear` channels connect the existing
+  main-owned Agent store to matching preload methods and the first renderer
+  consumer. Main errors cross the boundary only as closed, typed failure codes.
+- Boundary normalization rejects malformed responses and future workspace
+  schemas. Saving still traverses the existing bounded store; no renderer-owned
+  persistence or second conversation model was introduced.
+- Agent is a first-class desktop, Start-menu, taskbar and pop-out route. The
+  Fluent shell renders loading, empty, ready and recoverable error states;
+  persisted conversation creation, selection, pinning, deletion and history
+  clearing; context/provenance and provider disclosure; keyboard rail movement;
+  reduced motion; and compact container-query layout.
+- The shell deliberately has no prompt composer yet because provider execution
+  has no renderer bridge. It states that boundary instead of presenting a dead
+  send control. Persistent response caching remains refused until encrypted
+  retention exists.
+
+Automated evidence:
+
+- Focused workspace bridge/store/router/shell regression: 7 files / 55 tests
+  passed.
+- Architecture, desktop routing/personality and i18n regression: 6 files / 54
+  tests passed.
+- ESLint passes across the new Agent modules, their tests, store registration,
+  route consumer and four locale additions. The wider dirty-path lint still
+  reports two inherited adjacent-overload errors near line 1460 of
+  `window.d.ts`, outside this slice.
+- Repository-wide TypeScript remains red on the recorded inherited baseline;
+  filtered diagnostics contain no Agent workspace, shell, client or IPC path.
+- `git diff --check` on the Agent scope passes (line-ending notices only).
+
+Live Electron evidence:
+
+- Electron Forge rebuilt the real main and preload targets, then a production
+  relaunch exposed all four typed Agent methods. Agent opened from the real
+  Start menu as a focused taskbar-managed desktop window.
+- The initial empty state created a conversation through the production bridge.
+  Pinning changed the accessible control to “Unpin conversation”; a full
+  main-process relaunch changed the Electron PID and restored the same pinned
+  conversation from the main-owned store.
+- Delete required a second “Confirm delete” action. After confirmation the shell
+  returned to the canonical zero-conversation state, so the acceptance run left
+  no synthetic conversation in the user's history.
+- Before the Forge rebuild, the hot renderer briefly ran against the older
+  preload and correctly rendered the recoverable “not connected” state. It did
+  not throw or pretend persistence was available.
+- At 782 x 513 the shell's scroll dimensions exactly matched its bounding box:
+  no horizontal or vertical overflow, no clipped controls, and no redundant
+  internal window title. The debug bridge recorded no new error through create,
+  pin, restart, restore and delete.
+- Final live screenshot:
+  `debug/shots/win1-1786189661979.png`. Electron control remained serialized;
+  the Claude task performed no live verification.
+
 ## Exact next slice
 
-Wire the versioned store and first consuming Agent shell together with typed bridge methods. Persistent response caching remains refused until encrypted retention is designed. Do not add bridge channels without their consumers.
+Add the first consumed provider execution/stream bridge and composer as one
+typed slice. Reuse the existing privacy-gated Agent provider router, expose
+cancellation and honest local/cloud delivery metadata, and keep every new
+channel paired with the shell consumer and focused tests. Do not add persistent
+response caching.
