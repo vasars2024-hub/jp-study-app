@@ -985,11 +985,26 @@ were mine, introduced in this slice, and each is invisible to a unit test:
 
 1. **The label pointed at a key that does not exist.** The menu item called
    `t('reader.askAgent')` while the key shipped as `epub.askAgent` — the namespace
-   changed mid-work and the call site did not follow. `tools/i18n-check.cjs`
-   cannot catch this: it checks en↔ja/zh/ru *parity*, not that a `t()` call site
-   resolves to anything. Now verified by extracting every `t('…')` key added by the
-   diff and asserting each exists in `en.ts` — a check worth repeating on any slice
-   that adds a key.
+   changed mid-work and the call site did not follow. `tools/i18n-check.cjs` cannot
+   catch this: it compares the four catalogs *against each other*, and a key absent
+   from all four is absent from both sides of every comparison.
+
+   **Correction, and the useful part of this entry: the repo already has the gate
+   for it and this session simply did not run it.** `tools/i18n-missing-key-check.cjs`
+   scans `src/renderer`, `src/media` and `src/main` for literal `t('…')` keys and
+   fails on any that English does not define; run with the defect restored it
+   reports `NovelReader.tsx — 1 key(s): reader.askAgent` and exits 1. It would have
+   taken seconds. **Run it, not just `i18n-check.cjs`, on any slice that adds a
+   key** — the four-gate list this ledger keeps quoting is incomplete for i18n work.
+
+   One trap inside the trap, worth recording because it nearly produced the
+   opposite conclusion: the first canary used to test that tool was
+   `t('__canary_missing_key__')`, the tool stayed green, and that looked like proof
+   the tool was broken. Its key regex is
+   `/\bt\(\s*'([a-zA-Z][\w.-]*\.[\w.-]+)'/` — the key must start with a letter and
+   contain a dot, so the canary matched nothing. A malformed positive control is
+   indistinguishable from a check that does not work; shape the canary like a real
+   key (`canary.missingKey`) and confirm it fires before believing a green run.
 2. **The menu it lived in is not rendered where people read.** In the desktop-shell
    embedding there is **no element whose text is "Study"** — the AppChrome menu bar
    simply is not there, so the action was unreachable. `Collect selection` is
