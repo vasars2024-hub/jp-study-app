@@ -11,49 +11,24 @@ const SRC = resolve(__dirname, '..', '..');
 const read = (path: string) => readFileSync(resolve(SRC, path), 'utf8');
 
 describe('Media Center integration contract', () => {
-  /**
-   * Old-player retirement, 2026-07-31. `player` and `video` were
-   * `<MediaCenterView initialTab="library|video" />`; they now hand off to the adopted
-   * Seanime workspace. `music` did NOT move and this pins that: `MediaWorkspace.tsx`
-   * contains nothing music-shaped, so routing it there deletes a feature instead of
-   * migrating it.
-   */
-  it('routes player and video to the adopted workspace, and music to the legacy shell', () => {
+  it('routes every Media entry point to the shared Media shell', () => {
     const source = read('renderer/components/AppSection.tsx');
-    expect(source).toContain('<MediaWorkspaceSectionView legacyTab="library" />');
-    expect(source).toContain('<MediaWorkspaceSectionView legacyTab="video" />');
+    expect(source).toContain('<MediaCenterView initialTab="library" />');
+    expect(source).toContain('<MediaCenterView initialTab="video" />');
     expect(source).toContain('<MediaCenterView initialTab="music" />');
-    // The retired routes must not linger next to their replacements.
-    expect(source).not.toContain('<MediaCenterView initialTab="library" />');
-    expect(source).not.toContain('<MediaCenterView initialTab="video" />');
+    expect(source).not.toContain('MediaWorkspaceSectionView');
   });
 
-  /**
-   * Slice 14. Every section that routes to the workspace must be able to *reach* it from
-   * whatever window it opens in — including its own pop-out, which is a separate renderer
-   * with its own `App` tree and therefore its own `MediaWorkspaceHost` or none.
-   *
-   * Retirement step 2 added `player` to the routing and left this condition reading
-   * `popout === 'video'`, so a `player` pop-out rendered `MediaWorkspaceSectionView`'s
-   * open button over a window where nothing listened for the event: a control that does
-   * nothing at all, which is this seam's signature failure. The two lists are now one.
-   */
-  it('mounts the host in every pop-out whose section routes to the workspace', () => {
+  it('keeps the Seanime host reachable without replacing the Media shell', () => {
     const app = read('renderer/App.tsx');
-    const section = read('renderer/components/AppSection.tsx');
-    const routed = [...section.matchAll(/case '(\w+)':\s*\n\s*view = <MediaWorkspaceSectionView/g)]
-      .map((m) => m[1]);
+    const source = read('renderer/views/MediaCenterView.tsx');
 
-    expect(routed.sort()).toEqual(['player', 'video']);
-    // Read from the shared list rather than re-tested here: a literal in App.tsx is what
-    // drifted, so a literal in this test would only pin the drift somewhere else.
     expect(app).toContain('sectionOpensMediaWorkspace(popout)');
-    expect(app, 'App re-derived the routed sections from a literal')
-      .not.toMatch(/popout === 'video' &&/);
-    for (const id of routed) {
-      expect(read('shared/mediaWorkspace.ts'), `${id} is missing from the shared list`)
-        .toContain(`'${id}'`);
-    }
+    expect(source).toContain('mediaWorkspaceHostExists');
+    expect(source).toContain('openMediaWorkspace(request)');
+    expect(source).toContain("window.api.popOut('player')");
+    expect(source).toContain('data-media-source="seanime"');
+    expect(source).not.toContain('legacyMediaTabsHidden');
   });
 
   it('keeps a media surface when the sidecar is disabled', () => {
@@ -68,29 +43,20 @@ describe('Media Center integration contract', () => {
     expect(source).toContain("if (availability === 'pending') return null;");
   });
 
-  it('hides its own legacy Video and Library tabs when the workspace exists', () => {
-    // `AppSection` stopped routing to these, but this component's own nav still did — so
-    // the retired player and library stayed one click away from the Music app, which is
-    // the one section that still renders this view.
+  it('keeps local Video and Library tabs alongside the Seanime handoff', () => {
     const source = read('renderer/views/MediaCenterView.tsx');
-    expect(source).toContain('useMediaWorkspaceAvailability');
-    expect(source).toMatch(
-      /legacyMediaTabsHidden && \(item\.id === 'video' \|\| item\.id === 'library'\)/,
-    );
-    // Hidden means not navigable either: `video` used to open the workspace AND select the
-    // legacy panel behind it, so closing the overlay revealed the retired player.
-    expect(source).toMatch(
-      /legacyMediaTabsHidden && \(next === 'video' \|\| next === 'library'\)/,
-    );
-    // ...and nothing may strand the user on a tab that has no nav entry to leave by.
-    expect(source).toMatch(/if \(legacyMediaTabsHidden\) return;\s*\n\s*if \(!\['music', 'discover', 'library'\]/);
+    expect(source).toContain("id: 'library'");
+    expect(source).toContain("id: 'video'");
+    expect(source).toContain('data-media-source="seanime"');
+    expect(source).not.toContain('legacyMediaTabsHidden');
   });
 
-  it('keeps those tabs when there is no workspace, because that IS the fallback', () => {
-    // Hiding them with the sidecar disabled would leave the app with no video or library
-    // surface at all — the exact failure MediaWorkspaceSectionView's fallback prevents.
+  it('keeps the Seanime action truthful while the sidecar is unavailable', () => {
     const source = read('renderer/views/MediaCenterView.tsx');
-    expect(source).toContain("const legacyMediaTabsHidden = workspace === 'available'");
+    expect(source).toContain("const seanimeAvailable = workspace === 'available'");
+    expect(source).toContain("disabled={!seanimeAvailable}");
+    expect(source).toContain("workspace === 'pending'");
+    expect(source).toContain("workspace === 'unavailable'");
   });
 
   it('decides "is there a workspace?" in exactly one place', () => {
@@ -143,6 +109,16 @@ describe('Media Center integration contract', () => {
     expect(source).toContain('<DiscoveryPosterArt');
   });
 
+  it('keeps search, local library, discovery, and the Seanime source in the shell', () => {
+    const source = read('renderer/views/MediaCenterView.tsx');
+    expect(source).toContain('className="mc-sidebar"');
+    expect(source).toContain('className="mc-global-search"');
+    expect(source).toContain('<MediaLibraryShell');
+    expect(source).toContain('<DiscoveryControls');
+    expect(source).toContain('data-media-source="seanime"');
+    expect(source).toContain('openSeanime');
+  });
+
   it('keeps subtitle provider credentials actionable inside Media Center', () => {
     const source = read('renderer/views/MediaCenterView.tsx');
     expect(source).toContain('function SubtitleProviderQuickSetup()');
@@ -162,6 +138,9 @@ describe('Media Center integration contract', () => {
     expect(css).toMatch(/\.mc-root\s*\{[^}]*container-type:\s*inline-size/);
     expect(css).toContain('container-name: mc;');
     expect(css.match(/@container mc \(max-width/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(css).toMatch(/\.mc-app-chrome\s*\{[^}]*height:\s*100%/);
+    expect(css).toContain('.mc-app-chrome .ui-app-chrome__body');
+    expect(css).toContain('.mc-seanime-link');
     // Only motion/contrast preferences may still be `@media` — nothing width-based.
     expect(css).not.toMatch(/@media\s*\(max-width:\s*\d/);
   });

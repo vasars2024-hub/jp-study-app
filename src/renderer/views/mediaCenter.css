@@ -65,6 +65,35 @@
   color: var(--mc-text);
 }
 
+/* The same shell is rendered in a desktop window, a pop-out, and the Aero/Wired
+   AppChrome wrapper. Give every host a definite height so the content owns one
+   scroll region instead of collapsing into a short strip or leaving a large
+   empty canvas around the sidebar. */
+.mc-app-chrome {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mc-app-chrome .ui-app-chrome__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fwin-body > .mc-root,
+.popout-body > .mc-root,
+.fwin-body > .mc-app-chrome,
+.popout-body > .mc-app-chrome {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
 .mc-app-chrome .app-chrome-content {
   min-height: 0;
 }
@@ -192,7 +221,8 @@
 }
 
 .mc-nav button,
-.mc-settings-link {
+.mc-settings-link,
+.mc-seanime-link {
   position: relative;
   width: 100%;
   min-height: 40px;
@@ -210,12 +240,14 @@
 }
 
 .mc-nav button > svg,
-.mc-settings-link > svg {
+.mc-settings-link > svg,
+.mc-seanime-link > svg {
   flex: 0 0 auto;
 }
 
 .mc-nav button strong,
-.mc-settings-link strong {
+.mc-settings-link strong,
+.mc-seanime-link strong {
   font-size: var(--mc-fs-body, 13px);
   font-weight: 600;
 }
@@ -234,7 +266,8 @@
 }
 
 .mc-nav button:hover,
-.mc-settings-link:hover {
+.mc-settings-link:hover,
+.mc-seanime-link:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.035);
   color: #e8e9ed;
 }
@@ -257,6 +290,31 @@
   border-radius: 2px;
   background: var(--mc-accent-2);
   box-shadow: 0 0 10px rgba(255, 106, 131, 0.45);
+}
+
+.mc-seanime-link {
+  margin-top: 9px;
+  border-color: rgba(216, 74, 104, 0.16);
+  background: rgba(216, 74, 104, 0.07);
+}
+
+.mc-seanime-link:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.mc-seanime-link > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-seanime-link small {
+  margin-top: 2px;
+  color: var(--mc-dim);
+  font-size: var(--mc-fs-micro, 11px);
+  font-weight: 500;
+  line-height: 1.15;
 }
 
 .mc-sidebar-spacer {
@@ -1068,6 +1126,7 @@
 .mc-video-actions,
 .mc-music-window-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -2564,6 +2623,7 @@
 
   .mc-nav button small,
   .mc-settings-link small,
+  .mc-seanime-link small,
   .mc-sidebar-library {
     display: none;
   }
@@ -2621,12 +2681,14 @@
   .mc-nav-label,
   .mc-nav button > span,
   .mc-nav button em,
-  .mc-settings-link > span {
+  .mc-settings-link > span,
+  .mc-seanime-link > span {
     display: none;
   }
 
   .mc-nav button,
-  .mc-settings-link {
+  .mc-settings-link,
+  .mc-seanime-link {
     justify-content: center;
     padding-inline: 0;
   }

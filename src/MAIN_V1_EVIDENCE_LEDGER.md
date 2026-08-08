@@ -26,7 +26,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 | Central AI Agent | Read-only consolidation audit complete; first-class app genuinely missing | Typed tools/runtime exist, but the only functional Agent panel is Blanc-owned; persistence and handlers remain renderer-owned and there is no durable conversation/context handoff | Shared workspace contracts are frozen; provider runtime and main-owned persistence precede shell routing |
 | Unified Reading workspace | Partial and collision-prone | Reading Finder and Novels remain separate routed components; both are already modified in the dirty tree | Defer until ownership reconciliation after shared foundations |
 | ReadingLens Capture and Read | Partial | Main capture service, overlay, settings and tests exist; source still presents an overlay rather than the complete three-depth workflow | Defer until Lexicon + Reading contracts exist |
-| Media shell / Liquid | Implemented in several layers but live release state still needs a dedicated regression audit | Mature Media shell/workspace components exist and many paths are already modified; live Electron session restored but Media was not changed in this slice | Independent post-foundation audit, serialized live verification |
+| Media shell / Liquid | Main-tree Media shell repair reviewed and integrated; Liquid remains deliberately unverified | Player, Video and Music now route through the shared shell while local library, global search, discovery and explicit Seanime handoff remain reachable | Keep Liquid verification serialized and separate from the completed shell repair |
 | Remaining v1 surfaces | Unverified | Large dirty-tree overlap and stale documents prevent honest blanket status | Re-derive per route after the dependency tracks above |
 
 ## Slice 1 — shared vault adoption for AI and subtitle providers
@@ -142,6 +142,34 @@ Automated evidence:
 
 - Focused Agent workspace and existing permission/queue suites: 3 files / 26 tests passed.
 - `eslint` and `git diff --check` on the new shared contract paths: pass.
+
+## Luna Media shell repair and primary-tree reconciliation
+
+The exact Luna Max task worked in an isolated worktree and produced commit `99c874791810dd6a3f984b25e55518c8d6c2566a`. The primary orchestrator reviewed its complete four-path diff and integrated only the Luna-owned hunks. A pre-existing F16 reach-check change in `mediaCenterIntegration.test.ts` remains unstaged and outside this checkpoint.
+
+Behavior now established:
+
+- Player, Video and Music entry points all render the shared Media shell instead of replacing local Media with the adopted workspace.
+- The sidebar, history/navigation, global search, local library and discovery remain one surface.
+- Seanime is an explicit, availability-aware handoff from that surface; it does not hide local Video or Library navigation.
+- Primary review removed Luna's automatic item-play handoffs because the dirty main tree already owns that behavior inside `playItem`; the explicit Seanime controls remain and a single click can no longer dispatch the workspace twice.
+- The app-chrome body fills its window, top-bar actions can wrap, and compact pop-outs collapse secondary labels while preserving every primary route.
+
+Automated evidence:
+
+- Focused primary-tree verification: 4 files / 68 tests passed.
+- `eslint` on the changed TSX and integration-test paths: pass.
+- `git diff --cached --check`: pass.
+- Exact checkpoint scope: `AppSection.tsx`, `MediaCenterView.tsx`, `mediaCenter.css` and the Luna-owned hunks of `mediaCenterIntegration.test.ts`.
+
+Live Electron evidence:
+
+- The real Electron renderer showed the repaired local Library with 30 imported items, persistent sidebar, global search and explicit Media workspace source.
+- Discover rendered its connected search/filter controls and live recommendations without losing the Media shell.
+- The Media pop-out remained usable at 780 x 640: navigation collapsed to icons, search and local library remained visible, and no route disappeared.
+- Clicking the Seanime source opened the adopted workspace dialog with sidecar-ready status and Library/Readiness/Review navigation.
+- No new renderer or main-process error was recorded during reload, navigation, resize or handoff. The only error in the bridge ring predates the slice and records the dev server being unavailable during the original application boot.
+- Liquid verification was not started, as required.
 
 ## Exact next slice
 

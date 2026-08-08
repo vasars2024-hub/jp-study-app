@@ -9,13 +9,6 @@ const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 const LibraryView = lazy(() => import('../views/LibraryView'));
 const NovelsView = lazy(() => import('../views/NovelsView'));
 const MediaCenterView = lazy(() => import('../views/MediaCenterView'));
-/**
- * Old-player retirement, 2026-07-31. `player` and `video` hand off to the adopted Seanime
- * workspace; it falls back to `MediaCenterView` when the sidecar is disabled, so
- * `SEANIME_SIDECAR=0` remains a rollback rather than a way to lose the media surface.
- * `music` still routes to `MediaCenterView` directly — the workspace has no music surface.
- */
-const MediaWorkspaceSectionView = lazy(() => import('../views/MediaWorkspaceSectionView'));
 const ScraperView = lazy(() => import('../views/ScraperView'));
 const TranslateView = lazy(() => import('../views/TranslateView'));
 const DictionaryView = lazy(() => import('../views/DictionaryView'));
@@ -71,13 +64,16 @@ export default function AppSection({
       view = <NovelsView />;
       break;
     case 'player':
-      view = <MediaWorkspaceSectionView legacyTab="library" />;
+      // All Media entry points open the same shell. The shell owns local-library
+      // browsing and exposes the Seanime workspace as an explicit handoff, so a
+      // shortcut never lands on a status-only overlay or an empty canvas.
+      view = <MediaCenterView initialTab="library" />;
       break;
     case 'scraper':
       view = <ScraperView />;
       break;
     case 'video':
-      view = <MediaWorkspaceSectionView legacyTab="video" />;
+      view = <MediaCenterView initialTab="video" />;
       break;
     case 'youtube':
       view = <YouTubePlaylistsView />;

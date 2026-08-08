@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MediaItem } from '../../shared/types';
 import { MEDIA_STUDY_EVENT } from '../../shared/mediaStudyIntegration';
 import Icon, { type IconName } from '../components/Icons';
@@ -53,6 +53,10 @@ import {
 import { useT } from '../i18n';
 import { openMediaWorkspace } from '../mediaWorkspaceBridge';
 import { useMediaWorkspaceAvailability } from '../mediaWorkspaceAvailability';
+import {
+  mediaWorkspaceHostExists,
+  type MediaWorkspaceOpenRequest,
+} from '../../shared/mediaWorkspace';
 import * as player from '../playerBus';
 import type { SubtitleProviderCredentialState } from '../../shared/subtitleDiscoveryIpc';
 import './mediaCenter.css';
@@ -69,6 +73,8 @@ export type MediaCenterTab =
 interface MediaCenterViewProps {
   initialTab?: MediaCenterTab;
 }
+
+type OpenSeanimeWorkspace = (request?: MediaWorkspaceOpenRequest) => boolean;
 
 const NAV: Array<{ id: MediaCenterTab; labelKey: string; icon: IconName; hintKey: string }> = [
   { id: 'home', labelKey: 'mediaCenter.nav.home', icon: 'app', hintKey: 'mediaCenter.nav.homeHint' },
@@ -404,6 +410,16 @@ function HomePanel({
   const subtitleReady = state.items.filter((item) => (item.subtitles?.length ?? 0) > 0).length;
   const minutes = Math.round(state.items.reduce((sum, item) => sum + (item.durationSec ?? 0), 0) / 60);
 
+  const playItem = (item: MediaItem): void => {
+    if (item.kind === 'audio' || item.kind === 'audiobook') {
+      void music.play(item);
+      onNavigate('music');
+      return;
+    }
+    void state.playItem(item.id);
+    onNavigate('video');
+  };
+
   return (
     <div className="mc-page mc-home">
       <section className="mc-hero">
@@ -468,15 +484,7 @@ function HomePanel({
                     key={item.id}
                     item={item}
                     active={state.current?.id === item.id}
-                    onPlay={() => {
-                      if (item.kind === 'audio' || item.kind === 'audiobook') {
-                        void music.play(item);
-                        onNavigate('music');
-                      } else {
-                        void state.playItem(item.id);
-                        onNavigate('video');
-                      }
-                    }}
+                    onPlay={() => playItem(item)}
                   />
                 ))}
               </div>
@@ -500,15 +508,7 @@ function HomePanel({
                   <MediaTile
                     key={item.id}
                     item={item}
-                    onPlay={() => {
-                      if (item.kind === 'audio' || item.kind === 'audiobook') {
-                        void music.play(item);
-                        onNavigate('music');
-                      } else {
-                        void state.playItem(item.id);
-                        onNavigate('video');
-                      }
-                    }}
+                    onPlay={() => playItem(item)}
                   />
                 ))}
               </div>
@@ -638,7 +638,19 @@ function LibraryPanel({
   );
 }
 
-function VideoPanel({ state, onStudy }: { state: MediaState; onStudy: () => void }) {
+function VideoPanel({
+  state,
+  onStudy,
+  onOpenSeanime,
+  seanimeAvailable,
+  seanimeActionTitle,
+}: {
+  state: MediaState;
+  onStudy: () => void;
+  onOpenSeanime: OpenSeanimeWorkspace;
+  seanimeAvailable: boolean;
+  seanimeActionTitle?: string;
+}) {
   const { t } = useT();
   const videos = useMemo(() => orderUpNext(state.items), [state.items]);
   const current = state.current;
@@ -652,6 +664,15 @@ function VideoPanel({ state, onStudy }: { state: MediaState; onStudy: () => void
         <div className="mc-video-actions">
           <button type="button" className="mc-button mc-button-primary" onClick={() => void state.openFile()}>
             <Icon name="folder-open" size={13} /> {t('mediaCenter.action.openVideo')}
+          </button>
+          <button
+            type="button"
+            className="mc-button"
+            disabled={!seanimeAvailable}
+            title={seanimeActionTitle}
+            onClick={() => onOpenSeanime(current ? { localFilePath: current.path } : undefined)}
+          >
+            <Icon name="globe" size={13} /> {t('mediaWorkspace.launcher')}
           </button>
           <button type="button" className="mc-button" onClick={() => void state.openSubs()} disabled={!state.src}>
             <Icon name="caption" size={13} /> {t('mediaCenter.video.subtitles')}
@@ -771,7 +792,13 @@ function VideoPanel({ state, onStudy }: { state: MediaState; onStudy: () => void
         {videos.length > 0 ? (
           <div className="mc-tile-row mc-tile-row-small">
             {videos.slice(0, 7).map((item) => (
-              <MediaTile key={item.id} item={item} compact active={state.current?.id === item.id} onPlay={() => void state.playItem(item.id)} />
+              <MediaTile
+                key={item.id}
+                item={item}
+                compact
+                active={state.current?.id === item.id}
+                onPlay={() => void state.playItem(item.id)}
+              />
             ))}
           </div>
         ) : (
@@ -1325,23 +1352,36 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   );
   const tab = history.trail[history.at];
   const discovery = useDiscovery(tab === 'discover');
-  /**
-   * Old-player retirement, 2026-07-31. Video and Library are the two surfaces the adopted
-   * workspace owns, and `AppSection` no longer routes to them — but this component's own
-   * nav still did, so the legacy player and library stayed one click away from the Music
-   * app. They are hidden whenever the workspace exists.
-   *
-   * They are *kept* when it does not, because that is exactly the `SEANIME_SIDECAR=0`
-   * fallback `MediaWorkspaceSectionView` renders: hiding them there would leave the app
-   * with no video or library surface at all, which is the failure the fallback prevents.
-   */
   const workspace = useMediaWorkspaceAvailability();
-  const legacyMediaTabsHidden = workspace === 'available';
+  const seanimeAvailable = workspace === 'available';
+  const seanimeActionTitle = workspace === 'pending'
+    ? t('mediaWorkspace.connecting')
+    : workspace === 'unavailable'
+      ? t('mediaWorkspace.resumeLast.unavailable')
+      : undefined;
+
+  /**
+   * The local library and the adopted Seanime library are two providers of the
+   * same Media shell. Opening the adopted surface is an explicit action from
+   * this shell; it must never replace the sidebar or auto-open during mount.
+   *
+   * A Media Center pop-out has no desktop shell, so it may not have a host of
+   * its own. In that case, open the dedicated player pop-out, whose App tree
+   * mounts the host. The main window and the player pop-out dispatch directly.
+   */
+  const openSeanime = useCallback<OpenSeanimeWorkspace>((request = {}) => {
+    if (!seanimeAvailable) return false;
+    if (mediaWorkspaceHostExists()) {
+      openMediaWorkspace(request);
+      return true;
+    }
+    void window.api.popOut('player').catch(() => undefined);
+    return true;
+  }, [seanimeAvailable]);
+
   const nav = useMemo(
-    () => NAV
-      .filter((item) => !(legacyMediaTabsHidden && (item.id === 'video' || item.id === 'library')))
-      .map((item) => ({ ...item, label: t(item.labelKey), hint: t(item.hintKey) })),
-    [legacyMediaTabsHidden, t, lang],
+    () => NAV.map((item) => ({ ...item, label: t(item.labelKey), hint: t(item.hintKey) })),
+    [t, lang],
   );
 
   /** Jump to a tab, truncating any forward trail — the browser convention. */
@@ -1362,21 +1402,15 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   };
 
   const navigate = (next: MediaCenterTab): void => {
-    if (next === 'video') {
-      openMediaWorkspace({ localFilePath: media.current?.path });
-    }
-    // Hand off without also selecting the legacy panel behind the overlay. Before this,
-    // `video` opened the workspace AND set the tab, so closing the workspace revealed the
-    // retired player; `library` did not hand off at all.
-    if (legacyMediaTabsHidden && (next === 'video' || next === 'library')) {
-      if (next === 'library') openMediaWorkspace();
-      return;
-    }
     setTab(next);
   };
 
   useEffect(() => {
-    navigate(initialTab);
+    setHistory((current) => (
+      current.trail[current.at] === initialTab
+        ? current
+        : { trail: [initialTab], at: 0 }
+    ));
   }, [initialTab]);
 
   useEffect(() => {
@@ -1477,12 +1511,20 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   const body = useMemo(() => {
     if (tab === 'home') return <HomePanel state={media} music={music} onNavigate={navigate} />;
     if (tab === 'library') return <LibraryPanel state={media} music={music} onNavigate={navigate} />;
-    if (tab === 'video') return <VideoPanel state={media} onStudy={() => setTab('study')} />;
+    if (tab === 'video') return (
+      <VideoPanel
+        state={media}
+        onStudy={() => setTab('study')}
+        onOpenSeanime={openSeanime}
+        seanimeAvailable={seanimeAvailable}
+        seanimeActionTitle={seanimeActionTitle}
+      />
+    );
     if (tab === 'music') return <MusicPanel state={music} />;
     if (tab === 'study') return <StudyPanel state={media} />;
     if (tab === 'discover') return <DiscoverPanel state={discovery} />;
     return <SettingsPanel state={media} provenance={discovery.provenance} />;
-  }, [tab, media, music, discovery]);
+  }, [tab, media, music, discovery, openSeanime, seanimeActionTitle, seanimeAvailable]);
 
   return (
     <AppChrome menus={mediaMenus} status={status} className="mc-app-chrome">
@@ -1535,6 +1577,19 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
             ))}
           </nav>
 
+          <button
+            type="button"
+            className="mc-seanime-link"
+            data-media-source="seanime"
+            data-sidecar={workspace}
+            disabled={!seanimeAvailable}
+            title={seanimeActionTitle}
+            onClick={() => openSeanime()}
+          >
+            <Icon name="globe" size={15} />
+            <span><strong>{t('mediaWorkspace.launcher')}</strong><small>{t('mediaWorkspace.viewLibrary')}</small></span>
+          </button>
+
           <div className="mc-sidebar-spacer" />
 
           <div className="mc-sidebar-library">
@@ -1586,9 +1641,6 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                   if (tab === 'discover' && event.key === 'Enter') discovery.submitQuery();
                 }}
                 onFocus={() => {
-                  // Scoping search to Library is meaningless when that tab is hidden — it
-                  // would strand the user on a panel with no nav entry to leave by.
-                  if (legacyMediaTabsHidden) return;
                   if (!['music', 'discover', 'library'].includes(tab)) setTab('library');
                 }}
                 placeholder={searchPlaceholder}
