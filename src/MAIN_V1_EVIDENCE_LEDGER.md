@@ -24,7 +24,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 | Jimaku / OpenSubtitles credentials | Broken security policy: separate unmarked store could downgrade to plaintext | Clean-at-HEAD `src/main/subtitleProviderClients.ts` | Completed in first slice; retain provider-specific Test calls backed by shared status metadata |
 | Professional Lexicon core | SQLite/FTS adoption and Workbench compatibility foundation integrated | Canonical lookup now bridges into the existing `DictResult` surface with legacy fallback and pitch/frequency preservation; route aliases and input-scale contracts exist, while Dictionary and Translate remain separate UI routes | Adopt the contracts in a first-class Workbench shell after dirty route ownership is reconciled |
 | Central AI Agent | Provider runtime and atomic main-owned workspace store foundations complete; first-class app genuinely missing | Typed tools/runtime and shared contracts now have one cloud boundary plus retention-aware disk persistence, but shell/bridge handlers remain absent and the old queue/memory implementations remain renderer-owned | Complete local/stream adapters, then wire store IPC only with the first consuming Agent shell |
-| Unified Reading workspace | Partial and collision-prone | Reading Finder and Novels remain separate routed components; both are already modified in the dirty tree | Defer until ownership reconciliation after shared foundations |
+| Unified Reading workspace | Versioned route/library/handoff foundation integrated; UI remains partial and collision-prone | Reading Finder and Novels still render separately, but now share a bounded contract for aliases, deep links, work/edition/source/cover/progress cards and reader handoffs | Reconcile dirty Finder/Novels ownership before building the single shell |
 | ReadingLens Capture and Read | Partial | Main capture service, overlay, settings and tests exist; source still presents an overlay rather than the complete three-depth workflow | Defer until Lexicon + Reading contracts exist |
 | Media shell / Liquid | Main-tree Media shell repair reviewed and integrated; Liquid remains deliberately unverified | Player, Video and Music now route through the shared shell while local library, global search, discovery and explicit Seanime handoff remain reachable | Keep Liquid verification serialized and separate from the completed shell repair |
 | Remaining v1 surfaces | Unverified | Large dirty-tree overlap and stale documents prevent honest blanket status | Re-derive per route after the dependency tracks above |
@@ -235,6 +235,24 @@ Remaining boundary:
 
 - The first Agent shell must add typed preload/renderer consumers in the same checkpoint as `get/save/delete/clear` handlers so the bridge never contains dead or phantom channels.
 - Conversation history is local application data, not a credential. Session-only sensitive context is excluded by retention policy; an explicit encrypted-history mode remains a future privacy feature rather than an implicit claim in this store.
+
+## Luna unified Reading workspace foundation and primary review
+
+The isolated exact Luna Max assignment produced commit `87dd97c` across `readingWorkspace.ts`, its focused tests and a narrow production re-export from `readingIpc.ts`. Primary review applied the complete three-path diff, then added strict remote-cover URL validation, dangerous-scheme rejection and a 5,000-record normalization bound before integration.
+
+Behavior now established:
+
+- A versioned Reading route vocabulary covers Home, Discover, Library, Continue, Plan, Imports and Sources, with compatibility aliases for Reading Finder and Novels.
+- Canonical `reading://workspace/...` deep links preserve work, edition and local item identity and reject unknown future schemas.
+- Local EPUB, manga and web-inbox records project into one bounded card contract with work/edition identity, source provenance, availability, cover state, precise locator/progress, learner level, known ratio and tags.
+- Persisted/nested records are normalized defensively: invalid editions and locators are rejected or nulled, out-of-range learner metadata is bounded, dangerous remote cover schemes are rejected, and malformed/duplicate library records are dropped.
+- Existing dirty Finder, Novels, reader, library, handoff, shell, preload and i18n paths were left untouched.
+
+Automated evidence:
+
+- Primary Reading regression set: 12 files / 109 tests passed, including workspace/model/order, fetch/charset, manga acquisition/image, Seanime bridge, catalogue honesty, garden progress and architecture.
+- Targeted ESLint and `git diff --check`: pass.
+- No Electron verification was performed because this contract slice creates no new rendered shell; visual acceptance remains pending with UI adoption.
 
 ## Exact next slice
 

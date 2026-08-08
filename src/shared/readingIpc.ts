@@ -14,6 +14,20 @@
 import type { ReadingChapter, ReadingEdition, ReadingPage, ReadingWork } from './readingModel';
 import type { LibraryItem } from './types';
 
+// Keep the workspace route contract reachable from the existing Reading
+// boundary so future main/preload handoffs do not invent a second route shape.
+export {
+  READING_WORKSPACE_SCHEMA_VERSION,
+  normalizeReadingWorkspaceRoute,
+  serializeReadingWorkspaceRoute,
+} from './readingWorkspace';
+export type {
+  ReadingWorkspaceEntry,
+  ReadingWorkspaceIntent,
+  ReadingWorkspaceRoute,
+  ReadingWorkspaceSection,
+} from './readingWorkspace';
+
 export const READING_CHANNELS = {
   mangaEntry: 'reading:mangaEntry',
   mangaChapters: 'reading:mangaChapters',
