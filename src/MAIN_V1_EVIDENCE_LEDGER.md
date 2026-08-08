@@ -308,6 +308,29 @@ Remaining boundary:
 - The workspace result is a typed target only. A future clean route/bridge consumer must perform the full Reading workspace navigation and preserve provenance without introducing dead IPC.
 - Imported image/text and clipboard producers can now adopt the contract, but were not wired through dirty preload or shell paths in this checkpoint.
 
+## Slice 9 — honest Gemini and DeepSeek token streaming
+
+Behavior now established:
+
+- Agent cloud requests stream only when both the frozen provider policy enables streaming and the caller supplies a chunk consumer.
+- Gemini uses the official `streamGenerateContent` SSE endpoint; DeepSeek uses streamed chat completions with final usage requested through `stream_options.include_usage`.
+- Both parsers incrementally decode SSE boundaries, aggregate the final answer, retain provider usage/cost metadata and ignore presentation-observer failures.
+- A session-cache hit remains honestly reported as buffered. Cloud delivery metadata now reflects the runtime result instead of being hard-coded.
+- Timeout and external cancellation remain active through the entire response body, not merely until response headers arrive.
+- A retriable network failure may retry only before visible text is delivered. Once a chunk reaches the UI, the failure becomes non-retriable so a second attempt cannot duplicate partial output.
+
+Automated evidence:
+
+- Focused provider/router/policy/architecture regression: 4 files / 30 tests passed.
+- Targeted ESLint, `git diff --check` and changed-path TypeScript filtering: pass; no changed-path diagnostic.
+- Full accumulated suite: 442 files passed / 1 skipped; 5,850 tests passed / 6 skipped, with one unrelated `scraperLogBus` rollover test timing out under full-suite contention.
+- The timed-out scraper suite passed independently: 1 file / 27 tests.
+
+Verification boundary:
+
+- No real provider request was sent and no user content or funds were used. Deterministic SSE fixtures verify endpoint/body shape, chunk delivery, usage, observer isolation and retry-after-partial-output behavior.
+- Provider API contracts were checked against current official Gemini and DeepSeek documentation before implementation.
+
 ## Exact next slice
 
-Add true Gemini/DeepSeek token streaming, then wire the versioned store and first consuming Agent shell together with typed bridge methods. Persistent response caching remains refused until encrypted retention is designed. Do not add bridge channels without their consumers.
+Wire the versioned store and first consuming Agent shell together with typed bridge methods. Persistent response caching remains refused until encrypted retention is designed. Do not add bridge channels without their consumers.

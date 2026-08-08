@@ -15,6 +15,16 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function sseResponse(events: unknown[]): Response {
+  const body = events
+    .map((event) => `data: ${event === '[DONE]' ? event : JSON.stringify(event)}\n\n`)
+    .join('');
+  return new Response(body, {
+    status: 200,
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
+}
+
 describe('main-owned AI provider runtime', () => {
   beforeEach(() => {
     clearAiProviderSessionCache();
@@ -94,6 +104,108 @@ describe('main-owned AI provider runtime', () => {
       response_format: { type: 'json_object' },
       stream: false,
     });
+  });
+
+  it('streams Gemini SSE chunks and preserves final usage metadata', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse([
+      { candidates: [{ content: { parts: [{ text: 'first' }] } }] },
+      {
+        candidates: [{ content: { parts: [{ text: ' second' }] } }],
+        usageMetadata: { promptTokenCount: 8, candidatesTokenCount: 3, totalTokenCount: 11 },
+      },
+    ]));
+    vi.stubGlobal('fetch', fetchMock);
+    const chunks: string[] = [];
+
+    const result = await runCloudAiRequest({
+      providerId: 'gemini-2.5-flash',
+      apiKey: 'gemini-key',
+      prompt: 'Stream this.',
+      pricing: { inputPerMillionTokens: 1, outputPerMillionTokens: 2 },
+      onTextChunk: (chunk) => {
+        chunks.push(chunk);
+        if (chunk === 'first') throw new Error('observer failure');
+      },
+    });
+
+    expect(chunks).toEqual(['first', ' second']);
+    expect(result).toMatchObject({
+      text: 'first second',
+      delivery: 'streamed',
+      usage: { inputTokens: 8, outputTokens: 3, totalTokens: 11, estimatedCostUsd: 0.000014 },
+    });
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(':streamGenerateContent?alt=sse&key=gemini-key');
+  });
+
+  it('streams DeepSeek deltas and requests final usage', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse([
+      { choices: [{ delta: { content: 'deep' } }], usage: null },
+      { choices: [{ delta: { content: ' seek' } }], usage: null },
+      { choices: [], usage: { prompt_tokens: 4, completion_tokens: 2, total_tokens: 6 } },
+      '[DONE]',
+    ]));
+    vi.stubGlobal('fetch', fetchMock);
+    const chunks: string[] = [];
+
+    const result = await runCloudAiRequest({
+      providerId: 'deepseek-v4-flash',
+      apiKey: 'deepseek-key',
+      prompt: 'Stream this.',
+      onTextChunk: (chunk) => chunks.push(chunk),
+    });
+
+    expect(chunks).toEqual(['deep', ' seek']);
+    expect(result).toMatchObject({
+      text: 'deep seek',
+      delivery: 'streamed',
+      usage: { inputTokens: 4, outputTokens: 2, totalTokens: 6 },
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+  });
+
+  it('does not retry a failed stream after visible text was delivered', async () => {
+    const encoder = new TextEncoder();
+    let reads = 0;
+    const response = {
+      ok: true,
+      status: 200,
+      body: {
+        getReader: () => ({
+          read: async () => {
+            reads += 1;
+            if (reads === 1) {
+              return {
+                done: false,
+                value: encoder.encode(
+                  `data: ${JSON.stringify({ choices: [{ delta: { content: 'visible' } }] })}\n\n`,
+                ),
+              };
+            }
+            throw new Error('stream exploded');
+          },
+        }),
+      },
+    } as unknown as Response;
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal('fetch', fetchMock);
+    const chunks: string[] = [];
+
+    await expect(runCloudAiRequest({
+      providerId: 'deepseek-v4-pro',
+      apiKey: 'key',
+      prompt: 'Stream once.',
+      retryAttempts: 2,
+      retryBaseDelayMs: 0,
+      onTextChunk: (chunk) => chunks.push(chunk),
+    })).rejects.toMatchObject({ code: 'network', retriable: false });
+
+    expect(chunks).toEqual(['visible']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('owns a prompt-safe session cache without repeating the network call', async () => {

@@ -140,6 +140,7 @@ export async function runAgentProviderPrompt(
       pricing: options.pricing,
       signal: options.signal,
       onEvent: options.onCloudEvent,
+      onTextChunk: policy.streaming ? options.onTextChunk : undefined,
     });
     return {
       text: result.text,
@@ -154,7 +155,7 @@ export async function runAgentProviderPrompt(
         result.usage.estimatedCostUsd,
       ),
       usage: result.usage,
-      delivery: 'buffered',
+      delivery: result.delivery,
     };
   } catch (error) {
     if (

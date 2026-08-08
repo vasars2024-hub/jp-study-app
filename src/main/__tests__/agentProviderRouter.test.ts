@@ -64,7 +64,7 @@ describe('Agent provider router', () => {
     });
   });
 
-  it('runs an allowed cloud request without claiming token streaming', async () => {
+  it('reports the delivery mode returned by an allowed cloud request', async () => {
     vi.spyOn(providerRuntime, 'runCloudAiRequest').mockResolvedValue({
       text: 'cloud answer',
       providerId: 'gemini-2.5-flash',
@@ -75,6 +75,7 @@ describe('Agent provider router', () => {
       completedAt: 150,
       attempts: 1,
       cached: false,
+      delivery: 'streamed',
       usage: { inputTokens: 4, outputTokens: 2, totalTokens: 6, estimatedCostUsd: 0.001 },
     });
 
@@ -85,13 +86,49 @@ describe('Agent provider router', () => {
 
     expect(result).toMatchObject({
       text: 'cloud answer',
-      delivery: 'buffered',
+      delivery: 'streamed',
       provider: {
         target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
         cloud: true,
         estimatedCostUsd: 0.001,
       },
     });
+  });
+
+  it('passes the cloud streaming callback only when policy streaming is enabled', async () => {
+    const cloud = vi.spyOn(providerRuntime, 'runCloudAiRequest').mockImplementation(async (request) => {
+      request.onTextChunk?.('cloud');
+      return {
+        text: 'cloud',
+        providerId: 'deepseek-v4-flash',
+        model: 'deepseek-v4-flash',
+        credentialBucket: 'deepseek',
+        inputChars: 6,
+        startedAt: 100,
+        completedAt: 120,
+        attempts: 1,
+        cached: false,
+        delivery: request.onTextChunk ? 'streamed' : 'buffered',
+        usage: {},
+      };
+    });
+    const chunks: string[] = [];
+    const cloudPolicy = policy({
+      target: { kind: 'cloud', providerId: 'deepseek-v4-flash' },
+      allowCloud: true,
+    });
+
+    const streamed = await runAgentProviderPrompt(cloudPolicy, 'Prompt', {
+      onTextChunk: (chunk) => chunks.push(chunk),
+    });
+    const buffered = await runAgentProviderPrompt({ ...cloudPolicy, streaming: false }, 'Prompt', {
+      onTextChunk: (chunk) => chunks.push(chunk),
+    });
+
+    expect(chunks).toEqual(['cloud']);
+    expect(streamed.delivery).toBe('streamed');
+    expect(buffered.delivery).toBe('buffered');
+    expect(cloud).toHaveBeenCalledTimes(2);
   });
 
   it('uses local Qwen for a missing cloud key only when fallback is explicit', async () => {

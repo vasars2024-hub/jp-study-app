@@ -71,6 +71,7 @@ export interface AiProviderRequest {
   cache?: AiProviderCacheMode;
   signal?: AbortSignal;
   onEvent?: (event: AiProviderRuntimeEvent) => void;
+  onTextChunk?: (text: string) => void;
 }
 
 export interface AiProviderResult {
@@ -83,6 +84,7 @@ export interface AiProviderResult {
   completedAt: number;
   attempts: number;
   cached: boolean;
+  delivery: 'streamed' | 'buffered';
   usage: AiProviderUsage;
 }
 
@@ -213,6 +215,14 @@ function emit(request: AiProviderRequest, event: AiProviderRuntimeEvent): void {
   }
 }
 
+function emitTextChunk(request: AiProviderRequest, text: string): void {
+  try {
+    request.onTextChunk?.(text);
+  } catch {
+    // Streaming observers are presentation-only and cannot change execution.
+  }
+}
+
 function responseError(providerId: AiProviderId, status: number): AiProviderRuntimeError {
   const label = providerId === 'gemini-2.5-flash' ? 'Gemini' : 'DeepSeek';
   if (status === 401 || status === 403) {
@@ -282,7 +292,140 @@ async function parseDeepSeekResponse(response: Response, pricing?: AiProviderPri
   };
 }
 
+interface StreamAccumulator {
+  text: string;
+  usage: AiProviderUsage;
+}
+
+async function consumeSse(
+  response: Response,
+  consume: (payload: unknown) => void,
+): Promise<void> {
+  if (!response.body) {
+    throw new AiProviderRuntimeError('AI provider returned an empty stream.', 'invalid-response');
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const consumeEvent = (event: string): boolean => {
+    const data = event
+      .split(/\r?\n/u)
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n')
+      .trim();
+    if (!data) return false;
+    if (data === '[DONE]') return true;
+    try {
+      consume(JSON.parse(data) as unknown);
+    } catch (error) {
+      if (error instanceof AiProviderRuntimeError) throw error;
+      throw new AiProviderRuntimeError('AI provider returned an invalid stream event.', 'invalid-response');
+    }
+    return false;
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const events = buffer.split(/\r?\n\r?\n/u);
+    buffer = events.pop() ?? '';
+    for (const event of events) {
+      if (consumeEvent(event)) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The provider may close the connection immediately after [DONE].
+        }
+        return;
+      }
+    }
+    if (done) break;
+  }
+  if (buffer.trim()) consumeEvent(buffer);
+}
+
+function recordUsage(
+  rawInput: unknown,
+  rawOutput: unknown,
+  rawTotal: unknown,
+  pricing?: AiProviderPricing,
+): AiProviderUsage {
+  const input = typeof rawInput === 'number' && Number.isFinite(rawInput) ? rawInput : undefined;
+  const output = typeof rawOutput === 'number' && Number.isFinite(rawOutput) ? rawOutput : undefined;
+  const total = typeof rawTotal === 'number' && Number.isFinite(rawTotal) ? rawTotal : undefined;
+  return usageWithCost(input, output, total, pricing);
+}
+
+async function parseGeminiStream(
+  response: Response,
+  request: AiProviderRequest,
+): Promise<StreamAccumulator> {
+  let text = '';
+  let usage: AiProviderUsage = {};
+  await consumeSse(response, (payload) => {
+    if (typeof payload !== 'object' || payload === null) {
+      throw new AiProviderRuntimeError('Gemini returned an invalid stream event.', 'invalid-response');
+    }
+    const chunk = payload as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown; totalTokenCount?: unknown };
+    };
+    const delta = chunk.candidates?.[0]?.content?.parts
+      ?.map((part) => typeof part.text === 'string' ? part.text : '')
+      .join('') ?? '';
+    if (delta) {
+      text += delta;
+      emitTextChunk(request, delta);
+    }
+    if (chunk.usageMetadata) {
+      usage = recordUsage(
+        chunk.usageMetadata.promptTokenCount,
+        chunk.usageMetadata.candidatesTokenCount,
+        chunk.usageMetadata.totalTokenCount,
+        request.pricing,
+      );
+    }
+  });
+  if (!text.trim()) throw new AiProviderRuntimeError('Gemini returned an empty response.', 'invalid-response');
+  return { text: text.trim(), usage };
+}
+
+async function parseDeepSeekStream(
+  response: Response,
+  request: AiProviderRequest,
+): Promise<StreamAccumulator> {
+  let text = '';
+  let usage: AiProviderUsage = {};
+  await consumeSse(response, (payload) => {
+    if (typeof payload !== 'object' || payload === null) {
+      throw new AiProviderRuntimeError('DeepSeek returned an invalid stream event.', 'invalid-response');
+    }
+    const chunk = payload as {
+      choices?: Array<{ delta?: { content?: string } }>;
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown } | null;
+    };
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (typeof delta === 'string' && delta) {
+      text += delta;
+      emitTextChunk(request, delta);
+    }
+    if (chunk.usage) {
+      usage = recordUsage(
+        chunk.usage.prompt_tokens,
+        chunk.usage.completion_tokens,
+        chunk.usage.total_tokens,
+        request.pricing,
+      );
+    }
+  });
+  if (!text.trim()) throw new AiProviderRuntimeError('DeepSeek returned an empty response.', 'invalid-response');
+  return { text: text.trim(), usage };
+}
+
 function requestBody(request: AiProviderRequest, model: string, maxOutputTokens: number): { url: string; init: RequestInit } {
+  const streaming = Boolean(request.onTextChunk);
   if (request.providerId === 'gemini-2.5-flash') {
     const generationConfig: Record<string, unknown> = {
       maxOutputTokens,
@@ -293,7 +436,7 @@ function requestBody(request: AiProviderRequest, model: string, maxOutputTokens:
       ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
     };
     return {
-      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:${streaming ? 'streamGenerateContent?alt=sse' : 'generateContent'}`,
       init: {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -322,7 +465,8 @@ function requestBody(request: AiProviderRequest, model: string, maxOutputTokens:
           : {}),
         max_tokens: maxOutputTokens,
         ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-        stream: false,
+        stream: streaming,
+        ...(streaming ? { stream_options: { include_usage: true } } : {}),
       }),
     },
   };
@@ -346,19 +490,34 @@ async function fetchAttempt(
     timedOut = true;
     controller.abort();
   }, timeoutMs);
+  let emittedChunk = false;
+  const requestWithTrackedChunks: AiProviderRequest = request.onTextChunk
+    ? {
+        ...request,
+        onTextChunk: (text) => {
+          emittedChunk = true;
+          emitTextChunk(request, text);
+        },
+      }
+    : request;
   try {
-    const built = requestBody(request, model, maxOutputTokens);
+    const built = requestBody(requestWithTrackedChunks, model, maxOutputTokens);
     const headers = new Headers(built.init.headers);
     if (request.providerId === 'gemini-2.5-flash') {
-      built.url += `?key=${encodeURIComponent(apiKey)}`;
+      built.url += `${built.url.includes('?') ? '&' : '?'}key=${encodeURIComponent(apiKey)}`;
     } else {
       headers.set('Authorization', `Bearer ${apiKey}`);
     }
     const response = await fetch(built.url, { ...built.init, headers, signal: controller.signal });
     if (!response.ok) throw responseError(request.providerId, response.status);
-    return request.providerId === 'gemini-2.5-flash'
+    if (requestWithTrackedChunks.onTextChunk) {
+      return await (request.providerId === 'gemini-2.5-flash'
+        ? parseGeminiStream(response, requestWithTrackedChunks)
+        : parseDeepSeekStream(response, requestWithTrackedChunks));
+    }
+    return await (request.providerId === 'gemini-2.5-flash'
       ? parseGeminiResponse(response, request.pricing)
-      : parseDeepSeekResponse(response, request.pricing);
+      : parseDeepSeekResponse(response, request.pricing));
   } catch (error) {
     if (timedOut) {
       throw new AiProviderRuntimeError(
@@ -370,7 +529,11 @@ async function fetchAttempt(
     if (request.signal?.aborted) {
       throw new AiProviderRuntimeError('AI request was cancelled.', 'cancelled');
     }
-    throw runtimeError(error);
+    const normalized = runtimeError(error);
+    if (emittedChunk && normalized.retriable) {
+      throw new AiProviderRuntimeError(normalized.message, normalized.code, false, normalized.status);
+    }
+    throw normalized;
   } finally {
     clearTimeout(timer);
     request.signal?.removeEventListener('abort', abort);
@@ -439,6 +602,7 @@ export async function runCloudAiRequest(request: AiProviderRequest): Promise<AiP
       completedAt: Date.now(),
       attempts: 0,
       cached: true,
+      delivery: 'buffered',
       usage: cached.usage,
     };
   }
@@ -466,6 +630,7 @@ export async function runCloudAiRequest(request: AiProviderRequest): Promise<AiP
         completedAt: Date.now(),
         attempts,
         cached: false,
+        delivery: request.onTextChunk ? 'streamed' : 'buffered',
         usage: result.usage,
       };
     } catch (error) {
