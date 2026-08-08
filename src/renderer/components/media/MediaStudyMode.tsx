@@ -20,6 +20,7 @@ import {
   startMediaStudySession,
 } from '../../mediaStudyStore';
 import { dispatchMediaStudyAction } from './MediaStudyActions';
+import { handOffToAgent, mediaCueAgentContext } from '../../agentContextHandoff';
 import { openMediaWorkspace, reachMediaWorkspace } from '../../mediaWorkspaceBridge';
 import { useT } from '../../i18n';
 import MediaLanguageProfileCard from './MediaLanguageProfileCard';
@@ -241,6 +242,33 @@ export default function MediaStudyMode({
     }
     void openInPlayer(item, start, say);
   };
+  /**
+   * Hands one subtitle line to the Agent as session-only context.
+   *
+   * The scene travelling as the preview is bounded to the line and its immediate
+   * neighbours. A subtitle is one turn of a dialogue and rarely says enough on
+   * its own, but a control that says "this line" must not hand over the
+   * transcript — the reader producer learned that live, where a button labelled
+   * "this paragraph" sent the whole chapter.
+   *
+   * The conversation is titled from the **media item**, never from the line. A
+   * title is persisted, and `media-cue` is refused retention exactly so the line
+   * never reaches disk; titling with it would write it there anyway through the
+   * neighbouring field.
+   */
+  const askAgentAboutLine = (index: number): void => {
+    const sentences = analysis?.sentences ?? [];
+    const line = sentences[index];
+    if (!line) return;
+    void handOffToAgent(
+      mediaCueAgentContext(
+        line.text,
+        sentences.slice(Math.max(0, index - 1), index + 2).map((entry) => entry.text).join(' '),
+        item.id,
+      ),
+      t('agent.conversation.fromMedia', { label: item.title }),
+    );
+  };
   const createFlashcards = (): void => {
     if (!analysis) return;
     const added = addMediaStudyFlashcards(item, analysis);
@@ -337,6 +365,15 @@ export default function MediaStudyMode({
                 <button type="button" onClick={() => openSentence(sentence.start)}>
                   <time>{formatCueTime(sentence.start)}</time>
                   <span>{sentence.text}</span>
+                </button>
+                <button
+                  type="button"
+                  className="media-study-ask-agent"
+                  title={t('media.study.askAgentLine')}
+                  aria-label={t('media.study.askAgentLine')}
+                  onClick={() => askAgentAboutLine(index)}
+                >
+                  {t('media.study.askAgentLine')}
                 </button>
               </li>
             ))}

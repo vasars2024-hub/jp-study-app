@@ -38,6 +38,7 @@ import {
   attachAgentContextFromSurface,
   dictionaryAgentContext,
   handOffToAgent,
+  mediaCueAgentContext,
   openAgentSurface,
   readingPassageAgentContext,
   selectedTextAgentContext,
@@ -337,5 +338,110 @@ describe('reader selection as session-only context', () => {
     )).toBe('attached');
     expect(opened()).toEqual(['agent']);
     expect(workspace.saves).toHaveLength(1);
+  });
+});
+
+describe('media cue as session-only context', () => {
+  const LINE = '行ってきます';
+  const SCENE = 'もう八時だよ 行ってきます 気をつけてね';
+
+  it('builds a session-only item that asks for no retention', () => {
+    const item = createAgentContextItem(mediaCueAgentContext(LINE, SCENE, 'ep-3', NOW));
+    expect(item).toMatchObject({
+      kind: 'media-cue',
+      label: LINE,
+      preview: SCENE,
+      // `media-cue` floors at `personal` exactly like the two reader producers:
+      // what someone is watching is their own material, not reference data.
+      sensitivity: 'personal',
+      retained: false,
+      source: { app: 'media', entityId: 'ep-3' },
+    });
+  });
+
+  it('is dropped by the persistence filter, so a subtitle never reaches disk', () => {
+    const item = createAgentContextItem(mediaCueAgentContext(LINE, SCENE, 'ep-3', NOW));
+    const persisted = prepareAgentWorkspaceForPersistence({
+      version: 1,
+      activeConversationId: 'c1',
+      conversations: [{
+        id: 'c1',
+        title: 'Watching',
+        mode: 'ask',
+        createdAt: NOW,
+        updatedAt: NOW,
+        context: [item],
+        messages: [],
+      }],
+    });
+    expect(persisted.conversations[0].context).toEqual([]);
+  });
+
+  it('collapses the hard line breaks cue formats carry, so a rewind is one entry', () => {
+    // SRT and ASS wrap a single spoken line across two rows and the renderer folds
+    // that away, so the visible line and the raw cue differ by whitespace alone.
+    // Without collapsing, asking about the same subtitle after a rewind would sit
+    // on the shelf twice and look like two different lines.
+    const wrapped = createAgentContextItem(mediaCueAgentContext('行って\nきます', SCENE, 'ep-3', NOW));
+    const folded = createAgentContextItem(mediaCueAgentContext('行って きます', SCENE, 'ep-3', NOW + 9_000));
+    expect(wrapped?.id).toBe(folded?.id);
+  });
+
+  it('falls back to the line when the scene is empty, and never to an empty preview', () => {
+    expect(createAgentContextItem(mediaCueAgentContext(LINE, '   ', 'ep-3', NOW))?.preview).toBe(LINE);
+  });
+
+  it('does not collide with a reader item taken from the same text', () => {
+    const cue = createAgentContextItem(mediaCueAgentContext(LINE, SCENE, 'ep-3', NOW));
+    const read = createAgentContextItem(selectedTextAgentContext(LINE, SCENE, 'book-7', NOW));
+    expect(cue?.id).not.toBe(read?.id);
+    expect(cue?.id.startsWith('media-cue:')).toBe(true);
+  });
+
+  it('titles the media conversation from the item, never from the subtitle line', () => {
+    // The same rule the reader producer had to be corrected on, pinned here before
+    // it can be broken rather than after. A conversation title IS persisted, and
+    // `media-cue` is refused retention precisely so the line stays off disk —
+    // titling the conversation with it would write it there through the
+    // neighbouring field, defeating the refusal.
+    const source = readFileSync(
+      resolve(__dirname, '..', 'components', 'media', 'MediaStudyMode.tsx'),
+      'utf8',
+    );
+    const calls = [...source.matchAll(/t\('agent\.conversation\.fromMedia',\s*\{\s*label:\s*([^}]+?)\s*\}/g)]
+      .map((match) => match[1].trim());
+    expect(calls.length).toBeGreaterThan(0);
+    for (const argument of calls) {
+      expect(argument).toBe('item.title');
+      expect(argument).not.toMatch(/line|sentence|cue|text/i);
+    }
+  });
+
+  it('bounds the scene to the neighbouring lines, not the whole transcript', () => {
+    // The scope the label promises must be the scope delivered: the control says
+    // "this line", so the preview may carry the turns around it and nothing more.
+    // The reader producer shipped this bug — `.novel-content` as a fallback block
+    // sent 1,684 characters for a six-character selection — so the call site's
+    // slice is asserted on the source rather than trusted.
+    const source = readFileSync(
+      resolve(__dirname, '..', 'components', 'media', 'MediaStudyMode.tsx'),
+      'utf8',
+    );
+    expect(source).toMatch(/slice\(Math\.max\(0,\s*index - 1\),\s*index \+ 2\)/);
+    // ...and never the unbounded join that would send every analyzed sentence.
+    expect(source).not.toMatch(/sentences\.map\(\(entry\) => entry\.text\)\.join/);
+  });
+
+  it('attaches the line and then opens the Agent', async () => {
+    expect(await handOffToAgent(
+      mediaCueAgentContext(LINE, SCENE, 'ep-3', NOW),
+      'Watching: My Show',
+    )).toBe('attached');
+    expect(opened()).toEqual(['agent']);
+    const saved = workspace.saves[0] as {
+      conversations: Array<{ title: string; context: Array<{ id: string }> }>;
+    };
+    expect(saved.conversations[0].title).toBe('Watching: My Show');
+    expect(saved.conversations[0].context[0].id).toBe(`media-cue:${LINE}`);
   });
 });

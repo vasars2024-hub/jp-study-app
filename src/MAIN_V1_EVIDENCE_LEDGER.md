@@ -1145,18 +1145,100 @@ and `merge` can truncate — 60 retained plus 100 session collapses to 100, and
 saving that view back replaces the session list with the 40 that survived, bounded
 in practice only by `AGENT_CONTEXT_SHELF_LIMIT = 12`.
 
+## The media-cue producer, and the player surface it could not use
+
+`mediaCueAgentContext` completes the transport's producer list: a subtitle line
+handed to the Agent as session-only context. It follows `selectedTextAgentContext`
+exactly — `media-cue` floors at `personal`, so there is **no `retained`** and none
+is asked for, and the line reaches the shelf and the prompt through
+`main/agentSessionContext.ts` without touching disk. `identity` collapses
+whitespace before keying, which matters more here than in a reader: SRT and ASS
+wrap one spoken line across two rows, so the visible line and the raw cue differ by
+whitespace alone and a rewind would otherwise shelve the same subtitle twice.
+
+**The call site is not the player, and that is the finding.** The intended home was
+the live active cue. Two things blocked it, both verified rather than assumed:
+
+1. **`MediaState.active` is permanently `null` app-wide.** It is computed by a
+   cue-sync effect that returns immediately on `if (!v || !src)`, where `v` is
+   `videoRef.current` — and **nothing in the tree attaches `videoRef` to any
+   element**. The codebase already says so in two places
+   (`keyboardShortcuts.ts:554`: "Slice 16 deleted the component that rendered
+   `<video ref={videoRef}>`"; `VideoCoreStudyOverlay.tsx:1243`), but nobody
+   followed the consequence downstream: `MediaStudyMode`'s `activeCue` prop is
+   dead, and `MediaStudyAssistantPanel`'s `sentence={activeCue?.text ?? …}` has
+   always been silently taking its fallback. A control gated on `activeCue` would
+   have been unreachable in the embedding people actually use — exactly the check
+   this producer inherited from the reader work, and it fired.
+2. **The player's own cue controls have left the committable tree.**
+   `VideoCoreStudyOverlay.tsx` does have a live `activeCue` (from the VideoCore
+   manager, not the dead ref), and at HEAD it carries the sibling control this
+   button belongs beside — "translate this line", HEAD line 1832. But the working
+   tree has moved that whole region into `AiWorkspaceBlock`, in
+   `src/media/StudyBlocks.tsx`, which is **untracked**, one of **12 untracked
+   files plus 9 modified** making up the in-flight study-workspace block track.
+   The overlay's render section is rewritten wholesale (`-243`, `-211`, `+399`
+   lines); the transport row `data-study-action="previous-cue"` no longer exists
+   in the working tree at all. Adding the button there could not be committed
+   without absorbing another track's unfinished work, and a HEAD-scoped hunk
+   referencing `AiWorkspaceBlock` would commit a file that does not compile.
+
+So the producer is wired where a real subtitle line is both **visible and
+committable**: the `review-sentences` list in `MediaStudyMode`, which renders
+`analysis.sentences` built from the genuinely-loaded `state.cues`, in the same
+desktop window that hosts the Agent — `openAgentSurface()` dispatches `os:open`
+into `AppSection`, and `MediaCenterView` and the Agent are both sections of it.
+The route in is real: a library tile dispatches the study action, `MediaCenterView`
+opens the Study tab on `MEDIA_STUDY_EVENT`.
+
+Both remaining reader checks are enforced by tests that were confirmed to bite:
+
+- **No neighbouring persisted field carries what the item is refused.** The
+  conversation is titled `t('agent.conversation.fromMedia', { label: item.title })`
+  — the media item, never the line. A title *is* persisted, and `media-cue` is
+  refused retention precisely so the subtitle stays off disk; titling with it would
+  write it there anyway. Pinned by a source-level assertion, the same technique the
+  reader title fix ended up needing after review.
+- **The scope the label promises is the scope delivered.** The button says "this
+  line"; the preview carries that line and its two immediate neighbours, bounded by
+  `slice(Math.max(0, index - 1), index + 2)`. The reader producer shipped the
+  opposite bug live — "this paragraph" sending 1,684 characters of whole chapter —
+  so the slice is asserted on the source, together with a negative assertion
+  against the unbounded `sentences.map(…).join` that would send every analyzed
+  sentence.
+
+Canary evidence for both: reverting the title to `line.text` fails exactly one
+test; replacing the bounded slice with the whole-transcript join fails exactly one
+test. `MediaStudyMode.tsx` was restored byte-for-byte after each.
+
+Automated evidence: 459 files (458 passed, 1 skipped) and 6,067 tests (6,061
+passed, 6 skipped), 0 failed — **+8** against 6,059, reconciling with the 8 added.
+`i18n-missing-key-check`, `i18n-check` and `architecture-audit` all exit 0 (the
+audit reporting nothing new for the `MediaStudyMode → agentContextHandoff` edge);
+`eslint` exit 0 over the seven slice paths. Two keys per catalog in all four
+languages.
+
 ## Exact next slice
 
-One producer remains from the transport's list: a **media cue** — a subtitle line
-handing off from the player. It follows `selectedTextAgentContext` exactly, and it
-wants the three checks this reader work turned up: the control must be reachable in
-the embedding people actually use, no neighbouring persisted field may carry what
-the item is refused, and the scope the label promises must be the scope delivered.
-Note that its likely home (`MediaStudyMode` / `StudyOrchestratorWorkspace`) belongs
-to the active study-mode track, so check `src/.coordination/study-mode/` before
-editing. Then the remaining Track 3 surface: modes as workflow presets,
-attachments, history search and interactive result cards — and when cards get a
-producer, extend `retainedMessage`'s prune list first.
+**The player call site, once the study-workspace block track lands.** The producer
+and its i18n keys are already in place, so that slice is one button beside
+"translate this line" in `AiWorkspaceBlock`, plus the scene built from the
+overlay's own neighbouring cues rather than from `analysis.sentences`. It is
+blocked only on `src/media/`'s 12 untracked files being committed; nothing about
+the transport needs to change. Re-check `src/.coordination/study-mode/` first — its
+`state.json` still reads `SM-032` on branch `grammarx/phase-1-5`, last updated
+2026-07-30.
+
+**Worth fixing on the way, and owned by that track rather than this one:** the dead
+`videoRef` above. Either something must render `<video ref={videoRef}>` again or
+`MediaState.active`, `MediaStudyMode`'s `activeCue` prop and
+`MediaStudyAssistantPanel`'s `sentence` fallback should stop pretending to a live
+cue they never receive. Recorded here rather than fixed — the two files that would
+change are the other track's.
+
+Then the remaining Track 3 surface: modes as workflow presets, attachments, history
+search and interactive result cards — and when cards get a producer, extend
+`retainedMessage`'s prune list first.
 
 Still open and deliberately deferred: `localAgentProfilesStore` and
 `localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct

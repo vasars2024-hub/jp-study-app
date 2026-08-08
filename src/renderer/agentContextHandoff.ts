@@ -202,4 +202,43 @@ export function readingPassageAgentContext(
   };
 }
 
+/**
+ * A subtitle line's shape of the gesture — what someone is *watching* rather
+ * than reading, and the last producer on the transport's list.
+ *
+ * Same session-only lifetime as the two reader producers, for the same reason:
+ * `media-cue` floors at `personal`, so `createAgentContextItem` refuses
+ * retention and this does not ask for it. The line reaches the shelf and the
+ * prompt through `main/agentSessionContext.ts` and never touches disk.
+ *
+ * `identity` is the line itself with its whitespace collapsed, so asking about
+ * the same subtitle twice — after a rewind, say — is one shelf entry rather
+ * than two. Collapsing matters more here than in a reader: cue text arrives
+ * from SRT/ASS with hard line breaks the renderer folds away, so the visible
+ * line and the raw line differ by whitespace alone.
+ *
+ * `scene` is the preview, and it is the caller's job to keep it *bounded*. A
+ * line on its own is a poor prompt — a subtitle is one turn of a dialogue and
+ * often unintelligible without the turns around it — but "this line" must not
+ * become "this episode". The reader producer learned that the expensive way,
+ * where a control labelled "this paragraph" handed over the whole chapter.
+ */
+export function mediaCueAgentContext(
+  cue: string,
+  scene: string,
+  mediaId?: string,
+  now = Date.now(),
+): AgentContextInput {
+  const line = cue.trim().replace(/\s+/g, ' ');
+  return {
+    kind: 'media-cue',
+    // One line on the shelf, matching the selection producer's budget.
+    label: line.slice(0, 80),
+    preview: scene.trim().replace(/\s+/g, ' ') || line,
+    source: { app: 'media', ...(mediaId ? { entityId: mediaId } : {}) },
+    identity: line,
+    now,
+  };
+}
+
 export type { AgentContextItem };
