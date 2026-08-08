@@ -19,11 +19,11 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 
 | Requirement | Starting status | Evidence / ownership | Next dependency |
 | --- | --- | --- | --- |
-| Encrypted credential vault and provider migration | Two path-scoped checkpoints implemented; focused tests passed | Jiten, Gemini, DeepSeek, Jimaku, OpenSubtitles and MAL OAuth secrets now use `src/main/credentials/*`; shared Settings wiring remains in the protected dirty tree | Reconcile scraper credential references without absorbing unrelated `main.ts` / preload work |
+| Encrypted credential vault and provider migration | Three path-scoped checkpoints implemented; focused and full suites passed | Jiten, Gemini, DeepSeek, Jimaku, OpenSubtitles, MAL OAuth and dynamic scraper references now use `src/main/credentials/*`; shared Settings wiring remains in the protected dirty tree | Build the structured provider runtime without absorbing unrelated `main.ts` / preload work |
 | Gemini / DeepSeek credentials | Broken security policy: separate store could downgrade to plaintext | Clean-at-HEAD `src/main/mining.ts` explicitly wrote plaintext when `safeStorage` was unavailable | Completed in first slice; provider health/client unification remains |
 | Jimaku / OpenSubtitles credentials | Broken security policy: separate unmarked store could downgrade to plaintext | Clean-at-HEAD `src/main/subtitleProviderClients.ts` | Completed in first slice; retain provider-specific Test calls backed by shared status metadata |
 | Professional Lexicon core | Partially implemented, automated foundation verified | SQLite/FTS service plus Yomitan, CEDICT and Tatoeba code; dictionary focused suite passed. Dictionary and Translate are still separate `AppSection` routes | Audit service adoption/migrations, then build compatibility aliases into one Workbench |
-| Central AI Agent | Partially implemented foundation; first-class app genuinely missing | Typed tools, runtime, profiles, memory, knowledge, queue, scheduler and Study handlers exist. `AppSection.tsx` has no Agent route or surface | Define central context/conversation contracts after credential/provider foundation |
+| Central AI Agent | Read-only consolidation audit complete; first-class app genuinely missing | Typed tools/runtime exist, but the only functional Agent panel is Blanc-owned; persistence and handlers remain renderer-owned and there is no durable conversation/context handoff | Shared workspace contracts are frozen; provider runtime and main-owned persistence precede shell routing |
 | Unified Reading workspace | Partial and collision-prone | Reading Finder and Novels remain separate routed components; both are already modified in the dirty tree | Defer until ownership reconciliation after shared foundations |
 | ReadingLens Capture and Read | Partial | Main capture service, overlay, settings and tests exist; source still presents an overlay rather than the complete three-depth workflow | Defer until Lexicon + Reading contracts exist |
 | Media shell / Liquid | Implemented in several layers but live release state still needs a dedicated regression audit | Mature Media shell/workspace components exist and many paths are already modified; live Electron session restored but Media was not changed in this slice | Independent post-foundation audit, serialized live verification |
@@ -115,6 +115,34 @@ Automated evidence:
 - `eslint` on the changed scraper credential and focused test paths: pass.
 - `git diff --check` on the slice: pass (line-ending notices only).
 
+## Luna Agent consolidation audit
+
+The exact Luna Max read-only audit changed no files and made no commit. It confirmed:
+
+- The local GGUF planner, typed operation registry, permissions, profiles, task lifecycle, memory, knowledge, queue, automations and scheduler are real foundations, not a first-class chat app.
+- Blanc owns the only functional Agent panel and most adapters. Queue, memory, profiles and automations are renderer/localStorage-owned; scheduler triggers are broadcast to windows.
+- Cloud AI clients are split between `aiProviderClient.ts` and a duplicate translation client; local Qwen translation and the local Agent maintain separate llama runtime semantics.
+- There is no persistent conversation/message model, context shelf, attachment/provenance model, result-card effect contract or reliable cross-window contextual handoff.
+- `agent` is absent from the shared desktop section union, `AppSection`, popout allowlists, desktop catalog, Command Palette and shortcut catalog.
+- Declared operations exceed implemented adapters; route work must follow shared contracts, provider service, main-owned persistence and a central handler registry.
+
+The source-derived implementation order is: contracts -> provider/runtime service -> main-owned persistence -> central handler registry -> first-class route -> contextual handoffs -> help/automation -> grounded knowledge expansion. Shell routing must preserve the desktop grid, taskbar/focus behavior, popout deduplication and dragging layer.
+
+## Slice 4 — versioned Agent workspace contracts
+
+New shared contracts now define:
+
+- versioned conversations, messages, modes, attachments and provenance-bearing context shelf items;
+- explicit local/cloud provider targets, cloud and sensitive-context consent, input/output budgets, cache/retry/timeout/streaming policy and provider disclosure metadata;
+- safe result-card effects for navigation, context opening, step approval, undo and save;
+- bounded persistence normalization that rejects future schemas, malformed nested data, unknown providers and arbitrary persisted effects;
+- a privacy decision boundary that refuses cloud-disabled, undisclosed-sensitive and over-budget requests instead of silently crossing or truncating the boundary.
+
+Automated evidence:
+
+- Focused Agent workspace and existing permission/queue suites: 3 files / 26 tests passed.
+- `eslint` and `git diff --check` on the new shared contract paths: pass.
+
 ## Exact next slice
 
-Define the shared provider runtime contract for health, model selection, budgets/costs, caching, cancellation, streaming, retries and privacy, then reconcile it with the Agent audit before opening any Agent-owned implementation paths.
+Implement the main-owned provider runtime behind these contracts: credential lookup, provider health, model selection, retry/cancellation, usage/cost and budget reporting, cache ownership, streaming events and honest local-Qwen fallback. Preserve translation batch/concurrency/temperature/progress behavior behind golden compatibility tests before removing its duplicate client.
