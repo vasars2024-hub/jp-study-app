@@ -1,0 +1,153 @@
+// @vitest-environment node
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { emptyAgentWorkspaceState } from '../../shared/agentWorkspace';
+import {
+  createAgentWorkspaceStore,
+  prepareAgentWorkspaceForPersistence,
+  type AgentWorkspaceStore,
+} from '../agentWorkspaceStore';
+
+let root = '';
+let store: AgentWorkspaceStore;
+
+function document() {
+  return {
+    version: 1,
+    activeConversationId: 'chat-1',
+    conversations: [{
+      id: 'chat-1',
+      title: 'Retained chat',
+      mode: 'study',
+      createdAt: 100,
+      updatedAt: 200,
+      context: [{
+        id: 'ctx-keep',
+        kind: 'reading-passage',
+        label: 'Retained passage',
+        preview: '保存する',
+        source: { app: 'reading' },
+        sensitivity: 'ordinary',
+        retained: true,
+        createdAt: 100,
+      }, {
+        id: 'ctx-session',
+        kind: 'selected-text',
+        label: 'Session only',
+        preview: '秘密',
+        source: { app: 'reading' },
+        sensitivity: 'sensitive',
+        retained: false,
+        createdAt: 100,
+      }],
+      messages: [{
+        id: 'message-1',
+        conversationId: 'chat-1',
+        role: 'user',
+        status: 'complete',
+        text: 'Explain this.',
+        createdAt: 100,
+        updatedAt: 100,
+        contextIds: ['ctx-keep', 'ctx-session'],
+        attachments: [{
+          id: 'file-keep',
+          kind: 'document',
+          name: 'retained.txt',
+          sensitivity: 'ordinary',
+          retained: true,
+        }, {
+          id: 'file-session',
+          kind: 'image',
+          name: 'session.png',
+          sensitivity: 'sensitive',
+          retained: false,
+        }],
+        cards: [{
+          id: 'card-1',
+          kind: 'reading',
+          title: 'Reading result',
+          sourceContextIds: ['ctx-keep', 'ctx-session'],
+          actions: [{
+            id: 'open-session-context',
+            label: 'Open',
+            effect: { type: 'open-context', contextId: 'ctx-session' },
+          }],
+        }],
+        provider: {
+          target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+          cloud: true,
+          contextIds: ['ctx-keep', 'ctx-session'],
+          attachmentIds: ['file-keep', 'file-session'],
+          inputChars: 50,
+          startedAt: 100,
+        },
+      }],
+    }, {
+      id: 'chat-2',
+      title: 'Second chat',
+      mode: 'ask',
+      createdAt: 300,
+      updatedAt: 300,
+      context: [],
+      messages: [],
+    }],
+  };
+}
+
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-workspace-store-'));
+  store = createAgentWorkspaceStore(root);
+});
+
+afterEach(() => {
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+describe('main-owned Agent workspace store', () => {
+  it('starts empty for missing, corrupt, or future documents', () => {
+    expect(store.read()).toEqual(emptyAgentWorkspaceState());
+    fs.mkdirSync(path.dirname(store.filePath), { recursive: true });
+    fs.writeFileSync(store.filePath, '{bad json', 'utf8');
+    expect(store.read()).toEqual(emptyAgentWorkspaceState());
+    fs.writeFileSync(store.filePath, JSON.stringify({ version: 99, conversations: [] }), 'utf8');
+    expect(store.read()).toEqual(emptyAgentWorkspaceState());
+  });
+
+  it('atomically writes normalized state and leaves no temporary file', () => {
+    const saved = store.write(document());
+    expect(saved.activeConversationId).toBe('chat-1');
+    expect(store.read()).toEqual(saved);
+    expect(fs.existsSync(store.filePath)).toBe(true);
+    expect(fs.readdirSync(path.dirname(store.filePath))).toEqual(['workspace-v1.json']);
+  });
+
+  it('never persists session-only context, attachments, or dangling references', () => {
+    const persisted = prepareAgentWorkspaceForPersistence(document());
+    const conversation = persisted.conversations[0];
+    const message = conversation.messages[0];
+
+    expect(conversation.context.map((item) => item.id)).toEqual(['ctx-keep']);
+    expect(message.contextIds).toEqual(['ctx-keep']);
+    expect(message.attachments.map((item) => item.id)).toEqual(['file-keep']);
+    expect(message.cards[0].sourceContextIds).toEqual(['ctx-keep']);
+    expect(message.cards[0].actions).toEqual([]);
+    expect(message.provider).toMatchObject({
+      contextIds: ['ctx-keep'],
+      attachmentIds: ['file-keep'],
+    });
+  });
+
+  it('deletes an active conversation safely and can clear all history', () => {
+    store.write(document());
+    const afterDelete = store.deleteConversation('chat-1');
+    expect(afterDelete.conversations.map((item) => item.id)).toEqual(['chat-2']);
+    expect(afterDelete.activeConversationId).toBe('chat-2');
+    expect(store.read()).toEqual(afterDelete);
+
+    expect(store.clear()).toEqual(emptyAgentWorkspaceState());
+    expect(store.read()).toEqual(emptyAgentWorkspaceState());
+  });
+});

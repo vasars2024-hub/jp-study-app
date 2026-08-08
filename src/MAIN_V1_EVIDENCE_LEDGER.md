@@ -23,7 +23,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 | Gemini / DeepSeek credentials | Broken security policy: separate store could downgrade to plaintext | Clean-at-HEAD `src/main/mining.ts` explicitly wrote plaintext when `safeStorage` was unavailable | Completed in first slice; provider health/client unification remains |
 | Jimaku / OpenSubtitles credentials | Broken security policy: separate unmarked store could downgrade to plaintext | Clean-at-HEAD `src/main/subtitleProviderClients.ts` | Completed in first slice; retain provider-specific Test calls backed by shared status metadata |
 | Professional Lexicon core | SQLite/FTS adoption and Workbench compatibility foundation integrated | Canonical lookup now bridges into the existing `DictResult` surface with legacy fallback and pitch/frequency preservation; route aliases and input-scale contracts exist, while Dictionary and Translate remain separate UI routes | Adopt the contracts in a first-class Workbench shell after dirty route ownership is reconciled |
-| Central AI Agent | Read-only consolidation audit and first provider-runtime slice complete; first-class app genuinely missing | Typed tools/runtime and shared workspace contracts now have one cloud request boundary, but persistence and handlers remain renderer-owned and there is no durable conversation/context handoff | Complete local/stream/persistent-cache adapters, then main-owned conversation persistence |
+| Central AI Agent | Provider runtime and atomic main-owned workspace store foundations complete; first-class app genuinely missing | Typed tools/runtime and shared contracts now have one cloud boundary plus retention-aware disk persistence, but shell/bridge handlers remain absent and the old queue/memory implementations remain renderer-owned | Complete local/stream adapters, then wire store IPC only with the first consuming Agent shell |
 | Unified Reading workspace | Partial and collision-prone | Reading Finder and Novels remain separate routed components; both are already modified in the dirty tree | Defer until ownership reconciliation after shared foundations |
 | ReadingLens Capture and Read | Partial | Main capture service, overlay, settings and tests exist; source still presents an overlay rather than the complete three-depth workflow | Defer until Lexicon + Reading contracts exist |
 | Media shell / Liquid | Main-tree Media shell repair reviewed and integrated; Liquid remains deliberately unverified | Player, Video and Music now route through the shared shell while local library, global search, discovery and explicit Seanime handoff remain reachable | Keep Liquid verification serialized and separate from the completed shell repair |
@@ -215,6 +215,27 @@ Automated evidence:
 - Targeted ESLint: no errors; seven existing `any` warnings remain in `dictionary.ts`.
 - Electron verification remains deferred until a Workbench route exists; this slice has no new UI to verify honestly.
 
+## Slice 6 — main-owned Agent workspace persistence
+
+Behavior now established:
+
+- The versioned Agent workspace has one atomic main-process JSON store under the application user-data root, with bounded normalization on every read and write.
+- Missing, corrupt and future-version documents fail closed to an empty versioned workspace.
+- Context and attachments marked `retained: false` never cross a process restart. Their message/provider/card references and `open-context` actions are pruned with them, preventing restored conversations from exposing dangling or session-only data.
+- Deleting the active conversation selects the next retained conversation deterministically; clearing history writes the canonical empty state.
+- The store is exported from the production local-Agent main boundary. IPC handlers were deliberately not registered yet: the architecture gate rejected channels without a renderer consumer, and the dirty preload bridge remains outside this slice.
+
+Automated evidence:
+
+- Focused workspace-store and shared Agent contract suites: 2 files / 13 tests passed.
+- Architecture baseline: pass; no dead IPC and no test-only module.
+- Targeted ESLint and `git diff --check`: pass.
+
+Remaining boundary:
+
+- The first Agent shell must add typed preload/renderer consumers in the same checkpoint as `get/save/delete/clear` handlers so the bridge never contains dead or phantom channels.
+- Conversation history is local application data, not a credential. Session-only sensitive context is excluded by retention policy; an explicit encrypted-history mode remains a future privacy feature rather than an implicit claim in this store.
+
 ## Exact next slice
 
-Finish the provider adapters with honest local-Qwen selection, token streaming and privacy-reviewed persistent caching, then add versioned main-owned conversation persistence behind `agentWorkspace.ts`. Do not route the first-class Agent shell until both boundaries have focused migration and cancellation tests.
+Finish the provider adapters with honest local-Qwen selection and token streaming, then wire the versioned store and first consuming Agent shell together with typed bridge methods. Persistent response caching remains refused until encrypted retention is designed. Do not add bridge channels without their consumers.

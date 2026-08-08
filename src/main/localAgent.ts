@@ -13,6 +13,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
+export { getAgentWorkspaceStore } from './agentWorkspaceStore';
 
 const KNOWN_MODEL_FILENAMES = ['Qwen3-1.7B.gguf', 'Qwen_Qwen3-1.7B-Q4_K_M.gguf', 'Qwen3-1.7B-Q4_K_M.gguf', 'Qwen3-8B.gguf', 'Qwen3-14B.gguf', 'Qwen3-32B.gguf'];
 const PLAN_TIMEOUT_MS = 90_000;
