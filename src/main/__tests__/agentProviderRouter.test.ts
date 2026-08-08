@@ -41,7 +41,10 @@ afterEach(() => {
 describe('Agent provider router', () => {
   it('streams an explicitly local request through Qwen and discloses the real target', async () => {
     const chunks: string[] = [];
-    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (_prompt, options) => {
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (routedPrompt, options) => {
+      expect(routedPrompt).toContain('Explain this.');
+      expect(routedPrompt).toContain('[Context 1: Passage]');
+      expect(routedPrompt).toContain('短い文');
       options?.onTextChunk?.('first');
       options?.onTextChunk?.(' second');
       return 'first second';

@@ -13,6 +13,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
+import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
 export { runAgentProviderPrompt } from './agentProviderRouter';
@@ -270,6 +271,7 @@ export function registerLocalAgentIpc(): void {
   // boot, so the store's four channels arrive without touching the shared entry
   // point another track is mid-rewrite on.
   registerAgentWorkspaceIpc();
+  registerAgentExecutionIpc();
 }
 
 export function stopLocalAgentRuntime(): void {

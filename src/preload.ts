@@ -69,6 +69,12 @@ import type {
 } from './shared/mining';
 import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from './shared/localAgentRuntime';
 import type { AgentAutomation } from './shared/localAgentAutomation';
+import type {
+  AgentExecutionEvent,
+  AgentExecutionRequest,
+  AgentExecutionResult,
+  AgentExecutionCancelResult,
+} from './shared/agentExecutionBridge';
 import type { AgentWorkspaceState } from './shared/agentWorkspace';
 import type { AgentWorkspaceResult } from './shared/agentWorkspaceBridge';
 import type {
@@ -1325,6 +1331,15 @@ const api = {
     ipcRenderer.invoke('agentWorkspace:deleteConversation', conversationId),
   agentWorkspaceClear: (): Promise<AgentWorkspaceResult> =>
     ipcRenderer.invoke('agentWorkspace:clear'),
+  agentExecutionRun: (request: AgentExecutionRequest): Promise<AgentExecutionResult> =>
+    ipcRenderer.invoke('agentExecution:run', request),
+  agentExecutionCancel: (requestId: string): Promise<AgentExecutionCancelResult> =>
+    ipcRenderer.invoke('agentExecution:cancel', requestId),
+  onAgentExecutionEvent: (cb: (event: AgentExecutionEvent) => void): (() => void) => {
+    const handler = (_event: unknown, payload: AgentExecutionEvent): void => cb(payload);
+    ipcRenderer.on('agentExecution:event', handler);
+    return () => ipcRenderer.removeListener('agentExecution:event', handler);
+  },
   aiSetApiKey: (
     payload: string | { provider?: AiProviderKeyBucket; apiKey?: string },
   ): Promise<{

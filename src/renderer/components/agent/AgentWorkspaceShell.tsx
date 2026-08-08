@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FormEvent,
   type KeyboardEvent as RKeyboardEvent,
 } from 'react';
 import Icon from '../Icons';
@@ -14,6 +15,12 @@ import {
   type AgentMessage,
   type AgentWorkspaceState,
 } from '../../../shared/agentWorkspace';
+import type { AiProviderId } from '../../../shared/aiProviders';
+import {
+  defaultAgentExecutionPolicy,
+  type AgentExecutionFailureCode,
+  type AgentExecutionRequest,
+} from '../../../shared/agentExecutionBridge';
 import type {
   AgentWorkspaceFailureCode,
   AgentWorkspaceResult,
@@ -24,6 +31,10 @@ import {
   loadAgentWorkspace,
   saveAgentWorkspace,
 } from '../../agentWorkspaceClient';
+import {
+  cancelAgentPrompt,
+  executeAgentPrompt,
+} from '../../agentExecutionClient';
 import {
   agentContextDisclosure,
   agentConversationSummaries,
@@ -45,22 +56,74 @@ import './agent.css';
  * one store; this window keeps no copy of its own, which is exactly what the
  * older renderer/localStorage-owned Agent stores could not say.
  *
- * What it deliberately is not, in this slice: a place to run a prompt. The
- * provider router lives in main with no bridge of its own, so there is no
- * composer here rather than a composer that cannot send — the canvas says so in
- * as many words. Result-card actions render as a count for the same reason: a
- * button that does nothing is worse than an honest label.
+ * Prompt execution crosses the typed Agent execution bridge into the existing
+ * privacy-gated provider router. Streaming is presentation-only until the main
+ * process commits the final message to the same workspace store.
  *
  * No decorative emoji and no giant internal window title. The rail's heading is
  * a section label; the taskbar already says which app this is.
  */
 
 const VISIBLE_MESSAGE_LIMIT = 200;
+type AgentTargetChoice = 'local' | AiProviderId;
+
+const EXECUTION_ERROR_CODES = new Set<AgentExecutionFailureCode>([
+  'invalid-request',
+  'conversation-not-found',
+  'busy',
+  'store-failed',
+  'cancelled',
+  'timeout',
+  'missing-credential',
+  'persistent-cache-unavailable',
+  'cloud-disabled',
+  'sensitive-context',
+  'input-budget',
+  'cost-budget',
+  'authentication',
+  'rate-limit',
+  'upstream',
+  'network',
+  'invalid-response',
+  'provider-failed',
+  'bridge-unavailable',
+]);
+
+function executionErrorKey(code: AgentExecutionFailureCode): string {
+  if (code === 'busy') return 'agent.execute.error.busy';
+  if (code === 'store-failed') return 'agent.execute.error.store';
+  if (code === 'cancelled') return 'agent.execute.error.cancelled';
+  if (code === 'missing-credential') return 'agent.execute.error.credential';
+  if (code === 'authentication') return 'agent.execute.error.authentication';
+  if (code === 'bridge-unavailable') return 'agent.execute.error.bridge';
+  if (
+    code === 'cloud-disabled'
+    || code === 'sensitive-context'
+    || code === 'input-budget'
+    || code === 'cost-budget'
+    || code === 'persistent-cache-unavailable'
+  ) {
+    return 'agent.execute.error.privacy';
+  }
+  if (code === 'timeout' || code === 'rate-limit' || code === 'upstream' || code === 'network') {
+    return 'agent.execute.error.transient';
+  }
+  if (code === 'invalid-response' || code === 'provider-failed') {
+    return 'agent.execute.error.provider';
+  }
+  return 'agent.execute.error.request';
+}
 
 function newConversationId(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   if (uuid) return `agent-${uuid}`;
   return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function newExecutionId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return `run-${uuid}`;
+  return `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 type PendingConfirmation =
@@ -108,7 +171,13 @@ function MessageRow({ message }: { message: AgentMessage }) {
         ) : null}
       </div>
       {message.text ? <p className="agent-message-text">{message.text}</p> : null}
-      {message.error ? <p className="agent-message-error">{message.error}</p> : null}
+      {message.error ? (
+        <p className="agent-message-error">
+          {EXECUTION_ERROR_CODES.has(message.error as AgentExecutionFailureCode)
+            ? t(executionErrorKey(message.error as AgentExecutionFailureCode))
+            : message.error}
+        </p>
+      ) : null}
       {message.cards.length > 0 ? (
         <ul className="agent-cards">
           {message.cards.map((card) => (
@@ -135,6 +204,14 @@ export default function AgentWorkspaceShell() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<PendingConfirmation>(null);
+  const [draft, setDraft] = useState('');
+  const [target, setTarget] = useState<AgentTargetChoice>('local');
+  const [allowLocalFallback, setAllowLocalFallback] = useState(false);
+  const [runningRequestId, setRunningRequestId] = useState<string | null>(null);
+  const [runningPrompt, setRunningPrompt] = useState('');
+  const [streamedText, setStreamedText] = useState('');
+  const [executionFailure, setExecutionFailure] =
+    useState<AgentExecutionFailureCode | null>(null);
   const railRef = useRef<HTMLUListElement | null>(null);
 
   const apply = useCallback((result: AgentWorkspaceResult) => {
@@ -170,6 +247,41 @@ export default function AgentWorkspaceShell() {
   const selected = state ? agentSelectedConversation(state) : null;
   const phase = agentShellPhase({ loading, failure, state });
   const activeId = state?.activeConversationId ?? null;
+  const executing = runningRequestId !== null;
+  const blocked = busy || executing;
+
+  const submitPrompt = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const prompt = draft.trim();
+    if (!selected || !prompt || executing) return;
+    const requestId = newExecutionId();
+    const request: AgentExecutionRequest = {
+      requestId,
+      conversationId: selected.id,
+      prompt,
+      policy: defaultAgentExecutionPolicy(target),
+      allowLocalFallback: target === 'local' ? false : allowLocalFallback,
+    };
+    setRunningRequestId(requestId);
+    setRunningPrompt(prompt);
+    setStreamedText('');
+    setExecutionFailure(null);
+    const result = await executeAgentPrompt(request, (streamEvent) => {
+      setStreamedText((current) => current + streamEvent.text);
+    });
+    if (result.state) {
+      apply({ ok: true, state: result.state });
+      setDraft('');
+    }
+    if (!result.ok) setExecutionFailure(result.code);
+    setRunningRequestId(null);
+    setRunningPrompt('');
+    setStreamedText('');
+  }, [allowLocalFallback, apply, draft, executing, selected, target]);
+
+  const cancelExecution = useCallback(() => {
+    if (runningRequestId) void cancelAgentPrompt(runningRequestId);
+  }, [runningRequestId]);
 
   const createConversation = useCallback(() => {
     const next = agentWorkspaceWithNewConversation(state ?? emptyAgentWorkspaceState(), {
@@ -224,7 +336,7 @@ export default function AgentWorkspaceShell() {
       <section
         className="agent-shell"
         aria-label={t('agent.shell.aria')}
-        aria-busy={busy || loading}
+        aria-busy={blocked || loading}
       >
         <nav className="agent-rail" aria-label={t('agent.rail.aria')}>
           <div className="agent-rail-head">
@@ -238,7 +350,7 @@ export default function AgentWorkspaceShell() {
             type="button"
             className="agent-action agent-action-primary"
             onClick={createConversation}
-            disabled={busy}
+            disabled={blocked}
           >
             <Icon name="plus" size={15} />
             {t('agent.rail.new')}
@@ -253,7 +365,7 @@ export default function AgentWorkspaceShell() {
                   className={`agent-rail-entry${summary.id === activeId ? ' is-selected' : ''}`}
                   aria-current={summary.id === activeId ? 'true' : undefined}
                   onClick={() => select(summary.id)}
-                  disabled={busy}
+                  disabled={blocked}
                 >
                   <span className="agent-rail-entry-title">{summary.title}</span>
                   <span className="agent-rail-entry-meta">
@@ -275,7 +387,7 @@ export default function AgentWorkspaceShell() {
                   aria-label={summary.pinned ? t('agent.rail.unpin') : t('agent.rail.pin')}
                   aria-pressed={summary.pinned}
                   onClick={() => togglePin(summary.id)}
-                  disabled={busy}
+                  disabled={blocked}
                 >
                   <Icon name="pin" size={15} />
                 </button>
@@ -290,7 +402,7 @@ export default function AgentWorkspaceShell() {
                   type="button"
                   className="agent-action agent-action-danger"
                   onClick={() => void run(clearAgentWorkspace)}
-                  disabled={busy}
+                  disabled={blocked}
                 >
                   {t('agent.rail.clearConfirm')}
                 </button>
@@ -298,7 +410,7 @@ export default function AgentWorkspaceShell() {
                   type="button"
                   className="agent-action"
                   onClick={() => setConfirming(null)}
-                  disabled={busy}
+                  disabled={blocked}
                 >
                   {t('common.cancel')}
                 </button>
@@ -308,7 +420,7 @@ export default function AgentWorkspaceShell() {
                 type="button"
                 className="agent-action"
                 onClick={() => setConfirming({ kind: 'clear' })}
-                disabled={busy || summaries.length === 0}
+                disabled={blocked || summaries.length === 0}
               >
                 <Icon name="trash" size={15} />
                 {t('agent.rail.clear')}
@@ -325,7 +437,7 @@ export default function AgentWorkspaceShell() {
                 type="button"
                 className="agent-action"
                 onClick={() => void refresh()}
-                disabled={busy}
+                disabled={blocked}
               >
                 <Icon name="refresh" size={15} />
                 {t('agent.state.retry')}
@@ -346,7 +458,7 @@ export default function AgentWorkspaceShell() {
                 type="button"
                 className="agent-action agent-action-primary"
                 onClick={createConversation}
-                disabled={busy}
+                disabled={blocked}
               >
                 <Icon name="plus" size={15} />
                 {t('agent.state.emptyAction')}
@@ -371,7 +483,7 @@ export default function AgentWorkspaceShell() {
                       type="button"
                       className="agent-action agent-action-danger"
                       onClick={() => void run(() => deleteAgentConversation(selected.id))}
-                      disabled={busy}
+                      disabled={blocked}
                     >
                       {t('agent.conversation.deleteConfirm')}
                     </button>
@@ -379,7 +491,7 @@ export default function AgentWorkspaceShell() {
                       type="button"
                       className="agent-action"
                       onClick={() => setConfirming(null)}
-                      disabled={busy}
+                      disabled={blocked}
                     >
                       {t('common.cancel')}
                     </button>
@@ -389,7 +501,7 @@ export default function AgentWorkspaceShell() {
                     type="button"
                     className="agent-action"
                     onClick={() => setConfirming({ kind: 'delete', conversationId: selected.id })}
-                    disabled={busy}
+                    disabled={blocked}
                   >
                     <Icon name="trash" size={15} />
                     {t('agent.conversation.delete')}
@@ -421,6 +533,114 @@ export default function AgentWorkspaceShell() {
                   </ul>
                 </>
               )}
+
+              {executing ? (
+                <div className="agent-live-exchange" role="status" aria-live="polite">
+                  <div className="agent-message agent-message-user">
+                    <div className="agent-message-head">
+                      <span className="agent-message-role">{t('agent.message.role.user')}</span>
+                    </div>
+                    <p className="agent-message-text">{runningPrompt}</p>
+                  </div>
+                  <div className="agent-message agent-message-assistant">
+                    <div className="agent-message-head">
+                      <span className="agent-message-role">{t('agent.message.role.assistant')}</span>
+                      <span className="agent-chip agent-chip-status agent-status-streaming">
+                        {t('agent.message.status.streaming')}
+                      </span>
+                    </div>
+                    <p className="agent-message-text">
+                      {streamedText || t('agent.execute.waiting')}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              <form className="agent-composer" onSubmit={submitPrompt}>
+                <div className="agent-composer-options">
+                  <label className="agent-field">
+                    <span>{t('agent.execute.provider')}</span>
+                    <select
+                      value={target}
+                      onChange={(event) => setTarget(event.target.value as AgentTargetChoice)}
+                      disabled={blocked}
+                    >
+                      <option value="local">{t('agent.execute.provider.local')}</option>
+                      <option value="gemini-2.5-flash">
+                        {t('agent.execute.provider.gemini')}
+                      </option>
+                      <option value="deepseek-v4-flash">
+                        {t('agent.execute.provider.deepseekFlash')}
+                      </option>
+                      <option value="deepseek-v4-pro">
+                        {t('agent.execute.provider.deepseekPro')}
+                      </option>
+                    </select>
+                  </label>
+                  {target !== 'local' ? (
+                    <label className="agent-check">
+                      <input
+                        type="checkbox"
+                        checked={allowLocalFallback}
+                        onChange={(event) => setAllowLocalFallback(event.target.checked)}
+                        disabled={blocked}
+                      />
+                      <span>{t('agent.execute.localFallback')}</span>
+                    </label>
+                  ) : null}
+                </div>
+
+                {target !== 'local' ? (
+                  <p className="agent-cloud-notice">
+                    <Icon name="globe" size={14} />
+                    {t('agent.execute.cloudNotice', { provider: target })}
+                  </p>
+                ) : (
+                  <p className="agent-cloud-notice">
+                    <Icon name="lock" size={14} />
+                    {t('agent.execute.localNotice')}
+                  </p>
+                )}
+
+                <label className="agent-prompt-label">
+                  <span className="sr-only">{t('agent.execute.prompt')}</span>
+                  <textarea
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    placeholder={t('agent.execute.placeholder')}
+                    maxLength={20_000}
+                    rows={3}
+                    disabled={blocked}
+                  />
+                </label>
+
+                {executionFailure ? (
+                  <p className="agent-message-error" role="alert">
+                    {t(executionErrorKey(executionFailure))}
+                  </p>
+                ) : null}
+
+                <div className="agent-composer-actions">
+                  {executing ? (
+                    <button
+                      type="button"
+                      className="agent-action agent-action-danger"
+                      onClick={cancelExecution}
+                    >
+                      {t('agent.execute.cancel')}
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      className="agent-action agent-action-primary"
+                      disabled={busy || draft.trim().length === 0}
+                    >
+                      <Icon name="chat" size={15} />
+                      {t('agent.execute.send')}
+                    </button>
+                  )}
+                </div>
+              </form>
 
               <footer className="agent-scope">
                 <p>{t('agent.notice.scope')}</p>

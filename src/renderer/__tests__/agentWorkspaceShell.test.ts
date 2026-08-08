@@ -16,7 +16,8 @@
  * sentence would not.
  *
  * The bridge is NOT mocked: `window.api` is stubbed and the production client
- * runs, so these tests prove the shell really consumes the four channels.
+ * runs, so these tests prove the shell consumes the production workspace and
+ * execution clients.
  */
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -43,6 +44,7 @@ let root: Root;
 let calls: BridgeCall[];
 let stored: AgentWorkspaceState;
 let loadResult: unknown = null;
+let executionListener: ((event: unknown) => void) | null;
 
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
@@ -111,6 +113,7 @@ function populated(): AgentWorkspaceState {
 /** A stand-in for main: it answers from `stored` and records what it was asked. */
 function installBridge(): void {
   calls = [];
+  executionListener = null;
   const record = (method: string, handle: (...args: unknown[]) => unknown) =>
     (...args: unknown[]) => {
       calls.push({ method, args });
@@ -134,6 +137,19 @@ function installBridge(): void {
       stored = state();
       return { ok: true, state: stored };
     }),
+    onAgentExecutionEvent: (cb: (event: unknown) => void) => {
+      executionListener = cb;
+      return () => {
+        executionListener = null;
+      };
+    },
+    agentExecutionRun: record('execute', (raw) => ({
+      ok: false,
+      code: 'provider-failed',
+      requestId: (raw as { requestId: string }).requestId,
+      state: stored,
+    })),
+    agentExecutionCancel: record('cancelExecution', () => ({ ok: true, cancelled: true })),
   };
 }
 
@@ -209,10 +225,12 @@ describe('Agent workspace shell', () => {
     expect(text()).toContain('agent.message.role.assistant');
     expect(text()).toContain('agent.message.providerCloud');
     expect(text()).toContain('agent.context.retained');
-    // The scope of this slice is stated on the surface, not only in a docblock.
+    // Provider and retention boundaries are stated on the surface.
     expect(text()).toContain('agent.notice.scope');
     expect(text()).toContain('agent.notice.retention');
-    expect(host.querySelector('textarea, input')).toBeNull();
+    expect(host.querySelector('textarea')).not.toBeNull();
+    expect(host.querySelector('select')?.getAttribute('value')).toBeNull();
+    expect(text()).toContain('agent.execute.localNotice');
 
     const selected = host.querySelector('.agent-rail-entry.is-selected');
     expect(selected?.getAttribute('aria-current')).toBe('true');
@@ -302,5 +320,94 @@ describe('Agent workspace shell', () => {
     expect(host.querySelector('[role="alert"]')?.textContent)
       .toContain('agent.error.write-failed');
     expect(text()).toContain('Particle question');
+  });
+
+  it('streams a prompt through the execution bridge and renders the committed result', async () => {
+    stored = populated();
+    await mount();
+    let executedPrompt = '';
+    (window as unknown as { api: Record<string, unknown> }).api.agentExecutionRun =
+      async (raw: unknown) => {
+        const request = raw as { requestId: string; conversationId: string; prompt: string };
+        executedPrompt = request.prompt;
+        executionListener?.({
+          type: 'chunk',
+          requestId: request.requestId,
+          assistantMessageId: 'assistant-live',
+          text: 'Streamed ',
+        });
+        executionListener?.({
+          type: 'chunk',
+          requestId: request.requestId,
+          assistantMessageId: 'assistant-live',
+          text: 'answer',
+        });
+        stored = {
+          ...stored,
+          conversations: stored.conversations.map((conversation) => (
+            conversation.id === request.conversationId
+              ? {
+                  ...conversation,
+                  messages: [
+                    ...conversation.messages,
+                    {
+                      id: 'user-live',
+                      conversationId: conversation.id,
+                      role: 'user' as const,
+                      status: 'complete' as const,
+                      text: request.prompt,
+                      createdAt: 30,
+                      updatedAt: 30,
+                      contextIds: [],
+                      attachments: [],
+                      cards: [],
+                    },
+                    {
+                      id: 'assistant-live',
+                      conversationId: conversation.id,
+                      role: 'assistant' as const,
+                      status: 'complete' as const,
+                      text: 'Streamed answer',
+                      createdAt: 31,
+                      updatedAt: 31,
+                      contextIds: [],
+                      attachments: [],
+                      cards: [],
+                      provider: {
+                        target: { kind: 'local' as const, backend: 'local-qwen' as const },
+                        cloud: false,
+                        contextIds: [],
+                        attachmentIds: [],
+                        inputChars: 12,
+                        startedAt: 30,
+                        completedAt: 31,
+                      },
+                    },
+                  ],
+                }
+              : conversation
+          )),
+        };
+        return {
+          ok: true,
+          requestId: request.requestId,
+          assistantMessageId: 'assistant-live',
+          delivery: 'streamed',
+          state: stored,
+        };
+      };
+
+    const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        ?.call(textarea, 'Explain は');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await click(buttonWith('agent.execute.send'));
+
+    expect(executedPrompt).toBe('Explain は');
+    expect(text()).toContain('Explain は');
+    expect(text()).toContain('Streamed answer');
+    expect(text()).toContain('agent.message.providerLocal');
   });
 });

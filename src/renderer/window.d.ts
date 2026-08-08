@@ -45,6 +45,12 @@ import type {
 } from '../shared/mining';
 import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from '../shared/localAgentRuntime';
 import type { AgentAutomation } from '../shared/localAgentAutomation';
+import type {
+  AgentExecutionCancelResult,
+  AgentExecutionEvent,
+  AgentExecutionRequest,
+  AgentExecutionResult,
+} from '../shared/agentExecutionBridge';
 import type { AgentWorkspaceState } from '../shared/agentWorkspace';
 import type { AgentWorkspaceResult } from '../shared/agentWorkspaceBridge';
 import type {
@@ -857,6 +863,9 @@ declare global {
       agentWorkspaceSave(state: AgentWorkspaceState): Promise<AgentWorkspaceResult>;
       agentWorkspaceDeleteConversation(conversationId: string): Promise<AgentWorkspaceResult>;
       agentWorkspaceClear(): Promise<AgentWorkspaceResult>;
+      agentExecutionRun(request: AgentExecutionRequest): Promise<AgentExecutionResult>;
+      agentExecutionCancel(requestId: string): Promise<AgentExecutionCancelResult>;
+      onAgentExecutionEvent(cb: (event: AgentExecutionEvent) => void): () => void;
       aiSetApiKey(payload: string | {
         provider?: AiProviderKeyBucket;
         apiKey?: string;

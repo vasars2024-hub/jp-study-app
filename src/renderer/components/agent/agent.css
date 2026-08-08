@@ -221,7 +221,7 @@
 }
 
 /* One focus treatment for every control here, and it is never removed. */
-.agent-shell :is(button):focus-visible {
+.agent-shell :is(button, select, textarea, input):focus-visible {
   outline: 2px solid var(--agent-accent);
   outline-offset: 2px;
 }
@@ -464,6 +464,99 @@
 .agent-card-summary,
 .agent-card-actions {
   color: var(--agent-muted);
+}
+
+/* ---------- Composer ----------------------------------------------------- */
+
+.agent-live-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+}
+
+.agent-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+  padding: var(--space-md, 12px);
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-md, 8px);
+  background: var(--agent-surface);
+}
+
+.agent-composer-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-sm, 8px) var(--space-md, 12px);
+}
+
+.agent-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min(100%, 220px);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-field select,
+.agent-prompt-label textarea {
+  width: 100%;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--agent-surface-2);
+  color: var(--agent-text);
+  font: inherit;
+}
+
+.agent-field select {
+  min-height: 34px;
+  padding: 5px 9px;
+}
+
+.agent-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  font-size: var(--font-size-sm, 0.8125rem);
+  color: var(--agent-muted);
+}
+
+.agent-check input {
+  accent-color: var(--agent-accent-deep);
+}
+
+.agent-cloud-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-prompt-label {
+  display: block;
+}
+
+.agent-prompt-label textarea {
+  min-height: 72px;
+  max-height: 220px;
+  padding: var(--space-sm, 8px) var(--space-md, 12px);
+  line-height: var(--line-height-normal, 1.5);
+  resize: vertical;
+}
+
+.agent-prompt-label textarea::placeholder {
+  color: var(--agent-muted);
+}
+
+.agent-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm, 8px);
 }
 
 /* ---------- Scope notice -------------------------------------------------- */

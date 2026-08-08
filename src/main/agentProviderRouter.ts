@@ -34,6 +34,14 @@ export interface AgentProviderExecutionResult {
   fallbackReason?: 'missing-cloud-credential';
 }
 
+function promptWithContext(prompt: string, context: readonly AgentContextItem[]): string {
+  if (context.length === 0) return prompt;
+  const rows = context.map((item, index) => (
+    `[Context ${index + 1}: ${item.label}]\n${item.preview}`
+  ));
+  return `${prompt}\n\nSelected Study OS context:\n${rows.join('\n\n')}`;
+}
+
 function disclosure(
   target: AgentProviderDisclosure['target'],
   cloud: boolean,
@@ -118,14 +126,22 @@ export async function runAgentProviderPrompt(
         : 'input-budget';
     throw new AiProviderRuntimeError(`Agent provider request refused: ${privacy.reason ?? 'privacy policy'}.`, code);
   }
+  const providerPrompt = promptWithContext(prompt, privacy.context);
+  if (providerPrompt.length > policy.maxInputChars) {
+    throw new AiProviderRuntimeError(
+      'Agent provider request exceeds the configured input budget.',
+      'input-budget',
+    );
+  }
+  const inputChars = providerPrompt.length;
 
   if (policy.target.kind === 'local') {
     return runLocal(
       policy,
-      prompt,
+      providerPrompt,
       privacy.context,
       privacy.attachments,
-      privacy.inputChars,
+      inputChars,
       options,
     );
   }
@@ -136,7 +152,7 @@ export async function runAgentProviderPrompt(
     const result = await runCloudAiRequest({
       ...runtime,
       apiKey: options.apiKey,
-      prompt,
+      prompt: providerPrompt,
       pricing: options.pricing,
       signal: options.signal,
       onEvent: options.onCloudEvent,
@@ -147,7 +163,7 @@ export async function runAgentProviderPrompt(
       provider: disclosure(
         policy.target,
         true,
-        privacy.inputChars,
+        inputChars,
         privacy.context,
         privacy.attachments,
         result.startedAt,
@@ -165,10 +181,10 @@ export async function runAgentProviderPrompt(
     ) {
       return runLocal(
         policy,
-        prompt,
+        providerPrompt,
         privacy.context,
         privacy.attachments,
-        privacy.inputChars,
+        inputChars,
         options,
         'missing-cloud-credential',
       );

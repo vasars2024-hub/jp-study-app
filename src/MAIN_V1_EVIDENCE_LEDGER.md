@@ -395,10 +395,82 @@ Live Electron evidence:
   `debug/shots/win1-1786189661979.png`. Electron control remained serialized;
   the Claude task performed no live verification.
 
+## Slice 11 — grounded Agent execution bridge and real composer
+
+Behavior now established:
+
+- A typed main/preload/renderer execution bridge connects the Agent shell to the
+  existing privacy-gated provider router. Every channel has a live renderer
+  consumer; credentials remain main-only and runtime exception prose never
+  crosses the boundary.
+- Main owns the entire message transaction. It writes the user message and a
+  streaming assistant placeholder before provider execution, then re-reads the
+  latest workspace and persists complete, failed or cancelled terminal state.
+  A conversation deleted during execution is not resurrected.
+- Local Qwen is the default. Selecting Gemini or DeepSeek is an explicit
+  per-request cloud choice with a visible disclosure; missing-key local fallback
+  is separately opt-in. Persistent response caching is rejected at request
+  normalization until encrypted retained-response storage exists.
+- Context is formatted into the actual provider prompt and the fully composed
+  prompt is rechecked against the input budget. Stream chunks are delivered
+  only to the requesting renderer. Cancellation is scoped to that renderer,
+  and executions are serialized per conversation so main-owned store writes
+  cannot race.
+- The first prompt gives an untitled conversation a bounded title. The composer
+  exposes honest local/cloud choices, streaming/cancel state and localized
+  closed-error groups without placing secrets or provider error prose in the
+  renderer.
+
+Automated evidence:
+
+- Focused execution/router/workspace/architecture regression: 7 files / 52
+  tests passed after the final ownership and serialization hardening.
+- The broader Agent workspace, desktop and i18n run exercised 14 files / 105
+  tests: 104 passed and catalog hygiene found three verbatim-English cloud
+  labels in Japanese. After localized cloud qualifiers were added in Japanese,
+  Russian and Chinese, the affected 5 files / 46 tests passed; the final full
+  14-file gate then passed all 105 tests.
+- Targeted ESLint and `git diff --check` pass. Repository-wide TypeScript remains
+  red on its inherited baseline (424 output lines); filtered diagnostics contain
+  zero changed Agent execution, shell, preload, window declaration or provider
+  router paths.
+
+Live Electron evidence:
+
+- Electron Forge rebuilt the real main, preload and renderer targets. The live
+  preload exposed `agentExecutionRun`, `agentExecutionCancel` and
+  `onAgentExecutionEvent` beside the four workspace methods.
+- Vault-safe metadata confirmed DeepSeek was unconfigured. A harmless prompt
+  sent through the rendered DeepSeek Flash selection persisted a complete user
+  message and failed assistant message with the localized missing-credential
+  result; no provider request, user credential or funds were used.
+- At the 924 x 611 compact viewport the 782 x 513 Agent shell had no horizontal
+  overflow. Its dedicated canvas scrolled to its exact 130-pixel maximum, making
+  the provider selector, fallback control, prompt, error and send action
+  reachable. Screenshot: `debug/shots/win1-1786191378058.png`.
+- The synthetic acceptance conversation was deleted through the confirmed UI
+  path, returning the main-owned store to zero conversations. The fresh debug
+  error ring remained empty.
+
+Parallel-session reconciliation:
+
+- An accidentally resumed isolated session produced commits `1211b00` and
+  `83c4906` plus an uncommitted operational-store draft. None changed the main
+  worktree or index. The duplicate composer was not integrated: it downgraded a
+  forbidden persistent-cache request to `off` and did not serialize concurrent
+  writes to one conversation.
+- Review of `83c4906` confirmed that its registry honestly extracts 35 real
+  adapters and removes three false-success handlers, but its 17 unavailable
+  operations are still advertised by the system prompt and profile editor. The
+  isolated branch remains reference-only until availability is consumed by
+  discovery, planning and profile UI in the same reviewed slice.
+
 ## Exact next slice
 
-Add the first consumed provider execution/stream bridge and composer as one
-typed slice. Reuse the existing privacy-gated Agent provider router, expose
-cancellation and honest local/cloud delivery metadata, and keep every new
-channel paired with the shell consumer and focused tests. Do not add persistent
-response caching.
+Integrate a centralized Agent capability registry only with end-to-end
+availability consumption: models, planner and profile UI must receive the 35
+real operations and must identify the 17 unavailable operations rather than
+advertising guaranteed failures. Preserve execution-time permission/profile
+rechecks and confirmations. After that boundary is stable, migrate the legacy
+renderer-owned queue, memory and automations into versioned main-owned
+persistence; do not copy the stopped isolated worktree wholesale.
