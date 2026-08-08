@@ -276,6 +276,38 @@ Remaining boundary:
 - Gemini/DeepSeek token streaming still needs provider-specific stream parsers and cancellation tests before the Agent UI may offer a cloud streaming toggle.
 - Local streamed chunks are runtime output; the final returned text still passes through the existing Qwen cleanup boundary.
 
+## Luna ReadingLens workflow slice and primary review
+
+The isolated exact Luna Max assignment produced commit `f7b0cb342cbc6d9bb00d1de4db1f1b63e7bde618` across the clean Lens overlay and two new shared contract/test paths. Primary review applied the complete diff, then corrected the screenshot boundary so oversized, malformed and active-content image data is rejected rather than retained after truncation.
+
+Behavior now established:
+
+- OCR output enters a versioned, bounded capture envelope with source, engine, language, stable capture identity, line geometry/confidence and optional image evidence.
+- Capture normalization caps text, line count, line size, coordinates and metadata; invalid boxes are dropped and confidence is clamped.
+- Screen, clipboard, image and text sources share one quick -> compact -> workspace depth contract.
+- Compact handoffs reuse the canonical Lexicon input classifier, while paragraph/document captures resolve to a typed Reading workspace target without claiming that the protected bridge or route consumer already exists.
+- The production ReadingLens overlay now uses the shared normalized capture for OCR rendering and automatic AI context instead of maintaining a second passage-joining path.
+- Screenshot evidence accepts only bounded JPEG, PNG or WebP base64 data URLs. Oversized, malformed, local-file and SVG/active-content inputs fail closed.
+
+Automated evidence:
+
+- Primary focused regression: 5 files / 76 tests passed across the new contract, Lens lifecycle, Lens i18n, Lexicon classification and architecture baseline.
+- Targeted ESLint and `git diff --check`: pass (line-ending notices only).
+- Repository-wide TypeScript remains red on the documented inherited baseline; Luna's filtered output contained no diagnostic for the three owned paths.
+
+Live Electron evidence:
+
+- The real full-screen Lens opened from the production main window and rendered its localized select-screen affordance at 1920 x 1080.
+- Full-screen capture progressed through `Reading...` into bounded OCR line overlays with Dictionary AI, AI OCR, re-scan, Manga mode and new-region controls intact.
+- Selecting AI OCR opened the compact sentence-analysis panel and populated it from the shared normalized passage contract.
+- Closing the Lens hid the overlay window and returned control to the main Study window.
+- No new renderer or main-process error was recorded; the sole bridge-ring error predates this slice and records the dev server being unavailable at original application boot.
+
+Remaining boundary:
+
+- The workspace result is a typed target only. A future clean route/bridge consumer must perform the full Reading workspace navigation and preserve provenance without introducing dead IPC.
+- Imported image/text and clipboard producers can now adopt the contract, but were not wired through dirty preload or shell paths in this checkpoint.
+
 ## Exact next slice
 
 Add true Gemini/DeepSeek token streaming, then wire the versioned store and first consuming Agent shell together with typed bridge methods. Persistent response caching remains refused until encrypted retention is designed. Do not add bridge channels without their consumers.

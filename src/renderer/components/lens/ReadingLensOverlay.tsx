@@ -4,12 +4,17 @@ import LensAnalysisPanel from './LensAnalysisPanel';
 import { useT } from '../../i18n';
 import { getTokenizer, tokenizeSync, tokenizerReady, type JpToken } from '../../tokenizer';
 import type { LensInit } from '../../../main/readingLens';
-import type { LensOcrResult } from '../../../main/screenOcr';
 import {
   parseVisualNovelOcrTarget,
   VISUAL_NOVEL_OCR_TARGET_KEY,
   type VisualNovelOcrTarget,
 } from '../../../shared/visualNovelOcrTarget';
+import {
+  normalizeReadingLensCapture,
+  resolveReadingLensWorkflow,
+  type ReadingLensCapture,
+  type ReadingLensLine,
+} from '../../../shared/readingLens';
 import './readingLens.css';
 
 /**
@@ -56,6 +61,7 @@ type LensState =
     region: Rect;
     lines: LensLine[];
     engine: string;
+    capture: ReadingLensCapture;
     screenshotDataUrl?: string;
   }
   | { kind: 'empty'; region: Rect }
@@ -89,35 +95,14 @@ function isJapaneseWord(s: string): boolean {
   return /[぀-ヿ㐀-鿿々ー]/.test(s);
 }
 
-function buildLines(res: LensOcrResult): LensLine[] {
-  return res.lines.map((l) => ({
+function buildLines(lines: readonly ReadingLensLine[]): LensLine[] {
+  return lines.map((l) => ({
     text: l.text,
     box: l.box,
     vertical: l.vertical,
     confidence: l.confidence,
     tokens: tokenizerReady() ? tokenizeSync(l.text) : [{ surface: l.text, lemma: l.text } as JpToken],
   }));
-}
-
-/**
- * The scan as one passage for the AI.
- *
- * OCR line boxes are a layout artifact, not sentence boundaries — a subtitle or
- * a bubble is routinely split across two or three of them. Joining without a
- * separator is right for CJK (which has no inter-word space and would otherwise
- * gain a spurious one mid-word); a space is inserted only where the join would
- * weld two Latin/Cyrillic words together.
- */
-function joinLines(lines: LensLine[]): string {
-  return lines.reduce((acc, line) => {
-    const next = line.text.trim();
-    if (!next) return acc;
-    if (!acc) return next;
-    const needsSpace = /[\p{Letter}\p{Number}]$/u.test(acc) && /^[\p{Letter}\p{Number}]/u.test(next);
-    return needsSpace && !isJapaneseWord(acc.slice(-1)) && !isJapaneseWord(next[0])
-      ? `${acc} ${next}`
-      : acc + next;
-  }, '');
 }
 
 export default function ReadingLensOverlay() {
@@ -256,8 +241,17 @@ export default function ReadingLensOverlay() {
             setState({ kind: 'error', region, message, canRetry: true });
             return;
           }
-          const lines = buildLines(res);
-          if (!lines.length) {
+          const capture = normalizeReadingLensCapture({
+            source: 'screen',
+            language: res.lang,
+            engine: res.engine,
+            hash: res.hash,
+            text: res.text,
+            lines: res.lines,
+            screenshotDataUrl: res.screenshotDataUrl,
+          });
+          const lines = capture ? buildLines(capture.lines) : [];
+          if (!capture || !lines.length) {
             setState({ kind: 'empty', region });
           } else {
             setState({
@@ -265,7 +259,8 @@ export default function ReadingLensOverlay() {
               region,
               lines,
               engine: res.engine,
-              screenshotDataUrl: res.screenshotDataUrl,
+              capture,
+              screenshotDataUrl: capture.screenshotDataUrl,
             });
           }
         })
@@ -281,14 +276,14 @@ export default function ReadingLensOverlay() {
   }, [state, t]);
 
   // AI mode analyses the scan as soon as it lands, without a second click. The
-  // panel keeps whatever line the reader later picked, so this only fires on a
-  // *new* read — hence the dependency on the lines themselves, not on `state`.
-  const readingLines = state.kind === 'reading' ? state.lines : null;
+  // shared workflow contract supplies the same normalized passage that a future
+  // Reading workspace handoff will receive.
+  const readingCapture = state.kind === 'reading' ? state.capture : null;
   useEffect(() => {
-    if (mode !== 'ai' || !readingLines) return;
-    const joined = joinLines(readingLines);
-    if (joined) setAnalysisText(joined);
-  }, [mode, readingLines]);
+    if (mode !== 'ai' || !readingCapture) return;
+    const workflow = resolveReadingLensWorkflow(readingCapture, 'compact');
+    if (workflow.depth === 'compact' && workflow.input.text) setAnalysisText(workflow.input.text);
+  }, [mode, readingCapture]);
 
   // Pass-through: once we're reading (or showing a message), let clicks fall
   // through to the app below except over interactive elements.
