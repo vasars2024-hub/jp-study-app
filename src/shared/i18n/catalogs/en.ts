@@ -6480,6 +6480,11 @@ export const en: Catalog = {
     one: '{count} tool enabled of {total}',
     other: '{count} tools enabled of {total}',
   },
+  'blanc.agent.operations.unavailableCount': {
+    one: '{count} declared operation unavailable',
+    other: '{count} declared operations unavailable',
+  },
+  'blanc.agent.operations.unavailable': 'Unavailable',
   'blanc.agent.operations.enableAll': 'Enable all',
   'blanc.agent.operations.disableAll': 'Disable all',
   'blanc.agent.operations.restoreDefaults': 'Restore defaults',

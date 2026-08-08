@@ -465,12 +465,82 @@ Parallel-session reconciliation:
   isolated branch remains reference-only until availability is consumed by
   discovery, planning and profile UI in the same reviewed slice.
 
+## Centralized Agent capability registry
+
+The renderer's inline tool handlers are now one central registry
+(`src/renderer/agentToolRegistry.ts`), and availability is consumed end to end
+rather than merely declared:
+
+- `createCentralAgentToolRegistry` owns every installed adapter. The 28
+  operation ids previously declared inside `BlancReadyToolPanels.tsx`'s handler
+  memo were read back out of the new registry after extraction: 28 of 28
+  present.
+- `agentToolCapabilityMatrix` throws on any declared operation that is neither
+  installed nor explicitly classified, so a silently unhandled operation cannot
+  reach the profile UI or the model.
+- The profile editor disables unavailable operations, names the reason in the
+  control's `title`, prunes them from `enable all` and from any committed
+  approval set, and reports the unavailable total.
+- `LocalAgentPanel` passes the installed ids into the plan request;
+  `normalizeAvailableOperations` (main) re-validates them and
+  `selectLocalAgentApprovedOperations` intersects them with the profile and the
+  permission level before the system prompt is built. The model is never
+  offered an operation that would fail at execution.
+
+Measured catalog — re-derived from source this session, not inherited:
+
+- `AGENT_TOOL_OPERATIONS` declares **53** operations.
+- `UNAVAILABLE` classifies **17**, and all 17 are declared operations.
+- Installed adapters therefore number **36**.
+- The parallel session's "52 operations / 35 real" summary and this ledger's
+  previous "35 real operations" wording were both stale. 53/17/36 is the
+  measured set. A first count of 49 was a measurement error on this side: the
+  regex required the id on the same line as `operation(`, so multi-line
+  declarations were missed. Count `operation(` occurrences, not id literals.
+
+Automated evidence:
+
+- Full suite, run against the committed checkpoint: `npx vitest run` → 452
+  files (451 passed, 1 skipped) and 5,917 tests (5,911 passed, 6 skipped),
+  0 failed.
+- `npx vitest run agentToolRegistry localAgentProfileOperationsUi
+  localAgentZeroArgumentPlan localAgentPrompt agentWorkspace agentExecution
+  agentProviderRouter localAgentRuntime` → 13 files, 84 tests, 0 failed.
+  (This is a different selection from the 12 files / 121 tests quoted by the
+  previous session; totals are this run's own measurement.)
+- `npx eslint` over the seven registry-owned source paths: clean, exit 0.
+- `node tools/i18n-check.cjs` → exit 0; all 8,778 English keys translated.
+- `node tools/architecture-audit.cjs` → exit 0; 1,553 modules, 18 findings,
+  nothing new.
+- `git diff --cached --check`: clean.
+
+Live Electron evidence — Blanc Toolbox, debug bridge, single controller:
+
+- The panel was opened through the app's own `toolbox:select-tool` event, not
+  coordinate control. The editor rendered **53** operation checkboxes: **36**
+  enabled and **17** disabled, matching the source measurement exactly.
+- Each unavailability reason surfaced on its own control:
+  `dictionary.explain-grammar` → `dedicated-analysis-required`,
+  `flashcard.schedule-reviews` → `false-success-stub-removed`,
+  `anime.search` → `adapter-not-implemented`. All three were disabled and
+  unchecked; `dictionary.lookup` stayed enabled and checked.
+- Both new catalog keys rendered as localized text — "17 declared operations
+  unavailable", and 17 controls labelled "Unavailable" — with zero raw-key
+  leaks.
+- localStorage was snapshotted before the run and asserted byte-for-byte equal
+  afterwards; the two keys the navigation created were removed.
+
+Slice boundary: the four i18n catalogs are shared with unrelated in-flight
+work, so only the `blanc.agent.operations.*` hunks were staged (en +5, ja +4,
+ru +7, zh +4). Roughly 1,250 lines of foreign catalog additions remain
+unstaged, as does the user-owned F16 reach-check hunk in
+`src/renderer/__tests__/mediaCenterIntegration.test.ts`.
+
 ## Exact next slice
 
-Integrate a centralized Agent capability registry only with end-to-end
-availability consumption: models, planner and profile UI must receive the 35
-real operations and must identify the 17 unavailable operations rather than
-advertising guaranteed failures. Preserve execution-time permission/profile
-rechecks and confirmations. After that boundary is stable, migrate the legacy
-renderer-owned queue, memory and automations into versioned main-owned
-persistence; do not copy the stopped isolated worktree wholesale.
+Migrate the legacy renderer-owned task queue, memory, automations and scheduler
+updates into versioned main-owned persistence, with legacy localStorage
+migration and cross-window updates, preserving the execution-time permission
+and profile rechecks. Do not copy the stopped isolated worktree wholesale;
+`codex/claude-agent-shell` stays reference-only. Live Electron acceptance for
+that slice is still pending.

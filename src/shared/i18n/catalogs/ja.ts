@@ -6157,6 +6157,10 @@ export const ja: Catalog = {
   'blanc.agent.operations.enabledCount': {
     other: '{total} 件中 {count} 件のツールを有効化',
   },
+  'blanc.agent.operations.unavailableCount': {
+    other: '宣言済み操作のうち {count} 件は利用不可',
+  },
+  'blanc.agent.operations.unavailable': '利用不可',
   'blanc.agent.operations.enableAll': 'すべて有効化',
   'blanc.agent.operations.disableAll': 'すべて無効化',
   'blanc.agent.operations.restoreDefaults': '既定値に戻す',

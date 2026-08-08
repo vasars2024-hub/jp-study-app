@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildLocalAgentSystemPrompt, parseLocalAgentModelPlan } from '../localAgentPrompt';
+import {
+  buildLocalAgentSystemPrompt,
+  parseLocalAgentModelPlan,
+  selectLocalAgentApprovedOperations,
+} from '../localAgentPrompt';
+import type { AgentProfile } from '../localAgentProfiles';
 
 describe('local agent model boundary', () => {
   it('exposes only operations allowed by the configured permission', () => {
@@ -24,6 +29,39 @@ describe('local agent model boundary', () => {
     expect(prompt).not.toContain('flashcard.create-deck');
     expect(prompt).not.toContain('media.delete-item');
     expect(prompt).toContain('Assistant profile: Research');
+  });
+
+  it('advertises and accepts only operations with installed adapters', () => {
+    const context = {
+      permission: 'read-only' as const,
+      availableOperations: ['dictionary.lookup'] as const,
+      profile: {
+        id: 'research', name: 'Research', description: '', role: 'research' as const,
+        preferredModelFileName: '', permission: 'read-only' as const,
+        enabledOperations: [
+          'dictionary.lookup',
+          'dictionary.explain-grammar',
+        ] as AgentProfile['enabledOperations'],
+        responseLength: 'brief' as const, explanationDepth: 'standard' as const,
+        language: 'english' as const, teachingStyle: 'academic' as const,
+        correctionStyle: 'gentle' as const, enabled: true,
+      },
+    };
+    const approved = selectLocalAgentApprovedOperations(context);
+    const prompt = buildLocalAgentSystemPrompt(context);
+
+    expect(approved).toEqual(['dictionary.lookup']);
+    expect(prompt).toContain('dictionary.lookup');
+    expect(prompt).not.toContain('dictionary.explain-grammar');
+    expect(() => parseLocalAgentModelPlan(JSON.stringify({
+      summary: 'Explain grammar.',
+      steps: [{
+        label: 'Explain grammar',
+        operation: 'dictionary.explain-grammar',
+        arguments: { term: 'ために' },
+      }],
+    }), 'task-unavailable', 'Explain this grammar', 'read-only', 10, approved))
+      .toThrow('unavailable operation');
   });
 
   it('turns valid structured model output into a controller task', () => {

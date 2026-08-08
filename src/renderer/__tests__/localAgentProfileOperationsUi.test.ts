@@ -34,9 +34,14 @@ import {
   type AgentProfileStore,
 } from '../../shared/localAgentProfiles';
 import type { AgentToolOperationId } from '../../shared/localAgent';
+import {
+  availableAgentToolOperationIds,
+  createCentralAgentToolRegistry,
+} from '../agentToolRegistry';
 
 const STORAGE_KEY = 'jp-study-local-agent-profiles-v1';
 const TUTOR = 'study-tutor';
+const AVAILABLE = new Set(availableAgentToolOperationIds(createCentralAgentToolRegistry((key) => key)));
 
 function factoryTutor() {
   const found = DEFAULT_AGENT_PROFILES.find((profile) => profile.id === TUTOR);
@@ -170,16 +175,21 @@ describe('the editor renders the allow-list, not a count of it', () => {
     // Every operation must be listed, including the ones this profile does NOT have —
     // otherwise a user can only ever narrow, never restore or widen.
     expect(boxes.length).toBeGreaterThan(factoryTutor().enabledOperations.length);
-    expect(editor.checked().sort()).toEqual([...factoryTutor().enabledOperations].sort());
+    expect(editor.checked().sort()).toEqual(
+      factoryTutor().enabledOperations.filter((operation) => AVAILABLE.has(operation)).sort(),
+    );
   });
 
-  it('is enabled for a built-in profile', async () => {
+  it('enables real adapters and identifies unavailable declarations', async () => {
     // Slice 56's defect was scoped to built-ins, and the four built-ins are all a fresh user
     // has. An editor disabled for `builtIn: true` would reproduce it exactly.
     await mountEditor();
-    const boxes = Array.from(container?.querySelectorAll<HTMLInputElement>('input[data-operation]') ?? []);
-    expect(boxes.length).toBeGreaterThan(0);
-    expect(boxes.every((input) => !input.disabled)).toBe(true);
+    const lookup = container?.querySelector<HTMLInputElement>('input[data-operation="dictionary.lookup"]');
+    const grammar = container?.querySelector<HTMLInputElement>('input[data-operation="dictionary.explain-grammar"]');
+    expect(lookup?.disabled).toBe(false);
+    expect(grammar?.disabled).toBe(true);
+    expect(grammar?.checked).toBe(false);
+    expect(grammar?.closest('label')?.getAttribute('title')).toBe('dedicated-analysis-required');
   });
 });
 
@@ -194,14 +204,18 @@ describe('a narrowing made through the UI survives a restart', () => {
     expect(editor.checked()).not.toContain(removed);
     // The delta form, written directly — never a whole `enabledOperations` list leaning on
     // the legacy conversion in `applyBuiltInOverride`.
-    expect(storedTutor().disabledOperations).toEqual([removed]);
+    expect(storedTutor().disabledOperations).toEqual(factory.enabledOperations.filter(
+      (operation) => operation === removed || !AVAILABLE.has(operation),
+    ));
 
     const reloaded = await afterRestart();
     expect(reloaded.enabledOperations).not.toContain(removed);
-    expect(reloaded.enabledOperations).toHaveLength(factory.enabledOperations.length - 1);
+    expect(reloaded.enabledOperations).toEqual(factory.enabledOperations.filter(
+      (operation) => operation !== removed && AVAILABLE.has(operation),
+    ));
   });
 
-  it('lets a user turn an operation back on, and does not resurrect the old delta', async () => {
+  it('lets a user turn an operation back on while retaining unavailable-operation pruning', async () => {
     const factory = factoryTutor();
     const removed = factory.enabledOperations[0];
 
@@ -209,8 +223,12 @@ describe('a narrowing made through the UI survives a restart', () => {
     await editor.toggle(removed);
     await editor.toggle(removed);
 
-    expect(Object.hasOwn(storedTutor(), 'disabledOperations')).toBe(false);
-    expect((await afterRestart()).enabledOperations).toEqual(factory.enabledOperations);
+    expect(storedTutor().disabledOperations).toEqual(factory.enabledOperations.filter(
+      (operation) => !AVAILABLE.has(operation),
+    ));
+    expect((await afterRestart()).enabledOperations).toEqual(
+      factory.enabledOperations.filter((operation) => AVAILABLE.has(operation)),
+    );
   });
 
   it('lets a user widen a built-in beyond its factory set', async () => {

@@ -10,10 +10,8 @@
  *
  * `study.list-opportunities` is the operation under test because it is the only zero-argument
  * operation whose adapter can be reached from this suite. The two operations that actually
- * failed live — `flashcard.list-decks` and `calendar.list` — are declared inside
- * `BlancReadyToolPanels.tsx`'s `handlers` memo, and that module reaches the whole Blanc tree at
- * eval time under `environment: 'node'` (see `localAgentQueueRun.test.ts`'s header for the same
- * constraint). Their zero-parameter shape is asserted from source below instead, with a control
+ * failed live — `flashcard.list-decks` and `calendar.list` — are declared in the central
+ * renderer registry. Their zero-parameter shape is asserted from source below, with a control
  * that fails if the reader ever stops resolving anything.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -22,7 +20,7 @@ import { resolve } from 'node:path';
 import { executeAgentTaskStep, missingAgentToolArguments } from '../../shared/localAgent';
 import { parseLocalAgentModelPlan } from '../../shared/localAgentPrompt';
 
-const PANEL = resolve(__dirname, '../components/blanc/BlancReadyToolPanels.tsx');
+const REGISTRY = resolve(__dirname, '../agentToolRegistry.ts');
 
 /**
  * `studyAgentHandlers` reaches `knownWords.ts`, which calls `window.addEventListener` at module
@@ -31,12 +29,20 @@ const PANEL = resolve(__dirname, '../components/blanc/BlancReadyToolPanels.tsx')
 async function studyHandlers(api: Record<string, unknown>) {
   vi.stubGlobal('window', {
     api,
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
     dispatchEvent: () => true,
-    localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    localStorage: {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    },
   });
-  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+  vi.stubGlobal('localStorage', {
+    getItem: () => null,
+    setItem: () => undefined,
+    removeItem: () => undefined,
+  });
   return (await import('../studyAgentHandlers')).createStudyAgentHandlers();
 }
 
@@ -70,11 +76,11 @@ describe('a zero-argument plan runs end to end', () => {
   });
 
   it('the two operations that failed live declare zero-parameter adapters', () => {
-    const source = readFileSync(PANEL, 'utf8');
+    const source = readFileSync(REGISTRY, 'utf8');
     // A zero-parameter arrow — nothing to read out of `arguments`, so `{}` is complete input.
     for (const operation of ['flashcard.list-decks', 'calendar.list']) {
       const line = source.split('\n').find((candidate) => candidate.includes(`'${operation}':`));
-      expect(line, `${operation} is no longer declared in the panel's handlers`).toBeTruthy();
+      expect(line, `${operation} is no longer declared in the central handlers`).toBeTruthy();
       expect(line, `${operation} now takes arguments — re-check its requiredArguments`)
         .toMatch(new RegExp(`'${operation}':\\s*(async\\s*)?\\(\\s*\\)\\s*=>`));
       expect(missingAgentToolArguments(operation as never, {})).toEqual([]);

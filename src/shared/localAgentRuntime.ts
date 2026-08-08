@@ -1,11 +1,12 @@
 import type { AgentMemoryEntry } from './localAgentMemory';
-import type { AgentTask } from './localAgent';
+import type { AgentTask, AgentToolOperationId } from './localAgent';
 import type { LocalAgentSettings } from './localAgentSettings';
 import type { AgentProfile } from './localAgentProfiles';
 
 export interface LocalAgentPlanRequest {
   objective: string;
   settings: LocalAgentSettings;
+  availableOperations?: readonly AgentToolOperationId[];
   profile?: AgentProfile;
   memories?: readonly AgentMemoryEntry[];
   applicationState?: Readonly<Record<string, unknown>>;

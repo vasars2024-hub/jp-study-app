@@ -6757,6 +6757,13 @@ export const ru: Catalog = {
     many: 'Включено {count} инструментов из {total}',
     other: 'Включено {count} инструмента из {total}',
   },
+  'blanc.agent.operations.unavailableCount': {
+    one: '{count} объявленная операция недоступна',
+    few: '{count} объявленные операции недоступны',
+    many: '{count} объявленных операций недоступны',
+    other: '{count} объявленной операции недоступно',
+  },
+  'blanc.agent.operations.unavailable': 'Недоступно',
   'blanc.agent.operations.enableAll': 'Включить все',
   'blanc.agent.operations.disableAll': 'Отключить все',
   'blanc.agent.operations.restoreDefaults': 'Вернуть значения по умолчанию',

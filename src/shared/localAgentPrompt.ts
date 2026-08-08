@@ -13,6 +13,7 @@ import type { AgentProfile } from './localAgentProfiles';
 export interface LocalAgentPromptContext {
   permission: AgentPermissionLevel;
   profile?: AgentProfile;
+  availableOperations?: readonly AgentToolOperationId[];
   memories?: readonly AgentMemoryEntry[];
   applicationState?: Readonly<Record<string, unknown>>;
 }
@@ -31,8 +32,14 @@ function boundedJson(value: unknown, limit: number): string {
   }
 }
 
-export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): string {
-  const available = AGENT_TOOL_OPERATIONS.filter((definition) => {
+export function selectLocalAgentApprovedOperations(
+  context: LocalAgentPromptContext,
+): AgentToolOperationId[] {
+  const installed = context.availableOperations
+    ? new Set(context.availableOperations)
+    : null;
+  return AGENT_TOOL_OPERATIONS.filter((definition) => {
+    if (installed && !installed.has(definition.id)) return false;
     if (context.profile && !context.profile.enabledOperations.includes(definition.id)) return false;
     const access = evaluateAgentToolAccess({
       callId: 'prompt-capability-check',
@@ -41,11 +48,17 @@ export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): s
       confirmed: true,
     }, context.permission);
     return access.status === 'allowed';
-  }).map((definition) => ({
+  }).map((definition) => definition.id);
+}
+
+export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): string {
+  const approved = new Set(selectLocalAgentApprovedOperations(context));
+  const available = AGENT_TOOL_OPERATIONS.filter((definition) => approved.has(definition.id))
+    .map((definition) => ({
     operation: definition.id,
     label: definition.label,
     confirmation: definition.confirmation ?? 'none',
-  }));
+    }));
   const promptContext = boundedJson({
     memories: context.memories ?? [],
     applicationState: context.applicationState ?? {},

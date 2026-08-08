@@ -6125,6 +6125,10 @@ export const zh: Catalog = {
   'blanc.agent.operations.enabledCount': {
     other: '已启用 {count} 个工具（共 {total} 个）',
   },
+  'blanc.agent.operations.unavailableCount': {
+    other: '{count} 个已声明操作不可用',
+  },
+  'blanc.agent.operations.unavailable': '不可用',
   'blanc.agent.operations.enableAll': '全部启用',
   'blanc.agent.operations.disableAll': '全部禁用',
   'blanc.agent.operations.restoreDefaults': '恢复默认值',

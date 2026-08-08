@@ -37,7 +37,6 @@ import type {
   AgentExecutionEvent,
   AgentTask,
   AgentTaskStep,
-  AgentToolHandlers,
 } from '../../../shared/localAgent';
 import { selectAgentMemoryContext } from '../../../shared/localAgentMemory';
 import { loadLocalAgentMemory } from '../../localAgentMemoryStore';
@@ -45,15 +44,8 @@ import { loadLocalAgentSettings, saveLocalAgentSettings } from '../../localAgent
 import type { LocalAgentSettings } from '../../../shared/localAgentSettings';
 import {
   addDeckCards,
-  createDeckFolder,
-  deleteDeckFolder,
   loadDeck,
-  loadDeckFolders,
-  updateDeckCard,
-  type DeckFlashcard,
 } from '../../flashcardDeck';
-import { addEvent, deleteEvent, loadEvents, type CalendarEvent } from '../../calendar';
-import { DEFAULT_LOCAL_AGENT_SETTINGS } from '../../../shared/localAgentSettings';
 import {
   loadLocalAgentAutomations,
   onLocalAgentAutomationsChanged,
@@ -78,14 +70,6 @@ import {
   selectAgentQueueRun,
   type AgentQueueRunRefusal,
 } from '../../localAgentQueueRun';
-import { searchAgentKnowledge } from '../../../shared/localAgentKnowledge';
-import { buildLocalAgentKnowledgeSnapshot } from '../../localAgentKnowledge';
-import { applyBlancTheme } from '../../blancThemeApply';
-import { applyBlancCustomCss } from '../../blancCustomCssApply';
-import { loadToolboxSettings, saveToolboxSettings } from '../../toolboxSettings';
-import { recordBlancThemeHistory, undoBlancThemeHistory } from '../../blancThemeHistoryStore';
-import { presetById, sanitizeThemeOverrides } from '../../../shared/blancTheme';
-import { sanitizeCustomCss } from '../../../shared/blancCustomCss';
 import {
   effectiveAgentPermission,
   getActiveAgentProfile,
@@ -97,7 +81,10 @@ import {
   loadLocalAgentProfiles,
   saveLocalAgentProfiles,
 } from '../../localAgentProfilesStore';
-import { createStudyAgentHandlers } from '../../studyAgentHandlers';
+import {
+  availableAgentToolOperationIds,
+  createCentralAgentToolRegistry,
+} from '../../agentToolRegistry';
 import { AgentProfileOperationsEditor, agentPermissionLabelKey } from './AgentProfileOperations';
 
 // This panel renders Study OS class names, whose rules live in styles.css.
@@ -315,6 +302,16 @@ export function LocalAgentPanel() {
   const [newProfileName, setNewProfileName] = useState('');
   const activeProfile = useMemo(() => getActiveAgentProfile(profileStore), [profileStore]);
   const recommendedModels = useMemo(() => recommendedLocalAgentModels(settings.modelMode), [settings.modelMode]);
+  const handlers = useMemo(() => createCentralAgentToolRegistry(t), [lang, t]);
+  const availableOperations = useMemo(
+    () => availableAgentToolOperationIds(handlers),
+    [handlers],
+  );
+  const executableOperations = useMemo(() => {
+    if (!activeProfile) return availableOperations;
+    const allowed = new Set(activeProfile.enabledOperations);
+    return availableOperations.filter((operation) => allowed.has(operation));
+  }, [activeProfile, availableOperations]);
 
   const updateSettings = (patch: Partial<LocalAgentSettings>): void => {
     setSettings(saveLocalAgentSettings(patch));
@@ -337,6 +334,7 @@ export function LocalAgentPanel() {
         objective: request,
         settings,
         profile: activeProfile,
+        availableOperations,
         memories: settings.memoryEnabled
           ? selectAgentMemoryContext(memory, request, { maxCharacters: 4_000 })
           : [],
@@ -441,156 +439,6 @@ export function LocalAgentPanel() {
     setStatus(t('blanc.agent.status.profileCreated'));
   };
 
-  const handlers: AgentToolHandlers = useMemo(() => {
-    const textArg = (arguments_: Readonly<Record<string, unknown>>, name: string): string => {
-      const value = arguments_[name];
-      if (typeof value !== 'string' || !value.trim()) throw new Error(t('blanc.agent.error.needsArgument', { name }));
-      return value.trim().slice(0, 500);
-    };
-    const safeCardPatch = (value: unknown): Partial<DeckFlashcard> => {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(t('blanc.agent.error.cardPatchObject'));
-      const raw = value as Record<string, unknown>;
-      const patch: Partial<DeckFlashcard> = {};
-      for (const key of ['word', 'reading', 'meaning', 'sentence', 'front', 'back', 'folder', 'jlptLevel', 'sceneReference']) {
-        if (typeof raw[key] === 'string') patch[key as keyof DeckFlashcard] = raw[key] as never;
-      }
-      return patch;
-    };
-    const safeCalendarEntry = (arguments_: Readonly<Record<string, unknown>>): Omit<CalendarEvent, 'id' | 'createdAt'> => ({
-      title: textArg(arguments_, 'title'),
-      description: typeof arguments_.description === 'string' ? arguments_.description.slice(0, 500) : undefined,
-      date: /^\d{4}-\d{2}-\d{2}$/.test(textArg(arguments_, 'date')) ? textArg(arguments_, 'date') : (() => { throw new Error(t('blanc.agent.error.calendarDate')); })(),
-      startTime: typeof arguments_.startTime === 'string' ? arguments_.startTime.slice(0, 5) : undefined,
-      endTime: typeof arguments_.endTime === 'string' ? arguments_.endTime.slice(0, 5) : undefined,
-      allDay: arguments_.allDay === true,
-      color: typeof arguments_.color === 'string' ? arguments_.color.slice(0, 20) : '#6c7bff',
-      category: arguments_.category === 'reminder' ? 'reminder' : 'study',
-      reminder: 'none',
-      recurrence: 'none',
-    });
-    return {
-      ...createStudyAgentHandlers(),
-      'dictionary.lookup': async (arguments_) => window.api.lookupTerm(textArg(arguments_, 'term')),
-      'dictionary.explain-grammar': async (arguments_) => window.api.lookupTerm(textArg(arguments_, 'term')),
-      'dictionary.analyze-sentence': async (arguments_) => window.api.lookupTerm(textArg(arguments_, 'term')),
-      'dictionary.search-knowledge': async (arguments_) => {
-        const query = textArg(arguments_, 'query');
-        const [deck, media, library] = await Promise.all([
-          Promise.resolve(loadDeck()),
-          window.api.listMedia(),
-          window.api.listLibrary(),
-        ]);
-        const snapshot = buildLocalAgentKnowledgeSnapshot({
-          deck,
-          media,
-          library,
-          calendar: loadEvents(),
-          memory: loadLocalAgentMemory(),
-        });
-        return searchAgentKnowledge(snapshot, query, {
-          limit: typeof arguments_.limit === 'number' ? arguments_.limit : 20,
-        });
-      },
-      'flashcard.list-decks': () => ({ folders: loadDeckFolders(), cards: loadDeck().length }),
-      'flashcard.create-deck': (arguments_) => ({ folders: createDeckFolder(textArg(arguments_, 'name')) }),
-      'flashcard.add-cards': (arguments_) => {
-        if (!Array.isArray(arguments_.cards) || arguments_.cards.length < 1) throw new Error(t('blanc.agent.error.needsCards'));
-        const cards = arguments_.cards.slice(0, 50).map((raw) => {
-          if (!raw || typeof raw !== 'object') throw new Error(t('blanc.agent.error.cardObject'));
-          const card = raw as Record<string, unknown>;
-          return {
-            word: textArg(card, 'word'),
-            reading: typeof card.reading === 'string' ? card.reading.slice(0, 200) : '',
-            meaning: typeof card.meaning === 'string' ? card.meaning.slice(0, 500) : '',
-            sentence: typeof card.sentence === 'string' ? card.sentence.slice(0, 500) : undefined,
-            source: 'import' as const,
-            folder: typeof card.folder === 'string' ? card.folder.slice(0, 120) : undefined,
-          };
-        });
-        return { cards: addDeckCards(cards).length };
-      },
-      'flashcard.modify-cards': (arguments_) => ({ cards: updateDeckCard(textArg(arguments_, 'id'), safeCardPatch(arguments_.patch)).length }),
-      'flashcard.schedule-reviews': () => ({ queued: true, cards: loadDeck().length }),
-      'flashcard.delete-deck': (arguments_) => deleteDeckFolder(textArg(arguments_, 'name')),
-      'calendar.list': () => ({ events: loadEvents().slice(0, 100) }),
-      'calendar.schedule-session': (arguments_) => addEvent(safeCalendarEntry(arguments_)),
-      'calendar.create-reminder': (arguments_) => addEvent({ ...safeCalendarEntry(arguments_), category: 'reminder' }),
-      'calendar.delete-event': (arguments_) => ({ events: deleteEvent(textArg(arguments_, 'id')) }),
-      'settings.read': () => loadLocalAgentSettings(),
-      'settings.change-preference': (arguments_) => {
-        const key = textArg(arguments_, 'key') as keyof LocalAgentSettings;
-        const allowed: Array<keyof LocalAgentSettings> = ['enabled', 'modelFileName', 'modelMode', 'contextSize', 'memoryLimitMb', 'resourceMode', 'cpuLimitPct', 'gpuLimitPct', 'maxConcurrentTasks', 'backgroundProcessing', 'permission', 'memoryEnabled', 'privacyMode', 'debugMode'];
-        if (!allowed.includes(key)) throw new Error(t('blanc.agent.error.preferenceLocked'));
-        return saveLocalAgentSettings({ [key]: arguments_.value } as Partial<LocalAgentSettings>);
-      },
-      'settings.configure-module': (arguments_) => {
-        const key = textArg(arguments_, 'key') as keyof LocalAgentSettings;
-        if (!['enabled', 'memoryEnabled', 'privacyMode', 'debugMode'].includes(key)) throw new Error(t('blanc.agent.error.moduleLocked'));
-        return saveLocalAgentSettings({ [key]: arguments_.value } as Partial<LocalAgentSettings>);
-      },
-      'settings.reset': () => saveLocalAgentSettings(DEFAULT_LOCAL_AGENT_SETTINGS),
-      'settings.preview-theme': (arguments_) => {
-        const current = loadToolboxSettings();
-        const preset = typeof arguments_.preset === 'string' && presetById(arguments_.preset) ? arguments_.preset : current.themePreset;
-        const overrides = sanitizeThemeOverrides(arguments_.overrides);
-        applyBlancTheme(preset, overrides);
-        return { preview: true, preset, overrides };
-      },
-      'settings.apply-theme': (arguments_) => {
-        const current = loadToolboxSettings();
-        const preset = typeof arguments_.preset === 'string' && presetById(arguments_.preset) ? arguments_.preset : current.themePreset;
-        const overrides = sanitizeThemeOverrides(arguments_.overrides);
-        recordBlancThemeHistory(current);
-        const next = saveToolboxSettings({ themePreset: preset, themeOverrides: overrides });
-        applyBlancTheme(next.themePreset, next.themeOverrides);
-        return { applied: true, preset: next.themePreset, overrides: next.themeOverrides };
-      },
-      'settings.reset-theme': () => {
-        recordBlancThemeHistory(loadToolboxSettings());
-        const next = saveToolboxSettings({ themePreset: 'default', themeOverrides: {} });
-        applyBlancTheme(next.themePreset, next.themeOverrides);
-        return { reset: true };
-      },
-      'settings.undo-theme': () => {
-        const previous = undoBlancThemeHistory();
-        if (!previous) throw new Error(t('blanc.agent.error.noThemeHistory'));
-        const next = saveToolboxSettings({ themePreset: previous.preset, themeOverrides: previous.overrides });
-        applyBlancTheme(next.themePreset, next.themeOverrides);
-        return { restored: true, preset: next.themePreset, overrides: next.themeOverrides };
-      },
-      'settings.preview-css': (arguments_) => {
-        const css = sanitizeCustomCss(arguments_.css);
-        applyBlancCustomCss(css);
-        return { preview: true, characters: css.length };
-      },
-      'settings.apply-css': (arguments_) => {
-        const css = sanitizeCustomCss(arguments_.css);
-        const next = saveToolboxSettings({ customCss: css });
-        applyBlancCustomCss(next.customCss);
-        return { applied: true, characters: next.customCss.length };
-      },
-      'settings.reset-css': () => {
-        const next = saveToolboxSettings({ customCss: '' });
-        applyBlancCustomCss(next.customCss);
-        return { reset: true };
-      },
-      'media.search': async (arguments_) => {
-        const query = typeof arguments_.query === 'string' ? arguments_.query.toLocaleLowerCase().trim() : '';
-        const items = await window.api.listMedia();
-        return items.filter((item) => !query || `${item.title} ${item.path}`.toLocaleLowerCase().includes(query)).slice(0, 100);
-      },
-      'media.add-item': async (arguments_) => {
-        if (!Array.isArray(arguments_.paths) || !arguments_.paths.length) throw new Error(t('blanc.agent.error.needsPaths'));
-        const paths = arguments_.paths.filter((value): value is string => typeof value === 'string').slice(0, 20);
-        if (!paths.length) throw new Error(t('blanc.agent.error.noValidPaths'));
-        return window.api.importPaths(paths);
-      },
-      'media.delete-item': (arguments_) => window.api.removeMedia(textArg(arguments_, 'id')),
-    };
-    // `lang`, never `t` — `t`'s identity is stable by design, so depending on it would
-    // leave these operation errors frozen in the language the panel first mounted in.
-  }, [lang]);
-
   /**
    * The panel's one execution call. All three verbs — run next, confirm, and running an item
    * out of the persisted queue — funnel through here, so the profile allow-list is supplied in
@@ -606,7 +454,7 @@ export function LocalAgentPanel() {
         // Re-checked at EXECUTION, not only when the plan was built: a queued task outlives
         // the profile that authorized it, so narrowing a profile must take effect on work
         // already sitting in the queue.
-        allowedOperations: activeProfile?.enabledOperations,
+        allowedOperations: executableOperations,
         handlers,
         ...(confirmed ? { confirmedCallIds: new Set([step.request.callId]) } : {}),
       });

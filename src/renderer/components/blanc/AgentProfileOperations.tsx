@@ -12,6 +12,11 @@ import {
   type AgentProfileStore,
 } from '../../../shared/localAgentProfiles';
 import { setLocalAgentProfileOperations } from '../../localAgentProfilesStore';
+import {
+  agentToolCapabilityMatrix,
+  availableAgentToolOperationIds,
+  createCentralAgentToolRegistry,
+} from '../../agentToolRegistry';
 import { useT } from '../../i18n';
 
 /**
@@ -88,8 +93,18 @@ export interface AgentProfileOperationsEditorProps {
  * would make the editor and the refusal disagree about what the user just switched off.
  */
 export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }: AgentProfileOperationsEditorProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const profile = store.profiles.find((entry) => entry.id === profileId);
+  const handlers = useMemo(() => createCentralAgentToolRegistry(t), [lang, t]);
+  const capabilities = useMemo(() => agentToolCapabilityMatrix(handlers), [handlers]);
+  const availableOperations = useMemo(
+    () => availableAgentToolOperationIds(handlers),
+    [handlers],
+  );
+  const available = useMemo(() => new Set(availableOperations), [availableOperations]);
+  const unavailableReasons = useMemo(() => new Map(capabilities.flatMap((entry) => (
+    entry.available ? [] : [[entry.definition.id, entry.reason] as const]
+  ))), [capabilities]);
   const enabled = useMemo(
     () => new Set<AgentToolOperationId>(profile?.enabledOperations ?? []),
     [profile?.enabledOperations],
@@ -101,10 +116,15 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
   const isFactoryDefault = agentProfileOperationsAreFactoryDefault(profile);
 
   const commit = (next: readonly AgentToolOperationId[]): void => {
-    onStoreChange(setLocalAgentProfileOperations(store, profile.id, next));
+    onStoreChange(setLocalAgentProfileOperations(
+      store,
+      profile.id,
+      next.filter((operation) => available.has(operation)),
+    ));
   };
 
   const toggle = (operation: AgentToolOperationId): void => {
+    if (!available.has(operation)) return;
     const next = new Set(enabled);
     if (next.has(operation)) next.delete(operation);
     else next.add(operation);
@@ -121,7 +141,7 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
         <button
           type="button"
           data-testid="agent-operations-enable-all"
-          onClick={() => commit(AGENT_TOOL_OPERATIONS.map((definition) => definition.id))}
+          onClick={() => commit(availableOperations)}
         >
           {t('blanc.agent.operations.enableAll')}
         </button>
@@ -144,12 +164,17 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
         )}
         <span className="blanc-note">
           {t('blanc.agent.operations.enabledCount', {
-            count: profile.enabledOperations.length,
-            total: AGENT_TOOL_OPERATIONS.length,
+            count: profile.enabledOperations.filter((operation) => available.has(operation)).length,
+            total: availableOperations.length,
           })}
           {factoryOperations
             ? ` · ${t(isFactoryDefault ? 'blanc.agent.operations.usingDefaults' : 'blanc.agent.operations.customized')}`
             : ''}
+        </span>
+        <span className="blanc-note">
+          {t('blanc.agent.operations.unavailableCount', {
+            count: capabilities.length - availableOperations.length,
+          })}
         </span>
       </div>
       {profile.enabledOperations.length === 0 && (
@@ -160,11 +185,16 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
           <p className="blanc-note" id={`agent-operations-${tool}`}>{t(TOOL_GROUP_KEYS[tool])}</p>
           <div className="blanc-form-grid">
             {operations.map((definition) => (
-              <label key={definition.id} className="blanc-check" title={definition.id}>
+              <label
+                key={definition.id}
+                className="blanc-check"
+                title={unavailableReasons.get(definition.id) ?? definition.id}
+              >
                 <input
                   type="checkbox"
                   data-operation={definition.id}
-                  checked={enabled.has(definition.id)}
+                  checked={available.has(definition.id) && enabled.has(definition.id)}
+                  disabled={!available.has(definition.id)}
                   onChange={() => toggle(definition.id)}
                 />
                 <span>
@@ -173,6 +203,9 @@ export function AgentProfileOperationsEditor({ store, profileId, onStoreChange }
                   <span className="blanc-note">
                     ({t(agentPermissionLabelKey(definition.minimumPermission))})
                   </span>
+                  {!available.has(definition.id) ? (
+                    <span className="blanc-note"> · {t('blanc.agent.operations.unavailable')}</span>
+                  ) : null}
                 </span>
               </label>
             ))}

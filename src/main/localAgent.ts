@@ -3,7 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { LlamaChatSession } from 'node-llama-cpp';
-import { buildLocalAgentSystemPrompt, parseLocalAgentModelPlan } from '../shared/localAgentPrompt';
+import {
+  buildLocalAgentSystemPrompt,
+  parseLocalAgentModelPlan,
+  selectLocalAgentApprovedOperations,
+} from '../shared/localAgentPrompt';
+import { AGENT_TOOL_OPERATIONS, type AgentToolOperationId } from '../shared/localAgent';
 import { normalizeLocalAgentSettings, type LocalAgentSettings } from '../shared/localAgentSettings';
 import { effectiveAgentPermission } from '../shared/localAgentProfiles';
 import { recommendedLocalAgentModels } from '../shared/localAgentModels';
@@ -204,12 +209,15 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
     const loaded = await queueInference(async () => {
       const current = await loadRuntime(settings, modelPath);
       const permission = effectiveAgentPermission(settings.permission, request.profile);
-      const system = buildLocalAgentSystemPrompt({
+      const promptContext = {
         permission,
         profile: request.profile,
+        availableOperations: normalizeAvailableOperations(request.availableOperations),
         memories: settings.memoryEnabled ? request.memories : [],
         applicationState: settings.privacyMode ? {} : request.applicationState,
-      });
+      };
+      const approvedOperations = selectLocalAgentApprovedOperations(promptContext);
+      const system = buildLocalAgentSystemPrompt(promptContext);
       const prompt = `${system}\n\nUser request:\n${objective}`;
       const response = await promptWithTimeout(current.session, prompt);
       return parseLocalAgentModelPlan(
@@ -218,7 +226,7 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
         objective,
         permission,
         startedAt,
-        request.profile?.enabledOperations,
+        approvedOperations,
       );
     });
     lastError = '';
@@ -272,6 +280,15 @@ export function registerLocalAgentIpc(): void {
   // point another track is mid-rewrite on.
   registerAgentWorkspaceIpc();
   registerAgentExecutionIpc();
+}
+
+const AGENT_OPERATION_IDS = new Set(AGENT_TOOL_OPERATIONS.map((entry) => entry.id));
+
+function normalizeAvailableOperations(value: unknown): AgentToolOperationId[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((entry): entry is AgentToolOperationId => (
+    typeof entry === 'string' && AGENT_OPERATION_IDS.has(entry as AgentToolOperationId)
+  )))];
 }
 
 export function stopLocalAgentRuntime(): void {
