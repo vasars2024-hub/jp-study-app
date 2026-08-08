@@ -256,4 +256,26 @@ describe('the claim Phase 1 rests on: lookup is an index hit, not a scan', () =>
     expect(plan).toMatch(/idx_hw_dict_norm/);
     expect(plan).not.toMatch(/idx_hw_dict \(dict_id=\?\)/);
   });
+
+  it('reads a sense’s glosses from an index, not by scanning every gloss', () => {
+    // The worst of the two index defects real data found, because this query runs
+    // for every entry of every lookup: `where sense_id = ?` cannot use
+    // idx_gloss_lang(lang, sense_id) — wrong leading column — so SQLite scanned
+    // all 1.33 M glosses, 95 ms a call.
+    const plan = (db.prepare('explain query plan select text from glosses where sense_id = ? order by ord, id')
+      .all(1) as { detail: string }[])
+      .map((row) => row.detail)
+      .join(' ');
+    expect(plan).toMatch(/idx_gloss_sense/);
+    expect(plan).not.toMatch(/SCAN glosses/);
+  });
+
+  it('reads a headword’s senses from an index', () => {
+    const plan = (db.prepare('explain query plan select id from senses where headword_id = ? order by ord, id')
+      .all(1) as { detail: string }[])
+      .map((row) => row.detail)
+      .join(' ');
+    expect(plan).toMatch(/idx_sense_hw/);
+    expect(plan).not.toMatch(/SCAN senses/);
+  });
 });

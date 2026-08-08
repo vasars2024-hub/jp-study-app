@@ -154,6 +154,56 @@ Amending a v1 migration step is normally forbidden (`user_version` means an edit
 on a machine that applied it). It is legitimate here for one reason only: **v1 has not shipped**, so
 no machine has applied it.
 
+### And a second one, worse, on the hot path of every lookup
+
+Fixing the first index did not make the real-data run finish — it stayed CPU-bound. The cause was the
+same shape one table down, and this one is not confined to bulk work:
+
+```
+select text from glosses where sense_id = ? order by ord, id
+  →  SCAN glosses | USE TEMP B-TREE FOR ORDER BY      ~95 ms per call
+```
+
+§3.1 gives `glosses` exactly one index, `idx_gloss_lang(lang, sense_id)`. "The glosses of this sense"
+filters on `sense_id` **alone**, and `lang` is the leading column, so the index cannot serve it — over
+1 333 201 real gloss rows SQLite scanned the table, at 473 ms for five calls.
+
+`dictService.readSenses()` runs that query **for every sense of every entry it returns**. So this was
+not a slow test; it was a lookup service that would have taken seconds per query in the product, and
+a 50 k-row fixture would never have shown it. Added `idx_gloss_sense(sense_id, ord)` — ordering by
+`ord` in the index too, which makes it covering and removes the temp B-tree the ORDER BY builds.
+
+Both index defects were the same mistake — **assuming a composite index serves a predicate on its
+non-leading column** — and both are now pinned by query-plan assertions rather than by timings, since
+timings pass at fixture scale in both cases.
+
+Real corpus for the record: **697 837 headwords, 697 837 senses, 1 333 201 glosses.**
+
+### Phase 1's done-criterion, met against the real dictionaries
+
+`JP_DICT_REAL=1 npx vitest run src/main/__tests__/dictionaryRealData.test.ts` — 6/6:
+
+```
+[1/4] JMdict (Japanese–English)     524 106 headwords · 524 106 senses · 1 065 448 glosses
+[2/4] JMdict (Japanese–Russian)     101 843 headwords · 101 843 senses ·   161 514 glosses
+[3/4] Kanjium Pitch Accents                                              107 978 pitch rows
+[4/4] Moedict (Chinese monolingual)  71 888 headwords ·  71 888 senses ·   106 239 glosses
+
+migrated in 117.6 s · nothing skipped
+5 000 terms compared entry-for-entry: identical
+697 837 headwords · p50 0.0077 ms · p95 0.0181 ms      (gate: p95 < 5 ms)
+reverse lookup 'tradition' → 20 headwords
+every source index.json still on disk
+```
+
+**p95 is 276× under the gate.** The plan's Phase 1 done-criterion — *"the three bundled dicts are
+queryable from the DB and p95 exact lookup < 5 ms"* — is met, on the real corpus rather than on a
+fixture, and the pitch data that §3.1 had nowhere to put is 107 978 rows of it.
+
+The two index fixes are what made this finishable at all: the same run took **117 seconds to import
+and then over 25 minutes without completing the parity pass**; it is now 2.9 seconds. That is the
+measurement to keep in mind when reading "the import is slow" — the import was never the problem.
+
 ### Wiring, and the one piece of the plan that is blocked
 
 The architecture audit failed the moment these modules existed — `migrate.ts` and `cedict.ts` were

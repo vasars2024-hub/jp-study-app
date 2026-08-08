@@ -99,6 +99,13 @@ CREATE TABLE glosses (
   ord      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_gloss_lang ON glosses(lang, sense_id);
+-- §3.1 stops at the index above, and that index cannot serve the query every
+-- lookup actually makes. "The glosses of this sense" filters on sense_id alone,
+-- and idx_gloss_lang leads with lang, so SQLite falls back to SCAN glosses —
+-- measured at 95 ms per call over 1.33 M real rows, on the hot path of EVERY
+-- lookup, not just of bulk work. Ordering by ord here as well makes it covering
+-- and removes the temp B-tree the ORDER BY otherwise builds.
+CREATE INDEX idx_gloss_sense ON glosses(sense_id, ord);
 
 CREATE TABLE xrefs (
   from_sense INTEGER NOT NULL REFERENCES senses(id) ON DELETE CASCADE,
