@@ -22,7 +22,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 | Encrypted credential vault and provider migration | Three path-scoped checkpoints implemented; focused and full suites passed | Jiten, Gemini, DeepSeek, Jimaku, OpenSubtitles, MAL OAuth and dynamic scraper references now use `src/main/credentials/*`; shared Settings wiring remains in the protected dirty tree | Build the structured provider runtime without absorbing unrelated `main.ts` / preload work |
 | Gemini / DeepSeek credentials | Broken security policy: separate store could downgrade to plaintext | Clean-at-HEAD `src/main/mining.ts` explicitly wrote plaintext when `safeStorage` was unavailable | Completed in first slice; provider health/client unification remains |
 | Jimaku / OpenSubtitles credentials | Broken security policy: separate unmarked store could downgrade to plaintext | Clean-at-HEAD `src/main/subtitleProviderClients.ts` | Completed in first slice; retain provider-specific Test calls backed by shared status metadata |
-| Professional Lexicon core | Partially implemented, automated foundation verified | SQLite/FTS service plus Yomitan, CEDICT and Tatoeba code; dictionary focused suite passed. Dictionary and Translate are still separate `AppSection` routes | Audit service adoption/migrations, then build compatibility aliases into one Workbench |
+| Professional Lexicon core | SQLite/FTS adoption and Workbench compatibility foundation integrated | Canonical lookup now bridges into the existing `DictResult` surface with legacy fallback and pitch/frequency preservation; route aliases and input-scale contracts exist, while Dictionary and Translate remain separate UI routes | Adopt the contracts in a first-class Workbench shell after dirty route ownership is reconciled |
 | Central AI Agent | Read-only consolidation audit and first provider-runtime slice complete; first-class app genuinely missing | Typed tools/runtime and shared workspace contracts now have one cloud request boundary, but persistence and handlers remain renderer-owned and there is no durable conversation/context handoff | Complete local/stream/persistent-cache adapters, then main-owned conversation persistence |
 | Unified Reading workspace | Partial and collision-prone | Reading Finder and Novels remain separate routed components; both are already modified in the dirty tree | Defer until ownership reconciliation after shared foundations |
 | ReadingLens Capture and Read | Partial | Main capture service, overlay, settings and tests exist; source still presents an overlay rather than the complete three-depth workflow | Defer until Lexicon + Reading contracts exist |
@@ -195,6 +195,25 @@ Remaining boundary:
 
 - This is the unified cloud execution slice, not a claim that the full Agent provider layer is complete. Local Qwen execution selection, true token streaming, privacy-reviewed persistent response caching and live provider health probes still require dedicated adapters.
 - No real cloud request was issued; focused tests use deterministic provider responses and verify exact outgoing request contracts without spending user funds or transmitting user content.
+
+## Luna Lexicon Workbench slice and primary review
+
+The isolated exact Luna Max assignment produced commit `9e6e82dfe308e7f5a953c9a05a7484baceffd6f2` across five Lexicon-owned paths. Primary review applied the complete diff, then corrected two integration hazards before checkpointing: SQLite lookup now precedes legacy Yomitan initialization, and converted results retain the existing popup's pitch/frequency metadata instead of silently regressing it.
+
+Behavior now established:
+
+- `lookupTerm` attempts the canonical SQLite/FTS any-to-any service first and falls back to the established Yomitan/Jisho path on an empty database or read failure.
+- The unified lookup adapter preserves sourced glosses, dictionary attribution, structured HTML, multilingual gloss languages, commonness and de-inflection in the existing `DictResult` contract.
+- Legacy pitch and corpus-frequency fields are restored after conversion while the unified lookup schema lacks first-class metadata fields.
+- Shared Workbench contracts normalize `dictionary` and `translate` as compatibility aliases for a future `lexicon` route and deterministically classify character/word/sentence/paragraph/document input without invoking a model.
+- Dirty Dictionary/Translate renderer routes, shell routing, preload and shared catalogs were not edited.
+
+Automated evidence:
+
+- Focused Lexicon adapter, Workbench contract, dictionary database/lookup/migration/CEDICT and real-data suites: 7 files passed / 1 skipped; 103 tests passed / 6 skipped.
+- Architecture baseline: pass through real production use of Workbench normalization; no baseline update.
+- Targeted ESLint: no errors; seven existing `any` warnings remain in `dictionary.ts`.
+- Electron verification remains deferred until a Workbench route exists; this slice has no new UI to verify honestly.
 
 ## Exact next slice
 

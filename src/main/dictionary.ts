@@ -14,6 +14,8 @@ import {
   fetchJapaneseAudio,
   getAvailableGlossLangs,
   getDictRegistryHash,
+  getFrequencyRank,
+  getPitch,
   importYomitanZip,
   initYomitan,
   listYomitanDicts,
@@ -34,6 +36,9 @@ import {
   offlineStatus,
   searchOffline,
 } from './dictionary/tatoebaOffline';
+import { enrichLexiconResultMetadata, lookupResultToDictResult } from './dictionary/lexiconAdapter';
+import { lookupInDictionaryDb } from './dictionary/service';
+import { normalizeLexiconText } from '../shared/lexiconWorkbench';
 
 // Dictionary lookups go through Jisho.org (the same JMdict data Yomitan's main
 // dictionary is built on). We fetch here in the main process so the renderer
@@ -114,8 +119,34 @@ export async function lookupWord(query: string): Promise<DictResult> {
 
 /** Merged offline Yomitan + pitch/freq enrichment, with Jisho fallback. */
 export async function lookupTerm(query: string): Promise<DictResult> {
+  const q = normalizeLexiconText(query ?? '');
+  if (!q) return { query: q, entries: [] };
+
+  // SQLite/FTS is the canonical any-to-any path. It is additive during the
+  // migration: installations whose legacy JSON stores have not been imported
+  // yet still use the existing Yomitan/Jisho path below, unchanged.
+  try {
+    const unified = lookupInDictionaryDb({ text: q, limit: 8 });
+    if (unified.entries.length) {
+      const converted = lookupResultToDictResult(unified);
+      // Preserve the legacy popup's pitch/frequency contract while the unified
+      // schema grows first-class metadata fields of its own.
+      try {
+        await initYomitan();
+        return enrichLexiconResultMetadata(converted, {
+          pitchHtml: getPitch,
+          frequency: getFrequencyRank,
+        });
+      } catch {
+        return converted;
+      }
+    }
+  } catch {
+    // A database read must never take the established dictionary fallback down.
+  }
+
   await initYomitan();
-  return lookupTermMerged(query, lookupWord);
+  return lookupTermMerged(q, lookupWord);
 }
 
 /** Offline-only Yomitan glossary lookup (de-inflection aware) — no Jisho HTTP. */
