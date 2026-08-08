@@ -1,0 +1,21 @@
+{
+  "cycles": 2,
+  "snapshots": [
+    {
+      "label": "baseline",
+      "total": 72,
+      "totalChars": 1419499
+    },
+    {
+      "label": "boot-1",
+      "total": 72,
+      "totalChars": 1419499
+    },
+    {
+      "label": "boot-2",
+      "total": 72,
+      "totalChars": 1419499
+    }
+  ],
+  "findings": []
+}

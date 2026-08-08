@@ -1,0 +1,1292 @@
+{
+  "summary": {
+    "generated": "2026-08-07T17:41:19.271Z",
+    "liveObjectKeys": 30,
+    "compared": 20,
+    "writerTypeUnresolved": 5,
+    "noNamedWriter": 0,
+    "keysWithFieldDrift": 1,
+    "totalPresentNotWritten": 0,
+    "totalWrittenNotPresent": 17,
+    "totalWrittenNotRead": 0
+  },
+  "results": [
+    {
+      "key": "jp:directstream-open-generation",
+      "status": "non-object-payload",
+      "liveFields": [
+        "clientId",
+        "generation"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/media/StudyPlayerSlice.tsx"
+      ]
+    },
+    {
+      "key": "jp-os-motion-prefs-v1",
+      "status": "compared",
+      "liveFields": [
+        "companionWeight",
+        "motionMode",
+        "rewardParticles",
+        "velocity"
+      ],
+      "writtenFields": [
+        "companionWeight",
+        "motionMode",
+        "rewardParticles",
+        "velocity"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/motion/motionPrefs.ts"
+      ],
+      "fieldTypes": {
+        "companionWeight": "number",
+        "motionMode": "string",
+        "rewardParticles": "string",
+        "velocity": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-study.onboarding.v1",
+      "status": "compared",
+      "liveFields": [
+        "completedAt",
+        "lastStepId",
+        "replays"
+      ],
+      "writtenFields": [
+        "completedAt",
+        "lastStepId",
+        "replays"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/onboardingStore.ts"
+      ],
+      "fieldTypes": {
+        "completedAt": "string",
+        "lastStepId": "null",
+        "replays": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": [
+        "lastStepId"
+      ]
+    },
+    {
+      "key": "jp-os-settings-recent-v1",
+      "status": "compared",
+      "liveFields": [
+        "pages",
+        "queries"
+      ],
+      "writtenFields": [
+        "pages",
+        "queries"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/components/settings/settingsRecent.ts"
+      ],
+      "fieldTypes": {
+        "pages": "array[8]",
+        "queries": "array[4]"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-aero-environment-v1",
+      "status": "writer-type-unresolved",
+      "liveFields": [
+        "achievementCelebrations",
+        "activePlaylistId",
+        "ambientAudio",
+        "buddyRoutines",
+        "calendarWallsEnabled",
+        "companionActiveness",
+        "companionCelebrate",
+        "companionPauseWhenStudying",
+        "companionReactivity",
+        "companionTypes",
+        "companions",
+        "companionsEnabled",
+        "companionsOnOsDesktop",
+        "dayCycleLighting",
+        "enabled",
+        "environmentPresetId",
+        "lightingIntensity",
+        "matchParticleSuggestions",
+        "particleDensity",
+        "particleIntensity",
+        "particlePresets",
+        "particleSize",
+        "particlesEnabled",
+        "performanceTier",
+        "playlists",
+        "rotationEnabled",
+        "rules",
+        "snowAccumulation",
+        "weather"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [
+        "achievementCelebrations",
+        "activePlaylistId",
+        "ambientAudio",
+        "buddyRoutines",
+        "calendarWallsEnabled",
+        "companionActiveness",
+        "companionCelebrate",
+        "companionPauseWhenStudying",
+        "companionReactivity",
+        "companionTypes",
+        "companions",
+        "companionsEnabled",
+        "companionsOnOsDesktop",
+        "dayCycleLighting",
+        "enabled",
+        "environmentPresetId",
+        "lightingIntensity",
+        "matchParticleSuggestions",
+        "particleDensity",
+        "particleIntensity",
+        "particlePresets",
+        "particleSize",
+        "particlesEnabled",
+        "performanceTier",
+        "playlists",
+        "rotationEnabled",
+        "rules",
+        "snowAccumulation",
+        "weather"
+      ],
+      "writtenNotPresent": [],
+      "writerFiles": [],
+      "fieldTypes": {
+        "achievementCelebrations": "boolean",
+        "activePlaylistId": "string",
+        "ambientAudio": "object{2}",
+        "buddyRoutines": "array[11]",
+        "calendarWallsEnabled": "boolean",
+        "companionActiveness": "number",
+        "companionCelebrate": "boolean",
+        "companionPauseWhenStudying": "boolean",
+        "companionReactivity": "string",
+        "companionTypes": "array[1]",
+        "companions": "array[1]",
+        "companionsEnabled": "boolean",
+        "companionsOnOsDesktop": "boolean",
+        "dayCycleLighting": "boolean",
+        "enabled": "boolean",
+        "environmentPresetId": "string",
+        "lightingIntensity": "number",
+        "matchParticleSuggestions": "boolean",
+        "particleDensity": "number",
+        "particleIntensity": "number",
+        "particlePresets": "array[2]",
+        "particleSize": "number",
+        "particlesEnabled": "boolean",
+        "performanceTier": "string",
+        "playlists": "array[1]",
+        "rotationEnabled": "boolean",
+        "rules": "array[4]",
+        "snowAccumulation": "boolean",
+        "weather": "object{2}"
+      }
+    },
+    {
+      "key": "jp-flashcard-deck",
+      "status": "compared",
+      "liveFields": [
+        "cards",
+        "folders"
+      ],
+      "writtenFields": [
+        "cards",
+        "folders"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/flashcardDeck.ts"
+      ],
+      "fieldTypes": {
+        "cards": "array[3221]",
+        "folders": "array[1]"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-media-player-preferences-v1",
+      "status": "compared",
+      "liveFields": [
+        "autoPause",
+        "cueTimingReadout",
+        "dictationMode",
+        "dualSubs",
+        "furigana",
+        "grammarHighlight",
+        "loopLine",
+        "playbackRate",
+        "preferredAudioLanguage",
+        "primarySubs",
+        "secondarySubLang",
+        "seekStepSec",
+        "shadowingMode",
+        "subtitleBgOpacity",
+        "subtitleFontFamily",
+        "subtitleFontSize",
+        "subtitleFontWeight",
+        "subtitleOutline",
+        "subtitleOverlay",
+        "subtitleOverlayBackground",
+        "subtitlePosition",
+        "transcriptPanel",
+        "volumeNormalization"
+      ],
+      "writtenFields": [
+        "autoPause",
+        "cueTimingReadout",
+        "dictationMode",
+        "dualSubs",
+        "furigana",
+        "grammarHighlight",
+        "loopLine",
+        "playbackRate",
+        "preferredAudioLanguage",
+        "primarySubs",
+        "secondarySubLang",
+        "seekStepSec",
+        "shadowingMode",
+        "subtitleBgOpacity",
+        "subtitleFontFamily",
+        "subtitleFontSize",
+        "subtitleFontWeight",
+        "subtitleOutline",
+        "subtitleOverlay",
+        "subtitleOverlayBackground",
+        "subtitlePosition",
+        "transcriptPanel",
+        "volumeNormalization"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/media/VideoCoreStudyOverlay.tsx",
+        "src/renderer/components/media/MediaContent.tsx"
+      ],
+      "fieldTypes": {
+        "autoPause": "boolean",
+        "cueTimingReadout": "boolean",
+        "dictationMode": "boolean",
+        "dualSubs": "boolean",
+        "furigana": "boolean",
+        "grammarHighlight": "boolean",
+        "loopLine": "boolean",
+        "playbackRate": "number",
+        "preferredAudioLanguage": "string",
+        "primarySubs": "boolean",
+        "secondarySubLang": "string",
+        "seekStepSec": "number",
+        "shadowingMode": "boolean",
+        "subtitleBgOpacity": "number",
+        "subtitleFontFamily": "string",
+        "subtitleFontSize": "number",
+        "subtitleFontWeight": "number",
+        "subtitleOutline": "boolean",
+        "subtitleOverlay": "boolean",
+        "subtitleOverlayBackground": "number",
+        "subtitlePosition": "string",
+        "transcriptPanel": "boolean",
+        "volumeNormalization": "boolean"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-reading-garden-v1",
+      "status": "compared",
+      "liveFields": [
+        "bankedPages",
+        "lastBookId",
+        "lastEvolutionAt",
+        "lastEvolutionDay",
+        "lastReadAt",
+        "pagesRead",
+        "stage",
+        "version"
+      ],
+      "writtenFields": [
+        "bankedPages",
+        "lastBookId",
+        "lastEvolutionAt",
+        "lastEvolutionDay",
+        "lastReadAt",
+        "pagesRead",
+        "stage",
+        "version"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/readingGardenProgress.ts"
+      ],
+      "fieldTypes": {
+        "bankedPages": "number",
+        "lastBookId": "string",
+        "lastEvolutionAt": "null",
+        "lastEvolutionDay": "null",
+        "lastReadAt": "number",
+        "pagesRead": "number",
+        "stage": "number",
+        "version": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-os-environment-v1",
+      "status": "compared",
+      "liveFields": [
+        "achievementCelebrations",
+        "activePlaylistId",
+        "ambientAudio",
+        "buddyRoutines",
+        "calendarWallsEnabled",
+        "companionActiveness",
+        "companionCelebrate",
+        "companionPauseWhenStudying",
+        "companionReactivity",
+        "companionTypes",
+        "companions",
+        "companionsEnabled",
+        "companionsOnOsDesktop",
+        "dayCycleLighting",
+        "enabled",
+        "environmentPresetId",
+        "lightingIntensity",
+        "matchParticleSuggestions",
+        "particleDensity",
+        "particleIntensity",
+        "particlePresets",
+        "particleSize",
+        "particlesEnabled",
+        "performanceTier",
+        "playlists",
+        "rotationEnabled",
+        "rules",
+        "snowAccumulation",
+        "weather"
+      ],
+      "writtenFields": [
+        "achievementCelebrations",
+        "activePlaylistId",
+        "ambientAudio",
+        "buddyRoutines",
+        "calendarWallsEnabled",
+        "companionActiveness",
+        "companionCelebrate",
+        "companionPauseWhenStudying",
+        "companionReactivity",
+        "companionTypes",
+        "companions",
+        "companionsEnabled",
+        "companionsOnOsDesktop",
+        "dayCycleLighting",
+        "enabled",
+        "environmentPresetId",
+        "lightingIntensity",
+        "matchParticleSuggestions",
+        "particleDensity",
+        "particleIntensity",
+        "particlePresets",
+        "particleSize",
+        "particlesEnabled",
+        "performanceTier",
+        "playlists",
+        "rotationEnabled",
+        "rules",
+        "snowAccumulation",
+        "weather"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/storage/storage.ts"
+      ],
+      "fieldTypes": {
+        "achievementCelebrations": "boolean",
+        "activePlaylistId": "string",
+        "ambientAudio": "object{2}",
+        "buddyRoutines": "array[11]",
+        "calendarWallsEnabled": "boolean",
+        "companionActiveness": "number",
+        "companionCelebrate": "boolean",
+        "companionPauseWhenStudying": "boolean",
+        "companionReactivity": "string",
+        "companionTypes": "array[2]",
+        "companions": "array[1]",
+        "companionsEnabled": "boolean",
+        "companionsOnOsDesktop": "boolean",
+        "dayCycleLighting": "boolean",
+        "enabled": "boolean",
+        "environmentPresetId": "string",
+        "lightingIntensity": "number",
+        "matchParticleSuggestions": "boolean",
+        "particleDensity": "number",
+        "particleIntensity": "number",
+        "particlePresets": "array[2]",
+        "particleSize": "number",
+        "particlesEnabled": "boolean",
+        "performanceTier": "string",
+        "playlists": "array[1]",
+        "rotationEnabled": "boolean",
+        "rules": "array[8]",
+        "snowAccumulation": "boolean",
+        "weather": "object{2}"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-study-csv-editor-v1",
+      "status": "compared",
+      "liveFields": [
+        "hiddenColumns",
+        "savedAt",
+        "table",
+        "title"
+      ],
+      "writtenFields": [
+        "hiddenColumns",
+        "savedAt",
+        "table",
+        "title"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/components/csv-editor/csvEditorStorage.ts"
+      ],
+      "fieldTypes": {
+        "hiddenColumns": "array[0]",
+        "savedAt": "number",
+        "table": "object{4}",
+        "title": "string"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-ui-customization-v1",
+      "status": "compared",
+      "liveFields": [
+        "activeProfileId",
+        "developerMode",
+        "preview",
+        "profiles",
+        "version"
+      ],
+      "writtenFields": [
+        "activeProfileId",
+        "developerMode",
+        "preview",
+        "profiles",
+        "version"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/uiCustomizationStore.ts"
+      ],
+      "fieldTypes": {
+        "activeProfileId": "string",
+        "developerMode": "boolean",
+        "preview": "null",
+        "profiles": "array[5]",
+        "version": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-scraper-settings-v1",
+      "status": "compared",
+      "liveFields": [
+        "activeProfileId",
+        "profiles",
+        "siteOverrides",
+        "version"
+      ],
+      "writtenFields": [
+        "activeProfileId",
+        "profiles",
+        "siteOverrides",
+        "version"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/scraperSettingsStore.ts"
+      ],
+      "fieldTypes": {
+        "activeProfileId": "string",
+        "profiles": "array[3]",
+        "siteOverrides": "object{0}",
+        "version": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-os-personalization-v1",
+      "status": "compared",
+      "liveFields": [
+        "accentMode",
+        "accentPreset",
+        "autoTheme",
+        "chrome",
+        "customAccent",
+        "customCssEnabled",
+        "density",
+        "fontFamily",
+        "radius",
+        "shadow",
+        "wallpaperDim"
+      ],
+      "writtenFields": [
+        "accentMode",
+        "accentPreset",
+        "autoTheme",
+        "chrome",
+        "customAccent",
+        "customCssEnabled",
+        "density",
+        "fontFamily",
+        "radius",
+        "shadow",
+        "wallpaperDim"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/osPersonalization.ts"
+      ],
+      "fieldTypes": {
+        "accentMode": "string",
+        "accentPreset": "string",
+        "autoTheme": "boolean",
+        "chrome": "string",
+        "customAccent": "string",
+        "customCssEnabled": "boolean",
+        "density": "string",
+        "fontFamily": "string",
+        "radius": "string",
+        "shadow": "string",
+        "wallpaperDim": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-book-level-cache-v1",
+      "status": "writer-type-unresolved",
+      "liveFields": [
+        "02f12ce9-283b-4f11-a67e-4e18a312ffb0",
+        "05d06e9a-77f0-459b-b0c3-c07157ae2152",
+        "0785616f-ee62-4cf0-b8dc-2c322ae3569c",
+        "078d8fa0-ef33-4127-a8cf-e40089869d2a",
+        "151a85cc-6d5e-4e16-894a-ae83435c82b4",
+        "4b25bb16-516e-4309-8eef-5ab8ab9ceb94",
+        "4cbd1e61-09fd-43e8-8edf-355762f8f98d",
+        "70931740-9100-45fc-8af2-db64b52c146a",
+        "7cc53a32-8803-45a2-93de-31722bd406af",
+        "87258c38-1493-4326-b3bb-bb286e06e3d8",
+        "8d3a79ac-0f94-41d7-8724-882c8b7c8559",
+        "92f37374-72e2-4eef-9dac-fec6eb2a96d8",
+        "93807d45-8557-4da2-ab66-1e0a0bf067da",
+        "a388efff-917e-4384-8c7e-4f3ef18d5cbd",
+        "a8ff8fbb-6919-428b-9c78-8136710043c3",
+        "a96b9315-ba39-485f-a55b-9a87c15eac2d",
+        "b41ef962-176a-41da-be3e-d6217671684f",
+        "d29d9cbe-9181-4a2c-bdf5-ffd5605e8d14",
+        "d6fcd3bb-f4cd-4635-8b61-eeb093d59e9c",
+        "e73b0f47-7caf-41c6-af9e-ec1cbac61655"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [
+        "02f12ce9-283b-4f11-a67e-4e18a312ffb0",
+        "05d06e9a-77f0-459b-b0c3-c07157ae2152",
+        "0785616f-ee62-4cf0-b8dc-2c322ae3569c",
+        "078d8fa0-ef33-4127-a8cf-e40089869d2a",
+        "151a85cc-6d5e-4e16-894a-ae83435c82b4",
+        "4b25bb16-516e-4309-8eef-5ab8ab9ceb94",
+        "4cbd1e61-09fd-43e8-8edf-355762f8f98d",
+        "70931740-9100-45fc-8af2-db64b52c146a",
+        "7cc53a32-8803-45a2-93de-31722bd406af",
+        "87258c38-1493-4326-b3bb-bb286e06e3d8",
+        "8d3a79ac-0f94-41d7-8724-882c8b7c8559",
+        "92f37374-72e2-4eef-9dac-fec6eb2a96d8",
+        "93807d45-8557-4da2-ab66-1e0a0bf067da",
+        "a388efff-917e-4384-8c7e-4f3ef18d5cbd",
+        "a8ff8fbb-6919-428b-9c78-8136710043c3",
+        "a96b9315-ba39-485f-a55b-9a87c15eac2d",
+        "b41ef962-176a-41da-be3e-d6217671684f",
+        "d29d9cbe-9181-4a2c-bdf5-ffd5605e8d14",
+        "d6fcd3bb-f4cd-4635-8b61-eeb093d59e9c",
+        "e73b0f47-7caf-41c6-af9e-ec1cbac61655"
+      ],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/bookLevelEstimate.ts"
+      ],
+      "fieldTypes": {
+        "02f12ce9-283b-4f11-a67e-4e18a312ffb0": "object{4}",
+        "05d06e9a-77f0-459b-b0c3-c07157ae2152": "object{4}",
+        "0785616f-ee62-4cf0-b8dc-2c322ae3569c": "object{4}",
+        "078d8fa0-ef33-4127-a8cf-e40089869d2a": "object{4}",
+        "151a85cc-6d5e-4e16-894a-ae83435c82b4": "object{4}",
+        "4b25bb16-516e-4309-8eef-5ab8ab9ceb94": "object{4}",
+        "4cbd1e61-09fd-43e8-8edf-355762f8f98d": "object{4}",
+        "70931740-9100-45fc-8af2-db64b52c146a": "object{4}",
+        "7cc53a32-8803-45a2-93de-31722bd406af": "object{4}",
+        "87258c38-1493-4326-b3bb-bb286e06e3d8": "object{4}",
+        "8d3a79ac-0f94-41d7-8724-882c8b7c8559": "object{4}",
+        "92f37374-72e2-4eef-9dac-fec6eb2a96d8": "object{4}",
+        "93807d45-8557-4da2-ab66-1e0a0bf067da": "object{4}",
+        "a388efff-917e-4384-8c7e-4f3ef18d5cbd": "object{4}",
+        "a8ff8fbb-6919-428b-9c78-8136710043c3": "object{4}",
+        "a96b9315-ba39-485f-a55b-9a87c15eac2d": "object{4}",
+        "b41ef962-176a-41da-be3e-d6217671684f": "object{4}",
+        "d29d9cbe-9181-4a2c-bdf5-ffd5605e8d14": "object{4}",
+        "d6fcd3bb-f4cd-4635-8b61-eeb093d59e9c": "object{4}",
+        "e73b0f47-7caf-41c6-af9e-ec1cbac61655": "object{4}"
+      }
+    },
+    {
+      "key": "jp-study-stats-v1-ja",
+      "status": "non-object-payload",
+      "liveFields": [
+        "books",
+        "days",
+        "shows"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/stats.ts"
+      ]
+    },
+    {
+      "key": "jp-scraper-shell-v1",
+      "status": "compared",
+      "liveFields": [
+        "columnOrder",
+        "compact",
+        "density",
+        "drawerCategory",
+        "drawerOpen",
+        "groupBy",
+        "page",
+        "pageSize",
+        "railCollapsed",
+        "recentPages",
+        "resultTab",
+        "sortColumn",
+        "sortDir",
+        "version",
+        "visibleColumns"
+      ],
+      "writtenFields": [
+        "columnOrder",
+        "compact",
+        "density",
+        "drawerCategory",
+        "drawerOpen",
+        "groupBy",
+        "page",
+        "pageSize",
+        "railCollapsed",
+        "recentPages",
+        "resultTab",
+        "sortColumn",
+        "sortDir",
+        "version",
+        "visibleColumns"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/scraperShellStore.ts"
+      ],
+      "fieldTypes": {
+        "columnOrder": "array[14]",
+        "compact": "boolean",
+        "density": "string",
+        "drawerCategory": "string",
+        "drawerOpen": "boolean",
+        "groupBy": "string",
+        "page": "string",
+        "pageSize": "number",
+        "railCollapsed": "boolean",
+        "recentPages": "array[8]",
+        "resultTab": "string",
+        "sortColumn": "string",
+        "sortDir": "string",
+        "version": "number",
+        "visibleColumns": "array[10]"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-os-desktop-prefs-v1",
+      "status": "compared",
+      "liveFields": [
+        "clock24h",
+        "clockSeconds",
+        "clockShowDate",
+        "companionHostDisplays",
+        "iconLabel",
+        "iconSize",
+        "iconTextColor",
+        "iconsLocked",
+        "restoreSessionWindows",
+        "singleClickOpen",
+        "snapGrid",
+        "startColumns",
+        "taskbarSize"
+      ],
+      "writtenFields": [
+        "clock24h",
+        "clockSeconds",
+        "clockShowDate",
+        "companionHostDisplays",
+        "iconLabel",
+        "iconSize",
+        "iconTextColor",
+        "iconsLocked",
+        "restoreSessionWindows",
+        "singleClickOpen",
+        "snapGrid",
+        "startColumns",
+        "taskbarSize"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/desktopPrefs.ts"
+      ],
+      "fieldTypes": {
+        "clock24h": "boolean",
+        "clockSeconds": "boolean",
+        "clockShowDate": "boolean",
+        "companionHostDisplays": "string",
+        "iconLabel": "string",
+        "iconSize": "string",
+        "iconTextColor": "string",
+        "iconsLocked": "boolean",
+        "restoreSessionWindows": "boolean",
+        "singleClickOpen": "boolean",
+        "snapGrid": "number",
+        "startColumns": "number",
+        "taskbarSize": "string"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "sea-media-core-preferences",
+      "status": "not-in-census",
+      "liveFields": [
+        "autoNext",
+        "autoPlay",
+        "autoSkip",
+        "chapterMarkers",
+        "muted",
+        "playbackRate",
+        "showStats",
+        "skipPatterns",
+        "timestampMode",
+        "version",
+        "volume"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": []
+    },
+    {
+      "key": "jp-discovery-prefs-v1",
+      "status": "compared",
+      "liveFields": [
+        "feed",
+        "hideOwned",
+        "level",
+        "mediaType"
+      ],
+      "writtenFields": [
+        "feed",
+        "hideOwned",
+        "level",
+        "mediaType"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/components/discover/DiscoverContent.tsx"
+      ],
+      "fieldTypes": {
+        "feed": "string",
+        "hideOwned": "boolean",
+        "level": "null",
+        "mediaType": "string"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "noctis-session-queue-v2",
+      "status": "not-in-census",
+      "liveFields": [
+        "accumulator",
+        "clientId",
+        "lastSavedCount",
+        "lastUserLevel",
+        "nextSequence",
+        "pending",
+        "seenBooks",
+        "version"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": []
+    },
+    {
+      "key": "jp-os-display-prefs-v1",
+      "status": "compared",
+      "liveFields": [
+        "remapLayoutProportionally"
+      ],
+      "writtenFields": [
+        "animationLevel",
+        "baseFontPx",
+        "boldText",
+        "brightness",
+        "colorFilter",
+        "contrast",
+        "focusRing",
+        "letterSpacing",
+        "nightLight",
+        "pointerSize",
+        "reduceFlashes",
+        "remapLayoutProportionally",
+        "saturation",
+        "scrollbarMode",
+        "smoothScroll",
+        "transparency",
+        "underlineLinks",
+        "windowChromeMode"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [
+        "animationLevel",
+        "baseFontPx",
+        "boldText",
+        "brightness",
+        "colorFilter",
+        "contrast",
+        "focusRing",
+        "letterSpacing",
+        "nightLight",
+        "pointerSize",
+        "reduceFlashes",
+        "saturation",
+        "scrollbarMode",
+        "smoothScroll",
+        "transparency",
+        "underlineLinks",
+        "windowChromeMode"
+      ],
+      "writerFiles": [
+        "src/renderer/displayPrefs.ts"
+      ],
+      "fieldTypes": {
+        "remapLayoutProportionally": "boolean"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-mooncap-music-v1",
+      "status": "compared",
+      "liveFields": [
+        "enabled",
+        "volume"
+      ],
+      "writtenFields": [
+        "enabled",
+        "volume"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/components/reading-garden/mooncapMusic.ts"
+      ],
+      "fieldTypes": {
+        "enabled": "boolean",
+        "volume": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-level-lists",
+      "status": "compared",
+      "liveFields": [
+        "lists",
+        "updatedAt",
+        "version"
+      ],
+      "writtenFields": [
+        "lists",
+        "updatedAt",
+        "version"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/levelLists.ts"
+      ],
+      "fieldTypes": {
+        "lists": "array[5]",
+        "updatedAt": "number",
+        "version": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-study-environment-backup-v1",
+      "status": "writer-type-unresolved",
+      "liveFields": [
+        "achievementCelebrations",
+        "activePlaylistId",
+        "ambientAudio",
+        "buddyRoutines",
+        "calendarWallsEnabled",
+        "companionActiveness",
+        "companionCelebrate",
+        "companionPauseWhenStudying",
+        "companionReactivity",
+        "companionTypes",
+        "companions",
+        "companionsEnabled",
+        "companionsOnOsDesktop",
+        "dayCycleLighting",
+        "enabled",
+        "environmentPresetId",
+        "lightingIntensity",
+        "matchParticleSuggestions",
+        "particleDensity",
+        "particleIntensity",
+        "particlePresets",
+        "particleSize",
+        "particlesEnabled",
+        "performanceTier",
+        "playlists",
+        "rotationEnabled",
+        "rules",
+        "snowAccumulation",
+        "weather"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [
+        "achievementCelebrations",
+        "activePlaylistId",
+        "ambientAudio",
+        "buddyRoutines",
+        "calendarWallsEnabled",
+        "companionActiveness",
+        "companionCelebrate",
+        "companionPauseWhenStudying",
+        "companionReactivity",
+        "companionTypes",
+        "companions",
+        "companionsEnabled",
+        "companionsOnOsDesktop",
+        "dayCycleLighting",
+        "enabled",
+        "environmentPresetId",
+        "lightingIntensity",
+        "matchParticleSuggestions",
+        "particleDensity",
+        "particleIntensity",
+        "particlePresets",
+        "particleSize",
+        "particlesEnabled",
+        "performanceTier",
+        "playlists",
+        "rotationEnabled",
+        "rules",
+        "snowAccumulation",
+        "weather"
+      ],
+      "writtenNotPresent": [],
+      "writerFiles": [],
+      "fieldTypes": {
+        "achievementCelebrations": "boolean",
+        "activePlaylistId": "string",
+        "ambientAudio": "object{2}",
+        "buddyRoutines": "array[11]",
+        "calendarWallsEnabled": "boolean",
+        "companionActiveness": "number",
+        "companionCelebrate": "boolean",
+        "companionPauseWhenStudying": "boolean",
+        "companionReactivity": "string",
+        "companionTypes": "array[5]",
+        "companions": "array[0]",
+        "companionsEnabled": "boolean",
+        "companionsOnOsDesktop": "boolean",
+        "dayCycleLighting": "boolean",
+        "enabled": "boolean",
+        "environmentPresetId": "string",
+        "lightingIntensity": "number",
+        "matchParticleSuggestions": "boolean",
+        "particleDensity": "number",
+        "particleIntensity": "number",
+        "particlePresets": "array[1]",
+        "particleSize": "number",
+        "particlesEnabled": "boolean",
+        "performanceTier": "string",
+        "playlists": "array[1]",
+        "rotationEnabled": "boolean",
+        "rules": "array[8]",
+        "snowAccumulation": "boolean",
+        "weather": "object{2}"
+      }
+    },
+    {
+      "key": "jp-widget-gallery",
+      "status": "compared",
+      "liveFields": [
+        "favorites",
+        "recent"
+      ],
+      "writtenFields": [
+        "favorites",
+        "recent"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/components/WidgetGallery.tsx"
+      ],
+      "fieldTypes": {
+        "favorites": "array[0]",
+        "recent": "array[1]"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "jp-os-achievements-v1",
+      "status": "compared",
+      "liveFields": [
+        "dayKey",
+        "lastDailyCharsBucket",
+        "lastStreakCelebrated"
+      ],
+      "writtenFields": [
+        "dayKey",
+        "lastDailyCharsBucket",
+        "lastStreakCelebrated"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/environment/achievements.ts"
+      ],
+      "fieldTypes": {
+        "dayKey": "string",
+        "lastDailyCharsBucket": "number",
+        "lastStreakCelebrated": "number"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": [
+        "lastDailyCharsBucket",
+        "lastStreakCelebrated"
+      ]
+    },
+    {
+      "key": "jp-reader-settings",
+      "status": "compared",
+      "liveFields": [
+        "contentWidth",
+        "flow",
+        "font",
+        "fontSize",
+        "fontWeight",
+        "hideFurigana",
+        "hyperlinksEnabled",
+        "justify",
+        "kerning",
+        "lineHeight",
+        "paragraphIndent",
+        "prettyWrap",
+        "prioritizeStyles",
+        "sideMargin",
+        "theme",
+        "vpal",
+        "wordHighlight",
+        "writingMode"
+      ],
+      "writtenFields": [
+        "contentWidth",
+        "flow",
+        "font",
+        "fontSize",
+        "fontWeight",
+        "hideFurigana",
+        "hyperlinksEnabled",
+        "justify",
+        "kerning",
+        "lineHeight",
+        "paragraphIndent",
+        "prettyWrap",
+        "prioritizeStyles",
+        "sideMargin",
+        "theme",
+        "vpal",
+        "wordHighlight",
+        "writingMode"
+      ],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/readerSettings.ts"
+      ],
+      "fieldTypes": {
+        "contentWidth": "number",
+        "flow": "string",
+        "font": "string",
+        "fontSize": "number",
+        "fontWeight": "number",
+        "hideFurigana": "boolean",
+        "hyperlinksEnabled": "boolean",
+        "justify": "boolean",
+        "kerning": "boolean",
+        "lineHeight": "number",
+        "paragraphIndent": "number",
+        "prettyWrap": "boolean",
+        "prioritizeStyles": "boolean",
+        "sideMargin": "number",
+        "theme": "string",
+        "vpal": "boolean",
+        "wordHighlight": "boolean",
+        "writingMode": "string"
+      },
+      "writtenNotRead": [],
+      "moduleLocalOnly": []
+    },
+    {
+      "key": "noctis-pages-queue-v1",
+      "status": "not-in-census",
+      "liveFields": [
+        "clientId",
+        "nextSequence",
+        "pending",
+        "pendingPages",
+        "version"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [],
+      "writtenNotPresent": [],
+      "writerFiles": []
+    },
+    {
+      "key": "jp-deck-level-cache-v1",
+      "status": "writer-type-unresolved",
+      "liveFields": [
+        "48dcfd84-7581-431e-bc1e-bcf0eb94901b::容疑者Ｘの献身",
+        "e0eed414-3840-4b1c-96d9-32baf9a51519::メインページ"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [
+        "48dcfd84-7581-431e-bc1e-bcf0eb94901b::容疑者Ｘの献身",
+        "e0eed414-3840-4b1c-96d9-32baf9a51519::メインページ"
+      ],
+      "writtenNotPresent": [],
+      "writerFiles": [
+        "src/renderer/deckLevelEstimate.ts"
+      ],
+      "fieldTypes": {
+        "48dcfd84-7581-431e-bc1e-bcf0eb94901b::容疑者Ｘの献身": "object{5}",
+        "e0eed414-3840-4b1c-96d9-32baf9a51519::メインページ": "object{5}"
+      }
+    },
+    {
+      "key": "jp-grammarx-explorer-filters-v1",
+      "status": "writer-type-unresolved",
+      "liveFields": [
+        "categories",
+        "excludeCategories",
+        "familiarity",
+        "functions",
+        "lang",
+        "levels",
+        "query",
+        "registers",
+        "requireExamples",
+        "sort",
+        "studyReadyOnly",
+        "verifiedTagsOnly"
+      ],
+      "writtenFields": [],
+      "presentNotWritten": [
+        "categories",
+        "excludeCategories",
+        "familiarity",
+        "functions",
+        "lang",
+        "levels",
+        "query",
+        "registers",
+        "requireExamples",
+        "sort",
+        "studyReadyOnly",
+        "verifiedTagsOnly"
+      ],
+      "writtenNotPresent": [],
+      "writerFiles": [],
+      "fieldTypes": {
+        "categories": "array[0]",
+        "excludeCategories": "array[0]",
+        "familiarity": "array[0]",
+        "functions": "array[0]",
+        "lang": "string",
+        "levels": "array[0]",
+        "query": "string",
+        "registers": "array[0]",
+        "requireExamples": "boolean",
+        "sort": "string",
+        "studyReadyOnly": "boolean",
+        "verifiedTagsOnly": "boolean"
+      }
+    }
+  ]
+}

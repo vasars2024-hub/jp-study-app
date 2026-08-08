@@ -1,0 +1,646 @@
+{
+  "summary": {
+    "generated": "2026-08-07T18:25:36.213Z",
+    "keysExamined": 173,
+    "multiModuleDirect": 11,
+    "shallowMergeCandidates": 2,
+    "contestedFields": 2,
+    "ruled": 12,
+    "unruled": 0
+  },
+  "results": [
+    {
+      "key": "jp-os-environment-v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/environment/environmentStore.ts",
+        "src/renderer/storage/storage.ts"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/environment/environmentStore.ts:204",
+          "name": "saveEnvironment",
+          "shape": "shallow-merge",
+          "callerModules": [
+            "src/renderer/environment/buddyRoutines.ts",
+            "src/renderer/aeroEnvironment.ts",
+            "src/renderer/environment/CompanionLayer.tsx",
+            "src/renderer/findingReadouts.ts",
+            "src/renderer/miniRoutines.ts",
+            "src/renderer/components/settings/SettingsApp.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [
+            {
+              "field": "companions",
+              "modules": [
+                "src/renderer/environment/CompanionLayer.tsx",
+                "src/renderer/findingReadouts.ts",
+                "src/renderer/miniRoutines.ts"
+              ]
+            }
+          ],
+          "callers": [
+            "src/renderer/environment/buddyRoutines.ts:401",
+            "src/renderer/environment/buddyRoutines.ts:404",
+            "src/renderer/environment/buddyRoutines.ts:410",
+            "src/renderer/environment/buddyRoutines.ts:416",
+            "src/renderer/environment/buddyRoutines.ts:422",
+            "src/renderer/aeroEnvironment.ts:125",
+            "src/renderer/aeroEnvironment.ts:130",
+            "src/renderer/aeroEnvironment.ts:139",
+            "src/renderer/aeroEnvironment.ts:148",
+            "src/renderer/environment/CompanionLayer.tsx:375",
+            "src/renderer/environment/CompanionLayer.tsx:608",
+            "src/renderer/findingReadouts.ts:199",
+            "src/renderer/findingReadouts.ts:232",
+            "src/renderer/findingReadouts.ts:244",
+            "src/renderer/findingReadouts.ts:275",
+            "src/renderer/findingReadouts.ts:298",
+            "src/renderer/miniRoutines.ts:99",
+            "src/renderer/components/settings/SettingsApp.tsx:177"
+          ]
+        },
+        {
+          "site": "src/renderer/storage/storage.ts:468",
+          "name": "clearSettingsDomain",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/storage/storage.ts",
+            "src/renderer/components/settings/pages/MemoryPage.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/storage/storage.ts:524",
+            "src/renderer/storage/storage.ts:529",
+            "src/renderer/storage/storage.ts:534",
+            "src/renderer/storage/storage.ts:539",
+            "src/renderer/storage/storage.ts:544",
+            "src/renderer/storage/storage.ts:549",
+            "src/renderer/components/settings/pages/MemoryPage.tsx:206",
+            "src/renderer/components/settings/pages/MemoryPage.tsx:637"
+          ]
+        }
+      ],
+      "hazardFields": [
+        {
+          "field": "companions",
+          "modules": [
+            "src/renderer/environment/CompanionLayer.tsx",
+            "src/renderer/findingReadouts.ts",
+            "src/renderer/miniRoutines.ts"
+          ]
+        }
+      ],
+      "verdict": "candidate"
+    },
+    {
+      "key": "jp-study.toolbox.settings.v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/toolboxSettings.ts"
+      ],
+      "multiModuleDirect": false,
+      "owners": [
+        {
+          "site": "src/renderer/toolboxSettings.ts:29",
+          "name": "saveToolboxSettings",
+          "shape": "shallow-merge",
+          "callerModules": [
+            "src/renderer/components/blanc/BlancReadyToolPanels.tsx",
+            "src/renderer/components/blanc/BlancShell.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [
+            {
+              "field": "themeOverrides",
+              "modules": [
+                "src/renderer/components/blanc/BlancReadyToolPanels.tsx",
+                "src/renderer/components/blanc/BlancShell.tsx"
+              ]
+            }
+          ],
+          "callers": [
+            "src/renderer/components/blanc/BlancReadyToolPanels.tsx:544",
+            "src/renderer/components/blanc/BlancReadyToolPanels.tsx:550",
+            "src/renderer/components/blanc/BlancReadyToolPanels.tsx:557",
+            "src/renderer/components/blanc/BlancReadyToolPanels.tsx:568",
+            "src/renderer/components/blanc/BlancReadyToolPanels.tsx:573",
+            "src/renderer/components/blanc/BlancShell.tsx:1306",
+            "src/renderer/components/blanc/BlancShell.tsx:1311",
+            "src/renderer/components/blanc/BlancShell.tsx:1406",
+            "src/renderer/components/blanc/BlancShell.tsx:2563",
+            "src/renderer/components/blanc/BlancShell.tsx:3037"
+          ]
+        },
+        {
+          "site": "src/renderer/toolboxSettings.ts:35",
+          "name": "resetAllToolboxSettings",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/components/blanc/BlancShell.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/components/blanc/BlancShell.tsx:2824"
+          ]
+        },
+        {
+          "site": "src/renderer/toolboxSettings.ts:42",
+          "name": "resetToolboxSettingsCategory",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/components/blanc/BlancShell.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/components/blanc/BlancShell.tsx:2645"
+          ]
+        },
+        {
+          "site": "src/renderer/toolboxSettings.ts:54",
+          "name": "importCurrentToolboxSettings",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/components/blanc/BlancShell.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/components/blanc/BlancShell.tsx:2808"
+          ]
+        }
+      ],
+      "hazardFields": [
+        {
+          "field": "themeOverrides",
+          "modules": [
+            "src/renderer/components/blanc/BlancReadyToolPanels.tsx",
+            "src/renderer/components/blanc/BlancShell.tsx"
+          ]
+        }
+      ],
+      "verdict": "candidate"
+    },
+    {
+      "key": "jp-calendar-events",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/calendar.ts",
+        "src/renderer/storage/migrationRunner.ts"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/calendar.ts:87",
+          "name": "writeList",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/calendar.ts"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/calendar.ts:107",
+            "src/renderer/calendar.ts:113",
+            "src/renderer/calendar.ts:119"
+          ]
+        },
+        {
+          "site": "src/renderer/storage/migrationRunner.ts:83",
+          "name": "replaceAtomic",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-clipboard-history",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/clipboardHistory.ts",
+        "src/renderer/storage/migrationRunner.ts"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/clipboardHistory.ts:78",
+          "name": "writeList",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/clipboardHistory.ts"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/clipboardHistory.ts:156",
+            "src/renderer/clipboardHistory.ts:175",
+            "src/renderer/clipboardHistory.ts:181",
+            "src/renderer/clipboardHistory.ts:187",
+            "src/renderer/clipboardHistory.ts:193",
+            "src/renderer/clipboardHistory.ts:200",
+            "src/renderer/clipboardHistory.ts:205"
+          ]
+        },
+        {
+          "site": "src/renderer/storage/migrationRunner.ts:83",
+          "name": "replaceAtomic",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-flashcard-deck",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/flashcardDeck.ts",
+        "src/renderer/storage/migrationRunner.ts"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/flashcardDeck.ts:89",
+          "name": "readStore",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/flashcardDeck.ts"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/flashcardDeck.ts:119",
+            "src/renderer/flashcardDeck.ts:123",
+            "src/renderer/flashcardDeck.ts:127",
+            "src/renderer/flashcardDeck.ts:137",
+            "src/renderer/flashcardDeck.ts:145",
+            "src/renderer/flashcardDeck.ts:153",
+            "src/renderer/flashcardDeck.ts:190",
+            "src/renderer/flashcardDeck.ts:197",
+            "src/renderer/flashcardDeck.ts:231",
+            "src/renderer/flashcardDeck.ts:238",
+            "src/renderer/flashcardDeck.ts:247",
+            "src/renderer/flashcardDeck.ts:261",
+            "src/renderer/flashcardDeck.ts:278",
+            "src/renderer/flashcardDeck.ts:297",
+            "src/renderer/flashcardDeck.ts:314"
+          ]
+        },
+        {
+          "site": "src/renderer/flashcardDeck.ts:108",
+          "name": "writeStore",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/flashcardDeck.ts"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/flashcardDeck.ts:130",
+            "src/renderer/flashcardDeck.ts:140",
+            "src/renderer/flashcardDeck.ts:148",
+            "src/renderer/flashcardDeck.ts:166",
+            "src/renderer/flashcardDeck.ts:192",
+            "src/renderer/flashcardDeck.ts:199",
+            "src/renderer/flashcardDeck.ts:233",
+            "src/renderer/flashcardDeck.ts:242",
+            "src/renderer/flashcardDeck.ts:249",
+            "src/renderer/flashcardDeck.ts:269",
+            "src/renderer/flashcardDeck.ts:287",
+            "src/renderer/flashcardDeck.ts:305",
+            "src/renderer/flashcardDeck.ts:329"
+          ]
+        },
+        {
+          "site": "src/renderer/storage/migrationRunner.ts:83",
+          "name": "replaceAtomic",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-media-player-preferences-v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/media/VideoCoreStudyOverlay.tsx",
+        "src/renderer/components/media/MediaContent.tsx"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/media/VideoCoreStudyOverlay.tsx:563",
+          "name": null,
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        },
+        {
+          "site": "src/renderer/components/media/MediaContent.tsx:516",
+          "name": null,
+          "shape": "unresolved",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-media-study-database-v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/mediaStudyStore.ts",
+        "src/renderer/storage/migrationRunner.ts"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/mediaStudyStore.ts:34",
+          "name": "saveMediaStudyDatabase",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/mediaStudyStore.ts"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/mediaStudyStore.ts:44",
+            "src/renderer/mediaStudyStore.ts:52",
+            "src/renderer/mediaStudyStore.ts:61",
+            "src/renderer/mediaStudyStore.ts:69"
+          ]
+        },
+        {
+          "site": "src/renderer/storage/migrationRunner.ts:83",
+          "name": "replaceAtomic",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-media-tracking-v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/mediaTrackingStore.ts",
+        "src/renderer/storage/migrationRunner.ts"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/mediaTrackingStore.ts:86",
+          "name": "saveMediaTrackingDocument",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/mediaTrackingStore.ts",
+            "src/renderer/unifiedSearchTrackingMutation.ts"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/mediaTrackingStore.ts:113",
+            "src/renderer/mediaTrackingStore.ts:156",
+            "src/renderer/mediaTrackingStore.ts:170",
+            "src/renderer/unifiedSearchTrackingMutation.ts:104"
+          ]
+        },
+        {
+          "site": "src/renderer/storage/migrationRunner.ts:83",
+          "name": "replaceAtomic",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-study-csv-editor-v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/components/csv-editor/csvEditorStorage.ts",
+        "src/renderer/storage/migrationRunner.ts"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/components/csv-editor/csvEditorStorage.ts:55",
+          "name": "saveStoredEditor",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/components/csv-editor/csvEditorStorage.ts",
+            "src/renderer/components/CsvEditorPanel.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/components/csv-editor/csvEditorStorage.ts:40",
+            "src/renderer/components/CsvEditorPanel.tsx:292"
+          ]
+        },
+        {
+          "site": "src/renderer/storage/migrationRunner.ts:83",
+          "name": "replaceAtomic",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-telemetry-consent",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/renderer/components/ConsentScreen.tsx",
+        "src/renderer/views/SettingsView.tsx",
+        "src/renderer/widgets/more.tsx"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/renderer/components/ConsentScreen.tsx:20",
+          "name": "choose",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/components/ConsentScreen.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/components/ConsentScreen.tsx:44",
+            "src/renderer/components/ConsentScreen.tsx:47"
+          ]
+        },
+        {
+          "site": "src/renderer/views/SettingsView.tsx:350",
+          "name": "onToggle",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/renderer/views/SettingsView.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/renderer/views/SettingsView.tsx:368"
+          ]
+        },
+        {
+          "site": "src/renderer/widgets/more.tsx:231",
+          "name": "shareCountry",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-video-core-mining-history-v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/media/VideoCoreMiningPanel.tsx",
+        "src/renderer/components/music/useMusicMining.ts",
+        "src/renderer/__devharness__/continueWatchingHarness.tsx",
+        "src/renderer/__devharness__/detachedBlockHarness.tsx",
+        "src/renderer/__devharness__/watchLoopHarness.tsx"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/media/VideoCoreMiningPanel.tsx:216",
+          "name": "VideoCoreMiningPanel",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        },
+        {
+          "site": "src/renderer/components/music/useMusicMining.ts:117",
+          "name": null,
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        },
+        {
+          "site": "src/renderer/__devharness__/continueWatchingHarness.tsx:75",
+          "name": null,
+          "shape": "unresolved",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        },
+        {
+          "site": "src/renderer/__devharness__/detachedBlockHarness.tsx:236",
+          "name": "seedMiningHistory",
+          "shape": "full-replace",
+          "callerModules": [],
+          "testCallers": 1,
+          "contestedCollectionFields": [],
+          "callers": []
+        },
+        {
+          "site": "src/renderer/__devharness__/watchLoopHarness.tsx:109",
+          "name": null,
+          "shape": "unresolved",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    },
+    {
+      "key": "jp-video-core-resume-v1",
+      "class": "read-write",
+      "directWriteModules": [
+        "src/media/StudyPlayerSlice.tsx",
+        "src/renderer/__devharness__/continueWatchingHarness.tsx",
+        "src/renderer/__devharness__/resumeLastHarness.tsx"
+      ],
+      "multiModuleDirect": true,
+      "owners": [
+        {
+          "site": "src/media/StudyPlayerSlice.tsx:666",
+          "name": "persist",
+          "shape": "full-replace",
+          "callerModules": [
+            "src/media/StudyPlayerSlice.tsx"
+          ],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": [
+            "src/media/StudyPlayerSlice.tsx:679",
+            "src/media/StudyPlayerSlice.tsx:686",
+            "src/media/StudyPlayerSlice.tsx:691",
+            "src/media/StudyPlayerSlice.tsx:704"
+          ]
+        },
+        {
+          "site": "src/renderer/__devharness__/continueWatchingHarness.tsx:67",
+          "name": null,
+          "shape": "unresolved",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        },
+        {
+          "site": "src/renderer/__devharness__/resumeLastHarness.tsx:42",
+          "name": null,
+          "shape": "unresolved",
+          "callerModules": [],
+          "testCallers": 0,
+          "contestedCollectionFields": [],
+          "callers": []
+        }
+      ],
+      "hazardFields": [],
+      "verdict": "multi-module-direct-only"
+    }
+  ]
+}

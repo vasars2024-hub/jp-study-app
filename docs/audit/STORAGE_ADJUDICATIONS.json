@@ -1,0 +1,49 @@
+{
+  "_readme": [
+    "Verified rulings on flags raised by storage-reconcile.mjs (audit item 6.1, tier 1).",
+    "The tool classifies structurally; a human read decides. Anything ruled here keeps its",
+    "ruling on re-run, so a later pass argues only about what is genuinely new.",
+    "ruling: 'benign' (flag is correct but not a defect) | 'defect' (confirmed) | 'scope'",
+    "(the tool cannot see the other side of a boundary)."
+  ],
+  "jp-study.blanc.toolbox.workspaces.v1": {
+    "ruling": "benign",
+    "why": "Workspace-launcher is retired in favour of the App Drawer. BlancReadyToolPanels.tsx:1551-1554 documents that the App Drawer migration reads this key non-destructively and never writes it again. A migration inbox that predates the LEGACY_ naming convention."
+  },
+  "jp-novels-planned": {
+    "ruling": "benign",
+    "why": "Read once and removeItem-ed in the same effect (NovelsContent.tsx:365,374), migrating planned ids into store.plan. A consumed-once inbox."
+  },
+  "jp-study-whisper-lang": {
+    "ruling": "defect",
+    "why": "setStudyLang writes it beside STUDY_LANG_KEY (studyEnvironment.ts:40-41) and nothing reads it. Its only other mention is settingsCatalog.ts:180, which lists it for byte accounting, not as a functional read. Behaviour comes from setWhisperModelTier instead. Same shape as audit item 3.3."
+  },
+  "sea-server-auth-token": {
+    "ruling": "scope",
+    "why": "Written by seanimeBootstrap.ts:26 and read by the vendored Seanime frontend at vendor/seanime-web/app/(main)/_atoms/server-status.atoms.ts:11 via atomWithStorage. The census scans src/ only, so a key handed across that boundary always looks write-only."
+  },
+  "noctis-session-queue-v2": {
+    "ruling": "scope",
+    "why": "Declared in the sibling project jp-study-app-noctis-beta (src/renderer/cityPagesQueue.ts:7), not in this repo. A different build of the app writes into the same Chromium profile origin."
+  },
+  "noctis-pages-queue-v1": {
+    "ruling": "scope",
+    "why": "Same as noctis-session-queue-v2 — owned by the jp-study-app-noctis-beta build sharing this profile origin."
+  },
+  "seanime-client-id": {
+    "ruling": "scope",
+    "why": "Owned by vendor/seanime-web/lib/server/client-id.ts."
+  },
+  "sea-media-core-preferences": {
+    "ruling": "scope",
+    "why": "Owned by vendor/seanime-web/app/(main)/_features/media-core/media-core-preferences.ts."
+  },
+  "sea-video-core-anime4k": {
+    "ruling": "scope",
+    "why": "Owned by vendor/seanime-web/app/(main)/_features/video-core/video-core-anime-4k.ts."
+  },
+  "sea-mediastream-active-on-device": {
+    "ruling": "scope",
+    "why": "Owned by vendor/seanime-web/app/(main)/mediastream/_lib/mediastream.atoms.ts."
+  }
+}

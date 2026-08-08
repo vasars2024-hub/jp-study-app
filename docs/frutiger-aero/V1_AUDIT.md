@@ -871,6 +871,12 @@ prefixed.
   sitting on their defaults. Expected for an inventory this size; it is only a defect when a
   control claims to write one and does not, which is 6.1's per-key work and is not finished.
 
+> **Counts corrected by 6.E (2026-08-07).** The grep behind this section undercounted. The AST
+> census finds **183 static keys + 8 dynamic patterns**, not 163, because a grep cannot follow
+> the 22 wrapper functions, `Object.values(LS_KEYS)` sweeps, or injected-storage parameters.
+> Live is **74**, not 73 — one key was added during the session. The *shape* of this section
+> survives; the numbers here are superseded, and all 106 absent keys are classified in 6.E.
+
 ### 6.C — over-encoding scan across every live key (the 6.3 corruption check, completed)
 
 Every one of the 73 live keys was peeled until a parse failed. Exactly **two** were damaged, and
@@ -917,9 +923,9 @@ callers now use it. Five tests pin it, including the quota-refusal path.
 > a key whose recovery is unproven. Peel a copy in an `/eval` first and only drive the real UI
 > once the peeled value is known to match the reader's shape.
 
-| 6.1 | Field-level write/read reconciliation for every persisted key | **partial** | For each key, the set of fields **written** by some code path vs the set **present** in the live blob vs the set **read** by some consumer. Three failure classes to name separately: *written-then-erased* (6.2), *read-but-never-written* (a setting that can only ever be its default), *written-but-never-read* (a dead control — the `honesty-probe` verdict vocabulary applies). |
-| 6.2 | Last-writer-wins erasure between two owners of one key | pending | **A confirmed instance already exists — see item 3.3.** `jp-os-environment-v1.companions` has two writers: Settings › Companions (`patchEnv`) and `CompanionLayer.persist()`. The layer held a stale list and its position autosave wrote that list back over the setting, so `holdRoutineId` / `primaryRoutineId` / `secondaryRoutineId` vanished from the blob within seconds of being chosen. Fixed for those three fields; **the same shape is untested for every other multi-writer key.** |
-| 6.3 | Byte-for-byte round-trip per key | **partial** | Snapshot → change one field through the real control → change it back through the same control → diff the blob against the snapshot. A key that does not return to its exact bytes is either lossy or has a second writer. Note the known-benign case from 3.3: absent vs `""` compare unequal as text and identically in behaviour, so the report must distinguish *textual* from *behavioural* difference. |
+| 6.1 | Field-level write/read reconciliation for every persisted key | **DONE** | Both tiers run and every flag verified — see 6.E and 6.F. Key level: **one dead control** (`jp-study-whisper-lang`) and **zero dead defaults** across 183 keys; the 106 declared-but-absent keys from 6.B are now classified. Field level: **zero** fields present-but-unwritable across the whole store, and **one dead field** (`jp-study.onboarding.v1.lastStepId`). Two re-runnable tools, not a one-off reading. |
+| 6.2 | Last-writer-wins erasure between two owners of one key | **DONE** | Swept across all 173 keys that have a write site — see 6.G. **Three defects, all fixed with tests**: `jp-os-environment-v1.companions` (item 3.3's shape, still open *across windows*), `jp-video-core-mining-history-v1` (a panel holding a mount-time snapshot erased notes mined from the music player), and `jp-media-player-preferences-v1` (two schemas on one key; the legacy player's fixed-shape normaliser dropped nine fields the study overlay owns). Twelve keys carry a pinned ruling, **zero unruled**. |
+| 6.3 | Byte-for-byte round-trip per key | **DONE** | Run as snapshot → reload → snapshot → reload → snapshot over every live key — see 6.H. **72/72 byte-identical**, no key lost a field, nothing in the 6.A per-boot class. The probe carries a self-test so a silent zero cannot pass for a clean result. The *user-action* half of the original wording stays uncovered by construction and is named as such. |
 | 6.4 | Renderer storage has no restore point | **DEMONSTRATED** | `localStorage` and IndexedDB were never covered even when userData backups were being taken, and backups are now discontinued (§ Phase 0). This item is partly *how to audit safely*, not only *what is broken*. |
 
 ### 6.A — CONFIRMED, and repaired: two keys were JSON-stringified once per boot
@@ -963,6 +969,204 @@ starts by **deriving** the full key list from source, not from this line.
 > source and 73 are live; the derivation is one `grep` over `localStorage.*Item` literals plus
 > `*KEY*` constants.
 
+### 6.E — 6.1 at key level: one dead control, and no dead defaults at all
+
+Run 2026-08-07 against the live profile. Two tools, both re-runnable, both committed:
+
+| Tool | What it derives |
+|---|---|
+| `docs/migration/tools/storage-key-census.mjs` | every `localStorage.{get,set,remove}Item` call in `src/` resolved to the key it touches — **183 static keys, 8 dynamic patterns, 22 wrapper functions**, over 1,482 files |
+| `docs/migration/tools/storage-reconcile.mjs` | joins that census against a live snapshot and classifies every key |
+
+**Why an AST tool and not a grep, stated because it changed the answer.** Barely any call site
+passes a literal. The house pattern is a module-scoped `const KEY`, often imported, sometimes a
+member of `LS_KEYS`, and 22 functions take the key as a *parameter*. Four resolution rules each
+moved keys out of a wrong bucket:
+
+- **Wrappers, transitively.** `writeLocalStorageJson → writeLocalStorage → setItem`. Without
+  the chain, every caller of the outer wrapper reads as "never writes anything".
+- **`Object.values(LS_KEYS)` sweeps.** `migrationRunner.replaceAtomic` and `storage.ts:401`
+  write **every** key in `LS_KEYS` from a snapshot. Each of those keys therefore has a second
+  writer, which is the shape 6.2 cares about, and a literal-only scan sees none of it.
+- **Injected storage.** `loadReadingGardenProgress(storage: GardenStorage = localStorage)`
+  calls `storage.getItem`. Matching the bare identifier `localStorage` made
+  `jp-reading-garden-v1` — live in the profile — read as an orphan with no owner at all.
+- **Name collisions across boundaries.** `readJson` is a localStorage wrapper in
+  `renderer/aeroEnvironment.ts` and an **fs** wrapper in `main/immersion/index.ts`. Bare-name
+  matching credited three file reads to localStorage.
+
+**The result, and the correction to 6.B it forces:**
+
+| Class | Count | Verdict |
+|---|---|---|
+| Read by source, written by nothing | 19 | **all 19 benign** — migration inboxes, not dead settings |
+| Written by source, read by nothing | 2 | **1 real defect**, 1 scope artifact |
+| Declared, writable, absent on this profile | 98 | benign — settings nobody has changed |
+| Live, with a named reader and writer | 62 | healthy |
+| Live, named nowhere in `src/` | 6 | all six explained below |
+
+**The 106 "unclassified" keys from 6.B are now classified, and none of them is a defect.** The
+19 read-but-never-written keys are every one of them a *one-way migration inbox*: 17 are named
+`LEGACY_*`, `jp-novels-planned` is read and then `removeItem`-ed in the same effect
+(`NovelsContent.tsx:365,374`), and `jp-study.blanc.toolbox.workspaces.v1` carries a comment
+saying workspace-launcher is retired in favour of the App Drawer and the migration reads it
+non-destructively (`BlancReadyToolPanels.tsx:1551-1554`). The tool separates these structurally
+— `LEGACY` in the constant name, or a paired `removeItem` — so they are not re-flagged next run.
+
+**The one real key-level defect: `jp-study-whisper-lang` is a dead control.**
+`setStudyLang` writes two keys side by side (`studyEnvironment.ts:40-41`): `STUDY_LANG_KEY`,
+which `getStudyLang` reads, and `WHISPER_LANG_KEY`, which **nothing reads**. Its only other
+appearance is `settingsCatalog.ts:180`, which lists it for byte accounting in the storage
+inventory — not a functional read. The whisper language is persisted on every language switch
+and never consulted; the actual behaviour comes from the `setWhisperModelTier` call two lines
+below. This is the same shape as 3.3's dead setting, found by sweep rather than by accident.
+
+**`sea-server-auth-token` is not a defect, and says what the tool cannot see.** We write it
+(`seanimeBootstrap.ts:26`); the *vendored* Seanime frontend reads it
+(`vendor/seanime-web/app/(main)/_atoms/server-status.atoms.ts:11`, via `atomWithStorage`). The
+census scans `src/` only, so any key handed across that boundary looks write-only. **Stated as a
+standing limit of this tool, not as a finding.**
+
+**The six live keys named nowhere in `src/` — all six have an owner, none is corruption.**
+Four (`sea-media-core-preferences`, `sea-video-core-anime4k`, `sea-mediastream-active-on-device`,
+`seanime-client-id`) belong to `vendor/seanime-web`. The other two are the interesting ones:
+`noctis-session-queue-v2` and `noctis-pages-queue-v1` appear **nowhere in this repo** — they are
+declared in the sibling project `jp-study-app-noctis-beta`
+(`src/renderer/cityPagesQueue.ts:7`). **A different build of this app has been writing into the
+same profile origin.** That is not damage, but it means "everything in `localStorage`" is not the
+same set as "everything this app wrote", and any future clear-all or export must not assume it is.
+
+### 6.F — 6.1 at field level: the store is clean, and one field is dead
+
+`docs/migration/tools/storage-field-reconcile.mjs` compares, for each of the 30 live
+object-valued keys, the properties of the **type handed to `setItem`** (resolved with the
+TypeScript checker, so spreads and `Partial<T>` count) against the fields **present** in the
+running profile, and against whether each field is mentioned anywhere else in `src/`.
+
+**20 keys compared. Zero fields present-but-unwritable, store-wide.** No key in this profile
+carries a field its current writer cannot produce — which is the strongest thing 6.1 can say,
+and it is the direct answer to *"byte for byte … to see if it's missing"* at field level. Five
+keys could not be compared at all because their payload type is a `Record<…>` or a bare
+`JSON.parse` result with no declared fields (`jp-aero-environment-v1`, `jp-book-level-cache-v1`,
+`jp-deck-level-cache-v1`, `jp-grammarx-explorer-filters-v1`, `jp-study-environment-backup-v1`).
+**They are listed as not-compared rather than counted as passes.**
+
+**The one key with field drift is audit residue, not a product defect.**
+`jp-os-display-prefs-v1` holds exactly one of its 18 fields — `{"remapLayoutProportionally":true}`,
+34 bytes. No path in `displayPrefs.ts` can produce that: `saveDisplayPrefs` writes
+`normalize({...prev, ...partial})` and `resetDisplayPrefs` writes the full `DEFAULTS`, both
+complete objects. The multi-monitor track's own handoff says who did it —
+`HANDOFF_MULTIMONITOR.md:393-395`: *"`localStorage.jp-os-display-prefs-v1` was written with
+`remapLayoutProportionally: true` — the app previously had no stored display prefs at all."*
+They wrote the key directly rather than through the setter. It is harmless because
+`loadDisplayPrefs` merges `{...DEFAULTS, ...p}`, so a partial blob behaves exactly like a
+complete one, and the next real save rewrites all 18 fields. **Recorded because it is the second
+time this audit has found that driving storage directly during a measured run leaves residue a
+later pass reads as a defect — the first was 6.D.**
+
+**The one real field-level defect: `jp-study.onboarding.v1.lastStepId` is written and never
+read.** `markOnboardingStep` saves it on every tour step (`onboardingStore.ts:66`) and the loader
+normalises it back (`:37`), but **no consumer anywhere acts on it** — `HelpPage.tsx` reads only
+`completedAt` and `replays`, and nothing else in `src/` references the field. So the tour records
+where it got to and cannot resume there; it restarts from the beginning every time. This is the
+missing half of 5.6's finding that the tour's state machine "is NOT broken": the writes do land,
+and one of the three fields it writes drives nothing. **5.6 should treat resume as unbuilt rather
+than broken.**
+
+**The store moved 14 bytes during the run, and chasing it re-verified 3.3.** The closing
+assertion — same keys, same total size — failed: 74 keys still, but 1,420,554 → 1,420,568 chars.
+A per-key diff put all 14 bytes in `jp-os-environment-v1`, and the field set was **identical**
+(29 fields, none added or lost). The growth is inside `companions`, where a live desktop pet was
+mid-animation — `{"id":"c-bonzi","y":205.2077232000053,"motionTargetX":711.8561446727961,…}` —
+so a longer float serialises to a longer string. That is `CompanionLayer.persist()`, the second
+writer named in 3.3, doing its normal job. **The pass was read-only** (`getItem` and
+`localStorage.key(i)` only); this key simply has an owner that writes continuously, which is why
+a size assertion is not a corruption check. It also shows the 3.3 repair holding: `holdRoutineId`
+is still in the blob after the position autosave, which is precisely the field that used to vanish.
+
+**A false lead, recorded because the method produced it.** The first field-level run reported
+three dead fields; two (`lastStreakCelebrated`, `lastDailyCharsBucket`) were an artifact of
+excluding the writer's own file from the read search — `achievements.ts` reads both at `:52` and
+`:63` to gate celebrations. The tool now separates *mentioned nowhere* from *read only inside its
+own module* and reports the second as a candidate needing a human read, which is what it is. An
+earlier version also reported `length` as a missing field on two keys, because
+`getPropertiesOfType` on a `string[]` returns `length`; payload kind is now checked first.
+
+### 6.G — 6.2 swept: three keys had a second owner that erased fields, not one
+
+Report: `docs/audit/STORAGE_MULTIWRITER.md` · data: `STORAGE_MULTIWRITER.json` · rulings pinned in
+`STORAGE_MULTIWRITER_ADJUDICATIONS.json` · tool: `docs/migration/tools/storage-multiwriter.mjs`.
+
+**The obvious query is the wrong query, and this is the reason 6.2 sat pending.** "Keys written by
+`setItem` from two or more modules" returns 11 keys and **misses item 3.3 entirely** — 3.3's two
+owners both write through `saveEnvironment`, so at the `setItem` level there is exactly one writer.
+The population that actually erases data is a **shallow-merge setter reached from two or more
+modules with a contested collection-valued field**, and finding it needs the call graph, not a grep.
+The tool runs both queries and adjudicates the union: 173 keys with a write site, 2 shallow-merge
+candidates, 11 naive hits, 12 pinned rulings, **0 unruled**.
+
+Three defects, each a different way for the same shape to bite:
+
+1. **`jp-os-environment-v1.companions` — 3.3 again, one level up.** 3.3 closed the same-window case
+   with a resync effect, and this pass proved that fix's field coverage is *exact*: `CompanionsPage`
+   writes precisely `primaryRoutineId` / `secondaryRoutineId` / `holdRoutineId`, and the resync
+   reconciles precisely those three. What it does not reach is **another window**.
+   `main/desktopWindows.ts` opens one Study OS window per display, `EnvironmentStack` gates nothing
+   on display, so every window renders `CompanionLayer` and autosaves its own `listRef` — and
+   `environmentStore` is one of the stores with **no cross-window `storage` listener**, unlike
+   `toolboxSettings.ts:63-64`. `persist()` now re-reads those three fields at write time
+   (`companionAssignments.ts`, 6 tests).
+2. **`jp-video-core-mining-history-v1` — a mount-time snapshot written back whole.**
+   `useMusicMining.ts:117` appends against a fresh read and loses nothing. `VideoCoreMiningPanel`
+   seeds `history` into React state once at mount, never subscribes, and wrote the whole array back
+   on every change — so a note mined in the music player while the panel was open disappeared on the
+   panel's next append. Now folded against storage (`mergeVideoCoreMiningHistory`, 5 tests); the
+   union is well defined because both owners only ever append and every entry carries an `id`.
+3. **`jp-media-player-preferences-v1` — two schemas, one key.** Both players declare the key literal
+   separately and normalise on write. `normalizeVideoCoreStudyPreferences` spreads `{ ...raw }` and
+   preserves what it does not know; `normalizePlayerPreferences` built a fixed 14-field object, so
+   opening the legacy player erased the **nine** fields the study overlay owns. The live profile
+   holds the 23-field union, i.e. the overlay happened to have written last — the erasure is real and
+   was one launch away. The legacy player now merges over stored bytes
+   (`mergeStoredPlayerPreferences`, 3 tests).
+
+The nine remaining naive hits are ruled and recorded rather than dropped: seven are one real owner
+plus `migrationRunner.ts:83`, which writes **every** `LS_KEYS` key from a snapshot inside
+`replaceAtomic` — a deliberate whole-store restore, not a competing owner; one is a bare scalar
+(`jp-telemetry-consent`), where last-writer-wins is a conflict and not erasure, which 6.2 does not
+cover; one is `__devharness__` files, out of the product.
+
+**The tool carries a canary** asserting it still finds `saveEnvironment` with `companions` contested.
+It earned that on the first run: `sf.fileName` comes back forward-slashed from TypeScript while the
+root path was a Windows backslash string, so `startsWith` was false for every file and the sweep
+reported **zero candidates** — a clean-looking pass produced by collecting no call sites at all.
+
+### 6.H — 6.3 swept: 72 of 72 keys byte-identical across two boots
+
+Report: `docs/audit/STORAGE_ROUNDTRIP.md` · data: `STORAGE_ROUNDTRIP.json` · tool:
+`docs/migration/tools/storage-roundtrip.mjs`.
+
+The item asks for a per-key round trip driven through each key's real control. Driving 72 controls
+by hand is not a pass anyone would re-run, so the cycle used is the one the app performs on its own
+and performs on **every** key: **snapshot → reload → snapshot → reload → snapshot**. Two reloads are
+what make it diagnostic rather than descriptive — they separate *canonicalised once on read* from
+*changes on every boot*, and the second is exactly the 6.A class. This probe would have caught 6.A.
+
+Result: **72 live keys, 72 byte-identical across every cycle.** Zero canonicalised, zero per-boot,
+zero appeared or disappeared, and **zero lost a field**.
+
+A 100 % pass is when a probe most deserves distrust, so it carries a **positive control**: a
+synthetic key is planted, mutated between cycles, and the diff must report it. The first run also
+looked clean for a reason worth recording — the known continuous writer, the pet position autosave,
+sat at `motion: 'wall'` and had nothing to write, so *that* run never exercised the diff. The
+self-test is what makes the 72/72 an assertion instead of an absence. Between two runs the baseline
+did move by +8 chars, independently confirming the probe reads live values.
+
+Two things it does **not** cover, stated rather than implied: a field only a *user action* can
+change (the original wording's other half), and anything outside `localStorage` — IndexedDB has no
+coverage here and none elsewhere either (6.4). It also confirmed a fix in passing:
+`jp-study-whisper-lang` is **gone from the live profile**, which is the 6.E retirement landing.
+
 ### 5.7 — "the Scraper doesn't remember" was never about the Scraper
 
 The item names the Scraper *"and other new features"*, and that plural is the tell. Every
@@ -989,16 +1193,31 @@ rider on this one.
 
 ### What Section 6 still owes
 
-- **6.1 per-key field reconciliation is not done.** The whole-store corruption scan (6.C) is
-  complete and the inventory (6.B) is derived, but the three-way *written / present / read*
-  comparison **per field** has only been done for the keys that other items forced open
-  (`jp-os-environment-v1` in 3.3, `jp-os-desktop-prefs-v1` in 4.1). 106 declared-but-absent keys
-  are unclassified between "default, never touched" and "dead control".
-- **6.2 has one confirmed instance and no systematic sweep.** No key is written by a literal
-  `setItem` from two different source files, which is a real negative result — but it does not
-  cover the shape that actually bit in 3.3, where two owners both went through one exported
-  save function. That needs call-graph work, not grep.
-- **6.3 round-trips are measured only where an item required one** — `jp-os-desktop-prefs-v1`
-  byte-identical after an icon-size change and restore (4.1), `jp-os-personalization-v1` restored
-  (2.2), `jp-study-shortcuts-v1` still `null` throughout 4.2, and the known benign
-  absent-vs-`""` case in 3.3. A systematic pass over all 63 live keys was not run.
+**Nothing. Section 6 is closed** — 6.1, 6.2 and 6.3 all ran as re-runnable tools, every defect they
+found is fixed and pinned by tests, and 6.4 was demonstrated rather than measured. What follows is
+the record of how each closed and what each deliberately leaves outside its scope.
+
+- ~~**6.1 per-key field reconciliation is not done.**~~ **Done 2026-08-07 — see 6.E and 6.F.**
+  Both tiers ran as re-runnable tools, all 106 previously-unclassified keys are classified, and
+  every flag was verified by hand before being recorded. Two defects came out of it:
+  `jp-study-whisper-lang` (dead control) and `jp-study.onboarding.v1.lastStepId` (dead field).
+  **Both are now fixed** — the control is retired at its four sites and the tour resumes at
+  `lastStepId` instead of discarding it (`resumeIndex()`, 18 tests) — though 6.1 itself was scoped
+  as measurement and the fixes belong to their features.
+- ~~**6.2 has one confirmed instance and still no systematic sweep.**~~ **Done 2026-08-08 — see
+  6.G.** Swept over all 173 keys with a write site. The census's `writeSites` alone was *not*
+  sufficient: the naive module query misses item 3.3, whose two owners share one setter, so the
+  sweep resolves shallow-merge setters and their callers instead. Three defects, all fixed with
+  tests, one of them a cross-window gap the 3.3 repair could not reach. Twelve rulings pinned in
+  `STORAGE_MULTIWRITER_ADJUDICATIONS.json` so a re-run reprints settled verdicts rather than
+  re-litigating them; zero unruled. `migrationRunner`'s whole-snapshot restore is ruled *safe by
+  construction*, not skipped.
+- ~~**6.3 round-trips are measured only where an item required one.**~~ **Done 2026-08-08 — see
+  6.H.** Every live key, cycled twice through the app's own boot path: 72/72 byte-identical, no
+  field lost, nothing per-boot. Carries a positive control, because a 100 % pass is exactly when a
+  probe deserves distrust — and on the first run the known continuous writer was idle, so that run
+  never exercised the diff.
+- **What remains outside Section 6, by scope rather than by omission:** a round trip that only a
+  *user action* can drive (6.3 covers the boot path, which is the class 6.A belonged to), and
+  **IndexedDB**, which no probe here reads and which 6.4 already names as having no restore point
+  at all. Both are stated in the reports themselves, not only here.

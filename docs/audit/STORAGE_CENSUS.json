@@ -1,0 +1,4340 @@
+{
+  "summary": {
+    "generated": "2026-08-07T17:45:03.426Z",
+    "filesScanned": 1482,
+    "keys": 195,
+    "staticKeys": 183,
+    "dynamicKeys": 12,
+    "wrappers": 22,
+    "byClass": {
+      "read-never-written": 20,
+      "read-write": 171,
+      "test-only": 2,
+      "written-never-read": 2
+    },
+    "unresolvedCount": 36
+  },
+  "wrappers": [
+    {
+      "file": "src/renderer/aeroEnvironment.ts",
+      "name": "readJson",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/components/blanc/BlancShell.tsx",
+      "name": "readToolList",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/components/blanc/BlancShell.tsx",
+      "name": "writeToolList",
+      "paramIndex": 0,
+      "op": "write"
+    },
+    {
+      "file": "src/renderer/components/grammar/GrammarExplorer.tsx",
+      "name": "loadIds",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/components/grammar/GrammarExplorer.tsx",
+      "name": "saveIds",
+      "paramIndex": 0,
+      "op": "write"
+    },
+    {
+      "file": "src/renderer/components/media/library/MediaLibraryShell.tsx",
+      "name": "readStored",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/components/media/library/MediaLibraryShell.tsx",
+      "name": "store",
+      "paramIndex": 0,
+      "op": "write"
+    },
+    {
+      "file": "src/renderer/components/ui/SplitPane.tsx",
+      "name": "loadSize",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/continueWatchingStore.ts",
+      "name": "readJson",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/data/grammar/practiceFilters.ts",
+      "name": "loadPracticeFilters",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/data/grammar/practiceFilters.ts",
+      "name": "savePracticeFilters",
+      "paramIndex": 1,
+      "op": "write"
+    },
+    {
+      "file": "src/renderer/localStorageWrite.ts",
+      "name": "writeLocalStorage",
+      "paramIndex": 0,
+      "op": "write"
+    },
+    {
+      "file": "src/renderer/mediaProviderStore.ts",
+      "name": "readCandidate",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/mediaTrackingStore.ts",
+      "name": "readCandidate",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/releaseCheck.ts",
+      "name": "alreadySeen",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/releaseCheck.ts",
+      "name": "markSeen",
+      "paramIndex": 0,
+      "op": "write"
+    },
+    {
+      "file": "src/renderer/storage/migrationRunner.ts",
+      "name": "readLocal",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/storage/migrationRunner.ts",
+      "name": "writeLocal",
+      "paramIndex": 0,
+      "op": "write"
+    },
+    {
+      "file": "src/renderer/storage/storage.ts",
+      "name": "readHeavy",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/subtitleStore.ts",
+      "name": "readDocument",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/unifiedSearchStore.ts",
+      "name": "readCandidate",
+      "paramIndex": 0,
+      "op": "read"
+    },
+    {
+      "file": "src/renderer/localStorageWrite.ts",
+      "name": "writeLocalStorageJson",
+      "paramIndex": 0,
+      "op": "write"
+    }
+  ],
+  "keys": [
+    {
+      "key": "${…} (localStorage.key sweep)",
+      "class": "read-never-written",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 4,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/annotations.ts:41",
+        "src/renderer/bookmarks.ts:33",
+        "src/renderer/storage/settingsCatalog.ts:632",
+        "src/renderer/storage/storage.ts:221"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "${…} (whole-store sweep)",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 3,
+      "writes": 1,
+      "removes": 2,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/storage/settingsCatalog.ts:507",
+        "src/renderer/storage/settingsCatalog.ts:519",
+        "src/renderer/storage/settingsCatalog.ts:540"
+      ],
+      "writeSites": [
+        "src/renderer/storage/storage.ts:401"
+      ],
+      "removeSites": [
+        "src/renderer/lyrics.ts:98",
+        "src/renderer/storage/settingsCatalog.ts:645"
+      ]
+    },
+    {
+      "key": "j",
+      "class": "test-only",
+      "constNames": [
+        "MONO_KEYS",
+        "TETRIS_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 0,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-aero-discovered",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/aeroDiscovery.ts:7",
+        "src/renderer/aeroDiscovery.ts:15"
+      ],
+      "writeSites": [
+        "src/renderer/aeroDiscovery.ts:16"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-aero-environment-v1",
+      "class": "read-write",
+      "constNames": [
+        "AERO_ENV_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/aeroEnvironment.ts:77",
+        "src/renderer/aeroEnvironment.ts:81"
+      ],
+      "writeSites": [
+        "src/renderer/aeroEnvironment.ts:85"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-aero-legacy-features-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY",
+        "AERO_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 4,
+      "readSites": [
+        "src/renderer/aeroFeatureSettings.ts:97"
+      ],
+      "writeSites": [
+        "src/renderer/aeroFeatureSettings.ts:108"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-aero-restore-theme-v1",
+      "class": "read-write",
+      "constNames": [
+        "AERO_RESTORE_THEME_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 2,
+      "readSites": [
+        "src/renderer/aeroEnvironment.ts:106"
+      ],
+      "writeSites": [
+        "src/renderer/aeroEnvironment.ts:100"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-anki-deck",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_DECK_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/profileState.ts:122"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-anki-model",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_MODEL_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/profileState.ts:123"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-annotations:${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/annotations.ts:64"
+      ],
+      "writeSites": [
+        "src/renderer/views/NovelReader.tsx:294"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-annotations:${…} (whole-store sweep)",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/annotations.ts:84"
+      ],
+      "writeSites": [
+        "src/renderer/annotations.ts:85",
+        "src/renderer/annotations.ts:99"
+      ],
+      "removeSites": [
+        "src/renderer/annotations.ts:98"
+      ]
+    },
+    {
+      "key": "jp-app-border-settings",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/appBorderSettings.ts:29"
+      ],
+      "writeSites": [
+        "src/renderer/appBorderSettings.ts:53"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-app-zoom",
+      "class": "read-write",
+      "constNames": [
+        "KEY",
+        "UI_STATE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/appZoom.ts:28",
+        "src/renderer/storage/settingsCatalog.ts:486"
+      ],
+      "writeSites": [
+        "src/renderer/appZoom.ts:121"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-blanc-memory-v1",
+      "class": "read-write",
+      "constNames": [
+        "MEMORY_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/blancMode.ts:132"
+      ],
+      "writeSites": [
+        "src/renderer/blancMode.ts:142",
+        "src/renderer/blancMode.ts:153"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-blanc-mode-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/blancMode.ts:50"
+      ],
+      "writeSites": [
+        "src/renderer/blancMode.ts:60"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-book-level-cache-v1",
+      "class": "read-write",
+      "constNames": [
+        "CACHE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/bookLevelEstimate.ts:39"
+      ],
+      "writeSites": [
+        "src/renderer/bookLevelEstimate.ts:49"
+      ],
+      "removeSites": [
+        "src/renderer/bookLevelEstimate.ts:157"
+      ]
+    },
+    {
+      "key": "jp-bookmarks-${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/bookmarks.ts:51"
+      ],
+      "writeSites": [
+        "src/renderer/bookmarks.ts:81"
+      ],
+      "removeSites": [
+        "src/renderer/bookmarks.ts:80"
+      ]
+    },
+    {
+      "key": "jp-bookmarks-${…} (whole-store sweep)",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/bookmarks.ts:66"
+      ],
+      "writeSites": [
+        "src/renderer/bookmarks.ts:67"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-calendar-events",
+      "class": "read-write",
+      "constNames": [
+        "HEAVY_LOCAL_STORAGE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/calendar.ts:77",
+        "src/renderer/storage/migrationRunner.ts:48"
+      ],
+      "writeSites": [
+        "src/renderer/calendar.ts:87",
+        "src/renderer/storage/migrationRunner.ts:83"
+      ],
+      "removeSites": [
+        "src/renderer/storage/migrationRunner.ts:77"
+      ]
+    },
+    {
+      "key": "jp-clipboard-history",
+      "class": "read-write",
+      "constNames": [
+        "HEAVY_LOCAL_STORAGE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/clipboardHistory.ts:68",
+        "src/renderer/storage/migrationRunner.ts:48"
+      ],
+      "writeSites": [
+        "src/renderer/clipboardHistory.ts:78",
+        "src/renderer/storage/migrationRunner.ts:83"
+      ],
+      "removeSites": [
+        "src/renderer/storage/migrationRunner.ts:77"
+      ]
+    },
+    {
+      "key": "jp-clipboard-settings",
+      "class": "read-write",
+      "constNames": [
+        "SETTINGS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/clipboardHistory.ts:92"
+      ],
+      "writeSites": [
+        "src/renderer/clipboardHistory.ts:103"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-connection-profiles-v1",
+      "class": "read-write",
+      "constNames": [
+        "CONNECTION_PROFILES_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/connectionProfilesStore.ts:42"
+      ],
+      "writeSites": [
+        "src/renderer/connectionProfilesStore.ts:61"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-deck-level-cache-v1",
+      "class": "read-write",
+      "constNames": [
+        "CACHE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/deckLevelEstimate.ts:33"
+      ],
+      "writeSites": [
+        "src/renderer/deckLevelEstimate.ts:43"
+      ],
+      "removeSites": [
+        "src/renderer/deckLevelEstimate.ts:133"
+      ]
+    },
+    {
+      "key": "jp-desktop-notes",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_NOTES_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/desktopState.ts:113"
+      ],
+      "writeSites": [],
+      "removeSites": [
+        "src/renderer/desktopState.ts:126"
+      ]
+    },
+    {
+      "key": "jp-discovery-prefs-v1",
+      "class": "read-write",
+      "constNames": [
+        "PREFS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/discover/DiscoverContent.tsx:73"
+      ],
+      "writeSites": [
+        "src/renderer/components/discover/DiscoverContent.tsx:93"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-discovery-shortlist-v1",
+      "class": "read-write",
+      "constNames": [
+        "DISCOVERY_SHORTLIST_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 4,
+      "readSites": [
+        "src/renderer/discoveryShortlistStore.ts:134"
+      ],
+      "writeSites": [
+        "src/renderer/discoveryShortlistStore.ts:154"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-extension-last-local-version",
+      "class": "read-write",
+      "constNames": [
+        "LAST_EXT_LOCAL_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/releaseCheck.ts:38"
+      ],
+      "writeSites": [
+        "src/renderer/releaseCheck.ts:49"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-extension-seen-remote-version",
+      "class": "read-write",
+      "constNames": [
+        "SEEN_EXT_REMOTE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/releaseCheck.ts:75",
+        "src/renderer/releaseCheck.ts:90"
+      ],
+      "writeSites": [
+        "src/renderer/releaseCheck.ts:76",
+        "src/renderer/releaseCheck.ts:91"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-external-player-preferences-v1",
+      "class": "read-write",
+      "constNames": [
+        "EXTERNAL_PLAYER_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/externalPlayerStore.ts:4"
+      ],
+      "writeSites": [
+        "src/renderer/externalPlayerStore.ts:5"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-finding-summon-restore-v1",
+      "class": "read-write",
+      "constNames": [
+        "SUMMON_RESTORE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 2,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/findingReadouts.ts:163"
+      ],
+      "writeSites": [
+        "src/renderer/findingReadouts.ts:287"
+      ],
+      "removeSites": [
+        "src/renderer/findingReadouts.ts:195",
+        "src/renderer/findingReadouts.ts:239"
+      ]
+    },
+    {
+      "key": "jp-flashcard-deck",
+      "class": "read-write",
+      "constNames": [
+        "KEY",
+        "HEAVY_LOCAL_STORAGE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 3,
+      "writes": 3,
+      "removes": 1,
+      "testOnlySites": 5,
+      "readSites": [
+        "src/renderer/flashcardDeck.ts:71",
+        "src/renderer/storage/migrationRunner.ts:48",
+        "src/renderer/storage/settingsCatalog.ts:494"
+      ],
+      "writeSites": [
+        "src/renderer/flashcardDeck.ts:89",
+        "src/renderer/flashcardDeck.ts:108",
+        "src/renderer/storage/migrationRunner.ts:83"
+      ],
+      "removeSites": [
+        "src/renderer/storage/migrationRunner.ts:77"
+      ]
+    },
+    {
+      "key": "jp-fmhy-directory-snapshot-v1",
+      "class": "read-write",
+      "constNames": [
+        "FMHY_SNAPSHOT_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/verifiedSitesStore.ts:63"
+      ],
+      "writeSites": [
+        "src/renderer/verifiedSitesStore.ts:74"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-game-arena-seen-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/games/seenProgress.ts:23"
+      ],
+      "writeSites": [
+        "src/renderer/games/seenProgress.ts:33"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-game-arena-settings-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/games/settings.ts:71"
+      ],
+      "writeSites": [
+        "src/renderer/games/settings.ts:98"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-game-progress-v1",
+      "class": "read-write",
+      "constNames": [
+        "GAME_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/stats.ts:214"
+      ],
+      "writeSites": [
+        "src/renderer/stats.ts:232"
+      ],
+      "removeSites": [
+        "src/renderer/stats.ts:328"
+      ]
+    },
+    {
+      "key": "jp-global-lookup-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/globalLookupSettings.ts:33"
+      ],
+      "writeSites": [
+        "src/renderer/globalLookupSettings.ts:51"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-global-lookup-v1-last",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/globalLookupSettings.ts:73"
+      ],
+      "writeSites": [
+        "src/renderer/globalLookupSettings.ts:81"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-curation-v1",
+      "class": "read-write",
+      "constNames": [
+        "CURATION_LS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/grammarCuration.ts:184"
+      ],
+      "writeSites": [
+        "src/renderer/grammarCuration.ts:192"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-explorer-favorites-v1",
+      "class": "read-write",
+      "constNames": [
+        "FAVORITES_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/grammar/GrammarExplorer.tsx:102"
+      ],
+      "writeSites": [
+        "src/renderer/components/grammar/GrammarExplorer.tsx:143"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-explorer-filters-v1",
+      "class": "read-write",
+      "constNames": [
+        "EXPLORER_FILTERS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/grammar/GrammarExplorer.tsx:98"
+      ],
+      "writeSites": [
+        "src/renderer/components/grammar/GrammarExplorer.tsx:127"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-explorer-presets-v1",
+      "class": "read-write",
+      "constNames": [
+        "PRESETS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/grammarPresets.ts:105"
+      ],
+      "writeSites": [
+        "src/renderer/grammarPresets.ts:113"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-explorer-study-v1",
+      "class": "read-write",
+      "constNames": [
+        "STUDY_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/grammar/GrammarExplorer.tsx:103"
+      ],
+      "writeSites": [
+        "src/renderer/components/grammar/GrammarExplorer.tsx:144"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-familiarity-v1",
+      "class": "read-write",
+      "constNames": [
+        "FAMILIARITY_LS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/grammarFamiliarity.ts:318"
+      ],
+      "writeSites": [
+        "src/renderer/grammarFamiliarity.ts:327"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-notebook-timeline-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/notebookTimeline.ts:46"
+      ],
+      "writeSites": [
+        "src/renderer/notebookTimeline.ts:57"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-practice-filters-v1",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_PRACTICE_FILTERS_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/data/grammar/practiceFilters.ts:170"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-session-history-v1",
+      "class": "read-write",
+      "constNames": [
+        "HISTORY_LS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/grammarSessionHistory.ts:140"
+      ],
+      "writeSites": [
+        "src/renderer/grammarSessionHistory.ts:149"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-session-options-v1",
+      "class": "read-write",
+      "constNames": [
+        "SESSION_OPTIONS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/grammarSession.ts:422"
+      ],
+      "writeSites": [
+        "src/renderer/grammarSession.ts:430"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-grammarx-translation-history-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/translationHistory.ts:25"
+      ],
+      "writeSites": [
+        "src/renderer/translationHistory.ts:36"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-level-lists",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 2,
+      "readSites": [
+        "src/renderer/levelLists.ts:122"
+      ],
+      "writeSites": [
+        "src/renderer/levelLists.ts:149"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-level-threshold",
+      "class": "read-write",
+      "constNames": [
+        "THRESHOLD_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/levelService.ts:31"
+      ],
+      "writeSites": [
+        "src/renderer/levelService.ts:37"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-lookup-history",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/lookupHistory.ts:78"
+      ],
+      "writeSites": [
+        "src/renderer/lookupHistory.ts:93"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-lyrics-${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 2,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/lyrics.ts:46",
+        "src/renderer/lyrics.ts:74"
+      ],
+      "writeSites": [
+        "src/renderer/lyrics.ts:57",
+        "src/renderer/lyrics.ts:66"
+      ],
+      "removeSites": [
+        "src/renderer/lyrics.ts:85"
+      ]
+    },
+    {
+      "key": "jp-lyrics-settings",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/lyricsSettings.ts:15"
+      ],
+      "writeSites": [
+        "src/renderer/lyricsSettings.ts:25"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-manga-reader-settings",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/mangaReaderSettings.ts:112"
+      ],
+      "writeSites": [
+        "src/renderer/mangaReaderSettings.ts:144"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-manga-view-mode",
+      "class": "read-write",
+      "constNames": [
+        "MANGA_VIEW_MODE_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/manga/MangaViewModeSwitcher.tsx:9"
+      ],
+      "writeSites": [
+        "src/renderer/components/manga/MangaViewModeSwitcher.tsx:21"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-collapsed",
+      "class": "read-write",
+      "constNames": [
+        "COLLAPSED_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/media/MediaContent.tsx:114"
+      ],
+      "writeSites": [
+        "src/renderer/components/media/MediaContent.tsx:511"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-hub-item-state-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/mediaHubStore.ts:8"
+      ],
+      "writeSites": [
+        "src/renderer/mediaHubStore.ts:16"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-player-preferences-v1",
+      "class": "read-write",
+      "constNames": [
+        "PLAYER_PREFERENCES_KEY",
+        "PLAYER_PREFERENCES_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/media/VideoCoreStudyOverlay.tsx:226",
+        "src/renderer/components/media/MediaContent.tsx:105"
+      ],
+      "writeSites": [
+        "src/media/VideoCoreStudyOverlay.tsx:563",
+        "src/renderer/components/media/MediaContent.tsx:516"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-providers-v1",
+      "class": "read-write",
+      "constNames": [
+        "MEDIA_PROVIDER_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/mediaProviderStore.ts:28"
+      ],
+      "writeSites": [
+        "src/renderer/mediaProviderStore.ts:40"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-sections-collapsed",
+      "class": "read-write",
+      "constNames": [
+        "SECTION_COLLAPSED_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/media/MediaContent.tsx:125"
+      ],
+      "writeSites": [
+        "src/renderer/components/media/MediaContent.tsx:134"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-study-database-v1",
+      "class": "read-write",
+      "constNames": [
+        "MEDIA_STUDY_STORAGE_KEY",
+        "HEAVY_LOCAL_STORAGE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 2,
+      "readSites": [
+        "src/renderer/mediaStudyStore.ts:21",
+        "src/renderer/storage/migrationRunner.ts:48"
+      ],
+      "writeSites": [
+        "src/renderer/mediaStudyStore.ts:34",
+        "src/renderer/storage/migrationRunner.ts:83"
+      ],
+      "removeSites": [
+        "src/renderer/storage/migrationRunner.ts:77"
+      ]
+    },
+    {
+      "key": "jp-media-tracking-sources-audit-retention-v1",
+      "class": "read-write",
+      "constNames": [
+        "MEDIA_TRACKING_SOURCES_AUDIT_RETENTION_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/mediaTrackingSourcesStore.ts:62"
+      ],
+      "writeSites": [
+        "src/renderer/mediaTrackingSourcesStore.ts:75"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-tracking-sources-audit-v1",
+      "class": "read-write",
+      "constNames": [
+        "MEDIA_TRACKING_SOURCES_AUDIT_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/mediaTrackingSourcesStore.ts:84"
+      ],
+      "writeSites": [
+        "src/renderer/mediaTrackingSourcesStore.ts:99"
+      ],
+      "removeSites": [
+        "src/renderer/mediaTrackingSourcesStore.ts:107"
+      ]
+    },
+    {
+      "key": "jp-media-tracking-sources-v1",
+      "class": "read-write",
+      "constNames": [
+        "MEDIA_TRACKING_SOURCES_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/mediaTrackingSourcesStore.ts:28"
+      ],
+      "writeSites": [
+        "src/renderer/mediaTrackingSourcesStore.ts:38"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-media-tracking-v1",
+      "class": "read-write",
+      "constNames": [
+        "MEDIA_TRACKING_STORAGE_KEY",
+        "HEAVY_LOCAL_STORAGE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 3,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 3,
+      "readSites": [
+        "src/renderer/mediaTrackingStore.ts:68",
+        "src/renderer/mediaTrackingStore.ts:56",
+        "src/renderer/storage/migrationRunner.ts:48"
+      ],
+      "writeSites": [
+        "src/renderer/mediaTrackingStore.ts:86",
+        "src/renderer/storage/migrationRunner.ts:83"
+      ],
+      "removeSites": [
+        "src/renderer/storage/migrationRunner.ts:77"
+      ]
+    },
+    {
+      "key": "jp-medialib-scope",
+      "class": "read-write",
+      "constNames": [
+        "SCOPE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/media/library/MediaLibraryShell.tsx:97"
+      ],
+      "writeSites": [
+        "src/renderer/components/media/library/MediaLibraryShell.tsx:112"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-medialib-view",
+      "class": "read-write",
+      "constNames": [
+        "VIEW_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/media/library/MediaLibraryShell.tsx:105"
+      ],
+      "writeSites": [
+        "src/renderer/components/media/library/MediaLibraryShell.tsx:113"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-mini-frame-scale-v1",
+      "class": "read-write",
+      "constNames": [
+        "SCALE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/MiniShell.tsx:89"
+      ],
+      "writeSites": [
+        "src/renderer/components/MiniShell.tsx:99"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-mooncap-music-v1",
+      "class": "read-write",
+      "constNames": [
+        "MOONCAP_MUSIC_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/reading-garden/mooncapMusic.ts:24"
+      ],
+      "writeSites": [
+        "src/renderer/components/reading-garden/mooncapMusic.ts:50"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-multi-source-search",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_UNIFIED_SEARCH_STORAGE_KEYS"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/unifiedSearchStore.ts:64"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-music-collapsed",
+      "class": "read-write",
+      "constNames": [
+        "COLLAPSED_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/music/MusicContent.tsx:61"
+      ],
+      "writeSites": [
+        "src/renderer/components/music/MusicContent.tsx:151"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-music-liked",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/likedSongs.ts:8"
+      ],
+      "writeSites": [
+        "src/renderer/likedSongs.ts:24"
+      ],
+      "removeSites": [
+        "src/renderer/likedSongs.ts:41"
+      ]
+    },
+    {
+      "key": "jp-music-player",
+      "class": "read-write",
+      "constNames": [
+        "PREFS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/playerBus.ts:27"
+      ],
+      "writeSites": [
+        "src/renderer/playerBus.ts:62"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-music-sort",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/music/MusicContent.tsx:132"
+      ],
+      "writeSites": [
+        "src/renderer/components/music/MusicContent.tsx:243"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-novels-planned",
+      "class": "read-never-written",
+      "constNames": [
+        "PLAN_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/novels/NovelsContent.tsx:365"
+      ],
+      "writeSites": [],
+      "removeSites": [
+        "src/renderer/components/novels/NovelsContent.tsx:374"
+      ]
+    },
+    {
+      "key": "jp-os-accent",
+      "class": "read-write",
+      "constNames": [
+        "ACCENT_KEY",
+        "UI_STATE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/osPersonalization.ts:168"
+      ],
+      "writeSites": [
+        "src/renderer/osPersonalization.ts:276"
+      ],
+      "removeSites": [
+        "src/renderer/osPersonalization.ts:328"
+      ]
+    },
+    {
+      "key": "jp-os-achievements-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/environment/achievements.ts:23"
+      ],
+      "writeSites": [
+        "src/renderer/environment/achievements.ts:33"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-custom-css-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 2,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/customCss.ts:45"
+      ],
+      "writeSites": [
+        "src/renderer/customCss.ts:150"
+      ],
+      "removeSites": [
+        "src/renderer/customCss.ts:149",
+        "src/renderer/customCss.ts:161"
+      ]
+    },
+    {
+      "key": "jp-os-desktop-prefs-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/desktopPrefs.ts:74"
+      ],
+      "writeSites": [
+        "src/renderer/desktopPrefs.ts:113"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-display-prefs-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/displayPrefs.ts:86"
+      ],
+      "writeSites": [
+        "src/renderer/displayPrefs.ts:237",
+        "src/renderer/displayPrefs.ts:316"
+      ],
+      "removeSites": [
+        "src/renderer/displayPrefs.ts:306"
+      ]
+    },
+    {
+      "key": "jp-os-dnd",
+      "class": "read-write",
+      "constNames": [
+        "LS_DND"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/notificationStore.ts:68"
+      ],
+      "writeSites": [
+        "src/renderer/notificationStore.ts:76"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-environment-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY",
+        "ENV_KEY",
+        "ENVIRONMENT_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 3,
+      "readSites": [
+        "src/renderer/environment/environmentStore.ts:193",
+        "src/renderer/storage/settingsCatalog.ts:471"
+      ],
+      "writeSites": [
+        "src/renderer/environment/environmentStore.ts:204",
+        "src/renderer/storage/storage.ts:468"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-filedrop-prefs-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/fileDropPrefs.ts:52"
+      ],
+      "writeSites": [
+        "src/renderer/fileDropPrefs.ts:63"
+      ],
+      "removeSites": [
+        "src/renderer/fileDropPrefs.ts:73"
+      ]
+    },
+    {
+      "key": "jp-os-icons",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_ICONS_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/desktopState.ts:112"
+      ],
+      "writeSites": [],
+      "removeSites": [
+        "src/renderer/desktopState.ts:125"
+      ]
+    },
+    {
+      "key": "jp-os-motion-prefs-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/motion/motionPrefs.ts:95",
+        "src/renderer/motion/motionPrefs.ts:191"
+      ],
+      "writeSites": [
+        "src/renderer/motion/motionPrefs.ts:172",
+        "src/renderer/motion/motionPrefs.ts:192"
+      ],
+      "removeSites": [
+        "src/renderer/motion/motionPrefs.ts:210"
+      ]
+    },
+    {
+      "key": "jp-os-music-widget",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/musicWidgetSettings.ts:16"
+      ],
+      "writeSites": [
+        "src/renderer/musicWidgetSettings.ts:26"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-notifications-v1",
+      "class": "read-write",
+      "constNames": [
+        "LS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/notificationStore.ts:39"
+      ],
+      "writeSites": [
+        "src/renderer/notificationStore.ts:51"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-perf-tier",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/theme/perf.ts:25"
+      ],
+      "writeSites": [
+        "src/renderer/theme/perf.ts:36"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-personalization-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/customCss.ts:172",
+        "src/renderer/osPersonalization.ts:158"
+      ],
+      "writeSites": [
+        "src/renderer/osPersonalization.ts:336",
+        "src/renderer/osPersonalization.ts:275"
+      ],
+      "removeSites": [
+        "src/renderer/osPersonalization.ts:327"
+      ]
+    },
+    {
+      "key": "jp-os-reduce-motion",
+      "class": "read-write",
+      "constNames": [
+        "MOTION_KEY",
+        "UI_STATE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/displayPrefs.ts:96"
+      ],
+      "writeSites": [
+        "src/renderer/displayPrefs.ts:206"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-secret-history-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 2,
+      "readSites": [
+        "src/renderer/secretHistory.ts:44"
+      ],
+      "writeSites": [
+        "src/renderer/secretHistory.ts:60"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-secret-leaf-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/theme/SecretHistoryTrigger.tsx:26"
+      ],
+      "writeSites": [
+        "src/renderer/theme/SecretHistoryTrigger.tsx:34"
+      ],
+      "removeSites": [
+        "src/renderer/theme/SecretHistoryTrigger.tsx:43"
+      ]
+    },
+    {
+      "key": "jp-os-settings-recent-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/settings/settingsRecent.ts:14"
+      ],
+      "writeSites": [
+        "src/renderer/components/settings/settingsRecent.ts:28"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-sound-category-volume",
+      "class": "read-write",
+      "constNames": [
+        "LS_CATEGORY_VOLUME"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/audio/soundEngine.ts:76"
+      ],
+      "writeSites": [
+        "src/renderer/audio/soundEngine.ts:166"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-sound-enabled",
+      "class": "read-write",
+      "constNames": [
+        "LS_ENABLED"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/audio/soundEngine.ts:72"
+      ],
+      "writeSites": [
+        "src/renderer/audio/soundEngine.ts:127"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-sound-muted",
+      "class": "read-write",
+      "constNames": [
+        "LS_MUTED"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/audio/soundEngine.ts:73"
+      ],
+      "writeSites": [
+        "src/renderer/audio/soundEngine.ts:139"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-sound-volume",
+      "class": "read-write",
+      "constNames": [
+        "LS_VOLUME"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/audio/soundEngine.ts:74"
+      ],
+      "writeSites": [
+        "src/renderer/audio/soundEngine.ts:151"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-theme",
+      "class": "read-write",
+      "constNames": [
+        "UI_STATE_KEYS",
+        "THEME_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/storage/settingsCatalog.ts:478",
+        "src/renderer/theme/engine.ts:109"
+      ],
+      "writeSites": [
+        "src/renderer/theme/engine.ts:154"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-theme-engine-v",
+      "class": "read-write",
+      "constNames": [
+        "ENGINE_VERSION_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/theme/engine.ts:169"
+      ],
+      "writeSites": [
+        "src/renderer/theme/engine.ts:172"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-trinkets-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 2,
+      "readSites": [
+        "src/renderer/environment/companionTrinkets.ts:57"
+      ],
+      "writeSites": [
+        "src/renderer/environment/companionTrinkets.ts:74"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-user-wallpapers-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/wallpaperLibrary.ts:20"
+      ],
+      "writeSites": [
+        "src/renderer/wallpaperLibrary.ts:38"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-visualizer",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/visualizerSettings.ts:40"
+      ],
+      "writeSites": [
+        "src/renderer/visualizerSettings.ts:54"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-wall",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_WALL_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/desktopState.ts:114"
+      ],
+      "writeSites": [],
+      "removeSites": [
+        "src/renderer/desktopState.ts:127"
+      ]
+    },
+    {
+      "key": "jp-os-wall-fit",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/wallpaperFit.ts:32"
+      ],
+      "writeSites": [
+        "src/renderer/wallpaperFit.ts:43"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-os-wins",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_WINS_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/desktopState.ts:111"
+      ],
+      "writeSites": [],
+      "removeSites": [
+        "src/renderer/desktopState.ts:124"
+      ]
+    },
+    {
+      "key": "jp-perf-overlay",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/PerfOverlay.tsx:13"
+      ],
+      "writeSites": [
+        "src/renderer/components/PerfOverlay.tsx:44",
+        "src/renderer/components/PerfOverlay.tsx:57"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-pillarbox-settings",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/pillarboxSettings.ts:34"
+      ],
+      "writeSites": [
+        "src/renderer/pillarboxSettings.ts:45"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-reader-collection-prefs-v1",
+      "class": "read-write",
+      "constNames": [
+        "PREFS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/ReaderCollectionPanel.tsx:72"
+      ],
+      "writeSites": [
+        "src/renderer/components/ReaderCollectionPanel.tsx:94"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-reader-settings",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/readerSettings.ts:100"
+      ],
+      "writeSites": [
+        "src/renderer/readerSettings.ts:109"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-reading-adult",
+      "class": "read-write",
+      "constNames": [
+        "ADULT_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/reading/ReadingFinderContent.tsx:69"
+      ],
+      "writeSites": [
+        "src/renderer/components/reading/ReadingFinderContent.tsx:114"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-reading-garden-v1",
+      "class": "read-write",
+      "constNames": [
+        "READING_GARDEN_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/readingGardenProgress.ts:148"
+      ],
+      "writeSites": [
+        "src/renderer/readingGardenProgress.ts:164",
+        "src/renderer/readingGardenProgress.ts:189"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-release-last-check",
+      "class": "read-write",
+      "constNames": [
+        "LAST_CHECK_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/releaseCheck.ts:12"
+      ],
+      "writeSites": [
+        "src/renderer/releaseCheck.ts:17"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-release-seen-version",
+      "class": "read-write",
+      "constNames": [
+        "SEEN_APP_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/releaseCheck.ts:72"
+      ],
+      "writeSites": [
+        "src/renderer/releaseCheck.ts:73"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-saved-words",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_SAVED_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/savedWords.ts:29"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-saved-words-${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/savedWords.ts:40"
+      ],
+      "writeSites": [
+        "src/renderer/savedWords.ts:50"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-saved-words-ja",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/savedWords.ts:28"
+      ],
+      "writeSites": [
+        "src/renderer/savedWords.ts:31"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-scraper-advanced-v1",
+      "class": "read-write",
+      "constNames": [
+        "ADVANCED_MODE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/scraper/ScraperApp.tsx:74"
+      ],
+      "writeSites": [
+        "src/renderer/components/scraper/ScraperApp.tsx:82"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-scraper-recent-queries-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 3,
+      "readSites": [
+        "src/renderer/components/scraper/scraperRecent.ts:12"
+      ],
+      "writeSites": [
+        "src/renderer/components/scraper/scraperRecent.ts:35"
+      ],
+      "removeSites": [
+        "src/renderer/components/scraper/scraperRecent.ts:57"
+      ]
+    },
+    {
+      "key": "jp-scraper-settings-v1",
+      "class": "read-write",
+      "constNames": [
+        "SCRAPER_SETTINGS_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/scraperSettingsStore.ts:34"
+      ],
+      "writeSites": [
+        "src/renderer/scraperSettingsStore.ts:53"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-scraper-shell-v1",
+      "class": "read-write",
+      "constNames": [
+        "SCRAPER_SHELL_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/scraperShellStore.ts:28"
+      ],
+      "writeSites": [
+        "src/renderer/scraperShellStore.ts:47"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-settings-advanced-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/settingsAdvanced.ts:11"
+      ],
+      "writeSites": [
+        "src/renderer/settingsAdvanced.ts:19"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-shortcuts-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/keyboardShortcuts.ts:756"
+      ],
+      "writeSites": [
+        "src/renderer/keyboardShortcuts.ts:778",
+        "src/renderer/keyboardShortcuts.ts:954"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-blanc-theme-history-v1",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/blancThemeHistoryStore.ts:29"
+      ],
+      "writeSites": [
+        "src/renderer/blancThemeHistoryStore.ts:42",
+        "src/renderer/blancThemeHistoryStore.ts:49"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-csv-editor-v1",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY",
+        "HEAVY_LOCAL_STORAGE_KEYS"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 2,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/csv-editor/csvEditorStorage.ts:19",
+        "src/renderer/storage/migrationRunner.ts:48"
+      ],
+      "writeSites": [
+        "src/renderer/components/csv-editor/csvEditorStorage.ts:55",
+        "src/renderer/storage/migrationRunner.ts:83"
+      ],
+      "removeSites": [
+        "src/renderer/components/csv-editor/csvEditorStorage.ts:65",
+        "src/renderer/storage/migrationRunner.ts:77"
+      ]
+    },
+    {
+      "key": "jp-study-dict-lang",
+      "class": "read-write",
+      "constNames": [
+        "STUDY_LANG_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/studyEnvironment.ts:26"
+      ],
+      "writeSites": [
+        "src/renderer/studyEnvironment.ts:40"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-environment-backup-v1",
+      "class": "read-write",
+      "constNames": [
+        "STUDY_ENV_BACKUP_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/aeroEnvironment.ts:93"
+      ],
+      "writeSites": [
+        "src/renderer/aeroEnvironment.ts:89"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-epub-auto-translate",
+      "class": "read-write",
+      "constNames": [
+        "EPUB_TRANSLATE_AUTO_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/views/NovelReader.tsx:213"
+      ],
+      "writeSites": [
+        "src/renderer/views/NovelReader.tsx:917"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-epub-translate-mode",
+      "class": "read-write",
+      "constNames": [
+        "EPUB_TRANSLATE_MODE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/views/NovelReader.tsx:195"
+      ],
+      "writeSites": [
+        "src/renderer/views/NovelReader.tsx:916"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-ex-display",
+      "class": "read-write",
+      "constNames": [
+        "EX_DISPLAY_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/DictionaryResults.tsx:86"
+      ],
+      "writeSites": [
+        "src/renderer/components/DictionaryResults.tsx:661"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-ex-langs",
+      "class": "read-write",
+      "constNames": [
+        "EX_LANG_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/DictionaryResults.tsx:109"
+      ],
+      "writeSites": [
+        "src/renderer/components/DictionaryResults.tsx:668"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-focus-mode-v1",
+      "class": "read-write",
+      "constNames": [
+        "ACTIVE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/focusMode.ts:94"
+      ],
+      "writeSites": [
+        "src/renderer/focusMode.ts:195",
+        "src/renderer/focusMode.ts:223"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-focus-settings-v2",
+      "class": "read-write",
+      "constNames": [
+        "SETTINGS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/focusMode.ts:52"
+      ],
+      "writeSites": [
+        "src/renderer/focusMode.ts:73"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-lens-mode",
+      "class": "read-write",
+      "constNames": [
+        "MODE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/lens/ReadingLensOverlay.tsx:82"
+      ],
+      "writeSites": [
+        "src/renderer/components/lens/ReadingLensOverlay.tsx:164"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-lens-tier",
+      "class": "read-write",
+      "constNames": [
+        "TIER_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/lens/LensReaderPanel.tsx:54"
+      ],
+      "writeSites": [
+        "src/renderer/components/lens/LensReaderPanel.tsx:88"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-local-agent-automations-v1",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/localAgentAutomationStore.ts:12"
+      ],
+      "writeSites": [
+        "src/renderer/localAgentAutomationStore.ts:27"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-local-agent-memory-v1",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/localAgentMemoryStore.ts:18"
+      ],
+      "writeSites": [
+        "src/renderer/localAgentMemoryStore.ts:29"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-local-agent-profiles-v1",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 3,
+      "readSites": [
+        "src/renderer/localAgentProfilesStore.ts:15"
+      ],
+      "writeSites": [
+        "src/renderer/localAgentProfilesStore.ts:26"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-local-agent-settings-v1",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/localAgentSettingsStore.ts:12"
+      ],
+      "writeSites": [
+        "src/renderer/localAgentSettingsStore.ts:23"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-local-agent-task-queue-v1",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/localAgentTaskQueueStore.ts:12"
+      ],
+      "writeSites": [
+        "src/renderer/localAgentTaskQueueStore.ts:22"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-lockscreen-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/lockscreenSettings.ts:63"
+      ],
+      "writeSites": [
+        "src/renderer/lockscreenSettings.ts:86"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-mini-mode-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/miniMode.ts:255"
+      ],
+      "writeSites": [
+        "src/renderer/miniMode.ts:299"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-stats-v1",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_STATS_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/stats.ts:33"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-stats-v1-${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/stats.ts:191"
+      ],
+      "writeSites": [
+        "src/renderer/stats.ts:202"
+      ],
+      "removeSites": [
+        "src/renderer/stats.ts:521"
+      ]
+    },
+    {
+      "key": "jp-study-stats-v1-ja",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/stats.ts:32"
+      ],
+      "writeSites": [
+        "src/renderer/stats.ts:35"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-translate-source",
+      "class": "read-write",
+      "constNames": [
+        "SOURCE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/translate/TranslateContent.tsx:78"
+      ],
+      "writeSites": [
+        "src/renderer/components/translate/TranslateContent.tsx:105",
+        "src/renderer/components/translate/TranslateContent.tsx:118"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-translate-target",
+      "class": "read-write",
+      "constNames": [
+        "TRANSLATE_TARGET_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/translateTarget.ts:28"
+      ],
+      "writeSites": [
+        "src/renderer/translateTarget.ts:39"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-whisper-auto-device",
+      "class": "read-write",
+      "constNames": [
+        "AUTO_DEVICE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/whisperModelCache.ts:58"
+      ],
+      "writeSites": [
+        "src/renderer/whisperModelCache.ts:101"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-whisper-device",
+      "class": "read-write",
+      "constNames": [
+        "DEVICE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/whisperSettings.ts:22"
+      ],
+      "writeSites": [
+        "src/renderer/whisperSettings.ts:31"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-whisper-downloaded",
+      "class": "read-write",
+      "constNames": [
+        "DOWNLOADED_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/whisperModelCache.ts:34"
+      ],
+      "writeSites": [
+        "src/renderer/whisperModelCache.ts:82"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-whisper-lang",
+      "class": "written-never-read",
+      "constNames": [
+        "WHISPER_LANG_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 0,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [],
+      "writeSites": [
+        "src/renderer/studyEnvironment.ts:41"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-whisper-model",
+      "class": "read-write",
+      "constNames": [
+        "MODEL_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/whisperSettings.ts:47"
+      ],
+      "writeSites": [
+        "src/renderer/whisperSettings.ts:57"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study-workspace-v1:${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/media/StudyWorkspaceProvider.tsx:80"
+      ],
+      "writeSites": [
+        "src/media/StudyWorkspaceProvider.tsx:131"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.blanc.quickNotes",
+      "class": "read-write",
+      "constNames": [
+        "BLANC_QUICK_NOTES_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1994"
+      ],
+      "writeSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:2003"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.blanc.toolbox.favoriteTools",
+      "class": "read-write",
+      "constNames": [
+        "BLANC_FAVORITE_TOOLS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1174"
+      ],
+      "writeSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1305"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.blanc.toolbox.lastTool",
+      "class": "read-write",
+      "constNames": [
+        "BLANC_LAST_TOOL_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1185",
+        "src/renderer/components/blanc/BlancShell.tsx:1196"
+      ],
+      "writeSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1276",
+        "src/renderer/components/blanc/BlancShell.tsx:1289"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.blanc.toolbox.openTabs",
+      "class": "read-write",
+      "constNames": [
+        "BLANC_OPEN_TABS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1194"
+      ],
+      "writeSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1257"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.blanc.toolbox.recentTools",
+      "class": "read-write",
+      "constNames": [
+        "BLANC_RECENT_TOOLS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1176"
+      ],
+      "writeSites": [
+        "src/renderer/components/blanc/BlancShell.tsx:1274"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.blanc.toolbox.workspaces.v1",
+      "class": "read-never-written",
+      "constNames": [
+        "WORKSPACE_LAUNCHER_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/blanc/BlancReadyToolPanels.tsx:1573"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.blanc.toolbox.workspaces.v1.migrated",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/blanc/BlancAppDrawerPanel.tsx:91"
+      ],
+      "writeSites": [
+        "src/renderer/components/blanc/BlancAppDrawerPanel.tsx:97",
+        "src/renderer/components/blanc/BlancAppDrawerPanel.tsx:115"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.onboarding.v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/onboardingStore.ts:29"
+      ],
+      "writeSites": [
+        "src/renderer/onboardingStore.ts:48"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-study.toolbox.settings.v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 4,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/toolboxSettings.ts:20"
+      ],
+      "writeSites": [
+        "src/renderer/toolboxSettings.ts:29",
+        "src/renderer/toolboxSettings.ts:35",
+        "src/renderer/toolboxSettings.ts:42",
+        "src/renderer/toolboxSettings.ts:54"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-subtitle-management-v1",
+      "class": "read-write",
+      "constNames": [
+        "SUBTITLE_MANAGEMENT_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/subtitleStore.ts:96"
+      ],
+      "writeSites": [
+        "src/renderer/subtitleStore.ts:108"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-subtitle-providers-v1",
+      "class": "read-write",
+      "constNames": [
+        "SUBTITLE_PROVIDERS_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/subtitleStore.ts:77"
+      ],
+      "writeSites": [
+        "src/renderer/subtitleStore.ts:89"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-telemetry-consent",
+      "class": "read-write",
+      "constNames": [
+        "TELEMETRY_CONSENT_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 4,
+      "writes": 3,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/ConsentScreen.tsx:13",
+        "src/renderer/components/resources/WorldHeatMap.tsx:34",
+        "src/renderer/views/SettingsView.tsx:341",
+        "src/renderer/widgets/more.tsx:221"
+      ],
+      "writeSites": [
+        "src/renderer/components/ConsentScreen.tsx:20",
+        "src/renderer/views/SettingsView.tsx:350",
+        "src/renderer/widgets/more.tsx:231"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-telemetry-pinged",
+      "class": "read-write",
+      "constNames": [
+        "TELEMETRY_PINGED_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/telemetryPing.ts:9",
+        "src/renderer/telemetryPing.ts:25"
+      ],
+      "writeSites": [
+        "src/renderer/telemetryPing.ts:27"
+      ],
+      "removeSites": [
+        "src/renderer/telemetryPing.ts:10"
+      ]
+    },
+    {
+      "key": "jp-ui-customization-v1",
+      "class": "read-write",
+      "constNames": [
+        "UI_CUSTOMIZATION_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/uiCustomizationStore.ts:31"
+      ],
+      "writeSites": [
+        "src/renderer/uiCustomizationStore.ts:49"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-unified-search",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_UNIFIED_SEARCH_STORAGE_KEYS"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/unifiedSearchStore.ts:64"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-unified-search-history-v1",
+      "class": "read-write",
+      "constNames": [
+        "UNIFIED_SEARCH_HISTORY_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/unifiedSearchHistoryStore.ts:12"
+      ],
+      "writeSites": [
+        "src/renderer/unifiedSearchHistoryStore.ts:20"
+      ],
+      "removeSites": [
+        "src/renderer/unifiedSearchHistoryStore.ts:26"
+      ]
+    },
+    {
+      "key": "jp-unified-search-management-v1",
+      "class": "read-write",
+      "constNames": [
+        "UNIFIED_SEARCH_MANAGEMENT_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/unifiedSearchManagementStore.ts:15"
+      ],
+      "writeSites": [
+        "src/renderer/unifiedSearchManagementStore.ts:23"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-unified-search-v1",
+      "class": "read-write",
+      "constNames": [
+        "UNIFIED_SEARCH_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/unifiedSearchStore.ts:64"
+      ],
+      "writeSites": [
+        "src/renderer/unifiedSearchStore.ts:68",
+        "src/renderer/unifiedSearchStore.ts:79"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-verified-sites-v1",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_VERIFIED_SITES_STORAGE_KEYS"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/verifiedSitesStore.ts:25"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-verified-sites-v2",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_VERIFIED_SITES_STORAGE_KEYS"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/verifiedSitesStore.ts:25"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-verified-sites-v3",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_VERIFIED_SITES_STORAGE_KEYS"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/verifiedSitesStore.ts:25"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-verified-sites-v4",
+      "class": "read-write",
+      "constNames": [
+        "VERIFIED_SITES_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/verifiedSitesStore.ts:23"
+      ],
+      "writeSites": [
+        "src/renderer/verifiedSitesStore.ts:30",
+        "src/renderer/verifiedSitesStore.ts:40"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-video-core-mining-history-v1",
+      "class": "read-write",
+      "constNames": [
+        "VIDEO_CORE_MINING_HISTORY_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 6,
+      "writes": 6,
+      "removes": 0,
+      "testOnlySites": 2,
+      "readSites": [
+        "src/media/StudyBlocks.tsx:219",
+        "src/media/VideoCoreMiningPanel.tsx:59",
+        "src/renderer/components/music/useMusicMining.ts:54",
+        "src/renderer/components/reading/SeanimeStudyLibraryPanel.tsx:153",
+        "src/renderer/components/reading/SeanimeWatchLoopPanel.tsx:70",
+        "src/renderer/continueWatchingStore.ts:53"
+      ],
+      "writeSites": [
+        "src/media/VideoCoreMiningPanel.tsx:216",
+        "src/renderer/components/music/useMusicMining.ts:117",
+        "src/renderer/components/music/useMusicMining.ts:140",
+        "src/renderer/__devharness__/continueWatchingHarness.tsx:75",
+        "src/renderer/__devharness__/detachedBlockHarness.tsx:236",
+        "src/renderer/__devharness__/watchLoopHarness.tsx:109"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-video-core-resume-v1",
+      "class": "read-write",
+      "constNames": [
+        "VIDEO_CORE_RESUME_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 3,
+      "writes": 3,
+      "removes": 0,
+      "testOnlySites": 6,
+      "readSites": [
+        "src/media/StudyPlayerSlice.tsx:252",
+        "src/media/StudyPlayerSlice.tsx:657",
+        "src/renderer/continueWatchingStore.ts:48"
+      ],
+      "writeSites": [
+        "src/media/StudyPlayerSlice.tsx:666",
+        "src/renderer/__devharness__/continueWatchingHarness.tsx:67",
+        "src/renderer/__devharness__/resumeLastHarness.tsx:42"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-video-server-profiles-v1",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_VIDEO_SERVER_PROFILES_STORAGE_KEYS"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/videoServerProfilesStore.ts:17"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-video-server-profiles-v2",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_VIDEO_SERVER_PROFILES_STORAGE_KEYS"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/videoServerProfilesStore.ts:17"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-video-server-profiles-v3",
+      "class": "read-write",
+      "constNames": [
+        "VIDEO_SERVER_PROFILES_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 2,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/videoServerProfilesStore.ts:15"
+      ],
+      "writeSites": [
+        "src/renderer/videoServerProfilesStore.ts:22",
+        "src/renderer/videoServerProfilesStore.ts:32"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-vn-lens-capture-target-v1",
+      "class": "read-write",
+      "constNames": [
+        "VISUAL_NOVEL_OCR_TARGET_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/lens/ReadingLensOverlay.tsx:187"
+      ],
+      "writeSites": [
+        "src/renderer/components/immersion/VisualNovelPanel.tsx:420"
+      ],
+      "removeSites": [
+        "src/renderer/components/lens/ReadingLensOverlay.tsx:188"
+      ]
+    },
+    {
+      "key": "jp-widget-gallery",
+      "class": "read-write",
+      "constNames": [
+        "GKEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/WidgetGallery.tsx:18"
+      ],
+      "writeSites": [
+        "src/renderer/components/WidgetGallery.tsx:26"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-wired-archive-boot-seen-v1",
+      "class": "read-write",
+      "constNames": [
+        "BOOT_SEEN_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 1,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/terminalModeSettings.ts:165"
+      ],
+      "writeSites": [
+        "src/renderer/terminalModeSettings.ts:173"
+      ],
+      "removeSites": [
+        "src/renderer/terminalModeSettings.ts:181"
+      ]
+    },
+    {
+      "key": "jp-wired-archive-settings-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY",
+        "WIRED_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 4,
+      "readSites": [
+        "src/renderer/terminalModeSettings.ts:117"
+      ],
+      "writeSites": [
+        "src/renderer/terminalModeSettings.ts:128"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-wired-discovered-v1",
+      "class": "read-write",
+      "constNames": [
+        "KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 2,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/wiredDiscovery.ts:6",
+        "src/renderer/wiredDiscovery.ts:14"
+      ],
+      "writeSites": [
+        "src/renderer/wiredDiscovery.ts:15"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-wired-restore-theme-v1",
+      "class": "read-write",
+      "constNames": [
+        "WIRED_RESTORE_THEME_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/wiredArchiveLifecycle.ts:287"
+      ],
+      "writeSites": [
+        "src/renderer/wiredArchiveLifecycle.ts:273"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-word-knowledge",
+      "class": "read-never-written",
+      "constNames": [
+        "LEGACY_KNOWLEDGE_KEY"
+      ],
+      "legacyNamed": true,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [
+        "src/renderer/knownWords.ts:39"
+      ],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "jp-word-knowledge-${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/knownWords.ts:53"
+      ],
+      "writeSites": [
+        "src/renderer/knownWords.ts:63"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-word-knowledge-ja",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/knownWords.ts:38"
+      ],
+      "writeSites": [
+        "src/renderer/knownWords.ts:41"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp-youtube-discovery-prefs-v1",
+      "class": "read-write",
+      "constNames": [
+        "PREFS_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/discover/YoutubeDiscoveryPanel.tsx:104"
+      ],
+      "writeSites": [
+        "src/renderer/components/discover/YoutubeDiscoveryPanel.tsx:121"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp:directstream-open-generation",
+      "class": "read-write",
+      "constNames": [
+        "DIRECTSTREAM_OPEN_GENERATION_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/media/StudyPlayerSlice.tsx:286"
+      ],
+      "writeSites": [
+        "src/media/StudyPlayerSlice.tsx:318"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "jp:mediastream-transcode-paths",
+      "class": "read-write",
+      "constNames": [
+        "TRANSCODE_MEMO_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/media/StudyPlayerSlice.tsx:299"
+      ],
+      "writeSites": [
+        "src/media/StudyPlayerSlice.tsx:307"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "k",
+      "class": "test-only",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 0,
+      "writes": 0,
+      "removes": 0,
+      "testOnlySites": 1,
+      "readSites": [],
+      "writeSites": [],
+      "removeSites": []
+    },
+    {
+      "key": "resources.checklist.${…}",
+      "class": "read-write",
+      "constNames": [],
+      "legacyNamed": false,
+      "dynamic": true,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/components/resources/ResourcesContent.tsx:77"
+      ],
+      "writeSites": [
+        "src/renderer/components/resources/ResourcesContent.tsx:87"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "sea-server-auth-token",
+      "class": "written-never-read",
+      "constNames": [
+        "SERVER_AUTH_TOKEN_STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 0,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [],
+      "writeSites": [
+        "src/media/seanimeBootstrap.ts:26"
+      ],
+      "removeSites": []
+    },
+    {
+      "key": "ui-lang",
+      "class": "read-write",
+      "constNames": [
+        "STORAGE_KEY"
+      ],
+      "legacyNamed": false,
+      "dynamic": false,
+      "reads": 1,
+      "writes": 1,
+      "removes": 0,
+      "testOnlySites": 0,
+      "readSites": [
+        "src/renderer/i18n.ts:28"
+      ],
+      "writeSites": [
+        "src/renderer/i18n.ts:80"
+      ],
+      "removeSites": []
+    }
+  ],
+  "unresolved": [
+    {
+      "site": "src/renderer/components/ui/SplitPane.tsx:75",
+      "op": "write",
+      "detail": "identifier storageKey",
+      "text": "storageKey"
+    },
+    {
+      "site": "src/renderer/components/ui/SplitPane.tsx:57",
+      "op": "read",
+      "detail": "identifier storageKey",
+      "text": "storageKey"
+    },
+    {
+      "site": "src/renderer/__devharness__/studyLedgerHarness.tsx:162",
+      "op": "write",
+      "detail": "call statsKey()",
+      "text": "statsKey()"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaProviderStore.test.ts:29",
+      "op": "read",
+      "detail": "member store.MEDIA_PROVIDER_STORAGE_KEY",
+      "text": "store.MEDIA_PROVIDER_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaProviderStore.test.ts:73",
+      "op": "write",
+      "detail": "member store.MEDIA_PROVIDER_STORAGE_KEY",
+      "text": "store.MEDIA_PROVIDER_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaTrackingSourcesHistory.test.tsx:58",
+      "op": "write",
+      "detail": "member store.MEDIA_TRACKING_SOURCES_AUDIT_STORAGE_KEY",
+      "text": "store.MEDIA_TRACKING_SOURCES_AUDIT_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaTrackingSourcesHistory.test.tsx:70",
+      "op": "write",
+      "detail": "member store.MEDIA_TRACKING_SOURCES_AUDIT_STORAGE_KEY",
+      "text": "store.MEDIA_TRACKING_SOURCES_AUDIT_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaTrackingSourcesHistory.test.tsx:83",
+      "op": "write",
+      "detail": "member store.MEDIA_TRACKING_SOURCES_AUDIT_STORAGE_KEY",
+      "text": "store.MEDIA_TRACKING_SOURCES_AUDIT_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaTrackingSourcesHistory.test.tsx:98",
+      "op": "read",
+      "detail": "member store.MEDIA_TRACKING_SOURCES_AUDIT_RETENTION_STORAGE_KEY",
+      "text": "store.MEDIA_TRACKING_SOURCES_AUDIT_RETENTION_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaTrackingStore.test.ts:68",
+      "op": "write",
+      "detail": "member store.MEDIA_TRACKING_STORAGE_KEY",
+      "text": "store.MEDIA_TRACKING_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaTrackingStore.test.ts:81",
+      "op": "read",
+      "detail": "member store.MEDIA_TRACKING_STORAGE_KEY",
+      "text": "store.MEDIA_TRACKING_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/mediaTrackingStore.test.ts:88",
+      "op": "read",
+      "detail": "member store.MEDIA_TRACKING_STORAGE_KEY",
+      "text": "store.MEDIA_TRACKING_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/scraperShellStore.test.ts:30",
+      "op": "read",
+      "detail": "member store.SCRAPER_SHELL_STORAGE_KEY",
+      "text": "store.SCRAPER_SHELL_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/scraperShellStore.test.ts:59",
+      "op": "write",
+      "detail": "member store.SCRAPER_SHELL_STORAGE_KEY",
+      "text": "store.SCRAPER_SHELL_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/subtitleStore.test.ts:31",
+      "op": "read",
+      "detail": "member store.SUBTITLE_PROVIDERS_STORAGE_KEY",
+      "text": "store.SUBTITLE_PROVIDERS_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/subtitleStore.test.ts:138",
+      "op": "write",
+      "detail": "member store.SUBTITLE_MANAGEMENT_STORAGE_KEY",
+      "text": "store.SUBTITLE_MANAGEMENT_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/subtitleStore.test.ts:144",
+      "op": "write",
+      "detail": "member store.SUBTITLE_PROVIDERS_STORAGE_KEY",
+      "text": "store.SUBTITLE_PROVIDERS_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchHistoryStore.test.ts:18",
+      "op": "read",
+      "detail": "member store.UNIFIED_SEARCH_HISTORY_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_HISTORY_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchHistoryStore.test.ts:26",
+      "op": "write",
+      "detail": "member store.UNIFIED_SEARCH_HISTORY_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_HISTORY_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchManagementStore.test.ts:30",
+      "op": "write",
+      "detail": "member store.UNIFIED_SEARCH_MANAGEMENT_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_MANAGEMENT_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchStore.test.ts:30",
+      "op": "write",
+      "detail": "ElementAccessExpression",
+      "text": "store.LEGACY_UNIFIED_SEARCH_STORAGE_KEYS[0]"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchStore.test.ts:40",
+      "op": "read",
+      "detail": "member store.UNIFIED_SEARCH_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchStore.test.ts:45",
+      "op": "write",
+      "detail": "member store.UNIFIED_SEARCH_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchStore.test.ts:46",
+      "op": "write",
+      "detail": "ElementAccessExpression",
+      "text": "store.LEGACY_UNIFIED_SEARCH_STORAGE_KEYS[1]"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchStore.test.ts:53",
+      "op": "write",
+      "detail": "member store.UNIFIED_SEARCH_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchStore.test.ts:69",
+      "op": "read",
+      "detail": "member store.UNIFIED_SEARCH_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/unifiedSearchStore.test.ts:72",
+      "op": "read",
+      "detail": "member store.UNIFIED_SEARCH_STORAGE_KEY",
+      "text": "store.UNIFIED_SEARCH_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/verifiedSitesStore.test.ts:22",
+      "op": "write",
+      "detail": "member store.VERIFIED_SITES_STORAGE_KEY",
+      "text": "store.VERIFIED_SITES_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/verifiedSitesStore.test.ts:28",
+      "op": "write",
+      "detail": "ElementAccessExpression",
+      "text": "store.LEGACY_VERIFIED_SITES_STORAGE_KEYS[2]"
+    },
+    {
+      "site": "src/renderer/__tests__/verifiedSitesStore.test.ts:34",
+      "op": "read",
+      "detail": "member store.VERIFIED_SITES_STORAGE_KEY",
+      "text": "store.VERIFIED_SITES_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/verifiedSitesStore.test.ts:66",
+      "op": "write",
+      "detail": "member store.FMHY_SNAPSHOT_STORAGE_KEY",
+      "text": "store.FMHY_SNAPSHOT_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/videoServerProfilesStore.test.ts:22",
+      "op": "write",
+      "detail": "member store.VIDEO_SERVER_PROFILES_STORAGE_KEY",
+      "text": "store.VIDEO_SERVER_PROFILES_STORAGE_KEY"
+    },
+    {
+      "site": "src/renderer/__tests__/videoServerProfilesStore.test.ts:28",
+      "op": "write",
+      "detail": "ElementAccessExpression",
+      "text": "store.LEGACY_VIDEO_SERVER_PROFILES_STORAGE_KEYS[0]"
+    },
+    {
+      "site": "src/renderer/__tests__/videoServerProfilesStore.test.ts:30",
+      "op": "read",
+      "detail": "member store.VIDEO_SERVER_PROFILES_STORAGE_KEY",
+      "text": "store.VIDEO_SERVER_PROFILES_STORAGE_KEY"
+    },
+    {
+      "site": "src/shared/__tests__/studyEnvironment.test.ts:56",
+      "op": "read",
+      "detail": "member env.WHISPER_LANG_KEY",
+      "text": "env.WHISPER_LANG_KEY"
+    },
+    {
+      "site": "src/shared/__tests__/studyEnvironment.test.ts:77",
+      "op": "read",
+      "detail": "CallExpression",
+      "text": "kw.knowledgeKey('ja')"
+    }
+  ]
+}
