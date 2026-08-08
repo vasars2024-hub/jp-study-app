@@ -70,6 +70,7 @@ import {
   type WikiNavEntry,
 } from '../wikiArticle';
 import { getActiveProfile } from '../profileState';
+import { handOffToAgent, selectedTextAgentContext } from '../agentContextHandoff';
 import { useT } from '../i18n';
 import { KNOWN_LANGS } from '../../shared/langs';
 import { recordEpubPageRead } from '../readingGardenProgress';
@@ -2195,6 +2196,32 @@ export default function NovelReader({ item, onClose }: Props) {
     return sel || (popupRef.current?.kind === 'dict' ? popupRef.current.query : '');
   }, []);
 
+  /**
+   * Hands the selection to the Agent as session-only context.
+   *
+   * The sentence around the selection travels as the preview, so the model sees
+   * the fragment in its sentence rather than alone. Nothing is written to disk:
+   * `selected-text` is above the retention floor, so this lives in main's session
+   * context for the life of the process and no longer.
+   *
+   * `lang` is in the dependency list rather than `t` — `t`'s identity is stable by
+   * design, so depending on it would go stale after a language switch instead of
+   * erroring.
+   */
+  const askAgentAboutSelection = useCallback((): void => {
+    const selection = currentWord();
+    if (!selection) return;
+    void handOffToAgent(
+      selectedTextAgentContext(selection, currentSentence(), item.id),
+      // The **book**, not the selection. A conversation title is persisted, and
+      // titling it with the highlighted sentence would write the very `personal`
+      // material the context item is refused permission to store — measured live,
+      // where the sentence reached workspace-v1.json through the title while the
+      // item itself correctly did not. The book's name is already in the library.
+      t('agent.conversation.fromReading', { label: item.title }),
+    );
+  }, [currentWord, currentSentence, item.id, item.title, lang]);
+
   const openPopupFromSelection = useCallback(
     (kind: 'dict' | 'translate') => {
       const selObj = window.getSelection();
@@ -2472,6 +2499,15 @@ export default function NovelReader({ item, onClose }: Props) {
           label: 'Collect selection',
           icon: <Icon name="flashcards" size={14} />,
           onSelect: () => addSelectionToCollection('selection'),
+        },
+        {
+          // Translated even though its neighbours in this menu are not: the repo
+          // rule is that new UI text goes through the catalog from the moment it
+          // is written, so this does not join the hardcoded-string backlog.
+          id: 'ask-agent-selection',
+          label: t('epub.askAgent'),
+          icon: <Icon name="sparkle" size={14} />,
+          onSelect: askAgentAboutSelection,
         },
       ],
     },
@@ -2767,6 +2803,22 @@ export default function NovelReader({ item, onClose }: Props) {
             onClick={() => addSelectionToCollection('selection')}
           >
             Collect
+          </button>
+          {/*
+            The AppChrome "Study" menu carries this action too, but that menu bar
+            is not rendered when the reader is embedded in the desktop shell —
+            measured live, where no element with the text "Study" exists at all.
+            "Collect" is duplicated here for exactly the same reason, so the
+            hand-off follows it rather than being reachable only in one embedding.
+          */}
+          <button
+            type="button"
+            className="btn small"
+            title={t('epub.askAgent')}
+            aria-label={t('epub.askAgent')}
+            onClick={askAgentAboutSelection}
+          >
+            <Icon name="sparkle" size={14} />
           </button>
           <button
             type="button"

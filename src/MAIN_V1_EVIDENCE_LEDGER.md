@@ -964,14 +964,99 @@ Three boundaries, stated rather than smoothed over:
   included. Recorded rather than changed, because the alternative is persisting a
   reference to material that is meant to vanish.
 
+## The first session-only producer
+
+The transport had no producer, so `selected-text` was unblocked but unproven. A
+reader selection now hands off, which closes the loop the previous two slices
+built: producer → session store → shelf, with nothing on disk.
+
+- `selectedTextAgentContext` in `renderer/agentContextHandoff.ts` deliberately
+  passes **no `retained`**. The kind floors at `personal`, retention is refused
+  above `ordinary`, and it no longer needs it. `identity` is the selection, so
+  highlighting the same phrase twice is one shelf entry; the surrounding sentence
+  is the preview, because a bare fragment is a poor prompt.
+- `NovelReader.tsx` gets `askAgentAboutSelection`, an entry in the AppChrome
+  "Study" menu, and a toolbar button beside "Collect".
+- Keys `epub.askAgent` and `agent.conversation.fromReading` in all four languages;
+  8,795 → 8,797 English keys.
+
+**Three defects the live run caught and the whole test suite could not.** All three
+were mine, introduced in this slice, and each is invisible to a unit test:
+
+1. **The label pointed at a key that does not exist.** The menu item called
+   `t('reader.askAgent')` while the key shipped as `epub.askAgent` — the namespace
+   changed mid-work and the call site did not follow. `tools/i18n-check.cjs`
+   cannot catch this: it checks en↔ja/zh/ru *parity*, not that a `t()` call site
+   resolves to anything. Now verified by extracting every `t('…')` key added by the
+   diff and asserting each exists in `en.ts` — a check worth repeating on any slice
+   that adds a key.
+2. **The menu it lived in is not rendered where people read.** In the desktop-shell
+   embedding there is **no element whose text is "Study"** — the AppChrome menu bar
+   simply is not there, so the action was unreachable. `Collect selection` is
+   duplicated as a visible `Collect` button for exactly this reason; the hand-off
+   now follows it instead of existing in one embedding only.
+3. **The conversation title wrote the material the item is refused permission to
+   store.** The title came from `selection.slice(0, 40)`, and titles *are*
+   persisted — so `workspace-v1.json` contained `集団カンニ` while the context item
+   correctly did not. That is the session-only guarantee leaking through a
+   neighbouring field. It is now titled from `item.title`, the book's own library
+   name, and the fragment is absent from disk entirely.
+
+Automated evidence:
+
+- Full suite: 459 files (458 passed, 1 skipped) and 6,052 tests (6,046 passed, 6
+  skipped), 0 failed — +6 against the previous checkpoint's 6,046, all six in
+  `agentContextHandoff.test.ts`.
+- `node tools/i18n-check.cjs` → exit 0; 8,797 English keys, +2 from this slice,
+  translated in all three languages.
+- `node tools/architecture-audit.cjs` → exit 0, nothing new.
+- `npx eslint` over the seven slice paths → exit 0. The nine
+  `no-non-null-assertion` warnings in `NovelReader.tsx` sit at lines 1599–2110,
+  all above this slice's hunks, and are warnings rather than errors.
+- `tsc` is not a gate. Set-difference on the touched files shows **zero new
+  errors**: the four `Property 'lang' does not exist on type 'LibraryItem'` errors
+  at `NovelReader.tsx:112` are byte-identical code at HEAD's line 111, shifted one
+  line by this slice's import.
+
+Live evidence — a real book, a real selection, a real synthesized click:
+
+- `悪の教典 02` opened from the library; chapter 7 rendered 1,737 characters. Two
+  instrumentation notes for whoever drives this next: clicking an `<option>` does
+  **not** navigate a `<select>` — the first attempt measured an empty pane for that
+  reason and not a product fault, and it took a dispatched `change` event; and the
+  reader's text pane is empty until a chapter is chosen.
+- The click went through `/click` rather than `element.click()` **on purpose**: a
+  programmatic click dispatches no `mousedown` and therefore cannot collapse a
+  selection, so it would have passed whether or not the real gesture works. The
+  selection **survived the real mousedown**, which also vindicates the shipped
+  `Collect` button that depends on the same thing.
+- One item resulted: `kind: selected-text`, `label: 「また、集団カンニ`,
+  `preview: 第七章「また、集団カンニングがあるというんですか？` — the sentence around
+  the fragment — `source: { app: 'reading', entityId: <book id> }`,
+  `sensitivity: personal`, `retained: false`.
+- The shelf, read from a pop-out: "Kept after restart **0** / This session only
+  **1** / Marked sensitive 0", rendering "Selection · 「また、集団カンニ · Personal ·
+  Session · … · From reading".
+- Disk: the conversation is in `workspace-v1.json` with `context: []`, and the file
+  contains neither `selected-text` nor the fragment.
+- Residue: workspace restored to the pre-run empty state; `localStorage` 76 keys
+  with zero agent keys; 0 errors in the ring; probe globals deleted; pop-out
+  closed. `library.json` is dated 2026-08-01 and was **not** written, so the book's
+  reading position was not disturbed — `desktop-layout.json` was rewritten, which
+  is the documented consequence of opening and closing windows.
+
+Boundaries: `reading-passage` and `media-cue` still have **no** producer — only
+`selected-text` is wired. No provider request was made in this slice either.
+
 ## Exact next slice
 
-Wire the producers the transport just unblocked, which is also what turns its
-proof end-to-end. Concretely: a text selection in the Reading surface and a media
-cue attach as `selected-text` / `media-cue` / `reading-passage` and hand off to
-the same conversation, with en/ja/zh/ru keys, following
-`dictionaryAgentContext`'s shape in `renderer/agentContextHandoff.ts` — but
-**without** `retained: true`, which those kinds are refused and no longer need.
+Two producers remain from the transport's list: a **media cue** (a subtitle line
+hands off from the player) and a **reading passage** (a whole block rather than a
+selection). Both follow `selectedTextAgentContext` exactly — no `retained`, the
+surrounding context as the preview, en/ja/zh/ru keys — and both want the same
+live check the reader just needed: confirm the control is reachable in the
+embedding users actually use, and confirm no neighbouring persisted field
+(title, label, status line) writes the material the item itself is refused.
 Then the remaining Track 3 surface: modes as workflow presets, attachments,
 history search and interactive result cards.
 

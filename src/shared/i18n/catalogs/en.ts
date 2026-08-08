@@ -2219,6 +2219,7 @@ export const en: Catalog = {
   'agent.error.bridge-unavailable': 'This window is not connected to the workspace. Reopen the app.',
   'agent.conversation.untitled': 'New conversation',
   'agent.conversation.fromDictionary': 'Dictionary: {term}',
+  'agent.conversation.fromReading': 'Reading: {label}',
   'dictionary.askAgent': 'Ask the Agent about this word',
   'agent.conversation.delete': 'Delete',
   'agent.conversation.deleteConfirm': 'Confirm delete',
@@ -5362,6 +5363,7 @@ export const en: Catalog = {
   'flash.import.noRows': 'No valid rows found. Use CSV/TSV or one word per line.',
 
   // EPUB mining panels (en)
+  'epub.askAgent': 'Ask the Agent about the selection',
   'epub.translate.title': 'Book translation',
   'epub.translate.panelTitle': 'Book translation settings',
   'epub.translate.target': 'Translate to',

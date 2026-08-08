@@ -2071,6 +2071,7 @@ export const zh: Catalog = {
   'agent.error.bridge-unavailable': '此窗口未连接到工作区。请重新打开应用。',
   'agent.conversation.untitled': '新建对话',
   'agent.conversation.fromDictionary': '词典：{term}',
+  'agent.conversation.fromReading': '阅读：{label}',
   'dictionary.askAgent': '就该词询问智能助手',
   'agent.conversation.delete': '删除',
   'agent.conversation.deleteConfirm': '确认删除',
@@ -5053,6 +5054,7 @@ export const zh: Catalog = {
   'flash.import.noRows': '未找到有效行。请使用 CSV/TSV，或每行一个单词。',
 
   // EPUB mining panels (zh)
+  'epub.askAgent': '就所选内容询问智能助手',
   'epub.translate.title': '书籍翻译',
   'epub.translate.panelTitle': '书籍翻译设置',
   'epub.translate.target': '翻译到',

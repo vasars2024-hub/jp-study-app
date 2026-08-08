@@ -2233,6 +2233,7 @@ export const ru: Catalog = {
   'agent.error.bridge-unavailable': 'Это окно не связано с рабочей областью. Откройте приложение заново.',
   'agent.conversation.untitled': 'Новый разговор',
   'agent.conversation.fromDictionary': 'Словарь: {term}',
+  'agent.conversation.fromReading': 'Чтение: {label}',
   'dictionary.askAgent': 'Спросить агента об этом слове',
   'agent.conversation.delete': 'Удалить',
   'agent.conversation.deleteConfirm': 'Подтвердить удаление',
@@ -5614,6 +5615,7 @@ export const ru: Catalog = {
   'flash.import.noRows': 'Допустимых строк не найдено. Используйте CSV/TSV или одно слово на строку.',
 
   // EPUB mining panels (ru)
+  'epub.askAgent': 'Спросить агента о выделенном фрагменте',
   'epub.translate.title': 'Перевод книги',
   'epub.translate.panelTitle': 'Настройки перевода книги',
   'epub.translate.target': 'Переводить на',

@@ -137,4 +137,39 @@ export function dictionaryAgentContext(
   };
 }
 
+/**
+ * A reader selection's shape of the gesture — the first producer that is
+ * session-only rather than reference data.
+ *
+ * There is deliberately **no `retained`**. `selected-text` sits above the
+ * `ordinary` floor because it is the user's own reading material, and
+ * `createAgentContextItem` refuses retention above that floor, so asking for it
+ * would be silently dropped. The item reaches the shelf and the prompt through
+ * `main/agentSessionContext.ts` instead, and it is gone at the next launch —
+ * which is the honest lifetime for a passage someone highlighted once.
+ *
+ * `identity` is the selected text, so highlighting the same phrase twice is one
+ * shelf entry rather than two. The sentence around the selection is the preview
+ * for the same reason the dictionary uses it: a bare fragment is a poor prompt,
+ * and the model needs the sentence to say anything useful about the fragment.
+ */
+export function selectedTextAgentContext(
+  text: string,
+  sentence: string,
+  bookId?: string,
+  now = Date.now(),
+): AgentContextInput {
+  const selection = text.trim();
+  return {
+    kind: 'selected-text',
+    // The shelf shows this on one line, so a paragraph-length selection is
+    // trimmed for the label while the preview keeps the surrounding sentence.
+    label: selection.slice(0, 80),
+    preview: sentence.trim() || selection,
+    source: { app: 'reading', ...(bookId ? { entityId: bookId } : {}) },
+    identity: selection,
+    now,
+  };
+}
+
 export type { AgentContextItem };

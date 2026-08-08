@@ -37,6 +37,7 @@ import {
   dictionaryAgentContext,
   handOffToAgent,
   openAgentSurface,
+  selectedTextAgentContext,
 } from '../agentContextHandoff';
 import { createAgentContextItem } from '../../shared/agentContext';
 import { prepareAgentWorkspaceForPersistence } from '../../main/agentWorkspaceStore';
@@ -213,5 +214,77 @@ describe('routing', () => {
     expect(await handOffToAgent(dictionaryAgentContext('食べる', 'to eat', NOW), 'T'))
       .toBe('save-failed');
     expect(opened()).toEqual([]);
+  });
+});
+
+describe('reader selection as session-only context', () => {
+  const SENTENCE = '昨日は寿司を食べました。とても美味しかったです。';
+
+  it('builds a session-only item that asks for no retention', () => {
+    const item = createAgentContextItem(
+      selectedTextAgentContext('寿司を食べました', SENTENCE, 'book-7', NOW),
+    );
+    expect(item).toMatchObject({
+      kind: 'selected-text',
+      label: '寿司を食べました',
+      preview: SENTENCE,
+      // `selected-text` floors at `personal`, so the builder cannot ask for
+      // retention and does not try. This is the first producer whose material is
+      // the user's own rather than reference data.
+      sensitivity: 'personal',
+      retained: false,
+      source: { app: 'reading', entityId: 'book-7' },
+    });
+  });
+
+  it('is one shelf entry per phrase, however often it is highlighted', () => {
+    const first = createAgentContextItem(selectedTextAgentContext('寿司', SENTENCE, 'book-7', NOW));
+    const again = createAgentContextItem(
+      selectedTextAgentContext('  寿司  ', SENTENCE, 'book-7', NOW + 5_000),
+    );
+    expect(first?.id).toBe(again?.id);
+  });
+
+  it('falls back to the selection when there is no surrounding sentence', () => {
+    const item = createAgentContextItem(selectedTextAgentContext('寿司', '   ', 'book-7', NOW));
+    expect(item?.preview).toBe('寿司');
+  });
+
+  it('keeps a paragraph-length selection readable as a label', () => {
+    const long = 'あ'.repeat(300);
+    const item = createAgentContextItem(selectedTextAgentContext(long, SENTENCE, undefined, NOW));
+    expect(item?.label).toHaveLength(80);
+    // No book id means no entityId key at all, rather than an empty string.
+    expect(item?.source.entityId).toBeUndefined();
+  });
+
+  it('is dropped by the persistence filter, which is why the session transport exists', () => {
+    // The complement of the dictionary case above: that item is retained and
+    // survives a save, this one must not be written to disk at all. It reaches the
+    // shelf through `main/agentSessionContext.ts`, covered by that module's tests.
+    const item = createAgentContextItem(selectedTextAgentContext('寿司', SENTENCE, 'b', NOW));
+    const persisted = prepareAgentWorkspaceForPersistence({
+      version: 1,
+      activeConversationId: 'c1',
+      conversations: [{
+        id: 'c1',
+        title: 'Reading',
+        mode: 'ask',
+        createdAt: NOW,
+        updatedAt: NOW,
+        context: [item],
+        messages: [],
+      }],
+    });
+    expect(persisted.conversations[0].context).toEqual([]);
+  });
+
+  it('attaches the selection and then opens the Agent', async () => {
+    expect(await handOffToAgent(
+      selectedTextAgentContext('寿司を食べました', SENTENCE, 'book-7', NOW),
+      'Reading: 寿司を食べました',
+    )).toBe('attached');
+    expect(opened()).toEqual(['agent']);
+    expect(workspace.saves).toHaveLength(1);
   });
 });

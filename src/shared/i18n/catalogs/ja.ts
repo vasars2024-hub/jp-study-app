@@ -2080,6 +2080,7 @@ export const ja: Catalog = {
   'agent.error.bridge-unavailable': 'このウィンドウはワークスペースに接続されていません。アプリを開き直してください。',
   'agent.conversation.untitled': '新しい会話',
   'agent.conversation.fromDictionary': '辞書: {term}',
+  'agent.conversation.fromReading': '読書: {label}',
   'dictionary.askAgent': 'この単語についてエージェントに質問',
   'agent.conversation.delete': '削除',
   'agent.conversation.deleteConfirm': '削除を確認',
@@ -5078,6 +5079,7 @@ export const ja: Catalog = {
   'flash.import.noRows': '有効な行が見つかりません。CSV/TSVまたは1行1単語を使ってください。',
 
   // EPUB mining panels (ja)
+  'epub.askAgent': '選択範囲についてエージェントに質問',
   'epub.translate.title': '書籍の翻訳',
   'epub.translate.panelTitle': '書籍翻訳の設定',
   'epub.translate.target': '翻訳先',
