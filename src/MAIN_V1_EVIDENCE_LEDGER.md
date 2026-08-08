@@ -1284,6 +1284,57 @@ passed, 6 skipped), 0 failed — **+8** against 6,067, reconciling with the 8 ad
 (5 router, 2 shell model, 1 execution). `i18n-missing-key-check`, `i18n-check` and
 `architecture-audit` all exit 0; `eslint` exit 0 over the twelve slice paths.
 
+## Searchable history
+
+Track 3's product model asks for "chats, task threads, searchable history, pins,
+attachments" — pins and chats existed, history did not, and unlike the mode and
+the context shelf there was **nothing at all** to build on: no search function, no
+query state, no keys. `agentHistorySearch` is the whole feature, and it lives in
+`agentShellModel.ts` with the other pure transforms so it is assertable without
+mounting a tree.
+
+Four decisions are encoded in it rather than left to the surface:
+
+- **Substring, not tokens.** Japanese has no required word spaces, so splitting a
+  query into words fails exactly the queries this app exists to serve.
+  `localAgentKnowledge.terms()` already documents the same problem and falls back
+  the same way, so this matches a sibling rather than inventing a second idea.
+  Both sides are NFKC-folded and lowercased — the same idiom that module uses —
+  so a half-width katakana query finds text stored full-width. Verified to bite:
+  dropping the `normalize('NFKC')` and keeping only `toLocaleLowerCase` fails
+  exactly one test, the one searching `ﾗｰﾒﾝ` for `ラーメン`.
+- **Archived conversations are found, and marked.** The rail filters them out;
+  search must not, because searching history is precisely when someone wants the
+  conversation they put away. The `archived` flag travels so the surface can label
+  it instead of implying it is on the rail. Verified to bite: copying the rail's
+  `archived` filter into the search loop fails exactly one test.
+- **One row per conversation.** A single long chat would otherwise flood the list
+  and bury every other conversation that matched once, so the match count travels
+  and the snippet comes from the newest matching message.
+- **The context shelf is not searched.** It is what the Agent can see *now*, not
+  what was said, and a session-only item does not survive a restart — a result
+  pointing at one would vanish between launches.
+
+The snippet is bounded to ±48 characters around the hit with ellipses added only
+on the side actually cut, because a stored assistant reply can be thousands of
+characters and a result list has to stay scannable.
+
+On the surface, search **replaces** the rail list rather than filtering it in
+place: a result carries a snippet and a match count the rail entries do not, and
+archived conversations appear in one and not the other — two different lists, so
+two renderings. The query lives in component state, not the main-owned workspace:
+it is a view, not something a second window should inherit, and it must never
+reach disk. Clicking a result deliberately keeps the query, so several results can
+be read one after another without retyping.
+
+Automated evidence: 459 files (458 passed, 1 skipped) and 6,081 tests (6,075
+passed, 6 skipped), 0 failed — **+6**, reconciling with the 6 added.
+`i18n-missing-key-check`, `i18n-check` and `architecture-audit` exit 0; `eslint`
+exit 0; `tsc --noEmit` reports no error in any file this session touched (the root
+config has pre-existing top-level-`await` errors in unrelated test files, so it is
+not a clean gate and is not treated as one). Eight keys per catalog in all four
+languages, with CLDR plural forms for the two counts in `ru`.
+
 ## Exact next slice
 
 **The player call site, once the study-workspace block track lands.** The producer
@@ -1302,10 +1353,18 @@ the transport needs to change. Re-check `src/.coordination/study-mode/` first �
 cue they never receive. Recorded here rather than fixed — the two files that would
 change are the other track's.
 
-Then the rest of the Track 3 surface, modes now being done: **attachments**,
-**history search**, and **interactive result cards** — and when cards get a
+Then the rest of the Track 3 surface, modes and history search now being done:
+**attachments** and **interactive result cards** — and when cards get a
 producer, extend `retainedMessage`'s prune list first, since the file invariant
 rests on that list staying exhaustive the moment something writes one.
+
+**Attachments are the same "type without a producer" shape** the shelf and the
+mode both turned out to be: `AgentAttachment`, `AgentAttachmentKind`,
+`normalizeAttachment` and the router's `attachments` option all exist and are
+tested, but nothing in the tree builds one. Note before starting that the `file`
+context kind floors at `sensitive`, so an attachment producer runs straight into
+`evaluateAgentProviderPrivacy`'s cloud boundary — that is the interesting part of
+that slice, not the file picking.
 
 A mode preset is also the natural place to *reduce* a claim later: if a tool loop
 is ever wired to this path, `navigate` and `automate` are the two presets whose

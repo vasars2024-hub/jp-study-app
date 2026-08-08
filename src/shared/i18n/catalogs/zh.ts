@@ -2054,6 +2054,18 @@ export const zh: Catalog = {
   'agent.rail.messageCount': {
     other: '{count} 条消息',
   },
+  'agent.search.label': '搜索历史',
+  'agent.search.placeholder': '搜索对话',
+  'agent.search.clear': '清除搜索',
+  'agent.search.none': '没有匹配的对话。',
+  'agent.search.archived': '已归档',
+  'agent.search.titleMatch': '标题',
+  'agent.search.resultCount': {
+    other: '{count} 条结果',
+  },
+  'agent.search.matchCount': {
+    other: '{count} 条匹配消息',
+  },
   'agent.rail.cloud': '云端',
   'agent.rail.pin': '置顶对话',
   'agent.rail.unpin': '取消置顶',

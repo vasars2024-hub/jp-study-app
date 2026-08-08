@@ -2063,6 +2063,18 @@ export const ja: Catalog = {
   'agent.rail.messageCount': {
     other: 'メッセージ {count} 件',
   },
+  'agent.search.label': '履歴を検索',
+  'agent.search.placeholder': '会話を検索',
+  'agent.search.clear': '検索をクリア',
+  'agent.search.none': '該当する会話はありません。',
+  'agent.search.archived': 'アーカイブ済み',
+  'agent.search.titleMatch': 'タイトル',
+  'agent.search.resultCount': {
+    other: '{count} 件の結果',
+  },
+  'agent.search.matchCount': {
+    other: '一致するメッセージ {count} 件',
+  },
   'agent.rail.cloud': 'クラウド',
   'agent.rail.pin': '会話をピン留め',
   'agent.rail.unpin': 'ピン留めを解除',

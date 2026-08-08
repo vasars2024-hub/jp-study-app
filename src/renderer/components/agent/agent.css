@@ -99,6 +99,61 @@
   list-style: none;
 }
 
+/* History search. The results list reuses `.agent-rail-list` so it scrolls and
+   sizes identically to the rail it replaces; only the snippet is new. */
+.agent-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+}
+
+.agent-search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 var(--space-sm, 8px);
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--agent-muted);
+}
+
+.agent-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--agent-accent) 45%, var(--agent-line));
+}
+
+.agent-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: inherit;
+}
+
+.agent-search-input:focus {
+  outline: none;
+}
+
+/* The snippet is the one line that may be long, so it is the one that clamps —
+   the title above it must stay fully readable. */
+.agent-search-snippet {
+  font-size: var(--font-size-2xs, 0.6875rem);
+  color: var(--agent-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.agent-search-results .agent-rail-item {
+  /* No pin button beside a result, so the row is a single column. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .agent-rail-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

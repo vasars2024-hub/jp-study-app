@@ -41,6 +41,7 @@ import {
 import {
   agentContextDisclosure,
   agentConversationSummaries,
+  agentHistorySearch,
   agentRailFocusTarget,
   agentSelectedConversation,
   agentShellPhase,
@@ -264,6 +265,7 @@ export default function AgentWorkspaceShell() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<PendingConfirmation>(null);
+  const [query, setQuery] = useState('');
   const [draft, setDraft] = useState('');
   const [target, setTarget] = useState<AgentTargetChoice>('local');
   const [allowLocalFallback, setAllowLocalFallback] = useState(false);
@@ -321,6 +323,16 @@ export default function AgentWorkspaceShell() {
   }, [apply]);
 
   const summaries = useMemo(() => (state ? agentConversationSummaries(state) : []), [state]);
+  /**
+   * History search is a *view*, so the query lives here rather than in the
+   * main-owned workspace: it is not something a second window should inherit,
+   * and it must never reach disk.
+   */
+  const searching = query.trim().length > 0;
+  const results = useMemo(
+    () => (state && searching ? agentHistorySearch(state, query) : []),
+    [query, searching, state],
+  );
   const selected = state ? agentSelectedConversation(state) : null;
   const phase = agentShellPhase({ loading, failure, state });
   const activeId = state?.activeConversationId ?? null;
@@ -456,6 +468,68 @@ export default function AgentWorkspaceShell() {
             {t('agent.rail.new')}
           </button>
 
+          {/*
+            Search replaces the rail list rather than filtering it in place: a
+            result carries a snippet and a match count the rail entries do not,
+            and archived conversations appear here while the rail deliberately
+            hides them. Two different lists, so two different renderings.
+          */}
+          <div className="agent-search">
+            <label className="agent-search-field">
+              <span className="agent-visually-hidden">{t('agent.search.label')}</span>
+              <Icon name="search" size={14} />
+              <input
+                type="search"
+                className="agent-search-input"
+                value={query}
+                placeholder={t('agent.search.placeholder')}
+                onChange={(event) => setQuery(event.currentTarget.value)}
+              />
+            </label>
+            {searching ? (
+              <span className="agent-rail-count">
+                {t('agent.search.resultCount', { count: results.length })}
+              </span>
+            ) : null}
+          </div>
+
+          {searching ? (
+            results.length === 0 ? (
+              <p className="agent-placeholder" role="status">{t('agent.search.none')}</p>
+            ) : (
+              <ul className="agent-rail-list agent-search-results">
+                {results.map((result) => (
+                  <li key={result.conversationId} className="agent-rail-item">
+                    <button
+                      type="button"
+                      className={`agent-rail-entry${result.conversationId === activeId ? ' is-selected' : ''}`}
+                      aria-current={result.conversationId === activeId ? 'true' : undefined}
+                      // The query is deliberately kept after a click, so several
+                      // results can be read one after another without retyping.
+                      onClick={() => select(result.conversationId)}
+                      disabled={blocked}
+                    >
+                      <span className="agent-rail-entry-title">{result.title}</span>
+                      <span className="agent-search-snippet">{result.snippet}</span>
+                      <span className="agent-rail-entry-meta">
+                        {result.archived ? (
+                          <span className="agent-chip">{t('agent.search.archived')}</span>
+                        ) : null}
+                        {result.titleMatched ? (
+                          <span className="agent-chip">{t('agent.search.titleMatch')}</span>
+                        ) : null}
+                        {result.messageMatches > 0 ? (
+                          <span className="agent-rail-entry-messages">
+                            {t('agent.search.matchCount', { count: result.messageMatches })}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
           <ul className="agent-rail-list" ref={railRef} onKeyDown={railKeyDown}>
             {summaries.map((summary) => (
               <li key={summary.id} className="agent-rail-item">
@@ -494,6 +568,7 @@ export default function AgentWorkspaceShell() {
               </li>
             ))}
           </ul>
+          )}
 
           <div className="agent-rail-foot">
             {pendingClear ? (

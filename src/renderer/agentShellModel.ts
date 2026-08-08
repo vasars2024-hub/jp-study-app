@@ -269,6 +269,107 @@ export function agentWorkspaceWithPinToggled(
   };
 }
 
+export interface AgentHistoryMatch {
+  conversationId: string;
+  title: string;
+  /**
+   * Archived conversations are findable here even though the rail hides them.
+   * Searching history is precisely when someone wants the one they put away, so
+   * excluding them would make the feature useless at its main job — but the flag
+   * travels so the surface can mark it rather than pretending it is on the rail.
+   */
+  archived: boolean;
+  updatedAt: number;
+  /** How many stored messages matched, so a long chat reads as one row honestly. */
+  messageMatches: number;
+  /** True when the conversation's own title matched. */
+  titleMatched: boolean;
+  /** A bounded excerpt around the newest match, or the title when only it matched. */
+  snippet: string;
+}
+
+/** Matches `localAgentKnowledge`'s idiom so two agent surfaces fold text alike. */
+function foldForSearch(value: string): string {
+  return value.normalize('NFKC').toLocaleLowerCase();
+}
+
+/**
+ * A bounded excerpt centred on the match.
+ *
+ * The whole message would defeat the purpose — a result list has to be scannable,
+ * and a stored assistant reply can be thousands of characters. Ellipses are added
+ * only on the side actually cut.
+ */
+function snippetAround(text: string, at: number, queryLength: number, span = 48): string {
+  const start = Math.max(0, at - span);
+  const end = Math.min(text.length, at + queryLength + span);
+  const body = text.slice(start, end).replace(/\s+/g, ' ').trim();
+  return `${start > 0 ? '…' : ''}${body}${end < text.length ? '…' : ''}`;
+}
+
+/**
+ * Searches stored conversation history.
+ *
+ * **Substring, not tokens.** Japanese has no required word spaces, so splitting a
+ * query into words would fail on exactly the queries this app exists to serve —
+ * `localAgentKnowledge.terms()` already documents the same problem and falls back
+ * the same way. Both sides are NFKC-folded and lowercased, so a half-width
+ * katakana or full-width ASCII query finds text stored in the other form.
+ *
+ * **One row per conversation.** A single long chat would otherwise flood the
+ * result list and bury every other conversation that matched once. The count
+ * travels instead, and the snippet comes from the newest matching message.
+ *
+ * **Context is deliberately not searched.** The shelf is what the Agent can see
+ * *now*, not what was said — and session-only items do not survive a restart, so
+ * a result pointing at one would vanish between launches. History means the
+ * stored messages and the title.
+ *
+ * An empty or whitespace-only query returns `[]` rather than everything, so the
+ * surface can treat "no query" as "show the normal rail" without a second flag.
+ */
+export function agentHistorySearch(
+  state: AgentWorkspaceState,
+  query: string,
+): AgentHistoryMatch[] {
+  const needle = foldForSearch(query.trim());
+  if (!needle) return [];
+
+  const matches: AgentHistoryMatch[] = [];
+  for (const conversation of state.conversations) {
+    const titleMatched = foldForSearch(conversation.title).includes(needle);
+
+    let messageMatches = 0;
+    let snippet = '';
+    // Newest first, so the first hit found is the one worth showing.
+    for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
+      const text = conversation.messages[index]?.text ?? '';
+      const at = foldForSearch(text).indexOf(needle);
+      if (at < 0) continue;
+      messageMatches += 1;
+      if (!snippet) snippet = snippetAround(text, at, needle.length);
+    }
+
+    if (!titleMatched && messageMatches === 0) continue;
+    matches.push({
+      conversationId: conversation.id,
+      title: conversation.title,
+      archived: conversation.archived,
+      updatedAt: conversation.updatedAt,
+      messageMatches,
+      titleMatched,
+      snippet: snippet || conversation.title,
+    });
+  }
+
+  // Most recently touched first, with the same `id` tiebreak the rail uses so a
+  // shared millisecond stamp does not reorder results between renders.
+  return matches.sort((a, b) => {
+    if (a.updatedAt !== b.updatedAt) return b.updatedAt - a.updatedAt;
+    return a.conversationId.localeCompare(b.conversationId);
+  });
+}
+
 /**
  * Roving-tabindex target for Up/Down in the conversation rail. Wraps, because a
  * list that silently stops at the end reads as a broken key rather than a limit.

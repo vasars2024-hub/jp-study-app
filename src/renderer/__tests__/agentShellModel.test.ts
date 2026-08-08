@@ -12,11 +12,13 @@ import {
   AGENT_WORKSPACE_SCHEMA_VERSION,
   normalizeAgentWorkspaceState,
   type AgentConversation,
+  type AgentMessage,
   type AgentWorkspaceState,
 } from '../../shared/agentWorkspace';
 import {
   agentContextDisclosure,
   agentConversationSummaries,
+  agentHistorySearch,
   agentRailFocusTarget,
   agentSelectedConversation,
   agentShellPhase,
@@ -45,6 +47,21 @@ function conversation(overrides: Partial<AgentConversation> & { id: string }): A
 
 function workspace(conversations: AgentConversation[], activeConversationId: string | null = null): AgentWorkspaceState {
   return { version: AGENT_WORKSPACE_SCHEMA_VERSION, activeConversationId, conversations };
+}
+
+function message(conversationId: string, id: string, text: string): AgentMessage {
+  return {
+    id,
+    conversationId,
+    role: 'assistant',
+    status: 'complete',
+    text,
+    createdAt: 1,
+    updatedAt: 1,
+    contextIds: [],
+    attachments: [],
+    cards: [],
+  };
 }
 
 describe('Agent conversation summaries', () => {
@@ -179,6 +196,90 @@ describe('Agent workspace transforms', () => {
     // fires.
     expect(switched ? agentWorkspaceWithMode(switched, 'a', 'analyze', 901) : null).toBeNull();
     expect(agentWorkspaceWithMode(state, 'missing', 'study', 900)).toBeNull();
+  });
+
+  it('finds stored history by substring, folding width and case on both sides', () => {
+    // Japanese has no required word spaces, so a token split would fail exactly
+    // the queries this app exists to serve. NFKC folding is what makes a
+    // half-width katakana query find text stored full-width, and vice versa.
+    const state = workspace([
+      conversation({
+        id: 'a',
+        title: 'Ramen notes',
+        updatedAt: 100,
+        messages: [message('a', 'm1', 'ラーメンが好きです'), message('a', 'm2', 'Second line')],
+      }),
+      conversation({ id: 'b', title: 'ＲＡＭＥＮ shop', updatedAt: 200, messages: [] }),
+    ]);
+
+    expect(agentHistorySearch(state, 'ﾗｰﾒﾝ').map((m) => m.conversationId)).toEqual(['a']);
+    expect(agentHistorySearch(state, 'ラーメン')[0].snippet).toContain('ラーメン');
+    // Full-width title found by a plain ASCII query, and case-folded.
+    expect(agentHistorySearch(state, 'ramen').map((m) => m.conversationId)).toEqual(['b', 'a']);
+    expect(agentHistorySearch(state, 'ramen')[0]).toMatchObject({ titleMatched: true, messageMatches: 0 });
+  });
+
+  it('returns one row per conversation, counting the rest', () => {
+    // A single long chat would otherwise flood the list and bury every other
+    // conversation that matched once.
+    const state = workspace([
+      conversation({
+        id: 'a',
+        updatedAt: 100,
+        messages: [
+          message('a', 'm1', 'first hit here'),
+          message('a', 'm2', 'nothing'),
+          message('a', 'm3', 'second hit here'),
+        ],
+      }),
+    ]);
+    const [hit] = agentHistorySearch(state, 'hit');
+    expect(hit.messageMatches).toBe(2);
+    // The snippet comes from the NEWEST match, which is the one worth showing.
+    expect(hit.snippet).toContain('second hit here');
+  });
+
+  it('finds archived conversations, and says that is what they are', () => {
+    // Searching history is precisely when someone wants the conversation they
+    // put away, so the rail's archived filter must not apply here — but the flag
+    // travels so the surface can mark it rather than implying it is on the rail.
+    const state = workspace([
+      conversation({ id: 'a', archived: true, updatedAt: 100, messages: [message('a', 'm1', 'buried treasure')] }),
+    ]);
+    expect(agentConversationSummaries(state)).toEqual([]);
+    expect(agentHistorySearch(state, 'treasure')).toMatchObject([{ conversationId: 'a', archived: true }]);
+  });
+
+  it('does not search the context shelf, which is not history', () => {
+    // The shelf is what the Agent can see now, and a session-only item does not
+    // survive a restart — a result pointing at one would vanish between launches.
+    const item = createAgentContextItem({
+      kind: 'selected-text',
+      label: 'unmistakable-shelf-text',
+      preview: 'unmistakable-shelf-text',
+      source: { app: 'reading' },
+      identity: 'unmistakable-shelf-text',
+      now: 10,
+    });
+    const state = workspace([conversation({ id: 'a', context: item ? [item] : [] })]);
+    expect(agentHistorySearch(state, 'unmistakable-shelf-text')).toEqual([]);
+  });
+
+  it('bounds the snippet instead of returning the whole message', () => {
+    const long = `${'あ'.repeat(400)}目印${'い'.repeat(400)}`;
+    const state = workspace([conversation({ id: 'a', messages: [message('a', 'm1', long)] })]);
+    const [hit] = agentHistorySearch(state, '目印');
+    expect(hit.snippet.length).toBeLessThan(120);
+    expect(hit.snippet).toContain('目印');
+    // Cut on both sides, so both ellipses are present and neither is invented.
+    expect(hit.snippet.startsWith('…')).toBe(true);
+    expect(hit.snippet.endsWith('…')).toBe(true);
+  });
+
+  it('treats a blank query as "no search" rather than "everything"', () => {
+    const state = workspace([conversation({ id: 'a', messages: [message('a', 'm1', 'anything')] })]);
+    expect(agentHistorySearch(state, '')).toEqual([]);
+    expect(agentHistorySearch(state, '   ')).toEqual([]);
   });
 
   it('offers every mode the normalizer accepts, in a stable order with ask first', () => {
