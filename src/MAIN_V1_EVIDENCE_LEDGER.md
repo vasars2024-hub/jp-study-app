@@ -10,7 +10,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 - Starting worktree: 406 changed paths (171 modified, 133 deleted, 102 untracked). All pre-existing paths are treated as user-owned.
 - Recent relevant commits: `8d7642a` (SQLite/FTS dictionary), `9c74730` (sense-gloss indexing and real-corpus proof).
 - Focused starting baseline: credential + dictionary tests, 136 passed / 6 skipped.
-- Full post-slice baseline: 433 files passed / 1 skipped; 5,782 tests passed / 6 skipped.
+- Full post-foundation baseline: 434 files passed / 1 skipped; 5,793 tests passed / 6 skipped.
 - TypeScript baseline: red before the slice with project-wide test/module-mode errors and unrelated renderer/scraper errors. Changed-path filtering after the slice shows the same top-level-await test pattern and an existing `src/main/mining.ts:1705` IPC-handler type error; no new production error remains in the credential adapters.
 - Architecture gate: 1,518 modules, 18 known findings, nothing new; 3 known test-only findings remain pending.
 - i18n gates: catalog parity, locale-argument, missing-key, and hardcoded-text checks all pass with only their recorded baselines.
@@ -73,7 +73,6 @@ Live and visual evidence:
 
 Remaining risk:
 
-- Scraper credentials share the refusal primitive but remain a separate reference store.
 - Provider health, model selection, budgets/costs, caching, cancellation, streaming, retry and privacy are not yet one structured provider service.
 - Compact shell clipping is a release-level visual defect outside this slice.
 
@@ -100,6 +99,22 @@ Automated evidence:
 
 Checkpoint note: `src/main/malSync.ts` already contained unrelated user-owned MAL-3/MAL-4/MAL-7 work before this slice. Any checkpoint must stage only the token-storage hunks near the imports and `fileMalTokenStore`; those later hunks must remain unstaged.
 
+## Slice 3 — scraper credential-reference migration
+
+Behavior now established:
+
+- Existing per-connection `passwordRef` values remain stable in scraper settings; their secret bytes now live under a private dynamic `scraper` namespace in the central vault.
+- Reads migrate former `<scraperRoot>/credentials.json` entries one reference at a time and remove an old entry only after an encrypted vault write succeeds.
+- New writes refuse unavailable OS encryption. A readable legacy encrypted reference remains usable and unmodified when central migration cannot encrypt.
+- Clear removes both the vault field and any legacy entry; an undecryptable legacy value is treated as absent.
+- No scraper provider, qBittorrent session, runtime, settings-schema or renderer contract changed.
+
+Automated evidence:
+
+- Focused scraper qBittorrent and central-vault suites: 2 files / 52 tests passed.
+- `eslint` on the changed scraper credential and focused test paths: pass.
+- `git diff --check` on the slice: pass (line-ending notices only).
+
 ## Exact next slice
 
-Reconcile scraper credential references with the central vault without changing its provider/runtime behavior, then define the shared provider runtime contract for health, model selection, budgets/costs, caching, cancellation, streaming, retries and privacy.
+Define the shared provider runtime contract for health, model selection, budgets/costs, caching, cancellation, streaming, retries and privacy, then reconcile it with the Agent audit before opening any Agent-owned implementation paths.

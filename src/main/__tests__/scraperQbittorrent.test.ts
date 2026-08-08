@@ -36,7 +36,9 @@ const { buildAddForm, mapQbitState, mapTransfer, qbitBaseUrl, qbitSend, qbitTest
   await import('../scraper/qbittorrent');
 const { getScraperSecret, hasScraperSecret, setScraperSecret, clearScraperSecret } =
   await import('../scraper/credentials');
+const { readSecret, setCredentialVaultRoot } = await import('../credentials/vault');
 const { setScraperStoreRoot } = await import('../scraper/store');
+const { flushScraperLogWrites } = await import('../scraper/logBus');
 
 // ---- a stand-in qBittorrent WebUI ---------------------------------------
 
@@ -100,6 +102,7 @@ const TORRENT_INFO = [
 beforeAll(async () => {
   tempRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'scraper-qbit-'));
   setScraperStoreRoot(path.join(tempRoot, 'scraper'));
+  setCredentialVaultRoot(tempRoot);
 
   server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
@@ -177,6 +180,7 @@ afterAll(async () => {
     server.close(() => resolve());
   });
   setScraperStoreRoot(null);
+  setCredentialVaultRoot(null);
   await fsp.rm(tempRoot, { recursive: true, force: true });
 });
 
@@ -185,7 +189,9 @@ beforeEach(async () => {
   sessionValid = true;
   addBodies = [];
   resetQbitSessions();
+  await flushScraperLogWrites();
   await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
+  await fsp.rm(path.join(tempRoot, 'credentials.dat'), { force: true });
   await setScraperSecret('test/qbit', GOOD_PASS);
 });
 
@@ -225,7 +231,7 @@ describe('the credential vault', () => {
 
   it('never writes the plaintext to disk', async () => {
     await setScraperSecret('my/ref', 'hunter2');
-    const raw = await fsp.readFile(path.join(tempRoot, 'scraper', 'credentials.json'), 'utf-8');
+    const raw = await fsp.readFile(path.join(tempRoot, 'credentials.dat'), 'utf-8');
     expect(raw).not.toContain('hunter2');
   });
 
@@ -237,11 +243,36 @@ describe('the credential vault', () => {
   });
 
   it('treats an undecryptable secret as absent rather than throwing', async () => {
-    await setScraperSecret('my/ref', 'hunter2');
     // Simulate a file copied from another machine.
     const file = path.join(tempRoot, 'scraper', 'credentials.json');
+    await fsp.mkdir(path.dirname(file), { recursive: true });
     await fsp.writeFile(file, JSON.stringify({ secrets: { 'my/ref': 'Zm9yZWln' } }), 'utf-8');
     await expect(getScraperSecret('my/ref')).resolves.toBe('');
+  });
+
+  it('migrates a legacy per-scraper reference into the central vault', async () => {
+    const file = path.join(tempRoot, 'scraper', 'credentials.json');
+    const sealed = Buffer.from('enc:legacy-password').toString('base64');
+    await fsp.mkdir(path.dirname(file), { recursive: true });
+    await fsp.writeFile(file, JSON.stringify({ secrets: { 'legacy/ref': sealed } }), 'utf-8');
+
+    await expect(getScraperSecret('legacy/ref')).resolves.toBe('legacy-password');
+    expect(await hasScraperSecret('legacy/ref')).toBe(true);
+    expect(await fsp.readFile(path.join(tempRoot, 'credentials.dat'), 'utf-8'))
+      .not.toContain('legacy-password');
+    expect(JSON.parse(await fsp.readFile(file, 'utf-8')).secrets).toEqual({});
+  });
+
+  it('keeps a readable legacy reference when central migration cannot encrypt', async () => {
+    const file = path.join(tempRoot, 'scraper', 'credentials.json');
+    const sealed = Buffer.from('enc:legacy-password').toString('base64');
+    await fsp.mkdir(path.dirname(file), { recursive: true });
+    await fsp.writeFile(file, JSON.stringify({ secrets: { 'legacy/ref': sealed } }), 'utf-8');
+    encryptionAvailable = false;
+
+    await expect(getScraperSecret('legacy/ref')).resolves.toBe('legacy-password');
+    expect(JSON.parse(await fsp.readFile(file, 'utf-8')).secrets['legacy/ref']).toBe(sealed);
+    expect(readSecret('scraper', 'legacy/ref')).toBe('');
   });
 
   it('clears a secret', async () => {

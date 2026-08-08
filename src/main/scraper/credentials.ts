@@ -11,13 +11,18 @@
 // is refused rather than written in the clear — a scraper is not worth leaking
 // a torrent client's password over.
 //
-// **That refusal policy now lives in `main/credentials/vault.ts`** and is shared
-// with the app-wide vault rather than implemented twice. Only the policy moved:
-// this store keeps its own file (`<scraperRoot>/credentials.json`) and its own
-// `{ secrets: { ref: b64 } }` shape, because scraper refs are per-connection
-// names chosen by the user, not the fixed registry ids the app vault keys on.
+// The central vault accepts dynamic fields under the private `scraper`
+// namespace, so per-connection reference names remain stable while the bytes at
+// rest move into `<userData>/credentials.dat`. Reads migrate the former
+// `<scraperRoot>/credentials.json` entries one at a time.
 
-import { openSecret, sealSecret } from '../credentials/vault';
+import {
+  clearSecret,
+  hasSecret,
+  openSecret,
+  readSecret,
+  writeSecret,
+} from '../credentials/vault';
 import { readScraperJson, writeScraperJson } from './store';
 import { scraperLog } from './logBus';
 
@@ -29,6 +34,7 @@ interface CredentialFile {
 }
 
 const EMPTY: CredentialFile = { secrets: {} };
+const VAULT_ID = 'scraper';
 
 export interface CredentialWriteResult {
   ok: boolean;
@@ -48,10 +54,8 @@ export async function setScraperSecret(
     await clearScraperSecret(key);
     return { ok: true, ref: '', message: 'Credential removed.' };
   }
-  // `sealSecret` returns null for both "the OS says it cannot encrypt" and
-  // "encryption threw"; either way the secret is refused, not downgraded.
-  const sealed = sealSecret(secret);
-  if (sealed === null) {
+  const stored = writeSecret(VAULT_ID, key, secret);
+  if (!stored.ok) {
     scraperLog('error', 'credentials', 'OS encryption is unavailable; refused to store a secret.');
     return {
       ok: false,
@@ -59,9 +63,7 @@ export async function setScraperSecret(
       message: 'This system cannot encrypt stored secrets, so nothing was saved.',
     };
   }
-  const file = await readScraperJson<CredentialFile>(CREDENTIALS_FILE, EMPTY);
-  const secrets = { ...file.secrets, [key]: sealed };
-  await writeScraperJson(CREDENTIALS_FILE, { secrets });
+  await removeLegacySecret(key);
   scraperLog('info', 'credentials', `Stored a secret for "${key}".`);
   return { ok: true, ref: key, message: 'Stored in OS-protected storage.' };
 }
@@ -70,6 +72,9 @@ export async function setScraperSecret(
 export async function getScraperSecret(ref: string): Promise<string> {
   const key = ref.trim();
   if (!key) return '';
+  const current = readSecret(VAULT_ID, key);
+  if (current) return current;
+
   const file = await readScraperJson<CredentialFile>(CREDENTIALS_FILE, EMPTY);
   const stored = file.secrets[key];
   if (!stored) return '';
@@ -80,19 +85,33 @@ export async function getScraperSecret(ref: string): Promise<string> {
     // can act on, rather than a crash.
     scraperLog('warn', 'credentials', `Could not decrypt the secret for "${key}".`);
   }
+  if (plain) {
+    const migrated = writeSecret(VAULT_ID, key, plain);
+    if (migrated.ok) await removeLegacySecret(key, file);
+  }
   return plain;
 }
 
 export async function hasScraperSecret(ref: string): Promise<boolean> {
+  const key = ref.trim();
+  if (!key) return false;
+  if (hasSecret(VAULT_ID, key)) return true;
   const file = await readScraperJson<CredentialFile>(CREDENTIALS_FILE, EMPTY);
-  return Boolean(file.secrets[ref.trim()]);
+  return Boolean(file.secrets[key] && openSecret(file.secrets[key]));
 }
 
 export async function clearScraperSecret(ref: string): Promise<void> {
-  const file = await readScraperJson<CredentialFile>(CREDENTIALS_FILE, EMPTY);
+  const key = ref.trim();
+  if (!key) return;
+  clearSecret(VAULT_ID, key);
+  await removeLegacySecret(key);
+  scraperLog('info', 'credentials', `Removed the secret for "${key}".`);
+}
+
+async function removeLegacySecret(ref: string, current?: CredentialFile): Promise<void> {
+  const file = current ?? await readScraperJson<CredentialFile>(CREDENTIALS_FILE, EMPTY);
   if (!(ref in file.secrets)) return;
   const secrets = { ...file.secrets };
   delete secrets[ref];
   await writeScraperJson(CREDENTIALS_FILE, { secrets });
-  scraperLog('info', 'credentials', `Removed the secret for "${ref}".`);
 }
