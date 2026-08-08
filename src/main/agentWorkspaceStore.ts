@@ -8,6 +8,10 @@ import {
   type AgentMessage,
   type AgentWorkspaceState,
 } from '../shared/agentWorkspace';
+import {
+  getAgentSessionContextStore,
+  type AgentSessionContextStore,
+} from './agentSessionContext';
 
 const WORKSPACE_FILE = 'workspace-v1.json';
 
@@ -93,19 +97,47 @@ function atomicWrite(filePath: string, state: AgentWorkspaceState): void {
   }
 }
 
-export function createAgentWorkspaceStore(rootDirectory: string): AgentWorkspaceStore {
+/**
+ * The store hands out whole conversations, but only the retained half reaches the
+ * file. The session half lives in `agentSessionContext.ts`, in memory, and is
+ * re-attached on the way out.
+ *
+ * Both halves are joined here rather than at each call site because `read` and
+ * `write` are the only ways into the workspace: the IPC handlers, the
+ * `agentWorkspace:changed` broadcast and the prompt builder in
+ * `agentExecutionIpc` all go through them. Merging here is what lets a
+ * session-only item reach the shelf *and* the provider request without a second
+ * channel and without any consumer opting in.
+ *
+ * The file invariant stays structural: `atomicWrite` is still only ever handed
+ * the output of `prepareAgentWorkspaceForPersistence`, so a non-retained item has
+ * no path to disk even if the merge above it is wrong.
+ */
+export function createAgentWorkspaceStore(
+  rootDirectory: string,
+  session: AgentSessionContextStore = getAgentSessionContextStore(),
+): AgentWorkspaceStore {
   const filePath = path.join(rootDirectory, 'agent', WORKSPACE_FILE);
   const write = (value: unknown): AgentWorkspaceState => {
-    const state = prepareAgentWorkspaceForPersistence(value);
-    atomicWrite(filePath, state);
-    return state;
+    // Normalize once, then split. `absorb` needs the non-retained items that
+    // `prepareAgentWorkspaceForPersistence` is about to discard, so it has to see
+    // the document before the filter runs, not after.
+    const whole = normalizeAgentWorkspaceState(value);
+    const persisted = prepareAgentWorkspaceForPersistence(whole);
+    atomicWrite(filePath, persisted);
+    session.absorb(whole);
+    return session.merge(persisted);
   };
   return {
     filePath,
-    read: () => readFile(filePath),
+    read: () => session.merge(readFile(filePath)),
     write,
     deleteConversation: (conversationId: string) => {
-      const current = readFile(filePath);
+      // The *merged* document, not the file's. `write` re-derives the session half
+      // from what it is handed, so passing the file's view would delete one
+      // conversation and silently strip every other conversation's session-only
+      // context on the way past.
+      const current = session.merge(readFile(filePath));
       const conversations = current.conversations.filter((item) => item.id !== conversationId);
       const activeConversationId = current.activeConversationId === conversationId
         ? conversations[0]?.id ?? null

@@ -856,16 +856,124 @@ Verification boundary: no provider request was made, and no restart test was run
 — this slice adds no persisted field, the broadcast is a runtime mechanism, and
 the persistence it announces was proven at the previous checkpoint.
 
+## Session-only context gets a transport
+
+The shelf could only ever show reference data. Retention is refused above
+`ordinary` by `createAgentContextItem`, and the only route from a producer to the
+shelf ran through a store whose save filter drops everything non-retained — so a
+`selected-text`, `reading-passage` or `media-cue` item was built correctly and
+then deleted by the very save meant to deliver it. Both halves of that were
+right individually; together they made three of the eight context kinds
+unreachable.
+
+- `main/agentSessionContext.ts` holds the non-retained half **in main, in
+  memory**. Nothing in it touches `fs`. `absorb` **replaces** a conversation's
+  session list rather than unioning it — a removal reaches the store as a
+  document that simply no longer lists the item, and a union would make the
+  shelf's remove control a no-op — and it **forgets** every conversation the
+  document does not mention, which is what makes `deleteConversation` and `clear`
+  collect their session entries for free.
+- The join lives in `agentWorkspaceStore.ts` rather than at each call site,
+  because `read` and `write` are the only ways into the workspace. That single
+  change is why the shelf, the `agentWorkspace:changed` broadcast **and** the
+  prompt builder in `agentExecutionIpc` (which reads `store.read()`) all see
+  whole conversations. **No new IPC channel exists, because none is needed.**
+- **The file invariant stays structural.** `atomicWrite` is still only ever handed
+  the output of `prepareAgentWorkspaceForPersistence`, so a non-retained item has
+  no path to disk even if the merge above it is wrong. That filter was not
+  touched.
+- `deleteConversation` now reads the **merged** document instead of the file's.
+  Reading the file's view would have deleted one conversation and silently
+  stripped every *other* conversation's session context on the way past, because
+  `write` re-derives the session half from what it is handed.
+- Bounds: 100 items per conversation, matching the normalizer's own context cap so
+  the merged view cannot exceed what it would accept back, and a 200-conversation
+  memory backstop.
+- Why main, for data that is deliberately not durable: two of the three consumers
+  are in main, and a renderer-held copy would not reach a pop-out — the defect the
+  change broadcast fixed one slice ago.
+
+Automated evidence:
+
+- Full suite: `npx vitest run` → 459 files (458 passed, 1 skipped) and 6,046
+  tests (6,040 passed, 6 skipped), 0 failed. Against the previous checkpoint's
+  458 / 6,035 that is +1 file and +11 tests, reconciled per file:
+  `agentSessionContext` +6 in a new file, `agentWorkspaceStore` +5,
+  `agentWorkspaceIpc` 0.
+- `node tools/i18n-check.cjs` → exit 0. This slice adds no user-visible string;
+  the shelf already had the "This session only" and "Marked sensitive" lanes and
+  they simply stopped always reading 0.
+- `node tools/architecture-audit.cjs` → exit 0; 1,568 modules (1,566 before, +2
+  for the module and its test), 18 findings, nothing new. Worth stating
+  explicitly: the new main module is **not** reported as an orphan or a test-only
+  module, because it has a real production consumer.
+- `npx eslint` over the six slice-owned paths: exit 0.
+
+**One existing assertion was deliberately inverted, and it is the honest record
+of the behaviour change.** `agentWorkspaceIpc.test.ts` asserted that a save came
+back with `context: []` — it pinned the old truth that the save filter was the
+only thing between a producer and the shelf. It now asserts the reply carries the
+session item and that the *file* is what stays retained-only, checked on the raw
+bytes so a normalizer cannot launder it.
+
+Live Electron evidence — **a real restart, not a reload.** This slice is
+main-only, so a renderer reload would have proved nothing; the main pid moved
+47508 → 78112 → 75828 across the run, and the app was stopped through its own
+`window.close()` each time rather than killed.
+
+- A save of one retained item (`dictionary-entry`, `ordinary`) plus one
+  session-only item (`selected-text`, `sensitive`) came back from the store
+  carrying **both** ids.
+- The shelf read "Kept after restart **1** / This session only **1** / Marked
+  sensitive **1**" — the session lane non-zero for the first time — and rendered
+  "Selection · 選択した文 · Sensitive · Session · これはセッション限定の文です。 ·
+  From reading". That is precisely the class of item that could not reach the
+  shelf at all before this slice. The panel's own footer, "Context and
+  attachments marked session-only are never written to disk", is now a claim the
+  run below actually demonstrates rather than a promise about an empty set.
+- Disk: `<userData>/agent/workspace-v1.json` contains `keep-zq8` and does **not**
+  contain `sess-zq8` or its preview text. Re-checked with the app fully stopped,
+  so no writer was racing the read.
+- A **brand-new Agent pop-out** showed both items, which proves the merge sits on
+  the `load` read path and not only on the change push.
+- **After the restart**: the conversation returned with `keep-zq8` alone, and the
+  shelf counts fell to "Kept 1 / This session only 0 / Marked sensitive 0".
+- Residue: final state identical to the pre-run state (`version 1`,
+  `activeConversationId: null`, `conversations: []`); `localStorage` still 76 keys
+  with zero `agent.context.*` keys; 0 errors in the debug ring; probe globals
+  deleted.
+
+Three boundaries, stated rather than smoothed over:
+
+- **No session-only producer ships yet.** The transport was exercised through the
+  same `agentWorkspaceSave` call every producer makes, but the only shipped
+  producer is the Dictionary's retained hand-off. `selected-text`,
+  `reading-passage` and `media-cue` are now *unblocked*, not *wired* — that is the
+  next slice, and until it lands their producer half is unproven.
+- **No provider request was made.** The prompt path shares `store.read()` with the
+  shelf, so the merge reaching it follows from the same call the shelf proved. The
+  privacy gate that this slice makes load-bearing — `sensitive` context can reach
+  a request for the first time, where before only reference data could — is
+  covered by unit test against `evaluateAgentProviderPrivacy`, not by a live cloud
+  call.
+- **Message-level references stay retained-only by design.**
+  `retainedMessage` prunes `contextIds`, card references and the provider
+  disclosure to the retained set at the persistence boundary, so a message keeps
+  no durable back-reference to a session-only item it used. The live disclosure at
+  request time is unaffected; the durable record understates what a past request
+  included. Recorded rather than changed, because the alternative is persisting a
+  reference to material that is meant to vanish.
+
 ## Exact next slice
 
-The broadcast half of the previous plan is done, so what remains is the
-transport. Carry **non-retained** context to the shell without writing it to
-disk: today retention is refused above `ordinary` and the only route to the shelf
-runs through a store that drops non-retained context, so `selected-text`,
-`reading-passage` and `media-cue` are built correctly and then dropped by the
-save. With a session-only transport in place, add the Reading and Media
-hand-offs and the remaining Track 3 surface — modes as workflow presets,
-attachments, history search and interactive result cards.
+Wire the producers the transport just unblocked, which is also what turns its
+proof end-to-end. Concretely: a text selection in the Reading surface and a media
+cue attach as `selected-text` / `media-cue` / `reading-passage` and hand off to
+the same conversation, with en/ja/zh/ru keys, following
+`dictionaryAgentContext`'s shape in `renderer/agentContextHandoff.ts` — but
+**without** `retained: true`, which those kinds are refused and no longer need.
+Then the remaining Track 3 surface: modes as workflow presets, attachments,
+history search and interactive result cards.
 
 Still open and deliberately deferred: `localAgentProfilesStore` and
 `localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct

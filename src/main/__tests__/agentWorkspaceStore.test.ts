@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyAgentWorkspaceState } from '../../shared/agentWorkspace';
+import { createAgentSessionContextStore } from '../agentSessionContext';
 import {
   createAgentWorkspaceStore,
   prepareAgentWorkspaceForPersistence,
@@ -99,7 +100,9 @@ function document() {
 
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-workspace-store-'));
-  store = createAgentWorkspaceStore(root);
+  // An explicit session store per test. The default is a process singleton, so
+  // sharing it would carry one test's session-only context into the next.
+  store = createAgentWorkspaceStore(root, createAgentSessionContextStore());
 });
 
 afterEach(() => {
@@ -138,6 +141,89 @@ describe('main-owned Agent workspace store', () => {
       contextIds: ['ctx-keep'],
       attachmentIds: ['file-keep'],
     });
+  });
+
+  it('keeps session-only context live in memory while the file stays retained-only', () => {
+    const saved = store.write(document());
+    const ids = (state: typeof saved): string[] =>
+      state.conversations[0].context.map((item) => item.id);
+
+    // The whole point of the slice: the caller gets both halves back.
+    expect(ids(saved)).toEqual(['ctx-keep', 'ctx-session']);
+    expect(ids(store.read())).toEqual(['ctx-keep', 'ctx-session']);
+
+    // ...and the bytes on disk carry only the retained half. Asserted on the raw
+    // text, not on a parsed round trip, so a normalizer cannot launder it.
+    const raw = fs.readFileSync(store.filePath, 'utf8');
+    expect(raw).toContain('ctx-keep');
+    expect(raw).not.toContain('ctx-session');
+    expect(raw).not.toContain('秘密');
+    expect(JSON.parse(raw).conversations[0].context).toHaveLength(1);
+  });
+
+  it('loses session-only context across a restart and keeps the retained half', () => {
+    store.write(document());
+    // A new store on the same root with its own session half is what a restart
+    // looks like: the file survives, the memory does not.
+    const restarted = createAgentWorkspaceStore(root, createAgentSessionContextStore());
+    expect(restarted.read().conversations[0].context.map((item) => item.id))
+      .toEqual(['ctx-keep']);
+  });
+
+  it('removes a session-only item when a save stops listing it', () => {
+    store.write(document());
+    const current = store.read();
+    const trimmed = {
+      ...current,
+      conversations: current.conversations.map((conversation) => (
+        conversation.id === 'chat-1'
+          ? {
+              ...conversation,
+              context: conversation.context.filter((item) => item.id !== 'ctx-session'),
+            }
+          : conversation
+      )),
+    };
+    // Replace-not-union: a removal reaches the store as a document that simply no
+    // longer lists the item, so a union would make the remove control a no-op.
+    expect(store.write(trimmed).conversations[0].context.map((item) => item.id))
+      .toEqual(['ctx-keep']);
+    expect(store.read().conversations[0].context.map((item) => item.id)).toEqual(['ctx-keep']);
+  });
+
+  it('deletes one conversation without stripping another conversation\'s session context', () => {
+    const base = document();
+    base.conversations[1].context = [{
+      id: 'ctx-session-2',
+      kind: 'media-cue',
+      label: 'Session cue',
+      preview: '字幕',
+      source: { app: 'media' },
+      sensitivity: 'personal',
+      retained: false,
+      createdAt: 300,
+    }];
+    store.write(base);
+    expect(store.read().conversations[1].context.map((item) => item.id)).toEqual(['ctx-session-2']);
+
+    // `deleteConversation` re-derives the session half from the document it writes,
+    // so reading the file's view instead of the merged one would quietly drop this.
+    const afterDelete = store.deleteConversation('chat-1');
+    expect(afterDelete.conversations.map((item) => item.id)).toEqual(['chat-2']);
+    expect(afterDelete.conversations[0].context.map((item) => item.id)).toEqual(['ctx-session-2']);
+    expect(store.read().conversations[0].context.map((item) => item.id)).toEqual(['ctx-session-2']);
+  });
+
+  it('drops session-only context when history is cleared', () => {
+    store.write(document());
+    expect(store.clear()).toEqual(emptyAgentWorkspaceState());
+    // Re-creating the conversation must not resurrect the old session item.
+    const revived = store.write({
+      version: 1,
+      activeConversationId: 'chat-1',
+      conversations: [{ id: 'chat-1', title: 'Revived', mode: 'ask', createdAt: 400, updatedAt: 400, context: [], messages: [] }],
+    });
+    expect(revived.conversations[0].context).toEqual([]);
   });
 
   it('deletes an active conversation safely and can clear all history', () => {

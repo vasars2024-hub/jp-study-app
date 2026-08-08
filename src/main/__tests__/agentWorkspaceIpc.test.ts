@@ -49,6 +49,7 @@ vi.mock('electron', () => ({
 
 import { AGENT_WORKSPACE_CHANNELS } from '../../shared/agentWorkspaceBridge';
 import { emptyAgentWorkspaceState } from '../../shared/agentWorkspace';
+import { createAgentSessionContextStore } from '../agentSessionContext';
 import { createAgentWorkspaceStore, type AgentWorkspaceStore } from '../agentWorkspaceStore';
 import { registerAgentWorkspaceIpc } from '../agentWorkspaceIpc';
 
@@ -109,7 +110,9 @@ beforeEach(() => {
   registry.duplicates.length = 0;
   registry.windows.length = 0;
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-workspace-ipc-'));
-  store = createAgentWorkspaceStore(root);
+  // Its own session half — the default is a process singleton, so sharing it
+  // would carry one test's session-only context into the next.
+  store = createAgentWorkspaceStore(root, createAgentSessionContextStore());
   registerAgentWorkspaceIpc(() => store);
 });
 
@@ -141,15 +144,24 @@ describe('Agent workspace IPC', () => {
     expect(JSON.stringify(failed)).not.toContain(root);
   });
 
-  it('saves through the one store and drops session-only context on the way', () => {
+  it('saves through the one store and answers with session-only context the file never gets', () => {
     const result = invoke(AGENT_WORKSPACE_CHANNELS.save, workspace()) as {
       ok: boolean;
-      state: { conversations: { id: string; context: unknown[] }[] };
+      state: { conversations: { id: string; context: { id: string }[] }[] };
     };
     expect(result.ok).toBe(true);
-    expect(result.state.conversations[0].context).toEqual([]);
+    // This assertion was inverted when the session transport landed. It used to
+    // read `toEqual([])`, because the save filter was the only thing standing
+    // between a producer and the shelf and it dropped everything non-retained.
+    // The reply now carries the live document; the *file* is what stays
+    // retained-only, and that is asserted on the bytes below.
+    expect(result.state.conversations[0].context.map((item) => item.id)).toEqual(['ctx-session']);
     // Same store, not a second one: the handler's answer is what the store reads.
     expect(store.read()).toEqual(result.state);
+
+    const raw = fs.readFileSync(store.filePath, 'utf8');
+    expect(raw).not.toContain('ctx-session');
+    expect(JSON.parse(raw).conversations[0].context).toEqual([]);
   });
 
   it('refuses a foreign schema instead of overwriting history with an empty file', () => {

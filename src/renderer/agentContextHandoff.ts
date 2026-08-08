@@ -105,22 +105,21 @@ export async function handOffToAgent(
  * the identity rule — one shelf entry per term, not one per lookup — lives with
  * the other context rules instead of in a component.
  *
- * `retained: true` is load-bearing, and the live run is what proved it. The
- * hand-off's only route to the shell runs through the main-owned workspace
- * store, and `prepareAgentWorkspaceForPersistence` drops every context item that
- * is not retained — correctly, since session-only material must not cross a
- * restart. But that means a non-retained item is stripped by the very save that
- * was supposed to deliver it: the conversation appears with an empty shelf and
- * the model never sees the word. A dictionary entry is reference data at the
- * `ordinary` floor, so retaining it is both allowed by
- * `createAgentContextItem` and the honest thing to do — the user asked about
- * this word and will still be asking about it after a restart.
+ * `retained: true` here is a statement about durability, not a workaround. A
+ * dictionary entry is reference data at the `ordinary` floor, so retaining it is
+ * both allowed by `createAgentContextItem` and the honest thing to do — the user
+ * asked about this word and will still be asking about it after a restart.
  *
- * The consequence for producers above `ordinary` is recorded in the ledger:
- * `createAgentContextItem` refuses retention for personal and sensitive kinds,
- * so a reading passage or a media cue cannot reach the shell over this route at
- * all. Session-only context needs a transport that does not pass through the
- * persisted store, which is a separate slice.
+ * It used to be load-bearing for a different reason, and that reason is gone: the
+ * hand-off's only route to the shell ran through the persisted store, whose save
+ * filter drops everything non-retained, so a non-retained item was stripped by
+ * the very save meant to deliver it and producers above `ordinary` could not
+ * reach the shelf at all. `main/agentSessionContext.ts` now holds the
+ * non-retained half in memory and the store merges it back on read, so
+ * `selected-text`, `reading-passage` and `media-cue` producers work over this
+ * same route without anything reaching disk. Do not add `retained: true` to a
+ * personal or sensitive producer to "make it show up" — `createAgentContextItem`
+ * refuses it anyway, and it no longer needs it.
  */
 export function dictionaryAgentContext(
   term: string,
