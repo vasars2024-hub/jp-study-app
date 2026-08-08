@@ -5616,6 +5616,7 @@ export const ru: Catalog = {
 
   // EPUB mining panels (ru)
   'epub.askAgent': 'Спросить агента о выделенном фрагменте',
+  'epub.askAgentPassage': 'Спросить агента об этом абзаце',
   'epub.translate.title': 'Перевод книги',
   'epub.translate.panelTitle': 'Настройки перевода книги',
   'epub.translate.target': 'Переводить на',

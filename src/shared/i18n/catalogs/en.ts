@@ -5364,6 +5364,7 @@ export const en: Catalog = {
 
   // EPUB mining panels (en)
   'epub.askAgent': 'Ask the Agent about the selection',
+  'epub.askAgentPassage': 'Ask the Agent about this paragraph',
   'epub.translate.title': 'Book translation',
   'epub.translate.panelTitle': 'Book translation settings',
   'epub.translate.target': 'Translate to',

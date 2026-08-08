@@ -36,12 +36,22 @@ import { getAgentWorkspaceStore, type AgentWorkspaceStore } from './agentWorkspa
  * Only successful mutations broadcast. A refused or failed write did not change
  * the file, and telling every window to re-read after it would be announcing a
  * change that never happened.
+ *
+ * Exported because these four handlers are **not** the only writers: running a
+ * prompt mutates the same workspace three times from `agentExecutionIpc.ts`
+ * (begin, complete, fail). Those went unannounced when the push first shipped, so
+ * a pop-out saw neither the user's message nor the streamed reply — the same
+ * staleness this channel exists to fix. It stays the single `webContents.send`
+ * for the channel, which `agentWorkspaceBridge.test.ts` asserts by counting.
  */
-function broadcast(state: AgentWorkspaceState): void {
+export function broadcastAgentWorkspace(state: AgentWorkspaceState): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send('agentWorkspace:changed', state);
   }
 }
+
+/** Local alias, so the handlers below read as they did before it was exported. */
+const broadcast = broadcastAgentWorkspace;
 
 /**
  * The store is resolved per call, not captured at registration: `getPath` is

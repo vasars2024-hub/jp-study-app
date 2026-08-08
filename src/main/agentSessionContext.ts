@@ -53,28 +53,36 @@ export interface AgentSessionContextStore {
 }
 
 export function createAgentSessionContextStore(): AgentSessionContextStore {
-  const byConversation = new Map<string, AgentContextItem[]>();
+  let byConversation = new Map<string, AgentContextItem[]>();
 
+  /**
+   * Rebuilt from the document rather than mutated in place, which is what makes
+   * the cap safe.
+   *
+   * An earlier version mutated a long-lived Map: `set` on an existing key keeps
+   * its position while a re-inserted key lands at the end, so once past the cap
+   * the survivors became the next eviction victims and the dropped set *rotated
+   * on every save*. `normalizeAgentWorkspaceState` allows 500 conversations
+   * against this module's 200, so that state is reachable rather than theoretical.
+   * Rebuilding makes the contents a pure function of the last document: no
+   * rotation, and "forget every conversation the document does not mention"
+   * falls out for free instead of needing its own pass.
+   *
+   * The active conversation is absorbed first so the cap can never evict the one
+   * the user is looking at.
+   */
   const absorb = (state: AgentWorkspaceState): void => {
-    const seen = new Set<string>();
-    for (const conversation of state.conversations) {
-      seen.add(conversation.id);
+    const next = new Map<string, AgentContextItem[]>();
+    const active = state.conversations.filter((entry) => entry.id === state.activeConversationId);
+    const rest = state.conversations.filter((entry) => entry.id !== state.activeConversationId);
+    for (const conversation of [...active, ...rest]) {
+      if (next.size >= MAX_CONVERSATIONS) break;
       const sessionOnly = conversation.context
         .filter((item) => !item.retained)
         .slice(0, MAX_ITEMS_PER_CONVERSATION);
-      if (sessionOnly.length === 0) byConversation.delete(conversation.id);
-      else byConversation.set(conversation.id, sessionOnly);
+      if (sessionOnly.length > 0) next.set(conversation.id, sessionOnly);
     }
-    for (const id of [...byConversation.keys()]) {
-      if (!seen.has(id)) byConversation.delete(id);
-    }
-    // Insertion order is oldest-first, so the oldest conversations are the ones
-    // that fall off the backstop.
-    while (byConversation.size > MAX_CONVERSATIONS) {
-      const oldest = byConversation.keys().next();
-      if (oldest.done) break;
-      byConversation.delete(oldest.value);
-    }
+    byConversation = next;
   };
 
   const merge = (persisted: AgentWorkspaceState): AgentWorkspaceState => {

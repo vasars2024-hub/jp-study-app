@@ -11,9 +11,31 @@ import { AiProviderRuntimeError } from '../providerRuntime';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
+interface FakeWindow {
+  isDestroyed(): boolean;
+  webContents: { send(channel: string, payload: unknown): void };
+}
+
 const registry = vi.hoisted(() => ({
   handlers: new Map<string, Handler>(),
+  windows: [] as {
+    isDestroyed(): boolean;
+    webContents: { send(channel: string, payload: unknown): void };
+  }[],
+  pushes: [] as { channel: string; payload: unknown }[],
 }));
+
+/** A window that records what main pushed to it. */
+function makeBroadcastWindow(): void {
+  registry.windows.push({
+    isDestroyed: () => false,
+    webContents: {
+      send: (channel: string, payload: unknown): void => {
+        registry.pushes.push({ channel, payload });
+      },
+    },
+  });
+}
 
 vi.mock('electron', () => ({
   app: { getPath: (): string => os.tmpdir() },
@@ -22,9 +44,18 @@ vi.mock('electron', () => ({
       registry.handlers.set(channel, handler);
     },
   },
+  // Running a prompt now announces the workspace on `agentWorkspace:changed`, so
+  // this module reaches BrowserWindow. Without it the broadcast throws inside the
+  // handler's own try/catch and every result turns into `store-failed` — which is
+  // how the omission first showed up: five unrelated assertions failing with a
+  // code none of them was testing.
+  BrowserWindow: {
+    getAllWindows: (): FakeWindow[] => registry.windows,
+  },
 }));
 
 import { registerAgentExecutionIpc } from '../agentExecutionIpc';
+import { createAgentSessionContextStore } from '../agentSessionContext';
 import { createAgentWorkspaceStore, type AgentWorkspaceStore } from '../agentWorkspaceStore';
 
 let root = '';
@@ -84,9 +115,13 @@ const invoke = async (channel: string, ...args: unknown[]): Promise<unknown> => 
 
 beforeEach(() => {
   registry.handlers.clear();
+  registry.windows.length = 0;
+  registry.pushes.length = 0;
+  makeBroadcastWindow();
   sent.length = 0;
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-execution-ipc-'));
-  store = createAgentWorkspaceStore(root);
+  // Its own session half, so one test's session-only context cannot reach the next.
+  store = createAgentWorkspaceStore(root, createAgentSessionContextStore());
   store.write(workspace());
 });
 
@@ -104,6 +139,55 @@ describe('Agent execution IPC', () => {
       AGENT_EXECUTION_CHANNELS.cancel,
       AGENT_EXECUTION_CHANNELS.run,
     ].sort());
+  });
+
+  it('announces the workspace to every window on begin and on completion', async () => {
+    // Regression: running a prompt mutates the same main-owned workspace as the
+    // four `agentWorkspace:*` handlers, but for two commits it did so silently.
+    // An Agent pop-out therefore showed neither the user's message nor the reply —
+    // the exact staleness the `changed` push was added to fix. Two pushes are
+    // expected: one for the pending pair, one for the completed assistant message.
+    makeBroadcastWindow(); // a second window, which is the case that regressed
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'done',
+        delivery: 'streamed' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: [],
+          attachmentIds: [],
+          inputChars: 10,
+          startedAt: 1,
+        },
+      }),
+    });
+
+    await invoke(AGENT_EXECUTION_CHANNELS.run, request());
+
+    const changed = registry.pushes.filter((p) => p.channel === 'agentWorkspace:changed');
+    // Two windows × two mutations.
+    expect(changed).toHaveLength(4);
+    const last = changed[changed.length - 1].payload as ReturnType<AgentWorkspaceStore['read']>;
+    expect(last.conversations[0].messages.map((m) => m.status)).toContain('complete');
+  });
+
+  it('announces a failed run too, since the failure is written to the workspace', async () => {
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => {
+        throw new AiProviderRuntimeError('nope', 'authentication');
+      },
+    });
+    await invoke(AGENT_EXECUTION_CHANNELS.run, request());
+    const changed = registry.pushes.filter((p) => p.channel === 'agentWorkspace:changed');
+    // Begin, then the recorded failure — a window must not be left showing a
+    // message that is still streaming when it has already failed.
+    expect(changed).toHaveLength(2);
+    const last = changed[1].payload as ReturnType<AgentWorkspaceStore['read']>;
+    expect(last.conversations[0].messages.some((m) => m.status === 'failed')).toBe(true);
   });
 
   it('streams through the requesting renderer and commits both messages', async () => {

@@ -24,6 +24,7 @@ import {
   getAgentWorkspaceStore,
   type AgentWorkspaceStore,
 } from './agentWorkspaceStore';
+import { broadcastAgentWorkspace } from './agentWorkspaceIpc';
 
 type ProviderRunner = (
   policy: Parameters<typeof runAgentProviderPrompt>[0],
@@ -198,6 +199,10 @@ export function registerAgentExecutionIpc(
         );
         if (!pending) return agentExecutionFailure('invalid-request', request.requestId, current);
         started = store.write(pending);
+        // Running a prompt is a workspace mutation like any other, so it has to
+        // announce itself or a second window keeps showing the conversation as it
+        // was before the message was sent.
+        broadcastAgentWorkspace(started);
       } catch {
         return agentExecutionFailure('store-failed', request.requestId);
       }
@@ -249,6 +254,7 @@ export function registerAgentExecutionIpc(
             return agentExecutionFailure('conversation-not-found', request.requestId, latest);
           }
           const state = store.write(completed);
+          broadcastAgentWorkspace(state);
           return {
             ok: true,
             requestId: request.requestId,
@@ -275,6 +281,9 @@ export function registerAgentExecutionIpc(
             },
           );
           const state = failed ? store.write(failed) : latest;
+          // Only when a write actually happened: `latest` is an unchanged read, and
+          // announcing it would report a change that never occurred.
+          if (failed) broadcastAgentWorkspace(state);
           return agentExecutionFailure(code, request.requestId, state);
         } catch {
           return agentExecutionFailure('store-failed', request.requestId, started);

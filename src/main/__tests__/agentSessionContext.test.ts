@@ -128,6 +128,59 @@ describe('Agent session context store', () => {
     expect(crowd.size()).toBe(200);
   });
 
+  it('never evicts the conversation the user is looking at', () => {
+    // Regression: the cap used to evict by Map insertion order with no regard for
+    // the active conversation, so the one on screen could be the victim. The
+    // normalizer allows 500 conversations against this module's 200, so this is
+    // reachable rather than theoretical.
+    const store = createAgentSessionContextStore();
+    const many = Array.from({ length: 260 }, (_, index) => ({
+      id: `chat-${index}`,
+      context: [item(`s-${index}`, false)],
+    }));
+    const state = workspace(many);
+    // `chat-5` deliberately: the old policy inserted in document order and deleted
+    // from the front, so an *early* conversation is one it would have dropped. An
+    // active id near the end would have survived the bug and proved nothing.
+    const active = { ...state, activeConversationId: 'chat-5' };
+    store.absorb(active);
+    expect(store.size()).toBe(200);
+
+    const merged = store.merge({
+      ...active,
+      conversations: active.conversations.map((c) => ({ ...c, context: [] })),
+    });
+    const kept = merged.conversations.find((c) => c.id === 'chat-5');
+    expect(kept?.context.map((entry) => entry.id)).toEqual(['s-5']);
+  });
+
+  it('keeps the same conversations across repeated saves instead of rotating them', () => {
+    // Regression: absorb mutated a long-lived Map, and a re-inserted key landed at
+    // the end, so past the cap the survivors became the next victims and the
+    // dropped set rotated on every save. It is rebuilt from the document now, so
+    // the contents are a pure function of the last document.
+    const store = createAgentSessionContextStore();
+    const state = workspace(Array.from({ length: 260 }, (_, index) => ({
+      id: `chat-${index}`,
+      context: [item(`s-${index}`, false)],
+    })));
+
+    const survivors = (): string[] => {
+      const merged = store.merge({
+        ...state,
+        conversations: state.conversations.map((c) => ({ ...c, context: [] })),
+      });
+      return merged.conversations.filter((c) => c.context.length > 0).map((c) => c.id);
+    };
+
+    store.absorb(state);
+    const first = survivors();
+    store.absorb(state);
+    store.absorb(state);
+    expect(survivors()).toEqual(first);
+    expect(first).toHaveLength(200);
+  });
+
   it('leaves the cloud privacy boundary in charge of sensitive session context', () => {
     // This slice is what makes `sensitive` context reachable by a request at all:
     // retention is refused above `ordinary`, so before the session transport the

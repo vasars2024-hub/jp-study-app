@@ -8,6 +8,8 @@
  * that never got written; and repeating the gesture on the same word does not
  * grow the shelf.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const workspace = vi.hoisted(() => ({
@@ -37,6 +39,7 @@ import {
   dictionaryAgentContext,
   handOffToAgent,
   openAgentSurface,
+  readingPassageAgentContext,
   selectedTextAgentContext,
 } from '../agentContextHandoff';
 import { createAgentContextItem } from '../../shared/agentContext';
@@ -277,6 +280,54 @@ describe('reader selection as session-only context', () => {
       }],
     });
     expect(persisted.conversations[0].context).toEqual([]);
+  });
+
+  it('sends the whole block as a passage, distinct from the fragment inside it', () => {
+    const passage = `${SENTENCE}それから店を出ました。`;
+    const item = createAgentContextItem(readingPassageAgentContext(passage, 'book-7', NOW));
+    expect(item).toMatchObject({
+      kind: 'reading-passage',
+      preview: passage,
+      sensitivity: 'personal',
+      retained: false,
+      source: { app: 'reading', entityId: 'book-7' },
+    });
+    // The label is the opening of the passage, so a shelf line stays recognisable.
+    expect(item?.label).toBe(passage.slice(0, 60));
+    // A passage and a selection taken from the same text are different items: the
+    // id is namespaced by kind, so one never shadows the other on the shelf.
+    const fragment = createAgentContextItem(selectedTextAgentContext(passage, SENTENCE, 'book-7', NOW));
+    expect(item?.id).not.toBe(fragment?.id);
+    expect(item?.id.startsWith('reading-passage:')).toBe(true);
+  });
+
+  it('collapses whitespace so a re-flowed block is still one passage', () => {
+    const a = createAgentContextItem(readingPassageAgentContext('一行目\n  二行目', 'b', NOW));
+    const b = createAgentContextItem(readingPassageAgentContext('一行目 二行目', 'b', NOW + 1_000));
+    expect(a?.id).toBe(b?.id);
+  });
+
+  it('titles the reader conversation from the book, never from the selection', () => {
+    // An independent review pointed out that the fix for this had no test at all:
+    // reverting the call site to `selection.slice(0, 40)` left the whole suite
+    // green. A conversation title IS persisted, so titling it with the highlighted
+    // sentence writes the `personal` material the context item is refused
+    // permission to store — it reached workspace-v1.json that way, measured live.
+    //
+    // Asserted on the source text, the same way `agentWorkspaceBridge.test.ts`
+    // checks its four boundary files: the decision lives in a component, and this
+    // pins it without mounting a reader.
+    const source = readFileSync(
+      resolve(__dirname, '..', 'views', 'NovelReader.tsx'),
+      'utf8',
+    );
+    const calls = [...source.matchAll(/t\('agent\.conversation\.fromReading',\s*\{\s*label:\s*([^}]+?)\s*\}/g)]
+      .map((match) => match[1].trim());
+    expect(calls.length).toBeGreaterThan(0);
+    for (const argument of calls) {
+      expect(argument).toBe('item.title');
+      expect(argument).not.toMatch(/selection|currentWord|passage/i);
+    }
   });
 
   it('attaches the selection and then opens the Agent', async () => {

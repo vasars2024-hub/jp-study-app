@@ -70,7 +70,11 @@ import {
   type WikiNavEntry,
 } from '../wikiArticle';
 import { getActiveProfile } from '../profileState';
-import { handOffToAgent, selectedTextAgentContext } from '../agentContextHandoff';
+import {
+  handOffToAgent,
+  readingPassageAgentContext,
+  selectedTextAgentContext,
+} from '../agentContextHandoff';
 import { useT } from '../i18n';
 import { KNOWN_LANGS } from '../../shared/langs';
 import { recordEpubPageRead } from '../readingGardenProgress';
@@ -2222,6 +2226,45 @@ export default function NovelReader({ item, onClose }: Props) {
     );
   }, [currentWord, currentSentence, item.id, item.title, lang]);
 
+  /**
+   * The paragraph the selection sits in.
+   *
+   * `selectionInBlock()` is deliberately *not* used for this. Its block resolution
+   * ends at `.novel-part, .novel-content`, and in scroll mode there is no
+   * `.novel-part`, so it falls back to the whole loaded chapter — measured live at
+   * 1,684 characters for a six-character selection. A control that says "this
+   * paragraph" must not hand over the entire page, so the nearest real paragraph
+   * element is resolved here and the block is only the fallback.
+   */
+  const passageAroundSelection = useCallback((): string => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return '';
+    const start = selection.getRangeAt(0).startContainer;
+    const element = start.nodeType === Node.TEXT_NODE
+      ? start.parentElement
+      : (start as Element);
+    const paragraph = element?.closest('p, li, blockquote, h1, h2, h3, h4, .novel-part');
+    const text = (paragraph?.textContent ?? '').trim();
+    return text || (selectionInBlock()?.full ?? '').trim();
+  }, [selectionInBlock]);
+
+  /**
+   * The same gesture at paragraph scale: the paragraph around the selection rather
+   * than the selection itself.
+   *
+   * It still needs a selection or caret to know *which* paragraph is meant, and
+   * refuses rather than guessing when there is none.
+   */
+  const askAgentAboutPassage = useCallback((): void => {
+    const passage = passageAroundSelection();
+    if (!passage) return;
+    void handOffToAgent(
+      readingPassageAgentContext(passage, item.id),
+      // The book, for the reason spelled out above: a title is persisted.
+      t('agent.conversation.fromReading', { label: item.title }),
+    );
+  }, [passageAroundSelection, item.id, item.title, lang]);
+
   const openPopupFromSelection = useCallback(
     (kind: 'dict' | 'translate') => {
       const selObj = window.getSelection();
@@ -2508,6 +2551,12 @@ export default function NovelReader({ item, onClose }: Props) {
           label: t('epub.askAgent'),
           icon: <Icon name="sparkle" size={14} />,
           onSelect: askAgentAboutSelection,
+        },
+        {
+          id: 'ask-agent-passage',
+          label: t('epub.askAgentPassage'),
+          icon: <Icon name="sparkle" size={14} />,
+          onSelect: askAgentAboutPassage,
         },
       ],
     },
@@ -2819,6 +2868,21 @@ export default function NovelReader({ item, onClose }: Props) {
             onClick={askAgentAboutSelection}
           >
             <Icon name="sparkle" size={14} />
+          </button>
+          {/*
+            A separate icon rather than a second `sparkle`: two identical buttons
+            side by side would be a coin toss. Selection sends the fragment, this
+            sends the paragraph around it — different questions, so they read as
+            different controls.
+          */}
+          <button
+            type="button"
+            className="btn small"
+            title={t('epub.askAgentPassage')}
+            aria-label={t('epub.askAgentPassage')}
+            onClick={askAgentAboutPassage}
+          >
+            <Icon name="note" size={14} />
           </button>
           <button
             type="button"

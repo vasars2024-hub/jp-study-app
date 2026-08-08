@@ -1063,17 +1063,100 @@ Live evidence — a real book, a real selection, a real synthesized click:
 Boundaries: `reading-passage` and `media-cue` still have **no** producer — only
 `selected-text` is wired. No provider request was made in this slice either.
 
+## The passage producer, and two defects an independent review found
+
+Two things landed together: the second session-only producer, and fixes for two
+real defects in the three slices above — found by dispatching a **read-only
+adversarial review to a different Claude account** and asking it to falsify this
+ledger's own claims rather than confirm them.
+
+The producer:
+
+- `readingPassageAgentContext` sends the paragraph around the selection, where
+  `selectedTextAgentContext` sends the fragment. "Explain this word" and "explain
+  this paragraph" are different questions. Same session-only lifetime, no
+  `retained`, and `identity` is the whitespace-collapsed text so a re-flowed block
+  is still one shelf entry.
+- `passageAroundSelection()` in `NovelReader.tsx` resolves the nearest paragraph
+  itself and does **not** reuse `selectionInBlock()`. That helper's block
+  resolution ends at `.novel-part, .novel-content`, and in scroll mode there is no
+  `.novel-part` — so it returned the whole loaded chapter: **1,684 characters for a
+  six-character selection**, measured live, from a control labelled "this
+  paragraph". After the fix the same gesture yields **329** — the paragraph.
+- Two toolbar buttons with distinct icons (`sparkle`, `note`), not two identical
+  ones, plus both menu entries. Key `epub.askAgentPassage` in all four languages;
+  8,797 → 8,798 English keys.
+
+**The review's verdicts:** five VERIFIED, one OVERSTATED, four incidental
+findings. Two were real defects, fixed here:
+
+1. **The change broadcast never covered the execution path.** `agentExecutionIpc`
+   mutates the same workspace three times — begin, complete, fail — and announced
+   none of them; the only sender in the tree was `agentWorkspaceIpc`. So sending a
+   message in one window left an Agent pop-out showing neither the user's message
+   nor the streamed reply: *precisely the staleness `b19a902` exists to fix*, still
+   open in the one flow that matters most. The previous entry's bullet listing
+   `save` / `deleteConversation` / `clear` was literally true, which is exactly why
+   it read as complete coverage and was not. `broadcastAgentWorkspace` is now
+   exported and called on all three writes — still the single `webContents.send`
+   for the channel, which the parity test counts.
+   *Wrinkle worth recording:* `agentExecutionIpc.test.ts`'s electron mock had no
+   `BrowserWindow`, so the new call threw inside the handler's own `try` and
+   surfaced as **five unrelated assertions failing with `store-failed`**, a code
+   none of them was testing.
+2. **The 200-conversation cap could evict the conversation on screen, and the
+   victim set rotated on every save.** `normalizeAgentWorkspaceState` allows 500
+   conversations against this module's 200, so the state is reachable rather than
+   theoretical. Eviction walked Map insertion order with no regard for
+   `activeConversationId`; worse, `set` on an existing key keeps its position while
+   a previously-evicted key re-inserts at the end, so the survivors became the next
+   round's victims. `absorb` now **rebuilds** the map from the document with the
+   active conversation absorbed first: the contents are a pure function of the last
+   document, there is no rotation, and "forget every conversation the document does
+   not mention" falls out for free instead of needing its own pass. The comment
+   claiming oldest-first eviction was wrong and is gone.
+
+**The OVERSTATED verdict was fair and is also closed.** The previous entry's "+6
+tests" evidence line sat beside three defects it said the suite could not catch —
+and the title fix in particular had *no* test: reverting `item.title` to
+`selection.slice(0, 40)` left the entire suite green. There is now a source-level
+assertion (the same technique `agentWorkspaceBridge.test.ts` uses on its four
+boundary files) pinning that the reader's conversation title comes from
+`item.title` and never from the selection. Verified to bite: with the call site
+reverted, exactly one test fails.
+
+Automated evidence: 459 files (458 passed, 1 skipped) and 6,059 tests (6,053
+passed, 6 skipped), 0 failed — +7 against 6,052 (2 execution-broadcast, 2
+eviction, 2 passage-builder, 1 title regression). `i18n-missing-key-check`,
+`i18n-check` and `architecture-audit` all exit 0, the audit showing nothing new
+for the new `agentExecutionIpc → agentWorkspaceIpc` import edge; `eslint` exit 0
+over the eight slice paths.
+
+Live: the passage button produced `kind: reading-passage`, `retained: false`,
+`sensitivity: personal`, a 60-character label and a **329**-character preview, and
+`workspace-v1.json` contains neither `reading-passage` nor the passage prose.
+
+Still open from the review, recorded rather than fixed — both latent today:
+`retainedMessage` prunes card actions only for `open-context`, while
+`AgentResultEffect`'s `save` variant, `AgentNavigationEffect.controlId` and
+`card.title` / `card.summary` persist unpruned (nothing builds cards yet, but the
+file invariant rests on that prune list staying exhaustive when something does);
+and `merge` can truncate — 60 retained plus 100 session collapses to 100, and
+saving that view back replaces the session list with the 40 that survived, bounded
+in practice only by `AGENT_CONTEXT_SHELF_LIMIT = 12`.
+
 ## Exact next slice
 
-Two producers remain from the transport's list: a **media cue** (a subtitle line
-hands off from the player) and a **reading passage** (a whole block rather than a
-selection). Both follow `selectedTextAgentContext` exactly — no `retained`, the
-surrounding context as the preview, en/ja/zh/ru keys — and both want the same
-live check the reader just needed: confirm the control is reachable in the
-embedding users actually use, and confirm no neighbouring persisted field
-(title, label, status line) writes the material the item itself is refused.
-Then the remaining Track 3 surface: modes as workflow presets, attachments,
-history search and interactive result cards.
+One producer remains from the transport's list: a **media cue** — a subtitle line
+handing off from the player. It follows `selectedTextAgentContext` exactly, and it
+wants the three checks this reader work turned up: the control must be reachable in
+the embedding people actually use, no neighbouring persisted field may carry what
+the item is refused, and the scope the label promises must be the scope delivered.
+Note that its likely home (`MediaStudyMode` / `StudyOrchestratorWorkspace`) belongs
+to the active study-mode track, so check `src/.coordination/study-mode/` before
+editing. Then the remaining Track 3 surface: modes as workflow presets,
+attachments, history search and interactive result cards — and when cards get a
+producer, extend `retainedMessage`'s prune list first.
 
 Still open and deliberately deferred: `localAgentProfilesStore` and
 `localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct

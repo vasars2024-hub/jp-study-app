@@ -172,4 +172,34 @@ export function selectedTextAgentContext(
   };
 }
 
+/**
+ * A whole reading block, as opposed to the fragment inside it.
+ *
+ * The distinction is the point: `selectedTextAgentContext` sends what the reader
+ * highlighted, this sends the paragraph it sits in. "Explain this word" and
+ * "explain this paragraph" are different questions, and a fragment plus one
+ * sentence is often not enough for the second.
+ *
+ * Same session-only lifetime and the same reason as the selection producer — the
+ * kind floors at `personal`, so retention is refused and not asked for. `identity`
+ * is the passage text, so asking twice about the same paragraph is one shelf
+ * entry. The label is the passage's opening, because a shelf line has to be
+ * recognisable, while the preview carries the passage itself.
+ */
+export function readingPassageAgentContext(
+  passage: string,
+  bookId?: string,
+  now = Date.now(),
+): AgentContextInput {
+  const text = passage.trim().replace(/\s+/g, ' ');
+  return {
+    kind: 'reading-passage',
+    label: text.slice(0, 60),
+    preview: text,
+    source: { app: 'reading', ...(bookId ? { entityId: bookId } : {}) },
+    identity: text,
+    now,
+  };
+}
+
 export type { AgentContextItem };
