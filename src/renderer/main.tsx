@@ -78,9 +78,12 @@ import { registerWiredArchiveSoundPack } from './audio/wiredArchivePack';
 import { bootWiredArchiveSettings } from './terminalModeSettings';
 import { installWiredArchiveLifecycle } from './wiredArchiveLifecycle';
 import { applyBlancModeClass, isBlancWindow } from './blancMode';
-import { syncLocalAgentAutomations } from './localAgentAutomationStore';
+import { initAgentOperationalState } from './agentOperationalClient';
 
-syncLocalAgentAutomations();
+// Hydrates this window's view of the main-owned Agent queue, memory and
+// automations, and performs the one-way localStorage adoption. The schedule
+// itself is main's now, so nothing is pushed the other way at boot.
+void initAgentOperationalState();
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 

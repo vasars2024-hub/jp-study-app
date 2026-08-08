@@ -20,6 +20,7 @@ import type {
 } from '../shared/localAgentRuntime';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
+import { registerAgentOperationalIpc } from './agentOperationalIpc';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
 export { runAgentProviderPrompt } from './agentProviderRouter';
 
@@ -280,6 +281,8 @@ export function registerLocalAgentIpc(): void {
   // point another track is mid-rewrite on.
   registerAgentWorkspaceIpc();
   registerAgentExecutionIpc();
+  // Same reasoning for the operational store (queue, memory, automations).
+  registerAgentOperationalIpc();
 }
 
 const AGENT_OPERATION_IDS = new Set(AGENT_TOOL_OPERATIONS.map((entry) => entry.id));

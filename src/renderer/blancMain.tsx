@@ -33,6 +33,7 @@ import { installBlancConsoleCapture } from './blancConsole';
 import { installNotificationCapture } from './notificationStore';
 import { clearOnExitIfConfigured } from './clipboardHistory';
 import { markLockscreenUnlocked, shouldShowLockscreen } from './lockscreenSettings';
+import { initAgentOperationalState } from './agentOperationalClient';
 
 // Blanc's own tokens + the base stylesheet its panels inherit from. Study OS's
 // theme packs (aero, wired, materials, environment, city) are deliberately absent.
@@ -100,6 +101,12 @@ installBlancConsoleCapture();
 installKeyboardShortcuts();
 // BlancDeckPanel reads the active profile's Anki deck name.
 void initProfileState().catch((err) => console.error('[profileState] init failed:', err));
+// Earns its place by this file's own rule: `LocalAgentPanel` in
+// BlancReadyToolPanels is a Blanc surface, and it reads the Agent's task queue,
+// memory and automations. Those are main-owned now, so this window has to
+// hydrate them itself — the Study OS entry doing it does nothing for Blanc, and
+// without this the same queue renders full in one window and empty in the other.
+void initAgentOperationalState();
 
 function BlancRoot() {
   const [locked, setLocked] = useState(() => shouldShowLockscreen());

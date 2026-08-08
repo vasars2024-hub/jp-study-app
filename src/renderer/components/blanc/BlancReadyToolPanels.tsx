@@ -62,7 +62,11 @@ import {
   resumeAgentQueueItem,
   type AgentTaskQueue,
 } from '../../../shared/localAgentTaskQueue';
-import { loadLocalAgentTaskQueue, saveLocalAgentTaskQueue } from '../../localAgentTaskQueueStore';
+import {
+  loadLocalAgentTaskQueue,
+  onLocalAgentTaskQueueChanged,
+  saveLocalAgentTaskQueue,
+} from '../../localAgentTaskQueueStore';
 import {
   applyAgentRunToQueue,
   pendingAgentTaskStep,
@@ -355,10 +359,23 @@ export function LocalAgentPanel() {
     }
   };
 
+  // Both the schedule and the queue are main-owned now. Nothing is pushed *to*
+  // main at mount — the scheduler reads the store itself — and a change made in
+  // another window arrives as a push, so the panel subscribes instead of
+  // trusting the copy it read at mount.
+  //
+  // Each effect re-reads on subscribe: hydration is asynchronous and can land
+  // between the `useState` initializer and the passive effect, which would
+  // otherwise leave the panel showing an empty queue until the next edit.
   useEffect(() => {
-    window.api.localAgentSyncAutomations(automations);
+    setAutomations(loadLocalAgentAutomations());
     return onLocalAgentAutomationsChanged(setAutomations);
-  }, [automations]);
+  }, []);
+
+  useEffect(() => {
+    setTaskQueue(loadLocalAgentTaskQueue());
+    return onLocalAgentTaskQueueChanged(setTaskQueue);
+  }, []);
 
   useEffect(() => window.api.onLocalAgentTrigger((entry) => {
     if (!settings.enabled) {

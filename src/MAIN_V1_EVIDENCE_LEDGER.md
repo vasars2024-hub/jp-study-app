@@ -536,11 +536,146 @@ ru +7, zh +4). Roughly 1,250 lines of foreign catalog additions remain
 unstaged, as does the user-owned F16 reach-check hunk in
 `src/renderer/__tests__/mediaCenterIntegration.test.ts`.
 
+## Main-owned Agent operational state
+
+The Agent's task queue, memory and automations were three renderer-owned
+`localStorage` keys, each with its own module and its own per-window `fallback`
+variable. They are now three sections of one versioned main-owned document,
+`<userData>/agent/operational-v1.json`, written atomically through
+`src/main/agentOperationalStore.ts`.
+
+Three defects went with the old layout, and each has a specific replacement:
+
+- **No cross-window truth.** Two windows kept two copies and the last writer
+  won. Main now broadcasts `agentOperational:changed` to every window except the
+  one that caused the write, and the renderer client re-fires the same three
+  `CustomEvent`s the old stores fired — so existing consumers gained
+  cross-window updates without changing a call site.
+- **The scheduler depended on a renderer being alive.** `main`'s automation
+  scheduler only knew a schedule if some window had pushed it over
+  `localAgent:syncAutomations`. `main/localAgentScheduler.ts` now subscribes to
+  the store directly. The push channel had no caller left and was removed end to
+  end — handler, preload method and `window.d.ts` declaration — rather than left
+  as a dead channel.
+- **No atomicity or retention.** Writes are temp-file-plus-rename at `0o600`.
+  Terminal queue rows (completed, failed, cancelled) are pruned past 30 days;
+  queued, running and paused rows are never pruned by age, so the 100-item cap
+  can no longer be reached by history and evict live work.
+
+Shape of the renderer half: the consumers are synchronous —
+`loadLocalAgentMemory()` is called inside a tool adapter, and two panels seed
+`useState` from a plain call — while the owner is now asynchronous and in
+another process. `renderer/agentOperationalClient.ts` holds a synchronous
+snapshot over the main-owned document: hydrate once per window, read
+synchronously, write optimistically, persist through a single-flight loop that
+always sends the latest state, and apply main's push without echoing it back.
+
+Migration is one-way and latched by `legacyMigratedAt` inside the document, not
+by file existence — a crash between main committing the file and the renderer
+calling `removeItem` would otherwise discard real data next to a valid empty
+store. Adoption is per-section and only into an *empty* section, so a second
+window replaying its stale `localStorage` cannot roll back what main already
+owns. No code path writes a legacy key again.
+
+Execution-time authorization is untouched. `runAgentTaskStep` remains the
+renderer's one execution boundary and still re-checks permission and the profile
+allow-list, including for queued work restored from the new store.
+
+Automated evidence:
+
+- Full suite against the final tree: `npx vitest run` → 456 files (455 passed,
+  1 skipped) and 5,978 tests (5,972 passed, 6 skipped), 0 failed. The 452-file /
+  5,917-test baseline plus this slice's 4 new files and 61 new tests accounts
+  for the difference exactly.
+- New focused coverage: `agentOperationalStore` 12, `agentOperationalIpc` 20,
+  `agentOperationalClient` 19, `localAgentSchedulerStore` 8, and 2 added to
+  `localAgentQueueRun`.
+- Focused agent regression: `npx vitest run localAgentQueueRun agentToolRegistry
+  localAgentProfileOperationsUi localAgentZeroArgumentPlan localAgentPrompt
+  agentWorkspace agentExecution agentProviderRouter localAgentRuntime
+  agentOperational localAgentSchedulerStore` → 18 files, 157 tests, 0 failed.
+- `npx eslint` over the 16 slice-owned paths: exit 0, clean.
+- `node tools/i18n-check.cjs` → exit 0; 8,778 English keys translated. This
+  slice added no UI string, so no catalog was touched and the four shared
+  catalogs stay entirely foreign — none staged.
+- `node tools/architecture-audit.cjs` → exit 0; 1,562 modules, 18 findings,
+  nothing new. In particular no `dead-ipc` for the three added channels and none
+  for the removed one.
+
+Two defects the tests caught before the live run, both in the client:
+
+- A pushed document woke *every* section's subscribers, because normalization
+  allocates fresh objects and the change check was reference identity. Sections
+  whose content is unchanged now keep the previous reference.
+- An unusable push was **adopted**. `normalizeAgentOperationalState` answers an
+  unknown version with the empty document — correct for a cold read, data loss
+  for a push — so a malformed broadcast would have wiped the window's document
+  and persisted that emptiness on the next edit. The version is now checked
+  before normalization, exactly as a save is guarded in main.
+
+Live Electron evidence — Forge rebuild, real relaunch, debug bridge only:
+
+- Preload exposed `agentOperationalLoad`, `agentOperationalSave`,
+  `agentOperationalMigrateLegacy` and `onAgentOperationalChanged`;
+  `localAgentSyncAutomations` was gone. Before the rebuild the hot renderer
+  carried the new preload against the old main and correctly reported
+  `No handler registered for 'agentOperational:load'` rather than pretending.
+- Three legacy documents were seeded into `localStorage` — one queued task, two
+  memory entries, one daily automation. After a Forge rebuild and a
+  PID-changing relaunch (main 27104 → 25960) all three appeared in
+  `operational-v1.json` with `legacyMigratedAt` set, and all three legacy keys
+  were absent from `localStorage`.
+- **A gap the live run found and the tests could not:** `renderer/blancMain.tsx`
+  is the Blanc window's own entry point and never hydrated, so the window that
+  actually hosts the Agent panel rendered an empty queue while the store was
+  full. Fixed in this slice. After the fix the panel rendered the migrated row
+  "acceptance: list decks · Queued · 5" with Run/Pause/Cancel/Prioritize, and
+  the migrated schedule "Acceptance schedule · Daily at 03:00 · Read only".
+- Cross-window: Pause clicked in the Blanc panel changed the row to Paused, and
+  the Study OS window received exactly one push — the `queue` section only,
+  carrying `accept-task-1:paused`. Memory and automations did not fire. Main's
+  file matched.
+- Restart: main 25960 → 67804. The paused status, both memory entries and the
+  automation all restored, and `legacyMigratedAt` was unchanged — no
+  re-migration, and no legacy key resurrected.
+- Scheduler, with the Blanc window closed and no renderer push channel in
+  existence: writing a due automation through the store made main broadcast
+  `localAgent:trigger` to the panel-less window. The schedule is main's.
+- Residue: the store was returned to empty sections (the migration latch is
+  genuine history and was kept); `localStorage` was compared against a pre-run
+  snapshot and is identical at 76 keys, with the two keys Blanc navigation
+  created removed; the `agent` directory holds no temporary file; the debug
+  error ring reported 0 errors.
+
+Verification boundary: no provider request was made and no model was loaded —
+the acceptance exercised persistence, the bridge and the scheduler, not
+inference. The automation used for the scheduler proof was read-only and its
+trigger was delivered to a window with no Agent panel mounted, so nothing
+planned or executed.
+
+Slice boundary: `src/preload.ts` (218 foreign lines / 11 hunks),
+`src/renderer/window.d.ts` (137 / 8) and `src/renderer/main.tsx` (3 / 2) are
+shared with unrelated in-flight work and were staged hunk-scoped. `src/main.ts`
+carries 53 foreign lines and was deliberately **not** touched: the scheduler
+kept its exported names so the shared entry point needed no edit. The four i18n
+catalogs and the user-owned F16 reach-check hunk in
+`src/renderer/__tests__/mediaCenterIntegration.test.ts` remain unstaged.
+
 ## Exact next slice
 
-Migrate the legacy renderer-owned task queue, memory, automations and scheduler
-updates into versioned main-owned persistence, with legacy localStorage
-migration and cross-window updates, preserving the execution-time permission
-and profile rechecks. Do not copy the stopped isolated worktree wholesale;
-`codex/claude-agent-shell` stays reference-only. Live Electron acceptance for
-that slice is still pending.
+The Agent's product surface, now that its state is honest. The plan's Track 3
+asks for a context shelf showing what the agent can currently see; attachments;
+Ask/Navigate/Study/Analyze/Create/Automate modes as workflow presets; searchable
+history; interactive result cards; and contextual hand-off from Dictionary,
+Reading, Media and Flashcards into the same conversation. None of those exist
+yet. The load-bearing prerequisite — versioned main-owned persistence for both
+conversations and operational state — is now in place, so the next slice should
+take the smallest end-to-end vertical of that list rather than another storage
+move: a context shelf plus one real hand-off surface, with the shelf's contents
+derived from live app state rather than declared.
+
+Two smaller items remain open from this slice: `localAgentProfilesStore` and
+`localAgentSettingsStore` are still renderer-owned `localStorage`, which is
+correct for now — they are per-window preferences with no main-side reader — but
+should move if main ever needs to evaluate a profile without a renderer.
+`codex/claude-agent-shell` stays reference-only.

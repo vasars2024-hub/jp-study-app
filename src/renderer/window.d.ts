@@ -54,6 +54,11 @@ import type {
 import type { AgentWorkspaceState } from '../shared/agentWorkspace';
 import type { AgentWorkspaceResult } from '../shared/agentWorkspaceBridge';
 import type {
+  AgentOperationalState,
+  LegacyAgentOperationalPayload,
+} from '../shared/agentOperationalState';
+import type { AgentOperationalResult } from '../shared/agentOperationalBridge';
+import type {
   StudyAnalysisRequest,
   StudyAnkiExportResult,
   StudyAnkiPreview,
@@ -857,12 +862,17 @@ declare global {
       localAgentPlan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanResponse>;
       localAgentStatus(): Promise<LocalAgentRuntimeStatus>;
       localAgentModels(): Promise<LocalAgentModelInfo[]>;
-      localAgentSyncAutomations(entries: AgentAutomation[]): void;
       onLocalAgentTrigger(cb: (entry: AgentAutomation) => void): () => void;
       agentWorkspaceLoad(): Promise<AgentWorkspaceResult>;
       agentWorkspaceSave(state: AgentWorkspaceState): Promise<AgentWorkspaceResult>;
       agentWorkspaceDeleteConversation(conversationId: string): Promise<AgentWorkspaceResult>;
       agentWorkspaceClear(): Promise<AgentWorkspaceResult>;
+      agentOperationalLoad(): Promise<AgentOperationalResult>;
+      agentOperationalSave(state: AgentOperationalState): Promise<AgentOperationalResult>;
+      agentOperationalMigrateLegacy(
+        payload: LegacyAgentOperationalPayload,
+      ): Promise<AgentOperationalResult>;
+      onAgentOperationalChanged(cb: (state: AgentOperationalState) => void): () => void;
       agentExecutionRun(request: AgentExecutionRequest): Promise<AgentExecutionResult>;
       agentExecutionCancel(requestId: string): Promise<AgentExecutionCancelResult>;
       onAgentExecutionEvent(cb: (event: AgentExecutionEvent) => void): () => void;

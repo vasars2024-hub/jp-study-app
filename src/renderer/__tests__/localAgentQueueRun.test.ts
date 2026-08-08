@@ -40,6 +40,7 @@ import {
   prioritizeAgentQueueItem,
 } from '../../shared/localAgentTaskQueue';
 import { pendingAgentTaskStep, runAgentTaskStep, selectAgentQueueRun } from '../localAgentQueueRun';
+import { normalizeAgentOperationalState } from '../../shared/agentOperationalState';
 
 const REPO = resolve(__dirname, '../../..');
 const PANEL = 'src/renderer/components/blanc/BlancReadyToolPanels.tsx';
@@ -289,5 +290,54 @@ describe('the allow-list still bites on the newly-runnable path', () => {
     expect(handler).not.toHaveBeenCalled();
     expect(result.events.map((event) => event.type)).toEqual(['confirmation-required']);
     expect(result.task.steps[0].status).toBe('waiting-confirmation');
+  });
+});
+
+/**
+ * The queue no longer round-trips through a renderer-owned `localStorage` string;
+ * it goes out to the main-owned operational document and comes back through
+ * `normalizeAgentOperationalState`, which is what `main/agentOperationalStore.ts`
+ * applies on every read and every write.
+ *
+ * The risk that introduces is specific: if that normalization dropped or blanked
+ * a task's steps or its operation id, the allow-list above would have nothing
+ * left to bite on and a restored task would sail through. So the same refusal is
+ * asserted again, with the real persistence path in the middle.
+ */
+describe('a task restored from main-owned persistence is still re-checked', () => {
+  const throughMainPersistence = (queue: ReturnType<typeof rehydrated>) => {
+    const persisted = JSON.parse(JSON.stringify(normalizeAgentOperationalState({
+      version: 1,
+      queue,
+      memory: { version: 1, entries: [] },
+      automations: [],
+      legacyMigratedAt: null,
+    })));
+    return normalizeAgentOperationalState(persisted).queue;
+  };
+
+  it('carries the step and its operation id across the process boundary intact', () => {
+    const queue = throughMainPersistence(rehydrated(deleteDeckTask('restored')));
+    const item = queue.items.find((candidate) => candidate.id === 'restored');
+    expect(item?.task.steps).toHaveLength(1);
+    expect(item?.task.steps[0].request.operation).toBe('flashcard.delete-deck');
+  });
+
+  it('still refuses an operation the profile no longer enables', async () => {
+    const queue = throughMainPersistence(rehydrated(deleteDeckTask('restored')));
+    const selection = selectAgentQueueRun(queue, 'restored');
+    if (!selection.ok) throw new Error(`expected a runnable selection, got ${selection.reason}`);
+    const handler = vi.fn(() => ({ deleted: true }));
+
+    const result = await runAgentTaskStep(queue, selection.item.task, selection.step, {
+      permission: 'full-automation',
+      allowedOperations: ['flashcard.create-deck'],
+      handlers: { 'flashcard.delete-deck': handler },
+      confirmedCallIds: new Set(['call-restored']),
+    });
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(result.task.status).toBe('failed');
+    expect(result.task.steps[0].error).toMatch(/not enabled for the active agent profile/);
   });
 });

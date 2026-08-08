@@ -78,6 +78,11 @@ import type {
 import type { AgentWorkspaceState } from './shared/agentWorkspace';
 import type { AgentWorkspaceResult } from './shared/agentWorkspaceBridge';
 import type {
+  AgentOperationalState,
+  LegacyAgentOperationalPayload,
+} from './shared/agentOperationalState';
+import type { AgentOperationalResult } from './shared/agentOperationalBridge';
+import type {
   StudyAnalysisRequest,
   StudyAnkiExportResult,
   StudyAnkiPreview,
@@ -1312,9 +1317,10 @@ const api = {
     ipcRenderer.invoke('localAgent:plan', request),
   localAgentStatus: (): Promise<LocalAgentRuntimeStatus> => ipcRenderer.invoke('localAgent:status'),
   localAgentModels: (): Promise<LocalAgentModelInfo[]> => ipcRenderer.invoke('localAgent:models'),
-  localAgentSyncAutomations: (entries: AgentAutomation[]): void => {
-    ipcRenderer.send('localAgent:syncAutomations', entries);
-  },
+  // `localAgentSyncAutomations` used to live here, pushing the renderer's copy of
+  // the schedule into the main scheduler. Main owns the schedule now
+  // (`main/agentOperationalStore.ts`) and the scheduler subscribes to it, so the
+  // push had no remaining caller and would have been a dead channel.
   onLocalAgentTrigger: (cb: (entry: AgentAutomation) => void): (() => void) => {
     const handler = (_event: unknown, entry: AgentAutomation): void => cb(entry);
     ipcRenderer.on('localAgent:trigger', handler);
@@ -1331,6 +1337,22 @@ const api = {
     ipcRenderer.invoke('agentWorkspace:deleteConversation', conversationId),
   agentWorkspaceClear: (): Promise<AgentWorkspaceResult> =>
     ipcRenderer.invoke('agentWorkspace:clear'),
+  // The main-owned Agent operational store: task queue, memory, automations.
+  // Its only renderer consumer is `renderer/agentOperationalClient.ts`. The
+  // `changed` push is what makes a write in one window reach the others.
+  agentOperationalLoad: (): Promise<AgentOperationalResult> =>
+    ipcRenderer.invoke('agentOperational:load'),
+  agentOperationalSave: (state: AgentOperationalState): Promise<AgentOperationalResult> =>
+    ipcRenderer.invoke('agentOperational:save', state),
+  agentOperationalMigrateLegacy: (
+    payload: LegacyAgentOperationalPayload,
+  ): Promise<AgentOperationalResult> =>
+    ipcRenderer.invoke('agentOperational:migrateLegacy', payload),
+  onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
+    const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
+    ipcRenderer.on('agentOperational:changed', handler);
+    return () => ipcRenderer.removeListener('agentOperational:changed', handler);
+  },
   agentExecutionRun: (request: AgentExecutionRequest): Promise<AgentExecutionResult> =>
     ipcRenderer.invoke('agentExecution:run', request),
   agentExecutionCancel: (requestId: string): Promise<AgentExecutionCancelResult> =>

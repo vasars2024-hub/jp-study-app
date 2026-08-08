@@ -1,8 +1,32 @@
-import { BrowserWindow, ipcMain } from 'electron';
-import { automationDueAt, normalizeAgentAutomations, type AgentAutomation } from '../shared/localAgentAutomation';
+/**
+ * The automation scheduler.
+ *
+ * It used to be driven by the renderer: `localAgentAutomationStore.ts` read the
+ * schedule out of `localStorage` and pushed it over a `localAgent:syncAutomations`
+ * channel, and main held whatever the last renderer happened to send. That meant
+ * the schedule did not exist in main until some window had booted and pushed it,
+ * two windows could push two different schedules, and the source of truth was a
+ * renderer-owned string.
+ *
+ * Now the schedule lives in the main-owned operational store and this module
+ * reads it directly — at startup and again on every store write, from whichever
+ * window made it. The renderer push channel is gone; there is nothing left for a
+ * renderer to tell main about the schedule that main does not already own.
+ *
+ * `localAgent:trigger` remains: that is main → renderer, and it is the whole
+ * point of the scheduler.
+ */
+
+import { BrowserWindow } from 'electron';
+import { automationDueAt, type AgentAutomation } from '../shared/localAgentAutomation';
+import {
+  getAgentOperationalStore,
+  type AgentOperationalStore,
+} from './agentOperationalStore';
 
 let schedules: AgentAutomation[] = [];
 let timer: ReturnType<typeof setInterval> | null = null;
+let unsubscribe: (() => void) | null = null;
 const fired = new Set<string>();
 
 function dayKey(date = new Date()): string {
@@ -28,8 +52,10 @@ function tick(): void {
   for (const key of fired) if (!key.includes(`:${day}:`)) fired.delete(key);
 }
 
-function sync(raw: unknown): void {
-  schedules = normalizeAgentAutomations(raw);
+function apply(entries: readonly AgentAutomation[]): void {
+  // Already normalized by the store on read and on write; re-normalizing here
+  // would only hide a store defect.
+  schedules = [...entries];
   if (!schedules.length) {
     if (timer) clearInterval(timer);
     timer = null;
@@ -39,11 +65,26 @@ function sync(raw: unknown): void {
   tick();
 }
 
-export function registerLocalAgentSchedulerIpc(): void {
-  ipcMain.on('localAgent:syncAutomations', (_event, raw: unknown) => sync(raw));
+/**
+ * Starts the scheduler against the main-owned store.
+ *
+ * The exported name is unchanged so `src/main.ts` — which is carrying another
+ * track's uncommitted work — needs no edit. It still describes what happens:
+ * this wires the scheduler's main/renderer surface, which is now the
+ * `localAgent:trigger` push alone.
+ */
+export function registerLocalAgentSchedulerIpc(
+  resolveStore: () => AgentOperationalStore = getAgentOperationalStore,
+): void {
+  const store = resolveStore();
+  unsubscribe?.();
+  unsubscribe = store.subscribe((state) => apply(state.automations));
+  apply(store.read().automations);
 }
 
 export function stopLocalAgentScheduler(): void {
+  unsubscribe?.();
+  unsubscribe = null;
   if (timer) clearInterval(timer);
   timer = null;
   schedules = [];
