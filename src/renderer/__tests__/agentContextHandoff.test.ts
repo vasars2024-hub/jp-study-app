@@ -33,7 +33,6 @@ const blanc = vi.hoisted(() => ({ isBlanc: false }));
 vi.mock('../blancMode', () => ({ isBlancWindow: () => blanc.isBlanc }));
 
 import {
-  AGENT_WORKSPACE_CHANGED_EVENT,
   attachAgentContextFromSurface,
   dictionaryAgentContext,
   handOffToAgent,
@@ -191,36 +190,21 @@ describe('routing', () => {
     expect(opened()).toEqual(['agent']);
   });
 
-  it('announces the workspace change, so an already-open shell re-reads', async () => {
-    // Measured live: the shell loads once on mount and the workspace bridge has
-    // no change push, so a hand-off into an open Agent left it showing "0
-    // conversations" while the store held one. Re-opening the route only
-    // focuses the window, so the route change cannot be the signal.
+  it('leaves the change announcement to main, dispatching no window event', async () => {
+    // The hand-off used to dispatch `agent:workspace-changed` itself, which woke
+    // a shell in this window and left an Agent pop-out stale. Main now
+    // broadcasts every committed workspace, so a second mechanism here would be
+    // a duplicate refresh and a second thing to keep in step.
     let announced = 0;
     const count = (): void => {
       announced += 1;
     };
-    window.addEventListener(AGENT_WORKSPACE_CHANGED_EVENT, count);
-    try {
-      await handOffToAgent(dictionaryAgentContext('食べる', 'to eat', NOW), 'T');
-      expect(announced).toBe(1);
-    } finally {
-      window.removeEventListener(AGENT_WORKSPACE_CHANGED_EVENT, count);
-    }
-  });
-
-  it('does not announce when the save failed', async () => {
-    workspace.saveResult = { ok: false, code: 'write-failed' };
-    let announced = 0;
-    const count = (): void => {
-      announced += 1;
-    };
-    window.addEventListener(AGENT_WORKSPACE_CHANGED_EVENT, count);
+    window.addEventListener('agent:workspace-changed', count);
     try {
       await handOffToAgent(dictionaryAgentContext('食べる', 'to eat', NOW), 'T');
       expect(announced).toBe(0);
     } finally {
-      window.removeEventListener(AGENT_WORKSPACE_CHANGED_EVENT, count);
+      window.removeEventListener('agent:workspace-changed', count);
     }
   });
 

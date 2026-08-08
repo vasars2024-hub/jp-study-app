@@ -14,6 +14,7 @@
 import type { AgentWorkspaceState } from '../shared/agentWorkspace';
 import {
   agentWorkspaceFailure,
+  isAgentWorkspaceSavePayload,
   normalizeAgentWorkspaceResult,
   type AgentWorkspaceResult,
 } from '../shared/agentWorkspaceBridge';
@@ -23,6 +24,7 @@ interface AgentWorkspaceBridge {
   agentWorkspaceSave(state: AgentWorkspaceState): Promise<unknown>;
   agentWorkspaceDeleteConversation(conversationId: string): Promise<unknown>;
   agentWorkspaceClear(): Promise<unknown>;
+  onAgentWorkspaceChanged(callback: (state: unknown) => void): () => void;
 }
 
 type BridgeMethod = keyof AgentWorkspaceBridge;
@@ -71,4 +73,27 @@ export function deleteAgentConversation(conversationId: string): Promise<AgentWo
 export function clearAgentWorkspace(): Promise<AgentWorkspaceResult> {
   const method = bridgeMethod('agentWorkspaceClear');
   return call(method && (() => method()), 'write-failed');
+}
+
+/**
+ * Subscribes to main's committed-workspace push.
+ *
+ * The pushed state is re-derived through the same normalizer as a reply, for the
+ * reason in `agentWorkspaceBridge.ts`: a renderer must not assume what crossed
+ * the boundary is what this file describes. A push that cannot be understood is
+ * dropped rather than delivered as an empty workspace, which the consumer would
+ * otherwise adopt over correct content it already holds.
+ *
+ * Returns a no-op unsubscribe when the preload predates the channel, so a caller
+ * can always store the result and call it on unmount.
+ */
+export function onAgentWorkspaceChanged(
+  listener: (state: AgentWorkspaceState) => void,
+): () => void {
+  const method = bridgeMethod('onAgentWorkspaceChanged');
+  if (!method) return () => undefined;
+  return method((raw) => {
+    const result = normalizeAgentWorkspaceResult({ ok: true, state: raw });
+    if (result.ok && isAgentWorkspaceSavePayload(raw)) listener(result.state);
+  });
 }

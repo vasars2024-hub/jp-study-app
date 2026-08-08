@@ -754,16 +754,118 @@ store. Second boundary: the announce is a window event, so an Agent **pop-out**
 main-owned `agentWorkspace:changed` broadcast of the kind the operational store
 already has.
 
+## The workspace acquires a change broadcast
+
+The previous entry closed by naming its own second boundary: the hand-off was
+announced with a window `CustomEvent`, so an Agent **pop-out** — a separate
+`BrowserWindow` — never learned that the workspace had changed. That is now a
+main-owned push, and the window event is gone rather than kept alongside it.
+
+- `agentWorkspace:changed` is main → renderer, sent after every *successful*
+  mutation: `save`, `deleteConversation` and `clear`. A refused or failed write
+  did not change the file, and announcing it would be announcing a change that
+  never happened.
+- The push goes to **every** window, the writer included. Excluding the sender
+  would read as a saved render, but the sender is the window with the original
+  defect — the Dictionary producer and the shell both live in the Study OS
+  window — so excluding it would fix only the pop-out and leave the reported bug
+  in place. Re-applying state a window already holds is idempotent.
+- The shell adopts the pushed state directly instead of triggering a re-read: the
+  push carries the document just committed, so a `load` round trip would fetch
+  the same bytes and flicker the loading flag for a change already in hand.
+- A push is re-normalized on arrival exactly like a reply. A foreign schema
+  normalizes to the *empty* workspace, which a consumer would otherwise adopt
+  over correct content it already holds, so an ununderstandable push is dropped
+  instead of delivered.
+- `AGENT_WORKSPACE_CHANGED_EVENT` and its `dispatchEvent` are deleted from
+  `renderer/agentContextHandoff.ts`. There is one mechanism now, not two.
+- The bridge parity test was **extended rather than exempted**. A push has four
+  ends too — a `send` in main, an `on` in the preload, a declaration, and a
+  subscribe in the client — so it is separated by shape and asserted, because a
+  push with no listener is exactly as dead as a handler with no caller.
+
+Automated evidence:
+
+- Full suite: `npx vitest run` → 458 files (457 passed, 1 skipped) and 6,035
+  tests (6,029 passed, 6 skipped), 0 failed. Against the previous checkpoint's
+  458 / 6,027 that is +8 tests and no new files, reconciled per file rather than
+  asserted: `agentWorkspaceBridge` +3, `agentWorkspaceIpc` +6,
+  `agentContextHandoff` −1, `agentWorkspaceShell` 0 — sum +8. The −1 is the
+  retired window-event announcement test, correct now that main announces.
+- `node tools/i18n-check.cjs` → exit 0; 8,795 English keys translated. This
+  slice adds no user-visible string.
+- `node tools/architecture-audit.cjs` → exit 0; 1,566 modules, 18 findings,
+  nothing new.
+- `npx eslint` over the ten slice-owned paths → **exit 1, and zero of it is
+  ours.** Two `adjacent-overload-signatures` errors report `subtitleHarvestList`
+  and `subtitleHarvestFetch` in `renderer/window.d.ts`. Proven pre-existing by
+  set-difference on the same command, not by filename filtering:
+  `git show HEAD:src/renderer/window.d.ts | npx eslint --stdin --stdin-filename
+  src/renderer/window.d.ts` returns the identical two errors at HEAD lines
+  1342/1345, which foreign hunks above shift to 1480/1483 in the worktree. It is
+  a genuine duplicate declaration inside the single `window.api` type, owned by
+  the `nyaa-subtitles` track, and is left alone as foreign dirt.
+- `node tools/blanc-drift.cjs` → exit 1, which is its documented
+  one-tracked-gap baseline; no file from this slice appears in its output. It is
+  not one of this track's four gates.
+
+Live Electron evidence — driven entirely through the debug bridge, no mouse or
+keyboard control:
+
+- That the *running* main process carried the slice is established by pushes
+  actually arriving on `agentWorkspace:changed`, not by comparing build
+  timestamps. A preload binding would have proved nothing: a window reload
+  refreshes preload while main keeps its old handlers.
+- **Same window, the original defect's exact case.** With a listener installed
+  through the real `window.api`, a save from the desktop window returned
+  `ok: true` and delivered exactly one push carrying one conversation — to the
+  window that wrote it.
+- **The pop-out, which is why this slice exists.** Workspace cleared to empty,
+  then `window.api.popOut('agent')` opened window id 2 at `?popout=agent`. Its
+  live DOM read "0 conversations" and "No stored conversations". A write from
+  window 1 then delivered one push to window 2 carrying 1 conversation and 1
+  context item, and window 2's DOM — **with no navigation and no reload** —
+  showed "1 conversation", the conversation title, the shelf counts "Kept after
+  restart 1 / This session only 0 / Marked sensitive 0", the item "Dictionary ·
+  食べる · Ordinary · Kept · 昨日寿司を食べました。 · From dictionary", and the
+  localized remove control "Remove 食べる from context".
+- **Both directions, all three handlers.** Deleting the conversation *from the
+  pop-out* pushed to window 1, the non-writer, whose own DOM went to "0
+  conversations". `clear` was observed broadcasting the same way.
+- Residue: the final workspace state is identical to the pre-run state
+  (`version 1`, `activeConversationId: null`, `conversations: []`);
+  `localStorage` holds 76 keys, the same count the previous slice recorded, with
+  zero `agent.context.*` or `agentWorkspace` keys — there is still no
+  renderer-side copy; the debug error ring reported 0 errors. Probe listeners
+  were unsubscribed and their globals deleted, and the pop-out was closed through
+  the app's own `popoutControl('close')`, restoring the pre-run single-window
+  inventory.
+
+One measurement trap, recorded because it cost a false defect:
+
+- The first pop-out probe reported `context: []` and an empty shelf, which reads
+  exactly like the product dropping the hand-off. It was the **fixture**:
+  `kind: 'dictionary'` is not a kind (`'dictionary-entry'` is) and `source` is an
+  object `{ app }`, not a string. `normalizeContext` correctly returned `null`
+  and the store dropped the item. A hand-written context fixture typed into
+  `/eval` is outside vitest and outside `tsc`, so nothing checks its shape —
+  confirm a probe fixture against the normalizer's own accepted sets before
+  reading its rejection as a bug.
+
+Verification boundary: no provider request was made, and no restart test was run
+— this slice adds no persisted field, the broadcast is a runtime mechanism, and
+the persistence it announces was proven at the previous checkpoint.
+
 ## Exact next slice
 
-Give session-only context a transport, then widen the producers. Concretely:
-add a main-owned `agentWorkspace:changed` broadcast (the operational store's
-pattern, already proven in this branch) so every window and the Agent pop-out
-see a hand-off; then carry non-retained context to the shell without writing it
-to disk, so `selected-text`, `reading-passage` and `media-cue` producers become
-possible. With that in place, add the Reading and Media hand-offs and the
-remaining Track 3 surface — modes as workflow presets, attachments, history
-search and interactive result cards.
+The broadcast half of the previous plan is done, so what remains is the
+transport. Carry **non-retained** context to the shell without writing it to
+disk: today retention is refused above `ordinary` and the only route to the shelf
+runs through a store that drops non-retained context, so `selected-text`,
+`reading-passage` and `media-cue` are built correctly and then dropped by the
+save. With a session-only transport in place, add the Reading and Media
+hand-offs and the remaining Track 3 surface — modes as workflow presets,
+attachments, history search and interactive result cards.
 
 Still open and deliberately deferred: `localAgentProfilesStore` and
 `localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct

@@ -18,6 +18,7 @@ import {
   clearAgentWorkspace,
   deleteAgentConversation,
   loadAgentWorkspace,
+  onAgentWorkspaceChanged,
   saveAgentWorkspace,
 } from '../agentWorkspaceClient';
 
@@ -42,8 +43,25 @@ const occurrences = (source: string, needle: string): number =>
 const Q = String.fromCharCode(39);
 const handleSite = (channel: string): string => `ipcMain.handle(${Q}${channel}${Q}`;
 const invokeSite = (channel: string): string => `ipcRenderer.invoke(${Q}${channel}${Q}`;
+const sendSite = (channel: string): string => `webContents.send(${Q}${channel}${Q}`;
+const onSite = (channel: string): string => `ipcRenderer.on(${Q}${channel}${Q}`;
 
-const CHANNEL_ENTRIES = Object.entries(AGENT_WORKSPACE_CHANNELS);
+/**
+ * `changed` is a main → renderer push, not a request, so it has a different set
+ * of four ends: a `send` in main, an `on` in the preload, a declaration, and a
+ * subscribe in the client. It is separated by shape rather than exempted —
+ * a push with no listener is exactly as dead as a handler with no caller, and
+ * that is the property this file exists to defend.
+ */
+const PUSH_KEYS = new Set(['changed']);
+const REQUEST_ENTRIES = Object.entries(AGENT_WORKSPACE_CHANNELS)
+  .filter(([key]) => !PUSH_KEYS.has(key));
+const PUSH_ENTRIES = Object.entries(AGENT_WORKSPACE_CHANNELS)
+  .filter(([key]) => PUSH_KEYS.has(key));
+
+/** `changed` → `onAgentWorkspaceChanged`. */
+const pushMethodFor = (key: string): string =>
+  `onAgentWorkspace${key[0].toUpperCase()}${key.slice(1)}`;
 
 describe('Agent workspace bridge parity', () => {
   const handlerSource = read('src/main/agentWorkspaceIpc.ts');
@@ -51,8 +69,8 @@ describe('Agent workspace bridge parity', () => {
   const declarationSource = read('src/renderer/window.d.ts');
   const clientSource = read('src/renderer/agentWorkspaceClient.ts');
 
-  it('handles, exposes, declares and calls every channel exactly once', () => {
-    for (const [key, channel] of CHANNEL_ENTRIES) {
+  it('handles, exposes, declares and calls every request channel exactly once', () => {
+    for (const [key, channel] of REQUEST_ENTRIES) {
       const method = methodFor(key);
       expect(occurrences(handlerSource, handleSite(channel)), channel).toBe(1);
       expect(occurrences(preloadSource, invokeSite(channel)), channel).toBe(1);
@@ -62,10 +80,26 @@ describe('Agent workspace bridge parity', () => {
     }
   });
 
+  it('sends, exposes, declares and subscribes to every push channel exactly once', () => {
+    expect(PUSH_ENTRIES).toHaveLength(1);
+    for (const [key, channel] of PUSH_ENTRIES) {
+      const method = pushMethodFor(key);
+      expect(occurrences(handlerSource, sendSite(channel)), channel).toBe(1);
+      expect(occurrences(preloadSource, onSite(channel)), channel).toBe(1);
+      expect(occurrences(preloadSource, `${method}:`), method).toBe(1);
+      expect(occurrences(declarationSource, `${method}(`), method).toBe(1);
+      expect(occurrences(clientSource, `bridgeMethod(${Q}${method}${Q})`), method).toBe(1);
+    }
+  });
+
   it('registers no channel the contract does not declare', () => {
-    const pattern = new RegExp(`ipcMain\\.handle\\(${Q}([^${Q}]+)${Q}`, 'g');
-    const registered = [...handlerSource.matchAll(pattern)].map((match) => match[1]);
-    expect(registered.sort()).toEqual([...Object.values(AGENT_WORKSPACE_CHANNELS)].sort());
+    const handlePattern = new RegExp(`ipcMain\\.handle\\(${Q}([^${Q}]+)${Q}`, 'g');
+    const registered = [...handlerSource.matchAll(handlePattern)].map((match) => match[1]);
+    expect(registered.sort()).toEqual(REQUEST_ENTRIES.map(([, channel]) => channel).sort());
+
+    const sendPattern = new RegExp(`webContents\\.send\\(${Q}([^${Q}]+)${Q}`, 'g');
+    const pushed = [...handlerSource.matchAll(sendPattern)].map((match) => match[1]);
+    expect(pushed.sort()).toEqual(PUSH_ENTRIES.map(([, channel]) => channel).sort());
   });
 });
 
@@ -132,6 +166,42 @@ describe('Agent workspace bridge consumption', () => {
       .toEqual({ ok: false, code: 'write-failed' });
     expect(await deleteAgentConversation('chat-1')).toEqual({ ok: false, code: 'write-failed' });
     expect(await clearAgentWorkspace()).toEqual({ ok: false, code: 'write-failed' });
+  });
+
+  it('delivers a pushed workspace, re-derived rather than trusted', () => {
+    let push: ((state: unknown) => void) | null = null;
+    let unsubscribed = false;
+    stubApi({
+      onAgentWorkspaceChanged: (callback: (state: unknown) => void) => {
+        push = callback;
+        return () => {
+          unsubscribed = true;
+        };
+      },
+    });
+
+    const seen: unknown[] = [];
+    const off = onAgentWorkspaceChanged((state) => seen.push(state));
+    expect(push).toBeTypeOf('function');
+
+    push?.({ version: 1, activeConversationId: null, conversations: [] });
+    expect(seen).toEqual([emptyAgentWorkspaceState()]);
+
+    // A foreign schema normalizes to the EMPTY workspace, which a consumer would
+    // otherwise adopt over correct content it already holds. Dropped instead.
+    push?.({ version: 99, conversations: [{ id: 'ghost' }] });
+    push?.('nonsense');
+    push?.(null);
+    expect(seen).toHaveLength(1);
+
+    off();
+    expect(unsubscribed).toBe(true);
+  });
+
+  it('gives a usable unsubscribe when the preload predates the push channel', () => {
+    stubApi({});
+    const off = onAgentWorkspaceChanged(() => undefined);
+    expect(() => off()).not.toThrow();
   });
 
   it('re-normalizes whatever actually came back', async () => {

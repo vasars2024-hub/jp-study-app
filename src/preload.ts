@@ -1337,6 +1337,13 @@ const api = {
     ipcRenderer.invoke('agentWorkspace:deleteConversation', conversationId),
   agentWorkspaceClear: (): Promise<AgentWorkspaceResult> =>
     ipcRenderer.invoke('agentWorkspace:clear'),
+  // Fires for every committed workspace mutation, including this window's own —
+  // the contextual hand-off writes from the same window the shell lives in.
+  onAgentWorkspaceChanged: (cb: (state: AgentWorkspaceState) => void): (() => void) => {
+    const handler = (_event: unknown, state: AgentWorkspaceState): void => cb(state);
+    ipcRenderer.on('agentWorkspace:changed', handler);
+    return () => ipcRenderer.removeListener('agentWorkspace:changed', handler);
+  },
   // The main-owned Agent operational store: task queue, memory, automations.
   // Its only renderer consumer is `renderer/agentOperationalClient.ts`. The
   // `changed` push is what makes a write in one window reach the others.

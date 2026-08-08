@@ -37,6 +37,24 @@ export const AGENT_WORKSPACE_CHANNELS = {
   save: 'agentWorkspace:save',
   deleteConversation: 'agentWorkspace:deleteConversation',
   clear: 'agentWorkspace:clear',
+  /**
+   * Main → renderer, added once the workspace acquired a second writer.
+   *
+   * The shell loaded once on mount, which was correct while it was the only
+   * thing that ever wrote. A contextual hand-off (`renderer/agentContextHandoff.ts`)
+   * broke that: it writes context straight into the store, and an Agent that was
+   * already open went on reporting "0 conversations" while the file held one —
+   * measured live. Re-opening the route only focuses the window, so the route
+   * change could not be the signal either.
+   *
+   * The push goes to *every* window including the one that wrote. Excluding the
+   * sender would look like a saving of one render, but it is the sender that has
+   * the same-window hand-off problem — the producer and the shell are both in
+   * the Study OS window — so excluding it would leave the original defect in
+   * place and only fix the pop-out. Re-applying the state a window already holds
+   * is idempotent.
+   */
+  changed: 'agentWorkspace:changed',
 } as const;
 
 export type AgentWorkspaceChannel =

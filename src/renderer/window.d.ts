@@ -867,6 +867,7 @@ declare global {
       agentWorkspaceSave(state: AgentWorkspaceState): Promise<AgentWorkspaceResult>;
       agentWorkspaceDeleteConversation(conversationId: string): Promise<AgentWorkspaceResult>;
       agentWorkspaceClear(): Promise<AgentWorkspaceResult>;
+      onAgentWorkspaceChanged(cb: (state: AgentWorkspaceState) => void): () => void;
       agentOperationalLoad(): Promise<AgentOperationalResult>;
       agentOperationalSave(state: AgentOperationalState): Promise<AgentOperationalResult>;
       agentOperationalMigrateLegacy(

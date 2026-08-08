@@ -16,9 +16,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
+interface FakeWindow {
+  destroyed: boolean;
+  sent: Array<{ channel: string; payload: unknown }>;
+}
+
 const registry = vi.hoisted(() => ({
   handlers: new Map<string, Handler>(),
   duplicates: [] as string[],
+  windows: [] as FakeWindow[],
 }));
 
 vi.mock('electron', () => ({
@@ -30,6 +36,14 @@ vi.mock('electron', () => ({
       if (registry.handlers.has(channel)) registry.duplicates.push(channel);
       else registry.handlers.set(channel, handler);
     },
+  },
+  BrowserWindow: {
+    getAllWindows: () => registry.windows.map((window) => ({
+      isDestroyed: () => window.destroyed,
+      webContents: {
+        send: (channel: string, payload: unknown) => window.sent.push({ channel, payload }),
+      },
+    })),
   },
 }));
 
@@ -84,9 +98,16 @@ function workspace(activeConversationId = 'chat-1') {
   };
 }
 
+function makeWindow(): FakeWindow {
+  const window: FakeWindow = { destroyed: false, sent: [] };
+  registry.windows.push(window);
+  return window;
+}
+
 beforeEach(() => {
   registry.handlers.clear();
   registry.duplicates.length = 0;
+  registry.windows.length = 0;
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-workspace-ipc-'));
   store = createAgentWorkspaceStore(root);
   registerAgentWorkspaceIpc(() => store);
@@ -97,9 +118,13 @@ afterEach(() => {
 });
 
 describe('Agent workspace IPC', () => {
-  it('registers each declared channel exactly once', () => {
+  it('registers each declared request channel exactly once', () => {
+    // `changed` is a main → renderer push and deliberately has no handler; every
+    // other declared channel must have exactly one.
+    const { changed, ...requestChannels } = AGENT_WORKSPACE_CHANNELS;
+    expect(changed).toBe('agentWorkspace:changed');
     expect([...registry.handlers.keys()].sort())
-      .toEqual([...Object.values(AGENT_WORKSPACE_CHANNELS)].sort());
+      .toEqual([...Object.values(requestChannels)].sort());
     expect(registry.duplicates).toEqual([]);
   });
 
@@ -183,5 +208,83 @@ describe('Agent workspace IPC', () => {
       .toEqual({ ok: false, code: 'write-failed' });
     expect(invoke(AGENT_WORKSPACE_CHANNELS.clear))
       .toEqual({ ok: false, code: 'write-failed' });
+  });
+});
+
+/**
+ * The change push.
+ *
+ * The shell was the workspace's only writer until a contextual hand-off started
+ * writing context straight into the store, which left an already-open Agent
+ * reporting "0 conversations" against a file that held one. The push closes
+ * that, and it deliberately reaches the writing window too — the hand-off and
+ * the shell share the Study OS window, so excluding the sender would fix only
+ * the pop-out and leave the original defect standing.
+ */
+describe('Agent workspace change broadcast', () => {
+  it('announces a save to every window, the writer included', () => {
+    const a = makeWindow();
+    const b = makeWindow();
+
+    invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
+
+    for (const window of [a, b]) {
+      expect(window.sent).toHaveLength(1);
+      expect(window.sent[0].channel).toBe(AGENT_WORKSPACE_CHANNELS.changed);
+    }
+    // The payload is the committed document, so a receiver can adopt it without
+    // a second round trip.
+    expect(a.sent[0].payload).toEqual(store.read());
+  });
+
+  it('announces a conversation delete and a clear', () => {
+    invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
+    const window = makeWindow();
+
+    invoke(AGENT_WORKSPACE_CHANNELS.deleteConversation, 'chat-1');
+    expect(window.sent).toHaveLength(1);
+    expect((window.sent[0].payload as { conversations: unknown[] }).conversations)
+      .toHaveLength(1);
+
+    invoke(AGENT_WORKSPACE_CHANNELS.clear);
+    expect(window.sent).toHaveLength(2);
+    expect((window.sent[1].payload as { conversations: unknown[] }).conversations)
+      .toEqual([]);
+  });
+
+  it('stays silent when a write was refused', () => {
+    const window = makeWindow();
+    invoke(AGENT_WORKSPACE_CHANNELS.save, { version: 99, conversations: [] });
+    invoke(AGENT_WORKSPACE_CHANNELS.deleteConversation, '   ');
+    // Announcing a change that never happened would make every window re-read
+    // for nothing, and would report the refusal as a success.
+    expect(window.sent).toEqual([]);
+  });
+
+  it('stays silent when the store threw', () => {
+    const window = makeWindow();
+    registry.handlers.clear();
+    registerAgentWorkspaceIpc(() => ({
+      ...store,
+      write: () => {
+        throw new Error('ENOSPC');
+      },
+    }));
+    expect(invoke(AGENT_WORKSPACE_CHANNELS.save, workspace()))
+      .toEqual({ ok: false, code: 'write-failed' });
+    expect(window.sent).toEqual([]);
+  });
+
+  it('does not send to a destroyed window', () => {
+    const gone = makeWindow();
+    gone.destroyed = true;
+    invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
+    expect(gone.sent).toEqual([]);
+  });
+
+  it('does not announce a plain load', () => {
+    const window = makeWindow();
+    invoke(AGENT_WORKSPACE_CHANNELS.load);
+    expect(window.sent).toEqual([]);
   });
 });

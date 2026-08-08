@@ -30,28 +30,15 @@ export type AgentHandoffOutcome =
   | 'save-failed';
 
 /**
- * Tells an Agent shell in this window that the main-owned workspace changed
- * underneath it.
+ * Nothing here announces the change any more.
  *
- * The shell loads once on mount and the workspace bridge has no change push, so
- * a hand-off into an *already open* Agent wrote the context and the surface went
- * on showing what it read at mount — measured live: the store held the
- * conversation and the shell still said "0 conversations". Opening the route
- * again only focuses the existing window, so the route change cannot be the
- * signal either.
- *
- * A window event rather than a new IPC channel, because that matches what this
- * hand-off can already reach: `openAgentSurface` routes within this window too.
- * An Agent *pop-out* is a separate BrowserWindow and is not covered — closing
- * that needs a main-owned `agentWorkspace:changed` broadcast, which is recorded
- * as the next step rather than smuggled in here.
+ * A hand-off into an already-open Agent used to leave the shell showing what it
+ * read at mount, and this module dispatched a window event to wake it. That
+ * covered the same-window case only; an Agent pop-out is a separate
+ * BrowserWindow and never saw it. Main now broadcasts every committed workspace
+ * on `agentWorkspace:changed`, to every window including the writer, so the save
+ * below is the announcement and there is one mechanism instead of two.
  */
-export const AGENT_WORKSPACE_CHANGED_EVENT = 'agent:workspace-changed';
-
-function announceWorkspaceChanged(): void {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(AGENT_WORKSPACE_CHANGED_EVENT));
-}
 
 function newConversationId(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -86,9 +73,7 @@ export async function attachAgentContextFromSurface(
   if (!next) return 'unchanged';
 
   const saved = await saveAgentWorkspace(next);
-  if (!saved.ok) return 'save-failed';
-  announceWorkspaceChanged();
-  return 'attached';
+  return saved.ok ? 'attached' : 'save-failed';
 }
 
 /**

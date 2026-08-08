@@ -29,13 +29,13 @@ import {
   clearAgentWorkspace,
   deleteAgentConversation,
   loadAgentWorkspace,
+  onAgentWorkspaceChanged,
   saveAgentWorkspace,
 } from '../../agentWorkspaceClient';
 import {
   cancelAgentPrompt,
   executeAgentPrompt,
 } from '../../agentExecutionClient';
-import { AGENT_WORKSPACE_CHANGED_EVENT } from '../../agentContextHandoff';
 import {
   agentContextDisclosure,
   agentConversationSummaries,
@@ -293,18 +293,21 @@ export default function AgentWorkspaceShell() {
   }, [refresh]);
 
   /**
-   * A hand-off from another surface (Dictionary's "Ask the Agent") writes context
-   * straight into the main-owned workspace. Without this the shell keeps showing
-   * what it read at mount, and an Agent that is already open reports "0
-   * conversations" while the store holds one — measured live.
+   * The shell is no longer the only writer. A hand-off from another surface
+   * (Dictionary's "Ask the Agent") writes context straight into the main-owned
+   * workspace, and without this the shell keeps showing what it read at mount:
+   * an Agent already open reports "0 conversations" while the store holds one,
+   * measured live before the push existed.
+   *
+   * Main's state is adopted directly rather than triggering a re-read. The push
+   * carries the document that was just committed, so a `load` round trip would
+   * fetch the same bytes, and the loading flag would flicker the surface for a
+   * change that is already in hand.
    */
-  useEffect(() => {
-    const reload = (): void => {
-      void refresh();
-    };
-    window.addEventListener(AGENT_WORKSPACE_CHANGED_EVENT, reload);
-    return () => window.removeEventListener(AGENT_WORKSPACE_CHANGED_EVENT, reload);
-  }, [refresh]);
+  useEffect(() => onAgentWorkspaceChanged((next) => {
+    setState(next);
+    setFailure(null);
+  }), []);
 
   /** Every mutation goes through here, so no two writes can overlap. */
   const run = useCallback(async (operation: () => Promise<AgentWorkspaceResult>) => {

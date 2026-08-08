@@ -15,7 +15,7 @@
  * until encrypted retention exists.
  */
 
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import {
   agentWorkspaceFailure,
   agentWorkspaceSuccess,
@@ -23,7 +23,25 @@ import {
   normalizeAgentConversationId,
   type AgentWorkspaceResult,
 } from '../shared/agentWorkspaceBridge';
+import type { AgentWorkspaceState } from '../shared/agentWorkspace';
 import { getAgentWorkspaceStore, type AgentWorkspaceStore } from './agentWorkspaceStore';
+
+/**
+ * Announces a committed workspace to every window, the writer included.
+ *
+ * See `AGENT_WORKSPACE_CHANNELS.changed` for why the sender is not excluded: the
+ * hand-off that made this push necessary happens in the *same* window as the
+ * shell it has to refresh.
+ *
+ * Only successful mutations broadcast. A refused or failed write did not change
+ * the file, and telling every window to re-read after it would be announcing a
+ * change that never happened.
+ */
+function broadcast(state: AgentWorkspaceState): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('agentWorkspace:changed', state);
+  }
+}
 
 /**
  * The store is resolved per call, not captured at registration: `getPath` is
@@ -48,7 +66,9 @@ export function registerAgentWorkspaceIpc(
     // write would erase real history. See `isAgentWorkspaceSavePayload`.
     if (!isAgentWorkspaceSavePayload(raw)) return agentWorkspaceFailure('invalid-request');
     try {
-      return agentWorkspaceSuccess(resolveStore().write(raw));
+      const state = resolveStore().write(raw);
+      broadcast(state);
+      return agentWorkspaceSuccess(state);
     } catch {
       return agentWorkspaceFailure('write-failed');
     }
@@ -58,7 +78,9 @@ export function registerAgentWorkspaceIpc(
     const conversationId = normalizeAgentConversationId(raw);
     if (!conversationId) return agentWorkspaceFailure('invalid-request');
     try {
-      return agentWorkspaceSuccess(resolveStore().deleteConversation(conversationId));
+      const state = resolveStore().deleteConversation(conversationId);
+      broadcast(state);
+      return agentWorkspaceSuccess(state);
     } catch {
       return agentWorkspaceFailure('write-failed');
     }
@@ -66,7 +88,9 @@ export function registerAgentWorkspaceIpc(
 
   ipcMain.handle('agentWorkspace:clear', (): AgentWorkspaceResult => {
     try {
-      return agentWorkspaceSuccess(resolveStore().clear());
+      const state = resolveStore().clear();
+      broadcast(state);
+      return agentWorkspaceSuccess(state);
     } catch {
       return agentWorkspaceFailure('write-failed');
     }
