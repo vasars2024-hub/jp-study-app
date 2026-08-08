@@ -20,7 +20,7 @@
  * module that still owns each credential's bytes at rest today:
  *
  *   'vault'             — `main/credentials/vault.ts`, `<userData>/credentials.dat`
- *   'malSync'           — `main/malSync.ts`, `<userData>/mal-tokens.json`
+ *   'malSync'           — a remaining provider-owned legacy store
  *
  * `refusesWhenUnencrypted` is the part that matters to a user. The vault (and
  * the scraper store it shares its policy with) *refuses to write* when the OS
@@ -73,6 +73,11 @@ export interface CredentialSpec {
   kind: CredentialKind;
   category: CredentialCategory;
   fields: CredentialField[];
+  /**
+   * Secret field names stored by main-process flows but never pasted or shown
+   * by the generic settings row. OAuth access/refresh tokens are the first use.
+   */
+  storedSecretFields?: string[];
   /** Where the user gets the key. Opened with `openExternal`, never fetched. */
   signupUrl: string;
   /** i18n key for the free-tier note, shown before the user signs up. */
@@ -218,11 +223,12 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
     kind: 'oauth',
     category: 'sync',
     fields: [{ name: 'clientId', labelKey: 'credential.field.clientId', secret: false }],
+    storedSecretFields: ['accessToken', 'refreshToken'],
     signupUrl: 'https://myanimelist.net/apiconfig',
     testable: false,
     usedByKeys: ['credential.use.malSync'],
-    store: 'malSync',
-    refusesWhenUnencrypted: false,
+    store: 'vault',
+    refusesWhenUnencrypted: true,
     managedOnPage: 'study',
   },
 ];

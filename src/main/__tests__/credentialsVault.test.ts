@@ -49,6 +49,7 @@ const {
   vaultStatus,
   vaultStatuses,
   writeSecret,
+  writeSecretSet,
 } = await import('../credentials/vault');
 
 const FAKE_KEY = 'FAKE-JITEN-KEY-NOT-REAL-0001';
@@ -109,6 +110,25 @@ describe('storing a secret', () => {
     });
     expect(readSecret('jiten', 'apiKey')).toBe(FAKE_KEY);
     expect(hasSecret('jiten')).toBe(true);
+  });
+
+  it('stores a related secret set in one vault update', () => {
+    expect(writeSecretSet('mal', {
+      accessToken: 'FAKE-MAL-ACCESS-NOT-REAL',
+      refreshToken: 'FAKE-MAL-REFRESH-NOT-REAL',
+    }).ok).toBe(true);
+    expect(readSecret('mal', 'accessToken')).toBe('FAKE-MAL-ACCESS-NOT-REAL');
+    expect(readSecret('mal', 'refreshToken')).toBe('FAKE-MAL-REFRESH-NOT-REAL');
+  });
+
+  it('refuses a whole secret set when encryption is unavailable', () => {
+    encryptionAvailable = false;
+    expect(writeSecretSet('mal', {
+      accessToken: 'FAKE-MAL-ACCESS-NOT-REAL',
+      refreshToken: 'FAKE-MAL-REFRESH-NOT-REAL',
+    })).toEqual({ ok: false, messageKey: 'credential.result.noEncryption' });
+    expect(rawVault()).not.toContain('FAKE-MAL-ACCESS-NOT-REAL');
+    expect(rawVault()).not.toContain('FAKE-MAL-REFRESH-NOT-REAL');
   });
 
   it('resolves a bare credential id to its primary field', () => {
@@ -186,7 +206,7 @@ describe('reading a secret that cannot be decrypted', () => {
     fs.writeFileSync(vaultFile(), 'not json at all', 'utf-8');
     expect(readSecret('jiten')).toBe('');
     expect(vaultStatuses()).toEqual(
-      ['gemini', 'deepseek', 'jimaku', 'opensubtitles', 'jiten'].map((id) => ({
+      ['gemini', 'deepseek', 'jimaku', 'opensubtitles', 'jiten', 'mal'].map((id) => ({
         id,
         configured: false,
         lastTestedAt: 0,
@@ -257,13 +277,14 @@ describe('the renderer-facing shape', () => {
   });
 
   it('lists only the credentials this vault actually owns', () => {
-    // MAL is still the one registry entry with its own OAuth token store.
+    // MAL joins the central vault in the OAuth migration slice.
     expect(vaultStatuses().map((entry) => entry.id)).toEqual([
       'gemini',
       'deepseek',
       'jimaku',
       'opensubtitles',
       'jiten',
+      'mal',
     ]);
   });
 });

@@ -19,7 +19,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 
 | Requirement | Starting status | Evidence / ownership | Next dependency |
 | --- | --- | --- | --- |
-| Encrypted credential vault and Jiten migration | Implemented but uncommitted; focused tests passed | `src/main/credentials/*`, `src/main/jiten.ts`, Settings API-key page and IPC wiring are part of an existing dirty-tree track | Reconcile MAL OAuth tokens and scraper credential references without absorbing unrelated `main.ts` / preload work |
+| Encrypted credential vault and provider migration | Two path-scoped checkpoints implemented; focused tests passed | Jiten, Gemini, DeepSeek, Jimaku, OpenSubtitles and MAL OAuth secrets now use `src/main/credentials/*`; shared Settings wiring remains in the protected dirty tree | Reconcile scraper credential references without absorbing unrelated `main.ts` / preload work |
 | Gemini / DeepSeek credentials | Broken security policy: separate store could downgrade to plaintext | Clean-at-HEAD `src/main/mining.ts` explicitly wrote plaintext when `safeStorage` was unavailable | Completed in first slice; provider health/client unification remains |
 | Jimaku / OpenSubtitles credentials | Broken security policy: separate unmarked store could downgrade to plaintext | Clean-at-HEAD `src/main/subtitleProviderClients.ts` | Completed in first slice; retain provider-specific Test calls backed by shared status metadata |
 | Professional Lexicon core | Partially implemented, automated foundation verified | SQLite/FTS service plus Yomitan, CEDICT and Tatoeba code; dictionary focused suite passed. Dictionary and Translate are still separate `AppSection` routes | Audit service adoption/migrations, then build compatibility aliases into one Workbench |
@@ -73,13 +73,33 @@ Live and visual evidence:
 
 Remaining risk:
 
-- MAL OAuth tokens still live in `mal-tokens.json`; the existing store can persist plaintext and must receive a profile-aware vault migration.
 - Scraper credentials share the refusal primitive but remain a separate reference store.
 - Provider health, model selection, budgets/costs, caching, cancellation, streaming, retry and privacy are not yet one structured provider service.
 - Compact shell clipping is a release-level visual defect outside this slice.
 
 Checkpoint: `feat(credentials): centralize provider secrets in encrypted vault` (the final hash is reported outside this self-contained ledger). Generic Settings IPC/preload wiring remains uncommitted because those shared files contain unrelated user work; the specialized Jiten, AI and subtitle paths in this checkpoint are independently functional.
 
+## Slice 2 — MAL OAuth token migration
+
+Behavior now established:
+
+- MAL access and refresh tokens are stored together in the central encrypted vault; `mal-tokens.json` retains only versioned expiry and username metadata.
+- Former encrypted and plaintext token files migrate one-way after the vault confirms both fields were sealed.
+- When OS encryption is unavailable, a new OAuth session is refused instead of written as plaintext. An existing legacy plaintext session remains readable and unchanged until safe migration is possible.
+- Profile identity remains derived from Electron `userData`, and expiry/username metadata survives migration.
+- Sign-out clears both vault fields and metadata. Existing refresh, disconnect, profile, and renderer-safe status tests remain green.
+- The MAL registry row is now honestly vault-owned while keeping OAuth token field names out of the generic paste UI.
+
+Automated evidence:
+
+- Focused vault, MAL migration, MAL sync and registry suites: 4 files / 91 tests passed.
+- `eslint` on all changed MAL/vault/registry paths: pass.
+- Changed-path TypeScript filtering shows only the repository's known top-level-await test/configuration pattern; no new production error.
+- `git diff --check` on the slice: pass (line-ending notices only).
+- No live OAuth authorization was attempted: doing so would create or mutate a real external grant and is outside safe automated verification.
+
+Checkpoint note: `src/main/malSync.ts` already contained unrelated user-owned MAL-3/MAL-4/MAL-7 work before this slice. Any checkpoint must stage only the token-storage hunks near the imports and `fileMalTokenStore`; those later hunks must remain unstaged.
+
 ## Exact next slice
 
-Migrate MAL OAuth access/refresh tokens to the shared vault while preserving profile identity, expiry and username metadata; refuse new plaintext persistence; prove one-way migration, unavailable-encryption retention, disconnect, refresh and renderer-safe status. Then reconcile scraper credential references and begin the shared provider runtime contract.
+Reconcile scraper credential references with the central vault without changing its provider/runtime behavior, then define the shared provider runtime contract for health, model selection, budgets/costs, caching, cancellation, streaming, retries and privacy.

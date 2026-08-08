@@ -203,6 +203,54 @@ export function writeSecret(id: string, field: string, secret: string): VaultWri
 }
 
 /**
+ * Stores several fields for one credential in a single vault rewrite.
+ *
+ * Every non-empty value is sealed before the current file is changed. If even
+ * one value cannot be encrypted, nothing is written. OAuth token pairs use this
+ * path so an access token can never land without its matching refresh token.
+ */
+export function writeSecretSet(id: string, secrets: Record<string, string>): VaultWriteResult {
+  const trimmedId = id.trim();
+  const entries = Object.entries(secrets).map(([field, secret]) => [
+    field.trim(),
+    secret.trim(),
+  ] as const);
+  if (!trimmedId || entries.length === 0 || entries.some(([field]) => !field)) {
+    return { ok: false, messageKey: 'credential.result.badId' };
+  }
+
+  const sealed = new Map<string, string>();
+  for (const [field, secret] of entries) {
+    if (!secret) continue;
+    const value = sealSecret(secret);
+    if (value === null) {
+      return { ok: false, messageKey: 'credential.result.noEncryption' };
+    }
+    sealed.set(field, value);
+  }
+
+  const file = readVault();
+  let changed = false;
+  for (const [field, secret] of entries) {
+    const key = secretKey(trimmedId, field);
+    if (!secret) {
+      if (key in file.secrets) {
+        delete file.secrets[key];
+        changed = true;
+      }
+      continue;
+    }
+    file.secrets[key] = sealed.get(field) as string;
+    changed = true;
+  }
+  if (changed) writeVault(file);
+  return {
+    ok: true,
+    messageKey: sealed.size > 0 ? 'credential.result.stored' : 'credential.result.removed',
+  };
+}
+
+/**
  * Reads a secret back. **Main process only** — nothing on the IPC surface
  * returns this value.
  *
@@ -276,19 +324,21 @@ export function recordTestResult(id: string, ok: boolean, error = ''): void {
  */
 export function vaultStatus(id: string): CredentialStatus {
   const spec = credentialSpec(id);
-  const fields = spec?.fields.filter((entry) => entry.secret) ?? [{ name: 'apiKey', secret: true }];
+  const fields = spec?.storedSecretFields
+    ?? spec?.fields.filter((entry) => entry.secret).map((entry) => entry.name)
+    ?? ['apiKey'];
   const file = readVault();
   const meta = file.meta[id] ?? { lastTestedAt: 0, lastError: '' };
 
   let configured = false;
   let fromEnv = false;
-  for (const entry of fields) {
-    if (envValue(id, entry.name)) {
+  for (const field of fields) {
+    if (envValue(id, field)) {
       configured = true;
       fromEnv = true;
       break;
     }
-    const stored = file.secrets[secretKey(id, entry.name)];
+    const stored = file.secrets[secretKey(id, field)];
     if (stored && openSecret(stored)) configured = true;
   }
 

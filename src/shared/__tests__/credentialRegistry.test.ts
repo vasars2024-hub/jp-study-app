@@ -30,6 +30,9 @@ describe('registry shape', () => {
       const names = spec.fields.map((field) => field.name);
       expect(new Set(names).size).toBe(names.length);
       for (const name of names) expect(name).toMatch(/^[A-Za-z][A-Za-z0-9]*$/);
+      for (const name of spec.storedSecretFields ?? []) {
+        expect(name).toMatch(/^[A-Za-z][A-Za-z0-9]*$/);
+      }
     }
   });
 
@@ -104,6 +107,14 @@ describe('storage honesty', () => {
       expect(spec.fields.every((field) => !field.secret)).toBe(true);
       expect(spec.managedOnPage).toBeTruthy();
     }
+  });
+
+  it('records MAL OAuth tokens as vault-owned, non-rendered secret fields', () => {
+    const mal = credentialSpec('mal');
+    expect(mal?.store).toBe('vault');
+    expect(mal?.refusesWhenUnencrypted).toBe(true);
+    expect(mal?.storedSecretFields).toEqual(['accessToken', 'refreshToken']);
+    expect(mal?.fields.every((field) => !field.secret)).toBe(true);
   });
 });
 

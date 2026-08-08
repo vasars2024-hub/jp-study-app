@@ -24,7 +24,7 @@
  * mutates it unattended on first run is not one that can be shipped untested.
  */
 
-import { app, ipcMain, net, safeStorage, shell } from 'electron';
+import { app, ipcMain, net, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -41,6 +41,14 @@ import {
   type MalListStatus,
   type MalListStatusUpdate,
 } from '../shared/malSync';
+import {
+  clearSecret,
+  hasSecret,
+  openSecret,
+  readSecret,
+  vaultCanStore,
+  writeSecretSet,
+} from './credentials/vault';
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -171,91 +179,108 @@ export interface MalTokenStore {
   encrypted(): boolean;
 }
 
-interface MalTokenFile {
-  /** Mirrors `mining.ts`'s `_encrypted`: marks the format, not a preference. */
-  encrypted: boolean;
-  accessToken: string;
-  refreshToken: string;
+interface MalTokenMetadataFile {
+  version: 2;
   expiresAt: number;
   username?: string;
 }
 
-function encryptionAvailable(): boolean {
-  try {
-    return safeStorage.isEncryptionAvailable();
-  } catch {
-    return false;
-  }
+interface LegacyMalTokenFile extends Partial<MalTokenMetadataFile> {
+  encrypted?: boolean;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
-/** The real store: `<userData>/mal-tokens.json`, safeStorage-encrypted. */
+/**
+ * The real store: secrets in `<userData>/credentials.dat`, with only expiry and
+ * username metadata left in `<userData>/mal-tokens.json`.
+ *
+ * Reads understand the former encrypted/plaintext JSON shape and migrate it in
+ * one direction. New writes never fall back to plaintext when OS encryption is
+ * unavailable.
+ */
 export function fileMalTokenStore(
   filePath: () => string = () => path.join(app.getPath('userData'), 'mal-tokens.json'),
 ): MalTokenStore {
-  const readFile = (): MalTokenFile | null => {
+  const readFile = (): LegacyMalTokenFile | null => {
     try {
-      const raw = JSON.parse(fs.readFileSync(filePath(), 'utf-8')) as Partial<MalTokenFile>;
-      if (typeof raw.accessToken !== 'string' || !raw.accessToken) return null;
-      return {
-        encrypted: raw.encrypted === true,
-        accessToken: raw.accessToken,
-        refreshToken: typeof raw.refreshToken === 'string' ? raw.refreshToken : '',
-        expiresAt: typeof raw.expiresAt === 'number' ? raw.expiresAt : 0,
-        username: typeof raw.username === 'string' ? raw.username : undefined,
-      };
+      return JSON.parse(fs.readFileSync(filePath(), 'utf-8')) as LegacyMalTokenFile;
     } catch {
       return null;
     }
   };
 
+  const metadata = (file = readFile()): Pick<MalTokens, 'expiresAt' | 'username'> => ({
+    expiresAt: typeof file?.expiresAt === 'number' ? file.expiresAt : 0,
+    username: typeof file?.username === 'string' ? file.username : undefined,
+  });
+
+  const writeMetadata = (tokens: MalTokens): void => {
+    const payload: MalTokenMetadataFile = {
+      version: 2,
+      expiresAt: tokens.expiresAt,
+      username: tokens.username,
+    };
+    try {
+      fs.mkdirSync(path.dirname(filePath()), { recursive: true });
+      const temp = `${filePath()}.${process.pid}.tmp`;
+      fs.writeFileSync(temp, JSON.stringify(payload), { encoding: 'utf-8', mode: 0o600 });
+      fs.renameSync(temp, filePath());
+    } catch {
+      /* missing metadata only disables proactive refresh and the username label */
+    }
+  };
+
+  const readLegacyTokens = (file: LegacyMalTokenFile | null): MalTokens | null => {
+    if (!file || typeof file.accessToken !== 'string' || !file.accessToken) return null;
+    const accessToken = file.encrypted
+      ? openSecret(file.accessToken)
+      : file.accessToken;
+    const refreshToken = typeof file.refreshToken === 'string'
+      ? (file.encrypted ? openSecret(file.refreshToken) : file.refreshToken)
+      : '';
+    if (!accessToken) return null;
+    return { accessToken, refreshToken, ...metadata(file) };
+  };
+
   return {
     read(): MalTokens | null {
       const file = readFile();
-      if (!file) return null;
-      if (!file.encrypted) {
+      const accessToken = readSecret('mal', 'accessToken');
+      if (accessToken) {
         return {
-          accessToken: file.accessToken,
-          refreshToken: file.refreshToken,
-          expiresAt: file.expiresAt,
-          username: file.username,
+          accessToken,
+          refreshToken: readSecret('mal', 'refreshToken'),
+          ...metadata(file),
         };
       }
-      try {
-        return {
-          accessToken: safeStorage.decryptString(Buffer.from(file.accessToken, 'base64')),
-          refreshToken: file.refreshToken
-            ? safeStorage.decryptString(Buffer.from(file.refreshToken, 'base64'))
-            : '',
-          expiresAt: file.expiresAt,
-          username: file.username,
-        };
-      } catch {
-        // Encrypted by a different user or machine, or the OS credential was
-        // rotated. Treating it as absent produces a "connect your account"
-        // state the user can act on, rather than a crash on every call.
-        return null;
-      }
+
+      const legacy = readLegacyTokens(file);
+      if (!legacy) return null;
+      const migrated = writeSecretSet('mal', {
+        accessToken: legacy.accessToken,
+        refreshToken: legacy.refreshToken,
+      });
+      if (migrated.ok) writeMetadata(legacy);
+      return legacy;
     },
 
     write(tokens: MalTokens): void {
-      const canEncrypt = encryptionAvailable();
-      const seal = (value: string): string =>
-        value && canEncrypt ? safeStorage.encryptString(value).toString('base64') : value;
-      const payload: MalTokenFile = {
-        encrypted: canEncrypt,
-        accessToken: seal(tokens.accessToken),
-        refreshToken: seal(tokens.refreshToken),
-        expiresAt: tokens.expiresAt,
-        username: tokens.username,
-      };
-      try {
-        fs.writeFileSync(filePath(), JSON.stringify(payload), { encoding: 'utf-8', mode: 0o600 });
-      } catch {
-        /* an unwritable store means the user reconnects next session */
+      const stored = writeSecretSet('mal', {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      });
+      if (!stored.ok) {
+        throw new MalSyncError(
+          'not-configured',
+          'The MyAnimeList session could not be stored because secure OS encryption is unavailable.',
+        );
       }
+      writeMetadata(tokens);
     },
 
     clear(): void {
+      clearSecret('mal');
       try {
         fs.rmSync(filePath(), { force: true });
       } catch {
@@ -265,7 +290,9 @@ export function fileMalTokenStore(
 
     encrypted(): boolean {
       const file = readFile();
-      return file ? file.encrypted : encryptionAvailable();
+      if (hasSecret('mal', 'accessToken')) return true;
+      if (readLegacyTokens(file)) return file?.encrypted === true;
+      return vaultCanStore();
     },
   };
 }
