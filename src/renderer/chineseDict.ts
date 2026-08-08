@@ -4,13 +4,13 @@
 // DictEntry shape as the Japanese (Jisho) path, so the dictionary UI, the
 // reader pop-up, saving to Flashcards, and adding to Anki all work unchanged.
 import type { DictEntry, DictResult } from '../shared/types';
+import { cedictHeadwords, parseCedictLine, pinyinToneMarks, type CedictEntry } from '../shared/pinyin';
 
-interface CedictEntry {
-  trad: string;
-  simp: string;
-  pinyin: string; // numbered, e.g. "chuan2 tong3"
-  defs: string[];
-}
+// The line format, the tone-mark table and the classifier parser moved to
+// `shared/pinyin.ts` so the main-process CC-CEDICT importer can use the same code.
+// Re-exported here because these are this module's published API and several
+// callers import them from this path.
+export { pinyinToneMarks, parseClassifiers, type ClassifierHint } from '../shared/pinyin';
 
 interface CedictIndex {
   /** simplified or traditional headword -> entries */
@@ -19,52 +19,8 @@ interface CedictIndex {
   all: CedictEntry[];
 }
 
-// ----- numbered pinyin (chuan2) -> tone marks (chuán) -----
-const TONE: Record<string, string[]> = {
-  a: ['a', 'ā', 'á', 'ǎ', 'à', 'a'],
-  e: ['e', 'ē', 'é', 'ě', 'è', 'e'],
-  i: ['i', 'ī', 'í', 'ǐ', 'ì', 'i'],
-  o: ['o', 'ō', 'ó', 'ǒ', 'ò', 'o'],
-  u: ['u', 'ū', 'ú', 'ǔ', 'ù', 'u'],
-  ü: ['ü', 'ǖ', 'ǘ', 'ǚ', 'ǜ', 'ü'],
-};
-
-function syllableToneMark(syl: string): string {
-  const m = syl.match(/^([a-zü:]+)([0-5])$/i);
-  if (!m) return syl.replace(/u:/g, 'ü');
-  const base = m[1].toLowerCase().replace(/u:/g, 'ü');
-  const tone = Number(m[2]);
-  if (tone === 0 || tone === 5) return base;
-  let idx = -1;
-  if (base.includes('a')) idx = base.indexOf('a');
-  else if (base.includes('e')) idx = base.indexOf('e');
-  else if (base.includes('ou')) idx = base.indexOf('o');
-  else {
-    for (let k = base.length - 1; k >= 0; k--) {
-      if ('iouü'.includes(base[k])) {
-        idx = k;
-        break;
-      }
-    }
-  }
-  if (idx < 0) return base;
-  const ch = base[idx];
-  const marked = TONE[ch] ? TONE[ch][tone] : ch;
-  return base.slice(0, idx) + marked + base.slice(idx + 1);
-}
-
-export function pinyinToneMarks(pinyin: string): string {
-  return pinyin
-    .trim()
-    .split(/\s+/)
-    .map(syllableToneMark)
-    .join(' ');
-}
-
 // ----- index (loaded once, lazily) -----
 let indexPromise: Promise<CedictIndex> | null = null;
-
-const LINE_RE = /^(\S+)\s+(\S+)\s+\[([^\]]*)\]\s+\/(.+)\/\s*$/;
 
 async function loadCedictRaw(): Promise<string> {
   // Prefer Phase 6 managed install; fall back to the bundled public copy so ZH
@@ -90,17 +46,10 @@ async function buildIndex(): Promise<CedictIndex> {
   const byWord = new Map<string, CedictEntry[]>();
   const all: CedictEntry[] = [];
   for (const line of text.split('\n')) {
-    if (!line || line[0] === '#') continue;
-    const m = LINE_RE.exec(line);
-    if (!m) continue;
-    const entry: CedictEntry = {
-      trad: m[1],
-      simp: m[2],
-      pinyin: m[3],
-      defs: m[4].split('/').map((d) => d.trim()).filter(Boolean),
-    };
+    const entry = parseCedictLine(line);
+    if (!entry) continue;
     all.push(entry);
-    for (const key of entry.simp === entry.trad ? [entry.simp] : [entry.simp, entry.trad]) {
+    for (const key of cedictHeadwords(entry)) {
       const list = byWord.get(key);
       if (list) list.push(entry);
       else byWord.set(key, [entry]);
@@ -130,38 +79,6 @@ function toDictEntry(e: CedictEntry): DictEntry {
 }
 
 const hasCjk = (s: string): boolean => /[㐀-鿿豈-﫿]/.test(s);
-
-// ----- classifier (measure word) hints -----------------------------------
-
-export interface ClassifierHint {
-  trad: string;
-  simp: string;
-  pinyin: string; // tone-marked, e.g. "tiáo"
-}
-
-// CEDICT embeds classifier hints as defs like "CL:隻|只[zhi1],條|条[tiao2]"
-// (the trad| part is absent when both forms match, e.g. "CL:个[ge4]").
-const CL_ITEM_RE = /([^,|[\]]+)(?:\|([^,[\]]+))?\[([^\]]*)\]/g;
-
-/** Extract measure-word hints from a CEDICT entry's definition list. */
-export function parseClassifiers(defs: string[]): ClassifierHint[] {
-  const out: ClassifierHint[] = [];
-  const seen = new Set<string>();
-  for (const def of defs) {
-    if (!def.startsWith('CL:')) continue;
-    const body = def.slice(3);
-    CL_ITEM_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = CL_ITEM_RE.exec(body)) !== null) {
-      const trad = m[1].trim();
-      const simp = (m[2] ?? m[1]).trim();
-      if (!trad || seen.has(simp)) continue;
-      seen.add(simp);
-      out.push({ trad, simp, pinyin: pinyinToneMarks(m[3]) });
-    }
-  }
-  return out;
-}
 
 /** Look up a word (Chinese headword) or an English term, offline via CC-CEDICT. */
 export async function lookupChinese(query: string): Promise<DictResult> {

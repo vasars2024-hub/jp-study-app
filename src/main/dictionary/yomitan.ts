@@ -12,6 +12,7 @@ import AdmZip from 'adm-zip';
 import type { DeinflectionInfo, DictEntry, DictResult, DictSense, YomitanDictInfo } from '../../shared/types';
 import { deinflect } from '../../shared/deinflect';
 import { mt } from '../i18n';
+import { initDictionaryService } from './service';
 
 interface StoredGlossaryEntry {
   word: string;
@@ -952,6 +953,11 @@ export function initYomitan(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       fs.mkdirSync(yomitanRoot(), { recursive: true });
+      // Phase 1: open the SQLite dictionary and apply any schema migration. Cheap
+      // (DDL only, milliseconds) and deliberately does NOT migrate the JSON stores
+      // below — that takes minutes and would freeze this thread. See
+      // dictionary/service.ts for why it has nowhere to run yet.
+      initDictionaryService();
       await ensureBundledPitch();
       loadAllIndices();
       let changed = false;
