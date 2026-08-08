@@ -19,6 +19,10 @@ import {
   type AgentWorkspaceState,
 } from '../shared/agentWorkspace';
 import type { AgentWorkspaceFailureCode } from '../shared/agentWorkspaceBridge';
+import {
+  conversationWithAgentContext,
+  conversationWithoutAgentContext,
+} from '../shared/agentContext';
 
 export type AgentShellPhase = 'loading' | 'error' | 'empty' | 'ready';
 
@@ -148,6 +152,74 @@ export function agentWorkspaceWithNewConversation(
         messages: [],
       },
     ],
+  };
+}
+
+/**
+ * Attaches context to a conversation — the active one, or the one named.
+ *
+ * The `conversationId` is optional because the hand-off case has no conversation
+ * yet: a user asking the Agent about a word from the Dictionary has not opened a
+ * chat first. Rather than making every producer deal with that, this creates one
+ * and selects it, so "attach context" means the same thing from an empty
+ * workspace as from a busy one.
+ */
+export function agentWorkspaceWithContextAttached(
+  state: AgentWorkspaceState,
+  item: AgentContextItem,
+  options: { conversationId?: string | null; newConversation: { id: string; title: string }; now: number },
+): AgentWorkspaceState | null {
+  const targetId = options.conversationId ?? state.activeConversationId;
+  const target = targetId
+    ? state.conversations.find((conversation) => conversation.id === targetId) ?? null
+    : null;
+
+  if (!target) {
+    const created = agentWorkspaceWithNewConversation(state, {
+      id: options.newConversation.id,
+      title: options.newConversation.title,
+      now: options.now,
+    });
+    if (!created) return null;
+    return agentWorkspaceWithContextAttached(created, item, {
+      conversationId: options.newConversation.id,
+      newConversation: options.newConversation,
+      now: options.now,
+    });
+  }
+
+  const next = conversationWithAgentContext(target, item, options.now);
+  // Already the front item with the same content: selecting it is still worth a
+  // save when it is not the active conversation, but rewriting it is not.
+  if (!next) {
+    return state.activeConversationId === target.id
+      ? null
+      : { ...state, activeConversationId: target.id };
+  }
+  return {
+    ...state,
+    activeConversationId: target.id,
+    conversations: state.conversations.map((conversation) => (
+      conversation.id === target.id ? next : conversation
+    )),
+  };
+}
+
+export function agentWorkspaceWithContextDetached(
+  state: AgentWorkspaceState,
+  conversationId: string,
+  contextId: string,
+  now: number,
+): AgentWorkspaceState | null {
+  const target = state.conversations.find((conversation) => conversation.id === conversationId);
+  if (!target) return null;
+  const next = conversationWithoutAgentContext(target, contextId, now);
+  if (!next) return null;
+  return {
+    ...state,
+    conversations: state.conversations.map((conversation) => (
+      conversation.id === conversationId ? next : conversation
+    )),
   };
 }
 

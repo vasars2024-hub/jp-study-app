@@ -18,10 +18,13 @@ import {
   agentRailFocusTarget,
   agentSelectedConversation,
   agentShellPhase,
+  agentWorkspaceWithContextAttached,
+  agentWorkspaceWithContextDetached,
   agentWorkspaceWithNewConversation,
   agentWorkspaceWithPinToggled,
   agentWorkspaceWithSelection,
 } from '../agentShellModel';
+import { createAgentContextItem } from '../../shared/agentContext';
 
 function conversation(overrides: Partial<AgentConversation> & { id: string }): AgentConversation {
   return {
@@ -173,5 +176,117 @@ describe('Agent rail keyboard movement', () => {
 
   it('has nothing to move to in an empty rail', () => {
     expect(agentRailFocusTarget([], 'a', 1)).toBeNull();
+  });
+});
+
+/**
+ * Attaching context is the hand-off path: a user asking the Agent about a word
+ * from the Dictionary has no conversation open yet, so "attach" has to mean the
+ * same thing from an empty workspace as from a busy one. These pin that, and the
+ * `null`-when-nothing-changes convention the shell relies on to avoid rewriting
+ * the main-owned file on every click.
+ */
+describe('Agent context attachment', () => {
+  const NOW = 1_800_000_000_000;
+  const item = (identity = 'taberu') => {
+    const built = createAgentContextItem({
+      kind: 'dictionary-entry',
+      label: identity,
+      preview: 'to eat',
+      source: { app: 'dictionary' },
+      identity,
+      now: NOW,
+    });
+    if (!built) throw new Error('expected an item');
+    return built;
+  };
+  const handoff = { newConversation: { id: 'chat-new', title: 'From Dictionary' }, now: NOW };
+
+  it('creates and selects a conversation when the workspace is empty', () => {
+    const next = agentWorkspaceWithContextAttached(workspace([]), item(), handoff);
+    expect(next?.activeConversationId).toBe('chat-new');
+    expect(next?.conversations).toHaveLength(1);
+    expect(next?.conversations[0].context.map((entry) => entry.id))
+      .toEqual(['dictionary-entry:taberu']);
+  });
+
+  it('attaches to the active conversation rather than making another', () => {
+    const state = workspace([conversation({ id: 'a' }), conversation({ id: 'b' })], 'b');
+    const next = agentWorkspaceWithContextAttached(state, item(), handoff);
+    expect(next?.conversations).toHaveLength(2);
+    expect(next?.activeConversationId).toBe('b');
+    expect(next?.conversations.find((entry) => entry.id === 'b')?.context).toHaveLength(1);
+    expect(next?.conversations.find((entry) => entry.id === 'a')?.context).toEqual([]);
+  });
+
+  it('honours an explicit target over the active conversation', () => {
+    const state = workspace([conversation({ id: 'a' }), conversation({ id: 'b' })], 'b');
+    const next = agentWorkspaceWithContextAttached(state, item(), { ...handoff, conversationId: 'a' });
+    expect(next?.activeConversationId).toBe('a');
+    expect(next?.conversations.find((entry) => entry.id === 'a')?.context).toHaveLength(1);
+  });
+
+  it('creates a conversation when the active id points at nothing', () => {
+    const next = agentWorkspaceWithContextAttached(workspace([], 'ghost'), item(), handoff);
+    expect(next?.conversations.map((entry) => entry.id)).toEqual(['chat-new']);
+  });
+
+  it('stamps updatedAt on the conversation it touched', () => {
+    const state = workspace([conversation({ id: 'a', updatedAt: 1 })], 'a');
+    const next = agentWorkspaceWithContextAttached(state, item(), { ...handoff, now: NOW + 50 });
+    expect(next?.conversations[0].updatedAt).toBe(NOW + 50);
+  });
+
+  it('returns null when the same context is already at the front of the active conversation', () => {
+    const existing = item();
+    const state = workspace([conversation({ id: 'a', context: [existing] })], 'a');
+    expect(agentWorkspaceWithContextAttached(state, existing, handoff)).toBeNull();
+  });
+
+  it('still selects when the context is unchanged but the conversation was not active', () => {
+    // Re-asking about a word already attached to a background conversation should
+    // bring that conversation forward, not silently do nothing.
+    const existing = item();
+    const state = workspace(
+      [conversation({ id: 'a', context: [existing] }), conversation({ id: 'b' })],
+      'b',
+    );
+    const next = agentWorkspaceWithContextAttached(state, existing, { ...handoff, conversationId: 'a' });
+    expect(next?.activeConversationId).toBe('a');
+    expect(next?.conversations.find((entry) => entry.id === 'a')?.context).toHaveLength(1);
+  });
+});
+
+describe('Agent context removal', () => {
+  const NOW = 1_800_000_000_000;
+  const built = createAgentContextItem({
+    kind: 'dictionary-entry',
+    label: 'taberu',
+    source: { app: 'dictionary' },
+    identity: 'taberu',
+    now: NOW,
+  });
+  if (!built) throw new Error('expected an item');
+
+  it('detaches from the named conversation and stamps it', () => {
+    const state = workspace([conversation({ id: 'a', context: [built] })], 'a');
+    const next = agentWorkspaceWithContextDetached(state, 'a', built.id, NOW + 5);
+    expect(next?.conversations[0].context).toEqual([]);
+    expect(next?.conversations[0].updatedAt).toBe(NOW + 5);
+  });
+
+  it('returns null for an unknown conversation or an unknown context id', () => {
+    const state = workspace([conversation({ id: 'a', context: [built] })], 'a');
+    expect(agentWorkspaceWithContextDetached(state, 'nope', built.id, NOW)).toBeNull();
+    expect(agentWorkspaceWithContextDetached(state, 'a', 'nope', NOW)).toBeNull();
+  });
+
+  it('leaves other conversations alone', () => {
+    const state = workspace(
+      [conversation({ id: 'a', context: [built] }), conversation({ id: 'b', context: [built] })],
+      'a',
+    );
+    const next = agentWorkspaceWithContextDetached(state, 'a', built.id, NOW);
+    expect(next?.conversations.find((entry) => entry.id === 'b')?.context).toHaveLength(1);
   });
 });

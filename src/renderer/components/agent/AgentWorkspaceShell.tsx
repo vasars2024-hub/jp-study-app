@@ -35,12 +35,14 @@ import {
   cancelAgentPrompt,
   executeAgentPrompt,
 } from '../../agentExecutionClient';
+import { AGENT_WORKSPACE_CHANGED_EVENT } from '../../agentContextHandoff';
 import {
   agentContextDisclosure,
   agentConversationSummaries,
   agentRailFocusTarget,
   agentSelectedConversation,
   agentShellPhase,
+  agentWorkspaceWithContextDetached,
   agentWorkspaceWithNewConversation,
   agentWorkspaceWithPinToggled,
   agentWorkspaceWithSelection,
@@ -131,23 +133,78 @@ type PendingConfirmation =
   | { kind: 'clear' }
   | null;
 
-function ContextDisclosure({ conversation }: { conversation: AgentConversation }) {
+/**
+ * The context shelf: what the Agent can currently see.
+ *
+ * This used to render the three counts alone, which was the honest thing to show
+ * while nothing in the app could produce a context item — the shelf was always
+ * empty and there was nothing to list. Now that producers exist
+ * (`shared/agentContext.ts`), the counts are a summary *of* a list rather than a
+ * substitute for one: the user has to be able to see the actual material that
+ * will be sent, and remove a piece of it before sending.
+ */
+function ContextShelf({
+  conversation,
+  onRemove,
+  disabled,
+}: {
+  conversation: AgentConversation;
+  onRemove: (contextId: string) => void;
+  disabled: boolean;
+}) {
   const { t } = useT();
   const disclosure = agentContextDisclosure(conversation.context);
   if (conversation.context.length === 0) {
     return <p className="agent-context-empty">{t('agent.context.empty')}</p>;
   }
-  // A definition list, not an assembled sentence: label and number stay separate
-  // so no catalog has to guess at word order or agreement.
   return (
-    <dl className="agent-context-facts">
-      <dt>{t('agent.context.retained')}</dt>
-      <dd>{disclosure.retained}</dd>
-      <dt>{t('agent.context.session')}</dt>
-      <dd>{disclosure.sessionOnly}</dd>
-      <dt>{t('agent.context.sensitive')}</dt>
-      <dd>{disclosure.sensitive}</dd>
-    </dl>
+    <>
+      {/* A definition list, not an assembled sentence: label and number stay
+          separate so no catalog has to guess at word order or agreement. */}
+      <dl className="agent-context-facts">
+        <dt>{t('agent.context.retained')}</dt>
+        <dd>{disclosure.retained}</dd>
+        <dt>{t('agent.context.session')}</dt>
+        <dd>{disclosure.sessionOnly}</dd>
+        <dt>{t('agent.context.sensitive')}</dt>
+        <dd>{disclosure.sensitive}</dd>
+      </dl>
+      <ul className="agent-context-items">
+        {conversation.context.map((item) => (
+          <li key={item.id} className="agent-context-item">
+            <div className="agent-context-item-head">
+              <span className="agent-chip agent-chip-kind">
+                {t(`agent.context.kind.${item.kind}`)}
+              </span>
+              <span className="agent-context-item-label">{item.label}</span>
+              <span
+                className={`agent-chip agent-chip-sensitivity agent-sensitivity-${item.sensitivity}`}
+              >
+                <Icon name={item.sensitivity === 'ordinary' ? 'globe' : 'lock'} size={13} />
+                {t(`agent.context.sensitivity.${item.sensitivity}`)}
+              </span>
+              <span className="agent-chip agent-chip-retention">
+                {item.retained ? t('agent.context.retainedBadge') : t('agent.context.sessionBadge')}
+              </span>
+              <button
+                type="button"
+                className="agent-action agent-context-remove"
+                onClick={() => onRemove(item.id)}
+                disabled={disabled}
+                aria-label={t('agent.context.remove', { label: item.label })}
+              >
+                <Icon name="trash" size={14} />
+              </button>
+            </div>
+            {item.preview ? <p className="agent-context-item-preview">{item.preview}</p> : null}
+            <p className="agent-context-item-source">
+              {t('agent.context.source', { app: item.source.app })}
+              {item.source.route ? ` · ${item.source.route}` : ''}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -235,6 +292,20 @@ export default function AgentWorkspaceShell() {
     void refresh();
   }, [refresh]);
 
+  /**
+   * A hand-off from another surface (Dictionary's "Ask the Agent") writes context
+   * straight into the main-owned workspace. Without this the shell keeps showing
+   * what it read at mount, and an Agent that is already open reports "0
+   * conversations" while the store holds one — measured live.
+   */
+  useEffect(() => {
+    const reload = (): void => {
+      void refresh();
+    };
+    window.addEventListener(AGENT_WORKSPACE_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(AGENT_WORKSPACE_CHANGED_EVENT, reload);
+  }, [refresh]);
+
   /** Every mutation goes through here, so no two writes can overlap. */
   const run = useCallback(async (operation: () => Promise<AgentWorkspaceResult>) => {
     setBusy(true);
@@ -305,6 +376,17 @@ export default function AgentWorkspaceShell() {
     const next = agentWorkspaceWithPinToggled(state, conversationId, Date.now());
     if (next) void run(() => saveAgentWorkspace(next));
   }, [run, state]);
+
+  /**
+   * Removing context is not a cosmetic list edit — it is the user withdrawing
+   * material from the next request, so it goes through the same main-owned save
+   * as every other change rather than being held in component state.
+   */
+  const removeContext = useCallback((contextId: string) => {
+    if (!state || !selected) return;
+    const next = agentWorkspaceWithContextDetached(state, selected.id, contextId, Date.now());
+    if (next) void run(() => saveAgentWorkspace(next));
+  }, [run, selected, state]);
 
   const railKeyDown = useCallback((event: RKeyboardEvent<HTMLUListElement>) => {
     const ids = summaries.map((summary) => summary.id);
@@ -511,7 +593,11 @@ export default function AgentWorkspaceShell() {
 
               <section className="agent-context" aria-label={t('agent.context.title')}>
                 <h3 className="agent-subheading">{t('agent.context.title')}</h3>
-                <ContextDisclosure conversation={selected} />
+                <ContextShelf
+                  conversation={selected}
+                  onRemove={removeContext}
+                  disabled={blocked}
+                />
               </section>
 
               {selected.messages.length === 0 ? (

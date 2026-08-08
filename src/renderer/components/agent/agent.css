@@ -350,6 +350,63 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The shelf itself: the material that will actually be sent, under the counts. */
+.agent-context-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 6px);
+  margin: var(--space-sm, 8px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-context-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-xs, 6px) var(--space-sm, 8px);
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.agent-context-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+}
+
+.agent-context-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: var(--font-weight-medium, 500);
+}
+
+/* Bounded rather than scrolling: a passage can be 8,000 characters and the
+   shelf is a disclosure, not a reader. */
+.agent-context-item-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--font-size-sm, 0.8125rem);
+  color: var(--agent-muted);
+  overflow-wrap: anywhere;
+}
+
+.agent-context-item-source {
+  margin: 0;
+  font-size: var(--font-size-2xs, 0.6875rem);
+  color: var(--agent-muted);
+}
+
+.agent-context-remove {
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+}
+
 .agent-chip {
   display: inline-flex;
   align-items: center;
@@ -365,6 +422,18 @@
 .agent-chip-cloud,
 .agent-chip-provider {
   border-color: color-mix(in srgb, var(--agent-accent) 35%, var(--agent-line));
+}
+
+/* Sensitivity is the one chip that carries a consequence — it decides whether a
+   cloud provider may see the item — so it earns the accent, and only above
+   `ordinary`. */
+.agent-sensitivity-personal {
+  border-color: color-mix(in srgb, var(--agent-accent) 35%, var(--agent-line));
+}
+
+.agent-sensitivity-sensitive {
+  border-color: color-mix(in srgb, var(--agent-accent) 60%, var(--agent-line));
+  color: var(--agent-text);
 }
 
 .agent-status-failed {

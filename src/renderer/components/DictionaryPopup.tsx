@@ -6,6 +6,8 @@ import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../tts';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { getZoomFactor } from '../appZoom';
 import { getStudyLang } from '../studyEnvironment';
+import { dictionaryAgentContext, handOffToAgent } from '../agentContextHandoff';
+import { useT } from '../i18n';
 import Icon from './Icons';
 
 interface Props {
@@ -37,6 +39,7 @@ export default function DictionaryPopup({
   rightInsetPx = 0,
   onClose,
 }: Props) {
+  const { t } = useT();
   const style: CSSProperties = useMemo(() => {
     // App zoom is on #root (see appZoom.ts). Selection / client coords are
     // visual; fixed layout uses pre-zoom CSS pixels — divide by zoom factor.
@@ -91,6 +94,17 @@ export default function DictionaryPopup({
     setLvl(n);
   };
 
+  /**
+   * The sentence the word came from is the useful part of the context, so it is
+   * the preview when there is one; the term alone is a poor prompt.
+   */
+  const askAgent = (): void => {
+    void handOffToAgent(
+      dictionaryAgentContext(query, context ?? ''),
+      t('agent.conversation.fromDictionary', { term: query }),
+    );
+  };
+
   const playPronunciation = () => {
     // Script-based routing (kana→ja, Cyrillic→ru, Latin→en); Han-only text
     // follows the active dictionary language so Chinese reads as Chinese.
@@ -120,6 +134,17 @@ export default function DictionaryPopup({
             <Icon name="volume" size={14} />
           </button>
         )}
+        {/* Hands this entry to the one Agent conversation as context, rather than
+            opening a second chat that would keep its own hidden history. */}
+        <button
+          type="button"
+          className="dict-agent"
+          title={t('dictionary.askAgent')}
+          aria-label={t('dictionary.askAgent')}
+          onClick={askAgent}
+        >
+          <Icon name="sparkle" size={14} />
+        </button>
         <button className="dict-x" onClick={onClose} aria-label="Close">
           ×
         </button>

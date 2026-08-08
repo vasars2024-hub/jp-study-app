@@ -16689,6 +16689,16 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border-radius: var(--radius-sm);
 }
 .dict-tts:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* "Ask the Agent" sits beside pronunciation and shares its quiet head-button look. */
+.dict-agent {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.dict-agent:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .reader-anno-swatches { display: flex; gap: 4px; align-items: center; margin-left: 4px; }
 .reader-anno-swatch {
   width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border);

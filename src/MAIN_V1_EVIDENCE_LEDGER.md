@@ -661,21 +661,111 @@ kept its exported names so the shared entry point needed no edit. The four i18n
 catalogs and the user-owned F16 reach-check hunk in
 `src/renderer/__tests__/mediaCenterIntegration.test.ts` remain unstaged.
 
+## The context shelf gets a producer
+
+The Agent's context pipeline was complete except for its first link. The type,
+`normalizeContext`, `evaluateAgentProviderPrivacy`, the prompt formatting in
+`main/agentProviderRouter.ts` and the read in `main/agentExecutionIpc.ts` all
+existed and were tested — but **no production code ever built an
+`AgentContextItem`**. Every conversation's `context` was permanently `[]`, the
+shell's disclosure always read "no context", and the model never received the
+word, passage or cue the user was looking at.
+
+Re-derived from source before acting: `conversation.context` is already
+main-owned, already persisted and already formatted into the prompt, so this
+slice added **no IPC channel at all**. It is a producer, a surface and a
+hand-off over the bridge that was already there.
+
+- `shared/agentContext.ts` builds normalized items. Two rules are encoded rather
+  than left to call sites: sensitivity has a **floor per kind** that a producer
+  may raise but never lower (otherwise a surface could mark a reading passage
+  `ordinary` and walk it past the cloud privacy boundary), and retention is
+  refused outright above `ordinary`.
+- The shelf is bounded at 12 and keyed by identity, so looking a word up twice
+  is one entry, not two.
+- `AgentWorkspaceShell` renders the actual items — kind, label, preview, source,
+  sensitivity and retention — with a per-item remove, instead of the three
+  counts it showed while nothing could produce an item.
+- `renderer/agentContextHandoff.ts` is the first producer: the Dictionary popup's
+  "Ask the Agent" attaches the entry and opens the Agent conversation. Track 3
+  requires that contextual AI buttons hand off to the *same* conversation rather
+  than keeping a hidden history, and this writes into the one main-owned
+  workspace.
+
+Automated evidence:
+
+- Full suite: `npx vitest run` → 458 files (457 passed, 1 skipped) and 6,027
+  tests (6,021 passed, 6 skipped), 0 failed. Against the previous checkpoint's
+  456 / 5,978 that is +2 files and +49 tests, which reconciles exactly:
+  `agentContext` 25 and `agentContextHandoff` 14 in new files, plus 10 added to
+  `agentShellModel`.
+- `node tools/i18n-check.cjs` → exit 0; 8,795 English keys translated, 17 added
+  per language by this slice.
+- `node tools/architecture-audit.cjs` → exit 0; 1,566 modules, 18 findings,
+  nothing new.
+- `npx eslint` over the eight slice-owned paths: exit 0.
+
+Two defects the live run caught that the tests could not, both fixed here:
+
+- **The store erased the hand-off it was supposed to deliver.**
+  `prepareAgentWorkspaceForPersistence` drops every context item that is not
+  `retained` — correct, since session-only material must not cross a restart —
+  but the hand-off's only route to the shell is a save *through* that filter. The
+  first live attempt persisted the conversation with `"context": []`. A
+  dictionary entry is reference data at the `ordinary` floor, so it is now
+  retained, which is both permitted by the builder and honest. Pinned by a
+  regression test that runs the item through the real store function.
+- **An already-open Agent never re-read.** The shell loads once on mount and the
+  workspace bridge has no change push, so handing off into an open Agent wrote
+  the context and the surface went on reporting "0 conversations" while the store
+  held one. Re-opening the route only focuses the window, so that could not be
+  the signal. A window event now announces the change and the shell reloads on it.
+
+Live Electron evidence — renderer-only slice, reload rather than rebuild:
+
+- With the Agent **already open against an empty store** — the exact failing
+  case — a hand-off attached and the shelf appeared without any further
+  navigation: 1 item reading "Dictionary · 食べる · Ordinary · Kept ·
+  昨日寿司を食べました。 · From dictionary", and the counts "Kept after restart
+  1 / This session only 0 / Marked sensitive 0". Zero raw `agent.context.*` key
+  leaks.
+- The item reached `<userData>/agent/workspace-v1.json` intact, with
+  `sensitivity: "ordinary"` and `retained: true`.
+- Remove carried the localized accessible name "Remove 食べる from context",
+  emptied the shelf to "No context is attached." and took the item out of the
+  main-owned file.
+- Residue: the workspace was cleared back to zero conversations; `localStorage`
+  is identical to the pre-run snapshot at 76 keys; the debug error ring reported
+  0 errors.
+
+Verification boundary: no provider request was made. The path from
+`conversation.context` into the prompt is main's, and was already covered by
+`agentProviderRouter` tests; this slice proved the link that was missing, which
+is producer → store → shell.
+
+Known boundary this slice creates, and it is the next thing to fix: because
+retention is refused above `ordinary`, and because the only route to the shell
+runs through a store that drops non-retained context, **personal and sensitive
+context cannot reach the shelf at all today**. A reading passage, a media cue or
+a text selection would be built correctly and then dropped by the save. Those
+producers need a session-only transport that does not pass through the persisted
+store. Second boundary: the announce is a window event, so an Agent **pop-out**
+(a separate BrowserWindow) still will not see a hand-off; that wants a
+main-owned `agentWorkspace:changed` broadcast of the kind the operational store
+already has.
+
 ## Exact next slice
 
-The Agent's product surface, now that its state is honest. The plan's Track 3
-asks for a context shelf showing what the agent can currently see; attachments;
-Ask/Navigate/Study/Analyze/Create/Automate modes as workflow presets; searchable
-history; interactive result cards; and contextual hand-off from Dictionary,
-Reading, Media and Flashcards into the same conversation. None of those exist
-yet. The load-bearing prerequisite — versioned main-owned persistence for both
-conversations and operational state — is now in place, so the next slice should
-take the smallest end-to-end vertical of that list rather than another storage
-move: a context shelf plus one real hand-off surface, with the shelf's contents
-derived from live app state rather than declared.
+Give session-only context a transport, then widen the producers. Concretely:
+add a main-owned `agentWorkspace:changed` broadcast (the operational store's
+pattern, already proven in this branch) so every window and the Agent pop-out
+see a hand-off; then carry non-retained context to the shell without writing it
+to disk, so `selected-text`, `reading-passage` and `media-cue` producers become
+possible. With that in place, add the Reading and Media hand-offs and the
+remaining Track 3 surface — modes as workflow presets, attachments, history
+search and interactive result cards.
 
-Two smaller items remain open from this slice: `localAgentProfilesStore` and
-`localAgentSettingsStore` are still renderer-owned `localStorage`, which is
-correct for now — they are per-window preferences with no main-side reader — but
-should move if main ever needs to evaluate a profile without a renderer.
+Still open and deliberately deferred: `localAgentProfilesStore` and
+`localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct
+while they are per-window preferences with no main-side reader.
 `codex/claude-agent-shell` stays reference-only.
