@@ -424,6 +424,49 @@
   border-color: color-mix(in srgb, var(--agent-accent) 35%, var(--agent-line));
 }
 
+/* The mode picker reads as the chip it replaced until it is used: same pill,
+   same muted weight, so the header does not gain a second heavy control beside
+   the title. It is a real `select`, so keyboard and screen-reader behaviour come
+   from the platform rather than from a re-implementation. */
+.agent-mode-picker {
+  display: inline-flex;
+  align-items: center;
+}
+
+.agent-mode-select {
+  appearance: none;
+  padding: 1px 7px;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+  font-size: var(--font-size-2xs, 0.6875rem);
+  font-family: inherit;
+  color: var(--agent-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.agent-mode-select:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--agent-accent) 35%, var(--agent-line));
+  color: var(--agent-text, inherit);
+}
+
+.agent-mode-select:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.agent-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Sensitivity is the one chip that carries a consequence — it decides whether a
    cloud provider may see the item — so it earns the accent, and only above
    `ordinary`. */

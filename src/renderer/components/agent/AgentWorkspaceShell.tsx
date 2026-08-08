@@ -10,9 +10,11 @@ import {
 import Icon from '../Icons';
 import { useT } from '../../i18n';
 import {
+  AGENT_WORKSPACE_MODES,
   emptyAgentWorkspaceState,
   type AgentConversation,
   type AgentMessage,
+  type AgentWorkspaceMode,
   type AgentWorkspaceState,
 } from '../../../shared/agentWorkspace';
 import type { AiProviderId } from '../../../shared/aiProviders';
@@ -43,6 +45,7 @@ import {
   agentSelectedConversation,
   agentShellPhase,
   agentWorkspaceWithContextDetached,
+  agentWorkspaceWithMode,
   agentWorkspaceWithNewConversation,
   agentWorkspaceWithPinToggled,
   agentWorkspaceWithSelection,
@@ -374,6 +377,18 @@ export default function AgentWorkspaceShell() {
     if (next) void run(() => saveAgentWorkspace(next));
   }, [run, state]);
 
+  /**
+   * A mode switch is a change to what the next request will say, so it goes
+   * through the same main-owned save as every other edit rather than living in
+   * component state — a pop-out showing a different preset than the one that
+   * will actually be sent would be worse than no picker at all.
+   */
+  const setMode = useCallback((mode: AgentWorkspaceMode) => {
+    if (!state || !selected) return;
+    const next = agentWorkspaceWithMode(state, selected.id, mode, Date.now());
+    if (next) void run(() => saveAgentWorkspace(next));
+  }, [run, selected, state]);
+
   const togglePin = useCallback((conversationId: string) => {
     if (!state) return;
     const next = agentWorkspaceWithPinToggled(state, conversationId, Date.now());
@@ -560,7 +575,25 @@ export default function AgentWorkspaceShell() {
               <header className="agent-conversation-head">
                 <div className="agent-conversation-identity">
                   <span className="agent-conversation-title">{selected.title}</span>
-                  <span className="agent-chip">{t(`agent.mode.${selected.mode}`)}</span>
+                  {/*
+                    A real control, not the chip it used to be: the mode shapes
+                    the next request's prompt, so it has to be changeable where
+                    the user can see what it currently is.
+                  */}
+                  <label className="agent-mode-picker">
+                    <span className="agent-visually-hidden">{t('agent.mode.label')}</span>
+                    <select
+                      className="agent-mode-select"
+                      value={selected.mode}
+                      disabled={blocked}
+                      title={t(`agent.mode.${selected.mode}.hint`)}
+                      onChange={(event) => setMode(event.currentTarget.value as AgentWorkspaceMode)}
+                    >
+                      {AGENT_WORKSPACE_MODES.map((mode) => (
+                        <option key={mode} value={mode}>{t(`agent.mode.${mode}`)}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 {pendingDeleteId === selected.id ? (
                   <div className="agent-conversation-actions">

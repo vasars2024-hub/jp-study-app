@@ -223,6 +223,35 @@ export function agentWorkspaceWithContextDetached(
   };
 }
 
+/**
+ * Switches a conversation's workflow preset.
+ *
+ * The mode was a display-only field for four slices: the type carried all six,
+ * the normalizer validated them and the shell rendered the chip, but nothing
+ * ever wrote one, so every conversation was `ask` forever. This is the write.
+ *
+ * `updatedAt` moves because the rail sorts on it and a mode switch is a real
+ * edit the user just made — the conversation should not stay buried under
+ * others it was more recently touched than.
+ */
+export function agentWorkspaceWithMode(
+  state: AgentWorkspaceState,
+  conversationId: string,
+  mode: AgentWorkspaceMode,
+  now: number,
+): AgentWorkspaceState | null {
+  const target = state.conversations.find((conversation) => conversation.id === conversationId);
+  if (!target || target.mode === mode) return null;
+  return {
+    ...state,
+    conversations: state.conversations.map((conversation) => (
+      conversation.id === conversationId
+        ? { ...conversation, mode, updatedAt: now }
+        : conversation
+    )),
+  };
+}
+
 export function agentWorkspaceWithPinToggled(
   state: AgentWorkspaceState,
   conversationId: string,

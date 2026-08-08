@@ -1,10 +1,14 @@
 // @vitest-environment node
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AgentContextItem, AgentProviderPolicy } from '../../shared/agentWorkspace';
+import {
+  AGENT_WORKSPACE_MODES,
+  type AgentContextItem,
+  type AgentProviderPolicy,
+} from '../../shared/agentWorkspace';
 import * as providerRuntime from '../providerRuntime';
 import * as translate from '../translate';
-import { runAgentProviderPrompt } from '../agentProviderRouter';
+import { agentModePreset, runAgentProviderPrompt } from '../agentProviderRouter';
 
 function policy(overrides: Partial<AgentProviderPolicy> = {}): AgentProviderPolicy {
   return {
@@ -168,5 +172,85 @@ describe('Agent provider router', () => {
 
     expect(cloud).not.toHaveBeenCalled();
     expect(local).not.toHaveBeenCalled();
+  });
+});
+
+describe('workflow-preset modes', () => {
+  it('sends an ask conversation exactly the bytes it sent before modes existed', async () => {
+    // `ask` is what every conversation normalizes to, so a preset here would be
+    // boilerplate on every request the app has ever sent — tokens on the cloud
+    // path, latency on the local one. Its absence is also what makes this slice
+    // unable to regress the default: these two must be byte-identical.
+    let withMode = '';
+    let without = '';
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (routed) => {
+      if (!withMode) withMode = routed; else without = routed;
+      return 'ok';
+    });
+
+    await runAgentProviderPrompt(policy(), 'Explain this.', { mode: 'ask', context: [context()] });
+    await runAgentProviderPrompt(policy(), 'Explain this.', { context: [context()] });
+    expect(withMode).toBe(without);
+  });
+
+  it('leads with the preset and keeps the context shelf trailing', async () => {
+    let routed = '';
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (prompt) => {
+      routed = prompt;
+      return 'ok';
+    });
+
+    await runAgentProviderPrompt(policy(), 'Where is it?', {
+      mode: 'navigate',
+      context: [context()],
+    });
+
+    // The preset frames how the rest is read, so it leads; the shelf is
+    // reference material for the question, so it still trails.
+    expect(routed.indexOf(agentModePreset('navigate'))).toBe(0);
+    expect(routed.indexOf('Where is it?'))
+      .toBeGreaterThan(routed.indexOf(agentModePreset('navigate')));
+    expect(routed.indexOf('Selected Study OS context:'))
+      .toBeGreaterThan(routed.indexOf('Where is it?'));
+  });
+
+  it('counts the preset in the disclosed input size and against the budget', async () => {
+    // A disclosure that excluded the preset would understate what was actually
+    // sent, and a budget check that skipped it could pass a request the provider
+    // then rejects.
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockResolvedValue('ok');
+    const result = await runAgentProviderPrompt(policy(), 'Draft it.', { mode: 'create' });
+    expect(result.provider.inputChars)
+      .toBe(`${agentModePreset('create')}\n\nDraft it.`.length);
+
+    const tight = policy({ maxInputChars: 'Draft it.'.length + 5 });
+    await expect(runAgentProviderPrompt(tight, 'Draft it.', { mode: 'create' }))
+      .rejects.toMatchObject({ code: 'input-budget' });
+    // ...and the same prompt without the preset still fits, so the refusal above
+    // is the preset's weight and not an unrelated budget change.
+    await expect(runAgentProviderPrompt(tight, 'Draft it.')).resolves.toMatchObject({ text: 'ok' });
+  });
+
+  it('never lets a preset claim a capability this path does not have', () => {
+    // This execution path runs one prompt and returns text: there is no tool
+    // loop, so the Agent cannot open a surface and cannot run an automation.
+    // `navigate` and `automate` are precisely the modes whose names imply
+    // otherwise, and Track 3 requires the Agent never claim an action completed
+    // when only a plan was produced. A preset that let the model narrate having
+    // opened something would be that claim, authored by us.
+    expect(agentModePreset('navigate')).toMatch(/cannot open/i);
+    expect(agentModePreset('automate')).toMatch(/cannot execute/i);
+    expect(agentModePreset('automate')).toMatch(/never report a step as done/i);
+  });
+
+  it('has a preset for every mode except ask, so a new mode cannot be forgotten', () => {
+    for (const mode of AGENT_WORKSPACE_MODES) {
+      if (mode === 'ask') expect(agentModePreset(mode)).toBe('');
+      else expect(agentModePreset(mode).length).toBeGreaterThan(0);
+    }
+    // An unknown mode degrades to no preset rather than throwing — the store
+    // normalizes to `ask`, but the router must not be the thing that breaks if
+    // it ever sees something else.
+    expect(agentModePreset(undefined)).toBe('');
   });
 });

@@ -8,7 +8,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_WORKSPACE_MODES,
   AGENT_WORKSPACE_SCHEMA_VERSION,
+  normalizeAgentWorkspaceState,
   type AgentConversation,
   type AgentWorkspaceState,
 } from '../../shared/agentWorkspace';
@@ -20,6 +22,7 @@ import {
   agentShellPhase,
   agentWorkspaceWithContextAttached,
   agentWorkspaceWithContextDetached,
+  agentWorkspaceWithMode,
   agentWorkspaceWithNewConversation,
   agentWorkspaceWithPinToggled,
   agentWorkspaceWithSelection,
@@ -157,6 +160,41 @@ describe('Agent workspace transforms', () => {
     const unpinned = pinned ? agentWorkspaceWithPinToggled(pinned, 'a', 901) : null;
     expect(unpinned?.conversations[0]).toMatchObject({ pinned: false, updatedAt: 901 });
     expect(agentWorkspaceWithPinToggled(state, 'missing', 900)).toBeNull();
+  });
+
+  it('switches the workflow preset, and reports no change when it is already set', () => {
+    // The mode was display-only for four slices: the type carried all six, the
+    // normalizer validated them and the shell drew the chip, but nothing ever
+    // wrote one, so every conversation was `ask` forever. This is the write.
+    const state = workspace([conversation({ id: 'a' }), conversation({ id: 'b' })]);
+
+    const switched = agentWorkspaceWithMode(state, 'a', 'analyze', 900);
+    expect(switched?.conversations[0]).toMatchObject({ mode: 'analyze', updatedAt: 900 });
+    // Only the named conversation moves — a mode is per-conversation, not a
+    // workspace-wide setting.
+    expect(switched?.conversations[1]).toMatchObject({ mode: 'ask', updatedAt: 0 });
+
+    // Re-selecting the same mode is not an edit, so the shell can skip the save
+    // rather than rewriting the workspace file on every change event a `select`
+    // fires.
+    expect(switched ? agentWorkspaceWithMode(switched, 'a', 'analyze', 901) : null).toBeNull();
+    expect(agentWorkspaceWithMode(state, 'missing', 'study', 900)).toBeNull();
+  });
+
+  it('offers every mode the normalizer accepts, in a stable order with ask first', () => {
+    // The picker renders from this list, the router keys its presets off it and
+    // the normalizer validates against it. A second hand-written list anywhere
+    // would be the thing that drifts, so the shared one is asserted here.
+    expect(AGENT_WORKSPACE_MODES[0]).toBe('ask');
+    expect([...AGENT_WORKSPACE_MODES].sort()).toEqual(
+      ['analyze', 'ask', 'automate', 'create', 'navigate', 'study'],
+    );
+    // Every one of them survives a round trip through the store's normalizer,
+    // or the picker would offer a mode that silently reverts to `ask` on save.
+    for (const mode of AGENT_WORKSPACE_MODES) {
+      const state = workspace([conversation({ id: 'a', mode })]);
+      expect(normalizeAgentWorkspaceState(state).conversations[0].mode).toBe(mode);
+    }
   });
 });
 

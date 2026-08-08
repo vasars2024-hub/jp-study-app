@@ -1218,6 +1218,72 @@ audit reporting nothing new for the `MediaStudyMode → agentContextHandoff` edg
 `eslint` exit 0 over the seven slice paths. Two keys per catalog in all four
 languages.
 
+## Modes stop being a chip and become workflow presets
+
+The mode had the same shape the context shelf had before it got a producer: the
+pipeline existed except its first link. `AgentWorkspaceMode` carried all six
+modes, `normalizeAgentWorkspaceState` validated them, the shell rendered
+`t('agent.mode.…')` as a chip and all four catalogs had the labels — but **nothing
+in the tree ever wrote `mode`**, so every conversation in the app was `ask`,
+permanently, and the chip reported a choice no one could make.
+
+Three changes make it real, and one deliberate omission keeps it honest:
+
+- **`AGENT_WORKSPACE_MODES`** is now an exported ordered list, and the private
+  `Set` the normalizer uses is built from it. The picker renders from it, the
+  router keys presets off it and the normalizer validates against it; a second
+  hand-written list would have been the thing that drifted. A test walks the list
+  and round-trips every mode through the normalizer, so the picker cannot offer a
+  mode that silently reverts to `ask` on save.
+- **`agentWorkspaceWithMode`** is the write, following the module's convention of
+  returning `null` when nothing would change — re-selecting the current mode is
+  not an edit, so a `select` firing `change` does not rewrite the workspace file.
+  It goes through the same main-owned save as every other change, so a pop-out
+  cannot show a different preset than the one that will actually be sent.
+- **`MODE_PRESETS` in `agentProviderRouter`** is what a mode *does*: one
+  instruction folded into the prompt ahead of the user's text, with the context
+  shelf still trailing. Not a second runtime, a second history or a different
+  provider — "lightweight workflow presets, not separate bots", as Track 3 puts
+  it. `inputChars` is measured after assembly, so the disclosure and the
+  input-budget check both count the preset rather than quietly excluding it.
+
+**`ask` deliberately has no preset**, and that is load-bearing twice over. It is
+the mode every conversation normalizes to, so a preset would be boilerplate on
+every request the app has ever sent — tokens on the cloud path, latency on the
+local one. It also means this slice **cannot regress the existing default**: a
+test asserts that an `ask` request and a request with no mode at all produce
+byte-identical prompts.
+
+**Two presets state a limit rather than a capability.** This execution path runs
+one prompt and returns text — there is no tool loop, so the Agent cannot open a
+surface and cannot run an automation. `navigate` and `automate` are exactly the
+modes whose names imply otherwise, so `navigate` says it cannot open surfaces and
+`automate` says it cannot execute the plan and must never report a step as done.
+Track 3 requires the Agent never claim an action completed when only a plan was
+generated; a preset that let the model narrate having opened something would be
+that claim, authored by us rather than by it. A test pins all three phrases.
+
+The preset strings are **not translated**, on purpose: they are instructions to a
+model, not app chrome, so they follow the same rule as study content in
+`CLAUDE.md`'s i18n scope section. The mode's *label* and its new one-line hint are
+chrome and are translated — seven keys per catalog, and the `automate` hint says
+in the user's own language that the Agent cannot run the plan.
+
+The wiring test is the one that matters most: `agentExecutionIpc` read
+`conversation.context` and nothing else, so a field added to the conversation
+reaches the provider only if that call site changes too — the identical shape of
+gap the independent review found in the change broadcast two slices ago. `mode` is
+now read from the same conversation snapshot as `context`, so the preset that
+shapes a request is the one the conversation carried when it was sent rather than
+whatever it is changed to while the provider runs. Verified to bite: dropping
+`mode` from the options object fails exactly one test, with
+`expected undefined to be 'analyze'`.
+
+Automated evidence: 459 files (458 passed, 1 skipped) and 6,075 tests (6,069
+passed, 6 skipped), 0 failed — **+8** against 6,067, reconciling with the 8 added
+(5 router, 2 shell model, 1 execution). `i18n-missing-key-check`, `i18n-check` and
+`architecture-audit` all exit 0; `eslint` exit 0 over the twelve slice paths.
+
 ## Exact next slice
 
 **The player call site, once the study-workspace block track lands.** The producer
@@ -1236,9 +1302,15 @@ the transport needs to change. Re-check `src/.coordination/study-mode/` first �
 cue they never receive. Recorded here rather than fixed — the two files that would
 change are the other track's.
 
-Then the remaining Track 3 surface: modes as workflow presets, attachments, history
-search and interactive result cards — and when cards get a producer, extend
-`retainedMessage`'s prune list first.
+Then the rest of the Track 3 surface, modes now being done: **attachments**,
+**history search**, and **interactive result cards** — and when cards get a
+producer, extend `retainedMessage`'s prune list first, since the file invariant
+rests on that list staying exhaustive the moment something writes one.
+
+A mode preset is also the natural place to *reduce* a claim later: if a tool loop
+is ever wired to this path, `navigate` and `automate` are the two presets whose
+"you cannot" sentences must be revisited in the same commit that grants the
+capability — they are currently true, and would become false silently.
 
 Still open and deliberately deferred: `localAgentProfilesStore` and
 `localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct

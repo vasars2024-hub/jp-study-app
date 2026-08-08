@@ -146,7 +146,25 @@ export interface AgentProviderPrivacyDecision {
   inputChars: number;
 }
 
-const MODES = new Set<AgentWorkspaceMode>(['ask', 'navigate', 'study', 'analyze', 'create', 'automate']);
+/**
+ * The modes, in the order a picker offers them, with `ask` first because it is
+ * the default every conversation normalizes to.
+ *
+ * Exported as an ordered list rather than left as a private `Set`: the shell's
+ * picker, the prompt presets in `main/agentProviderRouter.ts` and this
+ * normalizer must agree on exactly six modes, and a second hand-written list
+ * would be the thing that silently drifts.
+ */
+export const AGENT_WORKSPACE_MODES: readonly AgentWorkspaceMode[] = [
+  'ask',
+  'navigate',
+  'study',
+  'analyze',
+  'create',
+  'automate',
+];
+
+const MODES = new Set<AgentWorkspaceMode>(AGENT_WORKSPACE_MODES);
 const ROLES = new Set<AgentMessageRole>(['user', 'assistant', 'tool', 'system']);
 const STATUSES = new Set<AgentMessageStatus>(['pending', 'streaming', 'complete', 'failed', 'cancelled']);
 const SENSITIVITIES = new Set<AgentSensitivity>(['ordinary', 'personal', 'sensitive']);

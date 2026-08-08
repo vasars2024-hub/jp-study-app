@@ -190,6 +190,42 @@ describe('Agent execution IPC', () => {
     expect(last.conversations[0].messages.some((m) => m.status === 'failed')).toBe(true);
   });
 
+  it('hands the conversation’s own mode to the provider, not a default', async () => {
+    // The same shape of gap an independent review found in the broadcast: this
+    // handler read `conversation.context` and nothing else, so a field added to
+    // the conversation reaches the provider only if this call site is changed
+    // too. A mode that never left the store would leave the picker looking
+    // effective while every request went out as `ask`.
+    const state = workspace();
+    state.conversations[0].mode = 'analyze';
+    store.write(state);
+
+    let seen: string | undefined = 'unset';
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async (_policy, _prompt, options) => {
+        seen = options.mode;
+        return {
+          text: 'done',
+          delivery: 'buffered' as const,
+          usage: {},
+          provider: {
+            target: { kind: 'local' as const, backend: 'local-qwen' as const },
+            cloud: false,
+            contextIds: [],
+            attachmentIds: [],
+            inputChars: 4,
+            startedAt: 1,
+            completedAt: 2,
+          },
+        };
+      },
+    });
+
+    await invoke(AGENT_EXECUTION_CHANNELS.run, request());
+    expect(seen).toBe('analyze');
+  });
+
   it('streams through the requesting renderer and commits both messages', async () => {
     registerAgentExecutionIpc({
       resolveStore: () => store,
