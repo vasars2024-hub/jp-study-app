@@ -25,6 +25,14 @@ import {
   type JitenSourceProfile,
   type JitenStore,
 } from '../shared/jiten';
+import {
+  clearSecret as clearVaultSecret,
+  readSecret as readVaultSecret,
+  writeSecret as writeVaultSecret,
+} from './credentials/vault';
+
+/** This module's id in `shared/credentialRegistry.ts`. */
+const JITEN_CREDENTIAL_ID = 'jiten';
 
 const MAX_EPUB_BYTES = 100 * 1024 * 1024;
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
@@ -46,37 +54,93 @@ function atomicWrite(file: string, data: string): void {
   fs.renameSync(tmp, file);
 }
 
+/**
+ * Moves a plaintext `apiKey` out of `jiten.json` and into the credentials vault.
+ *
+ * This key was the app's one secret stored in readable JSON
+ * (PROFESSIONAL_DICTIONARY_PLAN.md §0.1). It now lives in
+ * `main/credentials/vault.ts`; this runs the one-way move the first time an old
+ * store is read, and is a no-op on every read after that.
+ *
+ * Two deliberate details:
+ *
+ *   - **The plaintext is removed only once the vault write succeeded.** The
+ *     vault refuses to store anything on a machine whose OS cannot encrypt, and
+ *     deleting the key after a refusal would destroy it with nowhere to put it.
+ *     On such a machine the file is left exactly as it was and the app keeps
+ *     working as before — no worse than today, and no silent data loss.
+ *   - **The field is stripped, not the file, and nothing else is touched.**
+ *     `jiten.json` also carries the user's source profiles and reading plan.
+ *     Unlinking it would take those with it, and re-normalizing them through
+ *     `sanitizePlanEntries` on a *read* would drop any entry that fails
+ *     validation earlier than the app otherwise would. So the rest of the
+ *     document is written back exactly as it was found: this migration removes
+ *     one field and has no other opinion.
+ *
+ * @returns the key to use for this session regardless of the outcome.
+ */
+function migrateLegacyApiKey(raw: Partial<JitenStore>, legacy: string): string {
+  if (!legacy) return '';
+  if (!writeVaultSecret(JITEN_CREDENTIAL_ID, 'apiKey', legacy).ok) return legacy;
+  const config = { ...(raw.config ?? {}) } as Partial<JitenStore['config']>;
+  delete config.apiKey;
+  try {
+    atomicWrite(storePath(), JSON.stringify({ ...raw, config }, null, 2));
+  } catch {
+    // The vault holds the key now. A failed rewrite leaves a stale plaintext
+    // copy that the next successful read strips, so this is not worth throwing
+    // over — but it must not report success either.
+  }
+  return legacy;
+}
+
 function readStore(): JitenStore {
+  const empty = createEmptyJitenStore();
   try {
     const file = storePath();
-    if (!fs.existsSync(file)) return createEmptyJitenStore();
-    const raw = JSON.parse(fs.readFileSync(file, 'utf-8')) as Partial<JitenStore>;
+    const raw: Partial<JitenStore> = fs.existsSync(file)
+      ? (JSON.parse(fs.readFileSync(file, 'utf-8')) as Partial<JitenStore>)
+      : {};
+    const legacy = typeof raw.config?.apiKey === 'string' ? raw.config.apiKey.trim() : '';
+    // Vault first: after migration it is the only copy that exists.
+    const apiKey = readVaultSecret(JITEN_CREDENTIAL_ID) || migrateLegacyApiKey(raw, legacy);
     return {
       config: {
         apiBaseUrl: normalizeJitenApiBase(raw.config?.apiBaseUrl),
-        apiKey: typeof raw.config?.apiKey === 'string' && raw.config.apiKey.trim()
-          ? raw.config.apiKey.trim()
-          : undefined,
+        apiKey: apiKey || undefined,
       },
       sourceProfiles: sanitizeSourceProfiles(raw.sourceProfiles),
       plan: sanitizePlanEntries(raw.plan),
     };
   } catch {
-    return createEmptyJitenStore();
+    return empty;
   }
 }
 
+/**
+ * Persists everything except the key — that is the vault's job now, and writing
+ * it here is what made the file a plaintext secret store in the first place.
+ */
 function writeStore(store: JitenStore): JitenStore {
   const safe: JitenStore = {
-    config: {
-      apiBaseUrl: normalizeJitenApiBase(store.config.apiBaseUrl),
-      apiKey: store.config.apiKey?.trim() || undefined,
-    },
+    config: { apiBaseUrl: normalizeJitenApiBase(store.config.apiBaseUrl) },
     sourceProfiles: sanitizeSourceProfiles(store.sourceProfiles),
     plan: sanitizePlanEntries(store.plan),
   };
   atomicWrite(storePath(), JSON.stringify(safe, null, 2));
-  return safe;
+  // Returned in memory so the caller's next request can still authenticate;
+  // `forRenderer` strips it again at the IPC boundary.
+  const apiKey = readVaultSecret(JITEN_CREDENTIAL_ID);
+  return { ...safe, config: { ...safe.config, apiKey: apiKey || undefined } };
+}
+
+/**
+ * What the renderer is allowed to see. The key is never part of it — the
+ * settings page learns only whether one is configured, from the vault's own
+ * status channel.
+ */
+function forRenderer(store: JitenStore): JitenStore {
+  return { ...store, config: { apiBaseUrl: store.config.apiBaseUrl } };
 }
 
 function isHttpUrl(url: string): boolean {
@@ -374,19 +438,32 @@ function planFromDeck(deck: JitenDeck): JitenPlanEntry {
 }
 
 export function registerJitenIpc(): void {
-  ipcMain.handle('jiten:getStore', () => readStore());
-  ipcMain.handle('jiten:updateConfig', (_event, patch: Partial<JitenConfig>) => {
-    const store = readStore();
-    store.config = {
-      apiBaseUrl: normalizeJitenApiBase(patch.apiBaseUrl ?? store.config.apiBaseUrl),
-      apiKey: patch.apiKey !== undefined ? patch.apiKey?.trim() || undefined : store.config.apiKey,
-    };
-    return writeStore(store);
-  });
+  ipcMain.handle('jiten:getStore', () => forRenderer(readStore()));
+  /**
+   * `apiKey` semantics changed with the vault, because the renderer can no
+   * longer read the key back to re-send it:
+   *
+   *   omitted / ''  → leave the stored key alone (what the Novels panel sends
+   *                   after a refresh, which previously wiped the key)
+   *   a string      → store it
+   *   null          → remove it
+   */
+  ipcMain.handle(
+    'jiten:updateConfig',
+    (_event, patch: Partial<JitenConfig> & { apiKey?: string | null }) => {
+      const store = readStore();
+      if (patch.apiKey === null) clearVaultSecret(JITEN_CREDENTIAL_ID);
+      else if (typeof patch.apiKey === 'string' && patch.apiKey.trim()) {
+        writeVaultSecret(JITEN_CREDENTIAL_ID, 'apiKey', patch.apiKey.trim());
+      }
+      store.config = { apiBaseUrl: normalizeJitenApiBase(patch.apiBaseUrl ?? store.config.apiBaseUrl) };
+      return forRenderer(writeStore(store));
+    },
+  );
   ipcMain.handle('jiten:setSourceProfiles', (_event, profiles: JitenSourceProfile[]) => {
     const store = readStore();
     store.sourceProfiles = sanitizeSourceProfiles(profiles);
-    return writeStore(store);
+    return forRenderer(writeStore(store));
   });
   ipcMain.handle('jiten:searchDecks', (_event, req: JitenSearchRequest) => searchDecks(req ?? {}));
   ipcMain.handle('jiten:getDeckDetail', (_event, deckId: number) => getDeckDetail(Number(deckId)));
@@ -395,10 +472,15 @@ export function registerJitenIpc(): void {
     const deck = sanitizeJitenDeck(raw);
     return deck ? planFromDeck(deck) : null;
   });
-  ipcMain.handle('jiten:upsertPlan', (_event, entry: JitenPlanEntry) => upsertPlan(entry));
-  ipcMain.handle('jiten:updatePlan', (_event, id: string, patch: Partial<JitenPlanEntry>) => updatePlanPatch(id, patch));
-  ipcMain.handle('jiten:removePlan', (_event, id: string) => removePlan(id));
-  ipcMain.handle('jiten:importDirectEpub', (_event, input: JitenImportDirectRequest) => importDirectEpub(input));
+  ipcMain.handle('jiten:upsertPlan', (_event, entry: JitenPlanEntry) => forRenderer(upsertPlan(entry)));
+  ipcMain.handle('jiten:updatePlan', (_event, id: string, patch: Partial<JitenPlanEntry>) =>
+    forRenderer(updatePlanPatch(id, patch)),
+  );
+  ipcMain.handle('jiten:removePlan', (_event, id: string) => forRenderer(removePlan(id)));
+  ipcMain.handle('jiten:importDirectEpub', async (_event, input: JitenImportDirectRequest) => {
+    const result = await importDirectEpub(input);
+    return result.store ? { ...result, store: forRenderer(result.store) } : result;
+  });
   ipcMain.handle('jiten:downloadDeck', (_event, deckId: number, options?: Partial<JitenDeckDownloadOptions>) =>
     downloadDeck(Number(deckId), options),
   );

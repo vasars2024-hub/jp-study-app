@@ -14,11 +14,15 @@
  *     user's exact release.
  */
 
-import { app, net, safeStorage } from 'electron';
+import { net } from 'electron';
 import path from 'node:path';
-import fs from 'node:fs';
 import type { SubtitleRecordFormat } from '../shared/subtitleRecord';
 import type { SubtitleProviderExecutionId } from '../shared/subtitleDiscoveryIpc';
+import {
+  readSubtitleProviderSecret,
+  writeSubtitleProviderSecret,
+} from './credentials/subtitles';
+import { recordTestResult } from './credentials/vault';
 
 const USER_AGENT = 'jp-study-app v1';
 const TIMEOUT_MS = 20_000;
@@ -27,65 +31,16 @@ const TIMEOUT_MS = 20_000;
 // Credentials
 // ---------------------------------------------------------------------------
 
-type KeyStore = Partial<Record<'jimaku' | 'opensubtitles', string>>;
-
-function keyStorePath(): string {
-  return path.join(app.getPath('userData'), 'subtitle-keys.json');
-}
-
-function readKeyStore(): KeyStore {
-  try {
-    const raw = JSON.parse(fs.readFileSync(keyStorePath(), 'utf-8')) as Record<string, string>;
-    const out: KeyStore = {};
-    for (const id of ['jimaku', 'opensubtitles'] as const) {
-      const stored = raw[id];
-      if (typeof stored !== 'string' || !stored) continue;
-      try {
-        // Values are base64 ciphertext. A store written before encryption was
-        // available (or on a machine where it is not) round-trips as plain text.
-        out[id] = safeStorage.isEncryptionAvailable()
-          ? safeStorage.decryptString(Buffer.from(stored, 'base64'))
-          : stored;
-      } catch {
-        // A key we cannot decrypt (different machine, rotated OS credentials) is
-        // treated as absent rather than as a corrupt-file error.
-      }
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-function writeKeyStore(store: KeyStore): void {
-  const encoded: Record<string, string> = {};
-  for (const [id, value] of Object.entries(store)) {
-    if (!value) continue;
-    encoded[id] = safeStorage.isEncryptionAvailable()
-      ? safeStorage.encryptString(value).toString('base64')
-      : value;
-  }
-  try {
-    fs.writeFileSync(keyStorePath(), JSON.stringify(encoded), { encoding: 'utf-8', mode: 0o600 });
-  } catch {
-    /* an unwritable key store means the user re-enters the key next session */
-  }
-}
-
 export function setSubtitleProviderKey(id: 'jimaku' | 'opensubtitles', key: string): void {
-  const store = readKeyStore();
-  const trimmed = key.trim();
-  if (trimmed) store[id] = trimmed;
-  else delete store[id];
-  writeKeyStore(store);
+  writeSubtitleProviderSecret(id, key);
 }
 
 export function hasSubtitleProviderKey(id: 'jimaku' | 'opensubtitles'): boolean {
-  return Boolean(readKeyStore()[id]);
+  return Boolean(readSubtitleProviderSecret(id));
 }
 
 function keyFor(id: 'jimaku' | 'opensubtitles'): string | null {
-  return readKeyStore()[id] ?? null;
+  return readSubtitleProviderSecret(id) || null;
 }
 
 // ---------------------------------------------------------------------------
@@ -417,19 +372,28 @@ export async function fetchSubtitleCandidate(candidate: ProviderSubtitleCandidat
 
 /** Cheap reachability + credential check for the settings panel. */
 export async function testSubtitleProvider(id: 'jimaku' | 'opensubtitles'): Promise<{ ok: boolean; detail?: string }> {
-  if (!keyFor(id)) return { ok: false, detail: 'no-key' };
+  if (!keyFor(id)) {
+    recordTestResult(id, false, 'no-key');
+    return { ok: false, detail: 'no-key' };
+  }
   try {
+    let result: { ok: boolean; detail?: string };
     if (id === 'jimaku') {
       const entries = await requestJson<JimakuEntry[]>(`${JIMAKU}/entries/search?query=one%20piece`, {
         headers: { Authorization: keyFor(id) as string },
       });
-      return entries === null ? { ok: false, detail: 'unreachable' } : { ok: true };
+      result = entries === null ? { ok: false, detail: 'unreachable' } : { ok: true };
+    } else {
+      const info = await requestJson<{ data?: unknown }>(`${OPENSUBTITLES}/infos/user`, {
+        headers: { 'Api-Key': keyFor(id) as string },
+      });
+      result = info === null ? { ok: false, detail: 'unreachable' } : { ok: true };
     }
-    const info = await requestJson<{ data?: unknown }>(`${OPENSUBTITLES}/infos/user`, {
-      headers: { 'Api-Key': keyFor(id) as string },
-    });
-    return info === null ? { ok: false, detail: 'unreachable' } : { ok: true };
+    recordTestResult(id, result.ok, result.detail ?? '');
+    return result;
   } catch (error) {
-    return { ok: false, detail: error instanceof Error ? error.message : 'error' };
+    const detail = error instanceof Error ? error.message : 'error';
+    recordTestResult(id, false, detail);
+    return { ok: false, detail };
   }
 }

@@ -10,8 +10,14 @@
 // this user on this machine. When the OS cannot provide encryption the secret
 // is refused rather than written in the clear — a scraper is not worth leaking
 // a torrent client's password over.
+//
+// **That refusal policy now lives in `main/credentials/vault.ts`** and is shared
+// with the app-wide vault rather than implemented twice. Only the policy moved:
+// this store keeps its own file (`<scraperRoot>/credentials.json`) and its own
+// `{ secrets: { ref: b64 } }` shape, because scraper refs are per-connection
+// names chosen by the user, not the fixed registry ids the app vault keys on.
 
-import { safeStorage } from 'electron';
+import { openSecret, sealSecret } from '../credentials/vault';
 import { readScraperJson, writeScraperJson } from './store';
 import { scraperLog } from './logBus';
 
@@ -31,14 +37,6 @@ export interface CredentialWriteResult {
   message: string;
 }
 
-function encryptionAvailable(): boolean {
-  try {
-    return safeStorage.isEncryptionAvailable();
-  } catch {
-    return false;
-  }
-}
-
 /** Stores a secret and returns the reference to keep in settings. */
 export async function setScraperSecret(
   ref: string,
@@ -50,7 +48,10 @@ export async function setScraperSecret(
     await clearScraperSecret(key);
     return { ok: true, ref: '', message: 'Credential removed.' };
   }
-  if (!encryptionAvailable()) {
+  // `sealSecret` returns null for both "the OS says it cannot encrypt" and
+  // "encryption threw"; either way the secret is refused, not downgraded.
+  const sealed = sealSecret(secret);
+  if (sealed === null) {
     scraperLog('error', 'credentials', 'OS encryption is unavailable; refused to store a secret.');
     return {
       ok: false,
@@ -59,7 +60,7 @@ export async function setScraperSecret(
     };
   }
   const file = await readScraperJson<CredentialFile>(CREDENTIALS_FILE, EMPTY);
-  const secrets = { ...file.secrets, [key]: safeStorage.encryptString(secret).toString('base64') };
+  const secrets = { ...file.secrets, [key]: sealed };
   await writeScraperJson(CREDENTIALS_FILE, { secrets });
   scraperLog('info', 'credentials', `Stored a secret for "${key}".`);
   return { ok: true, ref: key, message: 'Stored in OS-protected storage.' };
@@ -72,15 +73,14 @@ export async function getScraperSecret(ref: string): Promise<string> {
   const file = await readScraperJson<CredentialFile>(CREDENTIALS_FILE, EMPTY);
   const stored = file.secrets[key];
   if (!stored) return '';
-  try {
-    return safeStorage.decryptString(Buffer.from(stored, 'base64'));
-  } catch {
+  const plain = openSecret(stored);
+  if (!plain) {
     // A secret encrypted by a different user or machine cannot be read here.
     // Treating that as "no secret" produces an "unauthorized" result the user
     // can act on, rather than a crash.
     scraperLog('warn', 'credentials', `Could not decrypt the secret for "${key}".`);
-    return '';
   }
+  return plain;
 }
 
 export async function hasScraperSecret(ref: string): Promise<boolean> {

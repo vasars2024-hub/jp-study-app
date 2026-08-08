@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, BrowserWindow, safeStorage } from 'electron';
+import { app, dialog, ipcMain, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
@@ -81,6 +81,7 @@ import {
   getMainJapaneseTokenizer,
   type MainKuromojiToken as KuromojiToken,
 } from './japaneseTokenizer';
+import { readAiProviderSecret, writeAiProviderSecret } from './credentials/ai';
 
 interface FrequencyDictionaryFile {
   summary: FrequencyDictionarySummary;
@@ -106,101 +107,16 @@ function languageOptionsFromRaw(raw?: Partial<MiningConfigFile>): AiLanguageOpti
   });
 }
 
-// AI provider keys were previously stored as plain JSON strings in
-// api-keys.json (PHASE_6_5_AUDIT.md §3/§8, Medium finding). They're now
-// encrypted at rest via Electron's safeStorage (OS keychain/DPAPI-backed)
-// when available. `_encrypted: true` marks a store written in the new
-// format; a store without that flag is legacy plaintext and gets
-// transparently migrated (re-encrypted and rewritten) on first read.
-interface ApiKeyStoreFile {
-  gemini?: string;
-  deepseek?: string;
-  _encrypted?: boolean;
-}
-
-let warnedNoEncryption = false;
-
-function encryptApiKeyValue(value: string): string {
-  if (!value) return '';
-  if (!safeStorage.isEncryptionAvailable()) {
-    if (!warnedNoEncryption) {
-      console.warn(
-        '[mining] OS-level encryption unavailable (safeStorage) — API keys will be stored in plaintext.',
-      );
-      warnedNoEncryption = true;
-    }
-    return value;
-  }
-  return safeStorage.encryptString(value).toString('base64');
-}
-
-function decryptApiKeyValue(stored: string, encrypted: boolean): string {
-  if (!stored) return '';
-  if (!encrypted) return stored.trim();
-  try {
-    return safeStorage.decryptString(Buffer.from(stored, 'base64')).trim();
-  } catch {
-    // OS keychain unavailable or key was encrypted on a different machine/user —
-    // fail closed (no key) rather than crash the mining/translate-analysis flow.
-    return '';
-  }
-}
-
-function readApiKeyStore(): Record<AiProviderKeyBucket, string> {
-  ensureMiningRoot();
-  const storePath = path.join(miningRoot(), 'api-keys.json');
-  let raw: ApiKeyStoreFile = {};
-  try {
-    raw = JSON.parse(fs.readFileSync(storePath, 'utf-8')) as ApiKeyStoreFile;
-  } catch {
-    raw = {};
-  }
-  const wasEncrypted = raw._encrypted === true;
-  let gemini = decryptApiKeyValue(typeof raw.gemini === 'string' ? raw.gemini : '', wasEncrypted);
-  const deepseek = decryptApiKeyValue(typeof raw.deepseek === 'string' ? raw.deepseek : '', wasEncrypted);
-
-  const legacyGemini = readLegacyGeminiApiKey();
-  if (legacyGemini && !gemini) gemini = legacyGemini;
-
-  // Migrate: legacy plaintext store (or one that just picked up the legacy
-  // .txt mirror) gets rewritten in encrypted form immediately.
-  if (!wasEncrypted && (gemini || deepseek)) {
-    writeApiKeyStore({ gemini, deepseek });
-  }
-
-  return { gemini, deepseek };
-}
-
-function writeApiKeyStore(store: Record<AiProviderKeyBucket, string>): void {
-  ensureMiningRoot();
-  const encryptedAvailable = safeStorage.isEncryptionAvailable();
-  const payload: ApiKeyStoreFile = {
-    gemini: encryptApiKeyValue(store.gemini ?? ''),
-    deepseek: encryptApiKeyValue(store.deepseek ?? ''),
-    _encrypted: encryptedAvailable,
-  };
-  atomicWrite(path.join(miningRoot(), 'api-keys.json'), JSON.stringify(payload, null, 2));
-}
-
-function readLegacyGeminiApiKey(): string {
-  try {
-    return fs.readFileSync(path.join(miningRoot(), 'gemini-api-key.txt'), 'utf-8').trim();
-  } catch {
-    return '';
-  }
-}
-
 function readApiKeysSet(): AiApiKeysSet {
-  const store = readApiKeyStore();
   return {
-    gemini: Boolean(store.gemini),
-    deepseek: Boolean(store.deepseek),
+    gemini: Boolean(readAiProviderSecret('gemini')),
+    deepseek: Boolean(readAiProviderSecret('deepseek')),
   };
 }
 
 function readApiKeyForProvider(providerId: AiProviderId): string {
   const bucket = providerKeyBucket(providerId);
-  return readApiKeyStore()[bucket];
+  return readAiProviderSecret(bucket);
 }
 
 function normalizeApiKeyString(value: unknown): string {
@@ -224,23 +140,9 @@ function parseApiKeyPayload(raw: unknown): { bucket: AiProviderKeyBucket; apiKey
   return { bucket: 'gemini', apiKey: '' };
 }
 
-function setApiKeyForBucket(bucket: AiProviderKeyBucket, value: unknown): void {
+function setApiKeyForBucket(bucket: AiProviderKeyBucket, value: unknown) {
   const apiKey = normalizeApiKeyString(value);
-  const store = readApiKeyStore();
-  store[bucket] = apiKey;
-  writeApiKeyStore(store);
-  if (bucket === 'gemini') {
-    // api-keys.json (encrypted) is now the sole source of truth — remove the
-    // legacy plaintext mirror instead of keeping it in sync (it previously
-    // held the same secret in plaintext, defeating the point of encrypting
-    // the primary store). readLegacyGeminiApiKey() still exists for one-way
-    // migration from installs that only ever wrote this file.
-    try {
-      fs.unlinkSync(path.join(miningRoot(), 'gemini-api-key.txt'));
-    } catch {
-      /* ignore — file may not exist */
-    }
-  }
+  return writeAiProviderSecret(bucket, apiKey);
 }
 
 function providerIdFromRaw(raw: string | undefined): AiProviderId {
@@ -1899,7 +1801,15 @@ export function registerMiningIpc(): void {
           apiKeySet: false,
         };
       }
-      setApiKeyForBucket(bucket, apiKey);
+      const stored = setApiKeyForBucket(bucket, apiKey);
+      if (!stored.ok) {
+        return {
+          ok: false,
+          error: stored.messageKey,
+          apiKeysSet: readApiKeysSet(),
+          apiKeySet: false,
+        };
+      }
       const apiKeysSet = readApiKeysSet();
       const config = readMiningConfig();
       return {
