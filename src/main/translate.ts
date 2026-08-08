@@ -466,7 +466,12 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
  */
 export async function runLocalQwenPrompt(
   prompt: string,
-  options?: { maxTokens?: number; timeoutMs?: number },
+  options?: {
+    maxTokens?: number;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    onTextChunk?: (text: string) => void;
+  },
 ): Promise<string> {
   if (!isTranslateAvailable()) {
     throw new Error(friendlyError(new Error('Qwen3 model not found')));
@@ -478,21 +483,34 @@ export async function runLocalQwenPrompt(
     // Independent of EPUB batch cancel — analysis/enrichment must not abort mid-flight
     // just because a translation batch was cancelled elsewhere.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let timedOut = false;
+    const abort = () => controller.abort(options?.signal?.reason);
+    if (options?.signal?.aborted) {
+      resetSessionHistory(s);
+      throw new Error('Local Qwen request was cancelled.');
+    }
+    options?.signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       const raw = await s.prompt(prompt, {
         maxTokens,
         signal: controller.signal,
         stopOnAbortSignal: true,
+        onTextChunk: options?.onTextChunk,
       });
       return extractJsonish(cleanLlmOutput(raw));
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
+        if (!timedOut) throw new Error('Local Qwen request was cancelled.');
         throw new Error(`Local Qwen timed out after ${Math.round(timeoutMs / 1000)}s.`);
       }
       throw err instanceof Error ? new Error(friendlyError(err)) : err;
     } finally {
       clearTimeout(timer);
+      options?.signal?.removeEventListener('abort', abort);
       resetSessionHistory(s);
     }
   });

@@ -19,6 +19,8 @@ export type AiProviderErrorCode =
   | 'timeout'
   | 'missing-credential'
   | 'persistent-cache-unavailable'
+  | 'cloud-disabled'
+  | 'sensitive-context'
   | 'input-budget'
   | 'cost-budget'
   | 'authentication'

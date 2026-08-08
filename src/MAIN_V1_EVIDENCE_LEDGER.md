@@ -23,7 +23,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 | Gemini / DeepSeek credentials | Broken security policy: separate store could downgrade to plaintext | Clean-at-HEAD `src/main/mining.ts` explicitly wrote plaintext when `safeStorage` was unavailable | Completed in first slice; provider health/client unification remains |
 | Jimaku / OpenSubtitles credentials | Broken security policy: separate unmarked store could downgrade to plaintext | Clean-at-HEAD `src/main/subtitleProviderClients.ts` | Completed in first slice; retain provider-specific Test calls backed by shared status metadata |
 | Professional Lexicon core | SQLite/FTS adoption and Workbench compatibility foundation integrated | Canonical lookup now bridges into the existing `DictResult` surface with legacy fallback and pitch/frequency preservation; route aliases and input-scale contracts exist, while Dictionary and Translate remain separate UI routes | Adopt the contracts in a first-class Workbench shell after dirty route ownership is reconciled |
-| Central AI Agent | Provider runtime and atomic main-owned workspace store foundations complete; first-class app genuinely missing | Typed tools/runtime and shared contracts now have one cloud boundary plus retention-aware disk persistence, but shell/bridge handlers remain absent and the old queue/memory implementations remain renderer-owned | Complete local/stream adapters, then wire store IPC only with the first consuming Agent shell |
+| Central AI Agent | Cloud/local provider routing and atomic main-owned workspace store foundations complete; first-class app genuinely missing | Privacy-gated cloud execution, actual local-Qwen chunk streaming, explicit no-key fallback and retention-aware disk persistence exist, but shell/bridge handlers remain absent and the old queue/memory implementations remain renderer-owned | Add true cloud streaming, then wire store IPC only with the first consuming Agent shell |
 | Unified Reading workspace | Versioned route/library/handoff foundation integrated; UI remains partial and collision-prone | Reading Finder and Novels still render separately, but now share a bounded contract for aliases, deep links, work/edition/source/cover/progress cards and reader handoffs | Reconcile dirty Finder/Novels ownership before building the single shell |
 | ReadingLens Capture and Read | Partial | Main capture service, overlay, settings and tests exist; source still presents an overlay rather than the complete three-depth workflow | Defer until Lexicon + Reading contracts exist |
 | Media shell / Liquid | Main-tree Media shell repair reviewed and integrated; Liquid remains deliberately unverified | Player, Video and Music now route through the shared shell while local library, global search, discovery and explicit Seanime handoff remain reachable | Keep Liquid verification serialized and separate from the completed shell repair |
@@ -254,6 +254,28 @@ Automated evidence:
 - Targeted ESLint and `git diff --check`: pass.
 - No Electron verification was performed because this contract slice creates no new rendered shell; visual acceptance remains pending with UI adoption.
 
+## Slice 7 — honest Agent cloud/local routing and local streaming
+
+Behavior now established:
+
+- One Agent provider router applies the shared privacy decision before either local or cloud execution receives a prompt.
+- Explicit local policies run through the installed Qwen runtime with timeout, external cancellation and real `onTextChunk` delivery.
+- A missing cloud credential can fall back to local Qwen only when the caller explicitly enables fallback. Authentication, budget, privacy, persistent-cache and upstream failures never silently switch providers.
+- Every result discloses the target that actually received the prompt, selected context/attachment ids, timing, cloud/local status and provider-reported cost when available.
+- Cloud responses remain honestly labeled `buffered`; this slice does not pretend that lifecycle events are token streaming.
+
+Automated evidence:
+
+- Focused provider router/runtime, translation guard, Agent policy and architecture suites: 5 files / 30 tests passed.
+- Full accumulated suite: 442 files passed / 1 skipped; 5,839 tests passed / 6 skipped.
+- Targeted ESLint: no errors; one unrelated existing non-null warning remains in `translate.ts`.
+- Repository-wide TypeScript remains red on the recorded baseline; no diagnostic references a changed Agent-provider path.
+
+Remaining boundary:
+
+- Gemini/DeepSeek token streaming still needs provider-specific stream parsers and cancellation tests before the Agent UI may offer a cloud streaming toggle.
+- Local streamed chunks are runtime output; the final returned text still passes through the existing Qwen cleanup boundary.
+
 ## Exact next slice
 
-Finish the provider adapters with honest local-Qwen selection and token streaming, then wire the versioned store and first consuming Agent shell together with typed bridge methods. Persistent response caching remains refused until encrypted retention is designed. Do not add bridge channels without their consumers.
+Add true Gemini/DeepSeek token streaming, then wire the versioned store and first consuming Agent shell together with typed bridge methods. Persistent response caching remains refused until encrypted retention is designed. Do not add bridge channels without their consumers.
