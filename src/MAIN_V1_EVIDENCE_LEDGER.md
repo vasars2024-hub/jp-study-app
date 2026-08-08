@@ -23,7 +23,7 @@ Last updated: 2026-08-08. This ledger is source-derived and intentionally compac
 | Gemini / DeepSeek credentials | Broken security policy: separate store could downgrade to plaintext | Clean-at-HEAD `src/main/mining.ts` explicitly wrote plaintext when `safeStorage` was unavailable | Completed in first slice; provider health/client unification remains |
 | Jimaku / OpenSubtitles credentials | Broken security policy: separate unmarked store could downgrade to plaintext | Clean-at-HEAD `src/main/subtitleProviderClients.ts` | Completed in first slice; retain provider-specific Test calls backed by shared status metadata |
 | Professional Lexicon core | Partially implemented, automated foundation verified | SQLite/FTS service plus Yomitan, CEDICT and Tatoeba code; dictionary focused suite passed. Dictionary and Translate are still separate `AppSection` routes | Audit service adoption/migrations, then build compatibility aliases into one Workbench |
-| Central AI Agent | Read-only consolidation audit complete; first-class app genuinely missing | Typed tools/runtime exist, but the only functional Agent panel is Blanc-owned; persistence and handlers remain renderer-owned and there is no durable conversation/context handoff | Shared workspace contracts are frozen; provider runtime and main-owned persistence precede shell routing |
+| Central AI Agent | Read-only consolidation audit and first provider-runtime slice complete; first-class app genuinely missing | Typed tools/runtime and shared workspace contracts now have one cloud request boundary, but persistence and handlers remain renderer-owned and there is no durable conversation/context handoff | Complete local/stream/persistent-cache adapters, then main-owned conversation persistence |
 | Unified Reading workspace | Partial and collision-prone | Reading Finder and Novels remain separate routed components; both are already modified in the dirty tree | Defer until ownership reconciliation after shared foundations |
 | ReadingLens Capture and Read | Partial | Main capture service, overlay, settings and tests exist; source still presents an overlay rather than the complete three-depth workflow | Defer until Lexicon + Reading contracts exist |
 | Media shell / Liquid | Main-tree Media shell repair reviewed and integrated; Liquid remains deliberately unverified | Player, Video and Music now route through the shared shell while local library, global search, discovery and explicit Seanime handoff remain reachable | Keep Liquid verification serialized and separate from the completed shell repair |
@@ -171,6 +171,31 @@ Live Electron evidence:
 - No new renderer or main-process error was recorded during reload, navigation, resize or handoff. The only error in the bridge ring predates the slice and records the dev server being unavailable during the original application boot.
 - Liquid verification was not started, as required.
 
+## Slice 5 — main-owned cloud provider runtime and translation convergence
+
+Behavior now established:
+
+- Gemini and DeepSeek request shaping, vault-backed credential lookup, model selection, timeouts, external cancellation, retry classification/backoff, lifecycle events and renderer-safe result metadata are owned by one main-process runtime.
+- Input and caller-supplied cost budgets fail before a provider receives context. Usage tokens and estimated cost are reported when the provider returns usage and the caller supplies current pricing; the runtime does not hard-code temporally unstable prices.
+- Session caching uses a SHA-256 request key and never places prompt text in the cache key exposed to callers. Failed and cancelled responses are not cached.
+- Malformed successful responses are classified as non-retriable provider errors; observer/telemetry exceptions cannot change execution semantics.
+- Existing mining, sentence analysis, Translate analysis and Media assistant wrappers now traverse the shared runtime through `aiProviderClient.ts`.
+- Cloud EPUB translation no longer owns duplicate Gemini/DeepSeek fetch code. Its 40-item batches, six-worker ceiling, strict grouping, temperature, progress and cancellation gate remain behind compatibility tests.
+
+Automated evidence:
+
+- Focused provider runtime, cloud-translation compatibility and translation-guard suites: 3 files / 14 tests passed.
+- Full post-runtime suite: 437 files passed / 1 skipped; 5,813 tests passed / 6 skipped.
+- Architecture baseline passes after connecting the Agent policy contract to the production runtime; no baseline file was weakened or updated.
+- `eslint` on the runtime, both migrated clients and their tests: pass.
+- Repository-wide TypeScript remains red on the recorded baseline; filtered diagnostics contain no changed provider-runtime path.
+- `git diff --check` on the slice: pass (line-ending notices only).
+
+Remaining boundary:
+
+- This is the unified cloud execution slice, not a claim that the full Agent provider layer is complete. Local Qwen execution selection, true token streaming, privacy-reviewed persistent response caching and live provider health probes still require dedicated adapters.
+- No real cloud request was issued; focused tests use deterministic provider responses and verify exact outgoing request contracts without spending user funds or transmitting user content.
+
 ## Exact next slice
 
-Implement the main-owned provider runtime behind these contracts: credential lookup, provider health, model selection, retry/cancellation, usage/cost and budget reporting, cache ownership, streaming events and honest local-Qwen fallback. Preserve translation batch/concurrency/temperature/progress behavior behind golden compatibility tests before removing its duplicate client.
+Finish the provider adapters with honest local-Qwen selection, token streaming and privacy-reviewed persistent caching, then add versioned main-owned conversation persistence behind `agentWorkspace.ts`. Do not route the first-class Agent shell until both boundaries have focused migration and cancellation tests.
