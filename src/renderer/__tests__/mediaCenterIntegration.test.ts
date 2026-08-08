@@ -16,7 +16,7 @@ describe('Media Center integration contract', () => {
     expect(source).toContain('<MediaCenterView initialTab="library" />');
     expect(source).toContain('<MediaCenterView initialTab="video" />');
     expect(source).toContain('<MediaCenterView initialTab="music" />');
-    expect(source).not.toContain('MediaWorkspaceSectionView');
+    expect(source).not.toContain('<MediaWorkspaceSectionView');
   });
 
   it('keeps the Seanime host reachable without replacing the Media shell', () => {

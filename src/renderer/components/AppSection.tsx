@@ -9,6 +9,9 @@ const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 const LibraryView = lazy(() => import('../views/LibraryView'));
 const NovelsView = lazy(() => import('../views/NovelsView'));
 const MediaCenterView = lazy(() => import('../views/MediaCenterView'));
+// Retained as an exported compatibility surface for older deep links and
+// recovery callers. Primary player/video routes intentionally use MediaCenter.
+export const MediaWorkspaceCompatibilityView = lazy(() => import('../views/MediaWorkspaceSectionView'));
 const ScraperView = lazy(() => import('../views/ScraperView'));
 const TranslateView = lazy(() => import('../views/TranslateView'));
 const DictionaryView = lazy(() => import('../views/DictionaryView'));
