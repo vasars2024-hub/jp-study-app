@@ -38,8 +38,14 @@ import {
   normalizeAgentTaskQueue,
   pauseAgentQueueItem,
   prioritizeAgentQueueItem,
+  updateAgentQueueItem,
 } from '../../shared/localAgentTaskQueue';
-import { pendingAgentTaskStep, runAgentTaskStep, selectAgentQueueRun } from '../localAgentQueueRun';
+import {
+  applyAgentRunToQueue,
+  pendingAgentTaskStep,
+  runAgentTaskStep,
+  selectAgentQueueRun,
+} from '../localAgentQueueRun';
 import { normalizeAgentOperationalState } from '../../shared/agentOperationalState';
 
 const REPO = resolve(__dirname, '../../..');
@@ -339,5 +345,40 @@ describe('a task restored from main-owned persistence is still re-checked', () =
     expect(handler).not.toHaveBeenCalled();
     expect(result.task.status).toBe('failed');
     expect(result.task.steps[0].error).toMatch(/not enabled for the active agent profile/);
+  });
+});
+
+/**
+ * `applyAgentRunToQueue`'s docstring has always said Pause and Cancel "stay live
+ * while a step is in flight and must not be reverted by its write-back". They
+ * were: `agentQueueStatusForTask` had no branch for either, so any run that did
+ * not fail or complete the task folded the row back to `queued` — resurrecting a
+ * cancelled task as runnable work and silently undoing a pause.
+ */
+describe('a run write-back respects the row status the user chose', () => {
+  const task = createAgentTask('task-writeback', 'Objective', [{
+    id: 'step-1',
+    label: 'Step',
+    request: { callId: 'call-1', operation: 'flashcard.list-decks', arguments: {} },
+  }], 10);
+  const empty = normalizeAgentTaskQueue({ version: 1, items: [] });
+
+  it.each(['cancelled', 'paused'] as const)('keeps a %s row at that status', (status) => {
+    const queue = updateAgentQueueItem(enqueueAgentTask(empty, task), task.id, { status });
+    const applied = applyAgentRunToQueue(queue, { ...task, status: 'running' });
+    expect(applied.items[0].status).toBe(status);
+    // The task itself is still written back — only the row's status is the
+    // user's decision rather than the run's report.
+    expect(applied.items[0].task.status).toBe('running');
+  });
+
+  it('still reports completion and failure onto a live row', () => {
+    const queue = enqueueAgentTask(empty, task);
+    expect(applyAgentRunToQueue(queue, { ...task, status: 'completed' }).items[0].status)
+      .toBe('completed');
+    expect(applyAgentRunToQueue(queue, { ...task, status: 'failed' }).items[0].status)
+      .toBe('failed');
+    expect(applyAgentRunToQueue(queue, { ...task, status: 'running' }).items[0].status)
+      .toBe('queued');
   });
 });

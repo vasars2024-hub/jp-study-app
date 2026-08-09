@@ -712,10 +712,10 @@ describe('Agent workspace shell', () => {
     await click(buttonWith('agent.card.approve.grant'));
 
     expect(grantCalls).toHaveLength(1);
-    expect((grantCalls[0][0] as { taskId: string; stepId: string })).toMatchObject({
-      taskId: 'task-1',
-      stepId: 'step-1',
-    });
+    // The grant is handed the conversation and the action's coordinates, not the
+    // approval the review captured — it re-resolves the whole gate itself.
+    expect((grantCalls[0][0] as { id: string }).id).toBe('chat-1');
+    expect(grantCalls[0].slice(1, 4)).toEqual(['msg-1', 'approval-card', 'approve']);
     expect(text()).toContain('agent.card.approve.granted');
     expect(text()).toContain('agent.timeline.effect.approve-step');
     expect(text()).toContain('agent.timeline.status.succeeded');

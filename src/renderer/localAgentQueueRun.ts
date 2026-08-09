@@ -88,8 +88,23 @@ export function pendingAgentTaskStep(task: AgentTask, pick: AgentStepPick): Agen
   )) ?? null;
 }
 
-/** How a task's own status reads back onto the queue row it came from. */
-export function agentQueueStatusForTask(task: AgentTask): AgentQueueStatus {
+/**
+ * How a task's own status reads back onto the queue row it came from.
+ *
+ * `current` is the row's status before the run. A row the user paused or
+ * cancelled keeps that status: those two are the user's decision about the
+ * *row*, not a report about the task, and nothing the task did while the
+ * decision was being made overrides it. Without this the function returned
+ * `queued` for both, so a completed step folded a cancelled task back into the
+ * queue as runnable work — resurrecting a task the user had stopped, and
+ * silently undoing a pause. That is exactly what `applyAgentRunToQueue`'s own
+ * docstring says must not happen.
+ */
+export function agentQueueStatusForTask(
+  task: AgentTask,
+  current?: AgentQueueStatus,
+): AgentQueueStatus {
+  if (current === 'cancelled' || current === 'paused') return current;
   if (task.status === 'completed') return 'completed';
   if (task.status === 'failed') return 'failed';
   return 'queued';
@@ -102,7 +117,11 @@ export function agentQueueStatusForTask(task: AgentTask): AgentQueueStatus {
  * folding in a queue captured before the `await` would quietly revert them.
  */
 export function applyAgentRunToQueue(queue: AgentTaskQueue, task: AgentTask): AgentTaskQueue {
-  return updateAgentQueueItem(queue, task.id, { task, status: agentQueueStatusForTask(task) });
+  const current = queue.items.find((item) => item.id === task.id)?.status;
+  return updateAgentQueueItem(queue, task.id, {
+    task,
+    status: agentQueueStatusForTask(task, current),
+  });
 }
 
 /**

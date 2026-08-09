@@ -37,9 +37,10 @@ import type {
   AgentToolOperationId,
 } from '../shared/localAgent';
 import type { AgentTaskQueue } from '../shared/localAgentTaskQueue';
-import type {
-  AgentStepApproval,
-  AgentStepApprovalFailureCode,
+import type { AgentConversation } from '../shared/agentWorkspace';
+import {
+  resolveAgentStepApproval,
+  type AgentStepApprovalFailureCode,
 } from '../shared/agentStepApproval';
 
 export interface AgentStepApprovalContext {
@@ -91,19 +92,42 @@ export type AgentStepGrantResult =
  * the review was open, this refuses rather than running something else.
  */
 export async function grantAgentStepApproval(
-  approval: AgentStepApproval,
-  context: AgentStepApprovalContext,
+  conversation: AgentConversation,
+  messageId: string,
+  cardId: string,
+  actionId: string,
+  t: AgentToolRegistryTranslate,
 ): Promise<AgentStepGrantResult> {
-  const queue = loadLocalAgentTaskQueue();
-  const item = queue.items.find((entry) => entry.task.id === approval.taskId);
-  if (!item) return { ok: false, code: 'task-not-found' };
-  const step = item.task.steps.find((entry) => entry.id === approval.stepId);
-  if (!step) return { ok: false, code: 'step-not-found' };
-  if (step.status !== 'waiting-confirmation') return { ok: false, code: 'step-not-awaiting' };
+  // The gate again, in full, against inputs read now. An earlier version of this
+  // function re-implemented a subset of it — it checked the step's status and
+  // not the queue row's — and an independent review found the hole that leaves:
+  // `cancelAgentQueueItem` marks the row and never touches the task, so a step
+  // of a cancelled task is still `waiting-confirmation` and ran anyway. Review,
+  // then cancel from the queue panel, then approve, and the operation executed.
+  //
+  // Re-implementing part of a gate is how that happens, so nothing is
+  // re-implemented here. The resolver is pure precisely so both callers can ask
+  // it the same question, and its own header says a gate that resolves
+  // differently depending on who is asking is not a gate.
+  const context = readAgentStepApprovalContext(t);
+  const resolution = resolveAgentStepApproval(
+    conversation,
+    context.queue,
+    messageId,
+    cardId,
+    actionId,
+    context.permission,
+    context.allowedOperations,
+  );
+  if (!resolution.ok) return { ok: false, code: resolution.code };
+
+  const item = context.queue.items.find((entry) => entry.task.id === resolution.approval.taskId);
+  const step = item?.task.steps.find((entry) => entry.id === resolution.approval.stepId);
+  if (!item || !step) return { ok: false, code: 'step-not-found' };
 
   let result: Awaited<ReturnType<typeof runAgentTaskStep>>;
   try {
-    result = await runAgentTaskStep(queue, item.task, step, {
+    result = await runAgentTaskStep(context.queue, item.task, step, {
       permission: context.permission,
       allowedOperations: context.allowedOperations,
       handlers: context.handlers,
@@ -123,7 +147,7 @@ export async function grantAgentStepApproval(
   // The step ran; whether it *succeeded* is the task's own report, and saying
   // otherwise would make this control the second place a step's outcome is
   // claimed. A step still waiting afterwards means the run refused it.
-  const after = result.task.steps.find((entry) => entry.id === approval.stepId);
+  const after = result.task.steps.find((entry) => entry.id === resolution.approval.stepId);
   if (after?.status === 'failed') return { ok: false, code: 'approve-failed' };
   if (after?.status === 'waiting-confirmation') return { ok: false, code: 'step-not-awaiting' };
   return { ok: true };

@@ -444,12 +444,11 @@ function MessageRow({
     // Nothing to grant that was never resolved and never shown. The reducer
     // refuses this too; checking here keeps the step from running before it.
     if (current?.status !== 'review' || !current.approval) return;
-    const approval = current.approval;
     dispatchApproval(key, { type: 'grant' });
-    // Re-read rather than reuse: the review may have been open for a while, and
-    // the profile that authorized it is allowed to have narrowed since.
-    const context = readAgentStepApprovalContext(t);
-    const result = await grantAgentStepApproval(approval, context);
+    // The grant re-resolves the whole gate against inputs read now — the queue,
+    // the profile and the shelf. Nothing the review captured is reused, because
+    // any of the three is allowed to have changed while the user was reading.
+    const result = await grantAgentStepApproval(conversation, message.id, cardId, actionId, t);
     if (result.ok) {
       recordApproval(cardId, actionId, { type: 'succeeded' });
       return;
