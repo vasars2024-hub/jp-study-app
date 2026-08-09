@@ -1733,6 +1733,51 @@ field-by-field ignoring `revision`, which main owns and moved 8 → 10; the
 synthetic conversation is absent. The error ring stayed at zero for the whole
 run. Screenshot: `debug/shots/win2-1786257946146.png`.
 
+## The navigation gate becomes reachable
+
+`routeAgentContext` in `renderer/agentContextHandoff.ts` is the first production
+producer of `route` context, and every "ask the Agent about this" gesture now
+carries the surface it happened on. `section` is typed `DesktopWinSection` so a
+call site cannot invent a destination the app cannot open, `identity` is the
+section alone so ten hand-offs from the Dictionary are one shelf entry, and
+`retained: true` is honest rather than a workaround — `route` floors at
+`ordinary` because it is the app's own navigation state and carries nothing of
+the user's. There is deliberately no preview: a place has no content to preview.
+The hand-off attaches the place and the material in **one** save, place first in
+the array so the material ends up first on the shelf; two sequential saves would
+broadcast a half-attached shelf and could give the two items different
+conversations.
+
+That last property is what the live run turned up a defect in.
+`evaluateAgentProviderPrivacy` selected disclosable context with
+`entry.preview.length > 0`, so a place — which has no preview by construction —
+was filtered out before the provider ever saw it. The producer, the resolver and
+the gate were all correct; the disclosure step silently discarded their input,
+and no user-facing conversation could produce a navigation card. Selection is now
+kind-aware (`carriesDisclosableContext`): a `route` qualifies on its label,
+every other kind still requires a preview. The prompt row for a place carries
+`Route: <route>` as its body, because that is what a navigation answer has to
+name.
+
+Automated evidence: the four agent suites pass 71 tests, including a new
+assertion that a place with no preview is disclosed while a genuinely empty item
+beside it is still dropped, and a router assertion pinning the place's prompt
+row. `tsc --noEmit` has a large pre-existing baseline; by set-difference these
+four files contribute zero new errors.
+
+Live Electron evidence, on a fresh start because main changed: the real
+dictionary gesture, the real `.dict-agent` hand-off and the real local Qwen
+provider. The persisted workspace shows the assistant message carrying **two**
+cards — `dictionary/食べる → open-context` and `navigation/Dictionary → navigate
+dictionary` — where the same path before the fix produced one. The navigation
+card resolves to a real allowlisted section.
+
+Recorded rather than fixed: the budget arithmetic in
+`evaluateAgentProviderPrivacy` sums previews only, so it undercounts labels for
+every kind, not just `route`. It is a pre-existing approximation and the
+disclosed `inputChars` is recomputed from the assembled prompt, so nothing
+user-visible is wrong.
+
 ## Exact next slice
 
 **A tool execution timeline with progress states.** Navigation is now the one
@@ -1741,13 +1786,9 @@ should stay that way until each has a typed producer, a permission rule and an
 honest failure path of its own. The timeline is what makes a multi-step action
 reviewable at all, and it is the prerequisite for `approve-step`.
 
-**Route and media context producers.** The gate is real but nothing in production
-creates a `route` context yet, so no user-facing conversation can currently
-produce a navigation card — the live acceptance above had to inject one. A
-producer in the desktop shell (and the media surfaces) is what turns this slice
-from working machinery into a reachable feature. It is the highest-value next
-step for the Agent, and it is small: `createAgentContextItem` already accepts the
-shape.
+**Media context producers.** The route half of this is **done** — see "The
+navigation gate becomes reachable" above; `routeAgentContext` ships and a real
+gesture produces a real navigation card. What remains is the media surfaces.
 
 **A note for whoever adds those producers:** `source.app` must be an allowlisted
 section name. The existing media producers emit `app: 'media'`, which is not a
