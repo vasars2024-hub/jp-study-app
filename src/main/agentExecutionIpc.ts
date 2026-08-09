@@ -16,6 +16,7 @@ import type {
   AgentResultCard,
   AgentWorkspaceState,
 } from '../shared/agentWorkspace';
+import { isAgentNavigableSection } from '../shared/agentNavigation';
 import {
   AiProviderRuntimeError,
   type AiProviderErrorCode,
@@ -76,54 +77,85 @@ const RESULT_CARD_KIND: Record<AgentContextItem['kind'], AgentResultCard['kind']
   file: 'generic',
 };
 
+/**
+ * The newest disclosed item matching a predicate.
+ *
+ * On equal timestamps the later shelf item wins, which keeps the selection
+ * deterministic even for contexts captured in the same millisecond.
+ */
+function newestDisclosed(
+  context: readonly AgentContextItem[],
+  disclosed: ReadonlySet<string>,
+  accept: (item: AgentContextItem) => boolean,
+): AgentContextItem | undefined {
+  let newest: AgentContextItem | undefined;
+  for (const item of context) {
+    if (!disclosed.has(item.id) || !accept(item)) continue;
+    if (!newest || item.createdAt >= newest.createdAt) newest = item;
+  }
+  return newest;
+}
+
 function resultCardsForContext(
   assistantMessageId: string,
   context: readonly AgentContextItem[],
   providerContextIds: readonly string[],
 ): AgentResultCard[] {
   const disclosed = new Set(providerContextIds);
-  let newest: AgentContextItem | undefined;
-  for (const item of context) {
-    // On equal timestamps the later shelf item wins, which keeps the selection
-    // deterministic even for contexts captured in the same millisecond.
-    if (disclosed.has(item.id) && (!newest || item.createdAt >= newest.createdAt)) {
-      newest = item;
-    }
-  }
-  if (!newest) return [];
+  // The two cards answer different questions and are chosen independently.
+  //
+  // They used to share one "newest disclosed" item, which meant a route context
+  // could only ever produce a navigation suggestion by *displacing* the source
+  // card for the material. Now that hand-offs attach the place beside the
+  // material — a word and the Dictionary it was looked up in, in the same
+  // gesture and the same millisecond — that tie decided which of the two the
+  // user got to see, which is not a decision a timestamp should be making.
+  const material = newestDisclosed(context, disclosed, (item) => item.kind !== 'route');
+  const route = newestDisclosed(context, disclosed, (item) => item.kind === 'route');
+  const source = material ?? route;
+  if (!source) return [];
   const sourceCard: AgentResultCard = {
     id: `${assistantMessageId}-context-1`,
-    kind: RESULT_CARD_KIND[newest.kind],
-    title: newest.label,
-    ...(newest.preview ? { summary: newest.preview } : {}),
+    kind: RESULT_CARD_KIND[source.kind],
+    title: source.label,
+    ...(source.preview ? { summary: source.preview } : {}),
     // Exact singleton provenance lets persistence drop this whole derived card
     // whenever its retained or session-only source is absent from the latest
     // conversation written after the provider finishes.
-    sourceContextIds: [newest.id],
+    sourceContextIds: [source.id],
     actions: [{
       id: `${assistantMessageId}-open-context-1`,
       // Renderer-side resolution supplies localized action chrome; keeping the
       // persisted label source-derived avoids introducing untranslated UI text.
-      label: newest.label,
-      effect: { type: 'open-context', contextId: newest.id },
+      label: source.label,
+      effect: { type: 'open-context', contextId: source.id },
     }],
   };
-  if (newest.kind !== 'route' || !newest.source.route) return [sourceCard];
+  // No suggestion for a place the app cannot open. `source.app` is free-form
+  // producer metadata — the media producers emit `media`, which is not a window —
+  // and a card that could only ever fail its allowlist check at review time is a
+  // dead control, not a suggestion.
+  if (!route || !isAgentNavigableSection(route.source.app)) return [sourceCard];
   const navigationCard: AgentResultCard = {
     id: `${assistantMessageId}-navigation-1`,
     kind: 'navigation',
-    title: newest.label,
-    ...(newest.preview ? { summary: newest.preview } : {}),
-    sourceContextIds: [newest.id],
+    title: route.label,
+    ...(route.preview ? { summary: route.preview } : {}),
+    sourceContextIds: [route.id],
     actions: [{
       id: `${assistantMessageId}-navigate-1`,
-      label: newest.label,
-      // This is a typed suggestion only. Renderer-side action handling decides
-      // whether and when to execute it; provider output never reaches the effect.
+      label: route.label,
+      // This is a typed suggestion only. Execution is gated in
+      // `main/agentNavigationIpc.ts` behind review and explicit approval, and it
+      // re-derives the destination from live context rather than trusting this.
+      // Provider output never reaches the effect.
       effect: {
         type: 'navigate',
-        section: newest.source.app,
-        page: newest.source.route,
+        section: route.source.app,
+        // A whole section is a destination on its own — main opens sections, not
+        // pages — so a route context without a sub-page still names somewhere
+        // real. The page rides along only when the producer knew one.
+        ...(route.source.route ? { page: route.source.route } : {}),
       },
     }],
   };

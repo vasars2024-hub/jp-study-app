@@ -608,10 +608,16 @@ describe('Agent execution IPC', () => {
     expect(JSON.stringify(cards)).not.toContain('delete-everything');
   });
 
-  it('keeps only the source card when disclosed route context has no route metadata', async () => {
+  /**
+   * Changed deliberately when navigation started executing. A section IS a
+   * destination — `popOut` takes a section and nothing else — and every
+   * production `route` producer emits `{ app }` with no sub-page, so requiring
+   * `source.route` meant no real hand-off could ever produce a suggestion.
+   */
+  it('suggests a whole section when disclosed route context names no page', async () => {
     const state = workspace();
     state.conversations[0].context = [{
-      id: 'ctx-route-without-destination',
+      id: 'ctx-route-without-page',
       kind: 'route',
       label: 'Current workspace',
       preview: '',
@@ -630,7 +636,58 @@ describe('Agent execution IPC', () => {
         provider: {
           target: { kind: 'local' as const, backend: 'local-qwen' as const },
           cloud: false,
-          contextIds: ['ctx-route-without-destination'],
+          contextIds: ['ctx-route-without-page'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toMatchObject({
+      id: 'request-run-1-assistant-context-1',
+      sourceContextIds: ['ctx-route-without-page'],
+      actions: [{ effect: { type: 'open-context', contextId: 'ctx-route-without-page' } }],
+    });
+    // The effect carries the section and no `page` at all — not an empty one.
+    expect(cards[1].actions[0].effect).toEqual({ type: 'navigate', section: 'reading' });
+    expect(JSON.stringify(cards)).not.toContain('admin');
+    expect(JSON.stringify(cards)).not.toContain('delete-everything');
+  });
+
+  it('refuses to suggest a route whose app is not a window the app can open', async () => {
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'ctx-route-media',
+      kind: 'route',
+      label: 'Watching',
+      preview: '',
+      // What `mediaCueAgentContext` emits. It is not in POPOUT_SECTIONS, so a
+      // suggestion built from it could only ever fail its allowlist check at
+      // review time — a dead control rather than a suggestion.
+      source: { app: 'media' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 40,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-route-media'],
           attachmentIds: [],
           inputChars: 100,
           startedAt: 100,
@@ -645,12 +702,74 @@ describe('Agent execution IPC', () => {
     };
     const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
     expect(cards).toHaveLength(1);
-    expect(cards[0]).toMatchObject({
-      id: 'request-run-1-assistant-context-1',
-      sourceContextIds: ['ctx-route-without-destination'],
-      actions: [{ effect: { type: 'open-context', contextId: 'ctx-route-without-destination' } }],
+    expect(cards[0].actions.every((action) => action.effect.type === 'open-context')).toBe(true);
+  });
+
+  /**
+   * The two cards answer different questions, so one gesture attaching a place
+   * beside its material — the same millisecond, by design — must produce both.
+   * They previously shared one "newest disclosed" item, so the place displaced
+   * the material's own card.
+   */
+  it('cards the material and the place independently when a gesture attaches both', async () => {
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'dictionary-entry:猫',
+      kind: 'dictionary-entry',
+      label: '猫',
+      preview: '猫が窓辺にいる。',
+      source: { app: 'dictionary' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 40,
+    }, {
+      id: 'route:dictionary',
+      kind: 'route',
+      label: 'Dictionary',
+      preview: '',
+      source: { app: 'dictionary' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 40,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['dictionary-entry:猫', 'route:dictionary'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
     });
-    expect(cards[0].actions.some((action) => action.effect.type === 'navigate')).toBe(false);
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards).toHaveLength(2);
+    // The source card is the word, not the place, despite the identical stamp.
+    expect(cards[0]).toMatchObject({
+      kind: 'dictionary',
+      title: '猫',
+      sourceContextIds: ['dictionary-entry:猫'],
+      actions: [{ effect: { type: 'open-context', contextId: 'dictionary-entry:猫' } }],
+    });
+    expect(cards[1]).toMatchObject({
+      kind: 'navigation',
+      title: 'Dictionary',
+      sourceContextIds: ['route:dictionary'],
+      actions: [{ effect: { type: 'navigate', section: 'dictionary' } }],
+    });
   });
 
   it('persists a closed provider failure code and never its error message', async () => {
