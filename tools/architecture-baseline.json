@@ -71,6 +71,10 @@
    "status": "accepted",
    "note": "The typed mirror of tokens.css and the source THEME_TOKEN_REFERENCE.md is generated from; PHASE_1_IMPLEMENTATION_PLAN.md and UI_UX_CORE_SHELL_EXECUTION_PLAN.md §12 both say to keep it in sync. It was an orphan — nothing read it, so nothing noticed drift. renderer/__tests__/themeTokenMirror.test.ts now checks every mirrored token against the CSS, which is why it reads as test-only: the test is the consumer, deliberately."
   },
+  "test-only-module:src/shared/agentOperationLog.ts": {
+   "status": "pending",
+   "note": "The operation log `undo` is blocked on. Built and tested, deliberately unwired — no producer, no card, no channel, no barrel export — until the undo resolver slice lands. MAIN_V1_EVIDENCE_LEDGER.md's 'Exact next slice' is explicit that the log must exist and refuse correctly before undo is connected, so test-only is the intended state here rather than an orphan."
+  },
   "test-only-module:src/shared/csvPaste.ts": {
    "status": "pending",
    "note": "Shipped parser with tests and no caller — either the CSV editor stopped using it or it was never wired. Unreviewed."
