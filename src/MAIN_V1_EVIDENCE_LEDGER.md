@@ -2120,6 +2120,26 @@ real buttons with `runAgentTaskStep` as the only mock — the queue store and th
 operational snapshot are real, so the Cancel click genuinely is what the Confirm
 click reads back. 6 keys in all four languages.
 
+**Automated evidence for this slice and the operation log below, measured
+together after both landed.** Full `npx vitest run`: **469 files passed, 1
+skipped; 6,352 tests passed, 6 skipped, 0 failed, exit 0** — up from the 464 /
+6,233 recorded at "approve-step becomes a real gate". All five i18n and
+architecture gates exit 0; `i18n-check` reports all 8,912 English keys
+translated in ja/zh/ru.
+
+**A staging note that cost more than the code did.** Four files in this slice's
+blast radius carried other tracks' uncommitted work: `catalogs/*.ts` held the
+`gameArena`/`mooncapLore` fold-in (327 foreign insertions and 14 deletions in
+`en.ts` alone), and the dictionary slice beside it found `preload.ts` at 226
+insertions of which 8 were its own, `window.d.ts` at 139 of which 2 were, and
+`DictionaryResults.tsx` carrying an audit-track Tatoeba attribution. Hunk-staging
+cannot separate those. What worked is the stronger form of the rule recorded
+above: **rebuild the file as HEAD plus your own lines, `git hash-object -w` it,
+and `git update-index --cacheinfo` the blob** — the working tree keeps every
+other track's changes untouched, and the staged diff is provably yours. Verify
+by arithmetic afterwards: the foreign line counts must drop by exactly what you
+committed and no more.
+
 ## The operation log, built and left unwired
 
 `undo` is the last inert effect, and it stayed inert for a reason the other three
