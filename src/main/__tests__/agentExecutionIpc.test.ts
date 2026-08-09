@@ -65,6 +65,7 @@ const sent: Array<{ channel: string; payload: unknown }> = [];
 function workspace() {
   return {
     version: 1,
+    revision: 0,
     activeConversationId: 'chat-1',
     conversations: [{
       id: 'chat-1',

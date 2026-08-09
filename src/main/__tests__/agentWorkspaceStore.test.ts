@@ -18,6 +18,7 @@ let store: AgentWorkspaceStore;
 function document() {
   return {
     version: 1,
+    revision: 0,
     activeConversationId: 'chat-1',
     conversations: [{
       id: 'chat-1',
@@ -137,9 +138,43 @@ describe('main-owned Agent workspace store', () => {
   it('atomically writes normalized state and leaves no temporary file', () => {
     const saved = store.write(document());
     expect(saved.activeConversationId).toBe('chat-1');
+    expect(saved.revision).toBe(1);
     expect(store.read()).toEqual(saved);
     expect(fs.existsSync(store.filePath)).toBe(true);
     expect(fs.readdirSync(path.dirname(store.filePath))).toEqual(['workspace-v1.json']);
+  });
+
+  it('refuses a stale compare-and-swap and preserves the newer document', () => {
+    const base = store.write(document());
+    const pinned = store.compareAndWrite({
+      ...base,
+      conversations: base.conversations.map((conversation) => (
+        conversation.id === 'chat-1' ? { ...conversation, pinned: true } : conversation
+      )),
+    });
+    expect(pinned).toMatchObject({ ok: true, state: { revision: 2 } });
+
+    const stale = store.compareAndWrite({
+      ...base,
+      conversations: base.conversations.map((conversation) => (
+        conversation.id === 'chat-1' ? { ...conversation, mode: 'analyze' } : conversation
+      )),
+    });
+    expect(stale).toMatchObject({ ok: false, state: { revision: 2 } });
+    if (stale.ok) throw new Error('expected stale compare-and-swap to be refused');
+    expect(stale.state.conversations.find((conversation) => conversation.id === 'chat-1'))
+      .toMatchObject({ pinned: true, mode: 'study' });
+    expect(store.read()).toEqual(stale.state);
+
+    const rebased = store.compareAndWrite({
+      ...stale.state,
+      conversations: stale.state.conversations.map((conversation) => (
+        conversation.id === 'chat-1' ? { ...conversation, mode: 'analyze' } : conversation
+      )),
+    });
+    expect(rebased).toMatchObject({ ok: true, state: { revision: 3 } });
+    expect(rebased.state.conversations.find((conversation) => conversation.id === 'chat-1'))
+      .toMatchObject({ pinned: true, mode: 'analyze' });
   });
 
   it('never persists session-only context, attachments, or dangling references', () => {
@@ -234,7 +269,7 @@ describe('main-owned Agent workspace store', () => {
 
   it('drops session-only context when history is cleared', () => {
     store.write(document());
-    expect(store.clear()).toEqual(emptyAgentWorkspaceState());
+    expect(store.clear()).toEqual({ ...emptyAgentWorkspaceState(), revision: 2 });
     // Re-creating the conversation must not resurrect the old session item.
     const revived = store.write({
       version: 1,
@@ -251,7 +286,7 @@ describe('main-owned Agent workspace store', () => {
     expect(afterDelete.activeConversationId).toBe('chat-2');
     expect(store.read()).toEqual(afterDelete);
 
-    expect(store.clear()).toEqual(emptyAgentWorkspaceState());
-    expect(store.read()).toEqual(emptyAgentWorkspaceState());
+    expect(store.clear()).toEqual({ ...emptyAgentWorkspaceState(), revision: 3 });
+    expect(store.read()).toEqual({ ...emptyAgentWorkspaceState(), revision: 3 });
   });
 });

@@ -20,6 +20,7 @@ import {
   loadAgentWorkspace,
   onAgentWorkspaceChanged,
   saveAgentWorkspace,
+  updateAgentWorkspace,
 } from '../agentWorkspaceClient';
 
 const ROOT = resolve(__dirname, '..', '..', '..');
@@ -168,6 +169,50 @@ describe('Agent workspace bridge consumption', () => {
     expect(await clearAgentWorkspace()).toEqual({ ok: false, code: 'write-failed' });
   });
 
+  it('re-applies a semantic edit to the latest state after a stale-save conflict', async () => {
+    const base = emptyAgentWorkspaceState();
+    const latest = {
+      ...base,
+      revision: 1,
+      activeConversationId: 'newer',
+      conversations: [{
+        id: 'newer',
+        title: 'Newer conversation',
+        mode: 'ask' as const,
+        createdAt: 1,
+        updatedAt: 1,
+        pinned: false,
+        archived: false,
+        context: [],
+        messages: [],
+      }],
+    };
+    const saved = { ...latest, revision: 2, activeConversationId: null };
+    const posted: unknown[] = [];
+    stubApi({
+      agentWorkspaceSave: (state: unknown) => {
+        posted.push(state);
+        return Promise.resolve(posted.length === 1
+          ? { ok: false, code: 'conflict', state: latest }
+          : { ok: true, state: saved });
+      },
+    });
+
+    const result = await updateAgentWorkspace(base, (current) => ({
+      ...current,
+      activeConversationId: null,
+    }));
+
+    expect(result).toEqual({ ok: true, state: saved });
+    expect(posted).toHaveLength(2);
+    expect(posted[0]).toMatchObject({ revision: 0, conversations: [] });
+    expect(posted[1]).toMatchObject({
+      revision: 1,
+      activeConversationId: null,
+      conversations: [expect.objectContaining({ id: 'newer' })],
+    });
+  });
+
   it('delivers a pushed workspace, re-derived rather than trusted', () => {
     let push: ((state: unknown) => void) | null = null;
     let unsubscribed = false;
@@ -183,15 +228,16 @@ describe('Agent workspace bridge consumption', () => {
     const seen: unknown[] = [];
     const off = onAgentWorkspaceChanged((state) => seen.push(state));
     expect(push).toBeTypeOf('function');
+    const emit = push as unknown as (state: unknown) => void;
 
-    push?.({ version: 1, activeConversationId: null, conversations: [] });
+    emit({ version: 1, revision: 0, activeConversationId: null, conversations: [] });
     expect(seen).toEqual([emptyAgentWorkspaceState()]);
 
     // A foreign schema normalizes to the EMPTY workspace, which a consumer would
     // otherwise adopt over correct content it already holds. Dropped instead.
-    push?.({ version: 99, conversations: [{ id: 'ghost' }] });
-    push?.('nonsense');
-    push?.(null);
+    emit({ version: 99, conversations: [{ id: 'ghost' }] });
+    emit('nonsense');
+    emit(null);
     expect(seen).toHaveLength(1);
 
     off();

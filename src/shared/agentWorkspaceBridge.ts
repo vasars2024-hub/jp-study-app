@@ -69,6 +69,7 @@ export type AgentWorkspaceFailureCode =
   | 'invalid-request'
   | 'read-failed'
   | 'write-failed'
+  | 'conflict'
   | 'bridge-unavailable';
 
 export interface AgentWorkspaceSuccess {
@@ -79,6 +80,8 @@ export interface AgentWorkspaceSuccess {
 export interface AgentWorkspaceFailure {
   ok: false;
   code: AgentWorkspaceFailureCode;
+  /** Latest committed state, present only when a stale compare-and-swap lost. */
+  state?: AgentWorkspaceState;
 }
 
 export type AgentWorkspaceResult = AgentWorkspaceSuccess | AgentWorkspaceFailure;
@@ -87,6 +90,7 @@ const FAILURE_CODES = new Set<AgentWorkspaceFailureCode>([
   'invalid-request',
   'read-failed',
   'write-failed',
+  'conflict',
   'bridge-unavailable',
 ]);
 
@@ -97,8 +101,11 @@ export function agentWorkspaceSuccess(state: AgentWorkspaceState): AgentWorkspac
   return { ok: true, state };
 }
 
-export function agentWorkspaceFailure(code: AgentWorkspaceFailureCode): AgentWorkspaceFailure {
-  return { ok: false, code };
+export function agentWorkspaceFailure(
+  code: AgentWorkspaceFailureCode,
+  state?: AgentWorkspaceState,
+): AgentWorkspaceFailure {
+  return { ok: false, code, ...(state ? { state } : {}) };
 }
 
 /** `null` for anything that is not a usable id, so a handler can refuse it. */
@@ -118,12 +125,17 @@ export function normalizeAgentConversationId(value: unknown): string | null {
  * save must present the current schema version before the store is allowed to
  * see it at all.
  */
-export function isAgentWorkspaceSavePayload(value: unknown): value is { version: number } {
+export function isAgentWorkspaceSavePayload(
+  value: unknown,
+): value is { version: number; revision: number } {
   return (
     typeof value === 'object'
     && value !== null
     && !Array.isArray(value)
     && (value as { version?: unknown }).version === AGENT_WORKSPACE_SCHEMA_VERSION
+    && typeof (value as { revision?: unknown }).revision === 'number'
+    && Number.isFinite((value as { revision: number }).revision)
+    && (value as { revision: number }).revision >= 0
   );
 }
 
@@ -139,7 +151,13 @@ export function normalizeAgentWorkspaceResult(value: unknown): AgentWorkspaceRes
   const raw = value as { ok?: unknown; code?: unknown; state?: unknown };
   if (raw.ok === true) return agentWorkspaceSuccess(normalizeAgentWorkspaceState(raw.state));
   if (raw.ok === false && FAILURE_CODES.has(raw.code as AgentWorkspaceFailureCode)) {
-    return agentWorkspaceFailure(raw.code as AgentWorkspaceFailureCode);
+    if (raw.code === 'conflict' && !isAgentWorkspaceSavePayload(raw.state)) {
+      return agentWorkspaceFailure('read-failed');
+    }
+    return agentWorkspaceFailure(
+      raw.code as AgentWorkspaceFailureCode,
+      raw.code === 'conflict' ? normalizeAgentWorkspaceState(raw.state) : undefined,
+    );
   }
   return agentWorkspaceFailure('read-failed');
 }

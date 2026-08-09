@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const workspace = vi.hoisted(() => ({
   state: {
     version: 1,
+    revision: 0,
     activeConversationId: null as string | null,
     conversations: [] as unknown[],
   },
@@ -25,7 +26,8 @@ const workspace = vi.hoisted(() => ({
 
 vi.mock('../agentWorkspaceClient', () => ({
   loadAgentWorkspace: async () => workspace.loadResult ?? { ok: true, state: workspace.state },
-  saveAgentWorkspace: async (state: unknown) => {
+  updateAgentWorkspace: async (base: unknown, transform: (state: unknown) => unknown) => {
+    const state = transform(base);
     workspace.saves.push(state);
     return workspace.saveResult ?? { ok: true, state };
   },
@@ -58,7 +60,7 @@ function opened(): string[] {
 }
 
 beforeEach(() => {
-  workspace.state = { version: 1, activeConversationId: null, conversations: [] };
+  workspace.state = { version: 1, revision: 0, activeConversationId: null, conversations: [] };
   workspace.loadResult = null;
   workspace.saveResult = null;
   workspace.saves = [];

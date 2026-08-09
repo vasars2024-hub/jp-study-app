@@ -49,6 +49,7 @@ describe('Agent workspace persistence contract', () => {
   it('starts empty and versioned', () => {
     expect(emptyAgentWorkspaceState()).toEqual({
       version: AGENT_WORKSPACE_SCHEMA_VERSION,
+      revision: 0,
       activeConversationId: null,
       conversations: [],
     });
@@ -63,6 +64,7 @@ describe('Agent workspace persistence contract', () => {
   it('normalizes bounded conversations, context, and messages', () => {
     const normalized = normalizeAgentWorkspaceState({
       version: 1,
+      revision: 7.9,
       activeConversationId: 'chat-1',
       conversations: [{
         id: 'chat-1',
@@ -106,6 +108,7 @@ describe('Agent workspace persistence contract', () => {
     });
 
     expect(normalized.activeConversationId).toBe('chat-1');
+    expect(normalized.revision).toBe(7);
     expect(normalized.conversations[0]).toMatchObject({ title: 'Study this', mode: 'study', pinned: true });
     expect(normalized.conversations[0].messages[0]).toMatchObject({
       conversationId: 'chat-1',

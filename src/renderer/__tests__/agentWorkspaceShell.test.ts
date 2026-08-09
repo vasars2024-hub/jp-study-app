@@ -49,6 +49,7 @@ let executionListener: ((event: unknown) => void) | null;
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
     version: AGENT_WORKSPACE_SCHEMA_VERSION,
+    revision: 0,
     activeConversationId: null,
     conversations: [],
     ...overrides,

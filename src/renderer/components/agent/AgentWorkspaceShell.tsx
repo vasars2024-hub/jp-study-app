@@ -32,7 +32,7 @@ import {
   deleteAgentConversation,
   loadAgentWorkspace,
   onAgentWorkspaceChanged,
-  saveAgentWorkspace,
+  updateAgentWorkspace,
 } from '../../agentWorkspaceClient';
 import {
   cancelAgentPrompt,
@@ -373,20 +373,26 @@ export default function AgentWorkspaceShell() {
   }, [runningRequestId]);
 
   const createConversation = useCallback(() => {
-    const next = agentWorkspaceWithNewConversation(state ?? emptyAgentWorkspaceState(), {
+    const base = state ?? emptyAgentWorkspaceState();
+    const input = {
       id: newConversationId(),
       title: t('agent.conversation.untitled'),
       now: Date.now(),
-    });
-    if (next) void run(() => saveAgentWorkspace(next));
+    };
+    void run(() => updateAgentWorkspace(
+      base,
+      (current) => agentWorkspaceWithNewConversation(current, input),
+    ));
     // `lang`, not `t`: `t`'s identity is stable by design, so depending on it
     // would silently go stale after a language switch instead of erroring.
   }, [lang, run, state, t]);
 
   const select = useCallback((conversationId: string) => {
     if (!state) return;
-    const next = agentWorkspaceWithSelection(state, conversationId);
-    if (next) void run(() => saveAgentWorkspace(next));
+    void run(() => updateAgentWorkspace(
+      state,
+      (current) => agentWorkspaceWithSelection(current, conversationId),
+    ));
   }, [run, state]);
 
   /**
@@ -397,14 +403,20 @@ export default function AgentWorkspaceShell() {
    */
   const setMode = useCallback((mode: AgentWorkspaceMode) => {
     if (!state || !selected) return;
-    const next = agentWorkspaceWithMode(state, selected.id, mode, Date.now());
-    if (next) void run(() => saveAgentWorkspace(next));
+    const now = Date.now();
+    void run(() => updateAgentWorkspace(
+      state,
+      (current) => agentWorkspaceWithMode(current, selected.id, mode, now),
+    ));
   }, [run, selected, state]);
 
   const togglePin = useCallback((conversationId: string) => {
     if (!state) return;
-    const next = agentWorkspaceWithPinToggled(state, conversationId, Date.now());
-    if (next) void run(() => saveAgentWorkspace(next));
+    const now = Date.now();
+    void run(() => updateAgentWorkspace(
+      state,
+      (current) => agentWorkspaceWithPinToggled(current, conversationId, now),
+    ));
   }, [run, state]);
 
   /**
@@ -414,8 +426,11 @@ export default function AgentWorkspaceShell() {
    */
   const removeContext = useCallback((contextId: string) => {
     if (!state || !selected) return;
-    const next = agentWorkspaceWithContextDetached(state, selected.id, contextId, Date.now());
-    if (next) void run(() => saveAgentWorkspace(next));
+    const now = Date.now();
+    void run(() => updateAgentWorkspace(
+      state,
+      (current) => agentWorkspaceWithContextDetached(current, selected.id, contextId, now),
+    ));
   }, [run, selected, state]);
 
   const railKeyDown = useCallback((event: RKeyboardEvent<HTMLUListElement>) => {

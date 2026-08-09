@@ -46,7 +46,12 @@ function conversation(overrides: Partial<AgentConversation> & { id: string }): A
 }
 
 function workspace(conversations: AgentConversation[], activeConversationId: string | null = null): AgentWorkspaceState {
-  return { version: AGENT_WORKSPACE_SCHEMA_VERSION, activeConversationId, conversations };
+  return {
+    version: AGENT_WORKSPACE_SCHEMA_VERSION,
+    revision: 0,
+    activeConversationId,
+    conversations,
+  };
 }
 
 function message(conversationId: string, id: string, text: string): AgentMessage {

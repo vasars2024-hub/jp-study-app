@@ -18,6 +18,7 @@ type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
 interface FakeWindow {
   destroyed: boolean;
+  throwsOnSend: boolean;
   sent: Array<{ channel: string; payload: unknown }>;
 }
 
@@ -41,7 +42,10 @@ vi.mock('electron', () => ({
     getAllWindows: () => registry.windows.map((window) => ({
       isDestroyed: () => window.destroyed,
       webContents: {
-        send: (channel: string, payload: unknown) => window.sent.push({ channel, payload }),
+        send: (channel: string, payload: unknown) => {
+          if (window.throwsOnSend) throw new Error('window closed during send');
+          window.sent.push({ channel, payload });
+        },
       },
     })),
   },
@@ -65,6 +69,7 @@ const invoke = (channel: string, ...args: unknown[]): unknown => {
 function workspace(activeConversationId = 'chat-1') {
   return {
     version: 1,
+    revision: 0,
     activeConversationId,
     conversations: [{
       id: 'chat-1',
@@ -100,7 +105,7 @@ function workspace(activeConversationId = 'chat-1') {
 }
 
 function makeWindow(): FakeWindow {
-  const window: FakeWindow = { destroyed: false, sent: [] };
+  const window: FakeWindow = { destroyed: false, throwsOnSend: false, sent: [] };
   registry.windows.push(window);
   return window;
 }
@@ -182,6 +187,19 @@ describe('Agent workspace IPC', () => {
     expect(store.read()).toEqual(before);
   });
 
+  it('returns the latest state and stays silent when a stale save loses the race', () => {
+    const first = invoke(AGENT_WORKSPACE_CHANNELS.save, workspace()) as {
+      ok: true;
+      state: ReturnType<typeof workspace>;
+    };
+    const window = makeWindow();
+    const stale = invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
+
+    expect(stale).toEqual({ ok: false, code: 'conflict', state: first.state });
+    expect(store.read()).toEqual(first.state);
+    expect(window.sent).toEqual([]);
+  });
+
   it('deletes only on a usable id and reselects deterministically', () => {
     invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
     for (const bad of [undefined, 42, '', '   ', { id: 'chat-1' }]) {
@@ -200,9 +218,15 @@ describe('Agent workspace IPC', () => {
 
   it('clears history to the canonical empty state', () => {
     invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
-    expect(invoke(AGENT_WORKSPACE_CHANNELS.clear))
-      .toEqual({ ok: true, state: emptyAgentWorkspaceState() });
-    expect(store.read()).toEqual(emptyAgentWorkspaceState());
+    const cleared = invoke(AGENT_WORKSPACE_CHANNELS.clear) as {
+      ok: true;
+      state: ReturnType<typeof emptyAgentWorkspaceState>;
+    };
+    expect(cleared).toMatchObject({
+      ok: true,
+      state: { revision: 2, activeConversationId: null, conversations: [] },
+    });
+    expect(store.read()).toEqual(cleared.state);
   });
 
   it('answers a write failure with a code rather than letting it reach the renderer', () => {
@@ -211,6 +235,7 @@ describe('Agent workspace IPC', () => {
       filePath: `${root}/agent/workspace-v1.json`,
       read: () => emptyAgentWorkspaceState(),
       write: () => { throw new Error('ENOSPC: no space left on device'); },
+      compareAndWrite: () => { throw new Error('ENOSPC: no space left on device'); },
       deleteConversation: () => { throw new Error('EBUSY: resource busy'); },
       clear: () => { throw new Error('EPERM: operation not permitted'); },
     }));
@@ -278,7 +303,7 @@ describe('Agent workspace change broadcast', () => {
     registry.handlers.clear();
     registerAgentWorkspaceIpc(() => ({
       ...store,
-      write: () => {
+      compareAndWrite: () => {
         throw new Error('ENOSPC');
       },
     }));
@@ -292,6 +317,19 @@ describe('Agent workspace change broadcast', () => {
     gone.destroyed = true;
     invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
     expect(gone.sent).toEqual([]);
+  });
+
+  it('does not turn one observer failure into a failed committed write', () => {
+    const closing = makeWindow();
+    closing.throwsOnSend = true;
+    const healthy = makeWindow();
+
+    const result = invoke(AGENT_WORKSPACE_CHANNELS.save, workspace());
+
+    expect(result).toMatchObject({ ok: true, state: { revision: 1 } });
+    expect(healthy.sent).toHaveLength(1);
+    expect(closing.sent).toEqual([]);
+    expect(store.read()).toEqual((result as { state: unknown }).state);
   });
 
   it('does not announce a plain load', () => {

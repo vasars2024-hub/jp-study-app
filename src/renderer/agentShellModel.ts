@@ -137,6 +137,7 @@ export function agentWorkspaceWithNewConversation(
   if (!id || state.conversations.some((existing) => existing.id === id)) return null;
   return {
     version: AGENT_WORKSPACE_SCHEMA_VERSION,
+    revision: state.revision,
     activeConversationId: id,
     conversations: [
       ...state.conversations,

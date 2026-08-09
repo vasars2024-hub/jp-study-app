@@ -46,7 +46,14 @@ import { getAgentWorkspaceStore, type AgentWorkspaceStore } from './agentWorkspa
  */
 export function broadcastAgentWorkspace(state: AgentWorkspaceState): void {
   for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send('agentWorkspace:changed', state);
+    if (window.isDestroyed()) continue;
+    try {
+      window.webContents.send('agentWorkspace:changed', state);
+    } catch {
+      // Observers are best-effort after the atomic write committed. A window can
+      // close between `isDestroyed` and `send`; that must not turn a successful
+      // store mutation into `write-failed` or strand an execution placeholder.
+    }
   }
 }
 
@@ -76,9 +83,10 @@ export function registerAgentWorkspaceIpc(
     // write would erase real history. See `isAgentWorkspaceSavePayload`.
     if (!isAgentWorkspaceSavePayload(raw)) return agentWorkspaceFailure('invalid-request');
     try {
-      const state = resolveStore().write(raw);
-      broadcast(state);
-      return agentWorkspaceSuccess(state);
+      const result = resolveStore().compareAndWrite(raw);
+      if (!result.ok) return agentWorkspaceFailure('conflict', result.state);
+      broadcast(result.state);
+      return agentWorkspaceSuccess(result.state);
     } catch {
       return agentWorkspaceFailure('write-failed');
     }

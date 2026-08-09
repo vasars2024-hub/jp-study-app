@@ -65,6 +65,35 @@ export function saveAgentWorkspace(state: AgentWorkspaceState): Promise<AgentWor
   return call(method && (() => method(state)), 'write-failed');
 }
 
+/**
+ * Applies one semantic renderer edit with compare-and-swap retry.
+ *
+ * Every window holds a view of the main-owned document, and a hand-off can write
+ * while that view is on screen. Reposting a transformed stale snapshot would
+ * erase the newer change. Main therefore refuses a stale revision and returns
+ * the latest committed state; the same pure transform is then re-applied to that
+ * state. No field-level merge policy lives in the bridge.
+ */
+export async function updateAgentWorkspace(
+  base: AgentWorkspaceState,
+  transform: (current: AgentWorkspaceState) => AgentWorkspaceState | null,
+  attempts = 4,
+): Promise<AgentWorkspaceResult> {
+  let current = base;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const next = transform(current);
+    if (!next) return { ok: true, state: current };
+    const result = await saveAgentWorkspace(next);
+    if (result.ok) return result;
+    if (result.code !== 'conflict' || !result.state) return result;
+    current = result.state;
+  }
+  // A continuously changing workspace is recoverable, but this gesture did not
+  // commit. Use the existing translated write failure instead of inventing a UI
+  // claim that the edit landed.
+  return agentWorkspaceFailure('write-failed');
+}
+
 export function deleteAgentConversation(conversationId: string): Promise<AgentWorkspaceResult> {
   const method = bridgeMethod('agentWorkspaceDeleteConversation');
   return call(method && (() => method(conversationId)), 'write-failed');

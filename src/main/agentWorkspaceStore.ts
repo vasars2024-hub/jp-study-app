@@ -19,9 +19,14 @@ export interface AgentWorkspaceStore {
   readonly filePath: string;
   read(): AgentWorkspaceState;
   write(value: unknown): AgentWorkspaceState;
+  compareAndWrite(value: unknown): AgentWorkspaceCompareAndWriteResult;
   deleteConversation(conversationId: string): AgentWorkspaceState;
   clear(): AgentWorkspaceState;
 }
+
+export type AgentWorkspaceCompareAndWriteResult =
+  | { ok: true; state: AgentWorkspaceState }
+  | { ok: false; state: AgentWorkspaceState };
 
 function retainedMessage(message: AgentMessage, contextIds: Set<string>): AgentMessage {
   const attachments = message.attachments.filter((attachment) => attachment.retained);
@@ -125,31 +130,49 @@ export function createAgentWorkspaceStore(
   session: AgentSessionContextStore = getAgentSessionContextStore(),
 ): AgentWorkspaceStore {
   const filePath = path.join(rootDirectory, 'agent', WORKSPACE_FILE);
-  const write = (value: unknown): AgentWorkspaceState => {
+  const current = (): AgentWorkspaceState => session.merge(readFile(filePath));
+  const commit = (
+    value: unknown,
+    persistedCurrent: AgentWorkspaceState,
+  ): AgentWorkspaceState => {
     // Normalize once, then split. `absorb` needs the non-retained items that
     // `prepareAgentWorkspaceForPersistence` is about to discard, so it has to see
     // the document before the filter runs, not after.
-    const whole = normalizeAgentWorkspaceState(value);
+    const whole = {
+      ...normalizeAgentWorkspaceState(value),
+      // Main owns the token. A renderer can return the token it read but cannot
+      // choose the next one, skip ahead or roll the document backwards.
+      revision: persistedCurrent.revision + 1,
+    };
     const persisted = prepareAgentWorkspaceForPersistence(whole);
     atomicWrite(filePath, persisted);
     session.absorb(whole);
     return session.merge(persisted);
   };
+  const write = (value: unknown): AgentWorkspaceState => commit(value, readFile(filePath));
   return {
     filePath,
-    read: () => session.merge(readFile(filePath)),
+    read: current,
     write,
+    compareAndWrite: (value: unknown) => {
+      const incoming = normalizeAgentWorkspaceState(value);
+      const persistedCurrent = readFile(filePath);
+      if (incoming.revision !== persistedCurrent.revision) {
+        return { ok: false, state: session.merge(persistedCurrent) };
+      }
+      return { ok: true, state: commit(incoming, persistedCurrent) };
+    },
     deleteConversation: (conversationId: string) => {
       // The *merged* document, not the file's. `write` re-derives the session half
       // from what it is handed, so passing the file's view would delete one
       // conversation and silently strip every other conversation's session-only
       // context on the way past.
-      const current = session.merge(readFile(filePath));
-      const conversations = current.conversations.filter((item) => item.id !== conversationId);
-      const activeConversationId = current.activeConversationId === conversationId
+      const latest = current();
+      const conversations = latest.conversations.filter((item) => item.id !== conversationId);
+      const activeConversationId = latest.activeConversationId === conversationId
         ? conversations[0]?.id ?? null
-        : current.activeConversationId;
-      return write({ ...current, activeConversationId, conversations });
+        : latest.activeConversationId;
+      return write({ ...latest, activeConversationId, conversations });
     },
     clear: () => write(emptyAgentWorkspaceState()),
   };

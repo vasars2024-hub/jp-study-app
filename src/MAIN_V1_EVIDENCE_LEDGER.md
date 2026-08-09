@@ -1359,7 +1359,66 @@ Focused evidence: the store/workspace/execution/IPC/bridge set passes 4 files an
 UI, preload, catalog, Media or other dirty path changed, so live visual evidence is
 not applicable to this persistence-only checkpoint.
 
+## Stale windows cannot erase newer Agent workspace changes
+
+The workspace bridge previously saved the whole renderer snapshot with no
+revision check. Two Agent windows, or one open shell plus a study-surface handoff,
+could therefore both read state A; the first write state B successfully, then the
+second post its transform of A and silently erase B. Atomic file replacement did
+not help: it protected bytes from partial writes, not the document from lost
+updates.
+
+The main-owned workspace now carries a monotonic `revision`. A renderer must
+return the revision it read; `compareAndWrite` refuses a stale token and returns
+the latest committed state without touching disk. `updateAgentWorkspace` then
+re-applies the original semantic transform to that latest state, up to a bounded
+four attempts. New conversation ids and timestamps are captured once per user
+gesture, outside the retry closure, so a conflict does not manufacture a second
+conversation or repeatedly change ordering metadata.
+
+All shell writes that can originate from a stale view use that path: create and
+select conversation, change mode, toggle pin, detach context, and the cross-surface
+context handoff. Main-side execution completion remains safe on its existing
+path because it reads the latest workspace and applies `finishExecution`
+synchronously before its trusted write; there is no event-loop yield between the
+read and commit.
+
+The revision is backward-compatible with existing `workspace-v1.json` files:
+documents written before this field normalize to revision zero, and the first
+successful main commit advances them to one. Main chooses every next value; a
+renderer cannot skip ahead or roll it back. Conflict replies are also validated
+at the shared bridge boundary before the latest state is exposed to renderer
+code.
+
+The broadcast is now explicitly best-effort *after* commit. Each observer send is
+isolated because a BrowserWindow can close between `isDestroyed()` and `send()`;
+one dead observer can no longer turn a committed save into `write-failed` or
+prevent healthy windows from receiving the update.
+
+Canary evidence covers both failure classes. The store test commits a pin, rejects
+a stale mode edit without losing the pin, then rebases the mode edit and preserves
+both. The renderer test receives a conflict containing a newer conversation,
+re-applies its transform, and verifies the second payload still contains that
+conversation. The IPC test proves a stale save does not broadcast, and a separate
+observer-failure test proves the committed write succeeds and reaches a healthy
+window even when another observer throws.
+
+Automated evidence: every `agent*.test.ts` suite passes — 17 files and 235 tests,
+0 failed. The focused workspace/execution/context set passes 9 files and 152
+tests. Targeted ESLint and path-scoped `git diff --check` exit 0;
+`architecture-audit` scans 1,568 modules with no new finding. Root
+`tsc --noEmit` remains a dirty-tree baseline gate with broad unrelated failures;
+filtering that output to this slice reports no error in a changed Agent file.
+No UI pixels, strings, preload surface, Media path or root configuration changed,
+so live visual evidence is not applicable.
+
 ## Exact next slice
+
+**Conversation continuity and streaming reconciliation.** The provider request
+still receives the current prompt, mode and context but not bounded prior turns,
+so the persisted conversation is not yet conversational. That slice must also
+ensure the renderer does not render the committed user/assistant messages and a
+second transient copy of the same live exchange while streaming.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside

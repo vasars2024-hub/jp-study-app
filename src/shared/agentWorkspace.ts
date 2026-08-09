@@ -134,6 +134,12 @@ export interface AgentConversation {
 
 export interface AgentWorkspaceState {
   version: typeof AGENT_WORKSPACE_SCHEMA_VERSION;
+  /**
+   * Monotonic compare-and-swap token owned by the main-process store.
+   * Renderers return the revision they read; a stale whole-document save is
+   * refused instead of erasing a newer message, context hand-off or window edit.
+   */
+  revision: number;
   activeConversationId: string | null;
   conversations: AgentConversation[];
 }
@@ -421,7 +427,12 @@ function normalizeConversation(value: unknown): AgentConversation | null {
 }
 
 export function emptyAgentWorkspaceState(): AgentWorkspaceState {
-  return { version: AGENT_WORKSPACE_SCHEMA_VERSION, activeConversationId: null, conversations: [] };
+  return {
+    version: AGENT_WORKSPACE_SCHEMA_VERSION,
+    revision: 0,
+    activeConversationId: null,
+    conversations: [],
+  };
 }
 
 /** Normalizes persisted renderer/main input and rejects unknown future schemas. */
@@ -435,6 +446,9 @@ export function normalizeAgentWorkspaceState(value: unknown): AgentWorkspaceStat
   const active = text(raw.activeConversationId, 240);
   return {
     version: AGENT_WORKSPACE_SCHEMA_VERSION,
+    revision: typeof raw.revision === 'number' && Number.isFinite(raw.revision)
+      ? Math.max(0, Math.floor(raw.revision))
+      : 0,
     activeConversationId: active && conversations.some((entry) => entry.id === active) ? active : null,
     conversations,
   };

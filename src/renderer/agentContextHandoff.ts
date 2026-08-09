@@ -19,7 +19,7 @@
 import { createAgentContextItem, type AgentContextInput } from '../shared/agentContext';
 import type { AgentContextItem } from '../shared/agentWorkspace';
 import { agentWorkspaceWithContextAttached } from './agentShellModel';
-import { loadAgentWorkspace, saveAgentWorkspace } from './agentWorkspaceClient';
+import { loadAgentWorkspace, updateAgentWorkspace } from './agentWorkspaceClient';
 import { isBlancWindow } from './blancMode';
 
 export type AgentHandoffOutcome =
@@ -64,15 +64,19 @@ export async function attachAgentContextFromSurface(
   const loaded = await loadAgentWorkspace();
   if (!loaded.ok) return loaded.code === 'bridge-unavailable' ? 'bridge-unavailable' : 'save-failed';
 
-  const next = agentWorkspaceWithContextAttached(loaded.state, item, {
+  const options = {
     newConversation: { id: newConversationId(), title: conversationTitle },
     now: input.now,
-  });
+  };
+  const next = agentWorkspaceWithContextAttached(loaded.state, item, options);
   // Already the front item of the active conversation: the shelf is correct, so
   // the save is skipped and the caller still opens the Agent.
   if (!next) return 'unchanged';
 
-  const saved = await saveAgentWorkspace(next);
+  const saved = await updateAgentWorkspace(
+    loaded.state,
+    (current) => agentWorkspaceWithContextAttached(current, item, options),
+  );
   return saved.ok ? 'attached' : 'save-failed';
 }
 
