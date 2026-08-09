@@ -1966,8 +1966,11 @@ the stale `src/.coordination/study-mode/state.json` are both real.
 
 It reported two defects. **One is real:** the "Exact next slice" note said the
 media *route* work remained, but `routeAgentContext('player', …)` already ships
-at `MediaStudyMode.tsx:274`. What remains is a media-*cue* producer, not the
-route call site. Corrected below.
+at `MediaStudyMode.tsx:274`. Following that up showed the item was more stale
+than the reviewer said — all four hand-off sites attach a route, and nothing in
+the media producer track remains. Corrected below. Note that my own first
+rewrite of that item was *also* wrong (it said a media-cue producer remained);
+the four call sites are what settled it, not either summary of them.
 
 **One is wrong, and the shape of the error is worth keeping.** It claimed the
 `source.app` note names the wrong failure code — that a media context yields
@@ -1983,12 +1986,21 @@ hypothesis with a file and a line attached, and the line is the part to read.
 
 ## Exact next slice
 
-**A media-cue context producer.** `mediaCueAgentContext` at
-`src/renderer/agentContextHandoff.ts:359` emits `source: { app: 'media' }`.
-`media` is not in `AGENT_NAVIGABLE_SECTIONS`, so a *route* context built that way
-resolves to `unknown-section` and fails closed — correctly but uselessly. Emit
-`player`, `video` or `music`. The route half of the media work is **done**:
-`routeAgentContext('player', …)` ships at `MediaStudyMode.tsx:274`.
+**Not the media producers — that work is finished.** Checked before starting it,
+and the whole item was stale. All four hand-off call sites exist and every one
+attaches a navigable route beside its material: `DictionaryPopup.tsx:109`
+(`dictionary`), `NovelReader.tsx:2231` and `:2271` (`library`), and
+`MediaStudyMode.tsx:274` (`player`). Nothing remains here.
+
+The long-standing `source.app` warning should be **retired rather than acted on**.
+`mediaCueAgentContext` at `src/renderer/agentContextHandoff.ts:359` does emit
+`source: { app: 'media' }`, and `media` is indeed not in
+`AGENT_NAVIGABLE_SECTIONS` — but that producer emits a `media-cue`, and a
+`media-cue` is material, not a place. Only a `route` context authorizes
+navigation, and the route beside it already says `player`, with a comment at the
+call site explaining exactly that choice. Changing the cue's `app` would relabel
+a context chip and fix nothing. The warning was written when the route half did
+not exist yet and has been describing a hypothetical ever since.
 
 **`save` and `undo`.** The two remaining inert effects, and the honest next
 targets now that `approve-step` shows the shape: a typed producer that stores
