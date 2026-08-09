@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateAgentProviderPrivacy,
   normalizeAgentWorkspaceState,
+  type AgentAttachment,
   type AgentContextItem,
   type AgentMessage,
   type AgentProviderPolicy,
@@ -48,7 +49,25 @@ function card(
   };
 }
 
-function message(id: string, cards: AgentResultCard[]): AgentMessage {
+function attachment(id: string, name = id): AgentAttachment {
+  return {
+    id,
+    kind: 'document',
+    name,
+    mimeType: 'text/plain',
+    sizeBytes: name.length,
+    localPath: `C:\\private\\${id}`,
+    sensitivity: 'sensitive',
+    retained: false,
+  };
+}
+
+function message(
+  id: string,
+  cards: AgentResultCard[],
+  attachments: AgentAttachment[] = [],
+  provider?: AgentMessage['provider'],
+): AgentMessage {
   return {
     id,
     conversationId: '',
@@ -58,8 +77,9 @@ function message(id: string, cards: AgentResultCard[]): AgentMessage {
     createdAt: 1,
     updatedAt: 1,
     contextIds: [],
-    attachments: [],
+    attachments,
     cards,
+    ...(provider ? { provider } : {}),
   };
 }
 
@@ -89,6 +109,12 @@ function persistedHalf(state: AgentWorkspaceState): AgentWorkspaceState {
     conversation.id,
     new Set(conversation.context.filter((entry) => entry.retained).map((entry) => entry.id)),
   ]));
+  const retainedAttachmentIdsByConversation = new Map(state.conversations.map((conversation) => [
+    conversation.id,
+    new Set(conversation.messages.flatMap((message) => (
+      message.attachments.filter((attachment) => attachment.retained).map((attachment) => attachment.id)
+    ))),
+  ]));
   return {
     ...state,
     conversations: state.conversations.map((conversation) => ({
@@ -96,6 +122,15 @@ function persistedHalf(state: AgentWorkspaceState): AgentWorkspaceState {
       context: conversation.context.filter((entry) => entry.retained),
       messages: conversation.messages.map((entry) => ({
         ...entry,
+        attachments: entry.attachments.filter((attachment) => attachment.retained),
+        ...(entry.provider ? {
+          provider: {
+            ...entry.provider,
+            attachmentIds: entry.provider.attachmentIds.filter((id) => (
+              retainedAttachmentIdsByConversation.get(conversation.id)?.has(id) === true
+            )),
+          },
+        } : {}),
         cards: entry.cards.filter((result) => (
           result.sourceContextIds.length > 0
           && result.sourceContextIds.every((id) => (
@@ -118,6 +153,82 @@ describe('Agent session context store', () => {
     // Merging twice must not stack the session item up.
     expect(store.merge(merged).conversations[0].context.map((entry) => entry.id))
       .toEqual(['keep', 'session']);
+  });
+
+  it('keeps non-retained attachment metadata and disclosure ids in memory only', () => {
+    const store = createAgentSessionContextStore();
+    const whole = workspace([{
+      id: 'chat-1',
+      context: [],
+      messages: [message('request', [], [attachment('file-1', 'first.txt')], {
+        target: { kind: 'local', backend: 'local-qwen' },
+        cloud: false,
+        contextIds: [],
+        attachmentIds: ['file-1'],
+        inputChars: 10,
+        startedAt: 1,
+      })],
+    }]);
+    store.absorb(whole);
+
+    const merged = store.merge(persistedHalf(whole));
+    expect(merged.conversations[0].messages[0].attachments).toEqual([{
+      id: 'file-1',
+      kind: 'document',
+      name: 'first.txt',
+      mimeType: 'text/plain',
+      sizeBytes: 'first.txt'.length,
+      sensitivity: 'sensitive',
+      retained: false,
+    }]);
+    expect(merged.conversations[0].messages[0].provider?.attachmentIds)
+      .toEqual(['file-1']);
+    expect(merged.conversations[0].messages[0].attachments[0])
+      .not.toHaveProperty('localPath');
+
+    const replacement = workspace([{
+      id: 'chat-1',
+      context: [],
+      messages: [message('request', [], [attachment('file-1', 'replacement.txt')], {
+        target: { kind: 'local', backend: 'local-qwen' },
+        cloud: false,
+        contextIds: [],
+        attachmentIds: ['file-1'],
+        inputChars: 10,
+        startedAt: 1,
+      })],
+    }]);
+    store.absorb(replacement);
+    expect(store.merge(persistedHalf(replacement)).conversations[0].messages[0]
+      .attachments[0].name).toBe('replacement.txt');
+
+    store.absorb(workspace([{ id: 'chat-1', context: [], messages: [message('request', [])] }]));
+    expect(store.merge(workspace([{ id: 'chat-1', context: [], messages: [message('request', [])] }]))
+      .conversations[0].messages[0].attachments).toEqual([]);
+  });
+
+  it('dedupes and bounds session attachments per message without rotating replacements', () => {
+    const store = createAgentSessionContextStore();
+    const state = workspace([{
+      id: 'chat-1',
+      context: [],
+      messages: [message('request', [])],
+    }]);
+    // Bypass the shared normalizer's same 50-item cap so this test exercises
+    // the in-memory boundary and duplicate replacement policy itself.
+    state.conversations[0].messages[0].attachments = [
+      attachment('file-0', 'first'),
+      attachment('file-0', 'duplicate'),
+      ...Array.from({ length: 60 }, (_, index) => attachment(`file-${index + 1}`)),
+    ];
+    const persisted = persistedHalf(state);
+
+    store.absorb(state);
+    const first = store.merge(persisted).conversations[0].messages[0].attachments;
+    store.absorb(state);
+    expect(store.merge(persisted).conversations[0].messages[0].attachments).toEqual(first);
+    expect(first).toHaveLength(50);
+    expect(first[0].name).toBe('first');
   });
 
   it('replaces rather than unions, so a removal actually removes', () => {

@@ -23,6 +23,7 @@ function request(): AgentExecutionRequest {
     prompt: 'Explain this',
     policy: defaultAgentExecutionPolicy(),
     allowLocalFallback: false,
+    attachments: [],
   };
 }
 

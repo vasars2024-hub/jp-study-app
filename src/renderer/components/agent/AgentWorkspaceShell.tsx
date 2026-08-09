@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
   type KeyboardEvent as RKeyboardEvent,
 } from 'react';
@@ -22,6 +23,7 @@ import {
   agentExecutionMessageIds,
   defaultAgentExecutionPolicy,
   type AgentExecutionFailureCode,
+  type AgentExecutionAttachment,
   type AgentExecutionRequest,
 } from '../../../shared/agentExecutionBridge';
 import type {
@@ -39,6 +41,11 @@ import {
   cancelAgentPrompt,
   executeAgentPrompt,
 } from '../../agentExecutionClient';
+import {
+  AGENT_ATTACHMENT_ACCEPT,
+  readAgentAttachmentFiles,
+  type AgentAttachmentReadFailureCode,
+} from '../../agentAttachments';
 import {
   agentContextDisclosure,
   agentConversationSummaries,
@@ -119,6 +126,10 @@ function executionErrorKey(code: AgentExecutionFailureCode): string {
     return 'agent.execute.error.provider';
   }
   return 'agent.execute.error.request';
+}
+
+function attachmentErrorKey(code: AgentAttachmentReadFailureCode): string {
+  return `agent.attachment.error.${code}`;
 }
 
 function newConversationId(): string {
@@ -259,6 +270,22 @@ function MessageRow({
             : message.error}
         </p>
       ) : null}
+      {message.attachments.length > 0 ? (
+        <ul className="agent-message-attachments" aria-label={t('agent.attachment.selected')}>
+          {message.attachments.map((attachment) => (
+            <li key={attachment.id} className="agent-attachment-chip">
+              <span>{attachment.name}</span>
+              <span className="agent-chip agent-chip-sensitivity agent-sensitivity-sensitive">
+                <Icon name="lock" size={12} />
+                {t('agent.context.sensitivity.sensitive')}
+              </span>
+              <span className="agent-chip agent-chip-retention">
+                {t('agent.context.sessionBadge')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {message.cards.length > 0 ? (
         <ul className="agent-cards">
           {message.cards.map((card) => (
@@ -322,12 +349,20 @@ export default function AgentWorkspaceShell() {
   const [draft, setDraft] = useState('');
   const [target, setTarget] = useState<AgentTargetChoice>('local');
   const [allowLocalFallback, setAllowLocalFallback] = useState(false);
+  const [attachments, setAttachments] = useState<AgentExecutionAttachment[]>([]);
+  const [attachmentFailure, setAttachmentFailure] = useState<{
+    code: AgentAttachmentReadFailureCode;
+    fileName?: string;
+  } | null>(null);
+  const [attachmentReading, setAttachmentReading] = useState(false);
+  const [cloudAttachmentConsent, setCloudAttachmentConsent] = useState(false);
   const [runningRequestId, setRunningRequestId] = useState<string | null>(null);
   const [runningPrompt, setRunningPrompt] = useState('');
   const [streamedText, setStreamedText] = useState('');
   const [executionFailure, setExecutionFailure] =
     useState<AgentExecutionFailureCode | null>(null);
   const railRef = useRef<HTMLUListElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const contextItemRefs = useRef(new Map<string, HTMLLIElement>());
   const [openedContext, setOpenedContext] = useState<{
     conversationId: string;
@@ -403,18 +438,53 @@ export default function AgentWorkspaceShell() {
     runningMessageIds
     && selected?.messages.some((message) => message.id === runningMessageIds.assistant),
   );
+  const attachmentConsentRequired = target !== 'local' && attachments.length > 0;
+
+  const selectAttachments = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (files.length === 0) return;
+    setAttachmentReading(true);
+    const result = await readAgentAttachmentFiles(files, attachments);
+    setAttachmentReading(false);
+    if (!result.ok) {
+      setAttachmentFailure({ code: result.code, fileName: result.fileName });
+      return;
+    }
+    setAttachments(result.attachments);
+    setAttachmentFailure(null);
+    setCloudAttachmentConsent(false);
+  }, [attachments]);
+
+  const removeAttachment = useCallback((attachmentId: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
+    setAttachmentFailure(null);
+    setCloudAttachmentConsent(false);
+  }, []);
 
   const submitPrompt = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const prompt = draft.trim();
-    if (!selected || !prompt || executing) return;
+    if (
+      !selected
+      || !prompt
+      || executing
+      || attachmentReading
+      || (attachmentConsentRequired && !cloudAttachmentConsent)
+    ) return;
     const requestId = newExecutionId();
+    const basePolicy = defaultAgentExecutionPolicy(target);
     const request: AgentExecutionRequest = {
       requestId,
       conversationId: selected.id,
       prompt,
-      policy: defaultAgentExecutionPolicy(target),
+      policy: {
+        ...basePolicy,
+        allowSensitiveContext: attachmentConsentRequired && cloudAttachmentConsent,
+      },
       allowLocalFallback: target === 'local' ? false : allowLocalFallback,
+      attachments,
     };
     setRunningRequestId(requestId);
     setRunningPrompt(prompt);
@@ -423,15 +493,33 @@ export default function AgentWorkspaceShell() {
     const result = await executeAgentPrompt(request, (streamEvent) => {
       setStreamedText((current) => current + streamEvent.text);
     });
-    if (result.state) {
+    if (result.ok) {
       apply({ ok: true, state: result.state });
       setDraft('');
+      setAttachments([]);
+      setAttachmentFailure(null);
+      setCloudAttachmentConsent(false);
+    } else if (result.state) {
+      // The failed assistant row is a real workspace change. Adopt it without
+      // clearing the prompt or selected files so the user can retry.
+      apply({ ok: true, state: result.state });
     }
     if (!result.ok) setExecutionFailure(result.code);
     setRunningRequestId(null);
     setRunningPrompt('');
     setStreamedText('');
-  }, [allowLocalFallback, apply, draft, executing, selected, target]);
+  }, [
+    allowLocalFallback,
+    apply,
+    attachmentConsentRequired,
+    attachmentReading,
+    attachments,
+    cloudAttachmentConsent,
+    draft,
+    executing,
+    selected,
+    target,
+  ]);
 
   const cancelExecution = useCallback(() => {
     if (runningRequestId) void cancelAgentPrompt(runningRequestId);
@@ -885,7 +973,10 @@ export default function AgentWorkspaceShell() {
                     <span>{t('agent.execute.provider')}</span>
                     <select
                       value={target}
-                      onChange={(event) => setTarget(event.target.value as AgentTargetChoice)}
+                      onChange={(event) => {
+                        setTarget(event.target.value as AgentTargetChoice);
+                        setCloudAttachmentConsent(false);
+                      }}
                       disabled={blocked}
                     >
                       <option value="local">{t('agent.execute.provider.local')}</option>
@@ -925,6 +1016,73 @@ export default function AgentWorkspaceShell() {
                   </p>
                 )}
 
+                <div className="agent-attachment-picker">
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    hidden
+                    multiple
+                    accept={AGENT_ATTACHMENT_ACCEPT}
+                    onChange={selectAttachments}
+                    disabled={blocked || attachmentReading}
+                  />
+                  <button
+                    type="button"
+                    className="agent-action agent-attachment-add"
+                    onClick={() => attachmentInputRef.current?.click()}
+                    disabled={blocked || attachmentReading}
+                  >
+                    {attachmentReading
+                      ? t('agent.attachment.reading')
+                      : t('agent.attachment.add')}
+                  </button>
+                  <span className="agent-attachment-session-note">
+                    {t('agent.attachment.sessionOnly')}
+                  </span>
+                </div>
+
+                {attachments.length > 0 ? (
+                  <ul className="agent-attachment-list" aria-label={t('agent.attachment.selected')}>
+                    {attachments.map((attachment) => (
+                      <li key={attachment.id} className="agent-attachment-chip">
+                        <span className="agent-attachment-name">{attachment.name}</span>
+                        <span className="agent-attachment-size">
+                          {t('agent.attachment.size', { count: attachment.sizeBytes ?? 0 })}
+                        </span>
+                        <button
+                          type="button"
+                          className="agent-action agent-attachment-remove"
+                          onClick={() => removeAttachment(attachment.id)}
+                          disabled={blocked || attachmentReading}
+                          aria-label={t('agent.attachment.remove', { name: attachment.name })}
+                        >
+                          <Icon name="trash" size={13} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {attachmentFailure ? (
+                  <p className="agent-message-error" role="alert">
+                    {t(attachmentErrorKey(attachmentFailure.code), {
+                      name: attachmentFailure.fileName ?? '',
+                    })}
+                  </p>
+                ) : null}
+
+                {attachmentConsentRequired ? (
+                  <label className="agent-check agent-attachment-consent">
+                    <input
+                      type="checkbox"
+                      checked={cloudAttachmentConsent}
+                      onChange={(event) => setCloudAttachmentConsent(event.target.checked)}
+                      disabled={blocked || attachmentReading}
+                    />
+                    <span>{t('agent.attachment.cloudConsent', { provider: target })}</span>
+                  </label>
+                ) : null}
+
                 <label className="agent-prompt-label">
                   <span className="sr-only">{t('agent.execute.prompt')}</span>
                   <textarea
@@ -956,7 +1114,12 @@ export default function AgentWorkspaceShell() {
                     <button
                       type="submit"
                       className="agent-action agent-action-primary"
-                      disabled={busy || draft.trim().length === 0}
+                      disabled={
+                        busy
+                        || attachmentReading
+                        || draft.trim().length === 0
+                        || (attachmentConsentRequired && !cloudAttachmentConsent)
+                      }
                     >
                       <Icon name="chat" size={15} />
                       {t('agent.execute.send')}

@@ -611,6 +611,40 @@
   color: var(--agent-accent);
 }
 
+.agent-message-attachments,
+.agent-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs, 6px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-attachment-chip {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  padding: 4px 5px 4px var(--space-sm, 8px);
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-md, 8px);
+  background: var(--agent-surface-2);
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-attachment-name {
+  max-width: min(42ch, 40vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-attachment-size,
+.agent-attachment-session-note {
+  color: var(--agent-muted);
+}
+
 .agent-cards {
   display: flex;
   flex-direction: column;
@@ -727,6 +761,35 @@
   margin: 0;
   font-size: var(--font-size-xs, 0.75rem);
   color: var(--agent-muted);
+}
+
+.agent-attachment-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+}
+
+.agent-attachment-add {
+  min-height: 32px;
+  color: var(--agent-text);
+}
+
+.agent-attachment-remove {
+  flex: 0 0 auto;
+  min-width: 28px;
+  min-height: 26px;
+  padding: 3px 6px;
+  color: var(--agent-muted);
+}
+
+.agent-attachment-consent {
+  align-items: flex-start;
+  padding: var(--space-sm, 8px);
+  border: 1px solid color-mix(in srgb, var(--agent-accent) 42%, var(--agent-line));
+  border-radius: var(--radius-sm, 6px);
+  background: var(--agent-accent-soft);
+  color: var(--agent-text);
 }
 
 .agent-prompt-label {

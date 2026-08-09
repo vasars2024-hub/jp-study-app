@@ -39,6 +39,22 @@ export interface AgentExecutionRequest {
   prompt: string;
   policy: AgentProviderPolicy;
   allowLocalFallback: boolean;
+  attachments: AgentExecutionAttachment[];
+}
+
+/**
+ * File content exists only for the lifetime of one execution request. The
+ * workspace stores the matching AgentAttachment metadata, never this payload.
+ */
+export interface AgentExecutionAttachment {
+  id: string;
+  kind: 'text' | 'document';
+  name: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  sensitivity: 'sensitive';
+  retained: false;
+  contentText: string;
 }
 
 export interface AgentExecutionChunkEvent {
@@ -117,6 +133,21 @@ const FAILURE_CODES = new Set<AgentExecutionFailureCode>([
 
 const ID_MAX = 180;
 const PROMPT_MAX = 20_000;
+export const AGENT_EXECUTION_ATTACHMENT_LIMIT = 5;
+export const AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT = 100_000;
+export const AGENT_EXECUTION_ATTACHMENTS_TOTAL_CHAR_LIMIT = 200_000;
+const ATTACHMENT_ID_MAX = 240;
+const ATTACHMENT_NAME_MAX = 500;
+const ATTACHMENT_MIME_MAX = 200;
+const FORBIDDEN_ATTACHMENT_FIELDS = new Set([
+  'localPath',
+  'path',
+  'bytes',
+  'contentBytes',
+  'data',
+  'base64',
+  'buffer',
+]);
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -132,6 +163,58 @@ function boundedInteger(value: unknown, fallback: number, min: number, max: numb
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(max, Math.max(min, Math.round(value)))
     : fallback;
+}
+
+function normalizeExecutionAttachment(value: unknown): AgentExecutionAttachment | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  if ([...FORBIDDEN_ATTACHMENT_FIELDS].some((field) => Object.hasOwn(raw, field))) return null;
+  if (raw.kind !== 'text' && raw.kind !== 'document') return null;
+  const id = boundedText(raw.id, ATTACHMENT_ID_MAX);
+  const name = boundedText(raw.name, ATTACHMENT_NAME_MAX);
+  if (!id || !name || typeof raw.contentText !== 'string') return null;
+  if (
+    raw.contentText.trim().length === 0
+    || raw.contentText.length > AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT
+  ) return null;
+  if (raw.mimeType !== undefined && typeof raw.mimeType !== 'string') return null;
+  const mimeType = boundedText(raw.mimeType, ATTACHMENT_MIME_MAX);
+  if (raw.mimeType !== undefined && !mimeType) return null;
+  if (
+    raw.sizeBytes !== undefined
+    && (
+      typeof raw.sizeBytes !== 'number'
+      || !Number.isSafeInteger(raw.sizeBytes)
+      || raw.sizeBytes < 0
+    )
+  ) return null;
+  return {
+    id,
+    kind: raw.kind,
+    name,
+    ...(mimeType ? { mimeType } : {}),
+    ...(typeof raw.sizeBytes === 'number' ? { sizeBytes: raw.sizeBytes } : {}),
+    sensitivity: 'sensitive',
+    retained: false,
+    contentText: raw.contentText,
+  };
+}
+
+function normalizeExecutionAttachments(value: unknown): AgentExecutionAttachment[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > AGENT_EXECUTION_ATTACHMENT_LIMIT) return null;
+  const attachments: AgentExecutionAttachment[] = [];
+  const ids = new Set<string>();
+  let totalChars = 0;
+  for (const valueEntry of value) {
+    const attachment = normalizeExecutionAttachment(valueEntry);
+    if (!attachment || ids.has(attachment.id)) return null;
+    totalChars += attachment.contentText.length;
+    if (totalChars > AGENT_EXECUTION_ATTACHMENTS_TOTAL_CHAR_LIMIT) return null;
+    ids.add(attachment.id);
+    attachments.push(attachment);
+  }
+  return attachments;
 }
 
 function normalizePolicy(value: unknown): AgentProviderPolicy | null {
@@ -204,7 +287,8 @@ export function normalizeAgentExecutionRequest(value: unknown): AgentExecutionRe
   const conversationId = normalizeAgentExecutionId(raw.conversationId);
   const prompt = boundedText(raw.prompt, PROMPT_MAX);
   const policy = normalizePolicy(raw.policy);
-  if (!requestId || !conversationId || !prompt || !policy) return null;
+  const attachments = normalizeExecutionAttachments(raw.attachments);
+  if (!requestId || !conversationId || !prompt || !policy || !attachments) return null;
   if (policy.target.kind === 'cloud' && !policy.allowCloud) return null;
   return {
     requestId,
@@ -212,6 +296,7 @@ export function normalizeAgentExecutionRequest(value: unknown): AgentExecutionRe
     prompt,
     policy,
     allowLocalFallback: raw.allowLocalFallback === true,
+    attachments,
   };
 }
 

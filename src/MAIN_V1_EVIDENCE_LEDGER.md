@@ -1592,13 +1592,43 @@ stayed empty. Screenshot: `debug/shots/win2-1786252832333.png`. The synthetic
 acceptance conversation was deleted and the user's original active conversation
 was restored.
 
+## Explicit session-only text attachments
+
+The composer now accepts up to five explicitly selected text/document files. It
+reads them asynchronously, rejects unsupported, empty, binary-like or oversized
+input, and shows removable name/size chips plus an unambiguous session-only note.
+No local path is accepted by the shared contract. Attachment content is passed
+only to the selected provider request; the persisted workspace contains bounded
+sanitized metadata and never attachment bytes or paths. Session-derived metadata
+is held only in the bounded in-memory overlay.
+
+Cloud routing has a separate visible consent gate whenever files are attached.
+The wording covers both the files and any selected sensitive context, and Send
+stays disabled until that consent is checked. Local execution does not require
+cloud consent. Provider input accounting includes attachment framing and complete
+content; it rejects an over-budget request instead of silently truncating a file.
+
+Automated evidence: the focused shared/main/renderer attachment set passes 7
+files / 79 tests; every `agent*.test.ts` suite passes 33 files / 383 tests; the
+full suite passes 459 files plus 1 skipped, 6,113 tests plus 6 skipped. Targeted
+ESLint, architecture, catalog parity, missing-key, locale-argument and
+hardcoded-text gates all pass. The architecture scan remains at the same 18 known
+findings with nothing new.
+
+Live Electron evidence: a fresh Forge process read `qa-session-notes.txt` through
+the actual hidden file input and rendered its 48-byte chip and session-only note.
+Switching to Gemini displayed the full disclosure, held Send disabled before
+consent, and enabled it after consent. No request was sent. The attachment,
+prompt, consent and provider were then cleared back to their original state, and
+the fresh debug error ring remained empty. Screenshot:
+`debug/shots/win1-1786255280556.png`.
+
 ## Exact next slice
 
-**Attachments.** `AgentAttachment`, `AgentAttachmentKind`, normalization and the
-provider path exist, but no production surface builds one. Start with an explicit
-user-selected file, keep local paths/session-only bytes out of the persisted
-document, and make the cloud privacy decision visible before any sensitive file
-content can leave the device.
+**A second deterministic read-only card producer.** Extend typed result cards
+without granting an effect: produce an app-help/navigation suggestion from
+trusted request/context metadata, render its provenance honestly, and keep route
+execution inert until the separate permissioned-effects slice.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside
@@ -1616,18 +1646,11 @@ the transport needs to change. Re-check `src/.coordination/study-mode/` first �
 cue they never receive. Recorded here rather than fixed — the two files that would
 change are the other track's.
 
-Then the rest of the Track 3 surface: **attachments**, additional deterministic
-card producers, and separately authorized effects. The first card is deliberately
-read-only; navigation, saves, approvals and undo remain unconnected until each has
-a typed producer, permission rule and honest failure path.
-
-**Attachments are the same "type without a producer" shape** the shelf and the
-mode both turned out to be: `AgentAttachment`, `AgentAttachmentKind`,
-`normalizeAttachment` and the router's `attachments` option all exist and are
-tested, but nothing in the tree builds one. Note before starting that the `file`
-context kind floors at `sensitive`, so an attachment producer runs straight into
-`evaluateAgentProviderPrivacy`'s cloud boundary — that is the interesting part of
-that slice, not the file picking.
+Then the rest of the Track 3 surface: additional deterministic card producers,
+permission-gated tool timelines, approve/cancel/retry/undo, route and media
+handoffs, privacy/budget controls and broad QA. The first card remains
+deliberately read-only; navigation, saves, approvals and undo stay unconnected
+until each has a typed producer, permission rule and honest failure path.
 
 A mode preset is also the natural place to *reduce* a claim later: if a tool loop
 is ever wired to this path, `navigate` and `automate` are the two presets whose

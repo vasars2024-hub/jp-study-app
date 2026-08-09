@@ -4,10 +4,12 @@ import {
   agentExecutionFailure,
   normalizeAgentExecutionId,
   normalizeAgentExecutionRequest,
+  type AgentExecutionAttachment,
   type AgentExecutionFailureCode,
   type AgentExecutionResult,
 } from '../shared/agentExecutionBridge';
 import type {
+  AgentAttachment,
   AgentConversation,
   AgentContextItem,
   AgentMessage,
@@ -125,6 +127,7 @@ function beginExecution(
   conversationId: string,
   requestId: string,
   prompt: string,
+  attachments: readonly AgentExecutionAttachment[],
   now: number,
 ): AgentWorkspaceState | null {
   const conversation = state.conversations.find((entry) => entry.id === conversationId);
@@ -134,6 +137,17 @@ function beginExecution(
     return null;
   }
   const contextIds = conversation.context.map((item) => item.id);
+  const messageAttachments: AgentAttachment[] = attachments.map((attachment) => ({
+    id: attachment.id,
+    kind: attachment.kind,
+    name: attachment.name,
+    ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+    ...(attachment.sizeBytes !== undefined ? { sizeBytes: attachment.sizeBytes } : {}),
+    // Content is request-only. Message metadata remains sensitive and session
+    // only even if a renderer submits a broader shape.
+    sensitivity: 'sensitive',
+    retained: false,
+  }));
   const user: AgentMessage = {
     id: ids.user,
     conversationId,
@@ -143,7 +157,7 @@ function beginExecution(
     createdAt: now,
     updatedAt: now,
     contextIds,
-    attachments: [],
+    attachments: messageAttachments,
     cards: [],
   };
   const assistant: AgentMessage = {
@@ -249,6 +263,7 @@ export function registerAgentExecutionIpc(
           request.conversationId,
           request.requestId,
           request.prompt,
+          request.attachments,
           now(),
         );
         if (!pending) return agentExecutionFailure('invalid-request', request.requestId, current);
@@ -273,6 +288,7 @@ export function registerAgentExecutionIpc(
       try {
         const result = await runProvider(request.policy, request.prompt, {
           context,
+          attachments: request.attachments,
           history,
           mode,
           signal: controller.signal,

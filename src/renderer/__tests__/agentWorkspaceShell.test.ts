@@ -183,6 +183,29 @@ async function click(button: HTMLButtonElement): Promise<void> {
   });
 }
 
+async function setTextarea(value: string): Promise<void> {
+  const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+      ?.call(textarea, value);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function selectFile(name: string, content: string): Promise<void> {
+  const input = host.querySelector('input[type="file"]') as HTMLInputElement;
+  const selected = {
+    name,
+    type: 'text/plain',
+    size: new TextEncoder().encode(content).length,
+    text: async () => content,
+  } as File;
+  Object.defineProperty(input, 'files', { configurable: true, value: [selected] });
+  await act(async () => {
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 beforeEach(() => {
   stored = state();
   loadResult = null;
@@ -608,5 +631,88 @@ describe('Agent workspace shell', () => {
     expect(text()).toContain('Explain は');
     expect(text()).toContain('Streamed answer');
     expect(text()).toContain('agent.message.providerLocal');
+  });
+
+  it('sends selected text locally and keeps the file and prompt after a failed request', async () => {
+    stored = populated();
+    await mount();
+    await selectFile('private-notes.txt', '秘密のノート');
+    await setTextarea('Use my notes');
+
+    expect(text()).toContain('private-notes.txt');
+    expect(text()).toContain('agent.attachment.sessionOnly');
+    expect(host.querySelector('.agent-attachment-consent')).toBeNull();
+    await click(buttonWith('agent.execute.send'));
+
+    const request = calls.find((call) => call.method === 'execute')?.args[0] as {
+      attachments: Array<Record<string, unknown>>;
+      policy: { allowSensitiveContext: boolean };
+    };
+    expect(request.policy.allowSensitiveContext).toBe(false);
+    expect(request.attachments).toMatchObject([{
+      kind: 'text',
+      name: 'private-notes.txt',
+      sensitivity: 'sensitive',
+      retained: false,
+      contentText: '秘密のノート',
+    }]);
+    expect(request.attachments[0]).not.toHaveProperty('localPath');
+    expect(text()).toContain('private-notes.txt');
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Use my notes');
+  });
+
+  it('blocks cloud attachment sending until the visible per-request consent is checked', async () => {
+    stored = populated();
+    await mount();
+    await selectFile('cloud-notes.txt', 'send only with consent');
+    await setTextarea('Summarize this');
+
+    const provider = host.querySelector('.agent-composer select') as HTMLSelectElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
+        ?.call(provider, 'gemini-2.5-flash');
+      provider.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    const send = buttonWith('agent.execute.send');
+    expect(send.disabled).toBe(true);
+    expect(text()).toContain('agent.attachment.cloudConsent');
+    expect(calls.some((call) => call.method === 'execute')).toBe(false);
+
+    const consent = host.querySelector('.agent-attachment-consent input') as HTMLInputElement;
+    await act(async () => {
+      consent.click();
+    });
+    expect(buttonWith('agent.execute.send').disabled).toBe(false);
+    await click(buttonWith('agent.execute.send'));
+
+    const request = calls.find((call) => call.method === 'execute')?.args[0] as {
+      policy: { target: { kind: string }; allowSensitiveContext: boolean };
+      attachments: unknown[];
+    };
+    expect(request.policy).toMatchObject({
+      target: { kind: 'cloud' },
+      allowSensitiveContext: true,
+    });
+    expect(request.attachments).toHaveLength(1);
+  });
+
+  it('clears selected files only after a successful request', async () => {
+    stored = populated();
+    await mount();
+    await selectFile('done.txt', 'finished content');
+    await setTextarea('Finish this');
+    (window as unknown as { api: Record<string, unknown> }).api.agentExecutionRun =
+      async (raw: unknown) => ({
+        ok: true,
+        requestId: (raw as { requestId: string }).requestId,
+        assistantMessageId: 'assistant-done',
+        delivery: 'buffered',
+        state: stored,
+      });
+
+    await click(buttonWith('agent.execute.send'));
+    expect(text()).not.toContain('done.txt');
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
   });
 });

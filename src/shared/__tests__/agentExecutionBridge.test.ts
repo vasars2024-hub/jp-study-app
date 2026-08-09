@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT,
+  AGENT_EXECUTION_ATTACHMENTS_TOTAL_CHAR_LIMIT,
   agentExecutionFailure,
   defaultAgentExecutionPolicy,
   normalizeAgentExecutionCancelResult,
@@ -36,7 +38,7 @@ describe('Agent execution bridge contract', () => {
       policy: defaultAgentExecutionPolicy(),
       allowLocalFallback: false,
     };
-    expect(normalizeAgentExecutionRequest(base)).toEqual(base);
+    expect(normalizeAgentExecutionRequest(base)).toEqual({ ...base, attachments: [] });
     expect(normalizeAgentExecutionRequest({ ...base, prompt: '   ' })).toBeNull();
     expect(normalizeAgentExecutionRequest({
       ...base,
@@ -45,6 +47,121 @@ describe('Agent execution bridge contract', () => {
     expect(normalizeAgentExecutionRequest({
       ...base,
       policy: { ...base.policy, target: { kind: 'cloud', providerId: 'future-ai' } },
+    })).toBeNull();
+  });
+
+  it('normalizes transient text attachments without retaining paths or weaker privacy', () => {
+    const base = {
+      requestId: 'run-files',
+      conversationId: 'chat-1',
+      prompt: 'Compare these notes',
+      policy: defaultAgentExecutionPolicy(),
+      allowLocalFallback: false,
+    };
+    expect(normalizeAgentExecutionRequest({
+      ...base,
+      attachments: [
+        {
+          id: 'note-a',
+          kind: 'text',
+          name: 'a.txt',
+          mimeType: 'text/plain',
+          sizeBytes: 12,
+          sensitivity: 'ordinary',
+          retained: true,
+          contentText: 'first note',
+        },
+        {
+          id: 'note-b',
+          kind: 'document',
+          name: 'b.md',
+          contentText: '# Second note',
+        },
+      ],
+    })).toEqual({
+      ...base,
+      attachments: [
+        {
+          id: 'note-a',
+          kind: 'text',
+          name: 'a.txt',
+          mimeType: 'text/plain',
+          sizeBytes: 12,
+          sensitivity: 'sensitive',
+          retained: false,
+          contentText: 'first note',
+        },
+        {
+          id: 'note-b',
+          kind: 'document',
+          name: 'b.md',
+          sensitivity: 'sensitive',
+          retained: false,
+          contentText: '# Second note',
+        },
+      ],
+    });
+  });
+
+  it('rejects malformed, binary, duplicate, path-bearing and too-many attachments', () => {
+    const base = {
+      requestId: 'run-files',
+      conversationId: 'chat-1',
+      prompt: 'Read this',
+      policy: defaultAgentExecutionPolicy(),
+      allowLocalFallback: false,
+    };
+    const valid = { id: 'a', kind: 'text', name: 'a.txt', contentText: 'a' };
+    for (const attachments of [
+      {},
+      [{ ...valid, kind: 'image' }],
+      [{ ...valid, contentText: '   ' }],
+      [{ ...valid, localPath: 'C:\\secret.txt' }],
+      [{ ...valid, bytes: [1, 2, 3] }],
+      [valid, { ...valid, name: 'duplicate.txt' }],
+      Array.from({ length: 6 }, (_, index) => ({ ...valid, id: `a-${index}` })),
+    ]) {
+      expect(normalizeAgentExecutionRequest({ ...base, attachments })).toBeNull();
+    }
+  });
+
+  it('accepts exact attachment character limits and rejects any overflow without truncation', () => {
+    const base = {
+      requestId: 'run-limits',
+      conversationId: 'chat-1',
+      prompt: 'Read this',
+      policy: defaultAgentExecutionPolicy(),
+      allowLocalFallback: false,
+    };
+    const content = 'a'.repeat(AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT);
+    const exact = normalizeAgentExecutionRequest({
+      ...base,
+      attachments: [
+        { id: 'a', kind: 'text', name: 'a.txt', contentText: content },
+        { id: 'b', kind: 'document', name: 'b.md', contentText: content },
+      ],
+    });
+    expect(exact?.attachments.map((entry) => entry.contentText.length))
+      .toEqual([AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT, AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT]);
+    expect(exact?.attachments.reduce((sum, entry) => sum + entry.contentText.length, 0))
+      .toBe(AGENT_EXECUTION_ATTACHMENTS_TOTAL_CHAR_LIMIT);
+
+    expect(normalizeAgentExecutionRequest({
+      ...base,
+      attachments: [{
+        id: 'too-long',
+        kind: 'text',
+        name: 'too-long.txt',
+        contentText: `${content}x`,
+      }],
+    })).toBeNull();
+    expect(normalizeAgentExecutionRequest({
+      ...base,
+      attachments: [
+        { id: 'a', kind: 'text', name: 'a.txt', contentText: content },
+        { id: 'b', kind: 'text', name: 'b.txt', contentText: content },
+        { id: 'c', kind: 'text', name: 'c.txt', contentText: 'x' },
+      ],
     })).toBeNull();
   });
 

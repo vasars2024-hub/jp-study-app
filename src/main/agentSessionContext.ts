@@ -25,6 +25,7 @@
  */
 
 import type {
+  AgentAttachment,
   AgentContextItem,
   AgentResultCard,
   AgentWorkspaceState,
@@ -39,11 +40,28 @@ import type {
 const MAX_ITEMS_PER_CONVERSATION = 100;
 const MAX_MESSAGES_PER_CONVERSATION = 2_000;
 const MAX_CARDS_PER_MESSAGE = 100;
+const MAX_ATTACHMENTS_PER_MESSAGE = 50;
 const MAX_CONVERSATIONS = 200;
 
 interface AgentSessionConversation {
   context: AgentContextItem[];
   cardsByMessage: Map<string, AgentResultCard[]>;
+  attachmentsByMessage: Map<string, AgentAttachment[]>;
+  providerAttachmentIdsByMessage: Map<string, string[]>;
+}
+
+function sessionAttachmentMetadata(attachment: AgentAttachment): AgentAttachment {
+  return {
+    id: attachment.id,
+    kind: attachment.kind,
+    name: attachment.name,
+    ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+    ...(attachment.sizeBytes !== undefined ? { sizeBytes: attachment.sizeBytes } : {}),
+    // A session overlay never needs a local path, and all execution attachments
+    // are forced into the sensitive/non-retained lane before they reach here.
+    sensitivity: 'sensitive',
+    retained: false,
+  };
 }
 
 export interface AgentSessionContextStore {
@@ -92,12 +110,38 @@ export function createAgentSessionContextStore(): AgentSessionContextStore {
       const context = conversation.context
         .filter((item) => !item.retained)
         .slice(0, MAX_ITEMS_PER_CONVERSATION);
-      if (context.length === 0) continue;
 
       const contextIds = new Set(conversation.context.map((item) => item.id));
       const sessionContextIds = new Set(context.map((item) => item.id));
+      const sessionAttachmentIds = new Set(
+        conversation.messages.flatMap((message) => (
+          message.attachments.filter((attachment) => !attachment.retained)
+            .map((attachment) => attachment.id)
+        )),
+      );
       const cardsByMessage = new Map<string, AgentResultCard[]>();
+      const attachmentsByMessage = new Map<string, AgentAttachment[]>();
+      const providerAttachmentIdsByMessage = new Map<string, string[]>();
       for (const message of conversation.messages.slice(-MAX_MESSAGES_PER_CONVERSATION)) {
+        const attachments: AgentAttachment[] = [];
+        const attachmentIds = new Set<string>();
+        for (const attachment of message.attachments) {
+          if (attachment.retained || attachmentIds.has(attachment.id)) continue;
+          attachmentIds.add(attachment.id);
+          attachments.push(sessionAttachmentMetadata(attachment));
+          if (attachments.length >= MAX_ATTACHMENTS_PER_MESSAGE) break;
+        }
+        if (attachments.length > 0) {
+          attachmentsByMessage.set(message.id, attachments);
+        }
+        const providerAttachmentIds = [...new Set(message.provider?.attachmentIds ?? [])]
+          // A provider disclosure belongs to the assistant row, while the
+          // request metadata belongs to the user row. Match across the
+          // conversation so the disclosure survives the same session split.
+          .filter((id) => sessionAttachmentIds.has(id));
+        if (providerAttachmentIds.length > 0) {
+          providerAttachmentIdsByMessage.set(message.id, providerAttachmentIds);
+        }
         const cards: AgentResultCard[] = [];
         const cardIds = new Set<string>();
         for (const card of message.cards) {
@@ -113,7 +157,13 @@ export function createAgentSessionContextStore(): AgentSessionContextStore {
         }
         if (cards.length > 0) cardsByMessage.set(message.id, cards);
       }
-      next.set(conversation.id, { context, cardsByMessage });
+      if (context.length === 0 && attachmentsByMessage.size === 0) continue;
+      next.set(conversation.id, {
+        context,
+        cardsByMessage,
+        attachmentsByMessage,
+        providerAttachmentIdsByMessage,
+      });
     }
     byConversation = next;
   };
@@ -133,17 +183,56 @@ export function createAgentSessionContextStore(): AgentSessionContextStore {
         const additions = sessionOnly.context.filter((item) => !retainedIds.has(item.id));
         const messages = conversation.messages.map((message) => {
           const sessionCards = sessionOnly.cardsByMessage.get(message.id);
-          if (!sessionCards || sessionCards.length === 0) return message;
-          // A retained card with the same identity is file-owned. Keeping it and
-          // refusing the session duplicate makes the split deterministic even if
-          // a malformed producer reuses an id for two provenance sets.
-          const persistedCardIds = new Set(message.cards.map((card) => card.id));
-          const cardAdditions = sessionCards.filter((card) => !persistedCardIds.has(card.id));
-          if (cardAdditions.length === 0) return message;
-          return {
-            ...message,
-            cards: [...message.cards, ...cardAdditions].slice(0, MAX_CARDS_PER_MESSAGE),
-          };
+          const sessionAttachments = sessionOnly.attachmentsByMessage.get(message.id);
+          const sessionProviderAttachmentIds = sessionOnly.providerAttachmentIdsByMessage
+            .get(message.id);
+          let nextMessage = message;
+
+          if (sessionCards && sessionCards.length > 0) {
+            // A retained card with the same identity is file-owned. Keeping it and
+            // refusing the session duplicate makes the split deterministic even if
+            // a malformed producer reuses an id for two provenance sets.
+            const persistedCardIds = new Set(message.cards.map((card) => card.id));
+            const cardAdditions = sessionCards.filter((card) => !persistedCardIds.has(card.id));
+            if (cardAdditions.length > 0) {
+              nextMessage = {
+                ...nextMessage,
+                cards: [...message.cards, ...cardAdditions].slice(0, MAX_CARDS_PER_MESSAGE),
+              };
+            }
+          }
+
+          if (sessionAttachments && sessionAttachments.length > 0) {
+            // A retained attachment with the same identity is file-owned. This
+            // mirrors the card rule and makes repeated reads idempotent.
+            const persistedAttachmentIds = new Set(message.attachments.map((item) => item.id));
+            const attachmentAdditions = sessionAttachments
+              .filter((attachment) => !persistedAttachmentIds.has(attachment.id));
+            if (attachmentAdditions.length > 0) {
+              nextMessage = {
+                ...nextMessage,
+                attachments: [...message.attachments, ...attachmentAdditions]
+                  .slice(0, MAX_ATTACHMENTS_PER_MESSAGE),
+              };
+            }
+          }
+
+          if (nextMessage.provider && sessionProviderAttachmentIds
+            && sessionProviderAttachmentIds.length > 0) {
+            const persistedAttachmentIds = new Set(nextMessage.provider.attachmentIds);
+            const attachmentIds = [
+              ...nextMessage.provider.attachmentIds,
+              ...sessionProviderAttachmentIds.filter((id) => !persistedAttachmentIds.has(id)),
+            ].slice(0, MAX_ATTACHMENTS_PER_MESSAGE);
+            if (attachmentIds.length !== nextMessage.provider.attachmentIds.length) {
+              nextMessage = {
+                ...nextMessage,
+                provider: { ...nextMessage.provider, attachmentIds },
+              };
+            }
+          }
+
+          return nextMessage;
         });
         const messagesChanged = messages.some((message, index) => (
           message !== conversation.messages[index]

@@ -51,6 +51,28 @@ function context(sensitivity: AgentContextItem['sensitivity'] = 'ordinary'): Age
   };
 }
 
+function attachment(contentText = 'attached study notes'): {
+  id: string;
+  kind: 'document';
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  sensitivity: 'sensitive';
+  retained: false;
+  contentText: string;
+} {
+  return {
+    id: 'attachment-1',
+    kind: 'document',
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    sizeBytes: contentText.length,
+    sensitivity: 'sensitive',
+    retained: false,
+    contentText,
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -185,6 +207,83 @@ describe('Agent provider router', () => {
 
     expect(cloud).not.toHaveBeenCalled();
     expect(local).not.toHaveBeenCalled();
+  });
+
+  it('includes accepted attachment metadata and content in the actual local prompt', async () => {
+    let routed = '';
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (prompt) => {
+      routed = prompt;
+      return 'grounded answer';
+    });
+
+    const result = await runAgentProviderPrompt(policy(), 'Use the file.', {
+      attachments: [attachment('一つの添付資料です。')],
+    });
+
+    expect(routed).toContain('Attached text/document content');
+    expect(routed).toContain('Name: notes.txt');
+    expect(routed).toContain('一つの添付資料です。');
+    expect(result.provider.attachmentIds).toEqual(['attachment-1']);
+    expect(result.provider.inputChars).toBe(routed.length);
+  });
+
+  it('includes the same attachment section in the actual cloud prompt after consent', async () => {
+    let routed = '';
+    vi.spyOn(providerRuntime, 'runCloudAiRequest').mockImplementation(async (request) => {
+      routed = request.prompt;
+      return {
+        text: 'cloud answer',
+        providerId: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash',
+        credentialBucket: 'gemini',
+        inputChars: request.prompt.length,
+        startedAt: 100,
+        completedAt: 110,
+        attempts: 1,
+        cached: false,
+        delivery: 'buffered',
+        usage: {},
+      };
+    });
+
+    const result = await runAgentProviderPrompt(policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+      allowSensitiveContext: true,
+    }), 'Use the cloud file.', {
+      apiKey: 'key',
+      attachments: [attachment('cloud attachment content')],
+    });
+
+    expect(routed).toContain('cloud attachment content');
+    expect(result.provider.attachmentIds).toEqual(['attachment-1']);
+  });
+
+  it('blocks sensitive cloud attachments without consent before the cloud runtime', async () => {
+    const cloud = vi.spyOn(providerRuntime, 'runCloudAiRequest');
+    const cloudPolicy = policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+    });
+
+    await expect(runAgentProviderPrompt(cloudPolicy, 'Summarize the file.', {
+      attachments: [attachment()],
+    })).rejects.toMatchObject({ code: 'sensitive-context' });
+
+    expect(cloud).not.toHaveBeenCalled();
+  });
+
+  it('counts attachment sections and contents in the final input budget', async () => {
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockResolvedValue('ok');
+    const file = attachment('x'.repeat(80));
+    const prompt = 'Prompt';
+
+    await expect(runAgentProviderPrompt(policy({ maxInputChars: prompt.length + 1 }), prompt, {
+      attachments: [file],
+    })).rejects.toMatchObject({ code: 'input-budget' });
+
+    await expect(runAgentProviderPrompt(policy({ maxInputChars: prompt.length + 1 }), prompt))
+      .resolves.toMatchObject({ text: 'ok' });
   });
 });
 

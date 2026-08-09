@@ -91,13 +91,27 @@ function workspace(): AgentWorkspaceState {
   };
 }
 
-function request(requestId = 'run-1') {
+function executionAttachment(contentText = '私有の添付資料') {
+  return {
+    id: 'attachment-1',
+    kind: 'document' as const,
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    sizeBytes: contentText.length,
+    sensitivity: 'sensitive' as const,
+    retained: false as const,
+    contentText,
+  };
+}
+
+function request(requestId = 'run-1', attachments?: unknown[]) {
   return {
     requestId,
     conversationId: 'chat-1',
     prompt: 'Explain this.',
     policy: defaultAgentExecutionPolicy(),
     allowLocalFallback: false,
+    ...(attachments ? { attachments } : {}),
   };
 }
 
@@ -316,6 +330,59 @@ describe('Agent execution IPC', () => {
       }],
     }]);
     expect(store.read()).toEqual(result.state);
+  });
+
+  it('routes attachment content but stores only sanitized user metadata in the session overlay', async () => {
+    let routedAttachments: readonly { contentText: string }[] = [];
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async (_policy, _prompt, options) => {
+        routedAttachments = (options.attachments ?? []) as readonly { contentText: string }[];
+        return {
+          text: 'grounded answer',
+          delivery: 'buffered' as const,
+          usage: {},
+          provider: {
+            target: { kind: 'local' as const, backend: 'local-qwen' as const },
+            cloud: false,
+            contextIds: [],
+            attachmentIds: ['attachment-1'],
+            inputChars: 100,
+            startedAt: 100,
+            completedAt: 101,
+          },
+        };
+      },
+    });
+
+    const result = await invoke(
+      AGENT_EXECUTION_CHANNELS.run,
+      request('run-attachment', [executionAttachment()]),
+    ) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+
+    expect(result.ok).toBe(true);
+    expect(routedAttachments).toMatchObject([{ contentText: '私有の添付資料' }]);
+    const messages = result.state.conversations[0].messages;
+    expect(messages[0].attachments).toEqual([{
+      id: 'attachment-1',
+      kind: 'document',
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      sizeBytes: '私有の添付資料'.length,
+      sensitivity: 'sensitive',
+      retained: false,
+    }]);
+    expect(messages[0].attachments[0]).not.toHaveProperty('contentText');
+    expect(messages[0].attachments[0]).not.toHaveProperty('localPath');
+    expect(messages[1].attachments).toEqual([]);
+    expect(messages[1].provider?.attachmentIds).toEqual(['attachment-1']);
+
+    const persisted = fs.readFileSync(store.filePath, 'utf8');
+    expect(persisted).not.toContain('私有の添付資料');
+    expect(persisted).not.toContain('attachment-1');
   });
 
   it('does not invent a result card when the successful request used no context', async () => {
