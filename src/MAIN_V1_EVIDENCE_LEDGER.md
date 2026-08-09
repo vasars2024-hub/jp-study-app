@@ -1984,6 +1984,187 @@ Both were checked against the source before either was acted on, which is the
 only reason the wrong one did not become a "fix". A sibling's finding is a
 hypothesis with a file and a line attached, and the line is the part to read.
 
+## `save` becomes a real effect
+
+The second of the three inert effects to acquire a gate, and deliberately built
+as a copy of `agentStepApproval.ts`'s shape rather than a third one — a third
+kind of permission gate would be a third thing to audit.
+
+What differs is what decides the design. `approve-step` authorizes work a
+planner already described; `save` creates a durable row out of context **the
+user put on the shelf themselves**. There is no plan to consult and nothing a
+model wrote to trust, so the word, the reading and the meaning are read from the
+live context item the effect names, and the stored effect keeps that item's id
+and nothing else.
+
+**Only reference-grade context can be saved.** `SAVABLE_CONTEXT_KINDS` is
+`dictionary-entry` alone. A `reading-passage`, a `selected-text` or a `media-cue`
+is the user's own material, session-only by design and never written to disk;
+turning one into a flashcard row would be the persistence boundary leaking
+through a button. Those refuse with `not-savable-kind`. `entityType` is a
+free-form string on the persisted effect, so `AGENT_SAVABLE_ENTITY_TYPES` does
+for it exactly what `AGENT_NAVIGABLE_SECTIONS` does for a destination.
+
+**Re-authorized at the moment of saving,** against the profile as it is *now*,
+through the same `flashcard.add-cards` operation the tool registry exposes.
+`AGENT_SAVE_OPERATION` names that operation once, so the permission check and
+the side effect cannot come to disagree about what was authorized.
+
+**Saving twice is not saving twice.** The deck is keyed by word; a second save
+of the same entry refuses with `already-saved` rather than quietly creating a
+duplicate the user then has to find and delete. `savedWords` is supplied by the
+caller rather than read here, which keeps the module free of renderer storage
+for the same reason the queue is passed into the approval gate.
+
+**Fifteen typed refusals, each with its own sentence in all four languages.**
+Empty provenance is not a pass — the same fail-closed rule the navigation and
+approval gates use. A context item whose label is blank refuses with
+`entity-incomplete` instead of writing a card with no front, which is the
+difference between a save that failed and a deck that quietly acquired an empty
+row.
+
+`agentSaveReduce` mirrors the approval lifecycle: `saved` spans the confirmation
+and the write it authorizes and accepts `failed`, or the card would read "saved"
+over a deck that gained nothing. A `retry` returns to `idle` rather than reusing
+the earlier resolution, so the next attempt re-reads the live deck and cannot
+act on a decision made before the word was already there.
+`AgentTimelineEffect` gains its third member. `undo` stays absent — it is the one
+that needs an operation log.
+
+**Automated evidence.** `src/shared/__tests__/agentSave.test.ts` is new (20
+tests); the shell suite grew 28 → 33 and `agentExecutionIpc` 20 → 21. 24 keys
+added in all four languages (8 card, 15 refusal, 1 timeline).
+
+## A grant that re-implemented a subset of its own gate
+
+An independent review running on a second account attacked the `approve-step`
+gate the previous section describes. It found the review half solid and the
+grant half not: `grantAgentStepApproval` checked
+`step.status === 'waiting-confirmation'` by hand instead of asking
+`resolveAgentStepApproval`, and so performed none of the queue-row, out-of-turn
+or permission checks the resolver performs.
+
+**The reachable exploit.** `cancelAgentQueueItem` sets the queue *row*'s status
+and never touches the task or its waiting step. So: review an approval card,
+cancel that task from the queue panel, then approve — and the step executed.
+Worse, the write-back went through `agentQueueStatusForTask`, which had no
+`cancelled` or `paused` branch and returned `queued`, so the cancelled task was
+resurrected and became eligible for the runner again. The same mechanism
+silently reverted a pause, which is precisely what the module header claimed the
+design prevented.
+
+Two more findings had the same single cause. A profile narrowed while the card
+sat on screen failed the *whole task* instead of refusing the step, because the
+permission re-read happens inside `executeAgentTaskStep` after `start-step`, so
+`fail-step` set `task.status = 'failed'` and `operation-denied` was unreachable
+from the grant path. And `step-not-current` was dropped entirely at grant time.
+
+**One fix closes all three.** The grant now calls the resolver in full against
+inputs read at that moment, and re-locates the step by id afterwards; nothing is
+re-implemented. `agentQueueStatusForTask` gains the missing `cancelled` and
+`paused` branches, so a write-back can no longer promote a row the user stopped —
+those two statuses are the user's decision about the *row*, not a report about
+the task.
+
+The lesson outlasts the fix and now lives in the function's header:
+**re-implementing part of a gate is how a gate stops being one.** The resolver
+was made pure precisely so that both callers could ask it the same question, and
+its own header already said that a gate resolving differently depending on who
+is asking is not a gate. The grant was the second caller, and it asked something
+else.
+
+**Automated evidence.** `src/renderer/__tests__/agentStepApprovalClient.test.ts`
+is new (7 tests), covering the cancelled-row and paused-row refusals directly;
+`localAgentQueueRun` grew 16 → 17. The review's own report is kept at
+`~/.claude-runs/lanes/20260809-122200-wake-a/review-x2.md`, including the seven
+attacks that **failed** and why — a list worth more than the findings, since it
+is the part a re-audit does not have to repeat.
+
+## The queue panel stops being a second gate
+
+The previous section's lesson, applied to the caller it had not yet reached. The
+Blanc queue panel's `confirmAndRun` never consulted the gate at all — it called
+`runAgentTaskStep` with a confirmed call id directly — so every check the card
+path performs was simply absent on the other route to the same permission.
+
+Its profile allow-list check was not a refusal either. The old body hands the
+step to the runner and lets `executeAgentTaskStep` deny it *after* `start-step`,
+which fails the whole plan rather than declining one step — the same defect the
+grant had, in the same shape, discovered independently. **Measured rather than
+argued:** restoring the old body fails 4 of the 5 new tests, and the fourth fails
+on the status line rather than on the call count, which is what exposed it.
+
+`resolveAgentStepApproval` is now split. The conversation-free half —
+`resolveAgentQueuedStepApproval(queue, taskId, stepId, permission,
+allowedOperations?)` — holds the whole live-state rule, and the card-shaped
+resolver is re-expressed on top of it. `AgentStepApprovalFailureCode` is built
+*from* the narrower `AgentQueuedStepApprovalFailureCode`, so the two cannot drift
+by construction rather than by discipline.
+
+**`paused` leaves `RUNNABLE_QUEUE_STATUS`,** which changes both surfaces: a
+paused row is no longer approvable and `pendingAgentStepApproval` stops offering
+one. This follows from the extraction rather than being bolted onto it. Every
+caller runs the step the instant the grant lands, so an approvable paused row is
+a button that silently undoes Pause — and `agentQueueStatusForTask` would then
+preserve `paused` over the run that just happened, which is the resurrection bug
+wearing different clothes. No existing assertion was edited to accommodate it:
+`agentStepApproval.test.ts` is 105 insertions and 0 deletions.
+
+**Still open, and deliberately not half-fixed:** `runNext` and `runQueued` have
+the same deny-after-start shape for the profile allow-list. They are not grants,
+so they were out of this slice's scope, but the defect is real and is recorded
+here rather than left for someone to rediscover.
+
+`blancAgentStepConfirmGate.test.ts` mounts the real panel in jsdom and clicks
+real buttons with `runAgentTaskStep` as the only mock — the queue store and the
+operational snapshot are real, so the Cancel click genuinely is what the Confirm
+click reads back. 6 keys in all four languages.
+
+## The operation log, built and left unwired
+
+`undo` is the last inert effect, and it stayed inert for a reason the other three
+did not share: `navigate`, `approve-step` and `save` each resolve against
+something the workspace already holds, and `undo` resolves against a record of
+past operations that did not exist. `shared/agentOperationLog.ts` is that record
+and nothing else — no producer, no card, no channel, no caller, no barrel export.
+
+**Ids only, never a copy of the entity.** A log that captured the old value of a
+row is a stale copy by construction, and restoring one would silently revert
+edits nobody asked to lose. An entry names what was touched and refuses to
+remember what it looked like.
+
+**An inverse is an operation the tool registry already exposes, or there is
+none.** `AGENT_INVERSE_OPERATIONS` maps eight forward operations to real
+`AgentToolOperationId`s — each re-derived against the union rather than taken on
+trust — so the undo of a gated action is itself gated, with no second and weaker
+path into tool execution. No delete has an inverse; ids alone cannot restore one.
+
+**Undoing onto state that moved is the defect it exists to prevent.** Any later
+entry naming one of the same ids refuses as `superseded`. A `read` does not
+supersede, because looking is not touching. `not-invertible` is checked before
+`superseded`, so a user is never told "something changed" when the truth is "that
+was never undoable" — an ordering choice, and the test that pins it says why.
+
+It reads no live state, by design: it answers what the inverse *would* be, from
+the log alone. `entity-not-found` is declared in the failure vocabulary and is
+unreachable from this module, reserved for the resolver the wiring slice adds.
+That is the seam. Bounded at 200, equal to `AGENT_TIMELINE_LIMIT` so an entry
+that has fallen out of the timeline the user is reading is not still offered as
+undoable.
+
+25 tests, exit 0. Classified `pending` in `tools/architecture-baseline.json`:
+test-only is this slice's intended state, not an orphan. `--update-baseline` was
+deliberately not used — it would have swept in three other tracks' new modules
+that happened to be in the tree.
+
+**One judgement call worth revisiting.** `flashcard.add-cards` maps to
+`flashcard.modify-cards`, which bends the module's own rule that an inverse is
+the reverse operation: modify is not the reverse of add, it is the nearest thing
+the registry offers, since there is no `flashcard.delete-cards`. That is the
+entry `save` — the effect that just shipped — would reach first. Either the
+registry gains a real delete verb or that mapping should be removed and
+`add-cards` declared non-invertible.
+
 ## Exact next slice
 
 **Not the media producers — that work is finished.** Checked before starting it,
@@ -2002,17 +2183,58 @@ call site explaining exactly that choice. Changing the cue's `app` would relabel
 a context chip and fix nothing. The warning was written when the route half did
 not exist yet and has been describing a hypothetical ever since.
 
-**`save` and `undo`.** The two remaining inert effects, and the honest next
-targets now that `approve-step` shows the shape: a typed producer that stores
-ids only, a resolver that re-derives everything from live state, re-authorization
-at the moment of action, and a typed refusal for every absence. `save` is the
-easier of the two — `entityType`/`entityId` against a real store. `undo` needs an
-operation log that does not exist yet, and should not be wired until it does.
+**`undo`, and only `undo`.** This item used to name `save` beside it. `save`
+shipped — see "`save` becomes a real effect" above — so `undo` is the last inert
+effect, and the shape is now established three times over: a typed producer that
+stores ids only, a resolver that re-derives everything from live state,
+re-authorization at the moment of action, and a typed refusal for every absence.
 
-**A queue-side view of the approval.** The Agent surface can now approve a step;
-the Blanc queue panel still has its own separate confirm button reading its own
-`confirmedCallIds`. Neither is wrong, but two controls granting the same
-permission through two paths is how they drift.
+What `undo` needs that neither of the others did is an **operation log**, and
+that log now exists — see "The operation log, built and left unwired" above. It
+stores ids and never captured values, and it refuses `superseded`,
+`not-invertible`, `already-undone`, `entity-not-named` and `log-rolled`.
+
+So the remaining `undo` work is the wiring, and it is a real slice rather than a
+connection: a producer that offers an undo only for an entry the log says is
+invertible, a resolver that re-derives against **live** state and raises the
+`entity-not-found` the log module declares but cannot itself produce,
+re-authorization of the inverse operation at the moment of action, and a card
+that renders a refusal as an explanation rather than a dead button. Nothing
+appends to the log yet either — the effects that complete must record what they
+did, and `save` is the first one that should.
+
+**The queue-side view of the approval is done** — see "The queue panel stops
+being a second gate" above. What it left behind is narrower and still real:
+`runNext` and `runQueued` check the profile allow-list by handing the step to
+the runner and letting the executor deny it after `start-step`, which fails the
+whole plan instead of declining one step. They are not grants, so no gate call
+belongs there; the fix is to refuse before starting, and it is one slice.
+
+**Two findings from the independent review that are still open.** Both were
+re-derived against the tree before being written here, and both are real.
+
+*The producer and the gate genuinely disagree.* `pendingAgentStepApproval` runs
+in **main** (`agentExecutionIpc.ts:177`), where neither the renderer-owned
+profile nor the card's provenance is visible. A task waiting on an operation the
+active profile disables therefore gets an approve card on every reply, and that
+card always refuses. The "anything it offers, the gate accepts" test
+(`agentStepApproval.test.ts:259`) varies nothing on either axis, so it passes
+while the property it names is false — the test agrees with itself, not with the
+gate. Two honest fixes exist and the choice between them is real: teach the
+producer the permission set, which means moving the producer or moving the
+profile; or let the card carry the refusal and render as a disabled explanation
+instead of a button that cannot work. The second is cheaper and arguably more
+truthful. Neither is free, which is why this is recorded rather than guessed at.
+
+*The `dismiss` branch is unreachable — in all three lifecycles, not one.* The
+review flagged it on the approval reducer. It is wider than that: no non-test
+code dispatches `{ type: 'dismiss' }` to the navigation, save or approval
+reducer. Three reducers carry a branch nothing can reach, and three test suites
+assert its behaviour, which is how it has stayed invisible. Either a completed
+card should offer a dismiss and return to `idle`, or the branch and its event
+member should go from all three. Cosmetic in effect — the state stays truthful
+either way — but it is dead weight in the one part of this surface that has been
+careful about claiming only what it does.
 
 **A note for whoever adds those producers:** `source.app` must be an allowlisted
 section name. The existing media producers emit `app: 'media'`, which is not a
