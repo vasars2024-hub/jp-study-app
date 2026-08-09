@@ -11,23 +11,23 @@
  * feeds to the provider.
  *
  * Attaching and opening are deliberately separate steps, and the attach happens
- * first. If the route never opens — a Blanc window has no Study OS desktop to
- * route — the context is still on the shelf and the user finds it waiting the
- * next time they open the Agent, rather than the gesture having done nothing.
+ * first. If opening the surface fails, the context is still on the shelf and the
+ * caller receives `open-failed` rather than being told the whole gesture landed.
  */
 
 import { createAgentContextItem, type AgentContextInput } from '../shared/agentContext';
 import type { AgentContextItem } from '../shared/agentWorkspace';
 import { agentWorkspaceWithContextAttached } from './agentShellModel';
 import { loadAgentWorkspace, updateAgentWorkspace } from './agentWorkspaceClient';
-import { isBlancWindow } from './blancMode';
+import { t } from './i18n';
 
 export type AgentHandoffOutcome =
   | 'attached'
   | 'unchanged'
   | 'invalid-context'
   | 'bridge-unavailable'
-  | 'save-failed';
+  | 'save-failed'
+  | 'open-failed';
 
 /**
  * Nothing here announces the change any more.
@@ -83,15 +83,36 @@ export async function attachAgentContextFromSurface(
 /**
  * Routes to the Agent surface, when this window has one.
  *
- * `os:open` takes a bare section id — `agent` is a real `DesktopWinSection`, see
- * `POPOUT_LABEL_KEYS` in `App.tsx`. The Blanc window is a different entry point
- * with no desktop router, so it is skipped rather than dispatching an event
- * nothing listens for.
+ * Main's existing pop-out route is used instead of the desktop-only `os:open`
+ * event. It focuses an existing Agent pop-out or creates one and is callable
+ * from the desktop, a first-class pop-out, a full-screen reader and Blanc.
  */
-export function openAgentSurface(): boolean {
-  if (typeof window === 'undefined' || isBlancWindow()) return false;
-  window.dispatchEvent(new CustomEvent('os:open', { detail: 'agent' }));
-  return true;
+export async function openAgentSurface(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  const api = (window as { api?: { popOut?: (section: string) => Promise<void> } }).api;
+  if (typeof api?.popOut !== 'function') return false;
+  try {
+    // A first-class pop-out, full-screen reader and Blanc window do not mount
+    // DesktopShell, so their `os:open` event has no listener. Main's pop-out
+    // contract works from every renderer and deduplicates by section, making it
+    // the one honest route for every embedding.
+    await api.popOut('agent');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function announceHandoffFailure(outcome: AgentHandoffOutcome): void {
+  if (typeof window === 'undefined') return;
+  const key = outcome === 'bridge-unavailable' || outcome === 'open-failed'
+    ? 'agent.error.bridge-unavailable'
+    : outcome === 'save-failed'
+      ? 'agent.error.write-failed'
+      : 'agent.execute.error.request';
+  window.dispatchEvent(new CustomEvent('os:toast', {
+    detail: { message: t(key), kind: 'warn' },
+  }));
 }
 
 /** The whole gesture: attach, then open. */
@@ -100,7 +121,14 @@ export async function handOffToAgent(
   conversationTitle: string,
 ): Promise<AgentHandoffOutcome> {
   const outcome = await attachAgentContextFromSurface(input, conversationTitle);
-  if (outcome === 'attached' || outcome === 'unchanged') openAgentSurface();
+  if (outcome !== 'attached' && outcome !== 'unchanged') {
+    announceHandoffFailure(outcome);
+    return outcome;
+  }
+  if (!await openAgentSurface()) {
+    announceHandoffFailure('open-failed');
+    return 'open-failed';
+  }
   return outcome;
 }
 

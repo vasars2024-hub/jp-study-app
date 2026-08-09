@@ -1525,14 +1525,43 @@ Automated evidence: every `agent*.test.ts` suite passes — 17 files and 241 tes
 tests; targeted ESLint exits 0. This changes provider input and persisted
 disclosure metadata, not static chrome, so no new visual artifact applies.
 
+## Context handoff opens from every renderer embedding
+
+The handoff attached context first and then dispatched `os:open`. That event is
+owned by `DesktopShell` (and separately bridged by Mini), but a first-class
+pop-out renders `AppSection` directly, a full-screen reader replaces the desktop,
+and Blanc is a separate entry point. In those embeddings the save succeeded,
+`openAgentSurface()` returned true, and no Agent surface opened.
+
+The route now uses main's existing `popOut('agent')` contract from every renderer.
+Main already deduplicates pop-outs by section, so the call focuses an existing
+Agent window or creates one; it does not create a second conversation or a second
+hidden history. The function awaits the IPC promise and returns false when the
+bridge is missing or main rejects the open, rather than reporting success after a
+fire-and-forget event.
+
+`handOffToAgent` adds the explicit `open-failed` outcome. The attach remains
+first, so a window-opening failure never loses the context, but the caller is no
+longer told the whole gesture landed. Because existing producer controls invoke
+the gesture with `void`, the handoff itself emits the shared `os:toast` warning on
+invalid input, bridge/save failure or open failure using existing translated
+Agent error strings. No producer-specific hidden error path remains necessary.
+
+The routing test proves desktop and Blanc embeddings both invoke the main-owned
+Agent pop-out route. Separate canaries prove a failed attach does not open and
+emits a warning, while a rejected pop-out reports `open-failed` after the context
+save is preserved.
+
+Focused evidence: the rendered handoff suite passes 1 file and 31 tests, 0
+failed. No dirty App, DesktopShell, Media, Reading or catalog path changed.
+
 ## Exact next slice
 
-**Pop-out-safe context handoff.** `openAgentSurface()` dispatches the desktop
-`os:open` event even in a first-class pop-out that renders `AppSection` without a
-desktop router. The context is attached, but the function reports success while
-no Agent surface opens and producer call sites discard failure outcomes. The next
-slice must make the routing result honest for each embedding and surface a failed
-attach instead of silently swallowing it.
+**Attachments or the first safe interactive result card.** Both schemas and the
+provider path exist, but neither has a real producer. Attachments must begin with
+an explicit user-selected file and keep local paths/session-only bytes out of the
+persisted document; a card must be deterministically grounded and execute only an
+already-typed safe effect rather than a model-authored arbitrary payload.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside

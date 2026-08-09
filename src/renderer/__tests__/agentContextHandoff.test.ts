@@ -51,9 +51,6 @@ import { prepareAgentWorkspaceForPersistence } from '../../main/agentWorkspaceSt
 const NOW = 1_800_000_000_000;
 
 let routed: string[] = [];
-const record = (event: Event): void => {
-  routed.push(String((event as CustomEvent).detail));
-};
 
 function opened(): string[] {
   return routed;
@@ -66,13 +63,17 @@ beforeEach(() => {
   workspace.saves = [];
   blanc.isBlanc = false;
   routed = [];
-  window.addEventListener('os:open', record);
+  (window as unknown as { api: Record<string, unknown> }).api = {
+    popOut: async (section: string) => {
+      routed.push(section);
+    },
+  };
 });
 
 afterEach(() => {
   // Removed, not just reset: a listener per test accumulates on the shared
   // jsdom window and every later dispatch is counted once per surviving one.
-  window.removeEventListener('os:open', record);
+  delete (window as unknown as { api?: unknown }).api;
   vi.restoreAllMocks();
 });
 
@@ -173,23 +174,23 @@ describe('attachAgentContextFromSurface', () => {
 });
 
 describe('routing', () => {
-  it('opens the Agent section by its bare id', () => {
-    expect(openAgentSurface()).toBe(true);
+  it('opens the Agent through the main-owned pop-out route', async () => {
+    expect(await openAgentSurface()).toBe(true);
     expect(opened()).toEqual(['agent']);
   });
 
-  it('does not dispatch in a Blanc window, which has no desktop router', () => {
+  it('opens from a Blanc window even though it has no desktop router', async () => {
     blanc.isBlanc = true;
-    expect(openAgentSurface()).toBe(false);
-    expect(opened()).toEqual([]);
+    expect(await openAgentSurface()).toBe(true);
+    expect(opened()).toEqual(['agent']);
   });
 
-  it('still attaches in a Blanc window, so the gesture is not lost', async () => {
+  it('attaches and opens from a Blanc window', async () => {
     blanc.isBlanc = true;
     const outcome = await handOffToAgent(dictionaryAgentContext('食べる', 'to eat', NOW), 'T');
     expect(outcome).toBe('attached');
     expect(workspace.saves).toHaveLength(1);
-    expect(opened()).toEqual([]);
+    expect(opened()).toEqual(['agent']);
   });
 
   it('opens after a successful attach', async () => {
@@ -216,9 +217,26 @@ describe('routing', () => {
   });
 
   it('does not open when the attach failed', async () => {
+    const toasts: unknown[] = [];
+    const onToast = (event: Event) => toasts.push((event as CustomEvent).detail);
+    window.addEventListener('os:toast', onToast);
     workspace.saveResult = { ok: false, code: 'write-failed' };
+    try {
+      expect(await handOffToAgent(dictionaryAgentContext('食べる', 'to eat', NOW), 'T'))
+        .toBe('save-failed');
+      expect(opened()).toEqual([]);
+      expect(toasts).toEqual([expect.objectContaining({ kind: 'warn' })]);
+    } finally {
+      window.removeEventListener('os:toast', onToast);
+    }
+  });
+
+  it('reports an open failure after preserving the attached context', async () => {
+    (window as unknown as { api: Record<string, unknown> }).api.popOut =
+      async () => Promise.reject(new Error('window refused'));
     expect(await handOffToAgent(dictionaryAgentContext('食べる', 'to eat', NOW), 'T'))
-      .toBe('save-failed');
+      .toBe('open-failed');
+    expect(workspace.saves).toHaveLength(1);
     expect(opened()).toEqual([]);
   });
 });
