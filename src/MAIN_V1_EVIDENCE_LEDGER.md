@@ -1834,16 +1834,173 @@ and the four catalogs re-staged hunk-scoped, leaving 39 lines. Anyone touching
 `catalogs/*.ts` here should stage by hunk and check the diffstat before
 committing.
 
+## Two halves of the navigation fix were left unstaged
+
+Found before starting the next slice, not by looking for it: `git status` showed
+`src/shared/agentNavigation.ts` and `src/main/agentExecutionIpc.ts` dirty on a
+branch whose ledger said their change had shipped. It had not. The previous
+session committed the *tests* for "a section is a destination" and the prose
+describing it, and left both implementations in the working tree.
+
+The two are now `1a3fbad` (the resolver: a section-only route context resolves
+instead of being refused `stale-provenance`, while a stored page against a live
+context that has since lost its route stays stale) and `376f28c` (the producer:
+`newestDisclosed` takes a predicate so the source card and the navigation
+suggestion are selected independently, rather than a millisecond tie deciding
+which of the two the user sees).
+
+Worth stating plainly because the ledger read as though this had shipped: **a
+section written into a ledger is not a commit.** The check is one `git status`
+against the paths a section names, and it costs nothing.
+
+## approve-step becomes a real gate
+
+`approve-step` had been in `AgentResultEffect` since the workspace contracts
+landed and inert ever since — a type with no producer, no permission rule and no
+failure path. `shared/agentStepApproval.ts` gives it all three, built the way
+`agentNavigation.ts` is, because the two are the same problem: a persisted
+suggestion that must not be trusted at the moment it is acted on.
+
+The step model it gates already existed. `AgentTask`/`AgentTaskStep` live in
+`shared/localAgent.ts`, persist in `AgentTaskQueue` inside the main-owned
+operational document, and carry a `waiting-confirmation` status on both task and
+step. That status *is* the question `approve-step` asks. Nothing new had to be
+invented to make the effect mean something; it had to be connected to what was
+already there.
+
+**The stored effect is a reference, never an instruction.** A card action carries
+a task id and a step id. Every word the user reads at review time — objective,
+step label, operation — is read out of the live queue, so a planner that rewrote
+either after the card was persisted is what the user actually approves. The
+stored action label is never shown, exactly as the navigation card's label is
+never allowed to name a place. A test asserts the sentinel label reaches no part
+of the resolution.
+
+**Approval is a third authorization boundary and gets the same check.**
+`localAgent.ts` already documents why `evaluateAgentToolAccess` runs at both
+planning and execution: a queued task outlives the profile that authorized it. A
+user-facing approval has the same exposure and re-evaluates against the profile
+as it is *now*, refusing with `operation-denied`. It passes `confirmed: false`
+deliberately — asking whether the user *may* approve must not be answered by
+pretending they already have, so `confirmation-required` is the expected success
+and only `denied` refuses.
+
+**Every absence is a typed refusal rather than a fall-through:** a task the queue
+no longer holds, a task already completed/failed/cancelled, a step that is not
+waiting, a step waiting out of turn (`step-not-current`), a card whose declared
+provenance is empty or gone.
+
+**The producer lives beside the gate,** in the same module, sharing one
+`RUNNABLE_QUEUE_STATUS` and one definition of "waiting on the user". A producer
+with its own reading of the queue eventually disagrees with the gate, and the
+visible form of that disagreement is a button that exists and always refuses. A
+test asserts the agreement directly: anything the producer offers, the gate
+accepts. Selection is FIFO on the oldest blocked task and independent of the
+reply it attaches to — the model chooses nothing. Only one approval is ever
+offered, because a message that sprouted four approve buttons would be a queue
+view, and the queue already has one.
+
+**No task text is persisted.** The card's title is the source context's own
+already-persisted label, so an approval adds no second home for the objective or
+the step label in `workspace-v1.json`. A main-side test pushes sentinels through
+both and asserts neither reaches the stored card, alongside the operation id.
+
+**The grant runs one step with one confirmed call id.** `executeAgentTaskStep`
+overwrites `request.confirmed` from its own `confirmedCallIds` set on every run,
+which makes a persisted confirmation impossible. That is a property worth
+keeping rather than routing around: a stored confirmation would authorize a
+re-run nobody watched. `agentStepApprovalReduce` therefore has no `running`
+state — `granted` spans the grant and the single run it authorizes, since a
+granted approval cannot be withdrawn mid-execution and a cancel there would
+be a button that stops nothing. It *does* accept `failed` from `granted`, which
+the first wiring got wrong: without it the card would have read "approved" over
+a step that never ran.
+
+`AgentTimelineEffect` gains its second member — the extension the timeline was
+built to make cheap. `save` and `undo` stay absent until each has a gate of its
+own.
+
+**Automated evidence.** `src/shared/__tests__/agentStepApproval.test.ts` is new
+(35 tests); the shell suite grew 22 → 28 with the approval review, grant, a
+profile-narrowed refusal, a step that stopped waiting, a cancel, and a
+fail→retry→succeed run asserting both timeline rows survive. `agentExecutionIpc`
+grew 18 → 20. Full `npx vitest run`: **464 files passed, 1 skipped; 6,233 tests
+passed, 6 skipped, 0 failed, exit 0.** All five i18n/architecture gates exit 0.
+Targeted ESLint reports 0 errors and 0 warnings. 26 keys added in all four
+languages.
+
+No live Electron evidence: the grant's only side effect is a queue write the
+`localAgentQueueRun` suites already cover against the same functions, and the
+gate has no main-process half. Stated rather than left as a silent absence.
+
+## Staging a catalog by hunk is not enough — check what the hunk deletes
+
+Recorded because it nearly shipped a real regression, and because the previous
+session's note ("stage `catalogs/*.ts` by hunk") is necessary but **not
+sufficient**.
+
+The four catalogs are being edited by five tracks at once. My 26 keys landed in
+one hunk that contained no other track's additions — by the previous session's
+rule, safe to stage. Staging it produced *26 insertions and 13 deletions*: another
+track had **moved** the `agent.attachment.*` block earlier in the file, so the
+hunk that added my keys also carried the removal of those 13 keys from their old
+position, while the re-adding hunk sat elsewhere and was correctly excluded.
+Committing it would have deleted 13 live keys from `HEAD` and broken the i18n
+gate for everyone.
+
+The rule that actually holds: **read `git diff --cached` for the catalogs and
+require zero deletions.** A pure addition should stage as a pure addition. When
+it does not, build a pure-insertion patch instead — anchor three context lines
+either side of a line that exists in `HEAD`, emit only `+` lines, and
+`git apply --cached`. The generator and the four patches are in
+`~/.claude-runs/lanes/20260809-122200-wake-a/`.
+
+## An independent verification pass, and what it got right and wrong
+
+A sibling agent re-derived this ledger's claims for the last five agent commits
+against the tree. Confirmed: `approve-step` had zero producers before this slice;
+`AgentResultEffect` carries `taskId`/`stepId` and `normalizeEffect` validates
+both; the navigable allowlist is exactly 23 and matches `POPOUT_SECTIONS`; the
+timeline suite is 10 tests and the shell suite was 22; the dead `videoRef` and
+the stale `src/.coordination/study-mode/state.json` are both real.
+
+It reported two defects. **One is real:** the "Exact next slice" note said the
+media *route* work remained, but `routeAgentContext('player', …)` already ships
+at `MediaStudyMode.tsx:274`. What remains is a media-*cue* producer, not the
+route call site. Corrected below.
+
+**One is wrong, and the shape of the error is worth keeping.** It claimed the
+`source.app` note names the wrong failure code — that a media context yields
+`stale-provenance` rather than `unknown-section`, because `agentNavigation.ts:182`
+skips on `item.kind !== 'route'` before `source.app` is compared. That describes
+a `media-cue` context. The note is about a **`route` context whose `app` is
+`media`**, and for that one `resolveAgentNavigation` returns `unknown-section` at
+line 172, before the provenance loop is ever entered. The ledger was right.
+
+Both were checked against the source before either was acted on, which is the
+only reason the wrong one did not become a "fix". A sibling's finding is a
+hypothesis with a file and a line attached, and the line is the part to read.
+
 ## Exact next slice
 
-**Wire `approve-step` onto the timeline.** It is the effect the timeline was built
-for and the only one whose prerequisite is now met. `save` and `undo` stay
-unconnected until each has a typed producer, a permission rule and an honest
-failure path of its own.
+**A media-cue context producer.** `mediaCueAgentContext` at
+`src/renderer/agentContextHandoff.ts:359` emits `source: { app: 'media' }`.
+`media` is not in `AGENT_NAVIGABLE_SECTIONS`, so a *route* context built that way
+resolves to `unknown-section` and fails closed — correctly but uselessly. Emit
+`player`, `video` or `music`. The route half of the media work is **done**:
+`routeAgentContext('player', …)` ships at `MediaStudyMode.tsx:274`.
 
-**Media context producers.** The route half of this is **done** — see "The
-navigation gate becomes reachable" above; `routeAgentContext` ships and a real
-gesture produces a real navigation card. What remains is the media surfaces.
+**`save` and `undo`.** The two remaining inert effects, and the honest next
+targets now that `approve-step` shows the shape: a typed producer that stores
+ids only, a resolver that re-derives everything from live state, re-authorization
+at the moment of action, and a typed refusal for every absence. `save` is the
+easier of the two — `entityType`/`entityId` against a real store. `undo` needs an
+operation log that does not exist yet, and should not be wired until it does.
+
+**A queue-side view of the approval.** The Agent surface can now approve a step;
+the Blanc queue panel still has its own separate confirm button reading its own
+`confirmedCallIds`. Neither is wrong, but two controls granting the same
+permission through two paths is how they drift.
 
 **A note for whoever adds those producers:** `source.app` must be an allowlisted
 section name. The existing media producers emit `app: 'media'`, which is not a
