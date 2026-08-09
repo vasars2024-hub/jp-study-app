@@ -808,6 +808,32 @@
   font-size: var(--font-size-xs, 0.75rem);
 }
 
+/* The save gate. One line of content rather than three, so it wraps like the
+   navigation gate rather than reserving a row of its own. */
+.agent-card-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  min-width: 0;
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-card-save-entry {
+  color: var(--agent-text);
+  font-weight: var(--font-weight-medium, 500);
+  overflow-wrap: anywhere;
+}
+
+.agent-card-save-confirm {
+  border-color: var(--agent-accent);
+  color: var(--agent-text);
+}
+
+.agent-card-save-status {
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
 .agent-card-actions,
 .agent-card-action-wrap {
   display: flex;

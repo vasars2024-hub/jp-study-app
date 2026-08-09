@@ -144,7 +144,26 @@ function resultCardsForContext(
       // persisted label source-derived avoids introducing untranslated UI text.
       label: source.label,
       effect: { type: 'open-context', contextId: source.id },
-    }],
+    },
+    // A save rides on the source card rather than getting a card of its own:
+    // it acts on exactly the item that card already shows, and a second card
+    // repeating the same title would suggest a second thing to look at.
+    //
+    // Only a dictionary entry. `agentSave.ts` refuses every other kind because
+    // the rest are session-only material, and a producer that offered the button
+    // anyway would be offering one that always fails — the dead control the
+    // navigation producer refuses to emit for the same reason.
+    ...(source.kind === 'dictionary-entry' ? [{
+      id: `${assistantMessageId}-save-1`,
+      label: source.label,
+      effect: {
+        type: 'save' as const,
+        entityType: 'flashcard',
+        // The context id, not the word. The gate reads the term and the gloss
+        // out of the live item, so a stored string can never become the row.
+        entityId: source.id,
+      },
+    }] : [])],
   };
   cards.push(sourceCard);
 

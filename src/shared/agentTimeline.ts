@@ -46,12 +46,13 @@ export type AgentTimelineStatus =
  *
  * `approve-step` joined when it acquired all three: `agentStepApproval.ts`
  * resolves it against the live task queue, re-authorizes it through
- * `evaluateAgentToolAccess`, and refuses with a typed code. `save` and `undo`
- * are still absent for the same reason `approve-step` was, and adding either
- * here before it has a gate of its own would put a claim in the record that
- * nothing checked.
+ * `evaluateAgentToolAccess`, and refuses with a typed code. `save` joined on the
+ * same terms through `agentSave.ts`. `undo` is still absent for the reason both
+ * of those once were — it has no operation log to resolve against — and adding
+ * it here before it has a gate would put a claim in the record that nothing
+ * checked.
  */
-export type AgentTimelineEffect = 'navigate' | 'approve-step';
+export type AgentTimelineEffect = 'navigate' | 'approve-step' | 'save';
 
 export interface AgentTimelineTarget {
   conversationId: string;

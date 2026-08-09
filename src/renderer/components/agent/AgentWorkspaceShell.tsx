@@ -66,6 +66,14 @@ import {
   grantAgentStepApproval,
   readAgentStepApprovalContext,
 } from '../../agentStepApprovalClient';
+import {
+  AGENT_SAVE_IDLE,
+  agentSaveReduce,
+  resolveAgentSave,
+  type AgentSaveEvent,
+  type AgentSaveRun,
+} from '../../../shared/agentSave';
+import { readAgentSaveContext, saveAgentEntity } from '../../agentSaveClient';
 import { runAgentNavigation } from '../../agentNavigationClient';
 import {
   AGENT_ATTACHMENT_ACCEPT,
@@ -293,6 +301,9 @@ function MessageRow({
   const recordApproval = (cardId: string, actionId: string, event: AgentTimelineEvent): void => {
     onRecord(cardId, actionId, 'approve-step', event);
   };
+  const recordSave = (cardId: string, actionId: string, event: AgentTimelineEvent): void => {
+    onRecord(cardId, actionId, 'save', event);
+  };
   const [failedActionId, setFailedActionId] = useState<string | null>(null);
   /**
    * One lifecycle per navigation action, keyed by card and action.
@@ -305,6 +316,8 @@ function MessageRow({
   const [navigationRuns, setNavigationRuns] = useState<Record<string, AgentNavigationRun>>({});
   /** One lifecycle per approval action, held here for the same reason. */
   const [approvalRuns, setApprovalRuns] = useState<Record<string, AgentStepApprovalRun>>({});
+  /** And one per save action. */
+  const [saveRuns, setSaveRuns] = useState<Record<string, AgentSaveRun>>({});
   const provider = message.provider;
 
   const dispatchNavigation = (key: string, event: AgentNavigationEvent): void => {
@@ -443,6 +456,51 @@ function MessageRow({
     }
     dispatchApproval(key, { type: 'failed', code: result.code });
     recordApproval(cardId, actionId, { type: 'failed', code: result.code });
+  };
+
+  const dispatchSave = (key: string, event: AgentSaveEvent): void => {
+    setSaveRuns((previous) => ({
+      ...previous,
+      [key]: agentSaveReduce(previous[key] ?? AGENT_SAVE_IDLE, event),
+    }));
+  };
+
+  /**
+   * Asks the gate what saving this would create. Resolves against the deck and
+   * the profile as they are now, and writes nothing.
+   */
+  const reviewSave = (key: string, cardId: string, actionId: string): void => {
+    recordSave(cardId, actionId, { type: 'review' });
+    const context = readAgentSaveContext(t);
+    const resolution = resolveAgentSave(
+      conversation,
+      message.id,
+      cardId,
+      actionId,
+      context.permission,
+      context.savedWords,
+      context.allowedOperations,
+    );
+    if (!resolution.ok) {
+      dispatchSave(key, { type: 'refused', code: resolution.code });
+      recordSave(cardId, actionId, { type: 'refused', code: resolution.code });
+      return;
+    }
+    dispatchSave(key, { type: 'review', target: resolution.target });
+  };
+
+  const confirmSave = (key: string, cardId: string, actionId: string): void => {
+    const current = saveRuns[key];
+    if (current?.status !== 'review' || !current.target) return;
+    const target = current.target;
+    dispatchSave(key, { type: 'confirm' });
+    const result = saveAgentEntity(target);
+    if (result.ok) {
+      recordSave(cardId, actionId, { type: 'succeeded' });
+      return;
+    }
+    dispatchSave(key, { type: 'failed', code: result.code });
+    recordSave(cardId, actionId, { type: 'failed', code: result.code });
   };
   return (
     <li className={`agent-message agent-message-${message.role}`}>
@@ -708,6 +766,97 @@ function MessageRow({
                             }}
                           >
                             {t('agent.card.approve.retry')}
+                          </button>
+                        </>
+                      ) : null}
+                    </span>
+                  );
+                })}
+                {card.actions.map((action) => {
+                  if (action.effect.type !== 'save') return null;
+                  const key = `${card.id}:${action.id}`;
+                  const run = saveRuns[key] ?? AGENT_SAVE_IDLE;
+                  // The word and the gloss come from the gate's resolution
+                  // against the live shelf item; the stored label names nothing.
+                  const target = run.target;
+                  return (
+                    <span
+                      key={action.id}
+                      className={`agent-card-save agent-save-${run.status}`}
+                      role="group"
+                      aria-label={t('agent.card.save.title')}
+                    >
+                      {run.status === 'idle' ? (
+                        <button
+                          type="button"
+                          className="agent-action agent-card-action"
+                          onClick={() => reviewSave(key, card.id, action.id)}
+                        >
+                          <Icon name="plus" size={13} />
+                          {t('agent.card.save.review')}
+                        </button>
+                      ) : null}
+                      {run.status === 'review' && target ? (
+                        <>
+                          <span className="agent-card-save-entry">
+                            {t('agent.card.save.entry', { word: target.word })}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action agent-card-save-confirm"
+                            onClick={() => confirmSave(key, card.id, action.id)}
+                          >
+                            <Icon name="check" size={13} />
+                            {t('agent.card.save.confirm')}
+                          </button>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => {
+                              dispatchSave(key, { type: 'cancel' });
+                              recordSave(card.id, action.id, { type: 'cancelled' });
+                            }}
+                          >
+                            {t('agent.card.save.cancel')}
+                          </button>
+                        </>
+                      ) : null}
+                      {run.status === 'saved' ? (
+                        <span className="agent-card-save-status">
+                          {t('agent.card.save.saved')}
+                        </span>
+                      ) : null}
+                      {run.status === 'cancelled' ? (
+                        <>
+                          <span className="agent-card-save-status">
+                            {t('agent.card.save.cancelled')}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => {
+                              dispatchSave(key, { type: 'retry' });
+                              reviewSave(key, card.id, action.id);
+                            }}
+                          >
+                            {t('agent.card.save.review')}
+                          </button>
+                        </>
+                      ) : null}
+                      {run.status === 'failed' ? (
+                        <>
+                          <span className="agent-card-action-error" role="alert">
+                            {t(`agent.save.error.${run.code ?? 'save-failed'}`)}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => {
+                              dispatchSave(key, { type: 'retry' });
+                              reviewSave(key, card.id, action.id);
+                            }}
+                          >
+                            {t('agent.card.save.retry')}
                           </button>
                         </>
                       ) : null}

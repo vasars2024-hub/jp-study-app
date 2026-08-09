@@ -535,9 +535,10 @@ describe('Agent execution IPC', () => {
       summary: 'word 8',
       sourceContextIds: ['ctx-retained-8'],
     });
-    expect(cards.every((card) => (
-      card.actions.length === 1 && card.actions[0].effect.type === 'open-context'
-    ))).toBe(true);
+    // A dictionary entry now carries a save beside the open, and nothing else:
+    // no navigation, and no duplicate of either.
+    expect(cards.flatMap((card) => card.actions.map((action) => action.effect.type)))
+      .toEqual(['open-context', 'save']);
   });
 
   it('adds a metadata-grounded navigation suggestion for the newest disclosed route', async () => {
@@ -750,6 +751,95 @@ describe('Agent execution IPC', () => {
     expect(serialized).not.toContain('flashcard.add-cards');
   });
 
+  it('offers a save on a dictionary entry, naming the context id rather than the word', async () => {
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'ctx-word',
+      kind: 'dictionary-entry',
+      label: '積ん読',
+      preview: 'tsundoku',
+      source: { app: 'dictionary', entityId: '積ん読' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 40,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-word'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards).toHaveLength(1);
+    expect(cards[0].actions.map((action) => action.effect)).toEqual([
+      { type: 'open-context', contextId: 'ctx-word' },
+      { type: 'save', entityType: 'flashcard', entityId: 'ctx-word' },
+    ]);
+  });
+
+  it.each([
+    'reading-passage',
+    'media-cue',
+    'selected-text',
+  ] as const)('offers no save on %s context, which the gate would refuse anyway', async (kind) => {
+    // The producer and `agentSave.ts` agree on what is savable. A button the
+    // gate could only ever refuse is a dead control, not an offer.
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'ctx-material',
+      kind,
+      label: '窓辺の猫',
+      preview: 'a cat by the window',
+      source: { app: 'reading' },
+      sensitivity: 'personal',
+      retained: false,
+      createdAt: 40,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-material'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards.flatMap((card) => card.actions.map((action) => action.effect.type)))
+      .not.toContain('save');
+  });
+
   it('offers no approval card when the queue has nothing waiting on the user', async () => {
     const state = workspace();
     state.conversations[0].context = [{
@@ -914,7 +1004,10 @@ describe('Agent execution IPC', () => {
       kind: 'dictionary',
       title: '猫',
       sourceContextIds: ['dictionary-entry:猫'],
-      actions: [{ effect: { type: 'open-context', contextId: 'dictionary-entry:猫' } }],
+      actions: [
+        { effect: { type: 'open-context', contextId: 'dictionary-entry:猫' } },
+        { effect: { type: 'save', entityType: 'flashcard', entityId: 'dictionary-entry:猫' } },
+      ],
     });
     expect(cards[1]).toMatchObject({
       kind: 'navigation',

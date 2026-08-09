@@ -36,6 +36,7 @@ vi.mock('../i18n', () => ({
       if (vars && 'objective' in vars) return `${key}:${vars.objective}`;
       if (vars && 'step' in vars) return `${key}:${vars.step}`;
       if (vars && 'operation' in vars) return `${key}:${vars.operation}`;
+      if (vars && 'word' in vars) return `${key}:${vars.word}`;
       return key;
     },
     lang: 'en',
@@ -54,6 +55,20 @@ vi.mock('../agentStepApprovalClient', () => ({
   grantAgentStepApproval: (...args: unknown[]) => {
     grantCalls.push(args);
     return Promise.resolve(grantResult);
+  },
+}));
+
+// Same seam for the save gate: the deck and the profile are stubbed, the one
+// write is recorded, and `resolveAgentSave` runs for real inside the component.
+vi.mock('../agentSaveClient', () => ({
+  readAgentSaveContext: () => ({
+    permission: saveContext.permission,
+    allowedOperations: saveContext.allowedOperations,
+    savedWords: new Set(saveContext.savedWords),
+  }),
+  saveAgentEntity: (...args: unknown[]) => {
+    saveCalls.push(args);
+    return saveResult;
   },
 }));
 
@@ -83,6 +98,13 @@ let approvalContext: {
 };
 let grantResult: unknown;
 let grantCalls: unknown[][];
+let saveContext: {
+  permission: string;
+  allowedOperations: string[];
+  savedWords: string[];
+};
+let saveResult: unknown;
+let saveCalls: unknown[][];
 
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
@@ -230,6 +252,36 @@ function waitingQueue(): { version: 1; items: unknown[] } {
   };
 }
 
+/**
+ * A conversation carrying the dictionary source card with its save action —
+ * the shape `resultCardsForContext` produces for a disclosed dictionary entry.
+ */
+function saveWorkspace(kind = 'dictionary-entry'): AgentWorkspaceState {
+  const base = populated();
+  base.conversations[0].context = [{
+    id: 'ctx-word',
+    kind,
+    label: '積ん読',
+    preview: 'books bought and left unread',
+    source: { app: 'dictionary', entityId: '積ん読' },
+    sensitivity: 'ordinary',
+    retained: true,
+    createdAt: 10,
+  }] as AgentWorkspaceState['conversations'][number]['context'];
+  base.conversations[0].messages[0].cards = [{
+    id: 'entry-card',
+    kind: 'dictionary',
+    title: '積ん読',
+    sourceContextIds: ['ctx-word'],
+    actions: [{
+      id: 'save',
+      label: 'Stored save label nobody reads',
+      effect: { type: 'save', entityType: 'flashcard', entityId: 'ctx-word' },
+    }],
+  }];
+  return base;
+}
+
 /** A stand-in for main: it answers from `stored` and records what it was asked. */
 function installBridge(): void {
   calls = [];
@@ -355,6 +407,13 @@ beforeEach(() => {
   };
   grantResult = { ok: true };
   grantCalls = [];
+  saveContext = {
+    permission: 'full-automation',
+    allowedOperations: ['flashcard.add-cards'],
+    savedWords: [],
+  };
+  saveResult = { ok: true };
+  saveCalls = [];
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -718,6 +777,73 @@ describe('Agent workspace shell', () => {
     expect(grantCalls).toHaveLength(0);
     expect(text()).toContain('agent.card.approve.cancelled');
     expect(text()).toContain('agent.timeline.status.cancelled');
+  });
+
+  it('reviews a save from the live shelf item, then writes only on confirm', async () => {
+    stored = saveWorkspace();
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+
+    expect(text()).toContain('agent.card.save.entry:積ん読');
+    expect(text()).not.toContain('Stored save label nobody reads');
+    expect(saveCalls).toHaveLength(0);
+
+    await click(buttonWith('agent.card.save.confirm'));
+    expect(saveCalls).toHaveLength(1);
+    expect(saveCalls[0][0]).toMatchObject({
+      entityType: 'flashcard',
+      entityId: 'ctx-word',
+      word: '積ん読',
+      meaning: 'books bought and left unread',
+    });
+    expect(text()).toContain('agent.card.save.saved');
+    expect(text()).toContain('agent.timeline.effect.save');
+    expect(text()).toContain('agent.timeline.status.succeeded');
+  });
+
+  it('refuses to save session-only reading context, and never writes', async () => {
+    // The persistence boundary, expressed as a control: a passage the user
+    // highlighted is never written to disk, so it cannot become a deck row.
+    stored = saveWorkspace('reading-passage');
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+
+    expect(text()).toContain('agent.save.error.not-savable-kind');
+    expect(saveCalls).toHaveLength(0);
+    expect(text()).toContain('agent.timeline.status.failed');
+  });
+
+  it('refuses a word the deck already holds', async () => {
+    stored = saveWorkspace();
+    saveContext.savedWords = ['積ん読'];
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+
+    expect(text()).toContain('agent.save.error.already-saved');
+    expect(saveCalls).toHaveLength(0);
+  });
+
+  it('refuses a save the profile no longer permits', async () => {
+    stored = saveWorkspace();
+    saveContext.allowedOperations = ['flashcard.list-decks'];
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+
+    expect(text()).toContain('agent.save.error.operation-denied');
+    expect(saveCalls).toHaveLength(0);
+  });
+
+  it('reports a write that failed after the user confirmed', async () => {
+    stored = saveWorkspace();
+    saveResult = { ok: false, code: 'save-failed' };
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+    await click(buttonWith('agent.card.save.confirm'));
+
+    // Not "saved" over a deck that gained nothing.
+    expect(text()).toContain('agent.save.error.save-failed');
+    expect(text()).not.toContain('agent.card.save.saved');
+    expect(text()).toContain('agent.timeline.status.failed');
   });
 
   it('announces stale or undeclared card context without moving focus or mutating state', async () => {
