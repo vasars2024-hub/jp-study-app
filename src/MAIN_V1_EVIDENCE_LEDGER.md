@@ -1450,6 +1450,40 @@ Targeted ESLint exits 0. No catalog, preload, Media or root-configuration path
 changed; the visible correction is behavior under an active stream rather than a
 new static layout.
 
+## Context provenance is opaque and fail-closed
+
+The card retention rule still had one Boolean edge after the previous checkpoint:
+`sourceContextIds.every(retained)` is true for an empty list. A card declaring no
+provenance could therefore persist its title, summary and action payloads in full,
+even though the boundary had no evidence that any source was retained. Cards now
+need at least one declared source and every declared source must survive. The first
+interactive producer can build on a fail-closed rule instead of making the empty
+list a privileged bypass.
+
+The ids being pruned were also content-bearing. Every personal producer used its
+selection, passage or subtitle as `identity`, and `createAgentContextItem` copied
+the first 200 characters into `id`. That made message references, provider
+disclosures and card provenance alternate storage locations for material whose
+context object is intentionally session-only. Personal and sensitive context now
+uses a deterministic 16-hex opaque identity; ordinary route/dictionary identities
+remain readable because they are reference data allowed across the persistence
+boundary.
+
+Hashing uses the complete personal identity rather than the previous 200-character
+prefix, so two long paragraphs with the same opening no longer collapse into one
+shelf item. The identifier is for stable deduplication, not encryption or user
+authentication; its privacy property is simply that the raw material is not the
+identifier.
+
+Canary evidence adds an unprovenanced card whose summary contains a sentinel and
+asserts neither reaches raw `workspace-v1.json`. Context tests assert equal
+personal inputs produce the same opaque id, different and shared-prefix inputs do
+not collide in the fixture, and the id contains none of the original material.
+The media handoff test verifies the same property at a real producer boundary.
+
+Focused evidence: 5 files and 111 tests pass, 0 failed. No visual, catalog,
+preload, Media implementation or root-configuration path changed.
+
 ## Exact next slice
 
 **Conversation continuity.** The provider request

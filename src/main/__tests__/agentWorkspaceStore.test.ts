@@ -92,6 +92,13 @@ function document() {
             label: 'Open missing',
             effect: { type: 'open-context', contextId: 'ctx-session' },
           }],
+        }, {
+          id: 'card-unprovenanced',
+          kind: 'generic',
+          title: 'Private material with no declared source',
+          summary: 'UNPROVENANCED_PRIVATE_VALUE',
+          sourceContextIds: [],
+          actions: [],
         }],
         provider: {
           target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
@@ -230,6 +237,8 @@ describe('main-owned Agent workspace store', () => {
     expect(raw).not.toContain('ctx-session');
     expect(raw).not.toContain('秘密');
     expect(raw).not.toContain('card-1');
+    expect(raw).not.toContain('card-unprovenanced');
+    expect(raw).not.toContain('UNPROVENANCED_PRIVATE_VALUE');
     expect(JSON.parse(raw).conversations[0].context).toHaveLength(1);
   });
 

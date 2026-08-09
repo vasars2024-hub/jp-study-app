@@ -57,6 +57,23 @@ describe('createAgentContextItem', () => {
     expect(build().id).toBe(build().id);
   });
 
+  it('keeps personal material out of ids without losing stable identity', () => {
+    const first = build({ kind: 'reading-passage', identity: '秘密の段落' });
+    const again = build({ kind: 'reading-passage', identity: '秘密の段落' });
+    const other = build({ kind: 'reading-passage', identity: '別の段落' });
+    expect(first.id).toBe(again.id);
+    expect(first.id).not.toBe(other.id);
+    expect(first.id).toMatch(/^reading-passage:[0-9a-f]{16}$/);
+    expect(first.id).not.toContain('秘密の段落');
+  });
+
+  it('does not collapse long personal identities that share their first 200 characters', () => {
+    const prefix = 'あ'.repeat(200);
+    const first = build({ kind: 'reading-passage', identity: `${prefix}甲` });
+    const second = build({ kind: 'reading-passage', identity: `${prefix}乙` });
+    expect(first.id).not.toBe(second.id);
+  });
+
   it('refuses input that could not describe anything', () => {
     const base = {
       kind: 'dictionary-entry' as const,

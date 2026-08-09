@@ -42,7 +42,10 @@ function retainedMessage(message: AgentMessage, contextIds: Set<string>): AgentM
     // source it declares is retained; a producer that needs persistence must make
     // that provenance explicit instead of relying on field-by-field redaction.
     cards: message.cards
-      .filter((card) => card.sourceContextIds.every((id) => contextIds.has(id)))
+      .filter((card) => (
+        card.sourceContextIds.length > 0
+        && card.sourceContextIds.every((id) => contextIds.has(id))
+      ))
       .map((card) => ({
         ...card,
         actions: card.actions.filter((action) => (

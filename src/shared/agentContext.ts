@@ -82,6 +82,26 @@ function clamp(value: string, max: number): string {
   return value.trim().slice(0, max);
 }
 
+/**
+ * Stable opaque identity for personal and sensitive material.
+ *
+ * Context ids are copied into messages, provider disclosures and result-card
+ * provenance. Putting the selection or subtitle itself in that id would make
+ * every one of those references content-bearing and turn a missed prune into a
+ * plaintext leak. Two independent 32-bit FNV-1a passes keep ids compact and
+ * deterministic without carrying the material itself.
+ */
+function opaqueIdentity(value: string): string {
+  let left = 0x811c9dc5;
+  let right = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    left = Math.imul(left ^ code, 0x01000193);
+    right = Math.imul(right ^ code, 0x85ebca6b);
+  }
+  return `${(left >>> 0).toString(16).padStart(8, '0')}${(right >>> 0).toString(16).padStart(8, '0')}`;
+}
+
 export interface AgentContextInput {
   kind: AgentContextKind;
   label: string;
@@ -107,13 +127,16 @@ export interface AgentContextInput {
  */
 export function createAgentContextItem(input: AgentContextInput): AgentContextItem | null {
   const label = clamp(input.label, AGENT_CONTEXT_LABEL_MAX);
-  const identity = clamp(input.identity, 200);
+  const rawIdentity = input.identity.trim();
   const app = clamp(input.source.app, 120);
-  if (!label || !identity || !app) return null;
+  if (!label || !rawIdentity || !app) return null;
 
   const floor = SENSITIVITY_FLOOR[input.kind];
   const requested = input.sensitivity ?? floor;
   const sensitivity = SENSITIVITY_RANK[requested] >= SENSITIVITY_RANK[floor] ? requested : floor;
+  const identity = sensitivity === 'ordinary'
+    ? rawIdentity.slice(0, 200)
+    : opaqueIdentity(rawIdentity);
 
   return {
     id: `${input.kind}:${identity}`,

@@ -444,6 +444,7 @@ describe('media cue as session-only context', () => {
       conversations: Array<{ title: string; context: Array<{ id: string }> }>;
     };
     expect(saved.conversations[0].title).toBe('Watching: My Show');
-    expect(saved.conversations[0].context[0].id).toBe(`media-cue:${LINE}`);
+    expect(saved.conversations[0].context[0].id).toMatch(/^media-cue:[0-9a-f]{16}$/);
+    expect(saved.conversations[0].context[0].id).not.toContain(LINE);
   });
 });
