@@ -293,6 +293,8 @@ declare global {
       lookupWord(query: string): Promise<DictResult>;
       lookupTerm(query: string): Promise<DictResult>;
       lookupTermOffline(query: string): Promise<DictResult>;
+      lookupChinese(query: string): Promise<DictResult>;
+      resetChineseDictCache(): Promise<void>;
       lookupTermsBatch(
         queries: Array<{ expression: string; reading?: string }>,
         langs: Array<'en' | 'ja' | 'zh' | 'ru'>,

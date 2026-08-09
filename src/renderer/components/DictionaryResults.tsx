@@ -17,7 +17,6 @@ import {
 import AnkiSetup from './AnkiSetup';
 import Icon from './Icons';
 import { addSaved, loadSaved, onSavedChanged, removeSaved } from '../savedWords';
-import { lookupChinese } from '../chineseDict';
 import { getActiveProfile, onProfileChanged } from '../profileState';
 import { translateTo, type TransLang } from '../translator';
 // Imported from their defining modules rather than the `shared/mining` barrel.
@@ -268,7 +267,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     setExTrans({});
     if (!query.trim()) return;
     const lookup =
-      lang === 'zh' ? lookupChinese(query) : window.api.lookupTerm(query);
+      lang === 'zh' ? window.api.lookupChinese(query) : window.api.lookupTerm(query);
     lookup.then((r) => {
       if (!alive) return;
       setResult(r);

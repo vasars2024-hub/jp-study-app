@@ -11,7 +11,6 @@ import {
   setStudyLang,
   type StudyLang,
 } from '../../../studyEnvironment';
-import { resetChineseDictCache } from '../../../chineseDict';
 
 function seg(active: boolean): string {
   return `btn small ${active ? 'primary' : ''}`;
@@ -31,7 +30,9 @@ export default function StudyLanguageSection() {
 
   useEffect(() => {
     if (status?.state === 'installed' && primaryId === 'cc-cedict') {
-      resetChineseDictCache();
+      // The CC-CEDICT index now lives in main (Phase 4), so this drops main's
+      // cache rather than the renderer's.
+      void window.api.resetChineseDictCache();
     }
   }, [status?.state, primaryId]);
 

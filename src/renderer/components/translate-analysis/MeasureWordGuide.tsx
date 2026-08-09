@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import CollapsibleSection from '../CollapsibleSection';
-import { lookupChinese, parseClassifiers, type ClassifierHint } from '../../chineseDict';
+import { parseClassifiers, type ClassifierHint } from '../../../shared/pinyin';
 import type { AspectNoteItem, MeasureWordItem } from '../../../shared/translateAnalysisCore';
 
 // The LLM names the noun and its contextual classifier; CEDICT's embedded
@@ -24,7 +24,7 @@ export default function MeasureWordGuide({
     }
     void Promise.all(
       nouns.map(async (noun) => {
-        const result = await lookupChinese(noun);
+        const result = await window.api.lookupChinese(noun);
         const defs = result.entries[0]?.senses?.[0]?.definitions ?? [];
         return [noun, parseClassifiers(defs)] as const;
       }),

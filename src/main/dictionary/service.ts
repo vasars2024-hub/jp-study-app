@@ -27,6 +27,7 @@
 // it to a button is safe only once it has somewhere to run.
 
 import fs from 'node:fs';
+import path from 'node:path';
 import { app } from 'electron';
 import { closeDictionaryDb, dictionaryDb, dictionaryDbPath, type SqliteDb } from './db';
 import { DICT_SCHEMA_VERSION } from './schema';
@@ -38,6 +39,12 @@ import {
 } from './migrate';
 import { importCedict, type CedictImportCounts } from './importers/cedict';
 import { lookup, type LookupQuery, type LookupResult } from './dictService';
+import {
+  lookupChineseTerm,
+  resetCedictIndexCache,
+  type ChineseLookupDeps,
+} from './chineseLookup';
+import type { DictResult } from '../../shared/types';
 
 export interface DictionaryStatus {
   /** Absolute path of the database file. */
@@ -128,14 +135,75 @@ export function importCedictFileNow(filePath: string, dictId?: string): CedictIm
  * Look a term up in the database, across every enabled dictionary.
  *
  * This is the service's read API and the successor to `lookupGlossary` /
- * `lookupChinese`. **Nothing in the renderer calls it yet** — swapping the five
- * dictionary surfaces onto it is Phase 4, and doing it before the legacy migration
- * has somewhere to run would point the UI at an empty database. It is exported here
- * rather than left as a test-only module because it is part of this service's
- * surface, not because it is in use.
+ * `lookupChinese`. Phase 4 put it in front of both: `dictionary.ts`'s `lookupTerm`
+ * tries it first for Japanese, and `lookupChineseInDictionary` below does the same
+ * for Chinese. Both fall back to the legacy source when it returns nothing, which
+ * is not politeness — the legacy migration still has nowhere to run, so on a
+ * current installation this database is empty and a hard swap would have made the
+ * dictionary silently return no results.
  */
 export function lookupInDictionaryDb(query: LookupQuery): LookupResult {
   return lookup(dictionaryDb(), query);
+}
+
+// ----- the Chinese surface's lookup path -------------------------------------
+//
+// Phase 4 moved `renderer/chineseDict.ts`'s engine here. The deps below are the
+// only Electron-aware part; `chineseLookup.ts` itself is pure so it can be
+// tested without a running app.
+
+/** Where the bundled CC-CEDICT copy lives, dev and packaged. */
+function bundledCedictPath(): string {
+  const rel = ['public', 'cedict', 'cedict.u8'];
+  return app.isPackaged
+    ? path.join(process.resourcesPath, ...rel)
+    : path.join(app.getAppPath(), ...rel);
+}
+
+/**
+ * Managed install (the Phase 6 `cc-cedict` asset) first, bundled copy second —
+ * the same precedence the renderer module used, so a user who downloaded the
+ * fuller dictionary keeps getting it.
+ *
+ * `downloads` is imported lazily: it is a large module and this path is only
+ * reached when the database has no Chinese dictionary.
+ */
+async function loadCedictText(): Promise<string> {
+  try {
+    const downloads = await import('../downloads');
+    if (downloads.isInstalled('cc-cedict')) {
+      const text = await downloads.readAssetText('cc-cedict');
+      if (text && text.length > 0) return text;
+    }
+  } catch {
+    /* fall through to the bundled copy */
+  }
+  const file = bundledCedictPath();
+  if (!fs.existsSync(file)) {
+    throw new Error(`Could not load the Chinese dictionary (missing ${file}).`);
+  }
+  return fs.readFileSync(file, 'utf8');
+}
+
+const chineseDeps: ChineseLookupDeps = {
+  db: () => {
+    try {
+      return dictionaryDb();
+    } catch {
+      return null;
+    }
+  },
+  loadCedictText,
+};
+
+/** Look a Chinese term up. Database first, CC-CEDICT file second. */
+export function lookupChineseInDictionary(query: string): Promise<DictResult> {
+  return lookupChineseTerm(query, chineseDeps);
+}
+
+/** Drop the cached CC-CEDICT index after a managed install finishes. */
+export function resetChineseDictionaryCache(): void {
+  resetCedictIndexCache();
 }
 
 export function shutdownDictionaryService(): void {

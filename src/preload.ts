@@ -380,6 +380,14 @@ const api = {
   lookupWord: (query: string): Promise<DictResult> => ipcRenderer.invoke('dict:lookup', query),
   /** Merged Yomitan offline lookup with Jisho fallback (Japanese). */
   lookupTerm: (query: string): Promise<DictResult> => ipcRenderer.invoke('dict:lookupTerm', query),
+  /**
+   * Chinese lookup — the dictionary database first, CC-CEDICT second. Replaces
+   * `renderer/chineseDict.ts`, which parsed 9.4 MB of CC-CEDICT on the UI thread.
+   */
+  lookupChinese: (query: string): Promise<DictResult> =>
+    ipcRenderer.invoke('dict:lookupChinese', query),
+  /** Drop main's cached CC-CEDICT index after a managed install finishes. */
+  resetChineseDictCache: (): Promise<void> => ipcRenderer.invoke('dict:resetChineseCache'),
   /** Structured pitch-accent data (downstep positions), for the Blanc pitch panel. */
   dictPitch: (term: string, reading?: string): Promise<PitchLookup> =>
     ipcRenderer.invoke('dict:pitch', term, reading),

@@ -37,7 +37,11 @@ import {
   searchOffline,
 } from './dictionary/tatoebaOffline';
 import { enrichLexiconResultMetadata, lookupResultToDictResult } from './dictionary/lexiconAdapter';
-import { lookupInDictionaryDb } from './dictionary/service';
+import {
+  lookupChineseInDictionary,
+  lookupInDictionaryDb,
+  resetChineseDictionaryCache,
+} from './dictionary/service';
 import { normalizeLexiconText } from '../shared/lexiconWorkbench';
 
 // Dictionary lookups go through Jisho.org (the same JMdict data Yomitan's main
@@ -385,6 +389,9 @@ export async function searchExamples(query: string, limit = DEFAULT_FETCH_LIMIT)
 export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string) => lookupTerm(query));
+  // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
+  ipcMain.handle('dict:lookupChinese', (_e, query: string) => lookupChineseInDictionary(query));
+  ipcMain.handle('dict:resetChineseCache', () => resetChineseDictionaryCache());
   // Read-only structured pitch data for the Blanc pitch panel.
   ipcMain.handle('dict:pitch', (_e, term: string, reading?: string) => getPitchData(term, reading));
   ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));
