@@ -1778,13 +1778,68 @@ every kind, not just `route`. It is a pre-existing approximation and the
 disclosed `inputChars` is recomputed from the assembled prompt, so nothing
 user-visible is wrong.
 
+## The execution timeline
+
+`shared/agentTimeline.ts` records what the Agent actually tried to do.
+`agentNavigationReduce` already models one action's lifecycle, but it models the
+*current state of one control*: a retry overwrites the refusal that preceded it,
+and a second card knows nothing about the first. That is right for a button and
+wrong for review, and review is the point — approving step three means reading
+what steps one and two did.
+
+Two rules carry it. **A terminal attempt is never mutated**, so a retry appends a
+second attempt beside the first rather than erasing it; this is the whole
+difference between a timeline and a status field, and it is the prerequisite for
+`approve-step`. And **an entry names ids only** — no section, page, destination
+or label. The navigation channel refuses payloads carrying those exact fields so
+that no stored string can widen what gets opened; a timeline that cached the
+resolved destination would put that string straight back and invite a renderer to
+trust it. The UI resolves every label from the section's own `palette.section.*`
+key, as the navigation card does.
+
+`idle` is deliberately not a timeline status: it is the state where nothing
+happened, and a record of things that did not happen is noise. A transition
+arriving with no live attempt is **dropped rather than opening one**, so a
+`succeeded` that no approval preceded cannot enter the record. The attempt opens
+when the user clicks Review rather than when resolution succeeds, so a refusal is
+something that happened and stays visible. The list is bounded at 200, dropping
+oldest first.
+
+It is session-only and per-window, for the same reason `AgentNavigationRun` is:
+it records what this window did while the user watched, not a property of the
+conversation, and persisting it would put one window's execution history in front
+of another window's user.
+
+Automated evidence: `src/shared/__tests__/agentTimeline.test.ts` (10) is new and
+the shell suite grew to 22, including a run that fails an approval, retries, and
+asserts **two** rows with the original failure and its code intact beneath the
+success — plus an assertion that no resolved destination string reaches the
+record. `src/shared/__tests__` and `src/main/__tests__` pass 312 files plus 1
+skipped, 4,745 tests plus 6 skipped; the renderer suites pass 142 files, 1,329
+tests. All four i18n gates exit 0 and targeted ESLint reports nothing. `tsc
+--noEmit` is not a gate; the only two errors in a file this slice touched are the
+pre-existing `AgentResultEffect.contextId` narrowing errors, unchanged apart from
+line numbers.
+
+No live Electron evidence for this slice, and the reason is worth stating: the
+timeline has no main-process half and no persistence, so there is nothing a live
+run could prove that the shell suite does not already prove against the same
+component with the bridge stubbed. The navigation gate it observes was proved
+live in the two slices above.
+
+**A note on the commit, recorded because it nearly shipped wrong.** The i18n
+catalogs are being edited by four other tracks in this same working tree. Staging
+them whole absorbed 1,380 lines that were not this slice's; the commit was reset
+and the four catalogs re-staged hunk-scoped, leaving 39 lines. Anyone touching
+`catalogs/*.ts` here should stage by hunk and check the diffstat before
+committing.
+
 ## Exact next slice
 
-**A tool execution timeline with progress states.** Navigation is now the one
-permission-gated effect; `save`, `approve-step` and `undo` remain unconnected and
-should stay that way until each has a typed producer, a permission rule and an
-honest failure path of its own. The timeline is what makes a multi-step action
-reviewable at all, and it is the prerequisite for `approve-step`.
+**Wire `approve-step` onto the timeline.** It is the effect the timeline was built
+for and the only one whose prerequisite is now met. `save` and `undo` stay
+unconnected until each has a typed producer, a permission rule and an honest
+failure path of its own.
 
 **Media context producers.** The route half of this is **done** — see "The
 navigation gate becomes reachable" above; `routeAgentContext` ships and a real
