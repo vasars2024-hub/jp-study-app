@@ -247,6 +247,85 @@ describe('Agent workspace shell', () => {
     expect(selected?.textContent).toContain('Particle question');
   });
 
+  it('opens a card source by scrolling to and focusing its exact context shelf item', async () => {
+    stored = populated();
+    stored.conversations[0].messages[0].cards = [{
+      id: 'card-1',
+      kind: 'reading',
+      title: 'Passage source',
+      sourceContextIds: ['ctx-1'],
+      actions: [{
+        id: 'open-source',
+        label: 'Model supplied label',
+        effect: { type: 'open-context', contextId: 'ctx-1' },
+      }, {
+        id: 'navigate',
+        label: 'Do not navigate',
+        effect: { type: 'navigate', section: 'dictionary' },
+      }],
+    }];
+    await mount();
+
+    const contextItem = host.querySelector<HTMLElement>('[data-agent-context="ctx-1"]');
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(contextItem, 'scrollIntoView', { value: scrollIntoView });
+    const action = buttonWith('agent.context.source');
+
+    expect(text()).not.toContain('Model supplied label');
+    expect(text()).not.toContain('Do not navigate');
+    expect(text()).not.toContain('agent.card.actionsPending');
+    await click(action);
+
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: 'auto',
+      block: 'nearest',
+      inline: 'nearest',
+    });
+    expect(document.activeElement).toBe(contextItem);
+    expect(contextItem?.classList.contains('is-opened')).toBe(true);
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(calls.map((call) => call.method)).toEqual(['load']);
+  });
+
+  it('announces stale or undeclared card context without moving focus or mutating state', async () => {
+    stored = populated();
+    stored.conversations[0].messages[0].cards = [{
+      id: 'stale-card',
+      kind: 'reading',
+      title: 'Stale source',
+      sourceContextIds: ['ctx-gone'],
+      actions: [{
+        id: 'open-stale',
+        label: 'Stale model label',
+        effect: { type: 'open-context', contextId: 'ctx-gone' },
+      }],
+    }, {
+      id: 'unproven-card',
+      kind: 'reading',
+      title: 'Missing provenance',
+      sourceContextIds: [],
+      actions: [{
+        id: 'open-unproven',
+        label: 'Unproven model label',
+        effect: { type: 'open-context', contextId: 'ctx-1' },
+      }],
+    }];
+    await mount();
+
+    const cardActions = [...host.querySelectorAll<HTMLButtonElement>('.agent-card-action')];
+    expect(cardActions).toHaveLength(2);
+    await click(cardActions[0]);
+    expect(host.querySelector('[role="alert"]')?.textContent)
+      .toContain('agent.error.invalid-request');
+    expect(host.querySelector('.agent-context-item.is-opened')).toBeNull();
+
+    await click(cardActions[1]);
+    expect(host.querySelector('[role="alert"]')?.textContent)
+      .toContain('agent.error.invalid-request');
+    expect(host.querySelector('.agent-context-item.is-opened')).toBeNull();
+    expect(calls.map((call) => call.method)).toEqual(['load']);
+  });
+
   it('moves rail focus with the arrow keys', async () => {
     stored = populated();
     await mount();

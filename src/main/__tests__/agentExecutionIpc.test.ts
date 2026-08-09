@@ -303,7 +303,174 @@ describe('Agent execution IPC', () => {
       ['user', 'complete', 'Explain this.'],
       ['assistant', 'complete', 'first second'],
     ]);
+    expect(messages[1].cards).toEqual([{
+      id: 'request-run-1-assistant-context-1',
+      kind: 'reading',
+      title: 'Passage',
+      summary: '短い文',
+      sourceContextIds: ['ctx-1'],
+      actions: [{
+        id: 'request-run-1-assistant-open-context-1',
+        label: 'Passage',
+        effect: { type: 'open-context', contextId: 'ctx-1' },
+      }],
+    }]);
     expect(store.read()).toEqual(result.state);
+  });
+
+  it('does not invent a result card when the successful request used no context', async () => {
+    const state = workspace();
+    state.conversations[0].context = [];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'done',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: [],
+          attachmentIds: [],
+          inputChars: 13,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    expect(result.ok).toBe(true);
+    expect(result.state.conversations[0].messages.at(-1)?.cards).toEqual([]);
+  });
+
+  it('keeps a session-only context card live without writing its derived text to disk', async () => {
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'ctx-session',
+      kind: 'selected-text',
+      label: 'Private selection',
+      preview: '秘密の文',
+      source: { app: 'reading' },
+      sensitivity: 'personal',
+      retained: false,
+      createdAt: 30,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'grounded answer',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-session'],
+          attachmentIds: [],
+          inputChars: 20,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    expect(result.ok).toBe(true);
+    expect(result.state.conversations[0].messages.at(-1)?.cards).toMatchObject([{
+      title: 'Private selection',
+      summary: '秘密の文',
+      sourceContextIds: ['ctx-session'],
+      actions: [{ effect: { type: 'open-context', contextId: 'ctx-session' } }],
+    }]);
+    expect(store.read().conversations[0].messages.at(-1)?.cards).toHaveLength(1);
+
+    const persisted = fs.readFileSync(store.filePath, 'utf8');
+    expect(persisted).not.toContain('Private selection');
+    expect(persisted).not.toContain('秘密の文');
+    expect(persisted).not.toContain('ctx-session');
+  });
+
+  it('emits only the newest disclosed context card and ignores duplicates and missing ids', async () => {
+    const state = workspace();
+    state.conversations[0].context = [
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: `ctx-retained-${index + 1}`,
+        kind: 'dictionary-entry' as const,
+        label: `Entry ${index + 1}`,
+        preview: `word ${index + 1}`,
+        source: { app: 'dictionary' },
+        sensitivity: 'ordinary' as const,
+        retained: true,
+        createdAt: 10 + index,
+      })),
+      {
+        id: 'ctx-session',
+        kind: 'selected-text',
+        label: 'Session selection',
+        preview: 'private selection',
+        source: { app: 'reading' },
+        sensitivity: 'personal',
+        retained: false,
+        createdAt: 30,
+      },
+      {
+        id: 'ctx-undisclosed',
+        kind: 'media-cue',
+        label: 'Unused cue',
+        preview: 'not sent',
+        source: { app: 'media' },
+        sensitivity: 'ordinary',
+        retained: true,
+        createdAt: 31,
+      },
+    ];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'done',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: [
+            ...Array.from({ length: 8 }, (_, index) => `ctx-retained-${index + 1}`),
+            'ctx-retained-1',
+            'ctx-missing',
+          ],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({
+      id: 'request-run-1-assistant-context-1',
+      kind: 'dictionary',
+      title: 'Entry 8',
+      summary: 'word 8',
+      sourceContextIds: ['ctx-retained-8'],
+    });
+    expect(cards.every((card) => (
+      card.actions.length === 1 && card.actions[0].effect.type === 'open-context'
+    ))).toBe(true);
   });
 
   it('persists a closed provider failure code and never its error message', async () => {

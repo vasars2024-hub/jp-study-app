@@ -10,12 +10,13 @@
  * opt out of the drop either. The result was a shelf that could only ever show
  * reference data.
  *
- * This module is the missing half: the non-retained items, held **in main and in
- * memory only**. Nothing here touches `fs`. The store merges the two halves on
- * read and splits them again on write, so every existing consumer — the shell,
- * the `agentWorkspace:changed` broadcast, and the prompt builder in
- * `agentExecutionIpc` — sees whole conversations without knowing there are two
- * sources. No new IPC channel exists, because none is needed.
+ * This module is the missing half: the non-retained items and result cards
+ * derived from them, held **in main and in memory only**. Nothing here touches
+ * `fs`. The store merges the two halves on read and splits them again on write,
+ * so every existing consumer — the shell, the `agentWorkspace:changed`
+ * broadcast, and the prompt builder in `agentExecutionIpc` — sees whole
+ * conversations without knowing there are two sources. No new IPC channel
+ * exists, because none is needed.
  *
  * Why main rather than the renderer, when the data is deliberately not durable:
  * the Agent's state is main-owned with no renderer copy, and two of the three
@@ -23,7 +24,11 @@
  * which is the defect the change broadcast just finished fixing.
  */
 
-import type { AgentContextItem, AgentWorkspaceState } from '../shared/agentWorkspace';
+import type {
+  AgentContextItem,
+  AgentResultCard,
+  AgentWorkspaceState,
+} from '../shared/agentWorkspace';
 
 /**
  * Matches the per-conversation context cap in `normalizeAgentWorkspaceState`, so
@@ -32,7 +37,14 @@ import type { AgentContextItem, AgentWorkspaceState } from '../shared/agentWorks
  * workspace is far smaller, and the oldest entries are the ones to lose.
  */
 const MAX_ITEMS_PER_CONVERSATION = 100;
+const MAX_MESSAGES_PER_CONVERSATION = 2_000;
+const MAX_CARDS_PER_MESSAGE = 100;
 const MAX_CONVERSATIONS = 200;
+
+interface AgentSessionConversation {
+  context: AgentContextItem[];
+  cardsByMessage: Map<string, AgentResultCard[]>;
+}
 
 export interface AgentSessionContextStore {
   /**
@@ -53,7 +65,7 @@ export interface AgentSessionContextStore {
 }
 
 export function createAgentSessionContextStore(): AgentSessionContextStore {
-  let byConversation = new Map<string, AgentContextItem[]>();
+  let byConversation = new Map<string, AgentSessionConversation>();
 
   /**
    * Rebuilt from the document rather than mutated in place, which is what makes
@@ -72,15 +84,36 @@ export function createAgentSessionContextStore(): AgentSessionContextStore {
    * the user is looking at.
    */
   const absorb = (state: AgentWorkspaceState): void => {
-    const next = new Map<string, AgentContextItem[]>();
+    const next = new Map<string, AgentSessionConversation>();
     const active = state.conversations.filter((entry) => entry.id === state.activeConversationId);
     const rest = state.conversations.filter((entry) => entry.id !== state.activeConversationId);
     for (const conversation of [...active, ...rest]) {
       if (next.size >= MAX_CONVERSATIONS) break;
-      const sessionOnly = conversation.context
+      const context = conversation.context
         .filter((item) => !item.retained)
         .slice(0, MAX_ITEMS_PER_CONVERSATION);
-      if (sessionOnly.length > 0) next.set(conversation.id, sessionOnly);
+      if (context.length === 0) continue;
+
+      const contextIds = new Set(conversation.context.map((item) => item.id));
+      const sessionContextIds = new Set(context.map((item) => item.id));
+      const cardsByMessage = new Map<string, AgentResultCard[]>();
+      for (const message of conversation.messages.slice(-MAX_MESSAGES_PER_CONVERSATION)) {
+        const cards: AgentResultCard[] = [];
+        const cardIds = new Set<string>();
+        for (const card of message.cards) {
+          if (cards.length >= MAX_CARDS_PER_MESSAGE) break;
+          if (cardIds.has(card.id)) continue;
+          if (
+            card.sourceContextIds.length === 0
+            || !card.sourceContextIds.some((id) => sessionContextIds.has(id))
+            || !card.sourceContextIds.every((id) => contextIds.has(id))
+          ) continue;
+          cardIds.add(card.id);
+          cards.push(card);
+        }
+        if (cards.length > 0) cardsByMessage.set(message.id, cards);
+      }
+      next.set(conversation.id, { context, cardsByMessage });
     }
     byConversation = next;
   };
@@ -91,18 +124,36 @@ export function createAgentSessionContextStore(): AgentSessionContextStore {
       ...persisted,
       conversations: persisted.conversations.map((conversation) => {
         const sessionOnly = byConversation.get(conversation.id);
-        if (!sessionOnly || sessionOnly.length === 0) return conversation;
+        if (!sessionOnly) return conversation;
         // Retained items first, then session-only. The split loses the original
         // interleaving, and the shelf is identity-keyed and bounded rather than
         // order-sensitive, so this is stable after one round trip instead of
         // pretending to reconstruct an order the file never stored.
         const retainedIds = new Set(conversation.context.map((item) => item.id));
-        const additions = sessionOnly.filter((item) => !retainedIds.has(item.id));
-        if (additions.length === 0) return conversation;
+        const additions = sessionOnly.context.filter((item) => !retainedIds.has(item.id));
+        const messages = conversation.messages.map((message) => {
+          const sessionCards = sessionOnly.cardsByMessage.get(message.id);
+          if (!sessionCards || sessionCards.length === 0) return message;
+          // A retained card with the same identity is file-owned. Keeping it and
+          // refusing the session duplicate makes the split deterministic even if
+          // a malformed producer reuses an id for two provenance sets.
+          const persistedCardIds = new Set(message.cards.map((card) => card.id));
+          const cardAdditions = sessionCards.filter((card) => !persistedCardIds.has(card.id));
+          if (cardAdditions.length === 0) return message;
+          return {
+            ...message,
+            cards: [...message.cards, ...cardAdditions].slice(0, MAX_CARDS_PER_MESSAGE),
+          };
+        });
+        const messagesChanged = messages.some((message, index) => (
+          message !== conversation.messages[index]
+        ));
+        if (additions.length === 0 && !messagesChanged) return conversation;
         return {
           ...conversation,
           context: [...conversation.context, ...additions]
             .slice(0, MAX_ITEMS_PER_CONVERSATION),
+          ...(messagesChanged ? { messages } : {}),
         };
       }),
     };

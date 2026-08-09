@@ -424,6 +424,13 @@
   border-radius: var(--radius-sm, 6px);
 }
 
+.agent-context-item.is-opened,
+.agent-context-item:focus-visible {
+  border-color: var(--agent-accent);
+  outline: 2px solid color-mix(in srgb, var(--agent-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
 .agent-context-item-head {
   display: flex;
   flex-wrap: wrap;
@@ -631,6 +638,24 @@
 .agent-card-summary,
 .agent-card-actions {
   color: var(--agent-muted);
+}
+
+.agent-card-actions,
+.agent-card-action-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+}
+
+.agent-card-action {
+  padding: 3px var(--space-sm, 8px);
+  color: var(--agent-text);
+}
+
+.agent-card-action-error {
+  color: var(--agent-accent);
+  font-size: var(--font-size-xs, 0.75rem);
 }
 
 /* ---------- Composer ----------------------------------------------------- */

@@ -9,7 +9,9 @@ import {
 } from '../shared/agentExecutionBridge';
 import type {
   AgentConversation,
+  AgentContextItem,
   AgentMessage,
+  AgentResultCard,
   AgentWorkspaceState,
 } from '../shared/agentWorkspace';
 import {
@@ -54,6 +56,56 @@ const PROVIDER_CODES = new Set<AiProviderErrorCode>([
   'network',
   'invalid-response',
 ]);
+
+/**
+ * Result cards are a compact view of the exact context used by a successful
+ * request, not another model output. A reply gets at most one card: the newest
+ * context item the provider disclosure says was actually included.
+ */
+const RESULT_CARD_KIND: Record<AgentContextItem['kind'], AgentResultCard['kind']> = {
+  route: 'navigation',
+  'selected-text': 'generic',
+  'dictionary-entry': 'dictionary',
+  'reading-passage': 'reading',
+  'media-cue': 'media',
+  'study-session': 'generic',
+  'saved-words': 'flashcards',
+  file: 'generic',
+};
+
+function resultCardsForContext(
+  assistantMessageId: string,
+  context: readonly AgentContextItem[],
+  providerContextIds: readonly string[],
+): AgentResultCard[] {
+  const disclosed = new Set(providerContextIds);
+  let newest: AgentContextItem | undefined;
+  for (const item of context) {
+    // On equal timestamps the later shelf item wins, which keeps the selection
+    // deterministic even for contexts captured in the same millisecond.
+    if (disclosed.has(item.id) && (!newest || item.createdAt >= newest.createdAt)) {
+      newest = item;
+    }
+  }
+  if (!newest) return [];
+  return [{
+    id: `${assistantMessageId}-context-1`,
+    kind: RESULT_CARD_KIND[newest.kind],
+    title: newest.label,
+    ...(newest.preview ? { summary: newest.preview } : {}),
+    // Exact singleton provenance lets persistence drop this whole derived card
+    // whenever its retained or session-only source is absent from the latest
+    // conversation written after the provider finishes.
+    sourceContextIds: [newest.id],
+    actions: [{
+      id: `${assistantMessageId}-open-context-1`,
+      // Renderer-side resolution supplies localized action chrome; keeping the
+      // persisted label source-derived avoids introducing untranslated UI text.
+      label: newest.label,
+      effect: { type: 'open-context', contextId: newest.id },
+    }],
+  }];
+}
 
 function replaceConversation(
   state: AgentWorkspaceState,
@@ -119,7 +171,8 @@ function finishExecution(
   conversationId: string,
   requestId: string,
   now: number,
-  update: Pick<AgentMessage, 'status' | 'text'> & Partial<Pick<AgentMessage, 'provider' | 'error'>>,
+  update: Pick<AgentMessage, 'status' | 'text'>
+    & Partial<Pick<AgentMessage, 'provider' | 'error' | 'cards'>>,
 ): AgentWorkspaceState | null {
   const conversation = state.conversations.find((entry) => entry.id === conversationId);
   if (!conversation) return null;
@@ -251,6 +304,11 @@ export function registerAgentExecutionIpc(
               status: 'complete',
               text: result.text,
               provider: result.provider,
+              cards: resultCardsForContext(
+                ids.assistant,
+                context,
+                result.provider.contextIds,
+              ),
             },
           );
           if (!completed) {

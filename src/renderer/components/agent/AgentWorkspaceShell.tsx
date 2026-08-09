@@ -151,10 +151,14 @@ type PendingConfirmation =
 function ContextShelf({
   conversation,
   onRemove,
+  onItemRef,
+  openedContextId,
   disabled,
 }: {
   conversation: AgentConversation;
   onRemove: (contextId: string) => void;
+  onItemRef: (contextId: string, element: HTMLLIElement | null) => void;
+  openedContextId: string | null;
   disabled: boolean;
 }) {
   const { t } = useT();
@@ -176,7 +180,13 @@ function ContextShelf({
       </dl>
       <ul className="agent-context-items">
         {conversation.context.map((item) => (
-          <li key={item.id} className="agent-context-item">
+          <li
+            key={item.id}
+            ref={(element) => onItemRef(item.id, element)}
+            className={`agent-context-item${openedContextId === item.id ? ' is-opened' : ''}`}
+            data-agent-context={item.id}
+            tabIndex={-1}
+          >
             <div className="agent-context-item-head">
               <span className="agent-chip agent-chip-kind">
                 {t(`agent.context.kind.${item.kind}`)}
@@ -213,8 +223,17 @@ function ContextShelf({
   );
 }
 
-function MessageRow({ message }: { message: AgentMessage }) {
+function MessageRow({
+  message,
+  conversation,
+  onOpenContext,
+}: {
+  message: AgentMessage;
+  conversation: AgentConversation;
+  onOpenContext: (contextId: string, sourceContextIds: readonly string[]) => boolean;
+}) {
   const { t } = useT();
+  const [failedActionId, setFailedActionId] = useState<string | null>(null);
   const provider = message.provider;
   return (
     <li className={`agent-message agent-message-${message.role}`}>
@@ -246,9 +265,42 @@ function MessageRow({ message }: { message: AgentMessage }) {
             <li key={card.id} className="agent-card">
               <span className="agent-card-title">{card.title}</span>
               {card.summary ? <span className="agent-card-summary">{card.summary}</span> : null}
-              {card.actions.length > 0 ? (
+              {card.actions.some((action) => action.effect.type === 'open-context') ? (
                 <span className="agent-card-actions">
-                  {t('agent.card.actionsPending', { count: card.actions.length })}
+                  {card.actions.map((action) => {
+                    if (action.effect.type !== 'open-context') return null;
+                    const target = conversation.context.find(
+                      (item) => item.id === action.effect.contextId,
+                    );
+                    const actionKey = `${card.id}:${action.id}`;
+                    const label = target
+                      ? t('agent.context.source', { app: target.source.app })
+                      : t('agent.context.title');
+                    return (
+                      <span key={action.id} className="agent-card-action-wrap">
+                        <button
+                          type="button"
+                          className="agent-action agent-card-action"
+                          aria-label={label}
+                          onClick={() => {
+                            const opened = onOpenContext(
+                              action.effect.contextId,
+                              card.sourceContextIds,
+                            );
+                            setFailedActionId(opened ? null : actionKey);
+                          }}
+                        >
+                          <Icon name="external" size={13} />
+                          {label}
+                        </button>
+                        {failedActionId === actionKey ? (
+                          <span className="agent-card-action-error" role="alert">
+                            {t('agent.error.invalid-request')}
+                          </span>
+                        ) : null}
+                      </span>
+                    );
+                  })}
                 </span>
               ) : null}
             </li>
@@ -276,6 +328,11 @@ export default function AgentWorkspaceShell() {
   const [executionFailure, setExecutionFailure] =
     useState<AgentExecutionFailureCode | null>(null);
   const railRef = useRef<HTMLUListElement | null>(null);
+  const contextItemRefs = useRef(new Map<string, HTMLLIElement>());
+  const [openedContext, setOpenedContext] = useState<{
+    conversationId: string;
+    contextId: string;
+  } | null>(null);
 
   const apply = useCallback((result: AgentWorkspaceResult) => {
     if (result.ok) {
@@ -440,6 +497,34 @@ export default function AgentWorkspaceShell() {
       (current) => agentWorkspaceWithContextDetached(current, selected.id, contextId, now),
     ));
   }, [run, selected, state]);
+
+  const registerContextItem = useCallback((
+    contextId: string,
+    element: HTMLLIElement | null,
+  ) => {
+    if (element) contextItemRefs.current.set(contextId, element);
+    else contextItemRefs.current.delete(contextId);
+  }, []);
+
+  /**
+   * Result cards are provider-authored data, so an effect is never used as a
+   * selector or a route. The only connected slice resolves an exact id through
+   * the selected conversation and the card's declared provenance, then moves
+   * focus to the already-rendered shelf item. Everything else remains inert.
+   */
+  const openContext = useCallback((
+    contextId: string,
+    sourceContextIds: readonly string[],
+  ): boolean => {
+    if (!selected || !sourceContextIds.includes(contextId)) return false;
+    const item = selected.context.find((candidate) => candidate.id === contextId);
+    const element = contextItemRefs.current.get(contextId);
+    if (!item || !element) return false;
+    element.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+    element.focus({ preventScroll: true });
+    setOpenedContext({ conversationId: selected.id, contextId });
+    return true;
+  }, [selected]);
 
   const railKeyDown = useCallback((event: RKeyboardEvent<HTMLUListElement>) => {
     const ids = summaries.map((summary) => summary.id);
@@ -730,6 +815,10 @@ export default function AgentWorkspaceShell() {
                 <ContextShelf
                   conversation={selected}
                   onRemove={removeContext}
+                  onItemRef={registerContextItem}
+                  openedContextId={openedContext?.conversationId === selected.id
+                    ? openedContext.contextId
+                    : null}
                   disabled={blocked}
                 />
               </section>
@@ -753,6 +842,8 @@ export default function AgentWorkspaceShell() {
                       return (
                         <MessageRow
                           key={message.id}
+                          conversation={selected}
+                          onOpenContext={openContext}
                           message={liveAssistant
                             ? {
                                 ...message,

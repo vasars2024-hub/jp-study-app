@@ -13,7 +13,9 @@ import {
   evaluateAgentProviderPrivacy,
   normalizeAgentWorkspaceState,
   type AgentContextItem,
+  type AgentMessage,
   type AgentProviderPolicy,
+  type AgentResultCard,
   type AgentWorkspaceState,
 } from '../../shared/agentWorkspace';
 import { createAgentSessionContextStore } from '../agentSessionContext';
@@ -32,7 +34,40 @@ function item(id: string, retained: boolean, extra: Partial<AgentContextItem> = 
   };
 }
 
-function workspace(conversations: { id: string; context: AgentContextItem[] }[]): AgentWorkspaceState {
+function card(
+  id: string,
+  sourceContextIds: string[],
+  title = id,
+): AgentResultCard {
+  return {
+    id,
+    kind: 'generic',
+    title,
+    sourceContextIds,
+    actions: [],
+  };
+}
+
+function message(id: string, cards: AgentResultCard[]): AgentMessage {
+  return {
+    id,
+    conversationId: '',
+    role: 'assistant',
+    status: 'complete',
+    text: id,
+    createdAt: 1,
+    updatedAt: 1,
+    contextIds: [],
+    attachments: [],
+    cards,
+  };
+}
+
+function workspace(conversations: {
+  id: string;
+  context: AgentContextItem[];
+  messages?: AgentMessage[];
+}[]): AgentWorkspaceState {
   return normalizeAgentWorkspaceState({
     version: 1,
     activeConversationId: conversations[0]?.id ?? null,
@@ -43,18 +78,31 @@ function workspace(conversations: { id: string; context: AgentContextItem[] }[])
       createdAt: 1,
       updatedAt: 1,
       context: entry.context,
-      messages: [],
+      messages: entry.messages ?? [],
     })),
   });
 }
 
 /** The persisted half: the same document with every non-retained item removed. */
 function persistedHalf(state: AgentWorkspaceState): AgentWorkspaceState {
+  const retainedIdsByConversation = new Map(state.conversations.map((conversation) => [
+    conversation.id,
+    new Set(conversation.context.filter((entry) => entry.retained).map((entry) => entry.id)),
+  ]));
   return {
     ...state,
     conversations: state.conversations.map((conversation) => ({
       ...conversation,
       context: conversation.context.filter((entry) => entry.retained),
+      messages: conversation.messages.map((entry) => ({
+        ...entry,
+        cards: entry.cards.filter((result) => (
+          result.sourceContextIds.length > 0
+          && result.sourceContextIds.every((id) => (
+            retainedIdsByConversation.get(conversation.id)?.has(id) === true
+          ))
+        )),
+      })),
     })),
   };
 }
@@ -179,6 +227,157 @@ describe('Agent session context store', () => {
     store.absorb(state);
     expect(survivors()).toEqual(first);
     expect(first).toHaveLength(200);
+  });
+
+  it('re-attaches session-provenance cards to their original message only', () => {
+    const store = createAgentSessionContextStore();
+    const whole = workspace([
+      {
+        id: 'chat-1',
+        context: [item('keep', true), item('session', false)],
+        messages: [
+          message('answer-1', [
+            card('retained-card', ['keep']),
+            card('session-card', ['keep', 'session']),
+          ]),
+          message('answer-2', []),
+        ],
+      },
+      {
+        id: 'chat-2',
+        context: [item('other-session', false)],
+        messages: [message('answer-1', [])],
+      },
+    ]);
+
+    store.absorb(whole);
+    const merged = store.merge(persistedHalf(whole));
+    expect(merged.conversations[0].messages[0].cards.map((entry) => entry.id))
+      .toEqual(['retained-card', 'session-card']);
+    expect(merged.conversations[0].messages[1].cards).toEqual([]);
+    expect(merged.conversations[1].messages[0].cards).toEqual([]);
+    expect(store.merge(merged).conversations[0].messages[0].cards.map((entry) => entry.id))
+      .toEqual(['retained-card', 'session-card']);
+  });
+
+  it('leaves retained cards file-owned and never duplicates a persisted card identity', () => {
+    const store = createAgentSessionContextStore();
+    const whole = workspace([{
+      id: 'chat-1',
+      context: [item('keep', true), item('session', false)],
+      messages: [message('answer', [
+        card('file-card', ['keep'], 'from-file'),
+        card('shared-id', ['session'], 'from-session'),
+      ])],
+    }]);
+    store.absorb(whole);
+
+    const persisted = persistedHalf(whole);
+    persisted.conversations[0].messages[0].cards.push(
+      card('shared-id', ['keep'], 'persisted-wins'),
+    );
+    const merged = store.merge(persisted);
+    expect(merged.conversations[0].messages[0].cards.map((entry) => entry.id))
+      .toEqual(['file-card', 'shared-id']);
+    expect(merged.conversations[0].messages[0].cards[1].title).toBe('persisted-wins');
+
+    // A retained-only card was never copied into the session store.
+    const withoutFileCard = {
+      ...persisted,
+      conversations: persisted.conversations.map((conversation) => ({
+        ...conversation,
+        messages: conversation.messages.map((entry) => ({ ...entry, cards: [] })),
+      })),
+    };
+    expect(store.merge(withoutFileCard).conversations[0].messages[0].cards.map((entry) => entry.id))
+      .toEqual(['shared-id']);
+  });
+
+  it('removes session cards when context, provenance, or the message disappears', () => {
+    const store = createAgentSessionContextStore();
+    const withCard = (sourceContextIds: string[], includeMessage = true) => workspace([{
+      id: 'chat-1',
+      context: [item('keep', true), item('session', false)],
+      messages: includeMessage ? [message('answer', [card('result', sourceContextIds)])] : [],
+    }]);
+    const persisted = persistedHalf(withCard(['session']));
+
+    store.absorb(withCard(['session']));
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toHaveLength(1);
+
+    store.absorb(withCard(['keep']));
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toEqual([]);
+
+    store.absorb(withCard(['session', 'missing-context']));
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toEqual([]);
+
+    store.absorb(withCard(['session'], false));
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toEqual([]);
+
+    const withoutSessionContext = workspace([{
+      id: 'chat-1',
+      context: [item('keep', true)],
+      messages: [message('answer', [card('result', ['session'])])],
+    }]);
+    store.absorb(withoutSessionContext);
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toEqual([]);
+  });
+
+  it('replaces a session card snapshot instead of retaining its previous contents', () => {
+    const store = createAgentSessionContextStore();
+    const withTitle = (title: string) => workspace([{
+      id: 'chat-1',
+      context: [item('session', false)],
+      messages: [message('answer', [card('result', ['session'], title)])],
+    }]);
+    const persisted = persistedHalf(withTitle('first'));
+
+    store.absorb(withTitle('first'));
+    store.absorb(withTitle('replacement'));
+    expect(store.merge(persisted).conversations[0].messages[0].cards)
+      .toMatchObject([{ id: 'result', title: 'replacement' }]);
+  });
+
+  it('bounds session cards per message without rotating survivors on repeated absorbs', () => {
+    const store = createAgentSessionContextStore();
+    const state = workspace([{
+      id: 'chat-1',
+      context: [item('session', false)],
+      messages: [message('answer', [])],
+    }]);
+    // Bypass the shared normalizer's identical cap so this test exercises the
+    // in-memory boundary itself, including duplicate-id suppression.
+    state.conversations[0].messages[0].cards = [
+      card('card-0', ['session']),
+      card('card-0', ['session'], 'duplicate'),
+      ...Array.from({ length: 139 }, (_, index) => card(`card-${index + 1}`, ['session'])),
+    ];
+    const persisted = persistedHalf(state);
+    const ids = () => store.merge(persisted).conversations[0].messages[0].cards
+      .map((entry) => entry.id);
+
+    store.absorb(state);
+    const first = ids();
+    store.absorb(state);
+    store.absorb(state);
+    expect(ids()).toEqual(first);
+    expect(first).toHaveLength(100);
+  });
+
+  it('stores cards for at most the newest 2,000 messages in a conversation', () => {
+    const store = createAgentSessionContextStore();
+    const state = workspace([{
+      id: 'chat-1',
+      context: [item('session', false)],
+      messages: Array.from({ length: 2_000 }, (_, index) => message(`message-${index}`, [])),
+    }]);
+    state.conversations[0].messages.unshift(
+      message('outside-session-cap', [card('old-card', ['session'])]),
+    );
+    const persisted = persistedHalf(state);
+
+    store.absorb(state);
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toEqual([]);
   });
 
   it('leaves the cloud privacy boundary in charge of sensitive session context', () => {

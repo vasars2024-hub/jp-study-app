@@ -1555,13 +1555,50 @@ save is preserved.
 Focused evidence: the rendered handoff suite passes 1 file and 31 tests, 0
 failed. No dirty App, DesktopShell, Media, Reading or catalog path changed.
 
+## The first safe interactive result card
+
+A successful execution now emits at most one deterministic card for the newest
+context item that the provider disclosure says was actually included. Its title,
+summary and exact singleton provenance come from that context snapshot; provider
+text is never parsed. The only produced effect is the existing read-only
+`open-context` contract. A request with no disclosed context produces no card.
+
+The persistence split now keeps cards derived from session-only reading or media
+context in main memory beside that context while continuing to remove both from
+`workspace-v1.json`. The overlay is bounded by conversation, message and card
+caps, rebuilt rather than unioned, scoped by message identity and exact context
+provenance, and gives a persisted card precedence on an id collision. Removing
+the context, card, message or conversation removes its in-memory copy.
+
+The rendered action does not trust its stored label or route arbitrary payloads.
+It accepts only `open-context`, verifies that the target is declared by the card
+and still belongs to the selected conversation, then scrolls and focuses the
+exact already-rendered shelf item. Missing or stale provenance produces a local
+accessible error. Navigate, save, approve and undo effects remain inert.
+
+Automated evidence: all 17 `agent*.test.ts` suites pass, 253 tests total. The
+combined producer, store, session overlay and rendered-shell run passes 4 files / 51
+tests; an added execution canary proves a personal result card remains live while
+its title, preview and context id are absent from the file. Targeted ESLint and
+`git diff --check` pass. Architecture scans 1,568 modules with the same 18 known
+findings and nothing new. Catalog parity, missing-key, locale-argument and
+hardcoded-text gates all pass.
+
+Live Electron evidence: Forge rebuilt main, preload and renderer and relaunched a
+fresh main process. In the 900 x 640 Agent pop-out, one grounded dictionary card
+rendered one action; activating it focused and highlighted its exact shelf item,
+left zero alerts and zero horizontal overflow, and the fresh debug error ring
+stayed empty. Screenshot: `debug/shots/win2-1786252832333.png`. The synthetic
+acceptance conversation was deleted and the user's original active conversation
+was restored.
+
 ## Exact next slice
 
-**Attachments or the first safe interactive result card.** Both schemas and the
-provider path exist, but neither has a real producer. Attachments must begin with
-an explicit user-selected file and keep local paths/session-only bytes out of the
-persisted document; a card must be deterministically grounded and execute only an
-already-typed safe effect rather than a model-authored arbitrary payload.
+**Attachments.** `AgentAttachment`, `AgentAttachmentKind`, normalization and the
+provider path exist, but no production surface builds one. Start with an explicit
+user-selected file, keep local paths/session-only bytes out of the persisted
+document, and make the cloud privacy decision visible before any sensitive file
+content can leave the device.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside
@@ -1579,11 +1616,10 @@ the transport needs to change. Re-check `src/.coordination/study-mode/` first â€
 cue they never receive. Recorded here rather than fixed â€” the two files that would
 change are the other track's.
 
-Then the rest of the Track 3 surface, modes and history search now being done:
-**interactive result cards** and **attachments**. The result-card persistence
-precondition is now closed; the next card slice must add one deterministic,
-grounded producer and execute only an already-typed safe effect rather than parse
-or trust arbitrary model-authored action payloads.
+Then the rest of the Track 3 surface: **attachments**, additional deterministic
+card producers, and separately authorized effects. The first card is deliberately
+read-only; navigation, saves, approvals and undo remain unconnected until each has
+a typed producer, permission rule and honest failure path.
 
 **Attachments are the same "type without a producer" shape** the shelf and the
 mode both turned out to be: `AgentAttachment`, `AgentAttachmentKind`,
