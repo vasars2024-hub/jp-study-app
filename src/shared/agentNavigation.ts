@@ -180,14 +180,21 @@ export function resolveAgentNavigation(
     // subtitle line describes material, not a place, and a card grounded in one
     // has no business opening a window.
     if (!item || item.kind !== 'route') continue;
-    if (item.source.app !== effect.section || !item.source.route) continue;
+    if (item.source.app !== effect.section) continue;
+    // A page must match exactly when the stored effect claims one, and the live
+    // context must still claim the same one. A stored page against a live
+    // context that has since lost its route is stale, not "close enough".
     if (effect.page !== undefined && effect.page !== item.source.route) continue;
     return {
       ok: true,
       // Built from the live item on purpose. The stored effect got this far by
       // matching it, so the two are equal here — but reading the live one is
-      // what keeps that true if this function is ever loosened.
-      destination: { section: effect.section, page: item.source.route },
+      // what keeps that true if this function is ever loosened. A section with
+      // no sub-page is a complete destination: main opens sections.
+      destination: {
+        section: effect.section,
+        ...(item.source.route ? { page: item.source.route } : {}),
+      },
     };
   }
   return { ok: false, code: 'stale-provenance' };

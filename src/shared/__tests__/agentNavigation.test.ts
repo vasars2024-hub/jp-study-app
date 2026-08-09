@@ -227,10 +227,23 @@ describe('resolveAgentNavigation', () => {
     expect(result).toEqual({ ok: false, code: 'unknown-section' });
   });
 
-  it('refuses a route context whose live source names no route', () => {
+  /**
+   * A section IS a destination. `popOut` takes a section and nothing else, so a
+   * route context that names only the app names somewhere real — which is the
+   * shape every production producer emits, since surfaces have no sub-pages.
+   */
+  it('resolves a section-only destination when neither side claims a page', () => {
     const result = resolve(conversation(
       [routeContext({ source: { app: 'dictionary' } })],
       navigateAction({ type: 'navigate', section: 'dictionary' }),
+    ));
+    expect(result).toEqual({ ok: true, destination: { section: 'dictionary' } });
+  });
+
+  it('still refuses a stored page whose live context has since lost its route', () => {
+    const result = resolve(conversation(
+      [routeContext({ source: { app: 'dictionary' } })],
+      navigateAction({ type: 'navigate', section: 'dictionary', page: 'entry/猫' }),
     ));
     expect(result).toEqual({ ok: false, code: 'stale-provenance' });
   });
