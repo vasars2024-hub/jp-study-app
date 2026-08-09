@@ -670,8 +670,33 @@
 }
 
 .agent-card-summary,
-.agent-card-actions {
+.agent-card-actions,
+.agent-card-pending {
   color: var(--agent-muted);
+}
+
+.agent-card-sources {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-card-source {
+  display: inline-flex;
+  gap: 4px;
+  color: var(--agent-muted);
+}
+
+.agent-card-source span + span::before {
+  content: '\00b7';
+  margin-right: 4px;
+}
+
+.agent-card-pending {
+  font-size: var(--font-size-xs, 0.75rem);
 }
 
 .agent-card-actions,

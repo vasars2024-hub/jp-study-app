@@ -288,50 +288,74 @@ function MessageRow({
       ) : null}
       {message.cards.length > 0 ? (
         <ul className="agent-cards">
-          {message.cards.map((card) => (
-            <li key={card.id} className="agent-card">
-              <span className="agent-card-title">{card.title}</span>
-              {card.summary ? <span className="agent-card-summary">{card.summary}</span> : null}
-              {card.actions.some((action) => action.effect.type === 'open-context') ? (
-                <span className="agent-card-actions">
-                  {card.actions.map((action) => {
-                    if (action.effect.type !== 'open-context') return null;
-                    const target = conversation.context.find(
-                      (item) => item.id === action.effect.contextId,
-                    );
-                    const actionKey = `${card.id}:${action.id}`;
-                    const label = target
-                      ? t('agent.context.source', { app: target.source.app })
-                      : t('agent.context.title');
-                    return (
-                      <span key={action.id} className="agent-card-action-wrap">
-                        <button
-                          type="button"
-                          className="agent-action agent-card-action"
-                          aria-label={label}
-                          onClick={() => {
-                            const opened = onOpenContext(
-                              action.effect.contextId,
-                              card.sourceContextIds,
-                            );
-                            setFailedActionId(opened ? null : actionKey);
-                          }}
-                        >
-                          <Icon name="external" size={13} />
-                          {label}
-                        </button>
-                        {failedActionId === actionKey ? (
-                          <span className="agent-card-action-error" role="alert">
-                            {t('agent.error.invalid-request')}
-                          </span>
-                        ) : null}
-                      </span>
-                    );
-                  })}
-                </span>
-              ) : null}
-            </li>
-          ))}
+          {message.cards.map((card) => {
+            const sources = card.sourceContextIds.flatMap((contextId) => {
+              const source = conversation.context.find((item) => item.id === contextId);
+              return source ? [source] : [];
+            });
+            const navigateCount = card.actions.filter(
+              (action) => action.effect.type === 'navigate',
+            ).length;
+            return (
+              <li key={card.id} className="agent-card">
+                <span className="agent-card-title">{card.title}</span>
+                {card.summary ? <span className="agent-card-summary">{card.summary}</span> : null}
+                {sources.length > 0 ? (
+                  <ul className="agent-card-sources" aria-label={t('agent.context.title')}>
+                    {sources.map((source) => (
+                      <li key={source.id} className="agent-chip agent-card-source">
+                        <span>{source.label}</span>
+                        <span>{t('agent.context.source', { app: source.source.app })}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {navigateCount > 0 ? (
+                  <span className="agent-card-pending">
+                    {t('agent.card.actionsPending', { count: navigateCount })}
+                  </span>
+                ) : null}
+                {card.actions.some((action) => action.effect.type === 'open-context') ? (
+                  <span className="agent-card-actions">
+                    {card.actions.map((action) => {
+                      if (action.effect.type !== 'open-context') return null;
+                      const target = conversation.context.find(
+                        (item) => item.id === action.effect.contextId,
+                      );
+                      const actionKey = `${card.id}:${action.id}`;
+                      const label = target
+                        ? t('agent.context.source', { app: target.source.app })
+                        : t('agent.context.title');
+                      return (
+                        <span key={action.id} className="agent-card-action-wrap">
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            aria-label={label}
+                            onClick={() => {
+                              const opened = onOpenContext(
+                                action.effect.contextId,
+                                card.sourceContextIds,
+                              );
+                              setFailedActionId(opened ? null : actionKey);
+                            }}
+                          >
+                            <Icon name="external" size={13} />
+                            {label}
+                          </button>
+                          {failedActionId === actionKey ? (
+                            <span className="agent-card-action-error" role="alert">
+                              {t('agent.error.invalid-request')}
+                            </span>
+                          ) : null}
+                        </span>
+                      );
+                    })}
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </li>

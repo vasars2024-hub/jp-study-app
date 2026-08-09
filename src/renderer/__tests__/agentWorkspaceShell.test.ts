@@ -296,7 +296,7 @@ describe('Agent workspace shell', () => {
 
     expect(text()).not.toContain('Model supplied label');
     expect(text()).not.toContain('Do not navigate');
-    expect(text()).not.toContain('agent.card.actionsPending');
+    expect(text()).toContain('agent.card.actionsPending=1');
     await click(action);
 
     expect(scrollIntoView).toHaveBeenCalledWith({
@@ -307,6 +307,50 @@ describe('Agent workspace shell', () => {
     expect(document.activeElement).toBe(contextItem);
     expect(contextItem?.classList.contains('is-opened')).toBe(true);
     expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(calls.map((call) => call.method)).toEqual(['load']);
+  });
+
+  it('keeps navigation suggestions inert and resolves provenance from live selected context', async () => {
+    stored = populated();
+    stored.conversations[0].context[0] = {
+      ...stored.conversations[0].context[0],
+      label: 'Live selected passage',
+      source: { app: 'live-reader' },
+    };
+    stored.conversations[1].context = [{
+      id: 'ctx-other',
+      kind: 'dictionary-entry',
+      label: 'Other conversation source',
+      preview: '別',
+      source: { app: 'dictionary' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 5,
+    }];
+    stored.conversations[0].messages[0].cards = [{
+      id: 'navigation-card',
+      kind: 'navigation',
+      title: 'Dictionary suggestion',
+      sourceContextIds: ['ctx-1', 'ctx-other', 'ctx-stale'],
+      actions: [{
+        id: 'navigate',
+        label: 'Model-authored route label',
+        effect: { type: 'navigate', section: 'dictionary', page: 'entry' },
+      }],
+    }];
+    await mount();
+
+    const card = host.querySelector<HTMLElement>('.agent-card');
+    const pending = card?.querySelector<HTMLElement>('.agent-card-pending');
+    const sources = card?.querySelector<HTMLElement>('.agent-card-sources');
+    expect(pending?.textContent).toBe('agent.card.actionsPending=1');
+    expect(card?.querySelectorAll('button')).toHaveLength(0);
+    expect(card?.textContent).not.toContain('Model-authored route label');
+    expect(sources?.getAttribute('aria-label')).toBe('agent.context.title');
+    expect(sources?.textContent).toContain('Live selected passage');
+    expect(sources?.textContent).toContain('agent.context.source');
+    expect(sources?.textContent).not.toContain('Other conversation source');
+    expect(host.textContent).not.toContain('ctx-stale');
     expect(calls.map((call) => call.method)).toEqual(['load']);
   });
 

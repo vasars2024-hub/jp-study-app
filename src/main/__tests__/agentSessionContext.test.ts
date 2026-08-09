@@ -371,6 +371,46 @@ describe('Agent session context store', () => {
       .toEqual(['retained-card', 'session-card']);
   });
 
+  it('keeps two cards with the same session-only route provenance together', () => {
+    const store = createAgentSessionContextStore();
+    const routeContext = item('route-session', false, {
+      kind: 'route',
+      source: { app: 'dictionary', route: '/dictionary' },
+      sensitivity: 'ordinary',
+    });
+    const routeCards = [
+      card('route-primary', ['route-session'], 'Open dictionary'),
+      card('route-secondary', ['route-session'], 'Review route details'),
+    ];
+    const whole = workspace([{
+      id: 'chat-1',
+      context: [routeContext],
+      messages: [message('answer', routeCards)],
+    }]);
+
+    store.absorb(whole);
+    const persisted = persistedHalf(whole);
+    expect(persisted.conversations[0].context).toEqual([]);
+    expect(persisted.conversations[0].messages[0].cards).toEqual([]);
+    expect(store.merge(persisted).conversations[0].messages[0].cards.map((entry) => entry.id))
+      .toEqual(['route-primary', 'route-secondary']);
+
+    store.absorb(workspace([{
+      id: 'chat-1',
+      context: [],
+      messages: [message('answer', routeCards)],
+    }]));
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toEqual([]);
+
+    store.absorb(whole);
+    store.absorb(workspace([{
+      id: 'chat-1',
+      context: [routeContext],
+      messages: [],
+    }]));
+    expect(store.merge(persisted).conversations[0].messages[0].cards).toEqual([]);
+  });
+
   it('leaves retained cards file-owned and never duplicates a persisted card identity', () => {
     const store = createAgentSessionContextStore();
     const whole = workspace([{

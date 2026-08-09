@@ -1623,12 +1623,51 @@ prompt, consent and provider were then cleared back to their original state, and
 the fresh debug error ring remained empty. Screenshot:
 `debug/shots/win1-1786255280556.png`.
 
+## A second deterministic read-only card producer
+
+When the newest context actually disclosed by the provider is a route with a
+normalized destination, execution now appends a typed navigation suggestion to
+the existing source card. Its destination is taken only from trusted
+`source.app` and `source.route` metadata. Provider response prose cannot choose
+the section, page, title, summary, ids or provenance. A route without destination
+metadata, a non-route context or an undisclosed context produces no suggestion.
+
+The renderer deliberately does not execute that navigate effect. It displays a
+localized pending-action count with no button, handler, routing or bridge call.
+Each card also renders provenance resolved from exact context ids in the current
+conversation; stale and cross-conversation ids are omitted, and stored action
+labels are never presented as provenance. Existing `open-context` remains the
+only live result-card action.
+
+The session overlay already supported two cards sharing one session-only route
+source. A new regression proves both stay in deterministic order in memory,
+neither reaches the persisted document, and both disappear when their source
+context or owning message is removed. No production persistence change was
+required.
+
+Automated evidence: the combined producer/session/renderer set passes 3 files /
+50 tests; every `agent*.test.ts` suite passes 33 files / 387 tests; the full suite
+passes 459 files plus 1 skipped, 6,117 tests plus 6 skipped. Targeted ESLint and
+`git diff --check` pass. Architecture remains at 1,570 modules and the same 18
+known findings with nothing new.
+
+Live Electron evidence: a snapshot/restore acceptance run injected two temporary
+cards over one session-only route. The source card kept its existing read-only
+open-context control; the navigation card showed `1 action, not yet connected`,
+zero navigation controls, and live `Live Reader route / From reading`
+provenance. A deliberately untrusted stored navigation label was absent from the
+DOM, and no bridge method beyond workspace load/save ran. The original workspace
+was restored at revision 8, the synthetic context/message were absent afterward,
+and the fresh error ring remained empty. Screenshot:
+`debug/shots/win1-1786255935672.png`.
+
 ## Exact next slice
 
-**A second deterministic read-only card producer.** Extend typed result cards
-without granting an effect: produce an app-help/navigation suggestion from
-trusted request/context metadata, render its provenance honestly, and keep route
-execution inert until the separate permissioned-effects slice.
+**Permission-gated navigation execution.** Resolve only a strict allowlist of
+known app sections/routes, show the exact destination in a review step, require
+an explicit user approval, and record pending/running/succeeded/failed/cancelled
+states. Unknown or stale destinations must fail closed. Add retry and honest
+failure before considering save, automation or undo effects.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside

@@ -60,9 +60,10 @@ const PROVIDER_CODES = new Set<AiProviderErrorCode>([
 ]);
 
 /**
- * Result cards are a compact view of the exact context used by a successful
- * request, not another model output. A reply gets at most one card: the newest
- * context item the provider disclosure says was actually included.
+ * Result cards are compact views of the exact context used by a successful
+ * request, not another model output. A reply gets the newest actually-disclosed
+ * context card and, for a route with a concrete destination, one typed but
+ * non-executing navigation suggestion.
  */
 const RESULT_CARD_KIND: Record<AgentContextItem['kind'], AgentResultCard['kind']> = {
   route: 'navigation',
@@ -90,7 +91,7 @@ function resultCardsForContext(
     }
   }
   if (!newest) return [];
-  return [{
+  const sourceCard: AgentResultCard = {
     id: `${assistantMessageId}-context-1`,
     kind: RESULT_CARD_KIND[newest.kind],
     title: newest.label,
@@ -106,7 +107,27 @@ function resultCardsForContext(
       label: newest.label,
       effect: { type: 'open-context', contextId: newest.id },
     }],
-  }];
+  };
+  if (newest.kind !== 'route' || !newest.source.route) return [sourceCard];
+  const navigationCard: AgentResultCard = {
+    id: `${assistantMessageId}-navigation-1`,
+    kind: 'navigation',
+    title: newest.label,
+    ...(newest.preview ? { summary: newest.preview } : {}),
+    sourceContextIds: [newest.id],
+    actions: [{
+      id: `${assistantMessageId}-navigate-1`,
+      label: newest.label,
+      // This is a typed suggestion only. Renderer-side action handling decides
+      // whether and when to execute it; provider output never reaches the effect.
+      effect: {
+        type: 'navigate',
+        section: newest.source.app,
+        page: newest.source.route,
+      },
+    }],
+  };
+  return [sourceCard, navigationCard];
 }
 
 function replaceConversation(
