@@ -170,6 +170,23 @@ describe('provider privacy boundary', () => {
     expect(result).toMatchObject({ allowed: true, context: [{ id: 'ctx-1' }], attachments: [{ id: 'file-1' }] });
   });
 
+  it('discloses a place item that has no preview, and still drops an empty one', () => {
+    const place: AgentContextItem = {
+      id: 'ctx-route',
+      kind: 'route',
+      label: 'Reader',
+      preview: '',
+      source: { app: 'reading', route: 'reader' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: now,
+    };
+    const empty: AgentContextItem = { ...context(), id: 'ctx-empty', preview: '' };
+
+    expect(evaluateAgentProviderPrivacy(policy(), 'Explain', [place, empty], []))
+      .toMatchObject({ allowed: true, context: [{ id: 'ctx-route' }] });
+  });
+
   it('refuses over-budget input instead of silently truncating context', () => {
     const result = evaluateAgentProviderPrivacy(policy({ maxInputChars: 4 }), 'Explain', [context()], []);
     expect(result).toMatchObject({ allowed: false, reason: 'input-budget' });

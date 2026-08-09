@@ -179,9 +179,14 @@ function promptWithContext(
 ): { prompt: string; historyMessageIds: string[] } {
   const preset = agentModePreset(mode);
   const head = preset ? `${preset}\n\n${prompt}` : prompt;
-  const rows = context.map((item, index) => (
-    `[Context ${index + 1}: ${item.label}]\n${item.preview}`
-  ));
+  // A place item has no preview by construction; its body is the route itself,
+  // which is what a navigation answer has to name.
+  const rows = context.map((item, index) => {
+    const body = item.preview || (item.source.route ? `Route: ${item.source.route}` : '');
+    return body
+      ? `[Context ${index + 1}: ${item.label}]\n${body}`
+      : `[Context ${index + 1}: ${item.label}]`;
+  });
   const contextSuffix = context.length === 0
     ? ''
     : `\n\nSelected Study OS context:\n${rows.join('\n\n')}`;

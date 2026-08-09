@@ -326,6 +326,29 @@ describe('workflow-preset modes', () => {
       .toBeGreaterThan(routed.indexOf('Where is it?'));
   });
 
+  it('gives a place item the route as its body so a navigation answer can name it', async () => {
+    let routed = '';
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (prompt) => {
+      routed = prompt;
+      return 'ok';
+    });
+
+    await runAgentProviderPrompt(policy(), 'Where am I?', {
+      context: [{
+        id: 'ctx-route',
+        kind: 'route',
+        label: 'Reader',
+        preview: '',
+        source: { app: 'reading', route: 'reader' },
+        sensitivity: 'ordinary',
+        retained: true,
+        createdAt: 100,
+      }],
+    });
+
+    expect(routed).toContain('[Context 1: Reader]\nRoute: reader');
+  });
+
   it('counts the preset in the disclosed input size and against the budget', async () => {
     // A disclosure that excluded the preset would understate what was actually
     // sent, and a budget check that skipped it could pass a request the provider

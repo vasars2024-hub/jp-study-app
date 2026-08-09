@@ -458,6 +458,18 @@ export function normalizeAgentWorkspaceState(value: unknown): AgentWorkspaceStat
 }
 
 /**
+ * An item is worth disclosing when it carries something the model can act on.
+ * For most kinds that is the preview text. A `route` names *where the user is*
+ * and has no content to preview by construction — filtering on preview alone
+ * dropped every place item before the provider ever saw it, so the navigation
+ * card the shelf existed to enable could never be produced.
+ */
+function carriesDisclosableContext(entry: AgentContextItem): boolean {
+  if (entry.kind === 'route') return entry.label.length > 0;
+  return entry.preview.length > 0;
+}
+
+/**
  * Applies the cloud/local boundary before a provider sees context. Sensitive
  * inputs default to denied, and an over-budget request is never silently cut.
  */
@@ -468,7 +480,7 @@ export function evaluateAgentProviderPrivacy(
   attachments: readonly AgentAttachment[],
 ): AgentProviderPrivacyDecision {
   const cloud = policy.target.kind === 'cloud';
-  const selectedContext = context.filter((entry) => entry.preview.length > 0);
+  const selectedContext = context.filter(carriesDisclosableContext);
   const selectedAttachments = [...attachments];
   const inputChars = prompt.length
     + selectedContext.reduce((sum, entry) => sum + entry.preview.length, 0);
