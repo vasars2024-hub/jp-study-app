@@ -19,6 +19,7 @@ import {
 } from '../../../shared/agentWorkspace';
 import type { AiProviderId } from '../../../shared/aiProviders';
 import {
+  agentExecutionMessageIds,
   defaultAgentExecutionPolicy,
   type AgentExecutionFailureCode,
   type AgentExecutionRequest,
@@ -338,6 +339,13 @@ export default function AgentWorkspaceShell() {
   const activeId = state?.activeConversationId ?? null;
   const executing = runningRequestId !== null;
   const blocked = busy || executing;
+  const runningMessageIds = runningRequestId
+    ? agentExecutionMessageIds(runningRequestId)
+    : null;
+  const hasPersistedRunningExchange = Boolean(
+    runningMessageIds
+    && selected?.messages.some((message) => message.id === runningMessageIds.assistant),
+  );
 
   const submitPrompt = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -739,14 +747,26 @@ export default function AgentWorkspaceShell() {
                     </p>
                   ) : null}
                   <ul className="agent-messages">
-                    {selected.messages.slice(-VISIBLE_MESSAGE_LIMIT).map((message) => (
-                      <MessageRow key={message.id} message={message} />
-                    ))}
+                    {selected.messages.slice(-VISIBLE_MESSAGE_LIMIT).map((message) => {
+                      const liveAssistant = message.id === runningMessageIds?.assistant
+                        && message.status === 'streaming';
+                      return (
+                        <MessageRow
+                          key={message.id}
+                          message={liveAssistant
+                            ? {
+                                ...message,
+                                text: streamedText || t('agent.execute.waiting'),
+                              }
+                            : message}
+                        />
+                      );
+                    })}
                   </ul>
                 </>
               )}
 
-              {executing ? (
+              {executing && !hasPersistedRunningExchange ? (
                 <div className="agent-live-exchange" role="status" aria-live="polite">
                   <div className="agent-message agent-message-user">
                     <div className="agent-message-head">

@@ -144,6 +144,25 @@ describe('main-owned Agent workspace store', () => {
     expect(fs.readdirSync(path.dirname(store.filePath))).toEqual(['workspace-v1.json']);
   });
 
+  it('terminalizes an interrupted execution once when the store opens', () => {
+    const interrupted = document();
+    interrupted.revision = 4;
+    interrupted.conversations[0].messages[0].status = 'streaming';
+    interrupted.conversations[0].messages[0].text = 'partial answer';
+    fs.mkdirSync(path.dirname(store.filePath), { recursive: true });
+    fs.writeFileSync(store.filePath, JSON.stringify(interrupted), 'utf8');
+
+    const recovered = store.read();
+    expect(recovered.revision).toBe(5);
+    expect(recovered.conversations[0].messages[0]).toMatchObject({
+      status: 'failed',
+      error: 'provider-failed',
+      text: 'partial answer',
+    });
+    expect(store.read()).toEqual(recovered);
+    expect(JSON.parse(fs.readFileSync(store.filePath, 'utf8'))).toEqual(recovered);
+  });
+
   it('refuses a stale compare-and-swap and preserves the newer document', () => {
     const base = store.write(document());
     const pinned = store.compareAndWrite({

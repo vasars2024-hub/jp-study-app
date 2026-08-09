@@ -110,6 +110,32 @@ function atomicWrite(filePath: string, state: AgentWorkspaceState): void {
 }
 
 /**
+ * A process restart cannot resume an in-flight provider call. Persisted pending
+ * or streaming rows are therefore terminalized once, when the main-owned store
+ * first opens the document, instead of presenting a permanent live status for a
+ * request that no longer exists. Partial text is preserved if a future runtime
+ * starts checkpointing chunks.
+ */
+export function recoverInterruptedAgentWorkspace(
+  state: AgentWorkspaceState,
+): AgentWorkspaceState {
+  let changed = false;
+  const conversations = state.conversations.map((conversation) => {
+    let conversationChanged = false;
+    const messages = conversation.messages.map((message) => {
+      if (message.status !== 'pending' && message.status !== 'streaming') return message;
+      changed = true;
+      conversationChanged = true;
+      return { ...message, status: 'failed' as const, error: 'provider-failed' };
+    });
+    return conversationChanged ? { ...conversation, messages } : conversation;
+  });
+  return changed
+    ? { ...state, revision: state.revision + 1, conversations }
+    : state;
+}
+
+/**
  * The store hands out whole conversations, but only the retained half reaches the
  * file. The session half lives in `agentSessionContext.ts`, in memory, and is
  * re-attached on the way out.
@@ -130,7 +156,16 @@ export function createAgentWorkspaceStore(
   session: AgentSessionContextStore = getAgentSessionContextStore(),
 ): AgentWorkspaceStore {
   const filePath = path.join(rootDirectory, 'agent', WORKSPACE_FILE);
-  const current = (): AgentWorkspaceState => session.merge(readFile(filePath));
+  let opened = false;
+  const persisted = (): AgentWorkspaceState => {
+    const state = readFile(filePath);
+    if (opened) return state;
+    opened = true;
+    const recovered = recoverInterruptedAgentWorkspace(state);
+    if (recovered !== state) atomicWrite(filePath, recovered);
+    return recovered;
+  };
+  const current = (): AgentWorkspaceState => session.merge(persisted());
   const commit = (
     value: unknown,
     persistedCurrent: AgentWorkspaceState,
@@ -149,14 +184,14 @@ export function createAgentWorkspaceStore(
     session.absorb(whole);
     return session.merge(persisted);
   };
-  const write = (value: unknown): AgentWorkspaceState => commit(value, readFile(filePath));
+  const write = (value: unknown): AgentWorkspaceState => commit(value, persisted());
   return {
     filePath,
     read: current,
     write,
     compareAndWrite: (value: unknown) => {
       const incoming = normalizeAgentWorkspaceState(value);
-      const persistedCurrent = readFile(filePath);
+      const persistedCurrent = persisted();
       if (incoming.revision !== persistedCurrent.revision) {
         return { ok: false, state: session.merge(persistedCurrent) };
       }

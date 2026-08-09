@@ -32,6 +32,7 @@ vi.mock('../i18n', () => ({
 }));
 
 import { AGENT_WORKSPACE_SCHEMA_VERSION, type AgentWorkspaceState } from '../../shared/agentWorkspace';
+import { agentExecutionMessageIds } from '../../shared/agentExecutionBridge';
 import AgentWorkspaceShell from '../components/agent/AgentWorkspaceShell';
 
 interface BridgeCall {
@@ -45,6 +46,7 @@ let calls: BridgeCall[];
 let stored: AgentWorkspaceState;
 let loadResult: unknown = null;
 let executionListener: ((event: unknown) => void) | null;
+let workspaceListener: ((state: unknown) => void) | null;
 
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
@@ -115,6 +117,7 @@ function populated(): AgentWorkspaceState {
 function installBridge(): void {
   calls = [];
   executionListener = null;
+  workspaceListener = null;
   const record = (method: string, handle: (...args: unknown[]) => unknown) =>
     (...args: unknown[]) => {
       calls.push({ method, args });
@@ -138,6 +141,12 @@ function installBridge(): void {
       stored = state();
       return { ok: true, state: stored };
     }),
+    onAgentWorkspaceChanged: (cb: (state: unknown) => void) => {
+      workspaceListener = cb;
+      return () => {
+        workspaceListener = null;
+      };
+    },
     onAgentExecutionEvent: (cb: (event: unknown) => void) => {
       executionListener = cb;
       return () => {
@@ -321,6 +330,116 @@ describe('Agent workspace shell', () => {
     expect(host.querySelector('[role="alert"]')?.textContent)
       .toContain('agent.error.write-failed');
     expect(text()).toContain('Particle question');
+  });
+
+  it('renders one live exchange when main announces the persisted placeholders', async () => {
+    stored = populated();
+    await mount();
+    let releaseProvider = (): void => undefined;
+    let announcePending = (): void => undefined;
+    let finishRun = (): void => undefined;
+    const providerGate = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      announcePending = resolve;
+    });
+    const finished = new Promise<void>((resolve) => {
+      finishRun = resolve;
+    });
+    (window as unknown as { api: Record<string, unknown> }).api.agentExecutionRun =
+      async (raw: unknown) => {
+        const request = raw as { requestId: string; conversationId: string; prompt: string };
+        const ids = agentExecutionMessageIds(request.requestId);
+        stored = {
+          ...stored,
+          conversations: stored.conversations.map((conversation) => (
+            conversation.id === request.conversationId
+              ? {
+                  ...conversation,
+                  messages: [
+                    ...conversation.messages,
+                    {
+                      id: ids.user,
+                      conversationId: conversation.id,
+                      role: 'user' as const,
+                      status: 'complete' as const,
+                      text: request.prompt,
+                      createdAt: 30,
+                      updatedAt: 30,
+                      contextIds: [],
+                      attachments: [],
+                      cards: [],
+                    },
+                    {
+                      id: ids.assistant,
+                      conversationId: conversation.id,
+                      role: 'assistant' as const,
+                      status: 'streaming' as const,
+                      text: '',
+                      createdAt: 31,
+                      updatedAt: 31,
+                      contextIds: [],
+                      attachments: [],
+                      cards: [],
+                    },
+                  ],
+                }
+              : conversation
+          )),
+        };
+        workspaceListener?.(stored);
+        executionListener?.({
+          type: 'chunk',
+          requestId: request.requestId,
+          assistantMessageId: ids.assistant,
+          text: 'Progressive answer',
+        });
+        announcePending();
+        await providerGate;
+        stored = {
+          ...stored,
+          conversations: stored.conversations.map((conversation) => ({
+            ...conversation,
+            messages: conversation.messages.map((message) => (
+              message.id === ids.assistant
+                ? { ...message, status: 'complete' as const, text: 'Progressive answer' }
+                : message
+            )),
+          })),
+        };
+        finishRun();
+        return {
+          ok: true,
+          requestId: request.requestId,
+          assistantMessageId: ids.assistant,
+          delivery: 'streamed' as const,
+          state: stored,
+        };
+      };
+
+    const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        ?.call(textarea, 'Explain は');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      buttonWith('agent.execute.send').click();
+      await pending;
+    });
+
+    const prompts = [...host.querySelectorAll('.agent-message-text')]
+      .filter((node) => node.textContent === 'Explain は');
+    expect(prompts).toHaveLength(1);
+    expect(host.querySelectorAll('.agent-status-streaming')).toHaveLength(1);
+    expect(text()).toContain('Progressive answer');
+    expect(host.querySelector('.agent-live-exchange')).toBeNull();
+
+    await act(async () => {
+      releaseProvider();
+      await finished;
+    });
   });
 
   it('streams a prompt through the execution bridge and renders the committed result', async () => {

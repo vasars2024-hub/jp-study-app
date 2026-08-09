@@ -1412,13 +1412,51 @@ filtering that output to this slice reports no error in a changed Agent file.
 No UI pixels, strings, preload surface, Media path or root configuration changed,
 so live visual evidence is not applicable.
 
+## One streaming run renders as one persisted exchange
+
+The execution handler commits and broadcasts the user row plus an empty streaming
+assistant row before the provider starts. The shell also rendered a separate
+transient user/assistant pair from `runningPrompt` and `streamedText`. As soon as
+the broadcast arrived, one real run therefore appeared twice — and the pop-out
+case made it more visible because both windows adopted the placeholders while
+only the initiating window owned the transient text.
+
+`agentExecutionMessageIds` is now the one shared definition of the two rows an
+execution owns. Main uses it when it creates and finishes the messages; the
+renderer uses the same assistant id to project streamed chunks into the already
+persisted placeholder. The transient pair remains only as a no-push fallback and
+disappears as soon as the main-owned assistant row is present. This keeps the
+workspace file authoritative without waiting for the final buffered answer to
+show progressive text.
+
+The adjacent restart case is closed at the store boundary. A provider call cannot
+survive an Electron main-process restart, so the first open of an existing
+workspace terminalizes any `pending` or `streaming` row as failed, preserves any
+partial text, advances the main-owned revision once, and writes that recovery
+atomically. The repair is one-time: after the store has opened, a genuinely active
+execution can write and read its streaming placeholder without the normal read
+path cancelling it.
+
+The rendered canary pushes the same pending document main produces, delivers a
+chunk, holds the provider open, and asserts one copy of the user prompt, one
+streaming status and no duplicate `.agent-live-exchange`. The store canary opens
+a revision-four document with a streaming row, asserts revision five plus a
+terminal status and preserved partial text, then verifies the second read is
+byte-stable.
+
+Automated evidence: every `agent*.test.ts` suite passes — 17 files and 237 tests,
+0 failed. The focused execution/workspace/render set passes 6 files and 58 tests.
+Targeted ESLint exits 0. No catalog, preload, Media or root-configuration path
+changed; the visible correction is behavior under an active stream rather than a
+new static layout.
+
 ## Exact next slice
 
-**Conversation continuity and streaming reconciliation.** The provider request
+**Conversation continuity.** The provider request
 still receives the current prompt, mode and context but not bounded prior turns,
-so the persisted conversation is not yet conversational. That slice must also
-ensure the renderer does not render the committed user/assistant messages and a
-second transient copy of the same live exchange while streaming.
+so the persisted conversation is not yet conversational. The history included in
+one request must be bounded, ordered, counted in the input budget, and disclosed
+without silently changing the no-history default prompt.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside

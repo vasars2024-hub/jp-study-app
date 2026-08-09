@@ -1,5 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import {
+  agentExecutionMessageIds,
   agentExecutionFailure,
   normalizeAgentExecutionId,
   normalizeAgentExecutionRequest,
@@ -54,13 +55,6 @@ const PROVIDER_CODES = new Set<AiProviderErrorCode>([
   'invalid-response',
 ]);
 
-function messageIds(requestId: string): { user: string; assistant: string } {
-  return {
-    user: `request-${requestId}-user`,
-    assistant: `request-${requestId}-assistant`,
-  };
-}
-
 function replaceConversation(
   state: AgentWorkspaceState,
   conversation: AgentConversation,
@@ -83,7 +77,7 @@ function beginExecution(
 ): AgentWorkspaceState | null {
   const conversation = state.conversations.find((entry) => entry.id === conversationId);
   if (!conversation) return null;
-  const ids = messageIds(requestId);
+  const ids = agentExecutionMessageIds(requestId);
   if (conversation.messages.some((message) => message.id === ids.user || message.id === ids.assistant)) {
     return null;
   }
@@ -129,7 +123,7 @@ function finishExecution(
 ): AgentWorkspaceState | null {
   const conversation = state.conversations.find((entry) => entry.id === conversationId);
   if (!conversation) return null;
-  const assistantId = messageIds(requestId).assistant;
+  const assistantId = agentExecutionMessageIds(requestId).assistant;
   if (!conversation.messages.some((message) => message.id === assistantId)) return null;
   return replaceConversation(state, {
     ...conversation,
@@ -219,7 +213,7 @@ export function registerAgentExecutionIpc(
         senderId: event.sender.id,
       });
       activeConversations.add(request.conversationId);
-      const ids = messageIds(request.requestId);
+      const ids = agentExecutionMessageIds(request.requestId);
 
       try {
         const result = await runProvider(request.policy, request.prompt, {

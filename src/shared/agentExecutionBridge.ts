@@ -50,6 +50,21 @@ export interface AgentExecutionChunkEvent {
 
 export type AgentExecutionEvent = AgentExecutionChunkEvent;
 
+/**
+ * Stable ids for the two persisted rows owned by one execution.
+ * Main creates them and renderers use the same definition to reconcile streamed
+ * text with the placeholder announced through the workspace broadcast.
+ */
+export function agentExecutionMessageIds(requestId: string): {
+  user: string;
+  assistant: string;
+} {
+  return {
+    user: `request-${requestId}-user`,
+    assistant: `request-${requestId}-assistant`,
+  };
+}
+
 export interface AgentExecutionSuccess {
   ok: true;
   requestId: string;
