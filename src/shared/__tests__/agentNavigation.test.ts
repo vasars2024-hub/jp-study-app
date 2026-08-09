@@ -21,12 +21,35 @@ import {
   type AgentNavigationFailureCode,
   type AgentNavigationRun,
 } from '../agentNavigation';
-import { en } from '../i18n/catalogs/en';
 import type {
   AgentContextItem,
   AgentConversation,
   AgentResultCardAction,
 } from '../agentWorkspace';
+
+/**
+ * The English catalog as **source text**, not as an imported object.
+ *
+ * Importing `catalogs/en` pulls in the split modules it re-exports, several of
+ * which exist only as uncommitted files in the primary tree — so an import here
+ * passes in a dirty worktree and fails on the commit, which is the worst of both
+ * (`agentWorkspaceShell.test.ts` mocks `../i18n` for the same reason). Reading
+ * the sources answers the only question these assertions ask — does English
+ * define this key — without depending on another track's work.
+ */
+const CATALOG_DIR = path.resolve(__dirname, '..', 'i18n', 'catalogs');
+
+const englishCatalogSource = ((): string => {
+  const parts = [fs.readFileSync(path.join(CATALOG_DIR, 'en.ts'), 'utf8')];
+  for (const entry of fs.readdirSync(CATALOG_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const nested = path.join(CATALOG_DIR, entry.name, 'en.ts');
+    if (fs.existsSync(nested)) parts.push(fs.readFileSync(nested, 'utf8'));
+  }
+  return parts.join('\n');
+})();
+
+const definesKey = (key: string): boolean => englishCatalogSource.includes(`'${key}':`);
 
 function routeContext(overrides: Partial<AgentContextItem> = {}): AgentContextItem {
   return {
@@ -107,10 +130,10 @@ describe('agent navigation allowlist', () => {
   });
 
   it('names every navigable section with a key English actually has', () => {
-    for (const section of AGENT_NAVIGABLE_SECTIONS) {
-      const key = AGENT_NAVIGATION_SECTION_LABEL_KEYS[section];
-      expect(typeof en[key as keyof typeof en]).toBe('string');
-    }
+    const missing = AGENT_NAVIGABLE_SECTIONS
+      .map((section) => AGENT_NAVIGATION_SECTION_LABEL_KEYS[section])
+      .filter((key) => !definesKey(key));
+    expect(missing).toEqual([]);
   });
 
   /**
@@ -132,13 +155,10 @@ describe('agent navigation allowlist', () => {
       'store-failed',
       'bridge-unavailable',
     ];
-    for (const code of codes) {
-      expect(typeof en[`agent.navigate.error.${code}` as keyof typeof en]).toBe('string');
-    }
+    expect(codes.filter((code) => !definesKey(`agent.navigate.error.${code}`))).toEqual([]);
     // The catalog carries no message for a code the union does not have.
-    const declared = Object.keys(en)
-      .filter((key) => key.startsWith('agent.navigate.error.'))
-      .map((key) => key.slice('agent.navigate.error.'.length));
+    const declared = [...englishCatalogSource.matchAll(/'agent\.navigate\.error\.([a-z-]+)':/g)]
+      .map((match) => match[1]);
     expect(declared.sort()).toEqual([...codes].sort());
   });
 });
