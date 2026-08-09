@@ -75,6 +75,10 @@ import {
   type AgentQueueRunRefusal,
 } from '../../localAgentQueueRun';
 import {
+  resolveAgentQueuedStepApproval,
+  type AgentQueuedStepApprovalFailureCode,
+} from '../../../shared/agentStepApproval';
+import {
   effectiveAgentPermission,
   getActiveAgentProfile,
   type AgentProfileStore,
@@ -271,6 +275,26 @@ const QUEUE_REFUSAL_KEYS: Record<AgentQueueRunRefusal, string> = {
   'item-not-found': 'blanc.agent.refusal.itemNotFound',
   'item-not-runnable': 'blanc.agent.refusal.itemNotRunnable',
   'no-pending-step': 'blanc.agent.refusal.noPendingStep',
+};
+
+/**
+ * Why a sensitive step could not be confirmed — the same shape as the map above,
+ * over the approval gate's own codes.
+ *
+ * The record is keyed by `AgentQueuedStepApprovalFailureCode`, the strict subset
+ * of the gate's failure codes that a caller without a conversation can produce.
+ * Keying it by the full union would have meant writing panel text for
+ * `stale-provenance` and friends, which no button here can ever reach; keying it
+ * by the subset means a code added to the gate breaks this file until it has
+ * something to say.
+ */
+const APPROVAL_REFUSAL_KEYS: Record<AgentQueuedStepApprovalFailureCode, string> = {
+  'task-not-found': 'blanc.agent.approvalRefusal.taskNotFound',
+  'task-not-runnable': 'blanc.agent.approvalRefusal.taskNotRunnable',
+  'step-not-found': 'blanc.agent.approvalRefusal.stepNotFound',
+  'step-not-awaiting': 'blanc.agent.approvalRefusal.stepNotAwaiting',
+  'step-not-current': 'blanc.agent.approvalRefusal.stepNotCurrent',
+  'operation-denied': 'blanc.agent.approvalRefusal.operationDenied',
 };
 
 const AGENT_WEEKDAY_KEYS = [
@@ -496,10 +520,57 @@ export function LocalAgentPanel() {
     if (step) await runStep(task, step, false);
   };
 
+  /**
+   * The confirm verb — the one verb here that *grants a permission*, and so the
+   * one that has to ask the gate.
+   *
+   * It used to call `runStep(task, step, true)` off the panel's own in-memory
+   * task and consult `resolveAgentStepApproval` not at all. Not out of neglect:
+   * that resolver wanted an `AgentConversation`, a message id and a card id, and
+   * this panel has never had any of the three, so the only shape of the gate
+   * that existed was one it could not call. It answered the question itself
+   * instead, and answered a shorter version — the profile allow-list, and
+   * nothing about the queue row, the step's own status, or whether the task is
+   * even on that step. Cancel a plan in the queue table below and this button,
+   * sitting a few pixels above it, still ran the step.
+   *
+   * `resolveAgentQueuedStepApproval` is that gate with the card half lifted off,
+   * so both surfaces now ask one question. The panel's `task` supplies a task id
+   * and a step id and nothing else; every decision — and the step that actually
+   * runs — comes from the live queue.
+   */
   const confirmAndRun = async (): Promise<void> => {
     if (!task) return;
-    const step = pendingAgentTaskStep(task, 'confirm');
-    if (step) await runStep(task, step, true);
+    const candidate = pendingAgentTaskStep(task, 'confirm');
+    if (!candidate) {
+      setStatus(t(APPROVAL_REFUSAL_KEYS['step-not-awaiting']));
+      return;
+    }
+    // Read now, not from `taskQueue` state: the gate's whole value is that it
+    // runs against the queue as it is at the moment of the grant, and a pause or
+    // a cancel from another window lands in the store before it lands in state.
+    const live = loadLocalAgentTaskQueue();
+    const resolution = resolveAgentQueuedStepApproval(
+      live,
+      task.id,
+      candidate.id,
+      effectiveAgentPermission(settings.permission, activeProfile),
+      executableOperations,
+    );
+    if (!resolution.ok) {
+      setStatus(t(APPROVAL_REFUSAL_KEYS[resolution.code]));
+      return;
+    }
+    // The queue's copy of both, not the panel's: that is the pair the gate just
+    // judged, and running a different one would put the check back beside the
+    // thing it was supposed to be checking.
+    const item = live.items.find((entry) => entry.task.id === resolution.approval.taskId);
+    const step = item?.task.steps.find((entry) => entry.id === resolution.approval.stepId);
+    if (!item || !step) {
+      setStatus(t(APPROVAL_REFUSAL_KEYS['step-not-found']));
+      return;
+    }
+    await runStep(item.task, step, true);
   };
 
   /**

@@ -151,12 +151,14 @@ describe('grantAgentStepApproval', () => {
     expect(runCalls).toHaveLength(1);
   });
 
-  it.each(['cancelled', 'completed', 'failed'] as const)(
+  it.each(['cancelled', 'paused', 'completed', 'failed'] as const)(
     'refuses to run a step of a %s queue row, and never calls the runner',
     async (status) => {
-      // `cancelAgentQueueItem` marks the ROW and leaves the task untouched, so
-      // the step is still `waiting-confirmation`. Checking only the step is what
-      // let a cancelled task's operation execute.
+      // `cancelAgentQueueItem` and `pauseAgentQueueItem` mark the ROW and leave
+      // the task untouched, so the step is still `waiting-confirmation`.
+      // Checking only the step is what let a cancelled task's operation execute.
+      // `paused` joined this list when the gate was split: the grant runs the
+      // step immediately, so approving a paused row silently undid Pause.
       queue = taskQueue({ status });
       await expect(grant()).resolves.toEqual({ ok: false, code: 'task-not-runnable' });
       expect(runCalls).toHaveLength(0);

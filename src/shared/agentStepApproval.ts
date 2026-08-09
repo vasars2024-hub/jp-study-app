@@ -28,6 +28,15 @@
  * may grant it; running the step is the task runner's job, behind its own
  * confirmed request. Keeping the two apart is what stops this module from
  * becoming a second, weaker path into tool execution.
+ *
+ * The gate comes in two shapes because two surfaces grant this permission.
+ * `resolveAgentQueuedStepApproval` is the whole rule and needs only the queue,
+ * a `taskId` and a `stepId`; `resolveAgentStepApproval` is that same rule with
+ * the card's own preconditions in front of it. The card shape came first, and
+ * for a while it was the *only* shape — which is why the Blanc queue panel,
+ * which has no conversation to pass it, ended up asking a shorter question of
+ * its own. Anything that decides whether a step may run belongs in the queued
+ * half, so there is no second place for it to be decided differently.
  */
 
 import type { AgentConversation } from './agentWorkspace';
@@ -40,18 +49,29 @@ import {
 } from './localAgent';
 import type { AgentQueueItem, AgentTaskQueue } from './localAgentTaskQueue';
 
-export type AgentStepApprovalFailureCode =
-  | 'invalid-request'
-  | 'conversation-not-found'
-  | 'action-not-found'
-  | 'not-approvable'
-  | 'stale-provenance'
+/**
+ * Everything the conversation-free half can refuse.
+ *
+ * Split out so a caller that has no card — the Blanc queue panel — can map every
+ * refusal it is able to see, exhaustively, without inventing text for codes it
+ * can never reach. The full union below is built *from* this one rather than
+ * repeating its members, so the two cannot drift.
+ */
+export type AgentQueuedStepApprovalFailureCode =
   | 'task-not-found'
   | 'task-not-runnable'
   | 'step-not-found'
   | 'step-not-awaiting'
   | 'step-not-current'
-  | 'operation-denied'
+  | 'operation-denied';
+
+export type AgentStepApprovalFailureCode =
+  | AgentQueuedStepApprovalFailureCode
+  | 'invalid-request'
+  | 'conversation-not-found'
+  | 'action-not-found'
+  | 'not-approvable'
+  | 'stale-provenance'
   | 'busy'
   | 'approve-failed'
   | 'store-failed'
@@ -80,16 +100,31 @@ export type AgentStepApprovalResolution =
   | { ok: true; approval: AgentStepApproval }
   | { ok: false; code: AgentStepApprovalFailureCode };
 
+/** The same answer, narrowed to the codes the conversation-free half can give. */
+export type AgentQueuedStepApprovalResolution =
+  | { ok: true; approval: AgentStepApproval }
+  | { ok: false; code: AgentQueuedStepApprovalFailureCode };
+
 /**
- * A queue item whose task can still reach a next step. Approving a step of a
- * cancelled, failed or completed task would grant permission for work that will
- * never run — a control that claims to do something it does not do, which is
- * the exact failure the navigation gate was built to avoid.
+ * A queue item whose task may run its next step *now*.
+ *
+ * Approving a step of a cancelled, failed or completed task would grant
+ * permission for work that will never run — a control that claims to do
+ * something it does not do, which is the exact failure the navigation gate was
+ * built to avoid.
+ *
+ * `paused` is refused for the opposite reason: that work *would* run. Every
+ * caller of this gate executes the step the moment the grant is given, so a
+ * paused row whose step could still be approved is a second control that
+ * silently undoes Pause — the same class of hole as the cancelled one commit
+ * 042ef46 closed, and the rule `selectAgentQueueRun` already states in its own
+ * docstring ("Pause has to keep meaning paused, or the queue's controls would be
+ * decoration again"). Resume is one click; running work the user stopped is not
+ * undoable.
  */
 const RUNNABLE_QUEUE_STATUS: ReadonlySet<AgentQueueItem['status']> = new Set<AgentQueueItem['status']>([
   'queued',
   'running',
-  'paused',
 ]);
 
 function approvalEffect(
@@ -119,7 +154,7 @@ function approvalEffect(
 function liveStep(
   task: AgentTask,
   stepId: string,
-): AgentTaskStep | AgentStepApprovalFailureCode {
+): AgentTaskStep | AgentQueuedStepApprovalFailureCode {
   const step = task.steps.find((entry) => entry.id === stepId);
   if (!step) return 'step-not-found';
   // Two separate refusals, because they mean different things to the user. A
@@ -132,31 +167,37 @@ function liveStep(
 }
 
 /**
- * Resolves one stored `approve-step` action against the conversation and the
- * task queue as they are *now*.
+ * The whole question, minus the card: may *this* step of *this* task run right
+ * now, for a user with this permission and this allow-list?
  *
- * Pure and side-effect free. The review step and the granted approval both call
- * it, and the only difference between them is what the caller does afterwards —
- * the same shape as `resolveAgentNavigation`, for the same reason: a gate that
- * resolves differently depending on who is asking is not a gate.
+ * Everything here is about live state — the queue row's status, the step's
+ * status, whether the step is the one the task is actually on, and what the
+ * profile permits today. None of it needs a conversation, and requiring one is
+ * what kept the second approval path from asking the gate at all: the Blanc
+ * queue panel has no `AgentConversation`, no message and no card, so the only
+ * shape of this gate it could reach was the card-shaped one it could not call.
+ * It answered the question itself instead, and checked one of the four things.
+ *
+ * So this is the gate, and the two callers differ only in how they arrive at a
+ * `taskId` and a `stepId`: a card reads them out of a stored effect, the panel
+ * out of the step the user is looking at. Both are references, never
+ * instructions — every word shown and every decision made is re-read from the
+ * live queue here.
+ *
+ * Pure and side-effect free, like the resolver it was extracted from.
  */
-export function resolveAgentStepApproval(
-  conversation: AgentConversation,
+export function resolveAgentQueuedStepApproval(
   queue: AgentTaskQueue,
-  messageId: string,
-  cardId: string,
-  actionId: string,
+  taskId: string,
+  stepId: string,
   permission: AgentPermissionLevel,
   allowedOperations?: readonly AgentToolOperationId[],
-): AgentStepApprovalResolution {
-  const effect = approvalEffect(conversation, messageId, cardId, actionId);
-  if (typeof effect === 'string') return { ok: false, code: effect };
-
-  const item = queue.items.find((entry) => entry.task.id === effect.taskId);
+): AgentQueuedStepApprovalResolution {
+  const item = queue.items.find((entry) => entry.task.id === taskId);
   if (!item) return { ok: false, code: 'task-not-found' };
   if (!RUNNABLE_QUEUE_STATUS.has(item.status)) return { ok: false, code: 'task-not-runnable' };
 
-  const step = liveStep(item.task, effect.stepId);
+  const step = liveStep(item.task, stepId);
   if (typeof step === 'string') return { ok: false, code: step };
 
   // The third boundary. `confirmed` is deliberately not set: asking whether the
@@ -175,15 +216,52 @@ export function resolveAgentStepApproval(
     approval: {
       taskId: item.task.id,
       stepId: step.id,
-      // Read from the live task, not from the stored card. If the planner
-      // rewrote the objective or the step label after this card was persisted,
-      // the user approves what the task says today.
+      // Read from the live task, not from whatever the caller was holding. If
+      // the planner rewrote the objective or the step label after the card was
+      // persisted — or after the panel last rendered — the user approves what
+      // the task says today.
       objective: item.task.objective,
       label: step.label,
       operation: step.request.operation,
       confirmation: decision.status === 'confirmation-required',
     },
   };
+}
+
+/**
+ * Resolves one stored `approve-step` action against the conversation and the
+ * task queue as they are *now*.
+ *
+ * The card-shaped half: it turns a message/card/action triple into the
+ * `taskId`/`stepId` pair the gate above works on, refusing on its own grounds
+ * (no such action, not an approval, provenance that no longer holds) and then
+ * asking the same gate everything else. It deliberately adds no live check of
+ * its own — a second copy of one of those checks is precisely the drift this
+ * split exists to end.
+ *
+ * Pure and side-effect free. The review step and the granted approval both call
+ * it, and the only difference between them is what the caller does afterwards —
+ * the same shape as `resolveAgentNavigation`, for the same reason: a gate that
+ * resolves differently depending on who is asking is not a gate.
+ */
+export function resolveAgentStepApproval(
+  conversation: AgentConversation,
+  queue: AgentTaskQueue,
+  messageId: string,
+  cardId: string,
+  actionId: string,
+  permission: AgentPermissionLevel,
+  allowedOperations?: readonly AgentToolOperationId[],
+): AgentStepApprovalResolution {
+  const effect = approvalEffect(conversation, messageId, cardId, actionId);
+  if (typeof effect === 'string') return { ok: false, code: effect };
+  return resolveAgentQueuedStepApproval(
+    queue,
+    effect.taskId,
+    effect.stepId,
+    permission,
+    allowedOperations,
+  );
 }
 
 /* ---------- Producer ------------------------------------------------------ */

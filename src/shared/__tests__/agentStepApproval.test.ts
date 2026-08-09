@@ -10,6 +10,7 @@ import {
   AGENT_STEP_APPROVAL_IDLE,
   agentStepApprovalReduce,
   pendingAgentStepApproval,
+  resolveAgentQueuedStepApproval,
   resolveAgentStepApproval,
   type AgentStepApproval,
   type AgentStepApprovalRun,
@@ -227,6 +228,103 @@ describe('resolveAgentStepApproval', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(typeof result.approval.confirmation).toBe('boolean');
   });
+
+  it('refuses a paused row, whose step the grant would run anyway', () => {
+    // Added with the split, and a deliberate change: `paused` used to be a
+    // runnable status here. Every caller executes the step the instant the
+    // grant is given, so an approvable paused row is a second control that
+    // undoes Pause — the same shape as the cancelled hole, in the other
+    // direction. `selectAgentQueueRun` has always refused paused for this
+    // reason; now so does the approval gate.
+    expect(resolve(conversation(), queue({ status: 'paused' }))).toEqual({
+      ok: false,
+      code: 'task-not-runnable',
+    });
+  });
+
+  it('is the queued gate with the card’s own checks in front of it', () => {
+    // The card half must add preconditions and subtract none. Same queue, same
+    // permission, same allow-list: whatever the conversation-free gate says
+    // about a resolvable action, the card-shaped one repeats verbatim.
+    for (const q of [queue(), queue({ status: 'cancelled' }), queue({ task: task({ steps: [step({ status: 'pending' })] }) })]) {
+      expect(resolve(conversation(), q)).toEqual(
+        resolveAgentQueuedStepApproval(q, 'task-1', 'step-1', 'full-automation'),
+      );
+    }
+  });
+});
+
+/**
+ * The same gate asked without a conversation — the shape the Blanc queue panel
+ * can actually reach. These are not a duplicate of the block above: that one
+ * proves the card's preconditions, this one proves the live-state rule itself
+ * holds for a caller that has no card to be judged on.
+ */
+describe('resolveAgentQueuedStepApproval', () => {
+  const resolveQueued = (
+    q = queue(),
+    permission: 'read-only' | 'limited-actions' | 'full-automation' = 'full-automation',
+    allowed?: readonly AgentTask['steps'][number]['request']['operation'][],
+  ) => resolveAgentQueuedStepApproval(q, 'task-1', 'step-1', permission, allowed);
+
+  it('resolves a waiting step, reading every word from the live task', () => {
+    expect(resolveQueued()).toEqual({
+      ok: true,
+      approval: {
+        taskId: 'task-1',
+        stepId: 'step-1',
+        objective: 'Mine today’s reading into the deck',
+        label: 'Add three cards to Core 2k',
+        operation: 'flashcard.add-cards',
+        confirmation: expect.any(Boolean),
+      } satisfies AgentStepApproval,
+    });
+  });
+
+  it.each(['cancelled', 'paused', 'completed', 'failed'] as const)(
+    'refuses a %s queue row',
+    (status) => {
+      // `cancelAgentQueueItem` and `pauseAgentQueueItem` mark the ROW and leave
+      // the task untouched, so the step is still `waiting-confirmation` and a
+      // step-only check waves it through. That is the drift this gate exists to
+      // stop being possible to write twice.
+      expect(resolveQueued(queue({ status }))).toEqual({ ok: false, code: 'task-not-runnable' });
+    },
+  );
+
+  it('refuses a task the queue no longer holds', () => {
+    expect(resolveQueued({ version: 1, items: [] })).toEqual({ ok: false, code: 'task-not-found' });
+  });
+
+  it('refuses a step the task does not contain', () => {
+    expect(resolveAgentQueuedStepApproval(queue(), 'task-1', 'step-9', 'full-automation'))
+      .toEqual({ ok: false, code: 'step-not-found' });
+  });
+
+  it.each(['pending', 'running', 'completed', 'failed', 'skipped'] as const)(
+    'refuses a %s step, which is not asking for anything',
+    (status) => {
+      expect(resolveQueued(queue({ task: task({ steps: [step({ status })] }) })))
+        .toEqual({ ok: false, code: 'step-not-awaiting' });
+    },
+  );
+
+  it('refuses a waiting step the task is not on', () => {
+    const q = queue({
+      task: task({
+        steps: [step({ id: 'step-0', status: 'running' }), step({ id: 'step-1' })],
+        currentStepId: 'step-0',
+      }),
+    });
+    expect(resolveQueued(q)).toEqual({ ok: false, code: 'step-not-current' });
+  });
+
+  it('re-authorizes against the permission level and the allow-list as they are now', () => {
+    expect(resolveQueued(queue(), 'read-only')).toEqual({ ok: false, code: 'operation-denied' });
+    expect(resolveQueued(queue(), 'full-automation', ['flashcard.list-decks']))
+      .toEqual({ ok: false, code: 'operation-denied' });
+    expect(resolveQueued(queue(), 'full-automation', ['flashcard.add-cards']).ok).toBe(true);
+  });
 });
 
 describe('pendingAgentStepApproval', () => {
@@ -255,6 +353,13 @@ describe('pendingAgentStepApproval', () => {
       expect(pendingAgentStepApproval(queue({ status }))).toBeNull();
     },
   );
+
+  it('offers nothing from a paused queue item either', () => {
+    // Kept in step with the gate on purpose. The producer's own docstring says
+    // both sides ask the same questions; a producer that still offered a paused
+    // row would put an approve button on screen that the gate always refuses.
+    expect(pendingAgentStepApproval(queue({ status: 'paused' }))).toBeNull();
+  });
 
   it('agrees with the resolver — anything it offers, the gate accepts', () => {
     const offered = pendingAgentStepApproval(queue());
