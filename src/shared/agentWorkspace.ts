@@ -68,6 +68,8 @@ export interface AgentProviderDisclosure {
   cloud: boolean;
   contextIds: string[];
   attachmentIds: string[];
+  /** Prior persisted turns included in this provider request, in sent order. */
+  historyMessageIds?: string[];
   inputChars: number;
   startedAt: number;
   completedAt?: number;
@@ -299,6 +301,7 @@ function normalizeProviderDisclosure(value: unknown): AgentProviderDisclosure | 
     cloud: target.kind === 'cloud',
     contextIds: stringList(raw.contextIds),
     attachmentIds: stringList(raw.attachmentIds, 50),
+    historyMessageIds: stringList(raw.historyMessageIds, 50),
     inputChars: typeof raw.inputChars === 'number' && Number.isFinite(raw.inputChars)
       ? Math.max(0, Math.round(raw.inputChars))
       : 0,

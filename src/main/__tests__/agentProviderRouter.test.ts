@@ -8,7 +8,20 @@ import {
 } from '../../shared/agentWorkspace';
 import * as providerRuntime from '../providerRuntime';
 import * as translate from '../translate';
-import { agentModePreset, runAgentProviderPrompt } from '../agentProviderRouter';
+import {
+  agentModePreset,
+  runAgentProviderPrompt,
+  type AgentProviderHistoryMessage,
+} from '../agentProviderRouter';
+
+function history(index: number, text = `turn-${index}`) {
+  return {
+    id: `history-${index}`,
+    role: index % 2 === 0 ? 'user' as const : 'assistant' as const,
+    status: 'complete' as const,
+    text,
+  };
+}
 
 function policy(overrides: Partial<AgentProviderPolicy> = {}): AgentProviderPolicy {
   return {
@@ -252,5 +265,55 @@ describe('workflow-preset modes', () => {
     // normalizes to `ask`, but the router must not be the thing that breaks if
     // it ever sees something else.
     expect(agentModePreset(undefined)).toBe('');
+  });
+
+  it('sends the newest bounded conversation turns in order and discloses their ids', async () => {
+    let routed = '';
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (prompt) => {
+      routed = prompt;
+      return 'ok';
+    });
+    const messages: AgentProviderHistoryMessage[] = Array.from(
+      { length: 14 },
+      (_, index) => history(index),
+    );
+    messages.splice(8, 0, {
+      id: 'ignored-failed',
+      role: 'assistant',
+      status: 'failed',
+      text: 'must not be sent',
+    });
+
+    const result = await runAgentProviderPrompt(policy({ maxInputChars: 20_000 }), 'Continue.', {
+      history: messages,
+      context: [context()],
+    });
+
+    expect(routed).not.toContain('turn-0');
+    expect(routed).not.toMatch(/\nturn-1\n/);
+    expect(routed).not.toContain('must not be sent');
+    expect(routed.indexOf('turn-2')).toBeLessThan(routed.indexOf('turn-13'));
+    expect(routed.indexOf('turn-13')).toBeLessThan(routed.indexOf('Current user request:'));
+    expect(routed.indexOf('Continue.')).toBeLessThan(routed.indexOf('Selected Study OS context:'));
+    expect(result.provider.historyMessageIds)
+      .toEqual(Array.from({ length: 12 }, (_, index) => `history-${index + 2}`));
+    expect(result.provider.inputChars).toBe(routed.length);
+  });
+
+  it('drops older history to fit the input budget without dropping the current request', async () => {
+    let routed = '';
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (prompt) => {
+      routed = prompt;
+      return 'ok';
+    });
+    const result = await runAgentProviderPrompt(policy({ maxInputChars: 520 }), 'Current question.', {
+      history: [history(1, 'a'.repeat(300)), history(2, 'b'.repeat(300))],
+    });
+
+    expect(routed.length).toBeLessThanOrEqual(520);
+    expect(routed).toContain('Current question.');
+    expect(routed).toContain('b'.repeat(100));
+    expect(routed).not.toContain('a'.repeat(100));
+    expect(result.provider.historyMessageIds).toEqual(['history-2']);
   });
 });

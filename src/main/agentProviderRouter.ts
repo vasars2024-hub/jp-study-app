@@ -2,6 +2,8 @@ import {
   evaluateAgentProviderPrivacy,
   type AgentAttachment,
   type AgentContextItem,
+  type AgentMessageRole,
+  type AgentMessageStatus,
   type AgentProviderDisclosure,
   type AgentProviderPolicy,
   type AgentWorkspaceMode,
@@ -21,12 +23,20 @@ export interface AgentProviderExecutionOptions {
   mode?: AgentWorkspaceMode;
   context?: AgentContextItem[];
   attachments?: AgentAttachment[];
+  history?: readonly AgentProviderHistoryMessage[];
   apiKey?: string;
   pricing?: AiProviderPricing;
   signal?: AbortSignal;
   allowLocalFallback?: boolean;
   onTextChunk?: (text: string) => void;
   onCloudEvent?: (event: AiProviderRuntimeEvent) => void;
+}
+
+export interface AgentProviderHistoryMessage {
+  id: string;
+  role: AgentMessageRole;
+  status: AgentMessageStatus;
+  text: string;
 }
 
 export interface AgentProviderExecutionResult {
@@ -87,18 +97,66 @@ export function agentModePreset(mode: AgentWorkspaceMode | undefined): string {
  * the disclosure and the input-budget check both count the preset rather than
  * quietly excluding it.
  */
+const HISTORY_MESSAGE_LIMIT = 12;
+const HISTORY_TEXT_LIMIT = 12_000;
+const HISTORY_MESSAGE_TEXT_LIMIT = 4_000;
+const HISTORY_HEADER = 'Conversation so far (oldest to newest):\n';
+const CURRENT_REQUEST_HEADER = '\n\nCurrent user request:\n';
+
+function historyRow(message: AgentProviderHistoryMessage): string {
+  const role = message.role === 'user' ? 'User' : 'Assistant';
+  const text = message.text.trim().length > HISTORY_MESSAGE_TEXT_LIMIT
+    ? `${message.text.trim().slice(0, HISTORY_MESSAGE_TEXT_LIMIT - 1)}…`
+    : message.text.trim();
+  return `${role}:\n${text}`;
+}
+
 function promptWithContext(
   prompt: string,
   context: readonly AgentContextItem[],
   mode?: AgentWorkspaceMode,
-): string {
+  history: readonly AgentProviderHistoryMessage[] = [],
+  maxInputChars = Number.POSITIVE_INFINITY,
+): { prompt: string; historyMessageIds: string[] } {
   const preset = agentModePreset(mode);
   const head = preset ? `${preset}\n\n${prompt}` : prompt;
-  if (context.length === 0) return head;
   const rows = context.map((item, index) => (
     `[Context ${index + 1}: ${item.label}]\n${item.preview}`
   ));
-  return `${head}\n\nSelected Study OS context:\n${rows.join('\n\n')}`;
+  const contextSuffix = context.length === 0
+    ? ''
+    : `\n\nSelected Study OS context:\n${rows.join('\n\n')}`;
+  const withoutHistory = `${head}${contextSuffix}`;
+  const eligible = history
+    .filter((message) => (
+      message.status === 'complete'
+      && (message.role === 'user' || message.role === 'assistant')
+      && message.id.trim().length > 0
+      && message.text.trim().length > 0
+    ))
+    .slice(-HISTORY_MESSAGE_LIMIT);
+  const selected: Array<{ id: string; row: string; textLength: number }> = [];
+  let selectedTextLength = 0;
+  for (let index = eligible.length - 1; index >= 0; index -= 1) {
+    const message = eligible[index];
+    const row = historyRow(message);
+    const textLength = Math.min(message.text.trim().length, HISTORY_MESSAGE_TEXT_LIMIT);
+    const candidateRows = [row, ...selected.map((entry) => entry.row)];
+    const candidatePrompt = `${preset ? `${preset}\n\n` : ''}${HISTORY_HEADER}${candidateRows.join('\n\n')}${CURRENT_REQUEST_HEADER}${prompt}${contextSuffix}`;
+    if (
+      selectedTextLength + textLength > HISTORY_TEXT_LIMIT
+      || candidatePrompt.length > maxInputChars
+    ) {
+      break;
+    }
+    selected.unshift({ id: message.id, row, textLength });
+    selectedTextLength += textLength;
+  }
+  if (selected.length === 0) return { prompt: withoutHistory, historyMessageIds: [] };
+  return {
+    prompt: `${preset ? `${preset}\n\n` : ''}${HISTORY_HEADER}${selected.map((entry) => entry.row).join('\n\n')}${CURRENT_REQUEST_HEADER}${prompt}${contextSuffix}`,
+    historyMessageIds: selected.map((entry) => entry.id),
+  };
 }
 
 function disclosure(
@@ -107,6 +165,7 @@ function disclosure(
   inputChars: number,
   context: AgentContextItem[],
   attachments: AgentAttachment[],
+  historyMessageIds: string[],
   startedAt: number,
   completedAt: number,
   estimatedCostUsd?: number,
@@ -116,6 +175,7 @@ function disclosure(
     cloud,
     contextIds: context.map((item) => item.id),
     attachmentIds: attachments.map((item) => item.id),
+    historyMessageIds,
     inputChars,
     startedAt,
     completedAt,
@@ -128,6 +188,7 @@ async function runLocal(
   prompt: string,
   context: AgentContextItem[],
   attachments: AgentAttachment[],
+  historyMessageIds: string[],
   inputChars: number,
   options: AgentProviderExecutionOptions,
   fallbackReason?: AgentProviderExecutionResult['fallbackReason'],
@@ -154,6 +215,7 @@ async function runLocal(
       inputChars,
       context,
       attachments,
+      historyMessageIds,
       startedAt,
       Date.now(),
     ),
@@ -185,7 +247,14 @@ export async function runAgentProviderPrompt(
         : 'input-budget';
     throw new AiProviderRuntimeError(`Agent provider request refused: ${privacy.reason ?? 'privacy policy'}.`, code);
   }
-  const providerPrompt = promptWithContext(prompt, privacy.context, options.mode);
+  const assembled = promptWithContext(
+    prompt,
+    privacy.context,
+    options.mode,
+    options.history,
+    policy.maxInputChars,
+  );
+  const providerPrompt = assembled.prompt;
   if (providerPrompt.length > policy.maxInputChars) {
     throw new AiProviderRuntimeError(
       'Agent provider request exceeds the configured input budget.',
@@ -200,6 +269,7 @@ export async function runAgentProviderPrompt(
       providerPrompt,
       privacy.context,
       privacy.attachments,
+      assembled.historyMessageIds,
       inputChars,
       options,
     );
@@ -225,6 +295,7 @@ export async function runAgentProviderPrompt(
         inputChars,
         privacy.context,
         privacy.attachments,
+        assembled.historyMessageIds,
         result.startedAt,
         result.completedAt,
         result.usage.estimatedCostUsd,
@@ -243,6 +314,7 @@ export async function runAgentProviderPrompt(
         providerPrompt,
         privacy.context,
         privacy.attachments,
+        assembled.historyMessageIds,
         inputChars,
         options,
         'missing-cloud-credential',

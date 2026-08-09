@@ -28,7 +28,11 @@ export type AgentWorkspaceCompareAndWriteResult =
   | { ok: true; state: AgentWorkspaceState }
   | { ok: false; state: AgentWorkspaceState };
 
-function retainedMessage(message: AgentMessage, contextIds: Set<string>): AgentMessage {
+function retainedMessage(
+  message: AgentMessage,
+  contextIds: Set<string>,
+  messageIds: Set<string>,
+): AgentMessage {
   const attachments = message.attachments.filter((attachment) => attachment.retained);
   const attachmentIds = new Set(attachments.map((attachment) => attachment.id));
   return {
@@ -57,6 +61,8 @@ function retainedMessage(message: AgentMessage, contextIds: Set<string>): AgentM
         ...message.provider,
         contextIds: message.provider.contextIds.filter((id) => contextIds.has(id)),
         attachmentIds: message.provider.attachmentIds.filter((id) => attachmentIds.has(id)),
+        historyMessageIds: (message.provider.historyMessageIds ?? [])
+          .filter((id) => id !== message.id && messageIds.has(id)),
       },
     } : {}),
   };
@@ -65,10 +71,13 @@ function retainedMessage(message: AgentMessage, contextIds: Set<string>): AgentM
 function retainedConversation(conversation: AgentConversation): AgentConversation {
   const context = conversation.context.filter((item) => item.retained);
   const contextIds = new Set(context.map((item) => item.id));
+  const messageIds = new Set(conversation.messages.map((message) => message.id));
   return {
     ...conversation,
     context,
-    messages: conversation.messages.map((message) => retainedMessage(message, contextIds)),
+    messages: conversation.messages.map((message) => (
+      retainedMessage(message, contextIds, messageIds)
+    )),
   };
 }
 

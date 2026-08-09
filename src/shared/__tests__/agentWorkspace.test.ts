@@ -85,6 +85,7 @@ describe('Agent workspace persistence contract', () => {
             target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
             cloud: false,
             contextIds: ['ctx-1'],
+            historyMessageIds: ['message-0', 'message-0'],
             inputChars: 50,
             startedAt: now,
           },
@@ -118,7 +119,11 @@ describe('Agent workspace persistence contract', () => {
         id: 'card-1',
         actions: [{ effect: { type: 'navigate', section: 'dictionary', highlight: true } }],
       }],
-      provider: { cloud: true, contextIds: ['ctx-1'] },
+      provider: {
+        cloud: true,
+        contextIds: ['ctx-1'],
+        historyMessageIds: ['message-0'],
+      },
     });
     expect(normalized.conversations[0].messages[0].cards[0].actions).toHaveLength(1);
   });

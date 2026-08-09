@@ -105,6 +105,7 @@ function document() {
           cloud: true,
           contextIds: ['ctx-keep', 'ctx-session'],
           attachmentIds: ['file-keep', 'file-session'],
+          historyMessageIds: ['missing-history', 'message-1'],
           inputChars: 50,
           startedAt: 100,
         },
@@ -218,6 +219,7 @@ describe('main-owned Agent workspace store', () => {
     expect(message.provider).toMatchObject({
       contextIds: ['ctx-keep'],
       attachmentIds: ['file-keep'],
+      historyMessageIds: [],
     });
   });
 

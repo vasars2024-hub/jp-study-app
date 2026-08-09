@@ -174,6 +174,7 @@ export function registerAgentExecutionIpc(
       let store: AgentWorkspaceStore;
       let started: AgentWorkspaceState;
       let context: AgentConversation['context'];
+      let history: AgentConversation['messages'];
       // Read beside `context`, from the same conversation snapshot, so the preset
       // that shapes the request is the one the conversation carried when it was
       // sent — not whatever it may be changed to while the provider runs.
@@ -188,6 +189,7 @@ export function registerAgentExecutionIpc(
           return agentExecutionFailure('conversation-not-found', request.requestId, current);
         }
         context = conversation.context;
+        history = conversation.messages;
         mode = conversation.mode;
         const pending = beginExecution(
           current,
@@ -218,6 +220,7 @@ export function registerAgentExecutionIpc(
       try {
         const result = await runProvider(request.policy, request.prompt, {
           context,
+          history,
           mode,
           signal: controller.signal,
           allowLocalFallback: request.allowLocalFallback,

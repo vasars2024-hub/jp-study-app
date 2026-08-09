@@ -7,6 +7,7 @@ import {
   AGENT_EXECUTION_CHANNELS,
   defaultAgentExecutionPolicy,
 } from '../../shared/agentExecutionBridge';
+import type { AgentWorkspaceState } from '../../shared/agentWorkspace';
 import { AiProviderRuntimeError } from '../providerRuntime';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
@@ -62,7 +63,7 @@ let root = '';
 let store: AgentWorkspaceStore;
 const sent: Array<{ channel: string; payload: unknown }> = [];
 
-function workspace() {
+function workspace(): AgentWorkspaceState {
   return {
     version: 1,
     revision: 0,
@@ -199,13 +200,27 @@ describe('Agent execution IPC', () => {
     // effective while every request went out as `ask`.
     const state = workspace();
     state.conversations[0].mode = 'analyze';
+    state.conversations[0].messages.push({
+      id: 'message-1',
+      conversationId: 'chat-1',
+      role: 'user',
+      status: 'complete',
+      text: 'Earlier question.',
+      createdAt: 15,
+      updatedAt: 15,
+      contextIds: [],
+      attachments: [],
+      cards: [],
+    });
     store.write(state);
 
     let seen: string | undefined = 'unset';
+    let seenHistory: string[] = [];
     registerAgentExecutionIpc({
       resolveStore: () => store,
       runProvider: async (_policy, _prompt, options) => {
         seen = options.mode;
+        seenHistory = options.history?.map((message) => message.id) ?? [];
         return {
           text: 'done',
           delivery: 'buffered' as const,
@@ -225,6 +240,7 @@ describe('Agent execution IPC', () => {
 
     await invoke(AGENT_EXECUTION_CHANNELS.run, request());
     expect(seen).toBe('analyze');
+    expect(seenHistory).toEqual(['message-1']);
   });
 
   it('streams through the requesting renderer and commits both messages', async () => {

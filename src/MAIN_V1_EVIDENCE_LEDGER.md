@@ -1484,13 +1484,55 @@ The media handoff test verifies the same property at a real producer boundary.
 Focused evidence: 5 files and 111 tests pass, 0 failed. No visual, catalog,
 preload, Media implementation or root-configuration path changed.
 
+## Persisted chats now carry bounded conversation continuity
+
+The workspace stored a conversation but the provider received only the newest
+prompt, mode and current context shelf. A second question such as "what about the
+other form?" therefore had no access to the answer it referred to. Searchable
+history was real on disk and in the rail, but execution behaved as a sequence of
+unrelated one-shot requests.
+
+Execution now snapshots the conversation's existing messages before it inserts
+the current user/streaming pair and hands that snapshot to the router. The router
+selects complete user and assistant messages only, preserves oldest-to-newest
+order, and places them between the optional workflow preset and the clearly
+labelled current request. System/tool rows, failed or interrupted rows, empty text
+and the in-flight pair are not replayed.
+
+History is bounded three ways: at most the newest 12 eligible messages, at most
+4,000 characters from one message, and at most 12,000 message-text characters in
+the request. The final configured `maxInputChars` budget is still authoritative;
+selection walks newest-first and stops at the oldest contiguous set that fits,
+so the current request, preset and context are never silently truncated to make
+room for history. With no eligible history, prompt assembly returns the exact
+pre-continuity bytes.
+
+Provider disclosures now record `historyMessageIds` in the order sent. The field
+normalizes to a bounded deduplicated list for old or untrusted documents, and the
+persistence boundary removes self-references and ids whose message no longer
+exists after normalization. This makes continuity auditable without putting
+message text into metadata.
+
+Canary evidence sends 14 turns plus a failed row and proves only the newest 12
+complete turns appear, in order, ahead of the current request and context. A tight
+budget test proves the newest turn remains while the older one is omitted, the
+request still fits and disclosure size matches the actual routed prompt. The IPC
+test proves the conversation snapshot — not an empty default — reaches the
+provider options.
+
+Automated evidence: every `agent*.test.ts` suite passes — 17 files and 241 tests,
+0 failed. The focused provider/execution/workspace set passes 4 files and 42
+tests; targeted ESLint exits 0. This changes provider input and persisted
+disclosure metadata, not static chrome, so no new visual artifact applies.
+
 ## Exact next slice
 
-**Conversation continuity.** The provider request
-still receives the current prompt, mode and context but not bounded prior turns,
-so the persisted conversation is not yet conversational. The history included in
-one request must be bounded, ordered, counted in the input budget, and disclosed
-without silently changing the no-history default prompt.
+**Pop-out-safe context handoff.** `openAgentSurface()` dispatches the desktop
+`os:open` event even in a first-class pop-out that renders `AppSection` without a
+desktop router. The context is attached, but the function reports success while
+no Agent surface opens and producer call sites discard failure outcomes. The next
+slice must make the routing result honest for each embedding and surface a failed
+attach instead of silently swallowing it.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside
