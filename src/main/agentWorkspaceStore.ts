@@ -30,13 +30,20 @@ function retainedMessage(message: AgentMessage, contextIds: Set<string>): AgentM
     ...message,
     contextIds: message.contextIds.filter((id) => contextIds.has(id)),
     attachments,
-    cards: message.cards.map((card) => ({
-      ...card,
-      sourceContextIds: card.sourceContextIds.filter((id) => contextIds.has(id)),
-      actions: card.actions.filter((action) => (
-        action.effect.type !== 'open-context' || contextIds.has(action.effect.contextId)
-      )),
-    })),
+    // A card is a derived result, not just a bag of context references. Its title,
+    // summary and action payloads may all repeat material from the source item.
+    // Filtering only `sourceContextIds` would therefore persist the derived text
+    // after a session-only source was removed. Keep the whole card only when every
+    // source it declares is retained; a producer that needs persistence must make
+    // that provenance explicit instead of relying on field-by-field redaction.
+    cards: message.cards
+      .filter((card) => card.sourceContextIds.every((id) => contextIds.has(id)))
+      .map((card) => ({
+        ...card,
+        actions: card.actions.filter((action) => (
+          action.effect.type !== 'open-context' || contextIds.has(action.effect.contextId)
+        )),
+      })),
     ...(message.provider ? {
       provider: {
         ...message.provider,

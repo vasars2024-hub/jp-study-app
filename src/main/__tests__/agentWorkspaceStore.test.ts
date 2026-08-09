@@ -69,11 +69,26 @@ function document() {
         cards: [{
           id: 'card-1',
           kind: 'reading',
-          title: 'Reading result',
+          title: 'Reading result repeats 秘密',
+          summary: 'Derived from session-only context: 秘密',
           sourceContextIds: ['ctx-keep', 'ctx-session'],
           actions: [{
             id: 'open-session-context',
             label: 'Open',
+            effect: { type: 'open-context', contextId: 'ctx-session' },
+          }],
+        }, {
+          id: 'card-retained',
+          kind: 'reading',
+          title: 'Retained result',
+          sourceContextIds: ['ctx-keep'],
+          actions: [{
+            id: 'open-retained-context',
+            label: 'Open retained',
+            effect: { type: 'open-context', contextId: 'ctx-keep' },
+          }, {
+            id: 'open-missing-context',
+            label: 'Open missing',
             effect: { type: 'open-context', contextId: 'ctx-session' },
           }],
         }],
@@ -135,8 +150,10 @@ describe('main-owned Agent workspace store', () => {
     expect(conversation.context.map((item) => item.id)).toEqual(['ctx-keep']);
     expect(message.contextIds).toEqual(['ctx-keep']);
     expect(message.attachments.map((item) => item.id)).toEqual(['file-keep']);
+    expect(message.cards.map((card) => card.id)).toEqual(['card-retained']);
     expect(message.cards[0].sourceContextIds).toEqual(['ctx-keep']);
-    expect(message.cards[0].actions).toEqual([]);
+    expect(message.cards[0].actions.map((action) => action.id))
+      .toEqual(['open-retained-context']);
     expect(message.provider).toMatchObject({
       contextIds: ['ctx-keep'],
       attachmentIds: ['file-keep'],
@@ -158,6 +175,7 @@ describe('main-owned Agent workspace store', () => {
     expect(raw).toContain('ctx-keep');
     expect(raw).not.toContain('ctx-session');
     expect(raw).not.toContain('秘密');
+    expect(raw).not.toContain('card-1');
     expect(JSON.parse(raw).conversations[0].context).toHaveLength(1);
   });
 

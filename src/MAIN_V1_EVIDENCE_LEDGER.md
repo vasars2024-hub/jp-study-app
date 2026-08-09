@@ -1335,6 +1335,30 @@ config has pre-existing top-level-`await` errors in unrelated test files, so it 
 not a clean gate and is not treated as one). Eight keys per catalog in all four
 languages, with CLDR plural forms for the two counts in `ru`.
 
+## Result cards cannot outlive session-only provenance
+
+The first card producer was not safe to start at the previous checkpoint. The
+persistence boundary removed session-only context objects and filtered their ids
+out of a card, but kept the rest of that card. Its `title`, `summary` and action
+payloads could therefore repeat a private selection, path, control id or entity id
+into `workspace-v1.json` after the source item itself was correctly refused.
+
+`retainedMessage` now treats a card as one derived result rather than a set of
+independently redactable fields: every declared `sourceContextId` must survive the
+retention boundary or the entire card is omitted. A retained-only card still
+survives, and an `open-context` action whose target is missing is still removed.
+This is deliberately a prerequisite, not a result-card completion claim; no card
+producer or interactive action surface exists yet.
+
+The regression fixture puts the session-only value in the card title and summary,
+then asserts against the raw file bytes as well as the normalized result. Reverting
+to id filtering leaves the private text and card id on disk and fails the test.
+
+Focused evidence: the store/workspace/execution/IPC/bridge set passes 4 files and
+41 tests, 0 failed; targeted ESLint and path-scoped `git diff --check` exit 0. No
+UI, preload, catalog, Media or other dirty path changed, so live visual evidence is
+not applicable to this persistence-only checkpoint.
+
 ## Exact next slice
 
 **The player call site, once the study-workspace block track lands.** The producer
@@ -1354,9 +1378,10 @@ cue they never receive. Recorded here rather than fixed — the two files that w
 change are the other track's.
 
 Then the rest of the Track 3 surface, modes and history search now being done:
-**attachments** and **interactive result cards** — and when cards get a
-producer, extend `retainedMessage`'s prune list first, since the file invariant
-rests on that list staying exhaustive the moment something writes one.
+**interactive result cards** and **attachments**. The result-card persistence
+precondition is now closed; the next card slice must add one deterministic,
+grounded producer and execute only an already-typed safe effect rather than parse
+or trust arbitrary model-authored action payloads.
 
 **Attachments are the same "type without a producer" shape** the shelf and the
 mode both turned out to be: `AgentAttachment`, `AgentAttachmentKind`,
