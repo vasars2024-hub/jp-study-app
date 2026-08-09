@@ -773,6 +773,41 @@
   font-size: var(--font-size-xs, 0.75rem);
 }
 
+/* The approval gate. Same wrapping rule as the navigation gate above, and for a
+   stronger version of the same reason: the review step carries an objective, a
+   step label and an operation id, any of which can be long, and a user cannot
+   approve what the card has clipped. The step line therefore gets the full row
+   rather than competing with the buttons for it. */
+.agent-card-approve {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  min-width: 0;
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-card-approve-step {
+  flex-basis: 100%;
+  color: var(--agent-text);
+  font-weight: var(--font-weight-medium, 500);
+  overflow-wrap: anywhere;
+}
+
+.agent-card-approve-operation {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+}
+
+.agent-card-approve-grant {
+  border-color: var(--agent-accent);
+  color: var(--agent-text);
+}
+
+.agent-card-approve-status {
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
 .agent-card-actions,
 .agent-card-action-wrap {
   display: flex;

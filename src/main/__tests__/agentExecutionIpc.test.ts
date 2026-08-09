@@ -662,6 +662,158 @@ describe('Agent execution IPC', () => {
     expect(JSON.stringify(cards)).not.toContain('delete-everything');
   });
 
+  /**
+   * The approval card stores two ids and nothing else. Everything the user reads
+   * at review time is re-derived from the live queue, so the objective and the
+   * step label — task text living in the operational document — must not gain a
+   * second home in `workspace-v1.json`.
+   */
+  it('offers one approval card naming only ids when a queued step waits on the user', async () => {
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'ctx-word',
+      kind: 'dictionary-entry',
+      label: '積ん読',
+      preview: 'tsundoku',
+      source: { app: 'dictionary' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 40,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      resolveTaskQueue: () => ({
+        version: 1,
+        items: [{
+          id: 'task-7',
+          task: {
+            id: 'task-7',
+            objective: 'OBJECTIVE-SENTINEL',
+            status: 'waiting-confirmation',
+            steps: [{
+              id: 'step-2',
+              label: 'STEP-LABEL-SENTINEL',
+              request: {
+                callId: 'call-2',
+                operation: 'flashcard.add-cards',
+                arguments: { cards: [{ front: 'a', back: 'b' }] },
+              },
+              status: 'waiting-confirmation',
+            }],
+            currentStepId: 'step-2',
+            createdAt: 10,
+            updatedAt: 10,
+          },
+          priority: 0,
+          status: 'running',
+          createdAt: 10,
+          updatedAt: 10,
+        }],
+      }),
+      runProvider: async () => ({
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-word'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards).toHaveLength(2);
+    expect(cards[1]).toEqual({
+      id: 'request-run-1-assistant-approval-1',
+      kind: 'plan',
+      title: '積ん読',
+      sourceContextIds: ['ctx-word'],
+      actions: [{
+        id: 'request-run-1-assistant-approve-step-1',
+        label: '積ん読',
+        effect: { type: 'approve-step', taskId: 'task-7', stepId: 'step-2' },
+      }],
+    });
+    const serialized = JSON.stringify(cards);
+    expect(serialized).not.toContain('OBJECTIVE-SENTINEL');
+    expect(serialized).not.toContain('STEP-LABEL-SENTINEL');
+    expect(serialized).not.toContain('flashcard.add-cards');
+  });
+
+  it('offers no approval card when the queue has nothing waiting on the user', async () => {
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'ctx-word',
+      kind: 'dictionary-entry',
+      label: '積ん読',
+      preview: 'tsundoku',
+      source: { app: 'dictionary' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 40,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      resolveTaskQueue: () => ({
+        version: 1,
+        items: [{
+          id: 'task-8',
+          task: {
+            id: 'task-8',
+            objective: 'Already running',
+            status: 'running',
+            steps: [{
+              id: 'step-1',
+              label: 'Running step',
+              request: { callId: 'call-1', operation: 'flashcard.list-decks', arguments: {} },
+              status: 'running',
+            }],
+            currentStepId: 'step-1',
+            createdAt: 10,
+            updatedAt: 10,
+          },
+          priority: 0,
+          status: 'running',
+          createdAt: 10,
+          updatedAt: 10,
+        }],
+      }),
+      runProvider: async () => ({
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-word'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards).toHaveLength(1);
+    expect(cards[0].actions[0].effect).toEqual({ type: 'open-context', contextId: 'ctx-word' });
+  });
+
   it('refuses to suggest a route whose app is not a window the app can open', async () => {
     const state = workspace();
     state.conversations[0].context = [{

@@ -51,9 +51,21 @@ import {
 import {
   agentTimelineForConversation,
   agentTimelineRecord,
+  type AgentTimelineEffect,
   type AgentTimelineEntry,
   type AgentTimelineEvent,
 } from '../../../shared/agentTimeline';
+import {
+  AGENT_STEP_APPROVAL_IDLE,
+  agentStepApprovalReduce,
+  resolveAgentStepApproval,
+  type AgentStepApprovalEvent,
+  type AgentStepApprovalRun,
+} from '../../../shared/agentStepApproval';
+import {
+  grantAgentStepApproval,
+  readAgentStepApprovalContext,
+} from '../../agentStepApprovalClient';
 import { runAgentNavigation } from '../../agentNavigationClient';
 import {
   AGENT_ATTACHMENT_ACCEPT,
@@ -263,9 +275,24 @@ function MessageRow({
    * because reviewing step three means reading steps one and two, which are
    * messages of their own.
    */
-  onRecord: (cardId: string, actionId: string, event: AgentTimelineEvent) => void;
+  onRecord: (
+    cardId: string,
+    actionId: string,
+    effect: AgentTimelineEffect,
+    event: AgentTimelineEvent,
+  ) => void;
 }) {
   const { t } = useT();
+  // Two thin wrappers rather than an `effect` argument threaded through every
+  // call: the effect is a property of which gate is running, not of the
+  // transition, and passing it per call is how a refusal ends up filed under the
+  // wrong control.
+  const recordNavigation = (cardId: string, actionId: string, event: AgentTimelineEvent): void => {
+    onRecord(cardId, actionId, 'navigate', event);
+  };
+  const recordApproval = (cardId: string, actionId: string, event: AgentTimelineEvent): void => {
+    onRecord(cardId, actionId, 'approve-step', event);
+  };
   const [failedActionId, setFailedActionId] = useState<string | null>(null);
   /**
    * One lifecycle per navigation action, keyed by card and action.
@@ -276,6 +303,8 @@ function MessageRow({
    * approved it, and would sync a granted permission into every other window.
    */
   const [navigationRuns, setNavigationRuns] = useState<Record<string, AgentNavigationRun>>({});
+  /** One lifecycle per approval action, held here for the same reason. */
+  const [approvalRuns, setApprovalRuns] = useState<Record<string, AgentStepApprovalRun>>({});
   const provider = message.provider;
 
   const dispatchNavigation = (key: string, event: AgentNavigationEvent): void => {
@@ -307,7 +336,7 @@ function MessageRow({
     if (blocked) return;
     // The attempt opens when the user asks, not when resolution succeeds — a
     // refusal is something that happened and has to be in the record.
-    onRecord(cardId, actionId, { type: 'review' });
+    recordNavigation(cardId, actionId, { type: 'review' });
     const result = await runAgentNavigation({
       conversationId: conversation.id,
       messageId: message.id,
@@ -318,7 +347,7 @@ function MessageRow({
     dispatchNavigation(key, result.ok
       ? { type: 'review', destination: result.destination }
       : { type: 'refused', code: result.code });
-    if (!result.ok) onRecord(cardId, actionId, { type: 'refused', code: result.code });
+    if (!result.ok) recordNavigation(cardId, actionId, { type: 'refused', code: result.code });
   };
 
   const approveNavigation = async (
@@ -327,7 +356,7 @@ function MessageRow({
     actionId: string,
   ): Promise<void> => {
     dispatchNavigation(key, { type: 'approve' });
-    onRecord(cardId, actionId, { type: 'running' });
+    recordNavigation(cardId, actionId, { type: 'running' });
     const result = await runAgentNavigation({
       conversationId: conversation.id,
       messageId: message.id,
@@ -339,11 +368,11 @@ function MessageRow({
     // success on it would be the one lie this gate cannot afford.
     if (result.ok && result.opened) {
       dispatchNavigation(key, { type: 'succeeded' });
-      onRecord(cardId, actionId, { type: 'succeeded' });
+      recordNavigation(cardId, actionId, { type: 'succeeded' });
     } else {
       const code = result.ok ? 'open-failed' : result.code;
       dispatchNavigation(key, { type: 'failed', code });
-      onRecord(cardId, actionId, { type: 'failed', code });
+      recordNavigation(cardId, actionId, { type: 'failed', code });
     }
   };
 
@@ -357,6 +386,63 @@ function MessageRow({
     // approval the user gave for a destination that has since changed.
     dispatchNavigation(key, { type: 'retry' });
     await reviewNavigation(key, cardId, actionId);
+  };
+
+  const dispatchApproval = (key: string, event: AgentStepApprovalEvent): void => {
+    setApprovalRuns((previous) => ({
+      ...previous,
+      [key]: agentStepApprovalReduce(previous[key] ?? AGENT_STEP_APPROVAL_IDLE, event),
+    }));
+  };
+
+  /**
+   * Asks the gate whether this step may be approved, and shows what approving it
+   * would run. Resolves against the queue and the profile as they are *now* —
+   * never against anything captured when the card was produced.
+   */
+  const reviewApproval = (key: string, cardId: string, actionId: string): void => {
+    // The attempt opens when the user asks, so a refusal is something that
+    // happened and stays in the record.
+    recordApproval(cardId, actionId, { type: 'review' });
+    const context = readAgentStepApprovalContext(t);
+    const resolution = resolveAgentStepApproval(
+      conversation,
+      context.queue,
+      message.id,
+      cardId,
+      actionId,
+      context.permission,
+      context.allowedOperations,
+    );
+    if (!resolution.ok) {
+      dispatchApproval(key, { type: 'refused', code: resolution.code });
+      recordApproval(cardId, actionId, { type: 'refused', code: resolution.code });
+      return;
+    }
+    dispatchApproval(key, { type: 'review', approval: resolution.approval });
+  };
+
+  const grantApproval = async (
+    key: string,
+    cardId: string,
+    actionId: string,
+  ): Promise<void> => {
+    const current = approvalRuns[key];
+    // Nothing to grant that was never resolved and never shown. The reducer
+    // refuses this too; checking here keeps the step from running before it.
+    if (current?.status !== 'review' || !current.approval) return;
+    const approval = current.approval;
+    dispatchApproval(key, { type: 'grant' });
+    // Re-read rather than reuse: the review may have been open for a while, and
+    // the profile that authorized it is allowed to have narrowed since.
+    const context = readAgentStepApprovalContext(t);
+    const result = await grantAgentStepApproval(approval, context);
+    if (result.ok) {
+      recordApproval(cardId, actionId, { type: 'succeeded' });
+      return;
+    }
+    dispatchApproval(key, { type: 'failed', code: result.code });
+    recordApproval(cardId, actionId, { type: 'failed', code: result.code });
   };
   return (
     <li className={`agent-message agent-message-${message.role}`}>
@@ -470,7 +556,7 @@ function MessageRow({
                             className="agent-action agent-card-action"
                             onClick={() => {
                               dispatchNavigation(key, { type: 'cancel' });
-                              onRecord(card.id, action.id, { type: 'cancelled' });
+                              recordNavigation(card.id, action.id, { type: 'cancelled' });
                             }}
                           >
                             {t('agent.card.navigate.cancel')}
@@ -519,6 +605,111 @@ function MessageRow({
                         <span className="agent-card-navigate-attempts">
                           {t('agent.card.navigate.attempt', { count: run.attempts })}
                         </span>
+                      ) : null}
+                    </span>
+                  );
+                })}
+                {card.actions.map((action) => {
+                  if (action.effect.type !== 'approve-step') return null;
+                  const key = `${card.id}:${action.id}`;
+                  const run = approvalRuns[key] ?? AGENT_STEP_APPROVAL_IDLE;
+                  // Every word of the objective, the step and the operation comes
+                  // from the gate's resolution against the live queue. The stored
+                  // action label is never shown and names nothing.
+                  const approval = run.approval;
+                  return (
+                    <span
+                      key={action.id}
+                      className={`agent-card-approve agent-approve-${run.status}`}
+                      role="group"
+                      aria-label={t('agent.card.approve.title')}
+                    >
+                      {run.status === 'idle' ? (
+                        <button
+                          type="button"
+                          className="agent-action agent-card-action"
+                          onClick={() => reviewApproval(key, card.id, action.id)}
+                        >
+                          <Icon name="check" size={13} />
+                          {t('agent.card.approve.review')}
+                        </button>
+                      ) : null}
+                      {run.status === 'review' && approval ? (
+                        <>
+                          <span className="agent-card-approve-step">
+                            {t('agent.card.approve.objective', { objective: approval.objective })}
+                            {' · '}
+                            {t('agent.card.approve.step', { step: approval.label })}
+                          </span>
+                          <span className="agent-card-approve-operation">
+                            {/*
+                              The operation id goes into a translated frame
+                              verbatim, the same way the context chip renders
+                              `source.app`. It is a stable machine identifier the
+                              user is being asked to authorize, and inventing a
+                              friendlier name for it here would be the one place
+                              this control could misdescribe what it runs.
+                            */}
+                            {t('agent.card.approve.operation', { operation: approval.operation })}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action agent-card-approve-grant"
+                            onClick={() => void grantApproval(key, card.id, action.id)}
+                          >
+                            <Icon name="check" size={13} />
+                            {t('agent.card.approve.grant')}
+                          </button>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => {
+                              dispatchApproval(key, { type: 'cancel' });
+                              recordApproval(card.id, action.id, { type: 'cancelled' });
+                            }}
+                          >
+                            {t('agent.card.approve.cancel')}
+                          </button>
+                        </>
+                      ) : null}
+                      {run.status === 'granted' ? (
+                        <span className="agent-card-approve-status">
+                          {t('agent.card.approve.granted')}
+                        </span>
+                      ) : null}
+                      {run.status === 'cancelled' ? (
+                        <>
+                          <span className="agent-card-approve-status">
+                            {t('agent.card.approve.cancelled')}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => {
+                              dispatchApproval(key, { type: 'retry' });
+                              reviewApproval(key, card.id, action.id);
+                            }}
+                          >
+                            {t('agent.card.approve.review')}
+                          </button>
+                        </>
+                      ) : null}
+                      {run.status === 'failed' ? (
+                        <>
+                          <span className="agent-card-action-error" role="alert">
+                            {t(`agent.approve.error.${run.code ?? 'approve-failed'}`)}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => {
+                              dispatchApproval(key, { type: 'retry' });
+                              reviewApproval(key, card.id, action.id);
+                            }}
+                          >
+                            {t('agent.card.approve.retry')}
+                          </button>
+                        </>
                       ) : null}
                     </span>
                   );
@@ -638,11 +829,12 @@ export default function AgentWorkspaceShell() {
     messageId: string,
     cardId: string,
     actionId: string,
+    effect: AgentTimelineEffect,
     event: AgentTimelineEvent,
   ): void => {
     setTimeline((previous) => agentTimelineRecord(
       previous,
-      { conversationId, messageId, cardId, actionId, effect: 'navigate' },
+      { conversationId, messageId, cardId, actionId, effect },
       event,
       Date.now(),
     ));
@@ -1229,11 +1421,12 @@ export default function AgentWorkspaceShell() {
                           key={message.id}
                           conversation={selected}
                           onOpenContext={openContext}
-                          onRecord={(cardId, actionId, event) => recordTimeline(
+                          onRecord={(cardId, actionId, effect, event) => recordTimeline(
                             selected.id,
                             message.id,
                             cardId,
                             actionId,
+                            effect,
                             event,
                           )}
                           message={liveAssistant

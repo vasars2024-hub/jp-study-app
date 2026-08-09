@@ -17,6 +17,12 @@ import type {
   AgentWorkspaceState,
 } from '../shared/agentWorkspace';
 import { isAgentNavigableSection } from '../shared/agentNavigation';
+import { pendingAgentStepApproval } from '../shared/agentStepApproval';
+import {
+  EMPTY_AGENT_TASK_QUEUE,
+  type AgentTaskQueue,
+} from '../shared/localAgentTaskQueue';
+import { getAgentOperationalStore } from './agentOperationalStore';
 import {
   AiProviderRuntimeError,
   type AiProviderErrorCode,
@@ -42,6 +48,13 @@ export interface AgentExecutionIpcDependencies {
   resolveStore?: () => AgentWorkspaceStore;
   runProvider?: ProviderRunner;
   now?: () => number;
+  /**
+   * The live task queue, read once per completed reply so an approval card can
+   * name a step that is actually waiting. Injected rather than imported at the
+   * call site because the operational store touches `app.getPath`, which a unit
+   * test has no business booting.
+   */
+  resolveTaskQueue?: () => AgentTaskQueue;
 }
 
 const PROVIDER_CODES = new Set<AiProviderErrorCode>([
@@ -100,6 +113,7 @@ function resultCardsForContext(
   assistantMessageId: string,
   context: readonly AgentContextItem[],
   providerContextIds: readonly string[],
+  queue: AgentTaskQueue,
 ): AgentResultCard[] {
   const disclosed = new Set(providerContextIds);
   // The two cards answer different questions and are chosen independently.
@@ -114,6 +128,7 @@ function resultCardsForContext(
   const route = newestDisclosed(context, disclosed, (item) => item.kind === 'route');
   const source = material ?? route;
   if (!source) return [];
+  const cards: AgentResultCard[] = [];
   const sourceCard: AgentResultCard = {
     id: `${assistantMessageId}-context-1`,
     kind: RESULT_CARD_KIND[source.kind],
@@ -131,11 +146,38 @@ function resultCardsForContext(
       effect: { type: 'open-context', contextId: source.id },
     }],
   };
+  cards.push(sourceCard);
+
+  // One approval card when a queued task is blocked on the user, and none
+  // otherwise. Everything the user will read at review time — the objective, the
+  // step, the operation — is re-derived from the live queue by
+  // `resolveAgentStepApproval`; only the two ids are stored, for the same reason
+  // the navigation effect stores a section and not a destination. The title is
+  // the source context's own already-persisted label, so approving a step
+  // introduces no new copy of task text into `workspace-v1.json`.
+  const pending = pendingAgentStepApproval(queue);
+  if (pending) {
+    cards.push({
+      id: `${assistantMessageId}-approval-1`,
+      kind: 'plan',
+      title: source.label,
+      sourceContextIds: [source.id],
+      actions: [{
+        id: `${assistantMessageId}-approve-step-1`,
+        label: source.label,
+        // A typed suggestion only. The grant is gated in the renderer behind
+        // review and explicit approval, and re-authorized against the live
+        // profile by `resolveAgentStepApproval` before anything is offered.
+        effect: { type: 'approve-step', taskId: pending.taskId, stepId: pending.stepId },
+      }],
+    });
+  }
+
   // No suggestion for a place the app cannot open. `source.app` is free-form
   // producer metadata — the media producers emit `media`, which is not a window —
   // and a card that could only ever fail its allowlist check at review time is a
   // dead control, not a suggestion.
-  if (!route || !isAgentNavigableSection(route.source.app)) return [sourceCard];
+  if (!route || !isAgentNavigableSection(route.source.app)) return cards;
   const navigationCard: AgentResultCard = {
     id: `${assistantMessageId}-navigation-1`,
     kind: 'navigation',
@@ -159,7 +201,7 @@ function resultCardsForContext(
       },
     }],
   };
-  return [sourceCard, navigationCard];
+  return [...cards, navigationCard];
 }
 
 function replaceConversation(
@@ -275,6 +317,18 @@ export function registerAgentExecutionIpc(
   const resolveStore = dependencies.resolveStore ?? getAgentWorkspaceStore;
   const runProvider = dependencies.runProvider ?? runAgentProviderPrompt;
   const now = dependencies.now ?? Date.now;
+  const resolveTaskQueue = dependencies.resolveTaskQueue
+    // A queue that cannot be read is an empty queue, not a failed reply. The
+    // approval card is an offer; losing it costs the user one button they can
+    // reach from the queue anyway, and failing the whole execution over it would
+    // trade a real answer for a missing suggestion.
+    ?? (() => {
+      try {
+        return getAgentOperationalStore().read().queue;
+      } catch {
+        return EMPTY_AGENT_TASK_QUEUE;
+      }
+    });
   const active = new Map<string, {
     controller: AbortController;
     conversationId: string;
@@ -377,6 +431,7 @@ export function registerAgentExecutionIpc(
                 ids.assistant,
                 context,
                 result.provider.contextIds,
+                resolveTaskQueue(),
               ),
             },
           );

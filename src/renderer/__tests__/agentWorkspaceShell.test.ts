@@ -26,15 +26,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // `section` is echoed alongside `count` because the navigation review step
 // resolves a section's own label key and interpolates it. Swallowing that var
 // would make "the destination text names what main resolved" unassertable.
+// `objective`/`step`/`operation` are echoed for the same reason on the approval
+// side: they are the whole content of the review step, read from the live queue.
 vi.mock('../i18n', () => ({
   useT: () => ({
     t: (key: string, vars?: Record<string, string | number>) => {
       if (vars && 'count' in vars) return `${key}=${vars.count}`;
       if (vars && 'section' in vars) return `${key}:${vars.section}`;
+      if (vars && 'objective' in vars) return `${key}:${vars.objective}`;
+      if (vars && 'step' in vars) return `${key}:${vars.step}`;
+      if (vars && 'operation' in vars) return `${key}:${vars.operation}`;
       return key;
     },
     lang: 'en',
   }),
+}));
+
+/**
+ * Only the approval's two live seams are stubbed: what the queue and profile
+ * currently say, and the one side effect a grant performs. `resolveAgentStepApproval`
+ * itself is deliberately NOT mocked — it runs for real inside the component, so
+ * these tests prove the shell shows what the gate decided rather than what the
+ * stored card claims.
+ */
+vi.mock('../agentStepApprovalClient', () => ({
+  readAgentStepApprovalContext: () => approvalContext,
+  grantAgentStepApproval: (...args: unknown[]) => {
+    grantCalls.push(args);
+    return Promise.resolve(grantResult);
+  },
 }));
 
 import { AGENT_WORKSPACE_SCHEMA_VERSION, type AgentWorkspaceState } from '../../shared/agentWorkspace';
@@ -55,6 +75,14 @@ let executionListener: ((event: unknown) => void) | null;
 let workspaceListener: ((state: unknown) => void) | null;
 let navigationReview: unknown;
 let navigationApproved: unknown;
+let approvalContext: {
+  queue: { version: 1; items: unknown[] };
+  permission: string;
+  allowedOperations: string[];
+  handlers: Record<string, unknown>;
+};
+let grantResult: unknown;
+let grantCalls: unknown[][];
 
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
@@ -149,6 +177,57 @@ function navigationWorkspace(): AgentWorkspaceState {
     }],
   }];
   return base;
+}
+
+/**
+ * A conversation carrying the approval card `main/agentExecutionIpc.ts` produces:
+ * a `plan` card whose action names two ids and whose stored label names nothing.
+ */
+function approvalWorkspace(): AgentWorkspaceState {
+  const base = populated();
+  base.conversations[0].messages[0].cards = [{
+    id: 'approval-card',
+    kind: 'plan',
+    title: 'Passage',
+    sourceContextIds: ['ctx-1'],
+    actions: [{
+      id: 'approve',
+      label: 'Stored label nobody reads',
+      effect: { type: 'approve-step', taskId: 'task-1', stepId: 'step-1' },
+    }],
+  }];
+  return base;
+}
+
+function waitingQueue(): { version: 1; items: unknown[] } {
+  return {
+    version: 1,
+    items: [{
+      id: 'task-1',
+      task: {
+        id: 'task-1',
+        objective: 'Live objective from the queue',
+        status: 'waiting-confirmation',
+        steps: [{
+          id: 'step-1',
+          label: 'Live step from the queue',
+          request: {
+            callId: 'call-1',
+            operation: 'flashcard.add-cards',
+            arguments: { cards: [{ front: 'a', back: 'b' }] },
+          },
+          status: 'waiting-confirmation',
+        }],
+        currentStepId: 'step-1',
+        createdAt: 10,
+        updatedAt: 10,
+      },
+      priority: 0,
+      status: 'running',
+      createdAt: 10,
+      updatedAt: 10,
+    }],
+  };
 }
 
 /** A stand-in for main: it answers from `stored` and records what it was asked. */
@@ -268,6 +347,14 @@ beforeEach(() => {
     destination: { section: 'dictionary', page: 'entry/猫' },
     opened: true,
   };
+  approvalContext = {
+    queue: waitingQueue(),
+    permission: 'full-automation',
+    allowedOperations: ['flashcard.add-cards'],
+    handlers: {},
+  };
+  grantResult = { ok: true };
+  grantCalls = [];
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -543,6 +630,94 @@ describe('Agent workspace shell', () => {
     await click(buttonWith('agent.card.navigate.approve'));
     expect(text()).toContain('agent.card.navigate.opened');
     expect(text()).toContain('agent.card.navigate.attempt=2');
+  });
+
+  it('reviews a step from the live queue, never from the stored card label', async () => {
+    stored = approvalWorkspace();
+    await mount();
+    await click(buttonWith('agent.card.approve.review'));
+
+    expect(text()).toContain('Live objective from the queue');
+    expect(text()).toContain('Live step from the queue');
+    expect(text()).toContain('agent.card.approve.operation:flashcard.add-cards');
+    // The persisted action label names nothing and is never shown.
+    expect(text()).not.toContain('Stored label nobody reads');
+    // Review resolves; it does not run.
+    expect(grantCalls).toHaveLength(0);
+  });
+
+  it('runs the step only after the grant, and records the attempt as succeeded', async () => {
+    stored = approvalWorkspace();
+    await mount();
+    await click(buttonWith('agent.card.approve.review'));
+    await click(buttonWith('agent.card.approve.grant'));
+
+    expect(grantCalls).toHaveLength(1);
+    expect((grantCalls[0][0] as { taskId: string; stepId: string })).toMatchObject({
+      taskId: 'task-1',
+      stepId: 'step-1',
+    });
+    expect(text()).toContain('agent.card.approve.granted');
+    expect(text()).toContain('agent.timeline.effect.approve-step');
+    expect(text()).toContain('agent.timeline.status.succeeded');
+  });
+
+  it('refuses a step the profile no longer permits, and never runs it', async () => {
+    stored = approvalWorkspace();
+    // The card was produced while the operation was enabled; the profile has
+    // since been narrowed. The real gate is what decides this.
+    approvalContext.allowedOperations = ['flashcard.list-decks'];
+    await mount();
+    await click(buttonWith('agent.card.approve.review'));
+
+    expect(text()).toContain('agent.approve.error.operation-denied');
+    expect(text()).not.toContain('agent.card.approve.grant');
+    expect(grantCalls).toHaveLength(0);
+    expect(text()).toContain('agent.timeline.status.failed');
+  });
+
+  it('refuses a step that stopped waiting while the card sat on screen', async () => {
+    stored = approvalWorkspace();
+    const queue = waitingQueue();
+    (queue.items[0] as { task: { steps: { status: string }[] } }).task.steps[0].status = 'completed';
+    approvalContext.queue = queue;
+    await mount();
+    await click(buttonWith('agent.card.approve.review'));
+
+    expect(text()).toContain('agent.approve.error.step-not-awaiting');
+    expect(grantCalls).toHaveLength(0);
+  });
+
+  it('keeps a failed run in the record beneath the retry that follows it', async () => {
+    stored = approvalWorkspace();
+    grantResult = { ok: false, code: 'approve-failed' };
+    await mount();
+    await click(buttonWith('agent.card.approve.review'));
+    await click(buttonWith('agent.card.approve.grant'));
+    expect(text()).toContain('agent.approve.error.approve-failed');
+
+    grantResult = { ok: true };
+    await click(buttonWith('agent.card.approve.retry'));
+    await click(buttonWith('agent.card.approve.grant'));
+
+    // Two attempts, and the first one's failure is still there: a retry appends
+    // beside the refusal rather than erasing it.
+    const rows = [...host.querySelectorAll('.agent-timeline-entry')];
+    expect(rows).toHaveLength(2);
+    expect(rows.some((row) => row.className.includes('agent-timeline-failed'))).toBe(true);
+    expect(rows.some((row) => row.className.includes('agent-timeline-succeeded'))).toBe(true);
+    expect(text()).toContain('agent.card.approve.granted');
+  });
+
+  it('cancels a reviewed step without running it', async () => {
+    stored = approvalWorkspace();
+    await mount();
+    await click(buttonWith('agent.card.approve.review'));
+    await click(buttonWith('agent.card.approve.cancel'));
+
+    expect(grantCalls).toHaveLength(0);
+    expect(text()).toContain('agent.card.approve.cancelled');
+    expect(text()).toContain('agent.timeline.status.cancelled');
   });
 
   it('announces stale or undeclared card context without moving focus or mutating state', async () => {

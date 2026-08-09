@@ -39,12 +39,19 @@ export type AgentTimelineStatus =
   | 'cancelled';
 
 /**
- * Only `navigate` executes today. The union exists so a second effect gains a
- * timeline by extending a type rather than by copying this module, and so an
- * unconnected effect cannot quietly appear in the record before it has a
- * producer, a permission rule and a failure path of its own.
+ * The union exists so a second effect gains a timeline by extending a type
+ * rather than by copying this module, and so an unconnected effect cannot
+ * quietly appear in the record before it has a producer, a permission rule and
+ * a failure path of its own.
+ *
+ * `approve-step` joined when it acquired all three: `agentStepApproval.ts`
+ * resolves it against the live task queue, re-authorizes it through
+ * `evaluateAgentToolAccess`, and refuses with a typed code. `save` and `undo`
+ * are still absent for the same reason `approve-step` was, and adding either
+ * here before it has a gate of its own would put a claim in the record that
+ * nothing checked.
  */
-export type AgentTimelineEffect = 'navigate';
+export type AgentTimelineEffect = 'navigate' | 'approve-step';
 
 export interface AgentTimelineTarget {
   conversationId: string;
