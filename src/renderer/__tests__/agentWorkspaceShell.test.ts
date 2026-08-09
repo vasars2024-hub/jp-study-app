@@ -451,6 +451,41 @@ describe('Agent workspace shell', () => {
     expect(text()).not.toContain('agent.card.navigate.approve');
   });
 
+  it('records each attempt on the activity timeline, keeping the failure a retry follows', async () => {
+    stored = navigationWorkspace();
+    await mount();
+
+    // Nothing attempted yet, so there is nothing to review.
+    expect(host.querySelector('.agent-timeline')).toBeNull();
+
+    navigationApproved = { ok: false, code: 'open-failed' };
+    await click(buttonWith('agent.card.navigate.review'));
+    await click(buttonWith('agent.card.navigate.approve'));
+
+    const timeline = host.querySelector<HTMLElement>('.agent-timeline');
+    expect(timeline?.getAttribute('aria-label')).toBe('agent.timeline.title');
+    expect(timeline?.textContent).toContain('agent.timeline.status.failed');
+    expect(timeline?.textContent).toContain('agent.navigate.error.open-failed');
+
+    // A retry is a second attempt beside the first, not a rewrite of it.
+    navigationApproved = {
+      ok: true,
+      destination: { section: 'dictionary', page: 'entry/猫' },
+      opened: true,
+    };
+    await click(buttonWith('agent.card.navigate.retry'));
+    await click(buttonWith('agent.card.navigate.approve'));
+
+    const rows = [...host.querySelectorAll('.agent-timeline-entry')];
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('agent.timeline.status.succeeded');
+    expect(rows[0].textContent).toContain('agent.timeline.attempt');
+    expect(rows[1].textContent).toContain('agent.timeline.status.failed');
+    // Ids only: no destination string reaches the record.
+    expect(host.querySelector('.agent-timeline')?.textContent)
+      .not.toContain('palette.section.dictionary');
+  });
+
   it('cancels a reviewed destination without opening it', async () => {
     stored = navigationWorkspace();
     await mount();

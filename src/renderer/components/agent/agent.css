@@ -676,6 +676,55 @@
   color: var(--agent-muted);
 }
 
+/* Activity inspector — a quiet record beside the conversation, never competing
+   with it. Deliberately monochrome apart from the failure row: an attempt that
+   did not work is the one the user came here to read. */
+.agent-timeline {
+  margin-top: var(--space-md, 12px);
+  padding-top: var(--space-sm, 8px);
+  border-top: 1px solid var(--agent-border, rgba(255, 255, 255, 0.08));
+}
+
+.agent-timeline-title {
+  margin: 0 0 var(--space-xs, 4px);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--agent-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agent-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-timeline-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs, 4px);
+  align-items: baseline;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--agent-muted);
+}
+
+.agent-timeline-effect {
+  color: var(--agent-text, inherit);
+}
+
+.agent-timeline-attempt {
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-timeline-failed .agent-timeline-status,
+.agent-timeline-code {
+  color: var(--agent-danger, #f38ba8);
+}
+
 .agent-card-sources {
   display: inline-flex;
   flex-wrap: wrap;

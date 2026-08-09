@@ -2325,6 +2325,21 @@ export const ru: Catalog = {
   'agent.execute.error.privacy': 'Запрос заблокирован политикой приватности или бюджета.',
   'agent.execute.error.transient': 'Провайдер временно недоступен. Повторите попытку.',
   'agent.execute.error.provider': 'Провайдер вернул непригодный ответ.',
+  'agent.timeline.title': 'Активность',
+  'agent.timeline.effect.navigate': 'Открыть место',
+  'agent.timeline.status.review': 'Ожидает вашего подтверждения',
+  'agent.timeline.status.running': 'Открывается',
+  'agent.timeline.status.succeeded': 'Открыто',
+  'agent.timeline.status.failed': 'Не удалось открыть',
+  'agent.timeline.status.cancelled': 'Отменено',
+  // A label of the form "Attempt N", so the noun does not agree with the
+  // numeral and every form is the same string.
+  'agent.timeline.attempt': {
+    one: 'Попытка {count}',
+    few: 'Попытка {count}',
+    many: 'Попытка {count}',
+    other: 'Попытка {count}',
+  },
   'agent.card.navigate.title': 'Предлагаемое место',
   'agent.card.navigate.review': 'Проверить место',
   'agent.card.navigate.destination': 'Открыть: {section}',

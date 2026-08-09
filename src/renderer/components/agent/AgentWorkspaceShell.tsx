@@ -48,6 +48,12 @@ import {
   type AgentNavigationEvent,
   type AgentNavigationRun,
 } from '../../../shared/agentNavigation';
+import {
+  agentTimelineForConversation,
+  agentTimelineRecord,
+  type AgentTimelineEntry,
+  type AgentTimelineEvent,
+} from '../../../shared/agentTimeline';
 import { runAgentNavigation } from '../../agentNavigationClient';
 import {
   AGENT_ATTACHMENT_ACCEPT,
@@ -246,10 +252,18 @@ function MessageRow({
   message,
   conversation,
   onOpenContext,
+  onRecord,
 }: {
   message: AgentMessage;
   conversation: AgentConversation;
   onOpenContext: (contextId: string, sourceContextIds: readonly string[]) => boolean;
+  /**
+   * Reports a navigation transition to the conversation's timeline. The runs
+   * below stay per-message and ephemeral; the timeline is per-conversation
+   * because reviewing step three means reading steps one and two, which are
+   * messages of their own.
+   */
+  onRecord: (cardId: string, actionId: string, event: AgentTimelineEvent) => void;
 }) {
   const { t } = useT();
   const [failedActionId, setFailedActionId] = useState<string | null>(null);
@@ -291,6 +305,9 @@ function MessageRow({
       return { ...previous, [key]: { status: 'idle', attempts: current.attempts } };
     });
     if (blocked) return;
+    // The attempt opens when the user asks, not when resolution succeeds — a
+    // refusal is something that happened and has to be in the record.
+    onRecord(cardId, actionId, { type: 'review' });
     const result = await runAgentNavigation({
       conversationId: conversation.id,
       messageId: message.id,
@@ -301,6 +318,7 @@ function MessageRow({
     dispatchNavigation(key, result.ok
       ? { type: 'review', destination: result.destination }
       : { type: 'refused', code: result.code });
+    if (!result.ok) onRecord(cardId, actionId, { type: 'refused', code: result.code });
   };
 
   const approveNavigation = async (
@@ -309,6 +327,7 @@ function MessageRow({
     actionId: string,
   ): Promise<void> => {
     dispatchNavigation(key, { type: 'approve' });
+    onRecord(cardId, actionId, { type: 'running' });
     const result = await runAgentNavigation({
       conversationId: conversation.id,
       messageId: message.id,
@@ -318,8 +337,14 @@ function MessageRow({
     });
     // `ok` without `opened` cannot happen for an approved request, but reporting
     // success on it would be the one lie this gate cannot afford.
-    if (result.ok && result.opened) dispatchNavigation(key, { type: 'succeeded' });
-    else dispatchNavigation(key, { type: 'failed', code: result.ok ? 'open-failed' : result.code });
+    if (result.ok && result.opened) {
+      dispatchNavigation(key, { type: 'succeeded' });
+      onRecord(cardId, actionId, { type: 'succeeded' });
+    } else {
+      const code = result.ok ? 'open-failed' : result.code;
+      dispatchNavigation(key, { type: 'failed', code });
+      onRecord(cardId, actionId, { type: 'failed', code });
+    }
   };
 
   const retryNavigation = async (
@@ -443,7 +468,10 @@ function MessageRow({
                           <button
                             type="button"
                             className="agent-action agent-card-action"
-                            onClick={() => dispatchNavigation(key, { type: 'cancel' })}
+                            onClick={() => {
+                              dispatchNavigation(key, { type: 'cancel' });
+                              onRecord(card.id, action.id, { type: 'cancelled' });
+                            }}
                           >
                             {t('agent.card.navigate.cancel')}
                           </button>
@@ -542,6 +570,47 @@ function MessageRow({
   );
 }
 
+/**
+ * The activity inspector: what was attempted here, newest first.
+ *
+ * Every attempt names its effect and its outcome and **nothing else**. There is
+ * no destination and no stored label — the timeline holds ids only, so there is
+ * no untrusted string here to render, which is the same property that makes the
+ * navigation channel safe. A failed attempt keeps its code so a retry beside it
+ * does not erase why the first one did not work.
+ */
+function ActivityTimeline({ entries }: { entries: readonly AgentTimelineEntry[] }) {
+  const { t } = useT();
+  if (entries.length === 0) return null;
+  return (
+    <section className="agent-timeline" aria-label={t('agent.timeline.title')}>
+      <h3 className="agent-timeline-title">{t('agent.timeline.title')}</h3>
+      <ol className="agent-timeline-list">
+        {entries.map((entry) => (
+          <li key={entry.id} className={`agent-timeline-entry agent-timeline-${entry.status}`}>
+            <span className="agent-timeline-effect">
+              {t(`agent.timeline.effect.${entry.effect}`)}
+            </span>
+            <span className="agent-timeline-status">
+              {t(`agent.timeline.status.${entry.status}`)}
+            </span>
+            {entry.attempt > 1 ? (
+              <span className="agent-timeline-attempt">
+                {t('agent.timeline.attempt', { count: entry.attempt })}
+              </span>
+            ) : null}
+            {entry.code ? (
+              <span className="agent-timeline-code">
+                {t(`agent.navigate.error.${entry.code}`)}
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export default function AgentWorkspaceShell() {
   const { t, lang } = useT();
   const [state, setState] = useState<AgentWorkspaceState | null>(null);
@@ -554,6 +623,30 @@ export default function AgentWorkspaceShell() {
   const [target, setTarget] = useState<AgentTargetChoice>('local');
   const [allowLocalFallback, setAllowLocalFallback] = useState(false);
   const [attachments, setAttachments] = useState<AgentExecutionAttachment[]>([]);
+  /**
+   * What this window actually tried to do, newest attempt first.
+   *
+   * Session-only and per-window, for the same reason `navigationRuns` is: it is
+   * a record of what the user watched happen here, not a property of the
+   * conversation, and syncing it would put one window's execution history in
+   * front of another window's user.
+   */
+  const [timeline, setTimeline] = useState<AgentTimelineEntry[]>([]);
+
+  const recordTimeline = (
+    conversationId: string,
+    messageId: string,
+    cardId: string,
+    actionId: string,
+    event: AgentTimelineEvent,
+  ): void => {
+    setTimeline((previous) => agentTimelineRecord(
+      previous,
+      { conversationId, messageId, cardId, actionId, effect: 'navigate' },
+      event,
+      Date.now(),
+    ));
+  };
   const [attachmentFailure, setAttachmentFailure] = useState<{
     code: AgentAttachmentReadFailureCode;
     fileName?: string;
@@ -1136,6 +1229,13 @@ export default function AgentWorkspaceShell() {
                           key={message.id}
                           conversation={selected}
                           onOpenContext={openContext}
+                          onRecord={(cardId, actionId, event) => recordTimeline(
+                            selected.id,
+                            message.id,
+                            cardId,
+                            actionId,
+                            event,
+                          )}
                           message={liveAssistant
                             ? {
                                 ...message,
@@ -1148,6 +1248,8 @@ export default function AgentWorkspaceShell() {
                   </ul>
                 </>
               )}
+
+              <ActivityTimeline entries={agentTimelineForConversation(timeline, selected.id)} />
 
               {executing && !hasPersistedRunningExchange ? (
                 <div className="agent-live-exchange" role="status" aria-live="polite">
