@@ -75,6 +75,10 @@ import type {
   AgentExecutionResult,
   AgentExecutionCancelResult,
 } from './shared/agentExecutionBridge';
+import type {
+  AgentNavigationRequest,
+  AgentNavigationResult,
+} from './shared/agentNavigationBridge';
 import type { AgentWorkspaceState } from './shared/agentWorkspace';
 import type { AgentWorkspaceResult } from './shared/agentWorkspaceBridge';
 import type {
@@ -1369,6 +1373,11 @@ const api = {
     ipcRenderer.on('agentExecution:event', handler);
     return () => ipcRenderer.removeListener('agentExecution:event', handler);
   },
+  // Permission-gated navigation. The request carries four ids and an approval
+  // flag and never a destination — see `shared/agentNavigationBridge.ts` for why
+  // that shape is the security property rather than a convenience.
+  agentNavigationRun: (request: AgentNavigationRequest): Promise<AgentNavigationResult> =>
+    ipcRenderer.invoke('agentNavigation:run', request),
   aiSetApiKey: (
     payload: string | { provider?: AiProviderKeyBucket; apiKey?: string },
   ): Promise<{

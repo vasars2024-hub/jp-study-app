@@ -1661,13 +1661,98 @@ was restored at revision 8, the synthetic context/message were absent afterward,
 and the fresh error ring remained empty. Screenshot:
 `debug/shots/win1-1786255935672.png`.
 
+## Permission-gated navigation execution
+
+The navigate effect now executes, behind a gate that is three separate refusals
+rather than one predicate. `shared/agentNavigation.ts` carries a hand-written
+allowlist of 23 sections, asserted by test against `POPOUT_SECTIONS` in
+`src/main.ts` so widening one without the other fails; `note` and `visualizer`
+are excluded exactly as main excludes them. The resolver then re-derives the
+destination **from live context**, never from the stored effect: it requires a
+`route` context still on the conversation's shelf whose `source.app` is the
+section and whose `source.route` matches the stored page. A card whose
+provenance has moved on resolves to `stale-provenance` and opens nothing.
+`controlId` and `highlight` are display hints and are ignored when choosing a
+target.
+
+The channel's shape is the security property. A request carries four ids and one
+boolean and **never a destination**; `normalizeAgentNavigationRequest` refuses —
+rather than strips — any payload carrying `section`, `page`, `destination`,
+`route`, `url`, `target`, `controlId` or `effect`. `approved: false` resolves for
+the review step and is guaranteed to open nothing; `approved: true` is the user's
+approval of a destination already shown to them. Main opens a **section** only,
+so a page can describe a destination but can never widen one. The opener is
+injected from `src/main.ts` beside the pop-out wiring that owns those windows,
+and `createPopoutWindow` now returns whether a window exists so a failed open is
+reported as `open-failed` instead of a claimed success.
+
+The renderer holds one lifecycle per action — idle, review, running, succeeded,
+failed, cancelled, with an approval count. It lives in component state, not the
+store: an approval is a decision about this window at this moment, and
+persisting it would sync a granted permission into every other window. `running`
+accepts neither cancel nor approve, because a window open is already in flight
+and a cancel there would be a button that does not stop what it claims to stop.
+A retry returns to review and re-resolves rather than reusing the first
+approval. The stored action label is never rendered; the destination is named
+through the section's own `palette.section.*` key. The former
+`agent.card.actionsPending` string is gone — "not yet connected" became false the
+moment this shipped.
+
+Automated evidence: `src/shared/__tests__/agentNavigation.test.ts` (21),
+`agentNavigationBridge.test.ts` (13) and `src/main/__tests__/agentNavigationIpc.test.ts`
+(16) are new; the shell suite grew to 21. Every IPC assertion checks the sections
+the opener was actually called with, not the returned code alone — a refusal that
+still opened something would pass a code-only check. The full suite passes 462
+files plus 1 skipped, 6,167 tests plus 6 skipped, 0 failed. `i18n-check`,
+`i18n-missing-key-check`, `i18n-hardcoded-check` and `i18n-locale-arg-check` all
+exit 0. Architecture: 1,577 modules, the same 18 findings, nothing new. Targeted
+ESLint reports nothing for the new or changed files (the two `window.d.ts` errors
+are a duplicated `subtitleHarvest*` declaration from another track, and the
+`main.ts` non-null warnings are pre-existing). `tsc --noEmit` is not a gate; it
+reports 360 errors, of which the only two in a file this slice touched are the
+`AgentResultEffect.contextId` narrowing errors **proved present at `da8a623`** by
+typechecking a pristine worktree at HEAD.
+
+Live Electron evidence, on a fresh start because main and preload changed: a
+snapshot/restore run injected one conversation carrying a `route` context and two
+navigation cards — one allowlisted, one naming `admin`. Before any interaction
+each card showed exactly one control, `Review destination`, no destination, and
+the deliberately untrusted stored label was absent from the DOM. Reviewing the
+allowed card showed `Open Dictionary · Page entry/QA` with Approve and Cancel,
+and **opened no window** — still two. Reviewing the blocked card produced `The
+Agent is not allowed to open that place.`, no destination and no approve control.
+Approving the allowed card opened window 3 at `?popout=dictionary` and the gate
+read `Opened Dictionary` with no controls left. Three direct bridge calls against
+the shipped main process then confirmed the boundary: an approved request with an
+injected `section: 'settings'` returned `invalid-request` and opened nothing, an
+approved request for the non-allowlisted section returned `unknown-section` and
+opened nothing, and a review-only request returned its destination with
+`opened: false`. The handler's existence was proved by invoking it, not by
+listing `window.api` keys. The workspace was restored and asserted identical
+field-by-field ignoring `revision`, which main owns and moved 8 → 10; the
+synthetic conversation is absent. The error ring stayed at zero for the whole
+run. Screenshot: `debug/shots/win2-1786257946146.png`.
+
 ## Exact next slice
 
-**Permission-gated navigation execution.** Resolve only a strict allowlist of
-known app sections/routes, show the exact destination in a review step, require
-an explicit user approval, and record pending/running/succeeded/failed/cancelled
-states. Unknown or stale destinations must fail closed. Add retry and honest
-failure before considering save, automation or undo effects.
+**A tool execution timeline with progress states.** Navigation is now the one
+permission-gated effect; `save`, `approve-step` and `undo` remain unconnected and
+should stay that way until each has a typed producer, a permission rule and an
+honest failure path of its own. The timeline is what makes a multi-step action
+reviewable at all, and it is the prerequisite for `approve-step`.
+
+**Route and media context producers.** The gate is real but nothing in production
+creates a `route` context yet, so no user-facing conversation can currently
+produce a navigation card — the live acceptance above had to inject one. A
+producer in the desktop shell (and the media surfaces) is what turns this slice
+from working machinery into a reachable feature. It is the highest-value next
+step for the Agent, and it is small: `createAgentContextItem` already accepts the
+shape.
+
+**A note for whoever adds those producers:** `source.app` must be an allowlisted
+section name. The existing media producers emit `app: 'media'`, which is not a
+window — a media route context built that way resolves to `unknown-section` and
+fails closed, correctly but uselessly. Emit `player`, `video` or `music`.
 
 **The player call site, once the study-workspace block track lands.** The producer
 and its i18n keys are already in place, so that slice is one button beside
@@ -1687,14 +1772,20 @@ change are the other track's.
 
 Then the rest of the Track 3 surface: additional deterministic card producers,
 permission-gated tool timelines, approve/cancel/retry/undo, route and media
-handoffs, privacy/budget controls and broad QA. The first card remains
-deliberately read-only; navigation, saves, approvals and undo stay unconnected
-until each has a typed producer, permission rule and honest failure path.
+handoffs, privacy/budget controls and broad QA. `open-context` and `navigate` are
+now the two live effects; `save`, `approve-step` and `undo` stay unconnected until
+each has a typed producer, permission rule and honest failure path.
 
-A mode preset is also the natural place to *reduce* a claim later: if a tool loop
-is ever wired to this path, `navigate` and `automate` are the two presets whose
-"you cannot" sentences must be revisited in the same commit that grants the
-capability — they are currently true, and would become false silently.
+**The `navigate` mode preset was revisited when navigation shipped, and
+deliberately left unchanged.** The earlier note here asked for exactly that
+review, on the grounds that its "You cannot open surfaces yourself" sentence
+would become false silently. It did not become false. What can now open a surface
+is a deterministic card built from context metadata and approved by the user; the
+model's prose still chooses nothing, triggers nothing and is never read as an
+effect. The capability granted is the user's, not the agent's, so the preset must
+keep saying what it says — telling the model it can act is the one edit that would
+make the sentence a lie. `automate`'s sentence is untouched and still true: there
+is no tool loop.
 
 Still open and deliberately deferred: `localAgentProfilesStore` and
 `localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct

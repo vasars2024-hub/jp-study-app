@@ -19,6 +19,7 @@ import type {
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
+import { registerAgentNavigationIpc } from './agentNavigationIpc';
 import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 import { registerAgentOperationalIpc } from './agentOperationalIpc';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
@@ -281,6 +282,10 @@ export function registerLocalAgentIpc(): void {
   // point another track is mid-rewrite on.
   registerAgentWorkspaceIpc();
   registerAgentExecutionIpc();
+  // Permission-gated navigation reads the same store the two above own, so it
+  // registers beside them rather than from `src/main.ts`. Its window opener is
+  // handed over separately, from the pop-out wiring that owns those windows.
+  registerAgentNavigationIpc();
   // Same reasoning for the operational store (queue, memory, automations).
   registerAgentOperationalIpc();
 }

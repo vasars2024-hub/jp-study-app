@@ -42,6 +42,14 @@ import {
   executeAgentPrompt,
 } from '../../agentExecutionClient';
 import {
+  AGENT_NAVIGATION_IDLE,
+  AGENT_NAVIGATION_SECTION_LABEL_KEYS,
+  agentNavigationReduce,
+  type AgentNavigationEvent,
+  type AgentNavigationRun,
+} from '../../../shared/agentNavigation';
+import { runAgentNavigation } from '../../agentNavigationClient';
+import {
   AGENT_ATTACHMENT_ACCEPT,
   readAgentAttachmentFiles,
   type AgentAttachmentReadFailureCode,
@@ -245,7 +253,86 @@ function MessageRow({
 }) {
   const { t } = useT();
   const [failedActionId, setFailedActionId] = useState<string | null>(null);
+  /**
+   * One lifecycle per navigation action, keyed by card and action.
+   *
+   * Held here rather than in the store on purpose: an approval is a decision
+   * about *this* window at *this* moment, not a property of the conversation.
+   * Persisting it would make "you approved this" outlive the reason the user
+   * approved it, and would sync a granted permission into every other window.
+   */
+  const [navigationRuns, setNavigationRuns] = useState<Record<string, AgentNavigationRun>>({});
   const provider = message.provider;
+
+  const dispatchNavigation = (key: string, event: AgentNavigationEvent): void => {
+    setNavigationRuns((previous) => ({
+      ...previous,
+      [key]: agentNavigationReduce(previous[key] ?? AGENT_NAVIGATION_IDLE, event),
+    }));
+  };
+
+  /**
+   * Resolves the destination for the review step. Never opens anything —
+   * `approved: false` is main's guarantee, not this component's promise.
+   */
+  const reviewNavigation = async (
+    key: string,
+    cardId: string,
+    actionId: string,
+  ): Promise<void> => {
+    let blocked = false;
+    setNavigationRuns((previous) => {
+      const current = previous[key] ?? AGENT_NAVIGATION_IDLE;
+      // A window open is already in flight; re-resolving would race it.
+      if (current.status === 'running') {
+        blocked = true;
+        return previous;
+      }
+      return { ...previous, [key]: { status: 'idle', attempts: current.attempts } };
+    });
+    if (blocked) return;
+    const result = await runAgentNavigation({
+      conversationId: conversation.id,
+      messageId: message.id,
+      cardId,
+      actionId,
+      approved: false,
+    });
+    dispatchNavigation(key, result.ok
+      ? { type: 'review', destination: result.destination }
+      : { type: 'refused', code: result.code });
+  };
+
+  const approveNavigation = async (
+    key: string,
+    cardId: string,
+    actionId: string,
+  ): Promise<void> => {
+    dispatchNavigation(key, { type: 'approve' });
+    const result = await runAgentNavigation({
+      conversationId: conversation.id,
+      messageId: message.id,
+      cardId,
+      actionId,
+      approved: true,
+    });
+    // `ok` without `opened` cannot happen for an approved request, but reporting
+    // success on it would be the one lie this gate cannot afford.
+    if (result.ok && result.opened) dispatchNavigation(key, { type: 'succeeded' });
+    else dispatchNavigation(key, { type: 'failed', code: result.ok ? 'open-failed' : result.code });
+  };
+
+  const retryNavigation = async (
+    key: string,
+    cardId: string,
+    actionId: string,
+  ): Promise<void> => {
+    // Straight back to review, not straight back to running: the second attempt
+    // re-resolves the destination and asks again, so a retry cannot reuse an
+    // approval the user gave for a destination that has since changed.
+    dispatchNavigation(key, { type: 'retry' });
+    await reviewNavigation(key, cardId, actionId);
+  };
   return (
     <li className={`agent-message agent-message-${message.role}`}>
       <div className="agent-message-head">
@@ -293,9 +380,9 @@ function MessageRow({
               const source = conversation.context.find((item) => item.id === contextId);
               return source ? [source] : [];
             });
-            const navigateCount = card.actions.filter(
+            const navigateActions = card.actions.filter(
               (action) => action.effect.type === 'navigate',
-            ).length;
+            );
             return (
               <li key={card.id} className="agent-card">
                 <span className="agent-card-title">{card.title}</span>
@@ -310,11 +397,104 @@ function MessageRow({
                     ))}
                   </ul>
                 ) : null}
-                {navigateCount > 0 ? (
-                  <span className="agent-card-pending">
-                    {t('agent.card.actionsPending', { count: navigateCount })}
-                  </span>
-                ) : null}
+                {navigateActions.map((action) => {
+                  const key = `${card.id}:${action.id}`;
+                  const run = navigationRuns[key] ?? AGENT_NAVIGATION_IDLE;
+                  // Every word of the destination comes from main's resolution
+                  // against live context. The stored action label is never shown
+                  // and never names a place.
+                  const destination = run.destination;
+                  const section = destination
+                    ? t(AGENT_NAVIGATION_SECTION_LABEL_KEYS[destination.section])
+                    : '';
+                  return (
+                    <span
+                      key={action.id}
+                      className={`agent-card-navigate agent-navigate-${run.status}`}
+                      role="group"
+                      aria-label={t('agent.card.navigate.title')}
+                    >
+                      {run.status === 'idle' ? (
+                        <button
+                          type="button"
+                          className="agent-action agent-card-action"
+                          onClick={() => void reviewNavigation(key, card.id, action.id)}
+                        >
+                          <Icon name="external" size={13} />
+                          {t('agent.card.navigate.review')}
+                        </button>
+                      ) : null}
+                      {run.status === 'review' && destination ? (
+                        <>
+                          <span className="agent-card-navigate-destination">
+                            {t('agent.card.navigate.destination', { section })}
+                            {destination.page
+                              ? ` · ${t('agent.card.navigate.page', { page: destination.page })}`
+                              : ''}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action agent-card-navigate-approve"
+                            onClick={() => void approveNavigation(key, card.id, action.id)}
+                          >
+                            <Icon name="check" size={13} />
+                            {t('agent.card.navigate.approve', { section })}
+                          </button>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => dispatchNavigation(key, { type: 'cancel' })}
+                          >
+                            {t('agent.card.navigate.cancel')}
+                          </button>
+                        </>
+                      ) : null}
+                      {run.status === 'running' ? (
+                        <span className="agent-card-navigate-status">
+                          {t('agent.card.navigate.running')}
+                        </span>
+                      ) : null}
+                      {run.status === 'succeeded' ? (
+                        <span className="agent-card-navigate-status">
+                          {t('agent.card.navigate.opened', { section })}
+                        </span>
+                      ) : null}
+                      {run.status === 'cancelled' ? (
+                        <>
+                          <span className="agent-card-navigate-status">
+                            {t('agent.card.navigate.cancelled')}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => void retryNavigation(key, card.id, action.id)}
+                          >
+                            {t('agent.card.navigate.review')}
+                          </button>
+                        </>
+                      ) : null}
+                      {run.status === 'failed' ? (
+                        <>
+                          <span className="agent-card-action-error" role="alert">
+                            {t(`agent.navigate.error.${run.code ?? 'open-failed'}`)}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-action agent-card-action"
+                            onClick={() => void retryNavigation(key, card.id, action.id)}
+                          >
+                            {t('agent.card.navigate.retry')}
+                          </button>
+                        </>
+                      ) : null}
+                      {run.attempts > 1 && (run.status === 'failed' || run.status === 'succeeded') ? (
+                        <span className="agent-card-navigate-attempts">
+                          {t('agent.card.navigate.attempt', { count: run.attempts })}
+                        </span>
+                      ) : null}
+                    </span>
+                  );
+                })}
                 {card.actions.some((action) => action.effect.type === 'open-context') ? (
                   <span className="agent-card-actions">
                     {card.actions.map((action) => {

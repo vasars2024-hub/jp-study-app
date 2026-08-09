@@ -23,10 +23,16 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// `section` is echoed alongside `count` because the navigation review step
+// resolves a section's own label key and interpolates it. Swallowing that var
+// would make "the destination text names what main resolved" unassertable.
 vi.mock('../i18n', () => ({
   useT: () => ({
-    t: (key: string, vars?: Record<string, string | number>) =>
-      (vars && 'count' in vars ? `${key}=${vars.count}` : key),
+    t: (key: string, vars?: Record<string, string | number>) => {
+      if (vars && 'count' in vars) return `${key}=${vars.count}`;
+      if (vars && 'section' in vars) return `${key}:${vars.section}`;
+      return key;
+    },
     lang: 'en',
   }),
 }));
@@ -47,6 +53,8 @@ let stored: AgentWorkspaceState;
 let loadResult: unknown = null;
 let executionListener: ((event: unknown) => void) | null;
 let workspaceListener: ((state: unknown) => void) | null;
+let navigationReview: unknown;
+let navigationApproved: unknown;
 
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
@@ -113,6 +121,36 @@ function populated(): AgentWorkspaceState {
   });
 }
 
+/**
+ * A conversation carrying one route context and the navigation card derived
+ * from it — the shape `main/agentExecutionIpc.ts` actually produces.
+ */
+function navigationWorkspace(): AgentWorkspaceState {
+  const base = populated();
+  base.conversations[0].context = [{
+    id: 'ctx-route',
+    kind: 'route',
+    label: 'Dictionary',
+    preview: 'Where you were',
+    source: { app: 'dictionary', route: 'entry/猫' },
+    sensitivity: 'ordinary',
+    retained: true,
+    createdAt: 10,
+  }];
+  base.conversations[0].messages[0].cards = [{
+    id: 'navigation-card',
+    kind: 'navigation',
+    title: 'Dictionary suggestion',
+    sourceContextIds: ['ctx-route'],
+    actions: [{
+      id: 'navigate',
+      label: 'Model-authored route label',
+      effect: { type: 'navigate', section: 'dictionary', page: 'entry/猫' },
+    }],
+  }];
+  return base;
+}
+
 /** A stand-in for main: it answers from `stored` and records what it was asked. */
 function installBridge(): void {
   calls = [];
@@ -160,6 +198,13 @@ function installBridge(): void {
       state: stored,
     })),
     agentExecutionCancel: record('cancelExecution', () => ({ ok: true, cancelled: true })),
+    // Main owns every navigation decision, so the stub answers from a fixture
+    // the test sets rather than resolving anything itself. That is the point:
+    // the shell must show what main resolved, not what the stored card says.
+    agentNavigationRun: record('navigate', (raw) => {
+      const request = raw as { approved: boolean };
+      return request.approved ? navigationApproved : navigationReview;
+    }),
   };
 }
 
@@ -207,8 +252,22 @@ async function selectFile(name: string, content: string): Promise<void> {
 }
 
 beforeEach(() => {
+  // React 19 warns on any state update `act` schedules asynchronously unless the
+  // environment declares itself. The navigation gate resolves through the bridge
+  // before it renders, so it is the first test here that needs it.
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   stored = state();
   loadResult = null;
+  navigationReview = {
+    ok: true,
+    destination: { section: 'dictionary', page: 'entry/猫' },
+    opened: false,
+  };
+  navigationApproved = {
+    ok: true,
+    destination: { section: 'dictionary', page: 'entry/猫' },
+    opened: true,
+  };
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -296,7 +355,10 @@ describe('Agent workspace shell', () => {
 
     expect(text()).not.toContain('Model supplied label');
     expect(text()).not.toContain('Do not navigate');
-    expect(text()).toContain('agent.card.actionsPending=1');
+    // The navigation action is present but gated: a review affordance and
+    // nothing else. No destination is shown until main resolves one.
+    expect(text()).toContain('agent.card.navigate.review');
+    expect(text()).not.toContain('agent.card.navigate.destination');
     await click(action);
 
     expect(scrollIntoView).toHaveBeenCalledWith({
@@ -341,10 +403,12 @@ describe('Agent workspace shell', () => {
     await mount();
 
     const card = host.querySelector<HTMLElement>('.agent-card');
-    const pending = card?.querySelector<HTMLElement>('.agent-card-pending');
+    const gate = card?.querySelector<HTMLElement>('.agent-card-navigate');
     const sources = card?.querySelector<HTMLElement>('.agent-card-sources');
-    expect(pending?.textContent).toBe('agent.card.actionsPending=1');
-    expect(card?.querySelectorAll('button')).toHaveLength(0);
+    // Before review: one button, no destination, and nothing asked of main.
+    expect(gate?.getAttribute('role')).toBe('group');
+    expect(card?.querySelectorAll('button')).toHaveLength(1);
+    expect(card?.textContent).toContain('agent.card.navigate.review');
     expect(card?.textContent).not.toContain('Model-authored route label');
     expect(sources?.getAttribute('aria-label')).toBe('agent.context.title');
     expect(sources?.textContent).toContain('Live selected passage');
@@ -352,6 +416,98 @@ describe('Agent workspace shell', () => {
     expect(sources?.textContent).not.toContain('Other conversation source');
     expect(host.textContent).not.toContain('ctx-stale');
     expect(calls.map((call) => call.method)).toEqual(['load']);
+  });
+
+  it('reviews a destination, opens it only on approval, and never sends one', async () => {
+    stored = navigationWorkspace();
+    await mount();
+
+    await click(buttonWith('agent.card.navigate.review'));
+
+    const review = calls.find((call) => call.method === 'navigate');
+    // The whole security property of the channel, asserted at the call site.
+    expect(review?.args[0]).toEqual({
+      conversationId: 'chat-1',
+      messageId: 'msg-1',
+      cardId: 'navigation-card',
+      actionId: 'navigate',
+      approved: false,
+    });
+    // The destination names the section main resolved, through that section's
+    // own label key — not through anything the stored card carried.
+    expect(text()).toContain('agent.card.navigate.destination:palette.section.dictionary');
+    expect(text()).toContain('agent.card.navigate.page');
+    // Reviewing opened nothing, and the stored label never became a destination.
+    expect(text()).not.toContain('agent.card.navigate.opened');
+    expect(text()).not.toContain('Model-authored route label');
+
+    await click(buttonWith('agent.card.navigate.approve'));
+
+    const approval = calls.filter((call) => call.method === 'navigate')[1];
+    expect(approval?.args[0]).toMatchObject({ approved: true });
+    expect(Object.keys(approval?.args[0] as object).sort())
+      .toEqual(['actionId', 'approved', 'cardId', 'conversationId', 'messageId']);
+    expect(text()).toContain('agent.card.navigate.opened');
+    expect(text()).not.toContain('agent.card.navigate.approve');
+  });
+
+  it('cancels a reviewed destination without opening it', async () => {
+    stored = navigationWorkspace();
+    await mount();
+
+    await click(buttonWith('agent.card.navigate.review'));
+    await click(buttonWith('agent.card.navigate.cancel'));
+
+    expect(text()).toContain('agent.card.navigate.cancelled');
+    expect(text()).not.toContain('agent.card.navigate.opened');
+    // Only the review resolution crossed the bridge. Nothing was approved.
+    expect(calls.filter((call) => call.method === 'navigate')).toHaveLength(1);
+  });
+
+  it('reports a refused destination and offers a retry that asks again', async () => {
+    navigationReview = { ok: false, code: 'stale-provenance' };
+    stored = navigationWorkspace();
+    await mount();
+
+    await click(buttonWith('agent.card.navigate.review'));
+    expect(host.querySelector('[role="alert"]')?.textContent)
+      .toContain('agent.navigate.error.stale-provenance');
+    expect(text()).not.toContain('agent.card.navigate.approve');
+
+    navigationReview = {
+      ok: true,
+      destination: { section: 'dictionary', page: 'entry/猫' },
+      opened: false,
+    };
+    await click(buttonWith('agent.card.navigate.retry'));
+    expect(text()).toContain('agent.card.navigate.destination');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('reports an approval that did not open a window, and counts the attempt', async () => {
+    navigationApproved = { ok: false, code: 'open-failed' };
+    stored = navigationWorkspace();
+    await mount();
+
+    await click(buttonWith('agent.card.navigate.review'));
+    await click(buttonWith('agent.card.navigate.approve'));
+
+    expect(host.querySelector('[role="alert"]')?.textContent)
+      .toContain('agent.navigate.error.open-failed');
+    expect(text()).not.toContain('agent.card.navigate.opened');
+
+    // A retry re-resolves and asks for a second approval rather than reusing
+    // the first one, and the attempt count says so.
+    navigationApproved = {
+      ok: true,
+      destination: { section: 'dictionary', page: 'entry/猫' },
+      opened: true,
+    };
+    await click(buttonWith('agent.card.navigate.retry'));
+    expect(text()).toContain('agent.card.navigate.destination');
+    await click(buttonWith('agent.card.navigate.approve'));
+    expect(text()).toContain('agent.card.navigate.opened');
+    expect(text()).toContain('agent.card.navigate.attempt=2');
   });
 
   it('announces stale or undeclared card context without moving focus or mutating state', async () => {

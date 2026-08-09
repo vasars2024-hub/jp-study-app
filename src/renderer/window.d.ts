@@ -51,6 +51,10 @@ import type {
   AgentExecutionRequest,
   AgentExecutionResult,
 } from '../shared/agentExecutionBridge';
+import type {
+  AgentNavigationRequest,
+  AgentNavigationResult,
+} from '../shared/agentNavigationBridge';
 import type { AgentWorkspaceState } from '../shared/agentWorkspace';
 import type { AgentWorkspaceResult } from '../shared/agentWorkspaceBridge';
 import type {
@@ -877,6 +881,7 @@ declare global {
       agentExecutionRun(request: AgentExecutionRequest): Promise<AgentExecutionResult>;
       agentExecutionCancel(requestId: string): Promise<AgentExecutionCancelResult>;
       onAgentExecutionEvent(cb: (event: AgentExecutionEvent) => void): () => void;
+      agentNavigationRun(request: AgentNavigationRequest): Promise<AgentNavigationResult>;
       aiSetApiKey(payload: string | {
         provider?: AiProviderKeyBucket;
         apiKey?: string;

@@ -671,7 +671,8 @@
 
 .agent-card-summary,
 .agent-card-actions,
-.agent-card-pending {
+.agent-card-navigate-status,
+.agent-card-navigate-attempts {
   color: var(--agent-muted);
 }
 
@@ -695,7 +696,31 @@
   margin-right: 4px;
 }
 
-.agent-card-pending {
+/* The permission gate. It wraps rather than clips: a destination line plus two
+   buttons has to stay readable in the compact pop-out, and a review step that
+   overflows its card is a review step the user cannot actually read. */
+.agent-card-navigate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  min-width: 0;
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-card-navigate-destination {
+  color: var(--agent-text);
+  font-weight: var(--font-weight-medium, 500);
+  overflow-wrap: anywhere;
+}
+
+.agent-card-navigate-approve {
+  border-color: var(--agent-accent);
+  color: var(--agent-text);
+}
+
+.agent-card-navigate-status,
+.agent-card-navigate-attempts {
   font-size: var(--font-size-xs, 0.75rem);
 }
 

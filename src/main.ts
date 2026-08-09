@@ -20,6 +20,7 @@ import { registerVideoClipIpc } from './main/videoClip';
 import { registerMediaStudyAssistantIpc } from './main/mediaStudyAssistant';
 import { registerMediaStudyOrchestratorIpc } from './main/mediaStudyOrchestrator';
 import { registerLocalAgentIpc, stopLocalAgentRuntime } from './main/localAgent';
+import { setAgentNavigationOpener } from './main/agentNavigationIpc';
 import { registerLocalAgentSchedulerIpc, stopLocalAgentScheduler } from './main/localAgentScheduler';
 import { registerMiningIpc } from './main/mining';
 import { registerImmersionIpc } from './main/immersion';
@@ -1329,14 +1330,18 @@ function broadcastPopoutState(): void {
 // that app full-window. `frame: false` gives each pop-out a clean widget frame — the
 // window's own drag strip + min/max/close (see PopoutChrome) drive it via the
 // popout:control IPC below.
-function createPopoutWindow(section: string): void {
-  if (!POPOUT_SECTIONS.has(section)) return;
+// Returns whether a window for that section now exists. Every pre-existing
+// caller ignores it; the Agent's permission-gated navigation does not, because
+// "the window opened" is the only honest thing it can report back to a user who
+// just approved a destination.
+function createPopoutWindow(section: string): boolean {
+  if (!POPOUT_SECTIONS.has(section)) return false;
   const existing = popoutWindows.get(section);
   if (existing && !existing.isDestroyed()) {
     if (existing.isMinimized()) existing.restore();
     existing.show();
     existing.focus();
-    return;
+    return true;
   }
   const mediaCenter = section === 'player' || section === 'video' || section === 'music';
   const mooncapWidget = section === 'city';
@@ -1383,10 +1388,19 @@ function createPopoutWindow(section: string): void {
   if (isDevServer()) forwardRendererConsole(win);
   void win.loadURL(rendererUrl(`popout=${encodeURIComponent(section)}`));
   broadcastPopoutState();
+  return true;
 }
 
 function registerPopoutIpc(): void {
-  openSectionHandler = (section: string) => createPopoutWindow(section);
+  openSectionHandler = (section: string) => {
+    createPopoutWindow(section);
+  };
+  // The Agent's navigation gate opens windows through this same function, so it
+  // is handed over here rather than imported the other way round: `POPOUT_SECTIONS`
+  // and `popoutWindows` stay the single owner of what a section means and of the
+  // one-window-per-section rule. The gate's own allowlist in
+  // `shared/agentNavigation.ts` mirrors this set and is tested against it.
+  setAgentNavigationOpener((section) => createPopoutWindow(section));
   if (pendingOpenSection) {
     createPopoutWindow(pendingOpenSection);
     pendingOpenSection = null;
