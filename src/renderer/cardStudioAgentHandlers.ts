@@ -5,6 +5,7 @@ import type {
   AiEnrichmentResult,
   AiEngineConfig,
   AiMiningLanguage,
+  MiningCandidate,
 } from '../shared/mining';
 // Leaf modules, not the `shared/mining` barrel and NEVER `shared/aiMiningCatalog`.
 // This module is reached from `agentToolRegistry`, which is on Blanc's boot path,
@@ -14,6 +15,12 @@ import type {
 // already, so the renderer never needs the table.
 import { AI_MINING_LANGUAGES } from '../shared/aiLanguageLayouts';
 import { DEFAULT_AI_PROVIDER_ID, providerKeyBucket } from '../shared/aiProviders';
+// `shared/chapterRange` is a dependency-free leaf, so naming a scoped deck here
+// costs the boot path nothing. It is also the ONLY way to name one: traditional
+// mining, the Anki deck, the export file and this adapter all read the same
+// function, which is what stops four surfaces from inventing four names.
+import { miningDeckIdentity } from '../shared/chapterRange';
+import type { ChapterRange, MiningDeckIdentity } from '../shared/chapterRange';
 import { loadSaved } from './savedWords';
 
 export type CardStudioAgentTranslate = (key: string, vars?: TVars) => string;
@@ -44,6 +51,25 @@ function optionalLanguage(value: unknown): AiMiningLanguage | undefined {
 function optionalText(value: unknown, limit: number): string | undefined {
   if (typeof value !== 'string' || !value.trim()) return undefined;
   return value.trim().slice(0, limit);
+}
+
+/**
+ * A chapter bound as the planner may have written it.
+ *
+ * Numeric strings are accepted because a local model emits `"3"` about as often as
+ * `3`, and refusing one spelling would make the range silently vanish — the step
+ * would run whole-book and report success. Out-of-range values are NOT rejected
+ * here: `normalizeChapterRange` clamps them against the real section count, which
+ * only main knows, and clamping twice against a count this side is guessing.
+ * `null` means "not specified", which is the one thing a bound must not invent.
+ */
+function optionalIndex(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.floor(value);
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return Math.floor(parsed);
+  }
+  return null;
 }
 
 export type CardStudioBlockedReason = 'api-key-missing' | 'local-model-missing';
@@ -129,6 +155,130 @@ export function resolveCardStudioTerms(
   };
 }
 
+/** Where a run's terms came from. Reported per run so the user can see it. */
+export type CardStudioTermSource = 'arguments' | 'saved-words' | 'book-chapters';
+
+/** What the adapter accepts. `book` has no main-level counterpart — see the handler. */
+export type CardStudioGenerationSource = 'preset' | 'dictionary' | 'book';
+
+export function resolveGenerationSource(value: unknown): CardStudioGenerationSource {
+  if (value === 'dictionary') return 'dictionary';
+  // `epub` and `chapter` are what a model reaches for when it has been told the
+  // library holds EPUBs; accepting them costs nothing and refusing them would
+  // silently downgrade a scoped request to an invented-word one.
+  if (value === 'book' || value === 'epub' || value === 'chapter') return 'book';
+  return 'preset';
+}
+
+/**
+ * The vocabulary a chapter range yielded, as generation terms.
+ *
+ * Ordered by occurrence count descending, with the expression as a deterministic
+ * tie-break. `analyzeBook` returns candidates in tokenizer order — stable for a
+ * given book, but carrying no signal about which words are worth a card — so an
+ * unsorted cap would take whichever words happen to appear first in chapter one.
+ * The tie-break is a plain code-unit comparison rather than `localeCompare`,
+ * whose ordering depends on the host's ICU data; this must not vary by machine.
+ *
+ * The cap is the same `MAX_TERMS` the dictionary path uses. It matters more here:
+ * a chapter range routinely yields thousands of candidates and every one of them
+ * would be a paid enrichment call.
+ *
+ * `sampleSentence` becomes the term's `sentence`, which is the point of mining a
+ * range rather than starring words by hand — main has consumed `terms[].sentence`
+ * since the dictionary path was written, and the mined line is exactly the
+ * context the card should quote.
+ */
+export function bookRangeTerms(
+  candidates: readonly MiningCandidate[],
+  limit: number,
+): CardStudioTerm[] {
+  return [...candidates]
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      if (a.expression < b.expression) return -1;
+      return a.expression > b.expression ? 1 : 0;
+    })
+    .slice(0, Math.max(0, limit))
+    .map((candidate) => ({
+      term: candidate.expression,
+      ...(candidate.reading ? { reading: candidate.reading } : {}),
+      ...(candidate.sampleSentence
+        ? { sentence: candidate.sampleSentence.trim().slice(0, 500) }
+        : {}),
+    }));
+}
+
+export interface CardStudioBookScope {
+  itemId: string;
+  bookTitle: string;
+  /** The range main actually applied — `null` for a whole-book run. */
+  range: ChapterRange | null;
+  sectionCount: number;
+  /** Candidates the range produced, before the `MAX_TERMS` cap. */
+  candidateCount: number;
+  terms: CardStudioTerm[];
+  identity: MiningDeckIdentity;
+}
+
+/**
+ * Mines a chapter range and turns it into generation terms.
+ *
+ * This is the parity fix: traditional mining has had a chapter range since
+ * `EpubMiningPanel` grew one, and the agent path could only ever generate from
+ * invented words or starred ones — so "make me cards for chapters 3 to 7" had no
+ * expression at all. `miningAnalyzeEpub` is the same IPC the manual panel calls,
+ * with the same arguments, and it WRITES NOTHING: it unzips the sections in the
+ * range, tokenizes, attaches offline glosses and returns. Nothing about this
+ * weakens the adapter's no-write property.
+ *
+ * The range is NOT normalized here. `normalizeChapterRange` needs the book's real
+ * section count, and only main has it before the extraction runs; main normalizes
+ * internally and reports back the range it used, so the identity is built from
+ * what actually happened rather than from what was asked. That is also why an
+ * out-of-range chapter number is not an error — it clamps, exactly as the manual
+ * panel's number inputs do.
+ *
+ * No mining config is passed, so main uses the user's saved traditional-mining
+ * settings — the same ones the panel would have loaded. An agent step silently
+ * mining under different thresholds than the panel shows would be a trap.
+ */
+export async function resolveCardStudioBookScope(
+  t: CardStudioAgentTranslate,
+  arguments_: Readonly<Record<string, unknown>>,
+): Promise<CardStudioBookScope> {
+  const itemId = optionalText(arguments_.itemId ?? arguments_.bookId ?? arguments_.id, 200);
+  if (!itemId) throw new Error(t('blanc.agent.error.aiNoBook'));
+
+  const from = optionalIndex(arguments_.chapterFrom ?? arguments_.from);
+  const to = optionalIndex(arguments_.chapterTo ?? arguments_.to);
+  const analysis = await window.api.miningAnalyzeEpub(itemId, undefined, { from, to });
+
+  const range = analysis.range ?? null;
+  const terms = bookRangeTerms(analysis.candidates, boundedCount(arguments_.termLimit, MAX_TERMS, MAX_TERMS));
+  // Main already refuses a range with no readable TEXT. This is the other empty:
+  // text that survived extraction but nothing that cleared the frequency floor
+  // and blacklist. Sending it on would spend a provider call to generate nothing.
+  if (!terms.length) throw new Error(t('blanc.agent.error.aiNoBookTerms'));
+
+  return {
+    itemId,
+    bookTitle: analysis.title,
+    range,
+    sectionCount: analysis.sections?.length ?? 0,
+    candidateCount: analysis.candidates.length,
+    terms,
+    identity: miningDeckIdentity({
+      itemId,
+      bookTitle: analysis.title,
+      range,
+      // Distinct from a traditional mining run of the same range, whose deck this
+      // must never replace — the two generators produce different cards.
+      generator: 'ai-studio',
+    }),
+  };
+}
+
 /**
  * Flattens the enrichment results into the exact card shape `flashcard.add-cards`
  * accepts, so a plan can pipe generate → add-cards without a translation step in
@@ -173,6 +323,13 @@ export function cardStudioCardRows(results: readonly AiEnrichmentResult[]): Arra
  * agent a destructive write with no confirmation gate and no undo, in an
  * operation whose declared claim is that it generated something. The write stays
  * `flashcard.add-cards`: already gated, already logged, already invertible.
+ *
+ * `generate-cards` takes three sources. `preset` invents words, `dictionary` uses
+ * starred or supplied ones, and `book` mines a chapter range — the last of which
+ * exists so the agent can express what the manual mining panel has always been
+ * able to do. All three end in the same rows and the same no-write guarantee; the
+ * `book` run additionally reports the deck identity its range belongs to, so the
+ * `add-cards` step that follows lands in the right group.
  */
 export function createCardStudioAgentHandlers(t: CardStudioAgentTranslate): AgentToolHandlers {
   return {
@@ -218,13 +375,18 @@ export function createCardStudioAgentHandlers(t: CardStudioAgentTranslate): Agen
       const config = await window.api.aiGetConfig();
       requireReadyEngine(t, config);
 
-      const source = arguments_.source === 'dictionary' ? 'dictionary' : 'preset';
+      const source = resolveGenerationSource(arguments_.source);
       const presetId = optionalText(arguments_.presetId, 120) ?? config.selectedPresetId;
       const formatId = optionalText(arguments_.formatId, 120) ?? config.selectedFormatId;
       const cardCount = boundedCount(arguments_.cardCount, config.cardCount, MAX_CARD_COUNT);
 
       const request: AiDeckGenerationRequest = {
-        source,
+        // `book` is an adapter-level source, not a main-level one: main knows
+        // "invent words" (`preset`) and "use the terms I gave you"
+        // (`dictionary`), and a chapter range is the second of those with the
+        // terms mined instead of starred. Reporting it as `book` in the RESULT
+        // is what keeps the distinction honest for the user.
+        source: source === 'book' ? 'dictionary' : source,
         presetId,
         formatId,
         cardCount,
@@ -237,8 +399,14 @@ export function createCardStudioAgentHandlers(t: CardStudioAgentTranslate): Agen
       };
 
       let usedTerms: CardStudioTerm[] = [];
-      let termSource: 'arguments' | 'saved-words' | undefined;
-      if (source === 'dictionary') {
+      let termSource: CardStudioTermSource | undefined;
+      let book: CardStudioBookScope | undefined;
+      if (source === 'book') {
+        book = await resolveCardStudioBookScope(t, arguments_);
+        usedTerms = book.terms;
+        termSource = 'book-chapters';
+        request.terms = book.terms;
+      } else if (source === 'dictionary') {
         const resolved = resolveCardStudioTerms(arguments_);
         // Main throws a form-shaped message here ("Star words in Dictionary
         // first…"). Refusing before the IPC keeps the reason attached to the
@@ -264,12 +432,28 @@ export function createCardStudioAgentHandlers(t: CardStudioAgentTranslate): Agen
         engine: config.engine,
         ...(config.engine === 'cloud' ? { sentToProvider: request.providerId } : {}),
         ...(termSource ? { termSource } : {}),
-        ...(source === 'dictionary'
+        // The deck this run is FOR, named by `miningDeckIdentity` so the gated
+        // `flashcard.add-cards` that follows writes to the same group a
+        // traditional mining run of the same range would — and so re-running a
+        // range updates it in place instead of accumulating duplicates.
+        ...(book
           ? {
+            itemId: book.itemId,
+            bookTitle: book.bookTitle,
+            chapterRange: book.identity.rangeLabel,
+            ...(book.range ? { chapterFrom: book.range.from, chapterTo: book.range.to } : {}),
+            sectionCount: book.sectionCount,
+            deckTitle: book.identity.deckTitle,
+            bookId: book.identity.bookId,
+            candidates: book.candidateCount,
+          }
+          : {}),
+        ...(source === 'preset'
+          ? { wordCount: request.wordCount }
+          : {
             terms: usedTerms.length,
             termsWithSentence: usedTerms.filter((term) => Boolean(term.sentence)).length,
-          }
-          : { wordCount: request.wordCount }),
+          }),
         expressions: results.map((result) => result.expression),
         cards,
       };

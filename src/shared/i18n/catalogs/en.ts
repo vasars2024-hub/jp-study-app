@@ -6767,6 +6767,10 @@ export const en: Catalog = {
     'AI card generation is set to local Qwen, but the model is missing. Install Qwen3-1.7B via Translate, or switch to Cloud in Flashcards → AI Card Studio.',
   'blanc.agent.error.aiNoTerms':
     'No words to build cards from. Star words in Dictionary first, or pass terms directly.',
+  'blanc.agent.error.aiNoBook':
+    'Generating from a book needs which book. Name a library item, or pick one in Flashcards → Mining.',
+  'blanc.agent.error.aiNoBookTerms':
+    'Those chapters produced no vocabulary worth carding. Try a wider range, or lower the minimum frequency in Mining settings.',
   'blanc.agent.error.nothingToUpdate': 'The operation was given nothing to change.',
   'agent.promptLibrary.title': 'Reusable prompts',
   'agent.promptLibrary.description': 'Save instructions you use often and place them back in the composer.',

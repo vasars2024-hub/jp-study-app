@@ -6438,6 +6438,10 @@ export const ja: Catalog = {
     'AIカード生成がローカルQwenに設定されていますが、モデルが見つかりません。翻訳からQwen3-1.7Bをインストールするか、フラッシュカード → AIカードスタジオでクラウドに切り替えてください。',
   'blanc.agent.error.aiNoTerms':
     'カードを作成する単語がありません。まず辞書で単語を保存するか、単語を直接指定してください。',
+  'blanc.agent.error.aiNoBook':
+    '書籍からの生成には対象の書籍が必要です。ライブラリの項目を指定するか、フラッシュカード → マイニングで選択してください。',
+  'blanc.agent.error.aiNoBookTerms':
+    'その章からはカードにできる語彙が見つかりませんでした。範囲を広げるか、マイニング設定で最小出現回数を下げてください。',
   'blanc.agent.error.nothingToUpdate': '変更する項目が指定されていません。',
   'agent.promptLibrary.title': '再利用プロンプト',
   'agent.promptLibrary.description': 'よく使う指示を保存し、コンポーザーに戻して使えます。',

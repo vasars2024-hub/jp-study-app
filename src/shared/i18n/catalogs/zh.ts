@@ -6406,6 +6406,10 @@ export const zh: Catalog = {
     'AI 卡片生成已设为本地 Qwen，但未找到模型。请通过「翻译」安装 Qwen3-1.7B，或在「闪卡 → AI 卡片工作室」中切换为云端。',
   'blanc.agent.error.aiNoTerms':
     '没有可用于生成卡片的词语。请先在词典中收藏词语，或直接提供词语。',
+  'blanc.agent.error.aiNoBook':
+    '从书籍生成需要指定是哪本书。请指明库中的条目，或在「闪卡 → 挖掘」中选择。',
+  'blanc.agent.error.aiNoBookTerms':
+    '这些章节没有产生值得制卡的词汇。请扩大范围，或在挖掘设置中降低最低出现频率。',
   'blanc.agent.error.nothingToUpdate': '未提供任何需要修改的内容。',
   'agent.promptLibrary.title': '可复用提示词',
   'agent.promptLibrary.description': '保存常用指令，并随时将其放回输入框。',
