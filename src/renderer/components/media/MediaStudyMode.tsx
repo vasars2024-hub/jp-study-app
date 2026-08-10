@@ -20,7 +20,8 @@ import {
   startMediaStudySession,
 } from '../../mediaStudyStore';
 import { dispatchMediaStudyAction } from './MediaStudyActions';
-import { handOffToAgent, mediaCueAgentContext } from '../../agentContextHandoff';
+import { handOffToAgent, mediaCueAgentContext, routeAgentContext } from '../../agentContextHandoff';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import { openMediaWorkspace, reachMediaWorkspace } from '../../mediaWorkspaceBridge';
 import { useT } from '../../i18n';
 import MediaLanguageProfileCard from './MediaLanguageProfileCard';
@@ -267,6 +268,10 @@ export default function MediaStudyMode({
         item.id,
       ),
       t('agent.conversation.fromMedia', { label: item.title }),
+      // `player` — the Media Center — rather than the producer's own `media`,
+      // which names no window and would yield a suggestion that could only fail
+      // its allowlist check.
+      routeAgentContext('player', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.player)),
     );
   };
   const createFlashcards = (): void => {

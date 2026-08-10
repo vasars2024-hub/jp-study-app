@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import LensReaderPanel from './LensReaderPanel';
 import LensAnalysisPanel from './LensAnalysisPanel';
 import { useT } from '../../i18n';
+import { handOffToAgent, readingPassageAgentContext } from '../../agentContextHandoff';
 import { getTokenizer, tokenizeSync, tokenizerReady, type JpToken } from '../../tokenizer';
 import type { LensInit } from '../../../main/readingLens';
 import {
@@ -414,6 +415,28 @@ export default function ReadingLensOverlay() {
     });
   };
 
+  /**
+   * The captured text, handed to the Agent as a reading passage.
+   *
+   * Deliberately with **no place item**. Every other hand-off attaches the
+   * surface it happened on so the Agent can offer to take the user back, but the
+   * lens is an overlay drawn over whatever was on screen — often another
+   * application entirely — and there is no window to return to. Naming a
+   * navigable section here would produce a card that opens the wrong thing.
+   *
+   * Not a `useCallback`: it calls `t()`, and depending on `t` is the documented
+   * way to go stale across a language switch (CLAUDE.md §6). A plain function
+   * reads the current `t` on every click.
+   */
+  const askAgent = (lines: readonly LensLine[]): void => {
+    const text = lines.map((line) => line.text).join('\n').trim();
+    if (!text) return;
+    void handOffToAgent(
+      readingPassageAgentContext(text),
+      t('agent.conversation.fromReading', { label: text.slice(0, 40) }),
+    );
+  };
+
   const rescan = (engine: 'auto' | 'manga' | 'web') => {
     const region =
       state.kind === 'reading' || state.kind === 'empty' || (state.kind === 'error' && state.region)
@@ -556,6 +579,7 @@ export default function ReadingLensOverlay() {
             onRescan={rescan}
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
+            onAskAgent={() => askAgent(state.lines)}
             visualNovelTitle={visualNovelTarget?.title}
             visualNovelSaveState={visualNovelSaveState}
             onSaveToVisualNovel={() => void saveToVisualNovel()}
@@ -639,6 +663,7 @@ function LensChrome({
   onRescan,
   onNewRegion,
   onClose,
+  onAskAgent,
   visualNovelTitle,
   visualNovelSaveState,
   onSaveToVisualNovel,
@@ -650,6 +675,7 @@ function LensChrome({
   onRescan: (engine: 'auto' | 'manga' | 'web') => void;
   onNewRegion: () => void;
   onClose: () => void;
+  onAskAgent: () => void;
   visualNovelTitle?: string;
   visualNovelSaveState: 'idle' | 'saving' | 'saved' | 'error';
   onSaveToVisualNovel: () => void;
@@ -657,6 +683,9 @@ function LensChrome({
   return (
     <div className="lens-chrome lens-interactive">
       <span className="lens-source-badge">{t('lens.badge.source.screen')}</span>
+      <button type="button" onClick={onAskAgent} title={t('lens.action.askAgent')}>
+        {t('lens.action.askAgent')}
+      </button>
       <div className="lens-mode" role="radiogroup" aria-label={t('lens.mode.label')}>
         {(['dictionary', 'ai'] as const).map((m) => (
           <button

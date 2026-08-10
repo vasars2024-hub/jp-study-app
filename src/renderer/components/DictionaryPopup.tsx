@@ -6,7 +6,8 @@ import { detectTtsLang, speak, stopSpeaking, ttsAvailable } from '../tts';
 import { registerCommandHandler } from '../keyboardShortcuts';
 import { getZoomFactor } from '../appZoom';
 import { getStudyLang } from '../studyEnvironment';
-import { dictionaryAgentContext, handOffToAgent } from '../agentContextHandoff';
+import { dictionaryAgentContext, handOffToAgent, routeAgentContext } from '../agentContextHandoff';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
 import { useT } from '../i18n';
 import Icon from './Icons';
 
@@ -102,6 +103,10 @@ export default function DictionaryPopup({
     void handOffToAgent(
       dictionaryAgentContext(query, context ?? ''),
       t('agent.conversation.fromDictionary', { term: query }),
+      // Where the lookup happened, so the Agent can offer to take the user back.
+      // The label comes from the section's own catalog key rather than a second
+      // name for the same window — see AGENT_NAVIGATION_SECTION_LABEL_KEYS.
+      routeAgentContext('dictionary', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.dictionary)),
     );
   };
 

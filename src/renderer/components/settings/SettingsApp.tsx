@@ -94,6 +94,7 @@ import {
   focusAgentSettingsRenderedTarget,
   normalizeAgentSettingsNavigationLink,
 } from './agentSettingsNavigation';
+import { handOffToAgent, settingsRouteAgentContext } from '../../agentContextHandoff';
 
 
 function applyMotion(reduce: boolean): void {
@@ -106,6 +107,11 @@ export default function SettingsApp(props: SettingsWallProps) {
   const [page, setPage] = useState<SettingsPageId>('home');
   const [focusSettingId, setFocusSettingId] = useState<string | null>(null);
   const [guidedPage, setGuidedPage] = useState<SettingsPageId | null>(null);
+  // Kept beside `guidedPage` rather than read off `focusSettingId`, which the
+  // highlight effect nulls after 2200 ms. The coordinate is what a hand-off back
+  // to the Agent needs, and it stays true for as long as the user is still on
+  // the page the Agent sent them to — not for 2.2 seconds.
+  const [guidedControlId, setGuidedControlId] = useState<string | null>(null);
   const [look, setLook] = useState<OsPersonalization>(loadPersonalization);
   const [deskPrefs, setDeskPrefs] = useState<DesktopPrefs>(loadDesktopPrefs);
   const [env, setEnv] = useState<EnvironmentSettings>(loadEnvironment);
@@ -128,6 +134,7 @@ export default function SettingsApp(props: SettingsWallProps) {
 
   const navigate = useCallback((next: SettingsPageId, settingId?: string) => {
     setGuidedPage(null);
+    setGuidedControlId(null);
     setPage(next);
     pushRecentPage(next);
     setFocusSettingId(settingId ?? null);
@@ -203,6 +210,7 @@ export default function SettingsApp(props: SettingsWallProps) {
       const mine = ++generation;
       const nextPage = destination.page as SettingsPageId;
       setGuidedPage(nextPage);
+      setGuidedControlId(destination.controlId ?? null);
       setPage(nextPage);
       pushRecentPage(nextPage);
       setFocusSettingId(destination.controlId ?? null);
@@ -327,6 +335,28 @@ export default function SettingsApp(props: SettingsWallProps) {
   const reduceMotion = typeof document !== 'undefined' && document.documentElement.classList.contains('reduce-motion');
   const pageLabel = meta?.label ?? 'Control Center';
   const pageGroup = meta?.group ?? 'Settings';
+  /**
+   * Hands the Agent the page the user is on — and the exact control, when the
+   * Agent's own guided navigation put them here.
+   *
+   * The place *is* the material for this surface, so it goes in as the item
+   * rather than as the decoration: there is nothing else the user is looking at.
+   * Naming the control matters more than it looks — a route item carrying a
+   * page/control coordinate is what authorizes a guided destination through the
+   * provenance path, which was unreachable until a producer could emit one.
+   */
+  const askAgent = (): void => {
+    // Only claim the control while the user is still on the page the Agent sent
+    // them to. After they navigate away it is someone else's coordinate, and a
+    // route item that names a control the user is not looking at would authorize
+    // a destination they never agreed to.
+    const controlId = guidedPage === page ? guidedControlId ?? undefined : undefined;
+    void handOffToAgent(
+      settingsRouteAgentContext(page, pageLabel, controlId),
+      t('agent.conversation.fromSettings', { label: pageLabel }),
+    );
+  };
+
   const toggleAdvanced = () => setAdvancedModeState(setSettingsAdvanced(!advancedMode));
   const focusSearch = () => {
     searchRef.current?.focus();
@@ -459,6 +489,20 @@ export default function SettingsApp(props: SettingsWallProps) {
         <div className={`os-settings os-settings-v2${advancedMode ? ' is-advanced' : ''}${aero ? ' aero-settings' : ''}`}>
           <div className="os-set-top">
             <SettingsSearch ref={searchRef} onNavigate={navigate} />
+            {/*
+              Beside the search rather than in the command bar below: that bar is
+              rendered only under `aero &&`, so a button placed there is missing
+              from the ordinary Settings window — including every pop-out, which
+              is the one the Agent itself opens.
+            */}
+            <Button
+              size="sm"
+              className="os-set-ask-agent"
+              leftIcon={<Icon name="sparkle" size={14} />}
+              onClick={askAgent}
+            >
+              {t('settings.action.askAgent')}
+            </Button>
             {aero && (
               <Toolbar className="aero-settings-commandbar" aria-label="Settings commands">
                 <Button

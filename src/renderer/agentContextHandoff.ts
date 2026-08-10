@@ -16,7 +16,8 @@
  */
 
 import { createAgentContextItem, type AgentContextInput } from '../shared/agentContext';
-import type { AgentContextItem } from '../shared/agentWorkspace';
+import type { AgentContextItem, AgentWorkspaceState } from '../shared/agentWorkspace';
+import type { DesktopWinSection } from '../shared/desktop';
 import { agentWorkspaceWithContextAttached } from './agentShellModel';
 import { loadAgentWorkspace, updateAgentWorkspace } from './agentWorkspaceClient';
 import { t } from './i18n';
@@ -47,35 +48,82 @@ function newConversationId(): string {
 }
 
 /**
- * Attaches one context item to the active conversation, creating one when there
- * is none.
+ * Attaches every item of one gesture in a single save.
+ *
+ * A gesture can carry more than one item — a word *and* the place it was looked
+ * up in — and those must land together. Two sequential saves would broadcast a
+ * half-attached shelf to every window and give the two items different
+ * conversations if the first one created it.
+ *
+ * Items are applied in array order and `attachAgentContext` puts each new one at
+ * the front, so **the last item in the array ends up first on the shelf**. Pass
+ * the place before the material: the material is what the user asked about.
+ */
+function withEveryContextAttached(
+  state: AgentWorkspaceState,
+  items: readonly AgentContextItem[],
+  newConversation: { id: string; title: string },
+  now: number,
+): AgentWorkspaceState | null {
+  let current = state;
+  let changed: AgentWorkspaceState | null = null;
+  // Only the first item may create the conversation; the rest must target the
+  // one it created rather than re-reading a stale `activeConversationId`.
+  let conversationId: string | null | undefined;
+  for (const item of items) {
+    const applied = agentWorkspaceWithContextAttached(current, item, {
+      ...(conversationId !== undefined ? { conversationId } : {}),
+      newConversation,
+      now,
+    });
+    if (applied) {
+      current = applied;
+      changed = applied;
+    }
+    conversationId = current.activeConversationId;
+  }
+  return changed;
+}
+
+/**
+ * Attaches one gesture's context to the active conversation, creating one when
+ * there is none.
  *
  * `conversationTitle` arrives translated from the caller: this module has no
  * `t()`, matching the rule `agentShellModel.ts` follows, so a title never has to
  * be assembled from fragments a catalog cannot reorder.
+ *
+ * `place` is optional and is the surface the gesture happened on. It is what
+ * lets the Agent offer to take the user back, and it is deliberately a separate
+ * item rather than a field on the material: "the sentence I highlighted" and
+ * "the reader I highlighted it in" are two different things to disclose, and the
+ * privacy floor treats them differently — a route carries nothing of the user's
+ * and is retained, the material is not.
  */
 export async function attachAgentContextFromSurface(
   input: AgentContextInput,
   conversationTitle: string,
+  place?: AgentContextInput,
 ): Promise<AgentHandoffOutcome> {
   const item = createAgentContextItem(input);
   if (!item) return 'invalid-context';
+  // A malformed place is dropped, never fatal: failing the whole hand-off over
+  // the decoration would lose the material the user actually asked about.
+  const placeItem = place ? createAgentContextItem(place) : null;
+  const items = placeItem ? [placeItem, item] : [item];
 
   const loaded = await loadAgentWorkspace();
   if (!loaded.ok) return loaded.code === 'bridge-unavailable' ? 'bridge-unavailable' : 'save-failed';
 
-  const options = {
-    newConversation: { id: newConversationId(), title: conversationTitle },
-    now: input.now,
-  };
-  const next = agentWorkspaceWithContextAttached(loaded.state, item, options);
+  const newConversation = { id: newConversationId(), title: conversationTitle };
+  const next = withEveryContextAttached(loaded.state, items, newConversation, input.now);
   // Already the front item of the active conversation: the shelf is correct, so
   // the save is skipped and the caller still opens the Agent.
   if (!next) return 'unchanged';
 
   const saved = await updateAgentWorkspace(
     loaded.state,
-    (current) => agentWorkspaceWithContextAttached(current, item, options),
+    (current) => withEveryContextAttached(current, items, newConversation, input.now),
   );
   return saved.ok ? 'attached' : 'save-failed';
 }
@@ -119,8 +167,9 @@ function announceHandoffFailure(outcome: AgentHandoffOutcome): void {
 export async function handOffToAgent(
   input: AgentContextInput,
   conversationTitle: string,
+  place?: AgentContextInput,
 ): Promise<AgentHandoffOutcome> {
-  const outcome = await attachAgentContextFromSurface(input, conversationTitle);
+  const outcome = await attachAgentContextFromSurface(input, conversationTitle, place);
   if (outcome !== 'attached' && outcome !== 'unchanged') {
     announceHandoffFailure(outcome);
     return outcome;
@@ -130,6 +179,149 @@ export async function handOffToAgent(
     return 'open-failed';
   }
   return outcome;
+}
+
+/**
+ * Where the user was — the first producer of `route` context, and the one that
+ * makes permission-gated navigation reachable at all.
+ *
+ * Until this existed nothing outside a test created a `route` item, so
+ * `main/agentExecutionIpc.ts` could never emit a navigation suggestion and the
+ * whole gate was unreachable machinery. Every "ask the Agent about this" gesture
+ * now says which surface it happened on.
+ *
+ * **`section` must be a name the app can actually open** — one of
+ * `AGENT_NAVIGABLE_SECTIONS`, which mirrors main's `POPOUT_SECTIONS`. It is typed
+ * as `DesktopWinSection` so a call site cannot invent one, and the card producer
+ * refuses to build a suggestion for a section that is not navigable, so a wrong
+ * value here yields no card rather than a card that always fails.
+ *
+ * `identity` is the section alone: handing off from the Dictionary ten times is
+ * one "Dictionary" on the shelf, not ten. `retained: true` is both allowed and
+ * honest — `route` floors at `ordinary` because it is the app's own navigation
+ * state and carries nothing of the user's, and where you were is still true
+ * after a restart.
+ *
+ * There is deliberately **no preview**. A place has no content to preview, and
+ * inventing a sentence for one would be untranslated chrome assembled outside
+ * the i18n system.
+ */
+export function routeAgentContext(
+  section: DesktopWinSection,
+  label: string,
+  now = Date.now(),
+): AgentContextInput {
+  return {
+    kind: 'route',
+    label,
+    source: { app: section },
+    identity: section,
+    retained: true,
+    now,
+  };
+}
+
+/**
+ * Where the user was, when the surface can name the exact control.
+ *
+ * `routeAgentContext` above says only "Settings". This says "the Theme card on
+ * the Appearance page", and that difference is what makes the *provenance* half
+ * of guided navigation reachable: `resolveAgentNavigation` authorizes a
+ * page/control destination by requiring a live `route` item to agree with the
+ * stored effect in every coordinate, and until now no producer could supply one.
+ * The index half — a fresh "where is X?" — has been answerable since the static
+ * table shipped; this is the other half, for a question asked *from* the place.
+ *
+ * `highlight` is claimed only alongside a control, because it is a promise the
+ * Settings surface has to keep: the delivery handshake refuses to acknowledge
+ * until that exact control has rendered and is visibly highlighted.
+ *
+ * `identity` is the coordinate rather than the section, so asking from two
+ * different cards leaves two shelf entries while asking twice from one leaves
+ * one. That is the opposite of the bare section producer on purpose — "Settings"
+ * ten times is one place, but two named controls are two different places.
+ */
+export function settingsRouteAgentContext(
+  page: string,
+  label: string,
+  controlId?: string,
+  now = Date.now(),
+): AgentContextInput {
+  return {
+    kind: 'route',
+    label,
+    source: {
+      app: 'settings',
+      route: page,
+      ...(controlId ? { controlId, highlight: true as const } : {}),
+    },
+    identity: controlId ? `settings/${page}/${controlId}` : `settings/${page}`,
+    retained: true,
+    now,
+  };
+}
+
+/**
+ * A review session — what the user is *doing*, rather than a thing they are
+ * looking at.
+ *
+ * Session-only, and not because of a rule about decks: `study-session` floors at
+ * `personal` because the counts describe how someone is actually performing, so
+ * `createAgentContextItem` refuses retention and this does not ask for it. "I got
+ * 12 of 40 wrong" is not something to leave on disk for the next launch.
+ *
+ * `identity` is the deck plus the session's start, so one sitting is one shelf
+ * entry however many cards are answered inside it, while tomorrow's review of
+ * the same deck is a new one. Using the deck alone would collapse every session
+ * a user ever has into a single stale item.
+ */
+export function studySessionAgentContext(
+  deckName: string,
+  summary: string,
+  startedAt: number,
+  deckId?: string,
+  now = Date.now(),
+): AgentContextInput {
+  return {
+    kind: 'study-session',
+    label: deckName.trim().slice(0, 80),
+    preview: summary.trim(),
+    source: { app: 'flashcards', ...(deckId ? { entityId: deckId } : {}) },
+    identity: `${deckId ?? deckName.trim()}@${Math.floor(startedAt)}`,
+    now,
+  };
+}
+
+/**
+ * The words someone has saved or mined — the one producer whose material is a
+ * *set* rather than a passage.
+ *
+ * The words themselves are the preview, joined by the caller so this module does
+ * not assemble a list separator outside the i18n system. It is the caller's job
+ * to keep that bounded, for the reason the media producer records: a control
+ * labelled "my saved words" must not hand over four thousand of them, and the
+ * reader producer already learned that lesson the expensive way.
+ *
+ * `identity` is the set's contents rather than its size, so re-asking after
+ * saving one more word is a genuinely new item while asking twice about the same
+ * list is one. `saved-words` floors at `personal` — a vocabulary list is a
+ * portrait of what someone does not yet know — so it is session-only like the
+ * reading producers, and retention is neither asked for nor available.
+ */
+export function savedWordsAgentContext(
+  words: readonly string[],
+  label: string,
+  now = Date.now(),
+): AgentContextInput {
+  const cleaned = words.map((word) => word.trim()).filter(Boolean);
+  return {
+    kind: 'saved-words',
+    label,
+    preview: cleaned.join('、'),
+    source: { app: 'flashcards' },
+    identity: cleaned.join(' '),
+    now,
+  };
 }
 
 /**

@@ -43,8 +43,13 @@ import {
   mediaCueAgentContext,
   openAgentSurface,
   readingPassageAgentContext,
+  routeAgentContext,
+  savedWordsAgentContext,
   selectedTextAgentContext,
+  settingsRouteAgentContext,
+  studySessionAgentContext,
 } from '../agentContextHandoff';
+import { AGENT_NAVIGABLE_SECTIONS, resolveAgentNavigation } from '../../shared/agentNavigation';
 import { createAgentContextItem } from '../../shared/agentContext';
 import { prepareAgentWorkspaceForPersistence } from '../../main/agentWorkspaceStore';
 
@@ -464,5 +469,227 @@ describe('media cue as session-only context', () => {
     expect(saved.conversations[0].title).toBe('Watching: My Show');
     expect(saved.conversations[0].context[0].id).toMatch(/^media-cue:[0-9a-f]{16}$/);
     expect(saved.conversations[0].context[0].id).not.toContain(LINE);
+  });
+});
+
+describe('routeAgentContext', () => {
+  it('keys identity on the section, so ten hand-offs are one shelf entry', () => {
+    expect(routeAgentContext('dictionary', 'Dictionary', NOW).identity).toBe('dictionary');
+    expect(routeAgentContext('dictionary', 'Dictionary', NOW + 5_000).identity).toBe('dictionary');
+  });
+
+  it('is ordinary and retained — a place carries nothing of the user’s', () => {
+    const item = createAgentContextItem(routeAgentContext('library', 'Library', NOW));
+    expect(item).toMatchObject({
+      id: 'route:library',
+      kind: 'route',
+      label: 'Library',
+      preview: '',
+      source: { app: 'library' },
+      sensitivity: 'ordinary',
+      retained: true,
+    });
+    // No `route` key at all, rather than an empty one: main opens sections.
+    expect(Object.hasOwn(item?.source ?? {}, 'route')).toBe(false);
+  });
+
+  it('survives the store’s retention filter, so it reaches the shelf', () => {
+    const item = createAgentContextItem(routeAgentContext('dictionary', 'Dictionary', NOW));
+    const persisted = prepareAgentWorkspaceForPersistence({
+      version: 1,
+      activeConversationId: 'c1',
+      conversations: [{
+        id: 'c1',
+        title: 'Dictionary',
+        mode: 'ask',
+        createdAt: NOW,
+        updatedAt: NOW,
+        pinned: false,
+        archived: false,
+        context: [item],
+        messages: [],
+      }],
+    });
+    expect(persisted.conversations[0].context.map((entry) => entry.id)).toEqual(['route:dictionary']);
+  });
+
+  /**
+   * Every section this producer is called with must be one the app can open,
+   * because the card producer silently drops a suggestion for anything else —
+   * so a wrong value here is invisible rather than loud.
+   */
+  it('is only ever called with a navigable section at its four call sites', () => {
+    const sources = [
+      ['components', 'DictionaryPopup.tsx'],
+      ['views', 'NovelReader.tsx'],
+      ['components', 'media', 'MediaStudyMode.tsx'],
+    ].map((parts) => readFileSync(resolve(__dirname, '..', ...parts), 'utf8')).join('\n');
+    const sections = [...sources.matchAll(/routeAgentContext\('([a-z]+)'/g)].map((m) => m[1]);
+    expect(sections.length).toBe(4);
+    for (const section of sections) {
+      expect(AGENT_NAVIGABLE_SECTIONS).toContain(section);
+    }
+  });
+});
+
+describe('a gesture that carries its place', () => {
+  it('attaches place and material together, with the material at the front', async () => {
+    expect(await handOffToAgent(
+      dictionaryAgentContext('食べる', 'a sentence', NOW),
+      'Dictionary: 食べる',
+      routeAgentContext('dictionary', 'Dictionary', NOW),
+    )).toBe('attached');
+
+    // One save, not two: a half-attached shelf must never be broadcast.
+    expect(workspace.saves).toHaveLength(1);
+    const saved = workspace.saves[0] as {
+      conversations: Array<{ context: Array<{ id: string }> }>;
+    };
+    expect(saved.conversations).toHaveLength(1);
+    expect(saved.conversations[0].context.map((entry) => entry.id))
+      .toEqual(['dictionary-entry:食べる', 'route:dictionary']);
+    expect(opened()).toEqual(['agent']);
+  });
+
+  it('does not grow the shelf when the same gesture repeats', async () => {
+    await handOffToAgent(
+      dictionaryAgentContext('食べる', 'a sentence', NOW),
+      'Dictionary: 食べる',
+      routeAgentContext('dictionary', 'Dictionary', NOW),
+    );
+    workspace.state = workspace.saves[0] as typeof workspace.state;
+    await handOffToAgent(
+      dictionaryAgentContext('食べる', 'a sentence', NOW),
+      'Dictionary: 食べる',
+      routeAgentContext('dictionary', 'Dictionary', NOW),
+    );
+    const last = workspace.saves.at(-1) as {
+      conversations: Array<{ context: Array<{ id: string }> }>;
+    };
+    expect(last.conversations[0].context.map((entry) => entry.id))
+      .toEqual(['dictionary-entry:食べる', 'route:dictionary']);
+  });
+
+  it('still delivers the material when the place is malformed', async () => {
+    expect(await handOffToAgent(
+      dictionaryAgentContext('食べる', 'a sentence', NOW),
+      'Dictionary: 食べる',
+      // An empty label cannot describe anything, so `createAgentContextItem`
+      // refuses it. Losing the word over that would be the wrong trade.
+      { ...routeAgentContext('dictionary', '', NOW) },
+    )).toBe('attached');
+    const saved = workspace.saves[0] as {
+      conversations: Array<{ context: Array<{ id: string }> }>;
+    };
+    expect(saved.conversations[0].context.map((entry) => entry.id))
+      .toEqual(['dictionary-entry:食べる']);
+  });
+});
+
+describe('the producers that had no call site', () => {
+  it('carries a guided coordinate all the way to an authorized destination', () => {
+    // The property this slice exists for. `resolveAgentNavigation` authorizes a
+    // page/control destination by requiring a live route item to agree with the
+    // stored effect in every coordinate — and `createAgentContextItem` used to
+    // rebuild `source` without `controlId` or `highlight`, so no item outside a
+    // test could ever satisfy it. The provenance half of guided navigation was
+    // unreachable machinery; this asserts it is reachable.
+    const place = createAgentContextItem(
+      settingsRouteAgentContext('appearance', 'Settings', 'theme', NOW),
+    );
+    expect(place?.source).toMatchObject({
+      app: 'settings', route: 'appearance', controlId: 'theme', highlight: true,
+    });
+
+    const conversation = {
+      id: 'c1', title: 'T', mode: 'ask' as const, createdAt: NOW, updatedAt: NOW,
+      pinned: false, archived: false,
+      context: [place!],
+      messages: [{
+        id: 'm1', conversationId: 'c1', role: 'assistant' as const,
+        status: 'complete' as const, text: '', createdAt: NOW, updatedAt: NOW,
+        contextIds: [], attachments: [],
+        cards: [{
+          id: 'card1', kind: 'navigation' as const, title: 'Theme',
+          sourceContextIds: [place!.id],
+          actions: [{
+            id: 'a1', label: 'Open',
+            effect: {
+              type: 'navigate' as const, section: 'settings',
+              page: 'appearance', controlId: 'theme', highlight: true,
+            },
+          }],
+        }],
+      }],
+    };
+
+    expect(resolveAgentNavigation(conversation, 'm1', 'card1', 'a1')).toEqual({
+      ok: true,
+      destination: {
+        section: 'settings', page: 'appearance', controlId: 'theme', highlight: true,
+      },
+    });
+  });
+
+  it('refuses a guided coordinate the allowlist does not know', () => {
+    // No validation happens in the producer on purpose, so this is where an
+    // invented control has to die: a card that cannot open is worse than none.
+    const place = createAgentContextItem(
+      settingsRouteAgentContext('appearance', 'Settings', 'not-a-control', NOW),
+    );
+    const conversation = {
+      id: 'c1', title: 'T', mode: 'ask' as const, createdAt: NOW, updatedAt: NOW,
+      pinned: false, archived: false,
+      context: [place!],
+      messages: [{
+        id: 'm1', conversationId: 'c1', role: 'assistant' as const,
+        status: 'complete' as const, text: '', createdAt: NOW, updatedAt: NOW,
+        contextIds: [], attachments: [],
+        cards: [{
+          id: 'card1', kind: 'navigation' as const, title: 'X',
+          sourceContextIds: [place!.id],
+          actions: [{
+            id: 'a1', label: 'Open',
+            effect: {
+              type: 'navigate' as const, section: 'settings',
+              page: 'appearance', controlId: 'not-a-control', highlight: true,
+            },
+          }],
+        }],
+      }],
+    };
+    expect(resolveAgentNavigation(conversation, 'm1', 'card1', 'a1'))
+      .toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('claims a highlight only when it names a control', () => {
+    const page = createAgentContextItem(settingsRouteAgentContext('appearance', 'Settings', undefined, NOW));
+    expect(page?.source.controlId).toBeUndefined();
+    expect(page?.source.highlight).toBeUndefined();
+    // Two named controls are two places; the bare section producer collapses.
+    expect(createAgentContextItem(settingsRouteAgentContext('appearance', 'S', 'theme', NOW))?.id)
+      .not.toBe(createAgentContextItem(settingsRouteAgentContext('appearance', 'S', 'accent', NOW))?.id);
+  });
+
+  it('keeps one sitting as one shelf entry and tomorrow as another', () => {
+    const first = createAgentContextItem(studySessionAgentContext('N5', '12 of 40', NOW, 'deck-1', NOW));
+    const same = createAgentContextItem(studySessionAgentContext('N5', '13 of 40', NOW, 'deck-1', NOW + 5_000));
+    const later = createAgentContextItem(studySessionAgentContext('N5', '2 of 40', NOW + 86_400_000, 'deck-1', NOW));
+    expect(same?.id).toBe(first?.id);
+    expect(later?.id).not.toBe(first?.id);
+    // Performance is not reference data: session-only, and retention refused.
+    expect(first?.sensitivity).toBe('personal');
+    expect(first?.retained).toBe(false);
+  });
+
+  it('identifies a saved-word set by its contents, not its size', () => {
+    const one = createAgentContextItem(savedWordsAgentContext(['食べる', '飲む'], 'Saved words', NOW));
+    const same = createAgentContextItem(savedWordsAgentContext(['食べる', ' 飲む '], 'Saved words', NOW));
+    const grown = createAgentContextItem(savedWordsAgentContext(['食べる', '飲む', '走る'], 'Saved words', NOW));
+    expect(same?.id).toBe(one?.id);
+    expect(grown?.id).not.toBe(one?.id);
+    expect(one?.preview).toBe('食べる、飲む');
+    expect(one?.sensitivity).toBe('personal');
+    expect(one?.retained).toBe(false);
   });
 });

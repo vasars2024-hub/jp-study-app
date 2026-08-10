@@ -3520,3 +3520,137 @@ probe cards saved through the real main-owned store:
 - The four card headings that are still literal English (`agent-memory`,
   `special-locked`, `wired-arcade`, `aero-arcade`) resolve through their
   translated `search.*` rows, which is why they work at all.
+
+## The context producers, and the field that was being thrown away — 2026-08-10
+
+### What the audit found
+
+Five producers existed (`route`, `dictionary-entry`, `selected-text`,
+`reading-passage`, `media-cue`), wired into exactly three surfaces:
+`DictionaryPopup`, `NovelReader` and `MediaStudyMode`. ReadingLens, Flashcards
+and Settings had no hand-off at all. And two declared `AgentContextKind` members
+— `study-session` and `saved-words` — had **no producer**: legal kinds nothing
+could create.
+
+### `createAgentContextItem` was dropping the coordinate
+
+The finding worth the slice. `AgentContextSource` declares `controlId` and
+`highlight`; `normalizeAgentWorkspaceState` preserves both
+(`agentWorkspace.ts:335-336`); and `resolveAgentNavigation` authorizes a guided
+page/control destination by requiring a live `route` item to agree with the
+stored effect **in every one of those coordinates**. But `createAgentContextItem`
+rebuilt `source` as `{app, route, entityId}` and silently discarded the other
+two.
+
+So no context item produced anywhere in the app could ever satisfy that check.
+The provenance half of guided navigation — "I am on this card, ask about it" —
+was unreachable machinery in exactly the way `route` context itself was before
+`routeAgentContext` existed. The index half has been answerable since the static
+table shipped; this was the other half, and it had never once run.
+
+Nothing is validated at the producer on purpose: the allowlist keeps the last
+word downstream, where `isAgentNavigationDestination` checks the pair against the
+registered guided targets. A test asserts both directions — a real coordinate
+resolves, an invented one returns `stale-provenance`.
+
+### Three producers, and where they attach
+
+- **`settingsRouteAgentContext(page, label, controlId?)`** — the canonical
+  Settings hand-off. `identity` is the coordinate rather than the section, the
+  opposite of the bare producer: "Settings" ten times is one place, but two named
+  controls are two different places. `highlight` is claimed only alongside a
+  control, because it is a promise the delivery handshake has to keep.
+- **`studySessionAgentContext`** — `identity` is deck + session start, so one
+  sitting is one entry however many cards are answered, while tomorrow's review
+  is a new one. Session-only: the counts describe how someone is performing.
+- **`savedWordsAgentContext`** — `identity` is the set's contents, not its size,
+  so re-asking after saving one more word is genuinely new. The caller bounds the
+  list, for the reason the media producer records.
+
+**Settings reads a persisted coordinate, not the highlight.** The obvious wiring
+— hand off `focusSettingId` — would have worked for 2200 ms and then silently
+stopped, because the highlight effect nulls it. A `guidedControlId` is kept beside
+`guidedPage` and cleared by the same `navigate()`, so the coordinate stays true
+while the user is still on the page the Agent sent them to, and is dropped the
+moment they leave. `askAgent` claims it only while `guidedPage === page`: after
+that it is someone else's coordinate, and a route item naming a control the user
+is not looking at would authorize a destination they never agreed to.
+
+**ReadingLens hands over with no place item, deliberately.** Every other hand-off
+attaches the surface it happened on so the Agent can offer to take the user back.
+The lens is an overlay drawn over whatever was on screen — often another
+application — and there is no window to return to. Naming a navigable section
+there would produce a card that opens the wrong thing.
+
+### Two things the live run corrected
+
+**The button was invisible where it mattered.** It first went into the Settings
+command bar, which is rendered under `{aero && (…)}` — so it was missing from the
+ordinary Settings window, including every pop-out, which is the one the Agent
+itself opens. Measured, not reasoned: the pop-out reported 79 buttons and zero
+matching. It now sits in `os-set-top` beside the search, which always renders.
+
+**The label is wrong, and it is not this slice's to fix.** The stored item came
+back labelled `Control Center`, because `pageLabel` reads `meta?.label` — the
+field another track's in-flight `SettingsNavPage` rename removed. That is the
+pre-existing `SettingsApp.tsx` type error this ledger has recorded twice; it will
+resolve when that track lands its `labelKey` call-site update.
+
+### A second uncommitted enrichment, smaller than the first
+
+`routeAgentContext` appears at four call sites in the working tree and **zero at
+HEAD** — the three surfaces have had `handOffToAgent` committed all along, but the
+*place* argument was never committed. So the pre-existing test "is only ever
+called with a navigable section at its four call sites" was a working-tree gate:
+it read 0 in a clean checkout. Those three one-line additions are committed here,
+and the test is now green standalone.
+
+### Measured evidence
+
+- Agent + i18n + lens + settings regression: **78 files, 1133 tests passed**.
+- `tsc --noEmit`: **392, unchanged.** `tsc` caught the one real mistake in this
+  slice — `Icon name="sparkles"` is not an `IconName`; it is `sparkle`.
+- `node tools/i18n-check.cjs`: clean at **9,192** keys (three added, translated
+  in all four).
+- `node tools/i18n-hardcoded-check.cjs`: no new component renders UI text without
+  i18n. Note the Settings command bar's own `Home`/`Find`/`Advanced` labels are
+  still literal English — pre-existing, and untouched here.
+- `node tools/architecture-audit.cjs --json`: **`fresh: []`**.
+- Focused ESLint over all seven paths: **exit 0**.
+- **Standalone**: checked out from the index alone, this slice's tests pass
+  **70/70** — including the four-call-sites test that fails at HEAD. That run
+  needs the seven untracked `i18n` module directories supplied first
+  (`grammarTaxonomy`, `gameArena`, `mooncapLore`, `miningUi`, `malSync`,
+  `scraperUi`, `animeSchedule`); the list has grown from the three recorded at
+  `ec6fe6a`.
+
+### Live Electron evidence
+
+Russian-UI dev app, real profile, driven through the debug bridge:
+
+- A guided navigation to `appearance/theme` was approved, then the Settings
+  pop-out's own «Спросить агента» button was clicked. What reached the real
+  main-owned store:
+
+  ```json
+  { "id": "route:settings/appearance/theme",
+    "source": { "app": "settings", "route": "appearance",
+                "controlId": "theme", "highlight": true },
+    "sensitivity": "ordinary", "retained": true }
+  ```
+
+  That item could not have existed before this slice.
+- Restores asserted: the probe conversation deleted, the one context item the
+  click attached to the user's real conversation removed by id, the workspace
+  back to its exact three conversation ids, `jp-os-settings-recent-v1`
+  **byte-for-byte identical**, `jp-settings-advanced-v1` untouched, and
+  `/logs?level=error` **0 entries**.
+
+### Still open after this
+
+- **Flashcards has producers but no call site.** `studySessionAgentContext` and
+  `savedWordsAgentContext` are tested and unused: `FlashcardsView` is a thin
+  wrapper and the session state lives in `FlashcardsContent.tsx` (1,677 lines),
+  which is where the button has to go. That is the remaining third of this plan
+  bullet, along with screenshot/OCR *attachment* context — a different mechanism
+  from context items, and untouched here.

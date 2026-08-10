@@ -149,6 +149,21 @@ export function createAgentContextItem(input: AgentContextInput): AgentContextIt
       ...(clamp(input.source.entityId ?? '', 500)
         ? { entityId: clamp(input.source.entityId ?? '', 500) }
         : {}),
+      // Carried, not dropped. `resolveAgentNavigation` authorizes a guided
+      // page/control destination by matching a stored effect against these two
+      // fields, and the workspace normalizer has always preserved them — but
+      // this producer rebuilt `source` without them, so no item outside a test
+      // could ever hold one. The whole provenance half of guided navigation was
+      // unreachable machinery until this line existed.
+      //
+      // Nothing is validated here on purpose: the allowlist has the last word
+      // downstream, where `isAgentNavigationDestination` checks the pair against
+      // the registered guided targets. A coordinate that is not real yields no
+      // suggestion rather than a suggestion that cannot open.
+      ...(clamp(input.source.controlId ?? '', 240)
+        ? { controlId: clamp(input.source.controlId ?? '', 240) }
+        : {}),
+      ...(input.source.highlight === true ? { highlight: true as const } : {}),
     },
     sensitivity,
     // Retention is refused outright above `ordinary` rather than quietly

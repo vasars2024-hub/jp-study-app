@@ -155,8 +155,16 @@ Completed in the current source tree:
 
 Still required before the Track 3 acceptance can be called complete:
 
-- canonical ReadingLens, Flashcards and Settings handoffs, study/saved-word
-  context producers, and screenshot/OCR attachment context;
+- **partly done.** ReadingLens and Settings now hand off, and the study-session
+  and saved-words producers exist and are tested. The load-bearing fix was that
+  `createAgentContextItem` rebuilt `source` without `controlId`/`highlight`, so
+  no context item could satisfy the guided check `resolveAgentNavigation` runs —
+  the provenance half of guided navigation had never once run (2026-08-10 — see
+  the ledger's "The context producers, and the field that was being thrown
+  away"). **Still required**: the Flashcards call site — the producers are unused
+  because the session state lives in `FlashcardsContent.tsx` rather than the thin
+  `FlashcardsView` — and screenshot/OCR *attachment* context, which is a
+  different mechanism from context items and untouched;
 - the remaining unavailable dictionary/media/anime/visual-novel adapters;
 - AI Card Studio conversion to an Agent workflow while retaining its editor;
 - broader planned-operation Undo surfacing and any product decision to make

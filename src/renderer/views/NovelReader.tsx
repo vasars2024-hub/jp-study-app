@@ -73,8 +73,10 @@ import { getActiveProfile } from '../profileState';
 import {
   handOffToAgent,
   readingPassageAgentContext,
+  routeAgentContext,
   selectedTextAgentContext,
 } from '../agentContextHandoff';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
 import { useT } from '../i18n';
 import { KNOWN_LANGS } from '../../shared/langs';
 import { recordEpubPageRead } from '../readingGardenProgress';
@@ -2223,6 +2225,10 @@ export default function NovelReader({ item, onClose }: Props) {
       // where the sentence reached workspace-v1.json through the title while the
       // item itself correctly did not. The book's name is already in the library.
       t('agent.conversation.fromReading', { label: item.title }),
+      // The reader is reached through the Library and is not a section of its
+      // own, so Library is the honest place to offer going back to — it is where
+      // the user's books are. The label is the section's own catalog name.
+      routeAgentContext('library', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.library)),
     );
   }, [currentWord, currentSentence, item.id, item.title, lang]);
 
@@ -2262,6 +2268,7 @@ export default function NovelReader({ item, onClose }: Props) {
       readingPassageAgentContext(passage, item.id),
       // The book, for the reason spelled out above: a title is persisted.
       t('agent.conversation.fromReading', { label: item.title }),
+      routeAgentContext('library', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.library)),
     );
   }, [passageAroundSelection, item.id, item.title, lang]);
 
