@@ -5165,3 +5165,72 @@ merge cleanly — the button line is not one it touches.
 - **The other two capture surfaces.** `visualNovels.ts`'s `saveCaptureScreenshot`
   path and the media player's own capture still hand nothing to the Agent.
 - **`mediaCueAgentContext`'s identity ignores `mediaId`**, as above.
+
+## The branch does not build from its own HEAD — the second one — 2026-08-11
+
+Found while testing `ca938e1` in a detached worktree, which is again the only
+place it could have been found. The ledger recorded this exact shape for
+`src/preload.ts` and recorded it as repaired. **There is a second, larger
+instance, and it is still live.**
+
+`src/shared/i18n/catalogs/{en,ja,zh,ru}.ts` import from five directories that
+**HEAD does not contain**:
+
+```
+../gameArena/<lang>    ../malSync/<lang>     ../miningUi/<lang>
+../mooncapLore/<lang>  ../scraperUi/<lang>
+```
+
+All five exist only as **untracked** directories in the shared working tree.
+What HEAD tracks is the older flat form — `catalogs/gameArena.ts`,
+`catalogs/mooncapLore.ts` — which the working tree has deleted, also
+uncommitted. So the split was made, the imports were rewritten to point at it,
+and only the rewritten imports were ever committed.
+
+The imports came in at `17c9150`. `src/shared/i18n/gameArena/` has been tracked
+in exactly one commit in the whole repository, `c41e78b`
+("Codex worktree snapshot: archive-cleanup"), which is **not an ancestor of this
+branch**.
+
+The consequence is the same as the `preload.ts` one and hides the same way: the
+dev app runs and every gate passes, because the working tree has the files. A
+checkout of HEAD alone cannot resolve the imports, so **every renderer test that
+transitively imports a catalog fails at HEAD**:
+
+```
+Error: Failed to resolve import "../gameArena/en" from "src/shared/i18n/catalogs/en.ts"
+```
+
+### Deliberately not repaired here
+
+The `preload.ts` repair was justified by two things this one does not have: that
+commit already touched `preload.ts`, and the fix was four moved lines of a
+function whose signature was already committed. Repairing *this* means
+committing nine untracked files that are another track's work in progress —
+adopting their split, on their behalf, mid-flight. That is the thing this
+repository's rules exist to prevent, so it is recorded rather than done. It
+belongs to whoever owns the i18n split.
+
+### What that cost this slice, and what was done instead
+
+`ca938e1` could not be gated standalone. It was gated against the working tree
+(all four gates clean, recorded above) and then verified in a detached worktree
+with the five untracked directories **copied in and never committed**:
+
+| | test files | tests failed | tests passed |
+| --- | --- | --- | --- |
+| `b376100` (baseline) | 9 failed / 468 | 47 | 6,296 |
+| `ca938e1` (this slice) | 9 failed / 468 | 47 | 6,303 |
+
+Same nine files, same forty-seven failures, **set difference empty** — and
+exactly +7 passing, matching the seven tests this slice adds.
+`agentContextHandoff.test.ts` itself passes 56/56 against the committed tree,
+which is the check that mattered: its `routeAgentContext` call-site test reads
+source files off disk, so it had to be proven against the *committed* versions
+of `DictionaryPopup.tsx`, `NovelReader.tsx` and `MediaStudyMode.tsx` rather than
+the working tree's foreign-modified ones.
+
+Those nine files fail at HEAD for the same reason the imports fail: the
+committed tree is missing other tracks' uncommitted work. In the shared working
+tree all 505 files pass. **Nobody should read the nine as a regression**, and
+nobody should read a green working-tree run as proof the branch builds.
