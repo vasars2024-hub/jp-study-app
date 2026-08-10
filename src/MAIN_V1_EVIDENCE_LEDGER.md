@@ -4192,3 +4192,239 @@ at all, and a missing channel must not take the three local types down with it.
 
 Whole suite 498 files / **6724** tests (up 9), `tsc` unchanged at 392 with none
 in the changed files, ESLint exit 0, `architecture-audit` `fresh: 0` exit 0.
+
+## Chapter-range mining, and a pipeline the Agent cannot fake — 2026-08-10
+
+Two user-directed slices, taken ahead of the AI Card Studio conversion.
+
+### The chapter range existed in the extractor and was discarded on the last line
+
+`extractEpubText` built `parts: string[]` — one entry per spine item, the book's
+own division — and returned `parts.join('\n')`. Chapter-scoped mining needed
+nothing more than not throwing that away. Nothing in `EpubMiningPanel.tsx`
+mentioned "chapter" at all, so scoped mining was absent from the manual UI too,
+not merely from the Agent.
+
+Two defects found while wiring it, both caught by the user rather than by me:
+
+1. **Indices were decode-dependent.** The first version numbered sections by
+   `sections.length + 1` after skipping empty ones, so a section's number could
+   not be known without decoding every earlier section. Numbering is now spine
+   position, established before any decoding.
+2. **A scoped run still decoded the whole book.** The first version extracted
+   everything and sliced afterwards; only tokenizing was scoped. The range now
+   goes INTO `extractEpubSections`, so chapters 1-5 of a 60-chapter novel cost
+   five chapters of unzip+strip, not sixty. `src/main/__tests__/epubChapterRange.test.ts`
+   asserts this as a property (`decoded: false` outside the range) rather than as
+   a timing. Positive-controlled: disabling the skip fails exactly the three
+   scoping tests and leaves the three whole-book tests passing.
+
+`extractEpubText` and `extractHtmlTextFromZipEntry` had NO remaining callers after
+the refactor and were deleted. An earlier comment in this session claiming
+`extractEpubText` was "kept as the joined form every existing caller expects" was
+wrong — eslint's unused-symbol warning is what disproved it.
+
+### Naming: `deckBookId` cannot distinguish two Japanese titles
+
+`deckBookId` slugs with `[^\w]+`, and `\w` is ASCII-only, so EVERY Japanese title
+collapses to the same id — `deckBookId('吾輩は猫である') === deckBookId('雪国')`,
+asserted in `chapterRange.test.ts`. A range-aware identity derived from that would
+have inherited the collision, so `miningDeckIdentity` derives from the **item id**
+plus the range slug.
+
+This matters because the deck store keys groups on the `(bookId, bookTitle)` PAIR
+— `replaceImportedDeck`, `setBookGroupFolder` and `renameBookGroup` all match on
+both — and `replaceImportedDeck` DELETES the matched group before inserting. With
+the range in the identity, re-mining chapter 5 replaces chapter 5 and leaves
+chapters 1-3 alone. Without it, it would not.
+
+The range label is deliberately untranslated. Deck names are study content under
+the project i18n rule, and a translated label would rename a user's deck on a UI
+language switch — which, given the group key, would orphan the cards in it.
+
+### AI Card Studio: what the conversion actually has to avoid
+
+`AiCardStudio.runGenerate` calls `saveAiResultsToDeck` **unconditionally**, the
+moment generation returns — before the preview panel renders, and through
+`replaceImportedDeck`. So the studio's "preview and correct" step happens AFTER a
+destructive write. The plan's "preserve rich dedicated editors for preview and
+correction" describes something the form does not currently do.
+
+`flashcard.generate-cards` therefore writes nothing and returns rows already
+shaped for `flashcard.add-cards`, which is gated, logged and invertible. The form
+was left exactly as it is; its auto-save is recorded here as an open defect, not
+silently changed.
+
+Also: `AiDeckGenerationRequest.terms[].sentence` is consumed by main
+(`sentence: entry.sentence ?? ''`) and has NEVER been sent by the only caller —
+the form builds terms from `savedWords` with `term` and `reading` only. The
+context pipe is already end-to-end; nothing was using it.
+
+The adapter reaches presets over IPC rather than importing `shared/aiMiningCatalog`.
+`agentToolRegistry` is on Blanc's boot path and the catalog is the 41 KB the
+barrel comment in `shared/mining.ts` exists to keep out of the entry chunk. No
+test guards that; only the comment does.
+
+### The pipeline terminal separates the claim from the evidence
+
+`AGENT_OPERATION_RECORD_CONTRACTS` records what an adapter CLAIMED. The executor
+is authoritative for "the handler ran", never for "the data is where it said".
+`buildAgentPipelineLines` re-reads the live stores and `pipelineVerdict` compares
+the two, so a step that reports success while writing nothing renders as
+`missing` rather than as a green line.
+
+Three rules the tests pin:
+- `unverifiable` is never `verified`. An operation with no record contract, or a
+  contract that produced no ids, is reported as unchecked. A missing check must
+  not read as a passed one.
+- **A deletion is verified by ABSENCE.** Scoring a `deleted` claim like a
+  `created` one inverts every verdict it produces: the perfect delete finds
+  nothing and would read `missing`, and the delete that silently did nothing
+  finds everything and would read `verified`.
+- Destination is read from the store, not from the return value, and reports the
+  `(folder, bookTitle)` pair the user actually sees. Cards from one step landing
+  in two groups is shown, not summed away.
+
+Entity types with no resolver (study-workspace, media-item, visual-novel — all
+behind IPC) report `resolvable: false`. Positive-controlled: making
+`pipelineVerdict` return `verified` unconditionally fails exactly the six tests
+that assert a non-passing outcome; restore byte-identical.
+
+The architecture audit caught `AgentPipelineTerminal.tsx` as an orphan module and
+`agentPipelineVerify.ts` as test-only — correctly, because a component nothing
+imports does not exist for the user. Both cleared by wiring the terminal into
+`AgentWorkspaceShell`, not by baselining.
+
+### Gates
+
+`npx vitest run` 501 files / 6766 tests, 0 failures (was 499/6742). tsc 392 =
+baseline, set-differenced. eslint 0 over the touched paths. `i18n-check` exit 0 at
+9,240 keys; two pure-format strings were rephrased to carry words rather than
+baselined. `i18n-hardcoded-check` exit 0. `architecture-audit` exit 0, nothing new.
+
+**Committed 2026-08-10 as `5eb4384`**, by the blob-splice recipe below. The
+"NOT COMMITTED" note that stood here is superseded.
+
+## The branch does not build from its own HEAD — 2026-08-10
+
+Committing `5eb4384` meant testing the staged tree in isolation for the first
+time, and that turned up something no working-tree gate can see.
+
+`git write-tree` + `commit-tree` + a detached worktree, with `node_modules`
+junctioned in, runs the suite against exactly what the commit contains. Against
+branch HEAD that worktree reports **54 failed files / 192 failed assertions**,
+before any of this session's work is applied. The branch has been green only
+against the dirty working tree.
+
+The largest cause is concrete and fixable by whoever owns it: HEAD's
+`shared/i18n/catalogs/en.ts` imports `../gameArena/en`, `../mooncapLore/en`,
+`../miningUi/en`, `../malSync/en` and `../scraperUi/en`, and **all five
+directories are untracked**. The import lines were committed; the modules never
+were. `catalogs/gameArena.ts` and `catalogs/mooncapLore.ts` are deleted in the
+working tree, so the old path is gone too.
+
+So the honest gate for a commit here is a **set-difference**, not a pass:
+capture `--reporter=json` at HEAD and at the staged tree and compare failing
+`(file, assertion)` pairs. For `5eb4384` that was **0 new failing assertions**.
+One new failing FILE appeared — `epubChapterRange.test.ts`, which fails on the
+missing `../gameArena/en`, not on anything it tests. Copying the five untracked
+directories into the probe and re-running gives **42/42 passing** across this
+session's three new test files, which is what proves the commit clean.
+
+A file-level check was necessary to see this at all: the transform error
+produces a failed file with **zero** assertion results, so an assertions-only
+diff reported `0 new failures` while the file was genuinely broken.
+
+### The splice, and the bug in the splice
+
+`git add` was safe for seven of the fourteen modified files — `mining.ts`,
+`miningTypes.ts`, `agentToolRegistry.ts`, `EpubMiningPanel.tsx`,
+`AgentWorkspaceShell.tsx`, `localAgent.ts`, `localAgentProfiles.ts` all carried
+this session's edits and nothing else. `preload.ts`, `window.d.ts`, `styles.css`
+and the four catalogs genuinely mix tracks and were spliced: read the INDEX blob
+(not HEAD — three key groups go into each catalog and reading HEAD each run
+discards the previous one), replace, `hash-object -w --no-filters`,
+`update-index --cacheinfo`.
+
+The previous session's `stage_keys.py` finds a multi-line entry by counting
+braces, and that **silently truncated three entries**. These catalogs' common
+multi-line shape opens no brace at all:
+
+```
+  'blanc.agent.error.aiLocalModelMissing':
+    'No local model is configured.',
+```
+
+Brace depth is 0 on the key line, so only the key was staged — a parse error in
+the committed blob while the working tree still read fine. Entry extraction is
+now bounded by where the NEXT top-level entry starts. This is exactly the class
+of failure the worktree probe exists to catch: every working-tree gate passed
+while the commit was broken.
+
+Also worth keeping: `git cat-file blob HEAD:<path>` returns LF for this tree
+while `styles.css` and all four catalogs are **CRLF in the working copy**, so
+anything lifted from the working tree is normalized before it enters a blob. The
+Bash tool's CR counts for those files were wrong in both directions; PowerShell's
+`ReadAllBytes` is what settled it.
+
+## The pipeline terminal's arguments — 2026-08-10
+
+`summarizeArguments` shipped written, tested and **unused**: `AgentOperationEntry`
+had no `arguments` field, so `buildAgentPipelineLines` hardcoded
+`argumentSummary: ''` and every line rendered blank. The terminal showed where a
+step landed but not what it aimed at — two runs differing only in chapter range
+were indistinguishable, which is most of what the user asked the terminal for.
+
+`buildAgentPipelineLines` **had no test at all**. That is how a hardcoded empty
+string survived being written in the same session as its own formatter's tests.
+The new coverage asserts the end-to-end line, not the formatter in isolation.
+
+Three decisions worth not re-litigating:
+
+- **Structured on the record, summarized at render.** Storing the pre-rendered
+  string would have been smaller, but it mixes presentation into a record and
+  freezes the format. The log is `useState` in the shell — in-memory, bounded at
+  200 — so there is no persistence cost to argue against it.
+- **Copied on append, shallowly, and the comment says shallowly.** The executor
+  passes `step.request.arguments` itself; a record that changes when its source
+  is edited later is not a record. Shallow covers exactly what the terminal
+  renders — keys, primitives, and an array's *length*. A nested array's contents
+  are still shared, and claiming otherwise would be the more dangerous comment.
+- **Optional, and absent rather than `{}`.** An operation that genuinely takes no
+  arguments must stay distinguishable from one whose arguments were lost on the
+  way in. Pinned by a test that asserts the key is absent.
+
+All three producers supply arguments: the executor passes the request's own
+object, `agentSaveClient` the row **as actually written** (the trimmed `word`,
+not the requested one), and `agentUndoClient` the sequence it reverses. Three
+existing exact-draft assertions were updated to include the new field rather than
+weakened to `toMatchObject` — they were written to be exact.
+
+No new i18n keys: arguments render as raw `key=value` data, which is not chrome.
+
+### Gates
+
+`npx vitest run` 501 files / **6772** tests, 0 failures (was 501/6766; +6 is
+exactly what was added). tsc 392, and set-differenced properly this time — 224
+distinct `(file, message)` pairs, **0 new, 0 gone, 0 count changes** — against a
+baseline captured by reverting only this slice's ten files, all of which carried
+no other track's work. eslint 0. `i18n-check` exit 0 at 9,240 keys.
+`i18n-hardcoded-check` exit 0. `architecture-audit` exit 0, nothing new.
+
+Positive-controlled twice: blanking `argumentSummary` fails exactly the two
+`buildAgentPipelineLines` tests that assert a non-empty summary and correctly
+leaves the no-arguments test passing; dropping `step.request.arguments` in the
+executor fails exactly the two execution-record tests. Both restores
+hash-compared byte-identical, and every edited source byte-scanned for control
+characters.
+
+Committed as `edadeeb`.
+
+### Still open
+
+- The terminal has never been seen rendered. Everything above is proven by test,
+  not by looking at it.
+- `flashcard.generate-cards` still takes no chapter range while the manual path
+  does. That parity gap is the natural next slice.
+- `AiCardStudio.runGenerate` still saves unconditionally before its preview
+  renders, through `replaceImportedDeck`. Unchanged on purpose.
