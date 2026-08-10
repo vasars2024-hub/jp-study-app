@@ -4016,3 +4016,115 @@ re-pointed at the two dictionary operations and `flashcard.schedule-reviews`, an
 a property assertion added that no row reports `adapter-not-implemented`. Those
 edits are in the working tree only; that feature is still another track's
 uncommitted work.
+
+## Track 3 was not in the repository — 2026-08-10
+
+### The finding
+
+While starting the "broader planned-operation Undo surfacing" item, `git status`
+showed `agentUndo.ts` as `??`. It was not alone. **36 untracked Agent files** and
+~35 modified tracked ones were sitting in the working tree: the capability
+directory, context suggestions, the conversation planner, the main-owned
+execution lease, the prompt library, save/undo, and the execution record — most
+of them written up in this ledger as landed, verified slices, several with live
+QA transcripts.
+
+HEAD did not contain any of it. A `git clean -fd`, a fresh clone, or a stray
+`git checkout` would have destroyed the larger part of Track 3, and the ledger
+would have been describing a repository that did not exist. The signature is
+repeated `git add <explicit paths>` discipline: every session committed the slice
+it was writing and none noticed that the modules underneath had never been added.
+
+`tools/architecture-baseline.json` had been recording the symptom the whole time.
+Its `test-only-module:src/shared/agentOperationLog.ts` entry said the log was
+"deliberately unwired — no producer, no card, no channel — until the undo
+resolver slice lands". The resolver had landed months of work ago; it just was
+not committed, so from HEAD's point of view the note stayed true.
+
+### Why it could not simply be committed
+
+Two project gates failed against the working set, which is the likeliest reason
+it never went in:
+
+1. `AgentConversationPlanQueue.tsx:148` called `window.confirm`. The
+   `nativeDialogGate` test fails the suite for exactly that — a native dialog
+   paints OS chrome over a desktop that is pretending to be an operating system.
+   Replaced with the shell's own `confirmDialog`, `danger`, with a title and
+   action label.
+2. `architectureBaseline`'s stale-entry check failed on the `agentOperationLog`
+   note above, because in the *working tree* the log does have consumers. Removing
+   the entry is what makes `node tools/architecture-audit.cjs` exit **0** — earlier
+   handoffs recorded that exit 1 as a permanent quirk of this branch. It never
+   was; it was this.
+
+With both fixed the whole suite is green: **498 files / 6715 tests, 0 failures** —
+the first time this branch has had a clean unfiltered run.
+
+### How it landed
+
+Six commits, by feature rather than one bulk import, so the history stays
+reviewable:
+
+| Commit | Slice |
+|---|---|
+| `d13c770` | the operation log's consumers — save, undo, execution record |
+| `ba00592` | the capability directory |
+| `784cf21` | context suggestions and their per-source preferences |
+| `98d12a9` | the conversation planner and the main-owned execution lease |
+| `95c962b` | the reusable prompt library |
+| `c04bb60` | the workspace wiring, and the baseline entry that is now stale |
+
+The four i18n catalogs and the two IPC boundary files (`preload.ts`,
+`window.d.ts`) carry several tracks' uncommitted work at once, so nothing was
+added wholesale: each commit spliced only its own keys (88 `agent.capabilities.*`,
+52 `agent.plan.*`, 25 `agent.promptLibrary.*`, 15 `agent.suggestions.*`) and only
+its own IPC block into the blob. **The working copies of the catalogs are CRLF
+while HEAD's blobs are LF**, so every spliced entry is normalized before it is
+written; a scripted edit that skips that step rewrites the whole file and the
+diff goes from four lines to nine thousand.
+
+### Verified: HEAD no longer imports anything uncommitted
+
+A resolver over all **1,546** committed source files, reading each one out of
+HEAD and resolving its relative imports against `git ls-files`, reports **no
+unresolved import from any Agent file**. The Agent set is internally complete as
+committed.
+
+It reports 38 unresolved specifiers elsewhere, of which the real ones are one
+pre-existing group: `catalogs/{en,ja,zh,ru}.ts` import **five** untracked i18n
+module directories — `gameArena`, `mooncapLore`, `miningUi`, `malSync`,
+`scraperUi`. That is the i18n track's uncommitted work and the reason a clean
+checkout still cannot load the catalogs. **The handoff note saying SEVEN dirs is
+now wrong**: `grammarTaxonomy` and `animeSchedule` are both tracked, with four
+files each. The rest of the 38 are `?raw`/`?worker` Vite query specifiers whose
+targets are tracked — artefacts of the checker, not findings.
+
+### The Undo item itself is still open, and here is what blocks it
+
+Landing the feature is not the same as broadening it. `AGENT_UNDO_SUPPORTED_OPERATIONS`
+still contains exactly one inverse, `flashcard.delete-cards`, while
+`AGENT_INVERSE_OPERATIONS` declares eight forward operations with real inverses.
+Two concrete defects sit between them, both found by reading rather than running,
+because only one operation currently reaches this code:
+
+1. **`resolveAgentUndo` hard-codes the inverse's arguments** as
+   `{ ids: [...entityIds] }` when it calls `evaluateAgentToolAccess`. That is the
+   shape `flashcard.delete-cards` takes. `flashcard.delete-deck` requires `name`,
+   `calendar.delete-event` and `media.delete-item` require `id` — so every one of
+   them would be refused as missing a required argument the moment it was added
+   to the supported set. The fix is one shared invocation builder used by both the
+   access check and the execution, not two places that must agree.
+2. **`liveEntityIds` is a single flat set**, and the renderer client fills it with
+   `loadDeck()` card ids. The doc comment already says the caller scopes it to the
+   entry's `entityType` — but the type cannot express that, so a calendar entry
+   would be checked against deck ids and refuse as `entity-not-found` every time.
+   It wants to be `(entityType: string) => ReadonlySet<string>`, which also forces
+   the media case to be pre-loaded, since media ids come from an async
+   `listMedia()`.
+
+`study.undo-filter` should stay out of that set on purpose: its inverse leaves the
+entity alive, so neither the "ids are gone" post-verification nor the `deleted`
+claim the client writes describes it, and the log — ids only — cannot express what
+"the filter reverted" would mean. `settings.apply-theme` / `apply-css` never enter
+the log at all: they have no `AGENT_OPERATION_RECORD_CONTRACTS` entry, which is
+the intended way to say an operation is not an Undo target.

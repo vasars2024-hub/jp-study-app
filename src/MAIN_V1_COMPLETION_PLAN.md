@@ -191,7 +191,16 @@ Still required before the Track 3 acceptance can be called complete:
   re-litigated a fourth time;
 - AI Card Studio conversion to an Agent workflow while retaining its editor;
 - broader planned-operation Undo surfacing and any product decision to make
-  the session-only activity/operation history durable;
+  the session-only activity/operation history durable. **The Undo feature itself
+  is now committed** (2026-08-10, `d13c770`/`c04bb60`) — it had never been in the
+  repository despite being written up here as verified; see the ledger's "Track 3
+  was not in the repository". Broadening it is still open, and two concrete
+  defects block it, both recorded in that ledger section: `resolveAgentUndo`
+  hard-codes the inverse's arguments as `{ids}` (so `delete-deck`, which needs
+  `name`, and `delete-event`/`delete-item`, which need `id`, would all be refused
+  as missing a required argument), and `liveEntityIds` is one flat set rather
+  than a per-`entityType` resolver (so a calendar entry gets checked against deck
+  ids). Fix both before adding anything to `AGENT_UNDO_SUPPORTED_OPERATIONS`;
 - Full-mode memory/profile/permission/automation and real provider-cost
   controls, retained-chat policy and memory scope;
 - final compact-width and complete keyboard/reduced-motion visual matrices.
