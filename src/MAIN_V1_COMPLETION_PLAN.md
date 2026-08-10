@@ -163,11 +163,15 @@ Still required before the Track 3 acceptance can be called complete:
   the ledger's "The context producers, and the field that was being thrown
   away"). ReadingLens, Settings and Flashcards all hand off now, the last through
   `FlashcardDeckOverview` with the word list bounded at 40 before it leaves.
-  **Still required**: a call site for `studySessionAgentContext`, which wants the
-  live review session in `FlashcardReviewMode` rather than the overview; and
-  screenshot/OCR *attachment* context, a different mechanism from context items
-  (`AgentAttachment`) whose material the lens already captures as
-  `screenshotDataUrl`, leaving only the producer and its privacy floor;
+  The review session hands off too, from `FlashcardReviewMode`'s done state.
+  **Still required**: screenshot/OCR *attachment* context. That one is not a
+  producer like the others — attachments reach a message through
+  `AgentExecutionAttachment` (`main/agentExecutionIpc.ts:319-349`), a lane
+  `agentProviderRouter.ts:118` calls deliberately separate and sensitive, and
+  `handOffToAgent` carries no attachments at all, so the transport itself is the
+  work. The `file` context kind exists with a `sensitive` floor but nothing
+  consumes it yet, so a `file` item today would be a reference the model cannot
+  read;
 - the remaining unavailable dictionary/media/anime/visual-novel adapters;
 - AI Card Studio conversion to an Agent workflow while retaining its editor;
 - broader planned-operation Undo surfacing and any product decision to make

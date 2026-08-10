@@ -3691,9 +3691,35 @@ Gates after this: **62 files / 884 tests** on `flashcard agent`, i18n clean at
 (the three `FlashcardsContent.tsx` errors are pre-existing and predate this
 edit), focused ESLint exit 0.
 
+### And the session hand-off, so nothing this track added is unreachable
+
+`studySessionAgentContext` now has its call site, in `FlashcardReviewMode`'s
+done state — "ask how this session went", offered at the moment it finished.
+It needed one piece of state the review did not keep: `sessionStartedAt`,
+stamped once per sitting in `startReviewSession`, because the producer keys its
+identity on deck-plus-start so that answering forty cards leaves one shelf entry
+while tomorrow's review leaves a new one.
+
+**Live, driven to completion through the bridge** (two words seeded into an empty
+profile, review started, flip/got-it until the done state):
+
+```json
+{ "id": "study-session:7270258504331ed9", "label": "Повторение словаря",
+  "preview": "Повторено 2 из 2",
+  "sensitivity": "personal", "retained": false }
+```
+
+Opaque identity again, and session-only: how someone is performing is not
+reference data. The `route:flashcards` place landed beside it as «Карточки».
+Both items removed afterwards, the seeded key deleted and `jp-saved-words-*`
+asserted back to **none**, workspace back to its exact three conversation ids,
+0 error entries.
+
+Gates: **68 files / 943 tests**, i18n clean at **9,198**, no new hardcoded UI
+text, `fresh: []`, `tsc` unchanged at 392, ESLint exit 0.
+
 ### Still open after this
 
-- `studySessionAgentContext` has no call site, as above.
 - **Screenshot/OCR attachment context** is untouched. It is a different mechanism
   from context items — `AgentAttachment`, not `AgentContextItem` — and the lens
   already captures `screenshotDataUrl` in its `reading` state, so the material

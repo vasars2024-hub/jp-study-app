@@ -71,6 +71,7 @@ import {
   handOffToAgent,
   routeAgentContext,
   savedWordsAgentContext,
+  studySessionAgentContext,
 } from '../../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import { registerCommandHandler } from '../../keyboardShortcuts';
@@ -169,6 +170,8 @@ export interface FlashcardsState {
   reviewed: number;
   total: number;
   reviewSource: 'dictionary' | 'epub';
+  /** When this sitting began — the identity half of a study-session hand-off. */
+  sessionStartedAt: number;
   reviewBookKey: string;
   setReviewBookKey: (v: string) => void;
   reviewUnknownOnly: boolean;
@@ -262,6 +265,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewed, setReviewed] = useState(0);
   const [total, setTotal] = useState(0);
   const [reviewSource, setReviewSource] = useState<'dictionary' | 'epub'>('dictionary');
+  const [sessionStartedAt, setSessionStartedAt] = useState(0);
   const [reviewBookKey, setReviewBookKey] = useState<string>('all');
   const [reviewUnknownOnly, setReviewUnknownOnly] = useState(true);
   const [bookFolderMenu] = useState<string | null>(null);
@@ -442,6 +446,10 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     if (!cards.length) return;
     const ordered = orderReviewCards(cards, initialMastered);
     setReviewSource(source);
+    // Stamped once per sitting: it is what gives a study-session hand-off a
+    // stable identity, so answering forty cards leaves one shelf entry while
+    // tomorrow's review of the same deck leaves a new one.
+    setSessionStartedAt(Date.now());
     setSessionCards(ordered);
     setReviewIndex(0);
     setMasteredIds(new Set(initialMastered));
@@ -778,6 +786,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     reviewed,
     total,
     reviewSource,
+    sessionStartedAt,
     reviewBookKey,
     setReviewBookKey,
     reviewUnknownOnly,
@@ -847,7 +856,34 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
     knownReviewCards,
     flipped,
     cardFx,
+    sessionStartedAt,
   } = state;
+
+  /**
+   * "Ask about how this session went" — a different gesture from asking about the
+   * saved-word list, which is why it lives here rather than in the overview.
+   *
+   * The counts are the material and they are `personal`: how someone is
+   * performing is not reference data, so the item is session-only and its
+   * identity is hashed. `studySessionAgentContext` keys that identity on the deck
+   * plus this sitting's start, so answering forty cards leaves one shelf entry.
+   */
+  const askAgentAboutSession = (): void => {
+    if (total === 0) return;
+    const deckName = reviewSource === 'epub' && reviewBookKey !== 'all'
+      ? epubReviewBooks.find((g) => `${g.bookId}::${g.bookTitle}` === reviewBookKey)?.bookTitle
+        ?? t('flash.session.deck')
+      : t('flash.session.deck');
+    void handOffToAgent(
+      studySessionAgentContext(
+        deckName,
+        t('flash.session.summary', { reviewed, total }),
+        sessionStartedAt,
+      ),
+      t('agent.conversation.fromStudySession'),
+      routeAgentContext('flashcards', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.flashcards)),
+    );
+  };
 
   function reviewStripCard(card: ReviewCard, mastered: boolean): JSX.Element {
     const i = sessionCards.findIndex((c) => c.id === card.id);
@@ -886,6 +922,9 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
           <div className="flash-done-actions">
             <button className="btn primary" onClick={state.restartReview}>
               {t('flash.reviewAgain')}
+            </button>
+            <button className="btn" onClick={askAgentAboutSession}>
+              {t('flash.askAgent')}
             </button>
             <button className="btn" onClick={state.endReview}>
               {t('flash.done')}
