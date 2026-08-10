@@ -164,14 +164,19 @@ Still required before the Track 3 acceptance can be called complete:
   away"). ReadingLens, Settings and Flashcards all hand off now, the last through
   `FlashcardDeckOverview` with the word list bounded at 40 before it leaves.
   The review session hands off too, from `FlashcardReviewMode`'s done state.
-  **Still required**: screenshot/OCR *attachment* context. That one is not a
-  producer like the others — attachments reach a message through
-  `AgentExecutionAttachment` (`main/agentExecutionIpc.ts:319-349`), a lane
-  `agentProviderRouter.ts:118` calls deliberately separate and sensitive, and
-  `handOffToAgent` carries no attachments at all, so the transport itself is the
-  work. The `file` context kind exists with a `sensitive` floor but nothing
-  consumes it yet, so a `file` item today would be a reference the model cannot
-  read;
+  **Still required**: screenshot/OCR *attachment* context — and it is not a
+  producer like the others, so do not scope it as one. Measured 2026-08-10:
+  `AgentExecutionAttachment` (`shared/agentExecutionBridge.ts`) is **text-only**
+  — `kind: 'text' | 'document'` carrying `contentText: string` — so an image
+  cannot travel that lane at all. `handOffToAgent` carries no attachments in any
+  case, and the `file` context kind exists with a `sensitive` floor but nothing
+  consumes it, so a `file` item today would be a reference the model cannot read.
+  The real work is a vision-input change: extending the execution attachment
+  contract to carry image bytes, deciding which providers accept them, and
+  setting the privacy floor and size bound for an image of the user's screen.
+  The material is ready — ReadingLens holds `screenshotDataUrl` in its `reading`
+  state and `visualNovels.ts:985` already persists one via
+  `saveCaptureScreenshot`;
 - the remaining unavailable dictionary/media/anime/visual-novel adapters;
 - AI Card Studio conversion to an Agent workflow while retaining its editor;
 - broader planned-operation Undo surfacing and any product decision to make
