@@ -4998,3 +4998,170 @@ this branch whose `preload.ts` does.**
   "Binary file … matches" instead of a diff, so **every change made to it in this
   slice was invisible to review** — including the ones that carry the capture.
   That is now costing something, and it belongs with whoever owns that file.
+
+## The second producer, and the id it was quietly stealing — 2026-08-11
+
+The section above named "the other capture surfaces" as still open and called
+them "a small edit rather than a design question". **A previous hop had already
+made most of that edit and left it uncommitted** — `VisualNovelAgentHandoffButton.tsx`
+untracked, plus edits to `VisualNovelSentenceAssist.tsx` and
+`agentContextHandoff.ts`, timestamped 23:33–23:34 against a commit made at
+23:25. That section predicted a third consecutive uncommitted slice and it was
+right. It is now three for three; whoever runs next should look at the working
+tree before believing any "still open" list, including this one.
+
+What was found there was coherent and is adopted. What was *missing* is below.
+
+### The picture was already on disk, and the handler proves it
+
+The lens hands over a JPEG main has just made; a VN capture's screenshot was
+saved when the line was captured. So this producer reads it back through
+`visual-novel:readCaptureImage` rather than making one. That handler is the
+component's whole premise, and a preload binding is not proof it exists, so it
+was invoked live rather than grepped:
+
+| probe | result |
+| --- | --- |
+| `typeof window.api.visualNovelReadCaptureImage` | `function` |
+| `visualNovelReadCaptureImage('C:/definitely/not/a/managed/capture.png')` | `{ok: false, error: 'The requested capture image is not managed by the visual novel library.'}` |
+
+A structured refusal, not an IPC "no handler registered" throw — the handler is
+registered *and* enforcing its directory boundary. Because it also refuses
+anything over 1 MiB, what reaches the vision lane is always well inside the
+lane's own 4 MiB bound, so no downscaling step is needed.
+
+### The defect: two producers of one kind can mint one id
+
+`media-cue` was reused rather than a new kind invented, which is the right call
+— a VN capture is one line plus the scene it was spoken in, which is what the
+kind describes and what floors it at `personal`. But a shelf id is
+`kind:identity` and **carries no trace of `source.app`**. Measured, not reasoned
+about:
+
+```
+mediaCue('行ってきます', …)          -> media-cue:8efb611876f0d424
+visualNovelCapture('行ってきます', …) -> media-cue:8efb611876f0d424   SAME
+```
+
+`attachAgentContext` keeps one entry per id and the newer **replaces** the
+older. So asking the Agent about a line a visual novel and an episode happen to
+share would silently take the shelf entry away from whichever was asked about
+first, and leave `source.app` naming whichever gesture happened to be last —
+the disclosure and the navigation provenance both wrong. Common short
+utterances are exactly the lines that collide, so this is the demo-passes,
+use-fails shape again.
+
+The repair is a namespaced identity — the line prefixed with a producer marker
+and a NUL separator, chosen because it cannot occur in a captured line, the
+same reason the saved-words producer joins on it. It is contained to the new
+producer, so no existing shelf id changes. After it:
+`media-cue:3dc535d3f85481ef`, distinct, and the two coexist on one shelf.
+
+**Pre-existing and deliberately not changed:** `mediaCueAgentContext` leaves
+`mediaId` out of its identity too, so the same subtitle line in two different
+shows is already one entry. That is the same class of looseness, it predates
+this slice, and fixing it would change ids that have already shipped. Named
+here rather than silently widened.
+
+### Three more things that were missing
+
+- **Both new i18n keys did not exist**, in any language.
+  `agent.conversation.fromVisualNovel` and `vnAssist.askAgent` were called by
+  the component and present in no catalog, so the button would have rendered
+  its own key as its label. This is the third slice running to ship a call to a
+  key nobody added; it is worth checking first, not last.
+- **No test file.** Seven tests added.
+- **A raw NUL byte was re-introduced, by this session.** The section above
+  recorded that `agentContextHandoff.ts` contained one and that git therefore
+  printed "Binary file … matches" instead of a diff. The previous hop had fixed
+  it by writing the six-character escape instead. Writing the new producer's
+  separator put **two** raw NULs back — one in code, one in prose — and the
+  file went binary again for exactly as long as it took to check the bytes.
+  Both are escapes now, the file has zero raw NULs, and its diff is readable
+  for the first time in this ledger's memory. The lesson is narrow and worth
+  keeping: an editor asked to write the escape into this repo writes the byte,
+  not the escape, so check with a byte count rather than by eye.
+
+### The test that guards the id, proved to guard it
+
+The collision test was run against a deliberately reverted producer and
+**failed** (`× does not take the shelf entry away from an episode with the same
+line`), then the file was restored and verified byte-identical (`Buffer.compare
+=== 0`). A regression test that has never been seen to fail is not yet evidence.
+
+The `routeAgentContext` call-site test previously asserted "its four call sites"
+across three files. This adds a fifth in a fourth file, so the test was widened
+rather than left to silently stop covering the newest producer.
+
+### Live acceptance
+
+Driven through the bridge on a **fresh boot** — the app was not running, and
+main does not reload with the renderer. All four catalogs loaded live through
+`ensureCatalog` and translated through `core.translate`:
+
+| lang | `agent.conversation.fromVisualNovel` | `vnAssist.askAgent` |
+| --- | --- | --- |
+| en | `Visual novel: ロミオ` | `Ask the Agent` |
+| ja | `ビジュアルノベル: ロミオ` | `エージェントに聞く` |
+| zh | `视觉小说：ロミオ` | `询问智能体` |
+| ru | `Визуальная новелла: ロミオ` | `Спросить Агента` |
+
+The `{label}` placeholder interpolates; no key rendered as its own text. The
+producer and the component were then imported in the **real renderer** (not
+vitest's module graph, which would not catch an import path the bundler
+rejects): ids distinct, `source.app` `media` vs `immersion`, `retained: false`,
+`sensitivity: personal`, and the component's default export is a function — so
+every import it names resolves. `/logs` shows seven entries, all ordinary
+startup, **zero errors**.
+
+Every probe global was deleted and re-read as absent. **No workspace write was
+made**, and none could have been: nothing was attached, so no conversation was
+created.
+
+### What was deliberately not verified
+
+**The button was not clicked in the real Immersion window.** Doing so needs a
+visual novel with a captured line in the user's own library, and it would create
+a real conversation in their workspace. What that click would add over what is
+proven — the handler returns a managed image or refuses, the producer mints a
+distinct item, the keys render, the component's imports resolve — is a click,
+not a fact. This is the same line the lens slice drew, for the same reason.
+
+### Gates
+
+`npx vitest run`: 504 passed / 1 skipped of 505 files, **6,858 passed** / 6
+skipped of 6,864 — up exactly 7 from `b376100`'s 6,851, matching the seven tests
+added. `node tools/i18n-check.cjs`: clean, all **9,249** English keys translated
+in ja/zh/ru (up 2). `node tools/architecture-audit.cjs`: nothing new, the same 3
+known pending findings. `npx eslint` on the touched paths: **0 errors**; the 4
+warnings in the test file are pre-existing non-null assertions, and the two this
+slice briefly added were removed rather than accepted. `tsc --noEmit` is not a
+gate here — but it caught two errors vitest could not, because esbuild strips
+types without checking them: `AgentContextItem` is exported from
+`shared/agentWorkspace.ts`, not `shared/agentContext.ts`, and a
+`.filter(x => x !== null)` does not narrow without a type predicate. Both fixed;
+**392** pre-existing errors, which is the recorded baseline, and 0 in any file
+this slice touches.
+
+### Staged against a shared tree
+
+Five of the eight files carry another track's uncommitted work — the four
+catalogs (~2,479 foreign insertions) and `VisualNovelSentenceAssist.tsx` (its
+i18n conversion plus an unrelated grammar-practice fix). Those five were
+committed as **reconstructed blobs**: HEAD plus this slice's lines only, each
+anchor asserted to match exactly once, each reconstruction diffed against HEAD
+to confirm it adds only the expected lines and deletes nothing. The working
+tree's foreign state is untouched. `agentContextHandoff.ts` was checked the same
+way and has no foreign hunks, so it was staged normally.
+
+One consequence worth naming: the **committed** `VisualNovelSentenceAssist.tsx`
+is HEAD's English-literal version plus the button, because the i18n conversion
+sitting in the working tree belongs to another track and is not this slice's to
+land. The button itself is fully translated. When that track commits, the two
+merge cleanly — the button line is not one it touches.
+
+### Still open
+
+- **The other two capture surfaces.** `visualNovels.ts`'s `saveCaptureScreenshot`
+  path and the media player's own capture still hand nothing to the Agent.
+- **`mediaCueAgentContext`'s identity ignores `mediaId`**, as above.

@@ -63,9 +63,11 @@ import {
   selectedTextAgentContext,
   settingsRouteAgentContext,
   studySessionAgentContext,
+  visualNovelCaptureAgentContext,
 } from '../agentContextHandoff';
 import { AGENT_NAVIGABLE_SECTIONS, resolveAgentNavigation } from '../../shared/agentNavigation';
-import { createAgentContextItem } from '../../shared/agentContext';
+import { attachAgentContext, createAgentContextItem } from '../../shared/agentContext';
+import type { AgentContextItem } from '../../shared/agentWorkspace';
 import { prepareAgentWorkspaceForPersistence } from '../../main/agentWorkspaceStore';
 
 const NOW = 1_800_000_000_000;
@@ -615,14 +617,15 @@ describe('routeAgentContext', () => {
    * because the card producer silently drops a suggestion for anything else —
    * so a wrong value here is invisible rather than loud.
    */
-  it('is only ever called with a navigable section at its four call sites', () => {
+  it('is only ever called with a navigable section at its five call sites', () => {
     const sources = [
       ['components', 'DictionaryPopup.tsx'],
       ['views', 'NovelReader.tsx'],
       ['components', 'media', 'MediaStudyMode.tsx'],
+      ['components', 'immersion', 'VisualNovelAgentHandoffButton.tsx'],
     ].map((parts) => readFileSync(resolve(__dirname, '..', ...parts), 'utf8')).join('\n');
     const sections = [...sources.matchAll(/routeAgentContext\('([a-z]+)'/g)].map((m) => m[1]);
-    expect(sections.length).toBe(4);
+    expect(sections.length).toBe(5);
     for (const section of sections) {
       expect(AGENT_NAVIGABLE_SECTIONS).toContain(section);
     }
@@ -788,5 +791,115 @@ describe('the producers that had no call site', () => {
     expect(one?.preview).toBe('食べる、飲む');
     expect(one?.sensitivity).toBe('personal');
     expect(one?.retained).toBe(false);
+  });
+});
+
+/**
+ * The second producer that can carry a picture, and the second producer of
+ * `media-cue` — which is the whole reason this block exists. Reusing a kind is
+ * cheap right up until two producers of it can mint the same id.
+ */
+describe('a captured visual-novel line', () => {
+  const LINE = '行ってきます';
+  const SCENE = '玄関 朝';
+
+  it('discloses the Immersion window, not the player, as where it came from', () => {
+    expect(createAgentContextItem(visualNovelCaptureAgentContext(LINE, SCENE, 'vn-9', NOW)))
+      .toMatchObject({
+        kind: 'media-cue',
+        label: LINE,
+        preview: SCENE,
+        // Same floor as every other `media-cue`: what someone is reading is
+        // their own material. Session-only, so neither the line nor the scene
+        // it names can reach disk.
+        sensitivity: 'personal',
+        retained: false,
+        source: { app: 'immersion', entityId: 'vn-9' },
+      });
+  });
+
+  /**
+   * The regression this producer's namespaced identity exists for.
+   *
+   * A shelf id is `kind:identity` and carries no trace of `source.app`, so
+   * before the namespace an anime subtitle and a VN capture of the same
+   * sentence minted byte-identical ids. `attachAgentContext` keeps one entry
+   * per id and the newer replaces the older, so asking about a line a visual
+   * novel and an episode happen to share would have taken the shelf entry away
+   * from whichever was asked about first — and common short utterances like
+   * this one are exactly the lines that collide.
+   */
+  it('does not take the shelf entry away from an episode with the same line', () => {
+    const cue = createAgentContextItem(mediaCueAgentContext(LINE, 'もう八時だよ', 'ep-3', NOW));
+    const vn = createAgentContextItem(visualNovelCaptureAgentContext(LINE, SCENE, 'vn-9', NOW));
+    expect(vn?.id).not.toBe(cue?.id);
+
+    const shelf = [cue, vn].filter((item): item is AgentContextItem => item !== null);
+    expect(shelf).toHaveLength(2);
+    expect(shelf.reduce((into, item) => attachAgentContext(into, item), [] as AgentContextItem[]))
+      .toHaveLength(2);
+  });
+
+  it('is still one entry when a hook and an OCR read disagree about the line break', () => {
+    // A text hook, a clipboard poller and an OCR read of one visible line
+    // disagree about where it wraps; re-capturing must not grow the shelf.
+    const hooked = createAgentContextItem(visualNovelCaptureAgentContext('行って\nきます', SCENE, 'vn-9', NOW));
+    const scanned = createAgentContextItem(visualNovelCaptureAgentContext('行って きます', SCENE, 'vn-9', NOW + 9_000));
+    expect(hooked?.id).toBe(scanned?.id);
+  });
+
+  it('falls back to the line when the scene is empty, which is the common case', () => {
+    // `scene` is free text the user fills in later, so it is usually blank at
+    // capture time — an empty preview would describe the material as having no
+    // content at all.
+    expect(createAgentContextItem(visualNovelCaptureAgentContext(LINE, '   ', 'vn-9', NOW))?.preview)
+      .toBe(LINE);
+  });
+
+  it('is dropped by the persistence filter, so a captured line never reaches disk', () => {
+    const item = createAgentContextItem(visualNovelCaptureAgentContext(LINE, SCENE, 'vn-9', NOW));
+    const persisted = prepareAgentWorkspaceForPersistence({
+      version: 1,
+      activeConversationId: 'c1',
+      conversations: [{
+        id: 'c1',
+        title: 'Visual novel',
+        mode: 'ask',
+        createdAt: NOW,
+        updatedAt: NOW,
+        context: [item],
+        messages: [],
+      }],
+    });
+    expect(persisted.conversations[0].context).toEqual([]);
+  });
+
+  /**
+   * The same rule the reader and cue producers were each corrected on. A
+   * conversation title IS persisted, and `media-cue` is refused retention
+   * precisely so the line stays off disk — titling the conversation with the
+   * raw line would write it there through the neighbouring field.
+   */
+  it('titles the conversation from a key, never from a raw line literal', () => {
+    const source = readFileSync(
+      resolve(__dirname, '..', 'components', 'immersion', 'VisualNovelAgentHandoffButton.tsx'),
+      'utf8',
+    );
+    expect(source).toContain("t('agent.conversation.fromVisualNovel'");
+    // The label passed into that key is bounded, so a paragraph-long capture
+    // cannot become a paragraph-long persisted title.
+    expect(source).toMatch(/label: line\.slice\(0, \d+\)/);
+  });
+
+  it('hands the picture over as an image, not as a field on the context', () => {
+    const source = readFileSync(
+      resolve(__dirname, '..', 'components', 'immersion', 'VisualNovelAgentHandoffButton.tsx'),
+      'utf8',
+    );
+    // The fourth argument of `handOffToAgent` is the only route an image may
+    // take; `FORBIDDEN_ATTACHMENT_FIELDS` refuses every other one.
+    expect(source).toContain('visualNovelReadCaptureImage');
+    expect(source).toMatch(/handOffToAgent\(/);
+    expect(source).not.toMatch(/dataUrl:\s*capture\./);
   });
 });

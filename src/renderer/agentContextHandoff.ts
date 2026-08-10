@@ -386,7 +386,7 @@ export function savedWordsAgentContext(
     label,
     preview: cleaned.join('、'),
     source: { app: 'flashcards' },
-    identity: cleaned.join(' '),
+    identity: cleaned.join('\u0000'),
     now,
   };
 }
@@ -528,6 +528,61 @@ export function mediaCueAgentContext(
     preview: scene.trim().replace(/\s+/g, ' ') || line,
     source: { app: 'media', ...(mediaId ? { entityId: mediaId } : {}) },
     identity: line,
+    now,
+  };
+}
+
+/**
+ * A captured visual-novel line — the second producer that can carry a picture,
+ * and the first whose picture was already on disk before the gesture.
+ *
+ * `media-cue` is **reused rather than a new kind invented**, and the reuse is
+ * honest rather than convenient: a visual-novel capture is one line of dialogue
+ * plus the scene it was spoken in, which is exactly what the kind describes and
+ * exactly what floors it at `personal`. A new kind would have to be given the
+ * same floor, the same session-only lifetime and the same prompt treatment, and
+ * would then differ from `media-cue` in nothing but its spelling.
+ *
+ * What genuinely differs is `source.app`. `mediaCueAgentContext` hard-codes
+ * `media`, and a line captured in the Immersion window is not something the
+ * player is showing — so this says `immersion`, which is both the truthful
+ * disclosure and the section the accompanying `route` item can navigate back to.
+ * That is the whole reason this is a separate function rather than a call with a
+ * different argument.
+ *
+ * `identity` is the line with its whitespace collapsed, for the cue producer's
+ * reason and then some: a VN text hook, a clipboard poller and an OCR read
+ * disagree about where the line breaks inside one visible line, so re-capturing
+ * the same sentence through a different route must not leave two shelf entries.
+ *
+ * It is also **namespaced**, which the cue producer does not need to be and this
+ * one does. A shelf id is `kind:identity` and carries no trace of `source.app`,
+ * so reusing `media-cue` means an anime subtitle and a VN capture of the same
+ * sentence produce byte-identical ids — measured, not assumed. `attachAgentContext`
+ * keeps one entry per id and the newer *replaces* the older, so asking about
+ * 「行ってきます」 in a visual novel would silently take the shelf entry away from
+ * the episode it was already attached to, and leave `source.app` naming whichever
+ * gesture happened to be last. Common short utterances are exactly the lines that
+ * collide. The separator is `\u0000` because it cannot occur in a captured line,
+ * the same reason the saved-words producer joins on it.
+ *
+ * The scene is the preview and falls back to the line, because a VN capture very
+ * often has no scene set — the field is free text the user fills in later — and
+ * an empty preview would describe the material as having no content at all.
+ */
+export function visualNovelCaptureAgentContext(
+  line: string,
+  scene: string,
+  visualNovelId?: string,
+  now = Date.now(),
+): AgentContextInput {
+  const text = line.trim().replace(/\s+/g, ' ');
+  return {
+    kind: 'media-cue',
+    label: text.slice(0, 80),
+    preview: scene.trim().replace(/\s+/g, ' ') || text,
+    source: { app: 'immersion', ...(visualNovelId ? { entityId: visualNovelId } : {}) },
+    identity: `visual-novel\u0000${text}`,
     now,
   };
 }

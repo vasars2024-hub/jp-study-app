@@ -7,6 +7,7 @@ import type {
   VisualNovelTextKind,
 } from '../../../shared/visualNovel';
 import { analyzeMediaStudyCues, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
+import VisualNovelAgentHandoffButton from './VisualNovelAgentHandoffButton';
 
 function draftFromCapture(capture: VisualNovelTextCapture): Required<VisualNovelCapturePatch> {
   return {
@@ -196,6 +197,7 @@ export default function VisualNovelSentenceAssist({
         <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void translate()}>{busy ? 'Working…' : 'Translate'}</button>
         <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void analyze()}>Analyze sentence</button>
         <button type="button" onClick={onSaveCard}>Save card</button>
+        <VisualNovelAgentHandoffButton capture={capture} screenshotDataUrl={screenshotDataUrl} />
         {capture.audioPath ? (
           <>
             <button type="button" disabled={audioBusy} onClick={() => void playAudio()}>
