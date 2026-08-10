@@ -19,6 +19,7 @@ import type {
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
+import { registerAgentImageStagingIpc } from './agentImageStaging';
 import { registerAgentNavigationIpc } from './agentNavigationIpc';
 import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 import { registerAgentOperationalIpc } from './agentOperationalIpc';
@@ -288,6 +289,10 @@ export function registerLocalAgentIpc(): void {
   registerAgentNavigationIpc();
   // Same reasoning for the operational store (queue, memory, automations).
   registerAgentOperationalIpc();
+  // And for the capture staging area, which is how a screenshot taken in one
+  // window reaches the Agent composer in another without entering the persisted
+  // workspace the other three stores write to.
+  registerAgentImageStagingIpc();
 }
 
 const AGENT_OPERATION_IDS = new Set(AGENT_TOOL_OPERATIONS.map((entry) => entry.id));

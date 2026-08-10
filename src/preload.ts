@@ -79,6 +79,12 @@ import type {
   AgentNavigationRequest,
   AgentNavigationResult,
 } from './shared/agentNavigationBridge';
+import { AGENT_IMAGE_STAGING_CHANNELS } from './shared/agentImageStaging';
+import type {
+  AgentImageStageRequest,
+  AgentImageStageResult,
+  AgentImageTakeResult,
+} from './shared/agentImageStaging';
 import type { AgentWorkspaceState } from './shared/agentWorkspace';
 import type { AgentWorkspaceResult } from './shared/agentWorkspaceBridge';
 import type {
@@ -1376,6 +1382,22 @@ const api = {
     ipcRenderer.on('agentWorkspace:changed', handler);
     return () => ipcRenderer.removeListener('agentWorkspace:changed', handler);
   },
+  // The capture staging area. A screenshot is staged for a conversation by the
+  // surface that captured it and claimed once by whichever window opens that
+  // conversation; the payload lives in main memory only and never in the
+  // persisted workspace. See shared/agentImageStaging.ts.
+  agentImageStage: (request: AgentImageStageRequest): Promise<AgentImageStageResult> =>
+    ipcRenderer.invoke(AGENT_IMAGE_STAGING_CHANNELS.stage, request),
+  agentImageTake: (conversationId: string): Promise<AgentImageTakeResult> =>
+    ipcRenderer.invoke(AGENT_IMAGE_STAGING_CHANNELS.take, conversationId),
+  // Fires for every accepted capture, carrying the conversation it was staged
+  // for and nothing else. The Agent shell claims on it because the hand-off
+  // stages *after* it saves, so the workspace push alone arrives too early.
+  onAgentImageStaged: (cb: (conversationId: string) => void): (() => void) => {
+    const handler = (_event: unknown, conversationId: string): void => cb(conversationId);
+    ipcRenderer.on(AGENT_IMAGE_STAGING_CHANNELS.staged, handler);
+    return () => ipcRenderer.removeListener(AGENT_IMAGE_STAGING_CHANNELS.staged, handler);
+  },
   // The main-owned Agent operational store: task queue, memory, automations.
   // Its only renderer consumer is `renderer/agentOperationalClient.ts`. The
   // `changed` push is what makes a write in one window reach the others.
@@ -1388,6 +1410,10 @@ const api = {
   ): Promise<AgentOperationalResult> =>
     ipcRenderer.invoke('agentOperational:migrateLegacy', payload),
   onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
+    const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
+    ipcRenderer.on('agentOperational:changed', handler);
+    return () => ipcRenderer.removeListener('agentOperational:changed', handler);
+  },
   agentExecutionLeaseAcquire: (
     request: AgentExecutionLeaseAcquireRequest,
   ): Promise<AgentExecutionLeaseAcquireResult> =>
@@ -1408,10 +1434,6 @@ const api = {
     request: AgentExecutionLeaseRecoverRequest,
   ): Promise<AgentExecutionLeaseRecoverResult> =>
     ipcRenderer.invoke('agentExecutionLease:recover', request),
-    const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
-    ipcRenderer.on('agentOperational:changed', handler);
-    return () => ipcRenderer.removeListener('agentOperational:changed', handler);
-  },
   agentExecutionRun: (request: AgentExecutionRequest): Promise<AgentExecutionResult> =>
     ipcRenderer.invoke('agentExecution:run', request),
   agentExecutionCancel: (requestId: string): Promise<AgentExecutionCancelResult> =>

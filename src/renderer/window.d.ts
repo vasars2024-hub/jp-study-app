@@ -58,6 +58,11 @@ import type {
 import type { AgentWorkspaceState } from '../shared/agentWorkspace';
 import type { AgentWorkspaceResult } from '../shared/agentWorkspaceBridge';
 import type {
+  AgentImageStageRequest,
+  AgentImageStageResult,
+  AgentImageTakeResult,
+} from '../shared/agentImageStaging';
+import type {
   AgentOperationalState,
   LegacyAgentOperationalPayload,
 } from '../shared/agentOperationalState';
@@ -891,6 +896,9 @@ declare global {
       agentWorkspaceDeleteConversation(conversationId: string): Promise<AgentWorkspaceResult>;
       agentWorkspaceClear(): Promise<AgentWorkspaceResult>;
       onAgentWorkspaceChanged(cb: (state: AgentWorkspaceState) => void): () => void;
+      agentImageStage(request: AgentImageStageRequest): Promise<AgentImageStageResult>;
+      agentImageTake(conversationId: string): Promise<AgentImageTakeResult>;
+      onAgentImageStaged(cb: (conversationId: string) => void): () => void;
       agentOperationalLoad(): Promise<AgentOperationalResult>;
       agentOperationalSave(state: AgentOperationalState): Promise<AgentOperationalResult>;
       agentOperationalMigrateLegacy(

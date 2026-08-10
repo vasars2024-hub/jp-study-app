@@ -2088,6 +2088,8 @@ export const zh: Catalog = {
   'agent.conversation.fromSettings': '设置: {label}',
   'agent.conversation.fromFlashcards': '记忆卡: 已保存的单词',
   'agent.conversation.fromStudySession': '学习记录',
+  'agent.handoff.capture.name': '屏幕截图',
+  'agent.handoff.error.image': '文本已发送，但截图未能附加。',
   'dictionary.askAgent': '就该词询问智能助手',
   'agent.conversation.delete': '删除',
   'agent.conversation.deleteConfirm': '确认删除',

@@ -55,7 +55,6 @@ type LensState =
     kind: 'scanning';
     region: Rect;
     engine: 'auto' | 'manga' | 'web';
-    includeScreenshot: boolean;
   }
   | {
     kind: 'reading';
@@ -182,7 +181,6 @@ export default function ReadingLensOverlay() {
         kind: 'scanning',
         region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
         engine: 'auto',
-        includeScreenshot: !!target,
       });
     } else {
       setState({ kind: 'selecting' });
@@ -220,11 +218,21 @@ export default function ReadingLensOverlay() {
   // previous overlay has actually painted out before the screenshot is taken.
   useEffect(() => {
     if (state.kind !== 'scanning') return;
-    const { region, engine, includeScreenshot } = state;
+    const { region, engine } = state;
     let alive = true;
     const run = () => {
       window.api
-        .lensOcr({ ...region, engine, includeScreenshot })
+        // Every scan keeps its screenshot now, where this used to ask for one
+        // only when a visual novel was being captured to. Two of the lens's own
+        // actions need the picture rather than the text — saving to a visual
+        // novel, and handing the capture to the Agent's vision lane — and an
+        // "ask the Agent" that carried the image on some scans and not others,
+        // decided by whether a visual novel happened to be targeted, is the kind
+        // of invisible inconsistency this surface must not have. The screen is
+        // captured either way (`main/screenOcr.ts` crops before it reads); the
+        // flag only decides whether the bounded JPEG rides back, and
+        // `boundedScreenshotDataUrl` holds that under 900 KB.
+        .lensOcr({ ...region, engine, includeScreenshot: true })
         .then((res) => {
           if (!alive) return;
           if (!res.available) {
@@ -375,14 +383,13 @@ export default function ReadingLensOverlay() {
             kind: 'scanning',
             region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
             engine: 'auto',
-            includeScreenshot: !!visualNovelTarget,
           });
         });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [close, state.kind, visualNovelTarget]);
+  }, [close, state.kind]);
 
   // ---- Selection drag ----------------------------------------------------
 
@@ -411,7 +418,6 @@ export default function ReadingLensOverlay() {
       kind: 'scanning',
       region: r,
       engine: 'auto',
-      includeScreenshot: !!visualNovelTarget,
     });
   };
 
@@ -424,16 +430,29 @@ export default function ReadingLensOverlay() {
    * application entirely — and there is no window to return to. Naming a
    * navigable section here would produce a card that opens the wrong thing.
    *
+   * The capture travels with it, and this is the first producer of an Agent
+   * image attachment. OCR is a lossy reading of a picture: it drops furigana,
+   * ruby, layout, the art a line sits on and anything it simply misread, and
+   * those are frequently the whole question. The screenshot goes to main's
+   * staging area rather than into the hand-off's own payload — see
+   * `shared/agentImageStaging.ts` for why the persisted workspace may not carry
+   * it — and `handOffToAgent` announces it if the staging fails, so a question
+   * about a screenshot is never asked of a conversation that never got one.
+   *
    * Not a `useCallback`: it calls `t()`, and depending on `t` is the documented
    * way to go stale across a language switch (CLAUDE.md §6). A plain function
    * reads the current `t` on every click.
    */
-  const askAgent = (lines: readonly LensLine[]): void => {
+  const askAgent = (lines: readonly LensLine[], screenshotDataUrl?: string): void => {
     const text = lines.map((line) => line.text).join('\n').trim();
     if (!text) return;
     void handOffToAgent(
       readingPassageAgentContext(text),
       t('agent.conversation.fromReading', { label: text.slice(0, 40) }),
+      undefined,
+      screenshotDataUrl
+        ? { dataUrl: screenshotDataUrl, name: t('agent.handoff.capture.name') }
+        : undefined,
     );
   };
 
@@ -446,7 +465,6 @@ export default function ReadingLensOverlay() {
       kind: 'scanning',
       region,
       engine,
-      includeScreenshot: !!visualNovelTarget,
     });
   };
 
@@ -579,7 +597,7 @@ export default function ReadingLensOverlay() {
             onRescan={rescan}
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
-            onAskAgent={() => askAgent(state.lines)}
+            onAskAgent={() => askAgent(state.lines, state.screenshotDataUrl)}
             visualNovelTitle={visualNovelTarget?.title}
             visualNovelSaveState={visualNovelSaveState}
             onSaveToVisualNovel={() => void saveToVisualNovel()}

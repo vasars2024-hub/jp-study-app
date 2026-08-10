@@ -4812,3 +4812,189 @@ never been committed (`git ls-files` returns nothing for those directories, and
 `b91c3e4`'s own `en.ts` carries the same imports). That failure is therefore
 also a *confirmation* — the staged blob really is HEAD's, since it breaks at
 HEAD's import line.
+
+## The capture reaches the Agent, and two ways it did not — 2026-08-10
+
+The section above named the producer as the next slice and called its design
+question open: where a 4 MB payload lives between the capturing window and the
+Agent window, when the persisted workspace may not hold it and a renderer copy
+does not reach a pop-out. **The question had already been answered in the
+working tree** — three untracked files (`shared/agentImageStaging.ts`,
+`main/agentImageStaging.ts`, `renderer/agentImageStagingClient.ts`) plus edits to
+`agentContextHandoff.ts`, `localAgent.ts`, `preload.ts` and `window.d.ts`,
+timestamped 21:10–21:12, after `f69c6d2` was committed. This is the second
+consecutive slice a previous hop built and left uncommitted and ungated; it is
+worth expecting a third.
+
+The answer it gives is a **fourth route**: main-process memory, keyed by
+conversation, bounded, expiring and single-use, importing no `fs`. Re-derived
+before adopting it, and it is coherent — a claim removes what it returns, a TTL
+drops what nobody comes for, and eviction is oldest-first with the conversation
+being staged into excluded so a second capture cannot evict the first. Keyed by
+conversation rather than by window is the load-bearing choice: the Agent claims
+by selecting the conversation the hand-off attached to, so no window has to be
+named or addressed.
+
+### What was actually missing
+
+The lane was a corridor with no doors at either end.
+
+- **Nothing claimed.** `takeAgentImages` had zero callers — `git grep` returns
+  only its own definition. The Agent shell had never been touched.
+- **Nothing produced.** ReadingLens's `askAgent` still handed off text alone, and
+  the screenshot it would send was only *requested* when a visual novel happened
+  to be targeted (`includeScreenshot: !!visualNovelTarget`, four sites).
+- **The one i18n key it already called did not exist.** `agentContextHandoff.ts`
+  announces `agent.handoff.error.image`; that key was in no catalog, in any
+  language, so the failure toast would have rendered its own key.
+- **No test file.** All three modules were untested.
+
+### The four decisions this slice adds
+
+- **Every lens scan keeps its screenshot.** The alternative — an "ask the Agent"
+  that carries the picture on some scans and not others, decided by whether a
+  visual novel is being captured to — is exactly the invisible inconsistency this
+  surface must not have. The screen is captured either way (`ocrRegion` crops
+  before it reads); the flag only decides whether the bounded JPEG rides back,
+  and `boundedScreenshotDataUrl` holds that under 900 KB, an eighth of the
+  per-image bound. `includeScreenshot` is gone from `LensState` entirely rather
+  than pinned to `true` at four call sites.
+- **A claim merges under the request's own bounds** — five attachments, two
+  images (`mergeStagedImageAttachments`). A claim that built a composer state
+  `normalizeAgentExecutionRequest` would refuse is a dead Send button with no
+  explanation, and the user did not choose the moment: the capture simply
+  arrived.
+- **What does not fit is counted, not dropped.** Staging is single-use, so a
+  capture the composer had no room for is *gone*, not pending. The shell says so
+  through the existing `too-many-images` banner.
+- **A re-delivered id is not a loss.** Ids already present are skipped without
+  incrementing the drop count.
+
+### Two defects the live run found, both fixed here
+
+**A forbidden field was accepted.** `normalizeAgentImageStageRequest` read only
+the fields it knew about, so a stage request carrying `bytes: [1,2,3]` answered
+`{ok: true, sizeBytes: 70}` — measured live, not reasoned about. Nothing untyped
+could reach the attachment (the normalizer rebuilds a clean object), but the
+vision lane's whole claim is that `FORBIDDEN_ATTACHMENT_FIELDS` was *extended,
+not weakened*, and staging is a **second door into the attachment world** that
+never consulted it. A boundary enforced at one of two doors is not a boundary.
+`hasForbiddenAttachmentField` is now exported from `agentExecutionBridge.ts` and
+both normalizers call it; the execution one is unchanged in behaviour.
+
+**The announcement arrived before the thing it announced.** The claim was first
+wired to `agentWorkspace:changed`, which looked right — it is the one signal that
+fires for every hand-off. It is also the *wrong* one: `attachAgentContextFromSurface`
+saves the context first, because the conversation id is what the save decides,
+and stages the capture second. So the push reaches an Agent that is **already
+open** before the image exists, it claims nothing, and the capture waits in main
+until its TTL. A newly created pop-out happened to win the race, which is the
+worst shape of defect — it would have worked in the demo and failed in use.
+
+The repair is a third channel, `agentImageStaging:staged`, broadcast by main
+after an accepted stage and carrying **the conversation id and nothing else** —
+the picture stays in main until a window claims it, so the announcement can never
+be the thing that copies a screenshot into a renderer that was not asking. The id
+is re-normalized before it is announced, because the store keyed on the bounded
+form and announcing the raw one would name a conversation no claim can match. The
+workspace push is now deliberately *not* wired to the claim, so an ordinary
+message costs no IPC round trip.
+
+### Live acceptance
+
+Driven through the bridge on a fresh boot, because `registerAgentImageStagingIpc`
+is a new call inside `registerLocalAgentIpc()` and main does not reload with the
+renderer. Both halves were driven: the main contract, and the shell.
+
+| probe | result |
+| --- | --- |
+| well-formed 1×1 PNG | `{ok: true, sizeBytes: 70}` |
+| `imageBase64: 'not base64!!'` | `invalid-request` |
+| `mimeType: 'image/gif'` | `invalid-request` |
+| 4.2 MB payload | `invalid-request` |
+| `data:image/png;base64,…` prefix | `invalid-request` |
+| extra `bytes` / `localPath` / `buffer` | `invalid-request` (was `ok` before the fix) |
+| third capture for one conversation | `too-many` |
+| `take` | 2 images, 70 bytes each |
+| `take` again | `{ok: true, images: []}` — single-use |
+
+The renderer half twice, and the second time is the one that matters:
+
+1. A capture staged for the live active conversation, then the main window
+   **reloaded** — main memory survives a renderer reload, so this is the
+   "window opens the conversation" path. The shell mounted, claimed, and rendered
+   the chip `probe-capture.jpg 70 байт` with the translated vision refusal
+   `Выбранная модель не умеет читать изображения…`, because this profile's target
+   is `local`. Screenshot: `debug/shots/win1-1786392372321.png`.
+2. After the broadcast fix, a capture staged into the **already-open** Agent with
+   no reload at all produced `lens-capture.jpg 70 байт` within 400 ms — the exact
+   case that silently did nothing before. Screenshot:
+   `debug/shots/win1-1786392836872.png`.
+
+Both chips were removed through their own control afterwards, leaving zero chips
+and zero alerts (which is also what rules out an ambient alert), `take` on that
+conversation returned empty, and every probe global was deleted and re-read as
+absent. **No workspace write was made at any point** — staging is memory-only, a
+claim is session-only React state, and a reload persists nothing. `/logs` shows
+seven entries, all ordinary startup, no errors.
+
+Separately, `window.api.lensOcr({…, includeScreenshot: true})` was invoked live on
+a 320×120 region: it returns `data:image/jpeg;base64,…`, 4,367 characters, which
+is one of the three formats `splitImageDataUrl` accepts. That is the producer's
+material proved real rather than assumed.
+
+### What was deliberately not verified
+
+**The lens gesture was not driven end to end.** Opening the overlay, dragging a
+region and clicking "Ask the Agent" would create a real conversation in the
+user's workspace, and the value of doing so over what is already proven — the
+lens returns an accepted image, the hand-off stages it against the id the save
+decided, main accepts it, the shell claims it — is a click, not a fact.
+
+### Gates
+
+`npx vitest run`: 504 passed / 1 skipped of 505 files, 6,851 passed / 6 skipped
+of 6,857 (up 32 from `f69c6d2`'s 6,819). `node tools/i18n-check.cjs`: clean, all
+9,247 English keys translated in ja/zh/ru. `node tools/architecture-audit.cjs`:
+nothing new, the same 3 known pending findings. `npx eslint` on the seventeen
+touched paths: **0 errors** in them. The two errors it reports are in
+`renderer/window.d.ts` and belong to the nyaa-subtitles track — the duplicate
+non-adjacent `subtitleHarvestList`/`subtitleHarvestFetch` declarations are
+present at HEAD (lines 649 and 1382) and are not this slice's. `tsc --noEmit` is
+not a gate here; by file+message set difference, 392 pre-existing errors and 0 in
+any file this slice touches.
+
+### The branch's own `preload.ts` has not parsed for five commits
+
+Found while testing this commit in a detached worktree, which is the only place
+it could have been found: the working tree has the fix uncommitted, so the dev
+app runs and every gate passes.
+
+`src/preload.ts` fails to parse at `f69c6d2`, `b91c3e4`, `225486e`, `e906ab8`
+and `2ba92d6` — every recent commit — with the same error at the same line. The
+cause is not a missing body. The eight `agentExecutionLease*` entries were
+spliced **between `onAgentOperationalChanged`'s signature and its body**, so the
+signature is followed by `agentExecutionLeaseAcquire`, the stranded body turns up
+after `agentExecutionLease:recover`, and the object literal stops parsing at
+`onAgentOperationalChanged:`. This is the concrete shape of the defect the
+ledger's "The branch does not build from its own HEAD" section named.
+
+Repaired here, in four moved lines, because this commit touches `preload.ts` and
+would otherwise carry the breakage forward a sixth time. The body is verbatim
+from the working tree where it already exists uncommitted, and it is the body of
+a function whose signature is already committed — a repair of the file, not an
+adoption of another track's work in progress. Nothing else in `preload.ts` was
+changed. The staged blob now parses under esbuild; **it is the first commit on
+this branch whose `preload.ts` does.**
+
+### Still open
+
+- **The other capture surfaces.** ReadingLens is the only producer. `visualNovels.ts`
+  persists a capture screenshot via `saveCaptureScreenshot` and
+  `VisualNovelSentenceAssist` holds one; neither hands it to the Agent yet, and
+  both are now a small edit rather than a design question.
+- **`renderer/agentContextHandoff.ts` still contains a stray NUL byte**, as the
+  section above recorded. Git still classifies it as binary and still prints
+  "Binary file … matches" instead of a diff, so **every change made to it in this
+  slice was invisible to review** — including the ones that carry the capture.
+  That is now costing something, and it belongs with whoever owns that file.

@@ -2097,6 +2097,8 @@ export const ja: Catalog = {
   'agent.conversation.fromSettings': '設定: {label}',
   'agent.conversation.fromFlashcards': 'フラッシュカード: 保存した単語',
   'agent.conversation.fromStudySession': '学習セッション',
+  'agent.handoff.capture.name': '画面キャプチャ',
+  'agent.handoff.error.image': 'テキストは送信しましたが、スクリーンショットを添付できませんでした。',
   'dictionary.askAgent': 'この単語についてエージェントに質問',
   'agent.conversation.delete': '削除',
   'agent.conversation.deleteConfirm': '削除を確認',

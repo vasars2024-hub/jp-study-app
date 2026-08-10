@@ -2256,6 +2256,8 @@ export const ru: Catalog = {
   'agent.conversation.fromSettings': 'Настройки: {label}',
   'agent.conversation.fromFlashcards': 'Карточки: сохранённые слова',
   'agent.conversation.fromStudySession': 'Учебная сессия',
+  'agent.handoff.capture.name': 'Снимок экрана',
+  'agent.handoff.error.image': 'Текст отправлен, но снимок экрана не удалось прикрепить.',
   'dictionary.askAgent': 'Спросить агента об этом слове',
   'agent.conversation.delete': 'Удалить',
   'agent.conversation.deleteConfirm': 'Подтвердить удаление',

@@ -2238,6 +2238,8 @@ export const en: Catalog = {
   'agent.conversation.fromSettings': 'Settings: {label}',
   'agent.conversation.fromFlashcards': 'Flashcards: saved words',
   'agent.conversation.fromStudySession': 'Study session',
+  'agent.handoff.capture.name': 'Screen capture',
+  'agent.handoff.error.image': 'The text was sent, but the screenshot could not be attached.',
   'dictionary.askAgent': 'Ask the Agent about this word',
   'agent.conversation.delete': 'Delete',
   'agent.conversation.deleteConfirm': 'Confirm delete',

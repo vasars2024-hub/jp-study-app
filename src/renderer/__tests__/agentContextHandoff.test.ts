@@ -36,6 +36,21 @@ vi.mock('../agentWorkspaceClient', () => ({
 const blanc = vi.hoisted(() => ({ isBlanc: false }));
 vi.mock('../blancMode', () => ({ isBlancWindow: () => blanc.isBlanc }));
 
+const staging = vi.hoisted(() => ({
+  staged: [] as Array<{ conversationId: string; mimeType: string; imageBase64: string }>,
+  result: { ok: true, sizeBytes: 70 } as unknown,
+}));
+vi.mock('../agentImageStagingClient', () => ({
+  stageAgentImage: async (request: {
+    conversationId: string;
+    mimeType: string;
+    imageBase64: string;
+  }) => {
+    staging.staged.push(request);
+    return staging.result;
+  },
+}));
+
 import {
   attachAgentContextFromSurface,
   dictionaryAgentContext,
@@ -67,6 +82,8 @@ beforeEach(() => {
   workspace.saveResult = null;
   workspace.saves = [];
   blanc.isBlanc = false;
+  staging.staged = [];
+  staging.result = { ok: true, sizeBytes: 70 };
   routed = [];
   (window as unknown as { api: Record<string, unknown> }).api = {
     popOut: async (section: string) => {
@@ -121,6 +138,86 @@ describe('dictionaryAgentContext', () => {
     });
     expect(persisted.conversations[0].context.map((entry) => entry.id))
       .toEqual(['dictionary-entry:食べる']);
+  });
+});
+
+describe('a capture travelling with the gesture', () => {
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  it('stages against the conversation the context actually landed in', async () => {
+    const outcome = await attachAgentContextFromSurface(
+      readingPassageAgentContext('昨日寿司を食べました', undefined, NOW),
+      'Reading',
+      undefined,
+      { dataUrl: `data:image/jpeg;base64,${PNG}`, name: 'Screen capture' },
+    );
+    expect(outcome).toBe('attached');
+    // The id is decided by the save, not guessed beforehand — staging against a
+    // guess would leave the capture on a conversation the shell never opens.
+    const saved = workspace.saves[0] as { activeConversationId: string };
+    expect(staging.staged).toHaveLength(1);
+    expect(staging.staged[0].conversationId).toBe(saved.activeConversationId);
+    // The `data:` prefix is stripped and the format comes from the URL.
+    expect(staging.staged[0]).toMatchObject({ mimeType: 'image/jpeg', imageBase64: PNG });
+  });
+
+  it('still stages when the shelf was already correct and no save happened', async () => {
+    await attachAgentContextFromSurface(
+      readingPassageAgentContext('昨日寿司を食べました', undefined, NOW),
+      'Reading',
+    );
+    workspace.state = workspace.saves[0] as typeof workspace.state;
+    staging.staged = [];
+
+    const outcome = await attachAgentContextFromSurface(
+      readingPassageAgentContext('昨日寿司を食べました', undefined, NOW),
+      'Reading',
+      undefined,
+      { dataUrl: `data:image/png;base64,${PNG}`, name: 'Screen capture' },
+    );
+    expect(outcome).toBe('unchanged');
+    expect(staging.staged).toHaveLength(1);
+  });
+
+  it('reports a capture it could not stage instead of claiming the whole gesture landed', async () => {
+    staging.result = { ok: false, code: 'too-many' };
+    const outcome = await attachAgentContextFromSurface(
+      readingPassageAgentContext('昨日寿司を食べました', undefined, NOW),
+      'Reading',
+      undefined,
+      { dataUrl: `data:image/png;base64,${PNG}`, name: 'Screen capture' },
+    );
+    expect(outcome).toBe('image-failed');
+  });
+
+  it('refuses a format the vision lane does not take, without calling main', async () => {
+    const outcome = await attachAgentContextFromSurface(
+      readingPassageAgentContext('昨日寿司を食べました', undefined, NOW),
+      'Reading',
+      undefined,
+      { dataUrl: `data:image/gif;base64,${PNG}`, name: 'Screen capture' },
+    );
+    expect(outcome).toBe('image-failed');
+    expect(staging.staged).toEqual([]);
+  });
+
+  it('opens the Agent anyway when only the capture failed', async () => {
+    staging.result = { ok: false, code: 'bridge-unavailable' };
+    const outcome = await handOffToAgent(
+      readingPassageAgentContext('昨日寿司を食べました', undefined, NOW),
+      'Reading',
+      undefined,
+      { dataUrl: `data:image/png;base64,${PNG}`, name: 'Screen capture' },
+    );
+    // The text half really did land, so the Agent is still the right place to
+    // be — the toast is what stops the user asking about a missing screenshot.
+    expect(outcome).toBe('image-failed');
+    expect(opened()).toEqual(['agent']);
+  });
+
+  it('does not touch the staging bridge when the gesture carries no capture', async () => {
+    await handOffToAgent(dictionaryAgentContext('食べる', 'to eat', NOW), 'Dictionary');
+    expect(staging.staged).toEqual([]);
   });
 });
 

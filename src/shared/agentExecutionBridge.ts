@@ -213,6 +213,26 @@ const FORBIDDEN_ATTACHMENT_FIELDS = new Set([
   'base64',
   'buffer',
 ]);
+/**
+ * Whether an object carries any of the fields above.
+ *
+ * Exported because the vision lane gave attachments a **second** entry point:
+ * `shared/agentImageStaging.ts` accepts a capture from a renderer and turns it
+ * into an attachment later, without this normalizer ever seeing the request. A
+ * boundary enforced at one of two doors is not a boundary, and a driven probe
+ * caught exactly that — a stage request carrying `bytes` was answered `ok`
+ * because the staging normalizer only read the fields it knew about.
+ *
+ * Dropping the unknown field silently would have been the wrong repair even
+ * though nothing untyped could reach the attachment: a caller who sent it
+ * believed it meant something, and answering `ok` tells them it did.
+ */
+export function hasForbiddenAttachmentField(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const raw = value as Record<string, unknown>;
+  return [...FORBIDDEN_ATTACHMENT_FIELDS].some((field) => Object.hasOwn(raw, field));
+}
+
 /** Standard alphabet only, correctly padded, no whitespace and no `data:` prefix. */
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 
@@ -249,7 +269,7 @@ function boundedInteger(value: unknown, fallback: number, min: number, max: numb
 function normalizeExecutionAttachment(value: unknown): AgentExecutionAttachment | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
-  if ([...FORBIDDEN_ATTACHMENT_FIELDS].some((field) => Object.hasOwn(raw, field))) return null;
+  if (hasForbiddenAttachmentField(raw)) return null;
   if (raw.kind !== 'text' && raw.kind !== 'document' && raw.kind !== 'image') return null;
   const image = raw.kind === 'image';
   const id = boundedText(raw.id, ATTACHMENT_ID_MAX);

@@ -156,6 +156,16 @@ let plannerResult: unknown;
 let plannerCalls: unknown[][];
 let planQueueActionResult: unknown;
 let planQueueActionCalls: unknown[][];
+/**
+ * What main is holding for each conversation, and what it was asked for.
+ *
+ * A staged capture is single-use in main, so the stub deletes what it hands
+ * back: a test that claimed twice and got the image twice would be asserting
+ * against a store the production one does not resemble.
+ */
+let stagedImages: Map<string, unknown[]>;
+let takeCalls: string[];
+let stagedListener: ((conversationId: string) => void) | null;
 
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
@@ -380,6 +390,18 @@ function installBridge(): void {
       state: stored,
     })),
     agentExecutionCancel: record('cancelExecution', () => ({ ok: true, cancelled: true })),
+    agentImageTake: (conversationId: string) => {
+      takeCalls.push(conversationId);
+      const images = stagedImages.get(conversationId) ?? [];
+      stagedImages.delete(conversationId);
+      return Promise.resolve({ ok: true, images });
+    },
+    onAgentImageStaged: (cb: (conversationId: string) => void) => {
+      stagedListener = cb;
+      return () => {
+        stagedListener = null;
+      };
+    },
     // Main owns every navigation decision, so the stub answers from a fixture
     // the test sets rather than resolving anything itself. That is the point:
     // the shell must show what main resolved, not what the stored card says.
@@ -446,6 +468,9 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   stored = state();
   loadResult = null;
+  stagedImages = new Map();
+  takeCalls = [];
+  stagedListener = null;
   navigationReview = {
     ok: true,
     destination: { section: 'dictionary', page: 'entry/猫' },
@@ -1591,6 +1616,124 @@ describe('Agent workspace shell', () => {
     };
     expect(request.policy.allowSensitiveContext).toBe(true);
     expect(request.attachments).toEqual([]);
+  });
+
+  /**
+   * The receiving end of the capture staging area.
+   *
+   * A screenshot cannot ride the persisted workspace, so a hand-off leaves it in
+   * main keyed by the conversation its context landed in and the window that
+   * opens that conversation collects it. These assert the collection actually
+   * happens, because the lane is otherwise reachable only from the file picker
+   * and a producer with no consumer is a screenshot that silently disappears.
+   */
+  describe('claiming a staged capture', () => {
+    const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+    const capture = (id: string) => ({
+      id,
+      name: 'Screen capture',
+      mimeType: 'image/png',
+      imageBase64: PNG,
+      sizeBytes: 70,
+    });
+
+    it('attaches what main was holding for the conversation it opens', async () => {
+      stored = populated();
+      stagedImages.set('chat-1', [capture('capture-1')]);
+      await mount();
+
+      expect(takeCalls).toContain('chat-1');
+      expect(host.querySelectorAll('.agent-attachment-chip')).toHaveLength(1);
+      expect(text()).toContain('Screen capture');
+
+      await setTextarea('What does this say?');
+      // Only Gemini reads an image, so the claimed capture leaves the local
+      // target refusing to submit — the same refusal a picked image produces.
+      expect(text()).toContain('agent.attachment.visionUnsupported');
+      expect(buttonWith('agent.execute.send').disabled).toBe(true);
+
+      const provider = host.querySelector('.agent-composer select') as HTMLSelectElement;
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
+          ?.call(provider, 'gemini-2.5-flash');
+        provider.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await act(async () => {
+        (host.querySelector('.agent-attachment-consent input') as HTMLInputElement).click();
+      });
+      await click(buttonWith('agent.execute.send'));
+
+      const request = calls.find((call) => call.method === 'execute')?.args[0] as {
+        attachments: Array<Record<string, unknown>>;
+      };
+      // The payload rides in `imageBase64` and nowhere else, at the strongest
+      // floor the contract has — the same shape a picked file produces.
+      expect(request.attachments).toMatchObject([{
+        kind: 'image',
+        name: 'Screen capture',
+        mimeType: 'image/png',
+        sensitivity: 'sensitive',
+        retained: false,
+        imageBase64: PNG,
+      }]);
+    });
+
+    it('claims again for a second hand-off into the conversation already open', async () => {
+      stored = populated();
+      await mount();
+      expect(host.querySelectorAll('.agent-attachment-chip')).toHaveLength(0);
+
+      // The second hand-off does not change `activeConversationId`, so main's
+      // announcement is the only signal that a new capture is waiting.
+      stagedImages.set('chat-1', [capture('capture-2')]);
+      await act(async () => {
+        stagedListener?.('chat-1');
+      });
+
+      expect(host.querySelectorAll('.agent-attachment-chip')).toHaveLength(1);
+    });
+
+    it('does not claim on an ordinary workspace push, which arrives before the capture', async () => {
+      stored = populated();
+      await mount();
+      const beforePush = takeCalls.length;
+
+      // The hand-off saves its context first and stages the capture second, so
+      // a claim driven by the push would run against a main that has nothing —
+      // and would then never run again for this conversation.
+      await act(async () => {
+        workspaceListener?.(stored);
+      });
+      expect(takeCalls.length).toBe(beforePush);
+    });
+
+    it('keeps the files the user picked and says what the capture cost it', async () => {
+      stored = populated();
+      await mount();
+      // Four picked files leave room for one attachment of the five a request
+      // may carry, so the second capture cannot land.
+      for (const name of ['a.txt', 'b.txt', 'c.txt', 'd.txt']) {
+        await selectFile(name, '秘密のノート');
+      }
+
+      stagedImages.set('chat-1', [capture('c-1'), capture('c-2')]);
+      await act(async () => {
+        stagedListener?.('chat-1');
+      });
+
+      // Staging is single-use, so the one that did not fit is gone rather than
+      // pending — saying so is the difference between a bounded list and a lie.
+      expect(host.querySelectorAll('.agent-attachment-chip')).toHaveLength(5);
+      expect(text()).toContain('a.txt');
+      expect(text()).toContain('agent.attachment.error.too-many-images');
+    });
+
+    it('does not ask main for a capture before a conversation is selected', async () => {
+      stored = state();
+      await mount();
+      expect(takeCalls).toEqual([]);
+    });
   });
 
   it('sends the visible per-request input and output budgets to main', async () => {

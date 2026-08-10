@@ -123,6 +123,8 @@ import {
   readAgentAttachmentFiles,
   type AgentAttachmentReadFailureCode,
 } from '../../agentAttachments';
+import { mergeStagedImageAttachments } from '../../../shared/agentImageStaging';
+import { onAgentImageStaged, takeAgentImages } from '../../agentImageStagingClient';
 import {
   agentContextDisclosure,
   agentConversationSummaries,
@@ -1261,6 +1263,20 @@ export default function AgentWorkspaceShell() {
   const [maxOutputTokens, setMaxOutputTokens] = useState(AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET);
   const [attachments, setAttachments] = useState<AgentExecutionAttachment[]>([]);
   /**
+   * Bumped by main's "a capture is waiting" announcement, and the reason the
+   * claim below is not keyed on the conversation id alone.
+   *
+   * Two things would go wrong without it. A second hand-off into the *same*
+   * conversation leaves `activeConversationId` unchanged, so an effect watching
+   * only that never runs again. And the hand-off stages its capture *after* it
+   * saves the context — the conversation id is what the save decides — so the
+   * `agentWorkspace:changed` push arrives at an already-open Agent before the
+   * image exists. Both were live defects; the announcement fixes both, and it is
+   * the workspace push that is deliberately *not* wired here, so an ordinary
+   * message does not cost an IPC round trip.
+   */
+  const [claimTicket, setClaimTicket] = useState(0);
+  /**
    * A view preference for this window only. The inspector disclosure never
    * enters the main-owned workspace document, so another window and the next
    * launch are not made to inherit a momentary layout choice.
@@ -1394,6 +1410,19 @@ export default function AgentWorkspaceShell() {
     setFailure(null);
   }), []);
 
+  /**
+   * Main's announcement that a capture is waiting.
+   *
+   * The conversation it names is deliberately ignored: the claim below is scoped
+   * to whatever this window has open, and a capture staged for a conversation
+   * this window is not showing is collected when the user switches to it. Acting
+   * on the id here would mean trusting it to match a `activeConversationId` this
+   * window may not have applied yet.
+   */
+  useEffect(() => onAgentImageStaged(() => {
+    setClaimTicket((current) => current + 1);
+  }), []);
+
   /** Every mutation goes through here, so no two writes can overlap. */
   const run = useCallback(async (operation: () => Promise<AgentWorkspaceResult>) => {
     setBusy(true);
@@ -1446,6 +1475,57 @@ export default function AgentWorkspaceShell() {
   useEffect(() => {
     setCloudSensitiveConsent(false);
   }, [sensitiveContextKey]);
+
+  /**
+   * The composer's own attachments, readable from an effect that must not re-run
+   * when they change.
+   *
+   * The claim below needs to know what is already attached in order to merge,
+   * but putting `attachments` in its dependency array would make every pick and
+   * every removal fire another claim. Declared before that effect so it is
+   * already current when the claim reads it: effects in one commit run in
+   * declaration order.
+   */
+  const attachmentsRef = useRef<AgentExecutionAttachment[]>(attachments);
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  /**
+   * Claims whatever capture a hand-off staged for this conversation.
+   *
+   * This is the receiving end of `shared/agentImageStaging.ts`: a surface that
+   * captured a screenshot cannot hand the payload over through the persisted
+   * workspace, so it leaves it in main keyed by the conversation its context
+   * landed in, and the window that opens that conversation collects it here.
+   *
+   * The claim is **single-use in main**, which decides the error handling. Once
+   * `take` has answered, the capture exists nowhere else; a claim this window
+   * cannot fit is gone rather than waiting for the next attempt, so the merge
+   * reports what it had to leave out instead of quietly shortening the list.
+   *
+   * Runs on every workspace push as well as on a conversation switch, and the
+   * overwhelmingly common answer is an empty list — `take` is a map lookup, and
+   * paying for it on each push is what makes a second hand-off into an
+   * already-open conversation work at all.
+   */
+  useEffect(() => {
+    if (!activeId) return undefined;
+    let alive = true;
+    void (async () => {
+      const claimed = await takeAgentImages(activeId);
+      if (!alive || !claimed.ok || claimed.images.length === 0) return;
+      const merged = mergeStagedImageAttachments(attachmentsRef.current, claimed.images);
+      setAttachments(merged.attachments);
+      // A capture is `sensitive`, so an arriving one invalidates a consent the
+      // user gave for the material that was on the shelf before it.
+      setCloudSensitiveConsent(false);
+      setAttachmentFailure(merged.dropped > 0 ? { code: 'too-many-images' } : null);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [activeId, claimTicket]);
 
   const selectAttachments = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;

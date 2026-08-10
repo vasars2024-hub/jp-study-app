@@ -164,22 +164,30 @@ Still required before the Track 3 acceptance can be called complete:
   away"). ReadingLens, Settings and Flashcards all hand off now, the last through
   `FlashcardDeckOverview` with the word list bounded at 40 before it leaves.
   The review session hands off too, from `FlashcardReviewMode`'s done state.
-  **Screenshot/OCR attachment context — half done.** The *lane* now exists and
-  is committed: `AgentExecutionAttachment` takes `kind: 'image'` carrying
-  `imageBase64`, bounded at 4 MiB decoded and two images per request, restricted
-  to png/jpeg/webp, and deliverable only to `gemini-2.5-flash` — both DeepSeek
+  **Screenshot/OCR attachment context — done.** The *lane* was committed first:
+  `AgentExecutionAttachment` takes `kind: 'image'` carrying `imageBase64`,
+  bounded at 4 MiB decoded and two images per request, restricted to
+  png/jpeg/webp, and deliverable only to `gemini-2.5-flash` — both DeepSeek
   models and the local backend refuse with `vision-unsupported` rather than
   dropping the image (2026-08-10 — see the ledger's "The vision lane, finished
   and driven live", which records the four decisions and the seven live
   normalizer probes). `FORBIDDEN_ATTACHMENT_FIELDS` was extended, not weakened.
-  **Still required**: a *producer*. The lane is reachable only from the file
-  picker; ReadingLens's `askAgent` hands off text alone and `handOffToAgent`
-  still carries no attachments. The open design question is where a multi-megabyte
-  payload lives between the capturing window and the Agent window, since
-  attachments are session-only React state and the hand-off route is the
-  persisted workspace store, which an image payload may not enter. The material
-  is ready — ReadingLens holds `screenshotDataUrl` in its `reading` state and
-  `visualNovels.ts:985` already persists one via `saveCaptureScreenshot`;
+  The **producer and the transport** followed the same day. The design question —
+  where a multi-megabyte payload lives between the capturing window and the Agent
+  window, when the persisted workspace may not hold it and a renderer copy does
+  not reach a pop-out — is answered by a fourth route: main-process memory keyed
+  by conversation, bounded, expiring and **single-use**, touching no `fs`
+  (`shared/agentImageStaging.ts`). ReadingLens now sends its capture with every
+  "ask the Agent", and every lens scan keeps its screenshot rather than only a
+  visual-novel one. Two defects were found by driving it and fixed here: a stage
+  request carrying `bytes` was accepted (staging was a second door into the
+  attachment world that never consulted the forbidden set), and the claim was
+  wired to the workspace push, which the hand-off's own ordering guarantees
+  arrives *before* the capture is staged — so an already-open Agent claimed
+  nothing. See the ledger's "The capture reaches the Agent, and two ways it did
+  not". **Still open, and now a small edit rather than a design question**: the
+  visual-novel surfaces produce nothing yet, though `visualNovels.ts:985` already
+  persists a capture screenshot via `saveCaptureScreenshot`;
 - **done.** All fourteen adapters are installed — five `visual-novel`, three
   `media`, six `anime` (`renderer/visualNovelAgentHandlers.ts`,
   `mediaAgentHandlers.ts`, `animeAgentHandlers.ts`, 2026-08-10; see the ledger's

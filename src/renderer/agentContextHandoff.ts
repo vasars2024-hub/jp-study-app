@@ -18,7 +18,9 @@
 import { createAgentContextItem, type AgentContextInput } from '../shared/agentContext';
 import type { AgentContextItem, AgentWorkspaceState } from '../shared/agentWorkspace';
 import type { DesktopWinSection } from '../shared/desktop';
+import { splitImageDataUrl } from '../shared/agentImageStaging';
 import { agentWorkspaceWithContextAttached } from './agentShellModel';
+import { stageAgentImage } from './agentImageStagingClient';
 import { loadAgentWorkspace, updateAgentWorkspace } from './agentWorkspaceClient';
 import { t } from './i18n';
 
@@ -28,7 +30,24 @@ export type AgentHandoffOutcome =
   | 'invalid-context'
   | 'bridge-unavailable'
   | 'save-failed'
-  | 'open-failed';
+  | 'open-failed'
+  | 'image-failed';
+
+/**
+ * A capture travelling with the gesture, as the surface already holds it.
+ *
+ * A `data:` URL rather than the split form the staging contract carries, because
+ * that is the shape every capture surface has — `screenOcr.ts` returns one and
+ * `shared/readingLens.ts` validates one — and `splitImageDataUrl` is the single
+ * place that converts. A caller that has to take the URL apart itself is a
+ * caller that can get the `mimeType` wrong.
+ */
+export interface AgentHandoffImage {
+  /** `data:image/(png|jpeg|webp);base64,…` — any other format is refused. */
+  dataUrl: string;
+  /** Shown as the attachment chip's label; the caller supplies it translated. */
+  name: string;
+}
 
 /**
  * Nothing here announces the change any more.
@@ -104,6 +123,7 @@ export async function attachAgentContextFromSurface(
   input: AgentContextInput,
   conversationTitle: string,
   place?: AgentContextInput,
+  image?: AgentHandoffImage,
 ): Promise<AgentHandoffOutcome> {
   const item = createAgentContextItem(input);
   if (!item) return 'invalid-context';
@@ -119,13 +139,49 @@ export async function attachAgentContextFromSurface(
   const next = withEveryContextAttached(loaded.state, items, newConversation, input.now);
   // Already the front item of the active conversation: the shelf is correct, so
   // the save is skipped and the caller still opens the Agent.
-  if (!next) return 'unchanged';
+  if (!next) {
+    return stageHandoffImage(loaded.state.activeConversationId, image, 'unchanged');
+  }
 
   const saved = await updateAgentWorkspace(
     loaded.state,
     (current) => withEveryContextAttached(current, items, newConversation, input.now),
   );
-  return saved.ok ? 'attached' : 'save-failed';
+  if (!saved.ok) return 'save-failed';
+  return stageHandoffImage(saved.state.activeConversationId, image, 'attached');
+}
+
+/**
+ * Stages the gesture's capture against the conversation its context just landed
+ * in, and says so if it could not.
+ *
+ * Runs **after** the context save rather than before it, because the
+ * conversation id is what the save decides: `agentWorkspaceWithContextAttached`
+ * either targets the active conversation or creates one, and both paths set
+ * `activeConversationId` to the result. Guessing the id beforehand would stage
+ * the capture against a conversation the shell never opens.
+ *
+ * A failure here is reported, never swallowed. The text half really did land, so
+ * this is not a failed hand-off — but a screenshot silently missing from a
+ * question about a screenshot is the same false success the vision lane refuses
+ * a provider for, and the caller announces it.
+ */
+async function stageHandoffImage(
+  conversationId: string | null,
+  image: AgentHandoffImage | undefined,
+  attached: 'attached' | 'unchanged',
+): Promise<AgentHandoffOutcome> {
+  if (!image) return attached;
+  if (!conversationId) return 'image-failed';
+  const split = splitImageDataUrl(image.dataUrl);
+  if (!split) return 'image-failed';
+  const staged = await stageAgentImage({
+    conversationId,
+    name: image.name,
+    mimeType: split.mimeType,
+    imageBase64: split.imageBase64,
+  });
+  return staged.ok ? attached : 'image-failed';
 }
 
 /**
@@ -157,23 +213,34 @@ function announceHandoffFailure(outcome: AgentHandoffOutcome): void {
     ? 'agent.error.bridge-unavailable'
     : outcome === 'save-failed'
       ? 'agent.error.write-failed'
-      : 'agent.execute.error.request';
+      : outcome === 'image-failed'
+        ? 'agent.handoff.error.image'
+        : 'agent.execute.error.request';
   window.dispatchEvent(new CustomEvent('os:toast', {
     detail: { message: t(key), kind: 'warn' },
   }));
 }
 
-/** The whole gesture: attach, then open. */
+/**
+ * The whole gesture: attach, then open.
+ *
+ * `image-failed` is the one outcome that announces and then **carries on**. The
+ * context did land and the Agent is still the right place to be; only the
+ * capture is missing, and the toast is what stops the user asking "what does
+ * this screenshot say" of a conversation that was never given one.
+ */
 export async function handOffToAgent(
   input: AgentContextInput,
   conversationTitle: string,
   place?: AgentContextInput,
+  image?: AgentHandoffImage,
 ): Promise<AgentHandoffOutcome> {
-  const outcome = await attachAgentContextFromSurface(input, conversationTitle, place);
-  if (outcome !== 'attached' && outcome !== 'unchanged') {
+  const outcome = await attachAgentContextFromSurface(input, conversationTitle, place, image);
+  if (outcome !== 'attached' && outcome !== 'unchanged' && outcome !== 'image-failed') {
     announceHandoffFailure(outcome);
     return outcome;
   }
+  if (outcome === 'image-failed') announceHandoffFailure(outcome);
   if (!await openAgentSurface()) {
     announceHandoffFailure('open-failed');
     return 'open-failed';
