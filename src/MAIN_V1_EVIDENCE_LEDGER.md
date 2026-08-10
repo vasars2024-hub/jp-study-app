@@ -4562,3 +4562,80 @@ Committed as `1479960`.
   without that would be a lie.
 - The five i18n modules HEAD imports but never committed are still untracked.
   Every commit on this branch is gated by set-difference because of it.
+
+## The pipeline terminal, seen at last — 2026-08-10
+
+Two sessions of evidence for this terminal were entirely by test. It has now been
+driven live through the debug bridge, in the real profile, and the result changes
+one written claim and adds one that nobody had recorded.
+
+### What was verified live
+
+- The terminal **mounts and renders**. In the Agent window (`Агент`, 1122×765) it
+  measures 282×67 collapsed and 282×196 expanded, body 248×40, with
+  `role="log"` and `aria-live="polite"` intact.
+- Its copy renders **translated** — lead line and the empty state
+  (`Шагов пока нет.`), header `Конвейер` with the idle status `Ожидание`.
+- The **whole plan path works end to end**. The local Qwen3-1.7B produced a valid
+  one-step plan from "Look up the word 食べる in the dictionary.", the queue
+  displayed `Аргументы: {"term":"食べる"}`, the step executed, and it completed
+  with a real dictionary result (食べる / たべる / "to eat").
+- A screenshot corroborates all of the above:
+  `debug/shots/win1-1786369269721.png`.
+
+### The correction: it is invisible by default
+
+`AgentPipelineTerminal` lives inside `.agent-full-inspector`, which is
+`hidden={viewMode === 'simple'}` (`AgentWorkspaceShell.tsx:2327`), and `viewMode`
+defaults to `'simple'` (`:1268`). **A user who never presses `Полный` never sees
+the terminal at all.** Nothing in the previous two sections says so; both describe
+it as though it were simply present. The first live measurement returned a 0×0
+box, which is exactly the silent pass §8 of the bridge skill warns about — a naive
+"does it render?" check scores 0×0 as fine.
+
+### The thing nobody had written down: it can only ever show writes
+
+The terminal stayed empty **after a step completed successfully**, which looked
+like a defect and is not one.
+`agentOperationDraftFromExecution` returns `null` unless the operation has an
+entry in `AGENT_OPERATION_RECORD_CONTRACTS` (`agentExecutionRecord.ts:148-151`),
+and that table holds exactly eight operations — `flashcard.create-deck`,
+`flashcard.add-cards`, `study.filter-vocabulary`, `study.undo-filter`,
+`study.create-cards`, `calendar.schedule-session`, `calendar.create-reminder`,
+`media.add-item`. **Every one of them writes.** A read-only operation has no side
+effect to verify, so it correctly produces no line.
+
+The consequence is worth stating plainly, because it is a product fact and not an
+implementation detail: **on a `read-only` profile the pipeline terminal is empty
+by construction, forever.** The profile driven here is `permission: "read-only"`,
+so no reachable operation could have populated it.
+
+### What is still unverified, and why it was not forced
+
+A populated line — `argumentSummary`, `verdict`, `destination` — remains unseen.
+Reaching one requires running an operation from that eight-item table, all of
+which write to real user data, on a machine with **no restore point** (the
+userData directory is 8.6 GB and the standing instruction is to take no backup).
+Raising the profile's permission and letting the agent create a deck or a
+calendar event to satisfy a screenshot is not a trade worth making. It is left
+open deliberately rather than quietly attempted.
+
+### Method notes
+
+The run needed the local agent enabled, which this profile had off with no model
+selected. `jp-study-local-agent-settings-v1` was captured to disk first, patched
+to `enabled: true` with the one GGUF present
+(`Qwen_Qwen3-1.7B-Q4_K_M.gguf`), and restored afterwards — **asserted
+byte-identical with `-ceq`, not by eye**. `permission` was read before the patch
+and deliberately left at `read-only`, which is what made the run safe regardless
+of what the model planned: `evaluateAgentToolAccess` refuses anything above
+read-only at parse time, so a write step could not have entered the queue.
+
+View mode, scroll position and the composer text were all restored. One artefact
+remains on purpose: the completed read-only plan is still in that conversation's
+plan list, because deleting it would mean editing the user's own conversation
+store to tidy up after a test.
+
+`click.ps1`'s hit-test refused twice, correctly, when the toggle had scrolled to
+`y = -520`. That is the guard working, not a failure — and it is the difference
+between "the control did nothing" and "the control was not under the cursor".
