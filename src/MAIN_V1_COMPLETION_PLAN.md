@@ -144,7 +144,6 @@ Completed in the current source tree:
   handshake finally enters history"). That commit is also the first time the
   delivery handshake itself entered history; it had lived only in the working
   tree.
-
 - a question asked in Russian, Japanese or Chinese now resolves. The blocker was
   the tokenizer rather than the vocabulary — it stripped every non-ASCII
   character, so such a query produced no tokens at all — and the fix reuses the
