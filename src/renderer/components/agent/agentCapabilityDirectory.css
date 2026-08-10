@@ -1,0 +1,189 @@
+.agent-capability-directory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+  min-width: 0;
+  color: var(--agent-text);
+}
+
+.agent-capability-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-sm, 8px);
+}
+
+.agent-capability-heading p,
+.agent-capability-total {
+  margin: 2px 0 0;
+  color: var(--agent-muted);
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-capability-total {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid var(--agent-line);
+  border-radius: 999px;
+  background: var(--agent-surface-2);
+}
+
+.agent-capability-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--agent-surface-2);
+}
+
+.agent-capability-filter {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm, 6px) - 2px);
+  background: transparent;
+  color: var(--agent-muted);
+  font: inherit;
+  font-size: var(--font-size-xs, 0.75rem);
+  cursor: pointer;
+}
+
+.agent-capability-filter:hover,
+.agent-capability-filter:focus-visible {
+  color: var(--agent-text);
+}
+
+.agent-capability-filter:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--agent-accent) 65%, white);
+  outline-offset: 1px;
+}
+
+.agent-capability-filter.is-selected {
+  border-color: color-mix(in srgb, var(--agent-accent) 42%, var(--agent-line));
+  background: var(--agent-accent-soft);
+  color: var(--agent-text);
+  font-weight: 600;
+}
+
+.agent-capability-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-capability-group {
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--agent-surface-2) 70%, transparent);
+}
+
+.agent-capability-group > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  color: var(--agent-muted);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 600;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.agent-capability-group > ul {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0 5px 5px;
+  list-style: none;
+}
+
+.agent-capability-group li {
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--agent-surface);
+}
+
+.agent-capability-group li.is-unavailable {
+  color: var(--agent-muted);
+}
+
+.agent-capability-operation {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-capability-operation strong {
+  min-width: 0;
+  font-size: var(--font-size-sm, 0.8125rem);
+  font-weight: 600;
+}
+
+.agent-capability-operation code {
+  overflow: hidden;
+  color: var(--agent-muted);
+  font-size: var(--font-size-2xs, 0.6875rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-capability-group dl {
+  display: grid;
+  gap: 3px;
+  margin: 7px 0 0;
+}
+
+.agent-capability-group dl > div {
+  display: grid;
+  grid-template-columns: minmax(76px, 0.35fr) minmax(0, 1fr);
+  gap: 7px;
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-capability-group dt {
+  color: var(--agent-muted);
+}
+
+.agent-capability-group dd {
+  margin: 0;
+}
+
+.agent-capability-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.agent-capability-status > span {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--agent-muted);
+}
+
+.is-available .agent-capability-status > span {
+  background: color-mix(in srgb, #56c98f 70%, var(--agent-text));
+}
+
+.is-unavailable .agent-capability-status > span {
+  background: color-mix(in srgb, var(--agent-accent) 70%, var(--agent-muted));
+}
+
+@container (max-width: 420px) {
+  .agent-capability-heading,
+  .agent-capability-operation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .agent-capability-total {
+    align-self: flex-start;
+  }
+}
+
