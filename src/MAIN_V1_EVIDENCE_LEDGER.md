@@ -4670,3 +4670,145 @@ own field name (not one of the forbidden ones), its own explicit size bound and
 (`gemini-2.5-flash`, `deepseek-v4-flash`/`-pro`) actually accept image input —
 the local Qwen3-1.7B backend does not. Treat the forbidden-fields set as a
 boundary to extend deliberately, not a check to route around.
+
+## The vision lane, finished and driven live — 2026-08-10
+
+The slice the section above named as next was already **written** when this
+session opened it — in the working tree, uncommitted, timestamped 18:15–18:22,
+after `b91c3e4` was committed at 18:02. A previous hop built it and stopped
+before it gated anything. Its own test file was half-written: four assertions in
+`main/__tests__/agentProviderRouter.test.ts` called an `image()` fixture and an
+`IMAGE_BASE64` constant that were never added, so the suite was red
+(`ReferenceError: image is not defined`). This session wrote the fixture, gated
+the whole thing, drove it live and committed it.
+
+Re-deriving before trusting it: the lane is real and coherent, not a sketch.
+`AgentExecutionAttachment` is `kind: 'text' | 'document' | 'image'`, an image
+carries `imageBase64`, and both halves of that biconditional are enforced — a
+payload on a text attachment and an image kind without a payload are each
+rejected.
+
+### The four decisions, recorded so they are not re-litigated
+
+- **`FORBIDDEN_ATTACHMENT_FIELDS` was not weakened. It was not touched.**
+  `imageBase64` is a *new declared* field admitted only for `kind: 'image'`, and
+  it is checked for alphabet, padding and decoded size before it is accepted.
+  `localPath`, `path`, `bytes`, `contentBytes`, `data`, `base64` and `buffer`
+  are still refused on every attachment of every kind.
+- **4 MiB decoded, 2 images per request** (`AGENT_EXECUTION_IMAGE_BYTES_LIMIT`,
+  `AGENT_EXECUTION_IMAGE_LIMIT`), on top of the existing five-attachment limit.
+  The bytes bound is measured in megabytes rather than characters because that
+  is what a picture of the user's screen actually costs; the count bound is a
+  bound on how much screen one question can disclose.
+- **Three formats only** — `image/png`, `image/jpeg`, `image/webp` — declared by
+  the caller, never guessed from the bytes, because the provider is told the
+  value verbatim.
+- **Only Gemini may be sent one.** `acceptsImageInput` is now a field on
+  `AiProviderDefinition`: true for `gemini-2.5-flash`, false for both DeepSeek
+  models (their chat-completions body has nowhere to put an image), and the
+  local Qwen backend is not in the table at all. `providerAcceptsImageInput`
+  deliberately does not go through `providerById`, which falls back to Gemini
+  for an unknown id and would hand an unrecognised provider a screenshot.
+
+The privacy floor needed no decision: an attachment is already
+`sensitivity: 'sensitive', retained: false`, so an image inherits the strongest
+floor the contract has — it can never be persisted, and cloud consent is already
+required before it leaves the machine.
+
+A capability miss is a **refusal**, never a silent drop, in three independent
+places: the composer refuses to submit, `agentProviderRouter` throws
+`vision-unsupported` after the privacy decision and before assembly, and
+`runCloudAiRequest` throws it again for non-Agent callers. The local fallback is
+disabled while images are attached, so a missing credential reports itself
+instead of quietly answering from the text. The failure a drop would produce — a
+model confidently describing a screenshot it was never shown, with the
+attachment still named in the disclosure — is exactly the false success Track 3
+forbids.
+
+### Live acceptance without a single write to the user's store
+
+The main-side contract was driven for real through `window.api.agentExecutionRun`
+in the Agent pop-out, using a trick worth reusing:
+**`normalizeAgentExecutionRequest` runs before the conversation lookup, and the
+conversation lookup runs before `store.write`** (`main/agentExecutionIpc.ts:439-474`).
+Sending a probe with a conversation id that does not exist therefore separates
+the two answers exactly — `conversation-not-found` means the request normalized,
+`invalid-request` means it did not — and nothing reaches disk either way. Seven
+probes, all live:
+
+| probe | result |
+| --- | --- |
+| well-formed 1×1 PNG | `conversation-not-found` (accepted) |
+| extra `bytes` field | `invalid-request` |
+| `imageBase64: 'not base64!!'` | `invalid-request` |
+| 4.2 MB payload | `invalid-request` |
+| `mimeType: 'image/gif'` | `invalid-request` |
+| three images | `invalid-request` |
+| `imageBase64` on a `text` attachment | `invalid-request` |
+
+The renderer half was driven the same way. The file picker's `accept` now leads
+with the three image types; a PNG injected into the composer's own file input
+produced the chip `probe-capture.png 70 байт` — the size shown is the *decoded*
+length via the same `decodedBase64Bytes` main uses, which is why the composer's
+number can never disagree with what ships — and, against this profile's `local`
+target, the translated refusal `Выбранная модель не умеет читать изображения…`
+rendered at 540×39 with `role="alert"` while Send stayed disabled. Removing the
+chip through its own control cleared the banner, which is what rules out an
+ambient alert. Screenshot: `debug/shots/win2-1786384589041.png`. Scroll position,
+the file input and both probe globals were restored and re-read afterwards.
+
+### What was deliberately not verified
+
+**No image has ever been sent to Gemini.** Doing so needs a live API key and puts
+a picture of the user's screen on someone else's server; it is not a thing to do
+to satisfy a ledger entry. The accept path rests on tests instead: the router
+asserts the bytes ride as `request.images` and that `IMAGE_BASE64` does **not**
+appear in the prompt, and `providerRuntime` places `inlineData` parts **before**
+the text part, because Gemini reads parts in order and "what does this screenshot
+show" asked before the screenshot is a question about nothing. The session cache
+digests image payloads into its key rather than embedding them — omitting them
+would serve the second "what is in this screenshot" the first one's answer.
+
+### Still open, and it is the next slice
+
+**Nothing produces an image attachment from a capture yet.** The lane is
+reachable only from the file picker. ReadingLens's `askAgent`
+(`components/lens/ReadingLensOverlay.tsx:431-438`) still hands off text alone,
+and `handOffToAgent` still carries no attachments at all. That is not a small
+edit: attachments are session-only React state inside `AgentWorkspaceShell`,
+while a hand-off travels through the *persisted* workspace store, which the
+contract forbids an image payload from entering. Wiring a capture across that
+boundary is a design question — where a 4 MB payload lives between two windows
+when neither the store nor disk may hold it — and it should be answered
+deliberately rather than by widening the store.
+
+Unrelated, found while reading: `renderer/agentContextHandoff.ts` contains a
+stray NUL byte, and has since before this branch (`git show HEAD:` has it too).
+Git classifies the file as binary, so `git diff` prints "Binary file … matches"
+and every change to it is invisible to review. Not fixed here — it is not this
+slice, and it belongs with whoever owns that file.
+
+### Gates
+
+`npx vitest run`: 503 passed / 1 skipped of 504 files, 6,819 passed / 6 skipped
+of 6,825 tests, 0 failures — the four the half-written fixture was breaking are
+the delta. `node tools/i18n-check.cjs` exit 0, all 9,245 English
+keys translated in ja/zh/ru. `node tools/architecture-audit.cjs` exit 0, nothing
+new. `npx eslint` clean over the ten touched paths. `tsc --noEmit` is not a gate
+here and was not run.
+
+Committed path-scoped. The four catalogs carry 600+ lines of other tracks' work
+in the working tree, so they were staged by the blob-splice recipe — HEAD's blob
+plus exactly the three new keys, verified by `git diff --cached` showing `3 +++`
+per language and by parsing each staged blob back out of the index with esbuild.
+
+The committed tree was then run in a detached probe worktree, which is the only
+way to test what the commit actually contains rather than what the dirty tree
+does. The three suites this slice touches pass there — 40 assertions, 0 failures.
+`shared/__tests__/i18n.test.ts` fails to collect, and does so for the branch
+defect already recorded two sections above: `catalogs/en.ts` imports
+`../gameArena/en`, `../mooncapLore/en`, `../miningUi/en` and two more that have
+never been committed (`git ls-files` returns nothing for those directories, and
+`b91c3e4`'s own `en.ts` carries the same imports). That failure is therefore
+also a *confirmation* — the staged blob really is HEAD's, since it breaks at
+HEAD's import line.

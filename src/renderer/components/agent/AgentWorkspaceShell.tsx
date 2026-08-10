@@ -19,7 +19,7 @@ import {
   type AgentWorkspaceMode,
   type AgentWorkspaceState,
 } from '../../../shared/agentWorkspace';
-import type { AiProviderId } from '../../../shared/aiProviders';
+import { providerAcceptsImageInput, type AiProviderId } from '../../../shared/aiProviders';
 import {
   AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
   AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
@@ -187,6 +187,9 @@ function executionErrorKey(code: AgentExecutionFailureCode): string {
   if (code === 'missing-credential') return 'agent.execute.error.credential';
   if (code === 'authentication') return 'agent.execute.error.authentication';
   if (code === 'bridge-unavailable') return 'agent.execute.error.bridge';
+  // Deliberately not folded into `privacy`: this is a capability of the chosen
+  // model, and the fix is to switch target rather than to grant consent.
+  if (code === 'vision-unsupported') return 'agent.attachment.visionUnsupported';
   if (
     code === 'cloud-disabled'
     || code === 'sensitive-context'
@@ -1428,6 +1431,12 @@ export default function AgentWorkspaceShell() {
   ) ?? false;
   const sensitiveConsentRequired = target !== 'local'
     && (attachments.length > 0 || hasSensitiveContext);
+  // Main refuses this combination with `vision-unsupported` rather than
+  // answering from the prompt alone. Saying so here, and refusing to submit,
+  // turns a failed round trip into a visible reason and a target the user can
+  // change — `providerAcceptsImageInput` is false for `'local'` too.
+  const visionUnsupported = attachments.some((attachment) => attachment.kind === 'image')
+    && !providerAcceptsImageInput(target);
   const knownInputChars = agentKnownInputChars(draft, attachments);
   const knownInputOverBudget = knownInputChars > maxInputChars;
   const planObjectiveTooLong = draft.trim().length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT;
@@ -1470,6 +1479,7 @@ export default function AgentWorkspaceShell() {
       || executing
       || attachmentReading
       || knownInputOverBudget
+      || visionUnsupported
       || (sensitiveConsentRequired && !cloudSensitiveConsent)
     ) return;
     const requestId = newExecutionId();
@@ -2174,6 +2184,12 @@ export default function AgentWorkspaceShell() {
                   </p>
                 ) : null}
 
+                {visionUnsupported ? (
+                  <p className="agent-message-error" role="alert">
+                    {t('agent.attachment.visionUnsupported')}
+                  </p>
+                ) : null}
+
                 {sensitiveConsentRequired ? (
                   <label className="agent-check agent-attachment-consent">
                     <input
@@ -2271,6 +2287,7 @@ export default function AgentWorkspaceShell() {
                           || attachmentReading
                           || draft.trim().length === 0
                           || knownInputOverBudget
+                          || visionUnsupported
                           || (sensitiveConsentRequired && !cloudSensitiveConsent)
                         }
                       >

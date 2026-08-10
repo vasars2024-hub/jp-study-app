@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { AiProviderId, AiProviderKeyBucket } from '../shared/aiProviders';
-import { providerKeyBucket } from '../shared/aiProviders';
+import { providerAcceptsImageInput, providerKeyBucket } from '../shared/aiProviders';
 import type { AgentProviderPolicy } from '../shared/agentWorkspace';
 import { readAiProviderSecret } from './credentials/ai';
 
@@ -27,6 +27,7 @@ export type AiProviderErrorCode =
   | 'rate-limit'
   | 'upstream'
   | 'network'
+  | 'vision-unsupported'
   | 'invalid-response';
 
 export class AiProviderRuntimeError extends Error {
@@ -53,10 +54,22 @@ export interface AiProviderUsage {
   estimatedCostUsd?: number;
 }
 
+/** One image part on a provider request. `base64` is raw, with no `data:` prefix. */
+export interface AiProviderImageInput {
+  mimeType: string;
+  base64: string;
+}
+
 export interface AiProviderRequest {
   providerId: AiProviderId;
   apiKey?: string;
   prompt: string;
+  /**
+   * Image parts to send alongside the prompt. Only providers whose definition
+   * sets `acceptsImageInput` may be given these; `runCloudAiRequest` refuses the
+   * rest rather than dropping the images and answering from the text alone.
+   */
+  images?: readonly AiProviderImageInput[];
   systemPrompt?: string;
   responseSchema?: unknown;
   responseMimeType?: 'application/json' | 'text/plain';
@@ -192,6 +205,15 @@ function cacheKey(request: AiProviderRequest, model: string, maxOutputTokens: nu
     responseMimeType: request.responseMimeType ?? 'text/plain',
     temperature: request.temperature ?? null,
     maxOutputTokens,
+    // Digested rather than embedded: the payloads are megabytes, and
+    // JSON.stringify would materialise a second copy of every one of them just
+    // to compute a key. Omitting them entirely would be the real bug — two
+    // "what is in this screenshot" requests share a prompt, and the second would
+    // be served the first one's answer out of the session cache.
+    images: (request.images ?? []).map((image) => ({
+      mimeType: image.mimeType,
+      digest: crypto.createHash('sha256').update(image.base64).digest('hex'),
+    })),
   })).digest('hex');
 }
 
@@ -442,7 +464,17 @@ function requestBody(request: AiProviderRequest, model: string, maxOutputTokens:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...(request.systemPrompt ? { systemInstruction: { parts: [{ text: request.systemPrompt }] } } : {}),
-          contents: [{ parts: [{ text: request.prompt }] }],
+          contents: [{
+            parts: [
+              // Images lead. Gemini reads parts in order, and a prompt that says
+              // "what does this screenshot show" placed BEFORE the screenshot is
+              // a question about nothing yet.
+              ...(request.images ?? []).map((image) => ({
+                inlineData: { mimeType: image.mimeType, data: image.base64 },
+              })),
+              { text: request.prompt },
+            ],
+          }],
           generationConfig,
         }),
       },
@@ -563,6 +595,16 @@ export async function runCloudAiRequest(request: AiProviderRequest): Promise<AiP
   const inputChars = request.prompt.length + (request.systemPrompt?.length ?? 0);
   if (request.maxInputChars !== undefined && inputChars > Math.max(0, request.maxInputChars)) {
     throw new AiProviderRuntimeError('AI request exceeds the configured input budget.', 'input-budget');
+  }
+  // Refused, never silently dropped. This runtime is reachable from callers
+  // other than the Agent router, so the capability check lives here as well as
+  // there — sending a screenshot's worth of question to a text-only model and
+  // returning its confident answer is the failure mode being prevented.
+  if ((request.images?.length ?? 0) > 0 && !providerAcceptsImageInput(request.providerId)) {
+    throw new AiProviderRuntimeError(
+      `${providerModel(request.providerId)} does not accept image input.`,
+      'vision-unsupported',
+    );
   }
   const maxOutputTokens = boundedInteger(request.maxOutputTokens, 2048, 1, 65_536);
   const preflightCost = estimateAiProviderCostUsd(

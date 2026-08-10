@@ -164,19 +164,22 @@ Still required before the Track 3 acceptance can be called complete:
   away"). ReadingLens, Settings and Flashcards all hand off now, the last through
   `FlashcardDeckOverview` with the word list bounded at 40 before it leaves.
   The review session hands off too, from `FlashcardReviewMode`'s done state.
-  **Still required**: screenshot/OCR *attachment* context — and it is not a
-  producer like the others, so do not scope it as one. Measured 2026-08-10:
-  `AgentExecutionAttachment` (`shared/agentExecutionBridge.ts`) is **text-only**
-  — `kind: 'text' | 'document'` carrying `contentText: string` — so an image
-  cannot travel that lane at all. `handOffToAgent` carries no attachments in any
-  case, and the `file` context kind exists with a `sensitive` floor but nothing
-  consumes it, so a `file` item today would be a reference the model cannot read.
-  The real work is a vision-input change: extending the execution attachment
-  contract to carry image bytes, deciding which providers accept them, and
-  setting the privacy floor and size bound for an image of the user's screen.
-  The material is ready — ReadingLens holds `screenshotDataUrl` in its `reading`
-  state and `visualNovels.ts:985` already persists one via
-  `saveCaptureScreenshot`;
+  **Screenshot/OCR attachment context — half done.** The *lane* now exists and
+  is committed: `AgentExecutionAttachment` takes `kind: 'image'` carrying
+  `imageBase64`, bounded at 4 MiB decoded and two images per request, restricted
+  to png/jpeg/webp, and deliverable only to `gemini-2.5-flash` — both DeepSeek
+  models and the local backend refuse with `vision-unsupported` rather than
+  dropping the image (2026-08-10 — see the ledger's "The vision lane, finished
+  and driven live", which records the four decisions and the seven live
+  normalizer probes). `FORBIDDEN_ATTACHMENT_FIELDS` was extended, not weakened.
+  **Still required**: a *producer*. The lane is reachable only from the file
+  picker; ReadingLens's `askAgent` hands off text alone and `handOffToAgent`
+  still carries no attachments. The open design question is where a multi-megabyte
+  payload lives between the capturing window and the Agent window, since
+  attachments are session-only React state and the hand-off route is the
+  persisted workspace store, which an image payload may not enter. The material
+  is ready — ReadingLens holds `screenshotDataUrl` in its `reading` state and
+  `visualNovels.ts:985` already persists one via `saveCaptureScreenshot`;
 - **done.** All fourteen adapters are installed — five `visual-novel`, three
   `media`, six `anime` (`renderer/visualNovelAgentHandlers.ts`,
   `mediaAgentHandlers.ts`, `animeAgentHandlers.ts`, 2026-08-10; see the ledger's

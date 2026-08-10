@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT,
   AGENT_EXECUTION_ATTACHMENTS_TOTAL_CHAR_LIMIT,
+  AGENT_EXECUTION_IMAGE_BYTES_LIMIT,
   agentExecutionFailure,
   defaultAgentExecutionPolicy,
   normalizeAgentExecutionCancelResult,
@@ -114,12 +115,109 @@ describe('Agent execution bridge contract', () => {
     const valid = { id: 'a', kind: 'text', name: 'a.txt', contentText: 'a' };
     for (const attachments of [
       {},
+      // An image kind with no payload: an attachment claiming to show something
+      // it does not carry. Rejected since the vision lane opened, where before
+      // the kind itself was unknown.
       [{ ...valid, kind: 'image' }],
       [{ ...valid, contentText: '   ' }],
       [{ ...valid, localPath: 'C:\\secret.txt' }],
       [{ ...valid, bytes: [1, 2, 3] }],
       [valid, { ...valid, name: 'duplicate.txt' }],
       Array.from({ length: 6 }, (_, index) => ({ ...valid, id: `a-${index}` })),
+    ]) {
+      expect(normalizeAgentExecutionRequest({ ...base, attachments })).toBeNull();
+    }
+  });
+
+  it('normalizes an image attachment and derives its size from the payload', () => {
+    const base = {
+      requestId: 'run-vision',
+      conversationId: 'chat-1',
+      prompt: 'What does this screen say?',
+      policy: defaultAgentExecutionPolicy('gemini-2.5-flash'),
+      allowLocalFallback: false,
+    };
+    const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const imageBase64 = bytes.toString('base64');
+    expect(normalizeAgentExecutionRequest({
+      ...base,
+      attachments: [{
+        id: 'shot-1',
+        kind: 'image',
+        name: 'capture.png',
+        mimeType: 'image/png',
+        sensitivity: 'ordinary',
+        retained: true,
+        contentText: '設定',
+        imageBase64,
+      }],
+    })).toEqual({
+      ...base,
+      attachments: [{
+        id: 'shot-1',
+        kind: 'image',
+        name: 'capture.png',
+        mimeType: 'image/png',
+        // Not supplied by the caller above: computed from the payload, so the
+        // figure the composer shows and the bytes that ship cannot diverge.
+        sizeBytes: bytes.length,
+        // The privacy floor is imposed, exactly as it is for text. A screenshot
+        // of the user's screen may never arrive declaring itself ordinary.
+        sensitivity: 'sensitive',
+        retained: false,
+        contentText: '設定',
+        imageBase64,
+      }],
+    });
+  });
+
+  it('holds the vision lane to one declared field, three formats and its own bounds', () => {
+    const base = {
+      requestId: 'run-vision-reject',
+      conversationId: 'chat-1',
+      prompt: 'Read this',
+      policy: defaultAgentExecutionPolicy('gemini-2.5-flash'),
+      allowLocalFallback: false,
+    };
+    const bytes = Buffer.from([1, 2, 3]);
+    const imageBase64 = bytes.toString('base64');
+    const image = {
+      id: 'shot-1',
+      kind: 'image',
+      name: 'capture.png',
+      mimeType: 'image/png',
+      contentText: '',
+      imageBase64,
+    };
+    expect(normalizeAgentExecutionRequest({ ...base, attachments: [image] })).not.toBeNull();
+
+    const oversized = Buffer.alloc(AGENT_EXECUTION_IMAGE_BYTES_LIMIT + 1).toString('base64');
+    for (const attachments of [
+      // The payload may not ride on a text attachment: reaching the vision lane
+      // without declaring it is exactly what the forbidden-field set prevents,
+      // and a new field must not become a way around that.
+      [{ ...image, kind: 'text', contentText: 'a' }],
+      // The old forbidden names are untouched by the new lane.
+      [{ ...image, base64: imageBase64 }],
+      [{ ...image, localPath: 'C:\\Users\\shot.png' }],
+      // A `data:` URL, whitespace and a non-base64 alphabet are all rejected
+      // rather than being repaired into something plausible.
+      [{ ...image, imageBase64: `data:image/png;base64,${imageBase64}` }],
+      [{ ...image, imageBase64: `${imageBase64}\n` }],
+      [{ ...image, imageBase64: '****' }],
+      // Format must be declared and must be one of the three. Guessing it from
+      // the bytes would put an unverified claim on the wire.
+      [{ ...image, mimeType: undefined }],
+      [{ ...image, mimeType: 'image/gif' }],
+      // A stated size that disagrees with the payload.
+      [{ ...image, sizeBytes: bytes.length + 1 }],
+      [{ ...image, imageBase64: oversized }],
+      // Bounded separately from the five-attachment limit.
+      [
+        { ...image, id: 'a' },
+        { ...image, id: 'b' },
+        { ...image, id: 'c' },
+      ],
     ]) {
       expect(normalizeAgentExecutionRequest({ ...base, attachments })).toBeNull();
     }

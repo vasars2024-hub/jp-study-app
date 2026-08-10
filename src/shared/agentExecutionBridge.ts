@@ -31,6 +31,7 @@ export type AgentExecutionFailureCode =
   | 'network'
   | 'invalid-response'
   | 'provider-failed'
+  | 'vision-unsupported'
   | 'bridge-unavailable';
 
 export interface AgentExecutionRequest {
@@ -45,16 +46,34 @@ export interface AgentExecutionRequest {
 /**
  * File content exists only for the lifetime of one execution request. The
  * workspace stores the matching AgentAttachment metadata, never this payload.
+ *
+ * `image` is the vision lane. It is the ONE kind allowed to carry bytes on this
+ * channel, it carries them in `imageBase64` and nowhere else, and it is bounded
+ * separately from the character budgets because a screenshot's cost to the user
+ * is measured in megabytes, not in characters. See `FORBIDDEN_ATTACHMENT_FIELDS`
+ * for what is still refused, and `providerAcceptsImageInput` for who may receive
+ * one.
+ *
+ * `contentText` on an `image` is the OCR/description text that came with the
+ * capture, and may be empty — an image attached from the file picker has none.
+ * It is reference text ABOUT the image, never a substitute for it: a provider
+ * that cannot take the image is refused rather than being sent this instead.
  */
 export interface AgentExecutionAttachment {
   id: string;
-  kind: 'text' | 'document';
+  kind: 'text' | 'document' | 'image';
   name: string;
   mimeType?: string;
   sizeBytes?: number;
   sensitivity: 'sensitive';
   retained: false;
   contentText: string;
+  /**
+   * Raw standard-alphabet base64, no `data:` prefix and no whitespace. Present
+   * if and only if `kind` is `image`; the normalizer rejects both halves of that
+   * biconditional being broken.
+   */
+  imageBase64?: string;
 }
 
 export interface AgentExecutionChunkEvent {
@@ -136,6 +155,7 @@ const FAILURE_CODES = new Set<AgentExecutionFailureCode>([
   'network',
   'invalid-response',
   'provider-failed',
+  'vision-unsupported',
   'bridge-unavailable',
 ]);
 
@@ -144,9 +164,46 @@ const PROMPT_MAX = 20_000;
 export const AGENT_EXECUTION_ATTACHMENT_LIMIT = 5;
 export const AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT = 100_000;
 export const AGENT_EXECUTION_ATTACHMENTS_TOTAL_CHAR_LIMIT = 200_000;
+
+/**
+ * The vision bounds. Separate from the character budgets on purpose: those
+ * measure what the prompt costs in tokens, and these measure what leaves the
+ * machine as a picture of the user's screen.
+ *
+ * 4 MiB decoded is a full-resolution PNG of a 4K display with room to spare and
+ * roughly a fifth of Gemini's 20 MB inline-request ceiling, so two of them plus
+ * a large text prompt still fit in one request. Two images per request is the
+ * bound on *how much screen* one question can disclose; the existing
+ * five-attachment limit still applies on top of it.
+ */
+export const AGENT_EXECUTION_IMAGE_LIMIT = 2;
+export const AGENT_EXECUTION_IMAGE_BYTES_LIMIT = 4 * 1024 * 1024;
+/** The three formats both Electron's capture path and Gemini's inline data agree on. */
+export const AGENT_EXECUTION_IMAGE_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+] as const;
+export type AgentExecutionImageMimeType = typeof AGENT_EXECUTION_IMAGE_MIME_TYPES[number];
+
 const ATTACHMENT_ID_MAX = 240;
 const ATTACHMENT_NAME_MAX = 500;
 const ATTACHMENT_MIME_MAX = 200;
+/**
+ * Field names that may never appear on an attachment object, whatever its kind.
+ *
+ * Every one of these is a way of smuggling something the caller has not
+ * declared: a `path`/`localPath` makes the attachment a reference into the
+ * user's filesystem that main would have to resolve, and `bytes`/`data`/
+ * `base64`/`buffer`/`contentBytes` are untyped binary with no size bound, no
+ * format and no kind to check them against.
+ *
+ * The vision lane did not weaken this set — it did not touch it. `imageBase64`
+ * is a *new* declared field, admitted only for `kind: 'image'`, and it is
+ * checked for format, alphabet and decoded size before it is accepted. That is
+ * the difference between extending the boundary and going around it: a caller
+ * still cannot hand this channel bytes without saying what they are.
+ */
 const FORBIDDEN_ATTACHMENT_FIELDS = new Set([
   'localPath',
   'path',
@@ -156,6 +213,22 @@ const FORBIDDEN_ATTACHMENT_FIELDS = new Set([
   'base64',
   'buffer',
 ]);
+/** Standard alphabet only, correctly padded, no whitespace and no `data:` prefix. */
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/**
+ * Decoded byte length of a base64 string, or `null` if it is not valid base64.
+ *
+ * Computed arithmetically rather than by decoding: this runs on renderer input
+ * in main, and `Buffer.from(value, 'base64')` would happily allocate megabytes
+ * for a string that is about to be rejected, as well as silently ignoring the
+ * invalid characters that are the reason to reject it.
+ */
+export function decodedBase64Bytes(value: string): number | null {
+  if (!value || value.length % 4 !== 0 || !BASE64_PATTERN.test(value)) return null;
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
+  return (value.length / 4) * 3 - padding;
+}
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -177,14 +250,16 @@ function normalizeExecutionAttachment(value: unknown): AgentExecutionAttachment 
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
   if ([...FORBIDDEN_ATTACHMENT_FIELDS].some((field) => Object.hasOwn(raw, field))) return null;
-  if (raw.kind !== 'text' && raw.kind !== 'document') return null;
+  if (raw.kind !== 'text' && raw.kind !== 'document' && raw.kind !== 'image') return null;
+  const image = raw.kind === 'image';
   const id = boundedText(raw.id, ATTACHMENT_ID_MAX);
   const name = boundedText(raw.name, ATTACHMENT_NAME_MAX);
   if (!id || !name || typeof raw.contentText !== 'string') return null;
-  if (
-    raw.contentText.trim().length === 0
-    || raw.contentText.length > AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT
-  ) return null;
+  // A text or document attachment with nothing in it is a no-op that still costs
+  // a section in the prompt. An image's `contentText` is optional OCR text about
+  // a payload that is carried elsewhere, so empty is its normal case.
+  if (!image && raw.contentText.trim().length === 0) return null;
+  if (raw.contentText.length > AGENT_EXECUTION_ATTACHMENT_CHAR_LIMIT) return null;
   if (raw.mimeType !== undefined && typeof raw.mimeType !== 'string') return null;
   const mimeType = boundedText(raw.mimeType, ATTACHMENT_MIME_MAX);
   if (raw.mimeType !== undefined && !mimeType) return null;
@@ -196,6 +271,39 @@ function normalizeExecutionAttachment(value: unknown): AgentExecutionAttachment 
       || raw.sizeBytes < 0
     )
   ) return null;
+
+  // `imageBase64` and `kind: 'image'` imply each other. A payload on a text
+  // attachment is a caller trying to reach the vision lane without declaring it,
+  // and an image kind with no payload is an attachment claiming to show
+  // something it does not carry — the provider would answer about a picture that
+  // was never sent.
+  if (raw.imageBase64 !== undefined && !image) return null;
+  let imageBase64: string | undefined;
+  if (image) {
+    if (typeof raw.imageBase64 !== 'string') return null;
+    imageBase64 = raw.imageBase64;
+    const decodedBytes = decodedBase64Bytes(imageBase64);
+    if (decodedBytes === null || decodedBytes > AGENT_EXECUTION_IMAGE_BYTES_LIMIT) return null;
+    // The format has to be declared, because the provider is told it verbatim.
+    // Guessing it from the bytes here would put an unverified claim on the wire.
+    if (!(AGENT_EXECUTION_IMAGE_MIME_TYPES as readonly string[]).includes(mimeType)) return null;
+    // `sizeBytes` is the user-facing figure; letting it disagree with the payload
+    // would make the size shown in the composer a different number from the one
+    // actually sent.
+    if (raw.sizeBytes !== undefined && raw.sizeBytes !== decodedBytes) return null;
+    return {
+      id,
+      kind: 'image',
+      name,
+      mimeType,
+      sizeBytes: decodedBytes,
+      sensitivity: 'sensitive',
+      retained: false,
+      contentText: raw.contentText,
+      imageBase64,
+    };
+  }
+
   return {
     id,
     kind: raw.kind,
@@ -214,11 +322,16 @@ function normalizeExecutionAttachments(value: unknown): AgentExecutionAttachment
   const attachments: AgentExecutionAttachment[] = [];
   const ids = new Set<string>();
   let totalChars = 0;
+  let images = 0;
   for (const valueEntry of value) {
     const attachment = normalizeExecutionAttachment(valueEntry);
     if (!attachment || ids.has(attachment.id)) return null;
     totalChars += attachment.contentText.length;
     if (totalChars > AGENT_EXECUTION_ATTACHMENTS_TOTAL_CHAR_LIMIT) return null;
+    if (attachment.kind === 'image') {
+      images += 1;
+      if (images > AGENT_EXECUTION_IMAGE_LIMIT) return null;
+    }
     ids.add(attachment.id);
     attachments.push(attachment);
   }

@@ -73,6 +73,43 @@ function attachment(contentText = 'attached study notes'): {
   };
 }
 
+/**
+ * A real 1×1 PNG, not a placeholder string.
+ *
+ * The router does not decode it, but the shared normalizer these attachments
+ * come through in production refuses anything that is not correctly padded
+ * standard-alphabet base64 — so a fixture that could not survive that trip would
+ * be testing a request shape the app can never actually produce.
+ */
+const IMAGE_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+function image(contentText = '設定を開く'): {
+  id: string;
+  kind: 'image';
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  sensitivity: 'sensitive';
+  retained: false;
+  contentText: string;
+  imageBase64: string;
+} {
+  return {
+    id: 'shot-1',
+    kind: 'image',
+    name: 'capture.png',
+    mimeType: 'image/png',
+    // The decoded length of the payload, which is what the normalizer stores.
+    sizeBytes: Buffer.from(IMAGE_BASE64, 'base64').length,
+    sensitivity: 'sensitive',
+    retained: false,
+    // OCR text about the picture, the way a lens capture supplies it — never a
+    // substitute for the image.
+    contentText,
+    imageBase64: IMAGE_BASE64,
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -209,6 +246,99 @@ describe('Agent provider router', () => {
     expect(local).not.toHaveBeenCalled();
   });
 
+  it('sends an image as a provider part, never as base64 inside the prompt', async () => {
+    let captured: providerRuntime.AiProviderRequest | null = null;
+    vi.spyOn(providerRuntime, 'runCloudAiRequest').mockImplementation(async (request) => {
+      captured = request;
+      return {
+        text: 'cloud answer',
+        providerId: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash',
+        credentialBucket: 'gemini',
+        inputChars: request.prompt.length,
+        startedAt: 100,
+        completedAt: 110,
+        attempts: 1,
+        cached: false,
+        delivery: 'buffered',
+        usage: {},
+      };
+    });
+
+    const result = await runAgentProviderPrompt(policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+      allowSensitiveContext: true,
+    }), 'What does this screen say?', { apiKey: 'key', attachments: [image()] });
+
+    const request = captured as unknown as providerRuntime.AiProviderRequest;
+    expect(request.images).toEqual([{ mimeType: 'image/png', base64: IMAGE_BASE64 }]);
+    // The bytes belong in the image part and nowhere else. Inlining them would
+    // spend the input budget on a payload the model reads as noise and would put
+    // the same picture in the request twice.
+    expect(request.prompt).not.toContain(IMAGE_BASE64);
+    expect(request.prompt).toContain('The image itself is attached to this request.');
+    // OCR text rides along, labelled as a transcription rather than as the
+    // content, so the model can prefer what it can actually see.
+    expect(request.prompt).toContain('Text recognised in the image (OCR; may contain errors):');
+    expect(request.prompt).toContain('設定');
+    expect(result.provider.attachmentIds).toEqual(['shot-1']);
+  });
+
+  it('refuses an image for a text-only provider and for local, rather than dropping it', async () => {
+    const cloud = vi.spyOn(providerRuntime, 'runCloudAiRequest');
+    const local = vi.spyOn(translate, 'runLocalQwenPrompt');
+
+    // DeepSeek's chat-completions body has nowhere to put an image. Answering
+    // from the prompt alone would leave the model describing a screenshot it was
+    // never shown, with the attachment still listed in the disclosure.
+    await expect(runAgentProviderPrompt(policy({
+      target: { kind: 'cloud', providerId: 'deepseek-v4-flash' },
+      allowCloud: true,
+      allowSensitiveContext: true,
+    }), 'Prompt', { apiKey: 'key', attachments: [image()] }))
+      .rejects.toMatchObject({ code: 'vision-unsupported' });
+
+    await expect(runAgentProviderPrompt(policy(), 'Prompt', { attachments: [image()] }))
+      .rejects.toMatchObject({ code: 'vision-unsupported' });
+
+    expect(cloud).not.toHaveBeenCalled();
+    expect(local).not.toHaveBeenCalled();
+  });
+
+  it('will not fall back to local with an image attached', async () => {
+    vi.spyOn(providerRuntime, 'runCloudAiRequest').mockRejectedValue(
+      new providerRuntime.AiProviderRuntimeError('missing', 'missing-credential'),
+    );
+    const local = vi.spyOn(translate, 'runLocalQwenPrompt').mockResolvedValue('local answer');
+
+    // The missing credential is the honest failure. Falling back would answer
+    // the question from the text while the disclosure still named the image.
+    await expect(runAgentProviderPrompt(policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+      allowSensitiveContext: true,
+    }), 'Prompt', { allowLocalFallback: true, attachments: [image()] }))
+      .rejects.toMatchObject({ code: 'missing-credential' });
+
+    expect(local).not.toHaveBeenCalled();
+  });
+
+  it('refuses an image on undisclosed sensitive cloud context before the capability check', async () => {
+    const cloud = vi.spyOn(providerRuntime, 'runCloudAiRequest');
+
+    // `sensitive-context` is the stronger refusal and must not be masked by the
+    // capability message — an image attachment is always `sensitive`.
+    await expect(runAgentProviderPrompt(policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+      allowSensitiveContext: false,
+    }), 'Prompt', { apiKey: 'key', attachments: [image()] }))
+      .rejects.toMatchObject({ code: 'sensitive-context' });
+
+    expect(cloud).not.toHaveBeenCalled();
+  });
+
   it('includes accepted attachment metadata and content in the actual local prompt', async () => {
     let routed = '';
     vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (prompt) => {
@@ -220,7 +350,7 @@ describe('Agent provider router', () => {
       attachments: [attachment('一つの添付資料です。')],
     });
 
-    expect(routed).toContain('Attached text/document content');
+    expect(routed).toContain('Attached content');
     expect(routed).toContain('Name: notes.txt');
     expect(routed).toContain('一つの添付資料です。');
     expect(result.provider.attachmentIds).toEqual(['attachment-1']);
