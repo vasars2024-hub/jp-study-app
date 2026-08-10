@@ -166,24 +166,39 @@ describe('agent navigation allowlist', () => {
 describe('resolveAgentNavigation', () => {
   it('resolves a destination from the live route context, not from the stored effect', () => {
     const result = resolve(conversation(
-      [routeContext()],
-      navigateAction({ type: 'navigate', section: 'dictionary', page: 'entry/猫' }),
+      [routeContext({
+        source: {
+          app: 'settings',
+          route: 'appearance',
+          controlId: 'theme',
+          highlight: true,
+        },
+      })],
+      navigateAction({
+        type: 'navigate',
+        section: 'settings',
+        page: 'appearance',
+        controlId: 'theme',
+        highlight: true,
+      }),
     ));
     expect(result).toEqual({
       ok: true,
-      destination: { section: 'dictionary', page: 'entry/猫' },
+      destination: {
+        section: 'settings',
+        page: 'appearance',
+        controlId: 'theme',
+        highlight: true,
+      },
     });
   });
 
-  it('resolves when the stored effect names no page, taking the page from live context', () => {
+  it('does not add a live page that was absent from the reviewed stored effect', () => {
     const result = resolve(conversation(
       [routeContext()],
       navigateAction({ type: 'navigate', section: 'dictionary' }),
     ));
-    expect(result).toEqual({
-      ok: true,
-      destination: { section: 'dictionary', page: 'entry/猫' },
-    });
+    expect(result).toEqual({ ok: false, code: 'stale-provenance' });
   });
 
   it('fails closed when the stored page no longer matches the live route', () => {
@@ -269,21 +284,61 @@ describe('resolveAgentNavigation', () => {
       .toEqual({ ok: false, code: 'action-not-found' });
   });
 
-  it('ignores display-only hints on the effect when choosing the destination', () => {
-    const result = resolve(conversation(
+  it('fails closed on duplicate message coordinates regardless of their order', () => {
+    const base = conversation(
       [routeContext()],
+      navigateAction({ type: 'navigate', section: 'dictionary' }),
+    );
+    const first = base.messages[0];
+    const second = { ...first, text: 'A second malformed row with the same message id' };
+    const malformed: AgentConversation = { ...base, messages: [first, second] };
+
+    // Deliberately bypass normalization: callers must not regain first-match
+    // behavior if malformed or legacy state reaches the pure resolver.
+    expect(resolve(malformed)).toEqual({ ok: false, code: 'action-not-found' });
+    expect(resolve({ ...malformed, messages: [...malformed.messages].reverse() }))
+      .toEqual({ ok: false, code: 'action-not-found' });
+  });
+
+  it('fails closed when a stored control or highlight differs from live provenance', () => {
+    const result = resolve(conversation(
+      [routeContext({
+        source: {
+          app: 'settings',
+          route: 'appearance',
+          controlId: 'theme',
+          highlight: true,
+        },
+      })],
       navigateAction({
         type: 'navigate',
-        section: 'dictionary',
-        page: 'entry/猫',
-        controlId: 'settings-delete-all',
+        section: 'settings',
+        page: 'appearance',
+        controlId: 'custom-css',
         highlight: true,
       }),
     ));
-    expect(result).toEqual({
-      ok: true,
-      destination: { section: 'dictionary', page: 'entry/猫' },
-    });
+    expect(result).toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('refuses an unknown Settings page/control pair even when stored and live match', () => {
+    const source = {
+      app: 'settings',
+      route: 'appearance',
+      controlId: 'delete-everything',
+      highlight: true as const,
+    };
+    const result = resolve(conversation(
+      [routeContext({ source })],
+      navigateAction({
+        type: 'navigate',
+        section: 'settings',
+        page: 'appearance',
+        controlId: 'delete-everything',
+        highlight: true,
+      }),
+    ));
+    expect(result).toEqual({ ok: false, code: 'stale-provenance' });
   });
 });
 
@@ -342,5 +397,110 @@ describe('agentNavigationReduce', () => {
     const running = agentNavigationReduce(review(), { type: 'approve' });
     expect(agentNavigationReduce(running, { type: 'review', destination })).toEqual(running);
     expect(agentNavigationReduce(running, { type: 'refused', code: 'busy' })).toEqual(running);
+  });
+});
+
+/**
+ * The second provenance authority: a card produced from a fresh question, whose
+ * destination is re-derived from the static index instead of the context shelf.
+ *
+ * These assertions are the same shape as the route-provenance ones above on
+ * purpose — resolve, then tamper with each coordinate in turn and require a
+ * refusal — because "the stored effect is never trusted" has to hold identically
+ * on both paths or the weaker one becomes the way in.
+ */
+describe('agent navigation resolved from a fresh query', () => {
+  const languageQuery = 'where do I change the interface language?';
+  const languageEffect = {
+    type: 'navigate' as const,
+    section: 'settings',
+    page: 'appearance',
+    controlId: 'ui-language',
+    highlight: true,
+    query: languageQuery,
+  };
+
+  const indexConversation = (
+    effect: AgentResultCardAction['effect'],
+    context: AgentContextItem[] = [],
+    sourceContextIds: string[] = [],
+  ) => conversation(context, navigateAction(effect), sourceContextIds);
+
+  it('resolves a card that has no context at all', () => {
+    expect(resolve(indexConversation(languageEffect))).toEqual({
+      ok: true,
+      destination: {
+        section: 'settings',
+        page: 'appearance',
+        controlId: 'ui-language',
+        highlight: true,
+      },
+    });
+  });
+
+  it('still refuses a card with neither context nor a query', () => {
+    expect(resolve(indexConversation({
+      type: 'navigate',
+      section: 'dictionary',
+    }))).toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('refuses a stored page the index no longer answers with', () => {
+    expect(resolve(indexConversation({ ...languageEffect, page: 'memory' })))
+      .toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('refuses a stored control the index no longer answers with', () => {
+    expect(resolve(indexConversation({ ...languageEffect, controlId: 'theme' })))
+      .toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('refuses a stored section the index no longer answers with', () => {
+    expect(resolve(indexConversation({ ...languageEffect, section: 'dictionary' })))
+      .toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('refuses a dropped highlight, so a silent downgrade cannot survive review', () => {
+    const { highlight, ...withoutHighlight } = languageEffect;
+    expect(highlight).toBe(true);
+    expect(resolve(indexConversation(withoutHighlight)))
+      .toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('refuses a query the index cannot place', () => {
+    expect(resolve(indexConversation({
+      ...languageEffect,
+      query: 'what is the capital of France',
+    }))).toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('refuses a section the allowlist does not permit even with a query', () => {
+    expect(resolve(indexConversation({
+      type: 'navigate',
+      section: 'media',
+      query: 'open the media library',
+    }))).toEqual({ ok: false, code: 'unknown-section' });
+  });
+
+  /**
+   * The two authorities must not be combinable. A card carrying a query is an
+   * index card; letting it also reach for the shelf would mean a question that
+   * resolves nowhere could still open whatever route happened to be attached.
+   */
+  it('does not let a query card borrow a live route context', () => {
+    const live = routeContext();
+    expect(resolve(indexConversation(
+      { type: 'navigate', section: 'dictionary', query: 'nothing the index knows' },
+      [live],
+      [live.id],
+    ))).toEqual({ ok: false, code: 'stale-provenance' });
+  });
+
+  it('answers a bare app name with that app', () => {
+    expect(resolve(indexConversation({
+      type: 'navigate',
+      section: 'flashcards',
+      query: 'take me to flashcards',
+    }))).toEqual({ ok: true, destination: { section: 'flashcards' } });
   });
 });

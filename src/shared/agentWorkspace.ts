@@ -3,6 +3,14 @@ import type { AiProviderId } from './aiProviders';
 export const AGENT_WORKSPACE_SCHEMA_VERSION = 1 as const;
 
 export type AgentWorkspaceMode = 'ask' | 'navigate' | 'study' | 'analyze' | 'create' | 'automate';
+
+export interface AgentReusablePrompt {
+  id: string;
+  title: string;
+  text: string;
+  createdAt: number;
+  updatedAt: number;
+}
 export type AgentMessageRole = 'user' | 'assistant' | 'tool' | 'system';
 export type AgentMessageStatus = 'pending' | 'streaming' | 'complete' | 'failed' | 'cancelled';
 export type AgentSensitivity = 'ordinary' | 'personal' | 'sensitive';
@@ -20,6 +28,10 @@ export interface AgentContextSource {
   app: string;
   route?: string;
   entityId?: string;
+  /** Exact control coordinate for a guided route, when the surface exposes one. */
+  controlId?: string;
+  /** Guided controls are only actionable when the surface can visibly identify them. */
+  highlight?: true;
 }
 
 export interface AgentContextItem {
@@ -82,6 +94,13 @@ export type AgentNavigationEffect = {
   page?: string;
   controlId?: string;
   highlight?: boolean;
+  /**
+   * The question this destination was looked up from, for a card that has no
+   * route context to re-derive against. Present only on an index-resolved
+   * suggestion; `resolveAgentNavigation` re-runs the lookup on it and refuses
+   * unless the static index still answers with these exact coordinates.
+   */
+  query?: string;
 };
 
 export type AgentResultEffect =
@@ -105,6 +124,27 @@ export interface AgentResultCard {
   summary?: string;
   sourceContextIds: string[];
   actions: AgentResultCardAction[];
+}
+
+/**
+ * Whether a card's provenance is the question it stores rather than the shelf.
+ *
+ * Retention normally drops a card the moment one of its source context items
+ * goes, because a card's title and summary can repeat that item's material and
+ * would otherwise outlive it. An index-resolved navigation card has no such
+ * material: its text is the user's own prompt, already persisted verbatim as the
+ * message above it, and its destination is re-derived from a static table rather
+ * than from anything that can be removed.
+ *
+ * Deliberately all-or-nothing. A card mixing a query action with any other kind
+ * fails this and falls back to the ordinary provenance rule, so this cannot
+ * become a way to keep an unrelated derived card alive.
+ */
+export function isAgentQueryProvenancedCard(card: AgentResultCard): boolean {
+  if (card.sourceContextIds.length > 0 || card.actions.length === 0) return false;
+  return card.actions.every((action) => (
+    action.effect.type === 'navigate' && Boolean(action.effect.query)
+  ));
 }
 
 export interface AgentMessage {
@@ -144,6 +184,40 @@ export interface AgentWorkspaceState {
   revision: number;
   activeConversationId: string | null;
   conversations: AgentConversation[];
+  /**
+   * User-authored composer presets. Optional keeps schema-v1 documents and
+   * hand-built test fixtures source-compatible; normalization preserves the
+   * field whenever a producer supplies it.
+   */
+  prompts?: AgentReusablePrompt[];
+}
+
+export interface AgentCardActionCoordinate {
+  message: AgentMessage;
+  card: AgentResultCard;
+  action: AgentResultCardAction;
+}
+
+/**
+ * Finds one persisted interactive coordinate only when every id is unique in
+ * its own scope. Runtime state normally crossed the normalizer below, but the
+ * gates are public pure functions and also receive hand-built typed state from
+ * tests and future producers. A chained `find` would let array order choose
+ * which duplicate effect executes; ambiguity is therefore the same as absence.
+ */
+export function findUnambiguousAgentCardAction(
+  conversation: AgentConversation,
+  messageId: string,
+  cardId: string,
+  actionId: string,
+): AgentCardActionCoordinate | null {
+  const messages = conversation.messages.filter((entry) => entry.id === messageId);
+  if (messages.length !== 1) return null;
+  const cards = messages[0].cards.filter((entry) => entry.id === cardId);
+  if (cards.length !== 1) return null;
+  const actions = cards[0].actions.filter((entry) => entry.id === actionId);
+  if (actions.length !== 1) return null;
+  return { message: messages[0], card: cards[0], action: actions[0] };
 }
 
 export interface AgentProviderPrivacyDecision {
@@ -258,6 +332,8 @@ function normalizeContext(value: unknown): AgentContextItem | null {
       app,
       ...(text(source.route, 500) ? { route: text(source.route, 500) } : {}),
       ...(text(source.entityId, 500) ? { entityId: text(source.entityId, 500) } : {}),
+      ...(text(source.controlId, 240) ? { controlId: text(source.controlId, 240) } : {}),
+      ...(source.highlight === true ? { highlight: true as const } : {}),
     },
     sensitivity: SENSITIVITIES.has(raw.sensitivity as AgentSensitivity)
       ? raw.sensitivity as AgentSensitivity
@@ -322,6 +398,7 @@ function normalizeEffect(value: unknown): AgentResultEffect | null {
       ...(text(raw.page, 240) ? { page: text(raw.page, 240) } : {}),
       ...(text(raw.controlId, 240) ? { controlId: text(raw.controlId, 240) } : {}),
       ...(raw.highlight === true ? { highlight: true } : {}),
+      ...(text(raw.query, 400) ? { query: text(raw.query, 400) } : {}),
     };
   }
   if (raw.type === 'open-context' && text(raw.contextId, 240)) {
@@ -341,6 +418,13 @@ function normalizeEffect(value: unknown): AgentResultEffect | null {
     };
   }
   return null;
+}
+
+/** Remove every member of an ambiguous normalized-id group, not just later ones. */
+function unambiguousIdEntries<T extends { id: string }>(entries: readonly T[]): T[] {
+  const counts = new Map<string, number>();
+  for (const entry of entries) counts.set(entry.id, (counts.get(entry.id) ?? 0) + 1);
+  return entries.filter((entry) => counts.get(entry.id) === 1);
 }
 
 function normalizeCard(value: unknown): AgentResultCard | null {
@@ -371,7 +455,7 @@ function normalizeCard(value: unknown): AgentResultCard | null {
     title,
     ...(text(raw.summary, 8_000) ? { summary: text(raw.summary, 8_000) } : {}),
     sourceContextIds: stringList(raw.sourceContextIds),
-    actions,
+    actions: unambiguousIdEntries(actions),
   };
 }
 
@@ -381,6 +465,14 @@ function normalizeMessage(value: unknown, conversationId: string): AgentMessage 
   if (!id || !ROLES.has(raw.role as AgentMessageRole)) return null;
   const createdAt = timestamp(raw.createdAt);
   const provider = normalizeProviderDisclosure(raw.provider);
+  const attachments = (Array.isArray(raw.attachments) ? raw.attachments : [])
+    .map(normalizeAttachment)
+    .filter((entry): entry is AgentAttachment => entry !== null)
+    .slice(0, 50);
+  const cards = (Array.isArray(raw.cards) ? raw.cards : [])
+    .map(normalizeCard)
+    .filter((entry): entry is AgentResultCard => entry !== null)
+    .slice(0, 100);
   return {
     id,
     conversationId,
@@ -392,14 +484,8 @@ function normalizeMessage(value: unknown, conversationId: string): AgentMessage 
     createdAt,
     updatedAt: timestamp(raw.updatedAt, createdAt),
     contextIds: stringList(raw.contextIds),
-    attachments: (Array.isArray(raw.attachments) ? raw.attachments : [])
-      .map(normalizeAttachment)
-      .filter((entry): entry is AgentAttachment => entry !== null)
-      .slice(0, 50),
-    cards: (Array.isArray(raw.cards) ? raw.cards : [])
-      .map(normalizeCard)
-      .filter((entry): entry is AgentResultCard => entry !== null)
-      .slice(0, 100),
+    attachments,
+    cards: unambiguousIdEntries(cards),
     ...(provider ? { provider } : {}),
     ...(text(raw.error, 2_000) ? { error: text(raw.error, 2_000) } : {}),
   };
@@ -410,6 +496,10 @@ function normalizeConversation(value: unknown): AgentConversation | null {
   const id = text(raw.id, 240);
   if (!id) return null;
   const createdAt = timestamp(raw.createdAt);
+  const messages = (Array.isArray(raw.messages) ? raw.messages : [])
+    .map((message) => normalizeMessage(message, id))
+    .filter((entry): entry is AgentMessage => entry !== null)
+    .slice(-2_000);
   return {
     id,
     title: text(raw.title, 500) || 'Conversation',
@@ -422,10 +512,23 @@ function normalizeConversation(value: unknown): AgentConversation | null {
       .map(normalizeContext)
       .filter((entry): entry is AgentContextItem => entry !== null)
       .slice(0, 100),
-    messages: (Array.isArray(raw.messages) ? raw.messages : [])
-      .map((message) => normalizeMessage(message, id))
-      .filter((entry): entry is AgentMessage => entry !== null)
-      .slice(-2_000),
+    messages: unambiguousIdEntries(messages),
+  };
+}
+
+function normalizeReusablePrompt(value: unknown): AgentReusablePrompt | null {
+  const raw = record(value);
+  const id = text(raw.id, 240);
+  const title = text(raw.title, 120);
+  const promptText = text(raw.text, 12_000);
+  if (!id || !title || !promptText) return null;
+  const createdAt = timestamp(raw.createdAt);
+  return {
+    id,
+    title,
+    text: promptText,
+    createdAt,
+    updatedAt: timestamp(raw.updatedAt, createdAt),
   };
 }
 
@@ -447,6 +550,12 @@ export function normalizeAgentWorkspaceState(value: unknown): AgentWorkspaceStat
     .filter((entry): entry is AgentConversation => entry !== null)
     .slice(0, 500);
   const active = text(raw.activeConversationId, 240);
+  const prompts = Array.isArray(raw.prompts)
+    ? unambiguousIdEntries(raw.prompts
+      .map(normalizeReusablePrompt)
+      .filter((entry): entry is AgentReusablePrompt => entry !== null)
+      .slice(0, 100))
+    : undefined;
   return {
     version: AGENT_WORKSPACE_SCHEMA_VERSION,
     revision: typeof raw.revision === 'number' && Number.isFinite(raw.revision)
@@ -454,6 +563,7 @@ export function normalizeAgentWorkspaceState(value: unknown): AgentWorkspaceStat
       : 0,
     activeConversationId: active && conversations.some((entry) => entry.id === active) ? active : null,
     conversations,
+    ...(prompts ? { prompts } : {}),
   };
 }
 

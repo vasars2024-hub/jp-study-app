@@ -17,7 +17,8 @@ import type {
   AgentWorkspaceState,
 } from '../shared/agentWorkspace';
 import { isAgentNavigableSection } from '../shared/agentNavigation';
-import { pendingAgentStepApproval } from '../shared/agentStepApproval';
+import { resolveAgentNavigationQuery } from '../shared/agentNavigationIndex';
+import { pendingAgentStepApprovalReference } from '../shared/agentStepApproval';
 import {
   EMPTY_AGENT_TASK_QUEUE,
   type AgentTaskQueue,
@@ -109,11 +110,59 @@ function newestDisclosed(
   return newest;
 }
 
+/**
+ * The navigation card for a question that named its own destination.
+ *
+ * Nothing here is authored from provider text: the effect's coordinates come
+ * from the static index, and the card's title is the user's own prompt, already
+ * persisted verbatim as the message that produced this reply. That matters twice
+ * — it introduces no untranslated UI copy into `workspace-v1.json`, and it makes
+ * the card say what was *asked*, leaving the destination itself to be re-derived
+ * and shown at review time.
+ */
+function indexNavigationCards(
+  assistantMessageId: string,
+  prompt: string,
+): AgentResultCard[] {
+  // Resolved from the *stored* text, not the raw prompt. The two differ once a
+  // long question is truncated, and a card whose effect was derived from more
+  // words than it persisted would refuse itself at approval time.
+  const title = prompt.trim().slice(0, 120);
+  if (!title) return [];
+  const answer = resolveAgentNavigationQuery(title);
+  // `null` covers "matched nothing" and "matched two places equally well". A
+  // suggestion is offered only when the index is certain.
+  if (!answer) return [];
+  return [{
+    id: `${assistantMessageId}-navigation-index-1`,
+    kind: 'navigation',
+    title,
+    // Empty on purpose. The stored question is this card's provenance, and
+    // `resolveAgentNavigation` re-runs the lookup on it rather than reading the
+    // destination off the effect.
+    sourceContextIds: [],
+    actions: [{
+      id: `${assistantMessageId}-navigate-index-1`,
+      label: title,
+      effect: {
+        type: 'navigate',
+        section: answer.section,
+        ...(answer.page ? { page: answer.page } : {}),
+        ...(answer.controlId ? { controlId: answer.controlId } : {}),
+        ...(answer.highlight ? { highlight: true } : {}),
+        query: title,
+      },
+    }],
+  }];
+}
+
 function resultCardsForContext(
   assistantMessageId: string,
+  conversationId: string,
   context: readonly AgentContextItem[],
   providerContextIds: readonly string[],
   queue: AgentTaskQueue,
+  prompt: string,
 ): AgentResultCard[] {
   const disclosed = new Set(providerContextIds);
   // The two cards answer different questions and are chosen independently.
@@ -127,7 +176,11 @@ function resultCardsForContext(
   const material = newestDisclosed(context, disclosed, (item) => item.kind !== 'route');
   const route = newestDisclosed(context, disclosed, (item) => item.kind === 'route');
   const source = material ?? route;
-  if (!source) return [];
+  // A cold "where do I change X?" has nothing on the shelf at all. That used to
+  // end the producer here; it is now exactly the case the index card exists for.
+  // The approval card is not lost by returning early — its selector requires at
+  // least one live disclosed context id, which is the same thing `source` is.
+  if (!source) return indexNavigationCards(assistantMessageId, prompt);
   const cards: AgentResultCard[] = [];
   const sourceCard: AgentResultCard = {
     id: `${assistantMessageId}-context-1`,
@@ -171,32 +224,49 @@ function resultCardsForContext(
   // otherwise. Everything the user will read at review time — the objective, the
   // step, the operation — is re-derived from the live queue by
   // `resolveAgentStepApproval`; only the two ids are stored, for the same reason
-  // the navigation effect stores a section and not a destination. The title is
-  // the source context's own already-persisted label, so approving a step
-  // introduces no new copy of task text into `workspace-v1.json`.
-  const pending = pendingAgentStepApproval(queue);
+  // the navigation effect stores a section and not a destination. The card's
+  // provenance and title come from the task origin that intersects this reply,
+  // never from an unrelated newest context. The title is still an
+  // already-persisted context label, so approving a step introduces no new copy
+  // of task text into `workspace-v1.json`.
+  const pending = pendingAgentStepApprovalReference(queue, {
+    conversationId,
+    contextIds: context.filter((item) => disclosed.has(item.id)).map((item) => item.id),
+  });
   if (pending) {
-    cards.push({
-      id: `${assistantMessageId}-approval-1`,
-      kind: 'plan',
-      title: source.label,
-      sourceContextIds: [source.id],
-      actions: [{
-        id: `${assistantMessageId}-approve-step-1`,
-        label: source.label,
-        // A typed suggestion only. The grant is gated in the renderer behind
-        // review and explicit approval, and re-authorized against the live
-        // profile by `resolveAgentStepApproval` before anything is offered.
-        effect: { type: 'approve-step', taskId: pending.taskId, stepId: pending.stepId },
-      }],
-    });
+    // The selector only returns ids from the live context array passed above.
+    // Still fail closed if a future refactor violates that contract rather than
+    // borrowing the unrelated material/route card title.
+    const approvalSource = context.find((item) => item.id === pending.sourceContextIds[0]);
+    if (approvalSource) {
+      cards.push({
+        id: `${assistantMessageId}-approval-1`,
+        kind: 'plan',
+        title: approvalSource.label,
+        sourceContextIds: pending.sourceContextIds,
+        actions: [{
+          id: `${assistantMessageId}-approve-step-1`,
+          label: approvalSource.label,
+          // A typed suggestion only. The grant is gated in the renderer behind
+          // review and explicit approval, and re-authorized against the live
+          // profile by `resolveAgentStepApproval` before anything is offered.
+          effect: { type: 'approve-step', taskId: pending.taskId, stepId: pending.stepId },
+        }],
+      });
+    }
   }
 
   // No suggestion for a place the app cannot open. `source.app` is free-form
   // producer metadata — the media producers emit `media`, which is not a window —
   // and a card that could only ever fail its allowlist check at review time is a
   // dead control, not a suggestion.
-  if (!route || !isAgentNavigableSection(route.source.app)) return cards;
+  //
+  // Falling through to the index rather than returning bare cards is what lets
+  // "what does this word mean, and where do I turn on pitch accent?" answer both
+  // halves: the shelf names the material, the question names the place.
+  if (!route || !isAgentNavigableSection(route.source.app)) {
+    return [...cards, ...indexNavigationCards(assistantMessageId, prompt)];
+  }
   const navigationCard: AgentResultCard = {
     id: `${assistantMessageId}-navigation-1`,
     kind: 'navigation',
@@ -217,6 +287,11 @@ function resultCardsForContext(
         // pages — so a route context without a sub-page still names somewhere
         // real. The page rides along only when the producer knew one.
         ...(route.source.route ? { page: route.source.route } : {}),
+        // Exact Settings coordinates are authored from the disclosed route
+        // context, never from provider text. The resolver still requires the
+        // persisted and live values to agree before main delivers the link.
+        ...(route.source.controlId ? { controlId: route.source.controlId } : {}),
+        ...(route.source.highlight === true ? { highlight: true } : {}),
       },
     }],
   };
@@ -336,18 +411,20 @@ export function registerAgentExecutionIpc(
   const resolveStore = dependencies.resolveStore ?? getAgentWorkspaceStore;
   const runProvider = dependencies.runProvider ?? runAgentProviderPrompt;
   const now = dependencies.now ?? Date.now;
-  const resolveTaskQueue = dependencies.resolveTaskQueue
-    // A queue that cannot be read is an empty queue, not a failed reply. The
-    // approval card is an offer; losing it costs the user one button they can
-    // reach from the queue anyway, and failing the whole execution over it would
-    // trade a real answer for a missing suggestion.
-    ?? (() => {
-      try {
-        return getAgentOperationalStore().read().queue;
-      } catch {
-        return EMPTY_AGENT_TASK_QUEUE;
-      }
-    });
+  const resolveTaskQueueSource = dependencies.resolveTaskQueue
+    ?? (() => getAgentOperationalStore().read().queue);
+  // A queue that cannot be read is an empty queue, not a failed reply. The
+  // approval card is an offer; losing it costs the user one button they can
+  // reach from the queue anyway, and failing the whole execution over it would
+  // trade a real answer for a missing suggestion. Keep the catch around the
+  // injected seam too so tests and alternate stores obey the production rule.
+  const resolveTaskQueue = (): AgentTaskQueue => {
+    try {
+      return resolveTaskQueueSource();
+    } catch {
+      return EMPTY_AGENT_TASK_QUEUE;
+    }
+  };
   const active = new Map<string, {
     controller: AbortController;
     conversationId: string;
@@ -437,6 +514,12 @@ export function registerAgentExecutionIpc(
         });
         try {
           const latest = store.read();
+          const latestConversation = latest.conversations.find(
+            (entry) => entry.id === request.conversationId,
+          );
+          if (!latestConversation) {
+            return agentExecutionFailure('conversation-not-found', request.requestId, latest);
+          }
           const completed = finishExecution(
             latest,
             request.conversationId,
@@ -448,9 +531,14 @@ export function registerAgentExecutionIpc(
               provider: result.provider,
               cards: resultCardsForContext(
                 ids.assistant,
-                context,
+                request.conversationId,
+                // Context may be removed while the provider is running. Result
+                // cards and causal approval selection must use what is live at
+                // completion, not the request snapshot used for the provider.
+                latestConversation.context,
                 result.provider.contextIds,
                 resolveTaskQueue(),
+                request.prompt,
               ),
             },
           );

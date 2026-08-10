@@ -3,6 +3,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import {
   emptyAgentWorkspaceState,
+  isAgentQueryProvenancedCard,
   normalizeAgentWorkspaceState,
   type AgentConversation,
   type AgentMessage,
@@ -47,8 +48,14 @@ function retainedMessage(
     // that provenance explicit instead of relying on field-by-field redaction.
     cards: message.cards
       .filter((card) => (
-        card.sourceContextIds.length > 0
-        && card.sourceContextIds.every((id) => contextIds.has(id))
+        // The one card that carries its own provenance — see
+        // `isAgentQueryProvenancedCard`. Everything else must still name a
+        // retained source for every id it declares.
+        isAgentQueryProvenancedCard(card)
+        || (
+          card.sourceContextIds.length > 0
+          && card.sourceContextIds.every((id) => contextIds.has(id))
+        )
       ))
       .map((card) => ({
         ...card,

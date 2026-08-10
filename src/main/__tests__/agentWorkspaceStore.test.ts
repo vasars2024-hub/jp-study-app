@@ -99,6 +99,49 @@ function document() {
           summary: 'UNPROVENANCED_PRIVATE_VALUE',
           sourceContextIds: [],
           actions: [],
+        }, {
+          // The one card that keeps no context id and survives anyway: its text
+          // is the user's own question and its destination is re-derived from a
+          // static table, so there is nothing here that can outlive a source.
+          id: 'card-query',
+          kind: 'navigation',
+          title: 'where do I change the interface language?',
+          sourceContextIds: [],
+          actions: [{
+            id: 'navigate-index',
+            label: 'where do I change the interface language?',
+            effect: {
+              type: 'navigate',
+              section: 'settings',
+              page: 'appearance',
+              controlId: 'ui-language',
+              highlight: true,
+              query: 'where do I change the interface language?',
+            },
+          }],
+        }, {
+          // Same empty provenance, but one action is not a query navigation, so
+          // it falls back to the ordinary rule and is dropped.
+          id: 'card-query-mixed',
+          kind: 'navigation',
+          title: 'MIXED_UNPROVENANCED_VALUE',
+          sourceContextIds: [],
+          actions: [{
+            id: 'navigate-index-mixed',
+            label: 'Mixed',
+            effect: {
+              type: 'navigate',
+              section: 'settings',
+              page: 'appearance',
+              controlId: 'ui-language',
+              highlight: true,
+              query: 'where do I change the interface language?',
+            },
+          }, {
+            id: 'open-session-context-mixed',
+            label: 'Open',
+            effect: { type: 'open-context', contextId: 'ctx-session' },
+          }],
         }],
         provider: {
           target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
@@ -150,6 +193,118 @@ describe('main-owned Agent workspace store', () => {
     expect(store.read()).toEqual(saved);
     expect(fs.existsSync(store.filePath)).toBe(true);
     expect(fs.readdirSync(path.dirname(store.filePath))).toEqual(['workspace-v1.json']);
+  });
+
+  it('persists reusable prompts in the same main-owned document across store instances', () => {
+    const saved = store.write({
+      ...emptyAgentWorkspaceState(),
+      prompts: [{
+        id: 'prompt-1',
+        title: 'Reading helper',
+        text: 'Explain the selected passage at N3 level.',
+        createdAt: 10,
+        updatedAt: 12,
+      }],
+    });
+    expect(saved.prompts?.[0]).toMatchObject({ id: 'prompt-1', title: 'Reading helper' });
+
+    const reopened = createAgentWorkspaceStore(root, createAgentSessionContextStore());
+    expect(reopened.read().prompts).toEqual(saved.prompts);
+  });
+
+  it('writes and reads only unambiguous normalized message/card/action coordinates', () => {
+    const longId = 'x'.repeat(240);
+    const action = (id: string, label: string) => ({
+      id,
+      label,
+      effect: { type: 'navigate', section: 'dictionary' },
+    });
+    const card = (id: string, title: string, actions: ReturnType<typeof action>[]) => ({
+      id,
+      kind: 'navigation',
+      title,
+      sourceContextIds: ['ctx-keep'],
+      actions,
+    });
+    const message = (id: string, text: string, cards: ReturnType<typeof card>[]) => ({
+      id,
+      role: 'assistant',
+      status: 'complete',
+      text,
+      createdAt: 100,
+      contextIds: ['ctx-keep'],
+      attachments: [],
+      cards,
+    });
+    const input = {
+      version: 1,
+      activeConversationId: 'chat-1',
+      conversations: [{
+        id: 'chat-1',
+        title: 'Coordinate persistence',
+        createdAt: 100,
+        context: [{
+          id: 'ctx-keep',
+          kind: 'reading-passage',
+          label: 'Retained',
+          preview: '保存',
+          source: { app: 'reading' },
+          sensitivity: 'ordinary',
+          retained: true,
+          createdAt: 100,
+        }],
+        messages: [
+          message('message-collision', 'MESSAGE_COLLISION_A', []),
+          message(' message-collision ', 'MESSAGE_COLLISION_B', []),
+          message('message-unique', 'MESSAGE_UNIQUE', [
+            card('card-collision', 'CARD_COLLISION_A', []),
+            card(' card-collision ', 'CARD_COLLISION_B', []),
+            card(`${longId}A`, 'CARD_LONG_A', []),
+            card(`${longId}B`, 'CARD_LONG_B', []),
+            card('card-unique', 'CARD_UNIQUE', [
+              action('action-collision', 'ACTION_COLLISION_A'),
+              action(' action-collision ', 'ACTION_COLLISION_B'),
+              action(`${longId}A`, 'ACTION_LONG_A'),
+              action(`${longId}B`, 'ACTION_LONG_B'),
+              action('action-unique', 'ACTION_UNIQUE'),
+            ]),
+          ]),
+        ],
+      }],
+    };
+
+    const saved = store.write(input);
+    const savedMessages = saved.conversations[0].messages;
+    expect(savedMessages.map((entry) => entry.id)).toEqual(['message-unique']);
+    expect(savedMessages[0].cards.map((entry) => entry.id)).toEqual(['card-unique']);
+    expect(savedMessages[0].cards[0].actions.map((entry) => entry.id)).toEqual(['action-unique']);
+    expect(store.read()).toEqual(saved);
+
+    const raw = fs.readFileSync(store.filePath, 'utf8');
+    const diskConversation = JSON.parse(raw).conversations[0];
+    expect(diskConversation.messages.map((entry: { id: string }) => entry.id))
+      .toEqual(['message-unique']);
+    expect(diskConversation.messages[0].cards.map((entry: { id: string }) => entry.id))
+      .toEqual(['card-unique']);
+    expect(diskConversation.messages[0].cards[0].actions.map((entry: { id: string }) => entry.id))
+      .toEqual(['action-unique']);
+    for (const removedSentinel of [
+      'MESSAGE_COLLISION_A',
+      'MESSAGE_COLLISION_B',
+      'CARD_COLLISION_A',
+      'CARD_COLLISION_B',
+      'CARD_LONG_A',
+      'CARD_LONG_B',
+      'ACTION_COLLISION_A',
+      'ACTION_COLLISION_B',
+      'ACTION_LONG_A',
+      'ACTION_LONG_B',
+    ]) {
+      expect(raw).not.toContain(removedSentinel);
+    }
+    expect(raw).toContain('MESSAGE_UNIQUE');
+    expect(raw).toContain('CARD_UNIQUE');
+    expect(raw).toContain('ACTION_UNIQUE');
   });
 
   it('terminalizes an interrupted execution once when the store opens', () => {
@@ -212,10 +367,14 @@ describe('main-owned Agent workspace store', () => {
     expect(conversation.context.map((item) => item.id)).toEqual(['ctx-keep']);
     expect(message.contextIds).toEqual(['ctx-keep']);
     expect(message.attachments.map((item) => item.id)).toEqual(['file-keep']);
-    expect(message.cards.map((card) => card.id)).toEqual(['card-retained']);
+    // `card-query` keeps no context id and survives on its stored question;
+    // `card-query-mixed` has the same empty provenance but one non-query action,
+    // so it falls back to the ordinary rule and goes.
+    expect(message.cards.map((card) => card.id)).toEqual(['card-retained', 'card-query']);
     expect(message.cards[0].sourceContextIds).toEqual(['ctx-keep']);
     expect(message.cards[0].actions.map((action) => action.id))
       .toEqual(['open-retained-context']);
+    expect(JSON.stringify(persisted)).not.toContain('MIXED_UNPROVENANCED_VALUE');
     expect(message.provider).toMatchObject({
       contextIds: ['ctx-keep'],
       attachmentIds: ['file-keep'],

@@ -7,7 +7,21 @@ import {
   AGENT_EXECUTION_CHANNELS,
   defaultAgentExecutionPolicy,
 } from '../../shared/agentExecutionBridge';
-import type { AgentWorkspaceState } from '../../shared/agentWorkspace';
+import type {
+  AgentContextItem,
+  AgentResultCard,
+  AgentWorkspaceState,
+} from '../../shared/agentWorkspace';
+import type {
+  AgentTaskStatus,
+  AgentTaskStepStatus,
+} from '../../shared/localAgent';
+import type {
+  AgentQueueItem,
+  AgentQueueStatus,
+  AgentTaskOrigin,
+  AgentTaskQueue,
+} from '../../shared/localAgentTaskQueue';
 import { AiProviderRuntimeError } from '../providerRuntime';
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
@@ -115,6 +129,112 @@ function request(requestId = 'run-1', attachments?: unknown[]) {
   };
 }
 
+interface ApprovalQueueItemOptions {
+  id?: string;
+  stepId?: string;
+  queueStatus?: AgentQueueStatus;
+  taskStatus?: AgentTaskStatus;
+  stepStatus?: AgentTaskStepStatus;
+  /** `null` deliberately omits the optional field. */
+  currentStepId?: string | null;
+  createdAt?: number;
+  priority?: number;
+  /** `null` deliberately omits causal provenance. */
+  origin?: AgentTaskOrigin | null;
+}
+
+/** One structurally valid producer candidate, with only the tested seam varied. */
+function approvalQueueItem(options: ApprovalQueueItemOptions = {}): AgentQueueItem {
+  const id = options.id ?? 'task-7';
+  const stepId = options.stepId ?? 'step-2';
+  const createdAt = options.createdAt ?? 10;
+  return {
+    id,
+    task: {
+      id,
+      objective: `OBJECTIVE-SENTINEL-${id}`,
+      status: options.taskStatus ?? 'waiting-confirmation',
+      steps: [{
+        id: stepId,
+        label: `STEP-LABEL-SENTINEL-${stepId}`,
+        request: {
+          callId: `call-${stepId}`,
+          operation: 'flashcard.add-cards',
+          arguments: { cards: [{ front: 'a', back: 'b' }] },
+        },
+        status: options.stepStatus ?? 'waiting-confirmation',
+      }],
+      ...(options.currentStepId === null
+        ? {}
+        : { currentStepId: options.currentStepId ?? stepId }),
+      createdAt,
+      updatedAt: createdAt,
+    },
+    ...(options.origin === null
+      ? {}
+      : { origin: options.origin ?? { conversationId: 'chat-1', contextIds: ['ctx-word'] } }),
+    priority: options.priority ?? 0,
+    status: options.queueStatus ?? 'running',
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+function approvalQueue(...items: AgentQueueItem[]): AgentTaskQueue {
+  return { version: 1, items };
+}
+
+/** Runs the real main producer with one disclosed source and an injected queue. */
+async function produceApprovalCards(
+  queue: AgentTaskQueue | (() => AgentTaskQueue),
+  options: {
+    context?: AgentContextItem[];
+    providerContextIds?: string[];
+    beforeProviderReturn?: () => void;
+  } = {},
+): Promise<AgentResultCard[]> {
+  const state = workspace();
+  const defaultContext: AgentContextItem = {
+    id: 'ctx-word',
+    kind: 'dictionary-entry',
+    label: '積ん読',
+    preview: 'tsundoku',
+    source: { app: 'dictionary' },
+    sensitivity: 'ordinary',
+    retained: true,
+    createdAt: 40,
+  };
+  state.conversations[0].context = options.context ?? [defaultContext];
+  store.write(state);
+  registerAgentExecutionIpc({
+    resolveStore: () => store,
+    resolveTaskQueue: typeof queue === 'function' ? queue : () => queue,
+    runProvider: async () => {
+      options.beforeProviderReturn?.();
+      return {
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: options.providerContextIds ?? ['ctx-word'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      };
+    },
+  });
+
+  const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+    ok: boolean;
+    state: ReturnType<AgentWorkspaceStore['read']>;
+  };
+  return result.state.conversations[0].messages.at(-1)?.cards ?? [];
+}
+
 const event = {
   sender: {
     id: 1,
@@ -128,6 +248,21 @@ const invoke = async (channel: string, ...args: unknown[]): Promise<unknown> => 
   if (!handler) throw new Error(`No handler for ${channel}`);
   return await handler(event, ...args);
 };
+
+function expectUniqueProducerCoordinates(state: AgentWorkspaceState): void {
+  for (const conversation of state.conversations) {
+    const messageIds = conversation.messages.map((message) => message.id);
+    expect(new Set(messageIds).size).toBe(messageIds.length);
+    for (const message of conversation.messages) {
+      const cardIds = message.cards.map((card) => card.id);
+      expect(new Set(cardIds).size).toBe(cardIds.length);
+      for (const card of message.cards) {
+        const actionIds = card.actions.map((action) => action.id);
+        expect(new Set(actionIds).size).toBe(actionIds.length);
+      }
+    }
+  }
+}
 
 beforeEach(() => {
   registry.handlers.clear();
@@ -332,6 +467,35 @@ describe('Agent execution IPC', () => {
     expect(store.read()).toEqual(result.state);
   });
 
+  it('emits unique message, card, and action ids within their persisted scopes', async () => {
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'Reply.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-1'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(
+      AGENT_EXECUTION_CHANNELS.run,
+      request('coordinate-uniqueness'),
+    ) as { ok: boolean; state: AgentWorkspaceState };
+
+    expect(result.ok).toBe(true);
+    expect(result.state.conversations[0].messages.at(-1)?.cards).not.toHaveLength(0);
+    expectUniqueProducerCoordinates(result.state);
+  });
+
   it('routes attachment content but stores only sanitized user metadata in the session overlay', async () => {
     let routedAttachments: readonly { contentText: string }[] = [];
     registerAgentExecutionIpc({
@@ -413,6 +577,114 @@ describe('Agent execution IPC', () => {
     };
     expect(result.ok).toBe(true);
     expect(result.state.conversations[0].messages.at(-1)?.cards).toEqual([]);
+  });
+
+  /**
+   * The fresh-question path. Everything above needs a shelf item to produce a
+   * card at all; these three cover the case the shelf is empty and the question
+   * itself names the destination.
+   */
+  const runWithPrompt = async (prompt: string, context: AgentContextItem[] = []) => {
+    const state = workspace();
+    state.conversations[0].context = context;
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'done',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: context.map((item) => item.id),
+          attachmentIds: [],
+          inputChars: prompt.length,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+    const result = await invoke(
+      AGENT_EXECUTION_CHANNELS.run,
+      { ...request(), prompt },
+    ) as { ok: boolean; state: ReturnType<AgentWorkspaceStore['read']> };
+    expect(result.ok).toBe(true);
+    return result.state.conversations[0].messages.at(-1)?.cards ?? [];
+  };
+
+  it('answers a fresh settings question from the index, with no context at all', async () => {
+    const cards = await runWithPrompt('where do I change the interface language?');
+    expect(cards).toEqual([{
+      id: 'request-run-1-assistant-navigation-index-1',
+      kind: 'navigation',
+      title: 'where do I change the interface language?',
+      // Empty: the stored question is the provenance, re-derived at review time.
+      sourceContextIds: [],
+      actions: [{
+        id: 'request-run-1-assistant-navigate-index-1',
+        label: 'where do I change the interface language?',
+        effect: {
+          type: 'navigate',
+          section: 'settings',
+          page: 'appearance',
+          controlId: 'ui-language',
+          highlight: true,
+          query: 'where do I change the interface language?',
+        },
+      }],
+    }]);
+  });
+
+  it('offers nothing when the question names no place the index knows', async () => {
+    expect(await runWithPrompt('what does this sentence mean?')).toEqual([]);
+  });
+
+  /**
+   * The producer stores the truncated title, so the effect has to be derived
+   * from that same string — otherwise a long question would resolve here and
+   * refuse itself at approval time.
+   */
+  it('stores exactly the question its destination was derived from', async () => {
+    const tail = 'and please explain it thoroughly '.repeat(6);
+    const prompt = `factory reset ${tail}`;
+    expect(prompt.length).toBeGreaterThan(120);
+    const cards = await runWithPrompt(prompt);
+    expect(cards).toHaveLength(1);
+    const effect = cards[0].actions[0].effect as { query?: string };
+    expect(effect.query).toBe(cards[0].title);
+    expect(cards[0].title.length).toBeLessThanOrEqual(120);
+    expect(cards[0].title.length).toBeLessThan(prompt.length);
+  });
+
+  it('offers nothing when the destination words fall past the stored length', async () => {
+    expect(await runWithPrompt(`${'kindly elaborate further for me '.repeat(6)}factory reset`))
+      .toEqual([]);
+  });
+
+  it('adds the index card beside a material card when the route is not a window', async () => {
+    const cards = await runWithPrompt('where is the factory reset', [{
+      id: 'ctx-1',
+      kind: 'dictionary-entry',
+      label: '猫',
+      preview: 'cat',
+      source: { app: 'media' },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 10,
+    }]);
+    expect(cards.map((card) => card.id)).toEqual([
+      'request-run-1-assistant-context-1',
+      'request-run-1-assistant-navigation-index-1',
+    ]);
+    expect(cards[1].actions[0].effect).toEqual({
+      type: 'navigate',
+      section: 'settings',
+      page: 'memory',
+      controlId: 'factory-reset',
+      highlight: true,
+      query: 'where is the factory reset',
+    });
   });
 
   it('keeps a session-only context card live without writing its derived text to disk', async () => {
@@ -609,6 +881,57 @@ describe('Agent execution IPC', () => {
     expect(JSON.stringify(cards)).not.toContain('delete-everything');
   });
 
+  it('copies exact Settings page, control, and highlight coordinates from disclosed route metadata', async () => {
+    const state = workspace();
+    state.conversations[0].context = [{
+      id: 'ctx-settings-theme',
+      kind: 'route',
+      label: 'Theme setting',
+      preview: 'Appearance',
+      source: {
+        app: 'settings',
+        route: 'appearance',
+        controlId: 'theme',
+        highlight: true,
+      },
+      sensitivity: 'ordinary',
+      retained: true,
+      createdAt: 40,
+    }];
+    store.write(state);
+    registerAgentExecutionIpc({
+      resolveStore: () => store,
+      runProvider: async () => ({
+        text: 'Open an unrelated provider-authored destination.',
+        delivery: 'buffered' as const,
+        usage: {},
+        provider: {
+          target: { kind: 'local' as const, backend: 'local-qwen' as const },
+          cloud: false,
+          contextIds: ['ctx-settings-theme'],
+          attachmentIds: [],
+          inputChars: 100,
+          startedAt: 100,
+          completedAt: 101,
+        },
+      }),
+    });
+
+    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
+      ok: boolean;
+      state: ReturnType<AgentWorkspaceStore['read']>;
+    };
+    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    expect(cards[1].actions[0].effect).toEqual({
+      type: 'navigate',
+      section: 'settings',
+      page: 'appearance',
+      controlId: 'theme',
+      highlight: true,
+    });
+    expect(JSON.stringify(cards)).not.toContain('unrelated provider-authored destination');
+  });
+
   /**
    * Changed deliberately when navigation started executing. A section IS a
    * destination — `popOut` takes a section and nothing else — and every
@@ -670,69 +993,7 @@ describe('Agent execution IPC', () => {
    * second home in `workspace-v1.json`.
    */
   it('offers one approval card naming only ids when a queued step waits on the user', async () => {
-    const state = workspace();
-    state.conversations[0].context = [{
-      id: 'ctx-word',
-      kind: 'dictionary-entry',
-      label: '積ん読',
-      preview: 'tsundoku',
-      source: { app: 'dictionary' },
-      sensitivity: 'ordinary',
-      retained: true,
-      createdAt: 40,
-    }];
-    store.write(state);
-    registerAgentExecutionIpc({
-      resolveStore: () => store,
-      resolveTaskQueue: () => ({
-        version: 1,
-        items: [{
-          id: 'task-7',
-          task: {
-            id: 'task-7',
-            objective: 'OBJECTIVE-SENTINEL',
-            status: 'waiting-confirmation',
-            steps: [{
-              id: 'step-2',
-              label: 'STEP-LABEL-SENTINEL',
-              request: {
-                callId: 'call-2',
-                operation: 'flashcard.add-cards',
-                arguments: { cards: [{ front: 'a', back: 'b' }] },
-              },
-              status: 'waiting-confirmation',
-            }],
-            currentStepId: 'step-2',
-            createdAt: 10,
-            updatedAt: 10,
-          },
-          priority: 0,
-          status: 'running',
-          createdAt: 10,
-          updatedAt: 10,
-        }],
-      }),
-      runProvider: async () => ({
-        text: 'Reply.',
-        delivery: 'buffered' as const,
-        usage: {},
-        provider: {
-          target: { kind: 'local' as const, backend: 'local-qwen' as const },
-          cloud: false,
-          contextIds: ['ctx-word'],
-          attachmentIds: [],
-          inputChars: 100,
-          startedAt: 100,
-          completedAt: 101,
-        },
-      }),
-    });
-
-    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
-      ok: boolean;
-      state: ReturnType<AgentWorkspaceStore['read']>;
-    };
-    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
+    const cards = await produceApprovalCards(approvalQueue(approvalQueueItem()));
     expect(cards).toHaveLength(2);
     expect(cards[1]).toEqual({
       id: 'request-run-1-assistant-approval-1',
@@ -746,9 +1007,222 @@ describe('Agent execution IPC', () => {
       }],
     });
     const serialized = JSON.stringify(cards);
-    expect(serialized).not.toContain('OBJECTIVE-SENTINEL');
-    expect(serialized).not.toContain('STEP-LABEL-SENTINEL');
+    expect(serialized).not.toContain('OBJECTIVE-SENTINEL-task-7');
+    expect(serialized).not.toContain('STEP-LABEL-SENTINEL-step-2');
     expect(serialized).not.toContain('flashcard.add-cards');
+  });
+
+  it.each([
+    ['originless', null],
+    ['wrong conversation', { conversationId: 'chat-other', contextIds: ['ctx-word'] }],
+    ['disjoint context', { conversationId: 'chat-1', contextIds: ['ctx-other'] }],
+    ['empty context', { conversationId: 'chat-1', contextIds: [] }],
+  ] satisfies Array<[string, AgentTaskOrigin | null]>)(
+    'emits no approval card for an %s task',
+    async (_name, origin) => {
+      const cards = await produceApprovalCards(approvalQueue(approvalQueueItem({ origin })));
+      expect(cards.flatMap((card) => card.actions.map((action) => action.effect.type)))
+        .not.toContain('approve-step');
+    },
+  );
+
+  it('requires an origin context to be both live and provider-disclosed', async () => {
+    const origin = { conversationId: 'chat-1', contextIds: ['ctx-origin'] };
+    const liveButUndisclosed = await produceApprovalCards(
+      approvalQueue(approvalQueueItem({ origin })),
+      {
+        context: [
+          {
+            id: 'ctx-word',
+            kind: 'dictionary-entry',
+            label: '積ん読',
+            source: { app: 'dictionary' },
+            sensitivity: 'ordinary',
+            retained: true,
+            createdAt: 40,
+          },
+          {
+            id: 'ctx-origin',
+            kind: 'study-session',
+            label: 'Origin session',
+            source: { app: 'flashcards' },
+            sensitivity: 'ordinary',
+            retained: true,
+            createdAt: 20,
+          },
+        ],
+        providerContextIds: ['ctx-word'],
+      },
+    );
+    expect(liveButUndisclosed.flatMap((card) => card.actions.map((action) => action.effect.type)))
+      .not.toContain('approve-step');
+
+    const disclosedButRemoved = await produceApprovalCards(
+      approvalQueue(approvalQueueItem({ origin })),
+      { providerContextIds: ['ctx-word', 'ctx-origin'] },
+    );
+    expect(disclosedButRemoved.flatMap((card) => card.actions.map((action) => action.effect.type)))
+      .not.toContain('approve-step');
+  });
+
+  it('reselects among matching tasks when an older origin is removed during the provider run', async () => {
+    const cards = await produceApprovalCards(
+      approvalQueue(
+        approvalQueueItem({
+          id: 'task-old-removed',
+          stepId: 'step-old',
+          createdAt: 1,
+          origin: { conversationId: 'chat-1', contextIds: ['ctx-old'] },
+        }),
+        approvalQueueItem({
+          id: 'task-live',
+          stepId: 'step-live',
+          createdAt: 2,
+          origin: { conversationId: 'chat-1', contextIds: ['ctx-live'] },
+        }),
+      ),
+      {
+        context: [
+          {
+            id: 'ctx-old',
+            kind: 'study-session',
+            label: 'Removed while running',
+            source: { app: 'flashcards' },
+            sensitivity: 'ordinary',
+            retained: true,
+            createdAt: 10,
+          },
+          {
+            id: 'ctx-live',
+            kind: 'study-session',
+            label: 'Still live',
+            source: { app: 'flashcards' },
+            sensitivity: 'ordinary',
+            retained: true,
+            createdAt: 20,
+          },
+        ],
+        providerContextIds: ['ctx-old', 'ctx-live'],
+        beforeProviderReturn: () => {
+          const latest = store.read();
+          store.write({
+            ...latest,
+            conversations: latest.conversations.map((conversation) => (
+              conversation.id === 'chat-1'
+                ? {
+                  ...conversation,
+                  context: conversation.context.filter((item) => item.id !== 'ctx-old'),
+                }
+                : conversation
+            )),
+          });
+        },
+      },
+    );
+
+    const approval = cards.find((card) => (
+      card.actions.some((action) => action.effect.type === 'approve-step')
+    ));
+    expect(approval).toMatchObject({
+      title: 'Still live',
+      sourceContextIds: ['ctx-live'],
+      actions: [{ effect: { taskId: 'task-live', stepId: 'step-live' } }],
+    });
+    expect(JSON.stringify(cards)).not.toContain('task-old-removed');
+    expect(JSON.stringify(cards)).not.toContain('Removed while running');
+  });
+
+  it('grounds the approval card in matched task origin instead of the newest reply source', async () => {
+    const cards = await produceApprovalCards(
+      approvalQueue(approvalQueueItem({
+        origin: {
+          conversationId: 'chat-1',
+          contextIds: ['ctx-origin-a', 'ctx-origin-b', 'ctx-hidden'],
+        },
+      })),
+      {
+        context: [
+          {
+            id: 'ctx-word',
+            kind: 'dictionary-entry',
+            label: 'Newest unrelated material',
+            source: { app: 'dictionary' },
+            sensitivity: 'ordinary',
+            retained: true,
+            createdAt: 100,
+          },
+          {
+            id: 'ctx-origin-a',
+            kind: 'study-session',
+            label: 'Causal session',
+            source: { app: 'flashcards' },
+            sensitivity: 'ordinary',
+            retained: true,
+            createdAt: 10,
+          },
+          {
+            id: 'ctx-origin-b',
+            kind: 'route',
+            label: 'Causal route',
+            source: { app: 'flashcards' },
+            sensitivity: 'ordinary',
+            retained: true,
+            createdAt: 20,
+          },
+        ],
+        providerContextIds: ['ctx-word', 'ctx-origin-a', 'ctx-origin-b'],
+      },
+    );
+
+    const approval = cards.find((card) => (
+      card.actions.some((action) => action.effect.type === 'approve-step')
+    ));
+    expect(approval).toMatchObject({
+      title: 'Causal session',
+      sourceContextIds: ['ctx-origin-a', 'ctx-origin-b'],
+      actions: [{
+        effect: { type: 'approve-step', taskId: 'task-7', stepId: 'step-2' },
+      }],
+    });
+    expect(JSON.stringify(approval)).not.toContain('ctx-hidden');
+    expect(approval?.sourceContextIds).not.toContain('ctx-word');
+  });
+
+  it('selects the oldest eligible approval and breaks timestamp ties by id', async () => {
+    const cards = await produceApprovalCards(approvalQueue(
+      approvalQueueItem({
+        id: 'task-unrelated-oldest',
+        stepId: 'step-unrelated',
+        createdAt: 1,
+        origin: { conversationId: 'chat-other', contextIds: ['ctx-word'] },
+      }),
+      // Deliberately not queue order or priority order. The two oldest entries
+      // tie on time; task-a is the deterministic FIFO winner by id.
+      approvalQueueItem({ id: 'task-z', stepId: 'step-z', createdAt: 10, priority: 100 }),
+      approvalQueueItem({ id: 'task-new', stepId: 'step-new', createdAt: 20, priority: 100 }),
+      approvalQueueItem({ id: 'task-a', stepId: 'step-a', createdAt: 10, priority: -100 }),
+    ));
+
+    const approvals = cards.flatMap((card) => card.actions)
+      .map((action) => action.effect)
+      .filter((effect) => effect.type === 'approve-step');
+    expect(approvals).toEqual([{
+      type: 'approve-step',
+      taskId: 'task-a',
+      stepId: 'step-a',
+    }]);
+  });
+
+  it('keeps the completed assistant reply when the optional queue read fails', async () => {
+    const cards = await produceApprovalCards(() => {
+      throw new Error('queue unavailable');
+    });
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0].actions[0].effect).toEqual({
+      type: 'open-context',
+      contextId: 'ctx-word',
+    });
   });
 
   it('offers a save on a dictionary entry, naming the context id rather than the word', async () => {
@@ -840,69 +1314,31 @@ describe('Agent execution IPC', () => {
       .not.toContain('save');
   });
 
-  it('offers no approval card when the queue has nothing waiting on the user', async () => {
-    const state = workspace();
-    state.conversations[0].context = [{
-      id: 'ctx-word',
-      kind: 'dictionary-entry',
-      label: '積ん読',
-      preview: 'tsundoku',
-      source: { app: 'dictionary' },
-      sensitivity: 'ordinary',
-      retained: true,
-      createdAt: 40,
-    }];
-    store.write(state);
-    registerAgentExecutionIpc({
-      resolveStore: () => store,
-      resolveTaskQueue: () => ({
-        version: 1,
-        items: [{
-          id: 'task-8',
-          task: {
-            id: 'task-8',
-            objective: 'Already running',
-            status: 'running',
-            steps: [{
-              id: 'step-1',
-              label: 'Running step',
-              request: { callId: 'call-1', operation: 'flashcard.list-decks', arguments: {} },
-              status: 'running',
-            }],
-            currentStepId: 'step-1',
-            createdAt: 10,
-            updatedAt: 10,
-          },
-          priority: 0,
-          status: 'running',
-          createdAt: 10,
-          updatedAt: 10,
-        }],
-      }),
-      runProvider: async () => ({
-        text: 'Reply.',
-        delivery: 'buffered' as const,
-        usage: {},
-        provider: {
-          target: { kind: 'local' as const, backend: 'local-qwen' as const },
-          cloud: false,
-          contextIds: ['ctx-word'],
-          attachmentIds: [],
-          inputChars: 100,
-          startedAt: 100,
-          completedAt: 101,
-        },
-      }),
-    });
-
-    const result = await invoke(AGENT_EXECUTION_CHANNELS.run, request()) as {
-      ok: boolean;
-      state: ReturnType<AgentWorkspaceStore['read']>;
-    };
-    const cards = result.state.conversations[0].messages.at(-1)?.cards ?? [];
-    expect(cards).toHaveLength(1);
-    expect(cards[0].actions[0].effect).toEqual({ type: 'open-context', contextId: 'ctx-word' });
-  });
+  it.each([
+    ['paused queue row', { queueStatus: 'paused' }],
+    ['completed queue row', { queueStatus: 'completed' }],
+    ['failed queue row', { queueStatus: 'failed' }],
+    ['cancelled queue row', { queueStatus: 'cancelled' }],
+    ['queued task status', { taskStatus: 'queued' }],
+    ['running task status', { taskStatus: 'running' }],
+    ['completed task status', { taskStatus: 'completed' }],
+    ['failed task status', { taskStatus: 'failed' }],
+    ['cancelled task status', { taskStatus: 'cancelled' }],
+    ['missing current step id', { currentStepId: null }],
+    ['different current step id', { currentStepId: 'step-other' }],
+    ['pending step status', { stepStatus: 'pending' }],
+    ['running step status', { stepStatus: 'running' }],
+    ['completed step status', { stepStatus: 'completed' }],
+    ['failed step status', { stepStatus: 'failed' }],
+    ['skipped step status', { stepStatus: 'skipped' }],
+  ] satisfies Array<[string, ApprovalQueueItemOptions]>)(
+    'serializes no approval card for an ineligible %s',
+    async (_name, options) => {
+      const cards = await produceApprovalCards(approvalQueue(approvalQueueItem(options)));
+      expect(cards.flatMap((card) => card.actions.map((action) => action.effect.type)))
+        .not.toContain('approve-step');
+    },
+  );
 
   it('refuses to suggest a route whose app is not a window the app can open', async () => {
     const state = workspace();

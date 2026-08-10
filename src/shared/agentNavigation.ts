@@ -13,22 +13,36 @@
  * 2. **The destination is re-derived from live context, never read off the
  *    stored effect.** `resolveAgentNavigation` returns a destination built from
  *    the `AgentContextItem` still sitting on the conversation's shelf. A stored
- *    effect whose section or page no longer matches that item resolves to
+ *    effect whose section, page, control or highlight no longer matches that item resolves to
  *    `stale-provenance` and opens nothing, so a card that was honest when it was
  *    written cannot become a wrong destination after the shelf moves on.
  * 3. **Approval is a separate argument from resolution.** Resolving is what the
  *    review step calls; it is side-effect free by construction, because opening
  *    lives in `main/agentNavigationIpc.ts` behind an explicit `approved` flag.
  *
+ * A card produced from a *fresh question* rather than a hand-off swaps rule 2's
+ * authority without weakening it: it carries the question it was looked up from,
+ * and `resolveAgentNavigationQuery` in `agentNavigationIndex.ts` re-runs that
+ * lookup against a static table at review and approval time. The stored effect
+ * still has to agree in every coordinate, and the allowlist above still has the
+ * last word — the only thing that changes is whether the destination is
+ * re-derived from the context shelf or from the index.
+ *
  * What a provider says never reaches any of this. The model authors message
  * text; `main/agentExecutionIpc.ts` authors the effect from context metadata,
  * and this module then refuses to trust even that unless live context still
- * agrees with it. `controlId` and `highlight` on the effect are display hints
- * with no bearing on the target and are ignored here on purpose.
+ * agrees with it. A page/control link is executable only for a statically
+ * registered Settings target; other apps retain their section-only behavior.
  */
 
 import type { DesktopWinSection } from './desktop';
-import type { AgentConversation, AgentNavigationEffect } from './agentWorkspace';
+import { resolveAgentNavigationQuery } from './agentNavigationIndex';
+import {
+  findUnambiguousAgentCardAction,
+  type AgentConversation,
+  type AgentNavigationEffect,
+  type AgentResultCard,
+} from './agentWorkspace';
 
 /**
  * Every section the Agent may open, in the order `POPOUT_SECTIONS` lists them.
@@ -64,6 +78,74 @@ export const AGENT_NAVIGABLE_SECTIONS: readonly DesktopWinSection[] = [
 ];
 
 const NAVIGABLE = new Set<string>(AGENT_NAVIGABLE_SECTIONS);
+
+/**
+ * Settings deep links the Agent may offer. This is deliberately narrower than
+ * arbitrary DOM ids: each control below is a stable SettingsCard coordinate
+ * whose page already renders a visible `focusSettingId` highlight. Settings
+ * validates this same registry again when the main process delivers the link.
+ */
+export const AGENT_SETTINGS_GUIDED_TARGETS = {
+  home: [],
+  appearance: [
+    'appearance-preview', 'ui-language', 'blanc-mode', 'theme', 'accent',
+    'typography', 'materials', 'app-border', 'pillarbox', 'custom-css',
+  ],
+  wallpaper: ['wallpaper', 'wallpaper-dim', 'rotation', 'mini-wallpaper'],
+  atmosphere: [
+    'living-layer', 'environment-preset', 'lighting', 'particles',
+    'particle-size', 'snow-accumulation', 'weather', 'ambient-audio', 'achievements',
+  ],
+  companions: [
+    'companions-leave-secret', 'companions', 'companion-activeness',
+    'buddy-programmer', 'os-pets', 'trinkets',
+  ],
+  'desktop-layout': ['icons', 'icon-recommended', 'taskbar', 'start-menu', 'session'],
+  shortcuts: ['os-hotkey', 'global-lookup', 'shortcuts'],
+  mini: ['mini-enable', 'mini-apps', 'mini-routines', 'mini-look'],
+  lockscreen: ['lockscreen-enable', 'lockscreen-pin', 'lockscreen-tint'],
+  study: [
+    'focus-mode', 'focus-lock', 'focus-default-tab', 'focus-distractions',
+    'focus-auto-enter', 'level', 'game-arena', 'profile', 'dictionary',
+    'system-dictionary', 'ai-analysis', 'reading-lens', 'study-language',
+    'study-language-setup', 'extension-bridge',
+  ],
+  'profile-rules': ['profile-rules'],
+  reading: ['reading'],
+  transcription: ['whisper'],
+  scraper: [],
+  visualizer: ['visualizer', 'lyrics'],
+  special: [
+    'blanc-mode', 'secret-os-leave', 'special-locked', 'wired-archive',
+    'wired-finding-terminal', 'wired-arcade', 'aero-gadget-lab', 'aero-arcade',
+  ],
+  monitors: ['monitors-list', 'monitors-layout-remap', 'monitors-simulated', 'monitors-reset'],
+  'file-drops': ['filedrop-auto', 'filedrop-overrides', 'filedrop-undo', 'filedrop-reset'],
+  'api-keys': [],
+  display: [
+    'window-chrome', 'borderless', 'zoom', 'base-font', 'contrast', 'night-light',
+    'brightness-sat', 'color-filter', 'transparency', 'focus-ring', 'scrollbars',
+    'pointer', 'animation-level', 'reduce-motion',
+  ],
+  motion: ['motion-mode', 'motion-velocity', 'motion-particles', 'motion-companion-weight'],
+  storage: ['storage-models'],
+  memory: [
+    'memory', 'system-memory', 'storage-usage', 'storage-inventory',
+    'agent-memory', 'backup', 'clear-data', 'factory-reset',
+  ],
+  help: [],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
+
+export type AgentSettingsPage = keyof typeof AGENT_SETTINGS_GUIDED_TARGETS;
+
+export function isAgentSettingsPage(value: unknown): value is AgentSettingsPage {
+  return typeof value === 'string' && Object.hasOwn(AGENT_SETTINGS_GUIDED_TARGETS, value);
+}
+
+export function isAgentSettingsControl(page: AgentSettingsPage, value: unknown): value is string {
+  return typeof value === 'string'
+    && (AGENT_SETTINGS_GUIDED_TARGETS[page] as readonly string[]).includes(value);
+}
 
 export function isAgentNavigableSection(value: unknown): value is DesktopWinSection {
   return typeof value === 'string' && NAVIGABLE.has(value);
@@ -124,13 +206,37 @@ export type AgentNavigationFailureCode =
 
 export interface AgentNavigationDestination {
   section: DesktopWinSection;
-  /**
-   * The route the live context names. Shown in the review step so the user sees
-   * what the Agent is pointing at, and deliberately **not** an execution target:
-   * main opens a section, never a page, so a page can describe a destination but
-   * can never widen one.
-   */
+  /** Exact Settings page re-derived from live route provenance. */
   page?: string;
+  /** Exact registered Settings control re-derived from live route provenance. */
+  controlId?: string;
+  /** Present only for a control the Settings surface can visibly highlight. */
+  highlight?: true;
+}
+
+/**
+ * Runtime validation shared by resolution, the IPC result boundary and the
+ * Settings renderer. Whole-section targets stay valid for every navigable app;
+ * page/control targets are intentionally limited to the typed Settings bridge.
+ */
+export function isAgentNavigationDestination(
+  value: unknown,
+): value is AgentNavigationDestination {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const raw = value as Record<string, unknown>;
+  if (!isAgentNavigableSection(raw.section)) return false;
+  const page = typeof raw.page === 'string' && raw.page ? raw.page : undefined;
+  const controlId = typeof raw.controlId === 'string' && raw.controlId
+    ? raw.controlId
+    : undefined;
+  const highlight = raw.highlight === true ? true : undefined;
+  if (raw.page !== undefined && page === undefined) return false;
+  if (raw.controlId !== undefined && controlId === undefined) return false;
+  if (raw.highlight !== undefined && highlight === undefined) return false;
+  if (!controlId && !highlight && raw.section !== 'settings') return true;
+  if (raw.section !== 'settings' || !page || !isAgentSettingsPage(page)) return false;
+  if (!controlId) return highlight === undefined;
+  return highlight === true && isAgentSettingsControl(page, controlId);
 }
 
 export type AgentNavigationResolution =
@@ -142,17 +248,19 @@ function navigationEffect(
   messageId: string,
   cardId: string,
   actionId: string,
-): AgentNavigationEffect | AgentNavigationFailureCode {
-  const message = conversation.messages.find((entry) => entry.id === messageId);
-  const card = message?.cards.find((entry) => entry.id === cardId);
-  const action = card?.actions.find((entry) => entry.id === actionId);
-  if (!message || !card || !action) return 'action-not-found';
-  if (action.effect.type !== 'navigate') return 'not-navigable';
+): { effect: AgentNavigationEffect; card: AgentResultCard } | AgentNavigationFailureCode {
+  const coordinate = findUnambiguousAgentCardAction(conversation, messageId, cardId, actionId);
+  if (!coordinate) return 'action-not-found';
+  if (coordinate.action.effect.type !== 'navigate') return 'not-navigable';
   // Provenance is the card's, not the action's: an action with no declared
   // source has nothing to check against and must not fall through to the
-  // shelf-wide search below.
-  if (card.sourceContextIds.length === 0) return 'stale-provenance';
-  return action.effect;
+  // shelf-wide search below. An index-resolved card is the one exception — its
+  // provenance is the stored question plus the static table, and it is re-derived
+  // by `indexDestination` instead.
+  if (coordinate.card.sourceContextIds.length === 0 && !coordinate.action.effect.query) {
+    return 'stale-provenance';
+  }
+  return { effect: coordinate.action.effect, card: coordinate.card };
 }
 
 /**
@@ -167,34 +275,68 @@ export function resolveAgentNavigation(
   cardId: string,
   actionId: string,
 ): AgentNavigationResolution {
-  const effect = navigationEffect(conversation, messageId, cardId, actionId);
-  if (typeof effect === 'string') return { ok: false, code: effect };
+  const result = navigationEffect(conversation, messageId, cardId, actionId);
+  if (typeof result === 'string') return { ok: false, code: result };
+  const { effect, card } = result;
   if (!isAgentNavigableSection(effect.section)) {
     return { ok: false, code: 'unknown-section' };
   }
-  const message = conversation.messages.find((entry) => entry.id === messageId);
-  const card = message?.cards.find((entry) => entry.id === cardId);
-  for (const contextId of card?.sourceContextIds ?? []) {
+  // An index-resolved card answers a question the conversation asked, not a
+  // place it was handed. Its check is the same shape as the provenance one
+  // below — re-derive, then require the stored effect to agree in every
+  // coordinate — with the static table standing in for the context shelf. It is
+  // deliberately checked *first*: a card carrying a query is an index card, and
+  // must never be able to borrow an unrelated route item to authorize itself.
+  if (effect.query) {
+    const answer = resolveAgentNavigationQuery(effect.query);
+    if (!answer) return { ok: false, code: 'stale-provenance' };
+    if (answer.section !== effect.section) return { ok: false, code: 'stale-provenance' };
+    if (answer.page !== effect.page) return { ok: false, code: 'stale-provenance' };
+    if (answer.controlId !== effect.controlId) return { ok: false, code: 'stale-provenance' };
+    const effectHighlight = effect.highlight === true ? true : undefined;
+    if (answer.highlight !== effectHighlight) return { ok: false, code: 'stale-provenance' };
+    const destination: AgentNavigationDestination = {
+      section: answer.section,
+      ...(answer.page ? { page: answer.page } : {}),
+      ...(answer.controlId ? { controlId: answer.controlId } : {}),
+      ...(answer.highlight ? { highlight: true } : {}),
+    };
+    // The allowlist still has the last word. The index is hand-written, but so
+    // was every other list that has ever drifted from the surface it names.
+    if (!isAgentNavigationDestination(destination)) {
+      return { ok: false, code: 'unknown-section' };
+    }
+    return { ok: true, destination };
+  }
+  for (const contextId of card.sourceContextIds) {
     const item = conversation.context.find((entry) => entry.id === contextId);
     // Only a live `route` context authorizes navigation. A dictionary entry or a
     // subtitle line describes material, not a place, and a card grounded in one
     // has no business opening a window.
     if (!item || item.kind !== 'route') continue;
     if (item.source.app !== effect.section) continue;
-    // A page must match exactly when the stored effect claims one, and the live
-    // context must still claim the same one. A stored page against a live
-    // context that has since lost its route is stale, not "close enough".
-    if (effect.page !== undefined && effect.page !== item.source.route) continue;
+    // Every coordinate must match in both directions. Treating an omitted
+    // stored field as "take whatever is live" would let a page/control be added
+    // after review without requiring a second approval.
+    if (effect.page !== item.source.route) continue;
+    if (effect.controlId !== item.source.controlId) continue;
+    const effectHighlight = effect.highlight === true ? true : undefined;
+    const liveHighlight = item.source.highlight === true ? true : undefined;
+    if (effectHighlight !== liveHighlight) continue;
+    const destination: AgentNavigationDestination = {
+      section: effect.section,
+      ...(item.source.route ? { page: item.source.route } : {}),
+      ...(item.source.controlId ? { controlId: item.source.controlId } : {}),
+      ...(liveHighlight ? { highlight: true } : {}),
+    };
+    if (!isAgentNavigationDestination(destination)) continue;
     return {
       ok: true,
       // Built from the live item on purpose. The stored effect got this far by
       // matching it, so the two are equal here — but reading the live one is
       // what keeps that true if this function is ever loosened. A section with
       // no sub-page is a complete destination: main opens sections.
-      destination: {
-        section: effect.section,
-        ...(item.source.route ? { page: item.source.route } : {}),
-      },
+      destination,
     };
   }
   return { ok: false, code: 'stale-provenance' };

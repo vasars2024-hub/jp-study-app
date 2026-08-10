@@ -2298,3 +2298,805 @@ Still open and deliberately deferred: `localAgentProfilesStore` and
 `localAgentSettingsStore` remain renderer-owned `localStorage`, which is correct
 while they are per-window preferences with no main-side reader.
 `codex/claude-agent-shell` stays reference-only.
+
+## `undo` becomes a real effect
+
+The last inert result-card effect is now wired end to end. The prerequisite was
+closed first: a reviewed Save target is presentation state, not authority.
+`grantAgentSave` re-reads the active profile, effective permission, available
+tool ids and live deck at confirmation time, then re-runs `resolveAgentSave` and
+writes only the target produced by that fresh resolution. Tests narrow the
+profile and remove the source after review; both refuse without a deck write.
+
+The operation log remains deliberately **session-only and window-local**. A
+successful Save appends its exact created card id and a stable call id to the
+bounded parent-shell log. That placement makes the Undo offer survive a
+conversation switch and MessageRow remount, without persisting a stale inverse
+across an app restart. A restart keeps the card and offers no Undo, which is the
+honest result for an ephemeral log.
+
+`flashcard.add-cards` now has a real inverse instead of the earlier
+`modify-cards` approximation. `flashcard.delete-cards` is a typed, destructive,
+limited-actions registry operation that accepts only an explicit id list,
+refuses a missing id, removes only the named live cards and returns the exact
+removed ids. The built-in profiles expose the operation anywhere they expose
+Add cards; the ordinary permission/allow-list gate therefore governs the
+inverse instead of a bespoke delete path.
+
+`agentUndoActionForCall` offers a deterministic ephemeral `undo` action only
+while the named log entry has a supported inverse. Review, confirm, cancel,
+retry, running, failed and undone are explicit lifecycle states. Confirmation
+calls `performAgentUndo`, which resolves the stable log entry again, re-reads
+the live profile, effective permission, registry allow-list and deck ids, and
+re-authorizes immediately before invoking the central registry adapter. A
+missing entity, superseding operation, rolled log, narrowed permission or
+disabled inverse is a typed refusal and never a best-effort mutation. Success
+records the inverse entry with `invertsSequence`, removes the Undo control and
+leaves the truthful result “The change was undone.” The timeline has its own
+Undo effect rather than labelling inverse attempts as navigation.
+
+### Measured evidence
+
+- Agent-focused regression: **45 files, 618 tests passed, 0 failed**.
+- Full repository regression: **471 files passed, 1 skipped; 6,371 tests
+  passed, 6 skipped**. Its single failure is the stale baseline row
+  `test-only-module:src/shared/agentOperationLog.ts`: the module is now a real
+  renderer dependency, so the finding is correctly gone. Removing the row from
+  `tools/architecture-baseline.json` is the only fix, but this workspace's
+  `AGENTS.md` restricts this task to `src/`; no root file was changed.
+- Main SSR, preload SSR and renderer production builds all exit 0. The renderer
+  still reports the repository's existing chunk/dynamic-import warnings.
+- All four i18n gates exit 0. All **8,936** English keys exist in ja/zh/ru;
+  locale-argument, missing-key and hardcoded-text checks are clean against their
+  baselines.
+- The changed Undo/Save paths contribute no TypeScript diagnostics to the known
+  repository-wide TypeScript baseline. Focused lint has no errors and retains
+  two pre-existing warnings in `localAgentProfiles.ts`.
+
+### Live Electron proof
+
+The production renderer was exercised through the dev-only loopback debug
+bridge because the page requires Electron preload APIs. No coordinate CUA or
+test-only renderer was used. A retained dictionary context produced a real
+local-Qwen result card. The initial read-only profile refused Save with no deck
+write. After opening Save review, narrowing the profile again refused at
+confirmation. Re-authorizing produced exactly one card,
+`fc-msm6fakf-iczkdf`, and changed the real deck from **3,221 to 3,222** cards.
+
+The Undo offer survived switching to another conversation and back. After Undo
+review opened, narrowing the permission to read-only refused confirmation with
+“The active profile no longer permits the inverse operation”; the deck stayed
+at 3,222 and the exact id remained. Re-authorizing and confirming removed only
+that id, restored the deck to **3,221**, removed the Undo button, rendered “The
+change was undone,” and recorded the successful and refused attempts in the
+activity timeline. The 900 x 640 window had no horizontal overflow and the
+bridge reported zero renderer error logs.
+
+Before live QA, the full Electron profile was copied to a temporary backup.
+After closing the Agent pop-out and main window through their application close
+paths, the backup was mirrored back. Source and restored profile both measured
+**53,394 files / 9,059,544,186 bytes**, and a dry-run mirror returned no
+differences. The five QA screenshots and temporary 9 GB backup were then
+removed, so neither the test prompt, permission changes nor temporary card
+remain in the user's profile.
+
+## Exact next slice after Undo
+
+Fix `runNext` and `runQueued` so a step disabled by the active profile is
+refused **before** `start-step`. Their current deny-after-start path turns a
+declined step into a failed plan, even though the card and queue-panel approval
+routes now fail closed before execution. Keep this slice narrow: extract or
+reuse one pre-start allow-list decision, prove both runners leave task and step
+state unchanged on refusal, and do not combine it with the separate
+main-produced approve-card/profile mismatch.
+
+After that, reconcile `pendingAgentStepApproval` with renderer-owned profile
+state so the producer does not keep offering a button the gate must refuse.
+Rendering a disabled explanation is the smaller honest fix unless profile state
+is intentionally moved across the main/renderer boundary. The three unreachable
+`dismiss` reducer branches and the independent Track 7 tour replay defect remain
+separate cleanup slices.
+
+## Ordinary queue runs refuse before they start
+
+`runNext` and `runQueued` no longer turn withdrawn authority into a failed
+plan. `executeAgentTaskStep` still owns the one access decision, but a denied
+decision now returns a typed `operation-denied` refusal **before** calling the
+clock, dispatching `start-step`, invoking an adapter or emitting an execution
+event. The original task object is returned unchanged. `runAgentTaskStep`
+propagates that refusal with the original queue object and does not call the
+queue write-back. The Blanc panel maps it to the existing localized refusal and
+returns before changing task, queue or activity state. The Agent approval client
+also handles the new union explicitly, so a future authority race cannot persist
+an untouched task and misreport it as a lifecycle failure.
+
+The click boundary was tightened at the same time. `runNext` and `runQueued`
+both re-read the main-owned queue, and `runNext` resolves its exact task id
+through `selectAgentQueueRun` instead of trusting the panel's task copy. A row
+paused or cancelled in the queue therefore refuses rather than running behind
+the queue controls. Both ordinary runs and Confirm re-read settings and the
+active profile at the click, compute the installed-handler/profile intersection
+again, and pass that fresh authority into the one runner. A profile narrowed in
+another window takes effect even while this panel still renders its older
+checkbox state. A queued task is only installed as the live task after a
+non-refused run, so a declined row does not clear the visible plan/activity.
+
+### Measured evidence
+
+- Focused execution/Blanc integration: **4 files, 55 tests passed**. The cases
+  pin task and queue reference identity, no clock call, no adapter call, no
+  error property, no events, both top-level run buttons, paused/cancelled
+  `runNext`, same-mount profile edits and cross-window-stale profile state.
+- Agent-focused regression: **45 files, 624 tests passed, 0 failed**.
+- Full repository regression: **471 files passed, 1 skipped; 6,377 tests
+  passed, 6 skipped**. The only failure remains the out-of-scope stale
+  `test-only-module:src/shared/agentOperationLog.ts` row in
+  `tools/architecture-baseline.json`.
+- Main SSR, preload SSR and renderer production builds exit 0 with the existing
+  chunk/dynamic-import warnings. All four i18n gates remain green across 8,936
+  English keys. Focused ESLint reports zero warnings and zero errors.
+
+### Live Blanc proof
+
+The production Electron renderer was exercised through the dev-only bridge in
+a 1000 x 760 Blanc window and again at 520 x 430. A real main-owned queued
+`flashcard.add-cards` task was seeded, Add cards was disabled from the real
+Approved tools editor, and **Run next queued plan** rendered “The current
+profile and permission level no longer allow this step’s action.” The serialized
+queue before and after was byte-identical: row `queued`, task `queued`, step
+`pending`, no error and no execution log.
+
+A second real queued `flashcard.delete-cards` task was allowed once so it reached
+`waiting-confirmation` without invoking its adapter. Delete cards was then
+disabled and **Run next approved step** rendered the same refusal. Its serialized
+queue was byte-identical before and after; the only activity remained the
+original `confirmation-required` event, with no `tool-started` or `tool-failed`.
+Both sizes had zero horizontal overflow, readable wrapped refusal text and zero
+renderer errors or Agent warnings.
+
+The full Electron profile was backed up before QA and restored afterwards.
+Backup and restored profile both measured **53,394 files / 9,059,544,186
+bytes**, and a dry-run mirror found no differences. Temporary task/profile/deck
+changes, three screenshots and the temporary 9 GB backup were removed.
+
+## Exact next slice after ordinary queue refusal
+
+Reconcile the approval-card producer with the renderer gate without moving
+renderer-owned profiles into main. Main may select and persist only a queue
+reference `{ taskId, stepId }`; it must not claim that the current renderer can
+approve it. Share one structural candidate rule that requires a runnable queue
+row, task status `waiting-confirmation`, the exact current step id, and a step
+that is itself waiting. `currentStepId: undefined` is a refusal, not an implicit
+match.
+
+At the Agent workspace boundary, hold one hydrated live approval context and
+observe queue, settings and profile changes once per shell rather than once per
+historical message. While idle, a resolvable reference renders **Review step**;
+a denied or unavailable reference renders a passive localized explanation with
+no action and no timeline attempt; pre-hydration renders a neutral checking
+state. Review and Grant must continue to re-read and re-authorize independently.
+Visually prove same-mount deny → enable → Review, deny-after-review, successful
+retry and long-locale wrapping at compact and large Agent sizes.
+
+## Approval references stay passive until live authority agrees
+
+Main now selects only a structurally coherent queue reference and makes no
+claim about renderer-owned authority. `pendingAgentStepApprovalReference` and
+the live resolver share one candidate rule: the queue row is `queued` or
+`running`, the task itself is exactly `waiting-confirmation`, the referenced
+step exists and is waiting, and `currentStepId` exactly matches it. A missing
+current id and every contradictory terminal/running task shape fail closed.
+The persisted effect remains IDs-only. A queue read failure now degrades to no
+approval suggestion without discarding the completed assistant reply.
+
+The Agent shell owns one hydrated approval context for all historical messages.
+It subscribes once to the main-owned queue plus same-window and cross-window
+settings/profile changes, and unsubscribes all three paths together. Before
+hydration it renders a passive localized availability check. Once hydrated, an
+idle/retry/review control is actionable only while the full live resolver
+succeeds. A denied state shows a monochrome lock and the existing localized
+reason, exposes none of the live objective, step label, operation id or stored
+action label, and creates no timeline attempt. Review and Grant still perform
+independent fresh reads; the presentation snapshot is never authorization.
+
+### Measured evidence
+
+- Focused producer/gate/observer/shell/store integration: **5 files, 167 tests
+  passed**. The matrix covers every queue/task/step/current-id contradiction,
+  deterministic FIFO, IDs-only serialization, optional queue-read failure,
+  handler/profile intersection, hydration muting, live queue/settings/profile
+  refresh, listener cleanup, passive information minimization and same-mount
+  deny/widen recovery.
+- Agent-focused regression: **46 files, 668 tests passed, 0 failed**.
+- Full repository regression: **472 files passed, 1 skipped; 6,421 tests passed,
+  6 skipped**. The only failure remains the out-of-scope stale
+  `test-only-module:src/shared/agentOperationLog.ts` entry in
+  `tools/architecture-baseline.json`.
+- The renderer production build exits 0 with the existing chunk and
+  dynamic-import warnings. The Forge development build compiled both the main
+  and preload targets before launching Electron. Focused ESLint and
+  `git diff --check` are clean.
+- All four i18n gates pass across **8,937 English keys**.
+
+### Live Agent proof
+
+The real Electron renderer, preload and main-owned stores were exercised in a
+dedicated Agent window at **900 x 640** and **1280 x 800**. With the default
+read-only permission, the authentic waiting `flashcard.add-cards` reference
+showed “The active profile no longer permits that operation,” with no button,
+no timeline row and none of the objective, step, operation or stored-label
+sentinels in rendered text. Enabling limited actions in the already-mounted
+window changed that same card to **Review step** without reload or timeline
+mutation. Review displayed the long objective and step from the live queue,
+never the stored action label.
+
+Narrowing permission from another Electron window while Review was open hid
+the live details and both action buttons immediately, while retaining the
+already-witnessed Review timeline entry. A deliberately silent same-window
+storage change then exercised the final TOCTOU boundary: the still-rendered
+Grant control was clicked, Grant re-read authority, returned the localized
+`operation-denied` failure, and the serialized main-owned queue before and
+after was byte-identical. No adapter ran. Re-enabling and retrying returned to
+Review, and Cancel ended the pass without a side effect. Long English review
+text and the Russian passive refusal wrapped without horizontal document or
+card overflow. The debug bridge reported **0 error logs and 0 Agent logs**.
+
+Seven temporary screenshots and the temporary QA directory were removed after
+inspection. The workspace and the post-reset operational document were restored
+to their captured SHA-256 hashes after the app closed. QA-process caveat: the
+attempted `--user-data-dir` isolation did not redirect Electron's
+`app.getPath('userData')`; the first direct operational seed therefore reached
+the normal profile before a backup existed. It was immediately reset to the
+empty operational document, but the pre-launch queue/memory/automation bytes
+cannot be proven or recovered. Future live Agent passes must take the full
+profile backup before launch, as the preceding slices did; this launch method
+must not be reused as an isolation claim.
+
+## Exact next slice after live approval availability
+
+Fail closed on duplicate persisted message/card/action coordinates before any
+more interactive effects are added. `normalizeCard` currently preserves
+duplicate action ids while resolvers use `find` and React renders by that id, so
+the action a user sees can become a different sibling from the action a gate
+resolves. Define one deterministic normalization rule for duplicate message,
+card and action ids, pin it across load/save and every interactive resolver,
+and prove no ambiguous stored coordinate can navigate, save, approve or undo.
+Keep the separate causal-provenance issue — an oldest global blocked task being
+attached to an unrelated disclosed source — as the next task-origin slice,
+rather than implying a card's persistence provenance caused the queued task.
+
+## Persisted Agent action coordinates fail closed on ambiguity
+
+Message, card and action ids are now canonicalized before uniqueness is
+decided. If trimming or the 240-character persistence bound makes two ids
+collide, **every** member of that collision group is removed and unrelated
+unique entries remain. The scope matches the coordinate contract: message ids
+are unique within a conversation, card ids within a message and action ids
+within a card. Reusing a card id in another message or an action id in another
+card remains valid.
+
+Normalization is not the only boundary. Navigation, save and approval now use
+one shared unambiguous coordinate lookup which requires exactly one matching
+message, card and action. Hand-built typed state, legacy state or a future
+producer that bypasses persistence therefore cannot restore first-array-match
+behavior. Every ambiguous coordinate maps to the existing `action-not-found`
+refusal, so no destination, entity or queued step can be chosen by ordering.
+The navigation resolver also carries the uniquely matched card forward into
+its provenance check instead of searching for it again.
+
+### Measured evidence
+
+- Focused normalization/store/producer/navigation/save/approval regression:
+  **6 files, 180 tests passed, 0 failed**.
+- Tests cover whitespace and truncation collisions at all three coordinate
+  levels, removal of every colliding member, preservation of unrelated entries,
+  legal reuse in a different scope, raw on-disk JSON, current producer
+  uniqueness and reversed malformed array order at each interactive gate.
+- Focused ESLint and `git diff --check` are clean; only the repository's normal
+  LF-to-CRLF notices are emitted.
+
+No live visual pass is required for this slice: valid normalized workspaces
+render exactly as before, while ambiguous persisted rows are removed before
+render and direct malformed resolver input produces the existing passive
+failure. The next broad Agent visual pass remains required after the visible
+Track 3 inspector/navigation work.
+
+## Exact next slice after unambiguous action coordinates
+
+Bind an approval reference to the workspace source that actually created its
+task. A queued item needs bounded optional origin coordinates: conversation id
+plus deduplicated context ids. The approval producer must consider only
+structurally eligible tasks whose origin conversation matches the current
+conversation and whose origin intersects the provider-disclosed context that
+is still live. Originless legacy rows, wrong-conversation rows, empty or
+disjoint origins and removed or undisclosed sources produce no approval card.
+FIFO and id tie-breaking apply only after this causal filter. The card's
+`sourceContextIds` must come from that matched task origin, while its effect
+continues to persist only `taskId` and `stepId`; objective, step label and
+operation remain live queue data.
+
+## Approval cards are bound to their task's causal origin
+
+Queued work now carries optional bounded origin coordinates beside the task:
+one conversation id and a deduplicated, capped list of context ids. The queue
+normalizer trims and bounds every id, omits malformed partial origins, preserves
+legacy originless rows, and carries a valid origin through replacement,
+write-back, pause, resume, cancel and priority changes. The main-owned
+operational store round-trips the normalized origin on disk without inventing
+one for legacy rows.
+
+The approval selector now receives the current conversation plus context ids
+that are both live and provider-disclosed. It first rejects structurally
+ineligible rows, then rejects originless tasks, a different conversation, and
+empty or disjoint origin intersections. FIFO and id tie-breaking run only over
+the remaining causal candidates. The returned card is grounded in the matched
+origin ids, in origin order and without duplicates; its title also comes from
+the first matched live context rather than the newest unrelated reply material.
+Removed or undisclosed origins therefore suppress the approval suggestion while
+leaving the completed assistant reply and its other cards intact. Completion
+uses the conversation's latest context snapshot rather than the provider's
+request snapshot, so removing the oldest origin during an in-flight request
+reselects the next matching task instead of choosing a card that persistence
+will immediately prune.
+
+This deliberately does not retrofit a false origin onto Blanc-created plans.
+Those legacy/context-free tasks remain runnable from the queue panel, but they
+cannot appear as if an unrelated Agent conversation created them. A future
+Agent task producer must pass its real conversation/context coordinates when it
+enqueues work.
+
+### Measured evidence
+
+- Focused origin/queue/gate/main/store integration: **5 files, 159 tests
+  passed, 0 failed**.
+- Agent-focused regression: **46 files, 690 tests passed, 0 failed**.
+- Full repository regression: **472 files passed, 1 skipped; 6,443 tests
+  passed, 6 skipped**. The sole failure is still the out-of-scope stale
+  `test-only-module:src/shared/agentOperationLog.ts` entry in the root
+  architecture baseline.
+- Renderer production build: **4,745 modules transformed, exit 0**, with the
+  repository's existing chunk-size, ambiguous utility and dynamic/static import
+  warnings. Focused ESLint and `git diff --check` are clean.
+
+No new renderer state was introduced in this slice, so its visible behavior is
+already the approval-card absence/presence behavior covered by the producer and
+shell suites. The next live visual pass belongs to the visible inspector and
+guided-navigation work and must use a full Electron profile backup before any
+store mutation.
+
+## Exact next slice after causal approval provenance
+
+Finish the planned collapsible context/activity inspector in the Agent shell.
+The toggle must be keyboard-operable with `aria-expanded` and `aria-controls`;
+context shelf and filtered activity retain their current behavior inside it;
+collapse state stays presentation-only and never writes the workspace. Large
+layout should read as rail / conversation canvas / inspector, while compact
+layout collapses or stacks without horizontal overflow. Conversation changes,
+long localized strings and reduced motion need focused tests and live proof.
+
+After that, complete exact guided navigation. The stored and live allowlisted
+destination must agree on section, page, control id and highlight; approval
+must deliver one typed deep link to one focused Settings window, stale or
+unknown controls must fail honestly, and renderer requests must never inject a
+destination.
+
+## Collapsible inspector and exact guided navigation are complete
+
+The Agent context/activity rail is now one accessible inspector. Its summary is
+keyboard-operable, exposes `aria-expanded` and `aria-controls`, and keeps the
+existing context shelf and filtered activity inside the controlled region.
+Collapse state remains component presentation state: it never enters the
+workspace serializer or the main-owned document. Desktop layout is rail /
+conversation / inspector; compact layout stacks the inspector below the
+conversation without changing the stored conversation.
+
+Guided navigation now preserves reviewable page metadata for ordinary app
+sections while allowing executable page/control/highlight coordinates only for
+registered Settings targets. The result-card producer copies those coordinates
+from the disclosed route context, never provider prose. The renderer sends only
+message/card/action ids plus the approval boolean; main re-resolves the unique
+persisted coordinate, re-checks live provenance and opens the typed destination.
+The Settings consumer accepts only an exact registered page, requires one
+unique rendered control when a control was requested, verifies the highlight
+contract, scrolls and focuses the target, then acknowledges delivery. Unknown,
+duplicated and stale coordinates fail honestly.
+
+### Measured evidence
+
+- Inspector/navigation focused regression: **6 files, 146 tests passed**.
+- Final cross-lane focused regression after the later Agent/Aero/Blanc changes:
+  **14 files, 187 tests passed**.
+- Agent-focused regression: **48 files, 709 tests passed**.
+- Focused ESLint has 0 errors; only two pre-existing Blanc non-null-assertion
+  warnings remain outside these Agent changes. `git diff --check` is clean.
+
+### Live Electron proof
+
+The real renderer, preload and main-owned stores were exercised at **1264 x
+821** and in an Agent pop-out at **900 x 640**. Both sizes had zero document,
+shell, workspace and card horizontal overflow. Russian long copy wrapped. Space
+on the focused inspector summary changed `aria-expanded` true to false, hid the
+controlled content, retained focus and left the captured workspace SHA-256
+unchanged, proving the collapse is presentation-only.
+
+An exact synthetic Settings route was inserted only after a full profile
+backup. Agent review displayed section, page, control and highlight in Russian.
+Approval opened one Settings window on `appearance`, found exactly one
+`data-setting-id="theme"`, focused its input, visibly highlighted it and
+completed the Agent timeline as **Opened**. No destination field came from the
+renderer request. The bridge reported **0 errors and 0 Agent logs**. The
+53,405-file profile was restored byte-for-byte and the temporary backup and
+screenshots were deleted.
+
+## Per-request budgets and complete cloud consent are visible
+
+The composer now exposes session-only input-character and output-token limits.
+Their bounds/defaults live beside the execution bridge normalizer, the selected
+values are sent in the existing main-enforced provider policy, and prompt plus
+file content that is already known to exceed the selected input limit is
+refused before IPC. Main remains the final authority because it also counts
+history, mode instructions, context labels and framing.
+
+Cloud consent is no longer attachment-only. It appears whenever the selected
+cloud provider would receive either files or disclosed sensitive shelf context,
+even when there is no attachment. The consent fingerprint changes when the
+provider, files, conversation or exact disclosed sensitive material changes,
+so a previous grant cannot silently authorize a different request. The controls
+do not mutate workspace persistence. A cost control remains deliberately absent
+until provider pricing is wired into Agent IPC; presenting a cap without a real
+estimate would be false assurance.
+
+### Measured and visual evidence
+
+- Provider/bridge/composer regression: **6 files, 133 tests passed**.
+- All four i18n gates pass across **8,949 English keys**.
+- In the real Electron Agent surface, expanded Russian request limits rendered
+  at **1264 x 821** and **900 x 640**, with values 50,000 / 1,500, correct hard
+  bounds, readable explanatory copy and zero document/canvas overflow.
+- Renderer production build: **4,750 modules transformed, exit 0**, with only
+  the repository's existing chunk, CJS, ambiguous utility and import warnings.
+- Forge compiled the main and preload development targets before the live pass.
+- Full repository regression: **6,483 tests passed, 6 skipped, 1 failed**. The
+  sole failure is the already-known stale root
+  `test-only-module:src/shared/agentOperationLog.ts` entry in
+  `tools/architecture-baseline.json`; project scope forbids editing that root
+  baseline in this track.
+
+## Parallel Aero and Blanc progress from this pass
+
+Aero M15 now has one normalized cross-window display-mode path. Display prefs,
+wallpaper fit and pillarbox/native-fill settings install one listener, apply
+sibling-window changes without echo writes, normalize deletion/corruption and
+update their DOM/CSS mirrors. The real Aero viewport consumes tested Classic
+4:3/Native geometry at 1024x768, 1280x960, 1600x1200 and widescreen native;
+living-environment image wallpapers honor Fill/Fit/Stretch/Center. A Claude-X
+read-only audit found and then drove fixes for stale pillarbox images on
+unmount, non-reactive reduced motion and a legacy motion-key echo write.
+Broader Aero evidence is **6 files, 30 tests passed**. M15 still needs its
+hands-on Classic/Native screenshot, pointer, window, companion and crop
+checkpoint before M16 begins.
+
+Blanc Pillar 6 now has a Master Search foundation. The visible top-strip button
+and existing Ctrl+F / Ctrl+Shift+P command paths open one focus-managed modal
+that groups Tools and Commands, uses configured shortcuts, ranks exact/prefix
+matches, prevents recursive self-opening, caps results honestly and supports
+arrow/Enter/Escape plus a trapped Tab cycle. Blanc/toolbox regression is **13
+files, 113 tests passed**. Live at **1164 x 721** and **884 x 601**, it focused
+the query, rendered `94 · showing 40`, narrowed `dictionary` to four real
+results and had zero document/dialog overflow. The next Blanc slice is adding
+settings, saved words/cards, dictionary, grammar, library, mined sentences,
+files and App Drawer shortcuts behind the same dispatcher.
+
+## Agent-origin conversational planner foundation is complete
+
+The Agent composer can now request a bounded multi-step action plan through the
+existing local planner. Planning receives the current allowed operations,
+profile and settings plus at most the latest 16 eligible conversation context
+items; privacy mode omits conversation context and selected-file planning is
+disabled with an honest explanation. The resulting task is enqueued through the
+existing main-owned operational queue with exact conversation and context
+origin. Replay/task-id collisions, foreign origins and partial origins are
+refused rather than replaced or inherited.
+
+The Agent surface now renders only plans whose origin matches the open
+conversation. It exposes normalized operations, bounded arguments, results,
+errors and statuses, and it can pause, resume or cancel the matching queued
+task. Legacy, foreign and dangling-origin tasks remain available to their
+existing owners but cannot masquerade as work created by this conversation.
+Backend errors are normalized so local model/store paths are not disclosed.
+This reuses the current queue, authorization profile, confirmation gate and
+store; no second queue or renderer-owned operational document was introduced.
+
+### Measured evidence
+
+- Planner and Agent shell: **54 tests passed**.
+- Planner, queue and authorization regression: **194 tests passed**.
+- Agent-focused regression before the runner continuation: **49 files, 720
+  tests passed**.
+- All four i18n gates passed across **8,991 English keys** at this checkpoint.
+- Final renderer production build: **4,756 modules transformed, exit 0**,
+  with only the repository's existing chunk, CJS, ambiguous-utility and
+  dynamic/static import warnings.
+- Full repository regression at this checkpoint: **6,512 tests passed, 6
+  skipped, 1 failed**. The only failure remains the stale root
+  `test-only-module:src/shared/agentOperationLog.ts` architecture-baseline
+  entry; this track is explicitly limited to `src/` and cannot alter that root
+  baseline.
+- Focused ESLint has **0 errors** and three existing Blanc warnings; `git diff
+  --check -- src` is clean.
+
+## Agent-origin execution and durable queue receipts are complete
+
+Conversation plans now expose **Run next**, explicit sensitive-step
+confirmation and failed-step retry. Every action re-resolves the exact
+conversation-origin row from live operational state, routes through the single
+existing `runAgentTaskStep` boundary and revalidates current permission plus the
+active profile's operation allow-list. Run next never supplies confirmation;
+the explicit confirmation action resolves the existing gate and grants only the
+current step's one-use call id. A sensitive retry returns to
+`waiting-confirmation` and must be approved again.
+
+After an asynchronous handler, write-back requires the exact normalized origin
+and a byte-stable original task snapshot. A legitimate status-only pause or
+cancel made while the handler ran is preserved; same-id replacement, origin
+drift and task/step drift are refused. Renderer-local in-progress state prevents
+repeat clicks in the same surface.
+
+Operational saves now provide additive generation-bound durability receipts.
+The existing synchronous setters and IPC contract remain compatible, while the
+planner waits for the exact save attempt covering its enqueue, control or run
+outcome. Receipt failure quarantines the exact row by origin and row snapshot;
+all execute, confirm, retry, pause and cancel controls are replaced with a
+save-only recovery action. Recovery re-reads the row, refuses any origin, task,
+status, priority or creation drift and retries only persistence—never the tool.
+If a tool returned but its outcome could not be committed, the UI states that
+the operation may have completed and suppresses blind retry.
+
+### Final measured evidence for this continuation
+
+- Focused planner/runner coverage: **15 tests passed**.
+- Durable operational-client coverage: **23 tests passed**.
+- Agent-focused regression: **49 files, 731 tests passed**.
+- All four i18n gates pass across **9,007 English keys**.
+- Renderer production build: **4,756 modules transformed, exit 0**, with only
+  the repository's existing build warnings.
+- Fresh full repository regression: **6,523 tests passed, 6 skipped, 1
+  failed**. The only failure remains the out-of-scope stale root
+  `test-only-module:src/shared/agentOperationLog.ts` architecture-baseline
+  entry.
+- Focused ESLint and `git diff --check` pass.
+
+## Exact remaining Track 3 architecture gaps
+
+Cross-window duplicate execution still requires a main-owned atomic task lease
+or compare-and-swap revision. The exact post-run checks prevent stale overwrite,
+but renderer locks cannot undo duplicate side effects if two windows start the
+same queued step simultaneously. That must be solved at the main-owned queue
+boundary before automatic/background execution is honest.
+
+Conversation-plan execution events, confirmation attempts, retries and
+quarantine recovery are not yet appended to the durable Agent operation
+log/timeline. Tool adapters do not consistently return authoritative entity ids,
+so generic undo records must not be fabricated from arbitrary results. The next
+logging slice should add explicit per-operation metadata only where authoritative
+ids are available, then append after a real tool completion even if persisting
+the queue outcome fails. Provider cost UI remains deferred until the request
+path supplies real pricing estimates.
+
+## Later parallel Aero and Blanc checkpoint
+
+Aero M16 now has a persisted, strict-version safe-mode switch applied before
+first paint. It suppresses Aero-only motion, particles, weather, lighting,
+companions, video/blur effects, ambient audio and system sounds without touching
+study data, and it is reversible from the Settings Motion page. A read-only
+health checker scans exactly seven known Secret OS/presentation JSON stores,
+reports malformed, wrong-shape or unavailable storage, ignores study stores and
+never writes, removes or repairs data. Recovery-focused evidence is **2 files,
+12 tests passed**; broader M16 evidence is **8 files, 42 tests passed**. Actual
+selective repair/restore remains open because destructive semantics require a
+separate product decision. M15's automated geometry, synchronization and
+wallpaper-fit work is complete, but its Classic/Native pointer, companion,
+window and crop screenshot checkpoint is still manual and therefore open.
+
+Blanc Master Search now draws from live App Drawer shortcuts, all 11 Settings
+sections and saved words in addition to its original tools and commands. Results
+route through the real launch/section/dictionary paths, settings targets scroll
+and focus, and saved-word matches use expression, reading and meaning. Focused
+source/search evidence is **11 tests passed**; broader Blanc/toolbox evidence is
+**15 files, 141 tests passed**. Remaining sources are deck cards, live
+dictionary entries, grammar, library/novels, mined sentences and filesystem
+results, plus per-source toggles and final landing/scope UX.
+
+## Track 3 hardening and product-surface checkpoint — 2026-08-10
+
+The earlier renderer-local duplicate-execution gap is closed. Execution now
+starts with a main-owned atomic lease that persists the exact task, step, call,
+action, previous status and expiry before a handler can run. Commit uses an
+exact compare-and-swap and preserves a concurrent Pause or Cancel. A crash or
+failed outcome commit leaves the durable execution marker quarantined; the UI
+offers **Verified not run — unlock** only after expiry. Whole-document saves
+rebase around active markers, so a stale renderer cannot silently make claimed
+work runnable again.
+
+Conversation-plan executor events now project into the visible timeline and an
+exact-id operation record wherever a handler returns authoritative entity ids.
+The projection is also recorded when queue-outcome persistence fails, because
+the side effect may already have occurred. This operation log and the timeline
+remain deliberately **session-only and window-local**; they are not described
+as durable evidence.
+
+The central Agent surface gained:
+
+- a clean Simple default and a Full disclosure mode;
+- main-owned reusable prompts with bounded create/edit/delete and composer
+  handoff;
+- a live directory for all **54** declared operations, including effective
+  profile/permission/adapter availability and confirmation requirements;
+- attached-context suggestion chips that only prefill the composer, plus a
+  main-owned global switch and six per-surface switches;
+- generic execution-status wording rather than navigation-specific timeline
+  copy.
+
+Blanc Master Search now also indexes every local deck card, successful
+persisted dictionary lookups, the deterministic grammar corpus and the current
+reader library, routing results through their real destinations.
+
+### Measured evidence
+
+- Agent-focused regression: **59 files, 776 tests passed**.
+- Final focused visual-surface regression: **4 files, 59 tests passed**.
+- Suggestion/operational integration checkpoint: **8 files, 95 tests passed**.
+- All i18n gates pass across **9,177 English keys**; missing-key,
+  locale-argument and hardcoded-component checks are clean.
+- Focused Agent ESLint is clean.
+- Final renderer production build: **4,770 modules transformed, exit 0**,
+  with only the repository's existing bundle/CJS/import warnings.
+
+### Live Electron evidence
+
+The real Electron window was inspected in the Russian locale with the current
+profile and IPC bridge. Simple mode showed conversation, context and one inert
+suggestion while hiding provider controls, queue, timeline, prompts and
+capabilities. Full mode exposed the provider/request limits, persistent prompt
+editor, and the capability directory. Clicking the suggestion populated the
+composer without sending or creating a plan, and the draft was cleared after
+verification. The live console contained no runtime error; only Electron's
+expected development Content-Security-Policy warning was present.
+
+This pass caught and fixed one real CSS defect: `.agent-full-inspector` and
+`.agent-composer-options` author `display` declarations overrode the HTML
+`hidden` attribute. Targeted `[hidden]` selectors now keep Simple mode visually
+simple. Hot-reload verification confirmed both the advanced inspector and
+provider row disappear while context suggestions remain available.
+
+### Honest remaining Track 3 gaps (superseded in part — see below)
+
+Track 3 is not product-complete. Fresh natural-language feature queries do not
+yet resolve through a deterministic help/settings/command index. Production
+handoffs remain incomplete for ReadingLens, Flashcards and Settings, and there
+is no screenshot/OCR context attachment. Seventeen declared tool adapters are
+still honestly unavailable, including the key dictionary analysis and media
+subtitle paths plus anime/visual-novel operations. AI Card Studio remains a
+separate generation experience. Planned-operation Undo coverage and Full-mode
+memory/profile/permission/automation/cost controls are incomplete. A compact
+viewport plus full keyboard/reduced-motion matrix also remains required.
+
+## Deterministic fresh-query navigation — 2026-08-10
+
+The first gap above is closed. Navigation previously had exactly one provenance
+authority: `resolveAgentNavigation` re-derived its destination from a live
+`route` context item, so a suggestion existed only where a hand-off had already
+attached the place. A cold "where do I change the interface language?" produced
+no card at all, because the producer returned early when the context shelf was
+empty.
+
+There is now a second authority with the same refusal shape. `src/shared/
+agentNavigationIndex.ts` holds a static table of 124 destinations — 22 app
+sections, 24 Settings pages and 78 registered guided controls — and
+`resolveAgentNavigationQuery` matches a question against it by exact token, with
+no fuzzy or substring matching. A navigation card produced from a fresh question
+stores that question on its effect and carries no context ids;
+`resolveAgentNavigation` re-runs the lookup at review and at approval and refuses
+with `stale-provenance` unless the index still answers with the identical
+section, page, control and highlight. The allowlist and
+`isAgentNavigationDestination` still have the last word, and a card carrying a
+query can never fall back to the context shelf, so the two authorities cannot be
+combined.
+
+Design decisions worth not re-litigating:
+
+- **Ambiguity refuses.** Two destinations tied on evidence inside one precedence
+  band return `null` rather than a guess. Bands are declared, not emergent:
+  section beats control beats page, which is what makes "dictionary" open the
+  app and "popup dictionary" open the setting.
+- **Terms are English**, exactly as `SETTINGS_REGISTRY.keywords` already are, and
+  are copied from that registry rather than invented. A JA/ZH/RU user finds a
+  setting by typing its English feature name in Settings search today and gets
+  the same reach here. A question asked *in* Russian resolves nothing — that is
+  the honest remaining limitation of this slice.
+- **The index lives in `src/shared`** because main resolves navigation and the
+  architecture audit forbids `shared` from importing `renderer`. The drift gate
+  is `renderer/__tests__/agentNavigationIndexMirror.test.ts`, which asserts every
+  coordinate against the live `SETTINGS_REGISTRY`/`SETTINGS_NAV` and rejects any
+  term that is not already a word of that destination.
+- **Retention gained one narrow exception.** A card with empty
+  `sourceContextIds` was always dropped before persistence, which would have made
+  index cards session-only. `isAgentQueryProvenancedCard` keeps a card whose
+  every action is a query navigation: its text is the user's own prompt, already
+  persisted verbatim above it, and its destination is re-derived from a static
+  table. A card mixing a query action with any other kind fails that check and is
+  still dropped.
+- **The stored question is the truncated one.** The producer resolves from the
+  120-character title it will persist, not from the raw prompt, so a long
+  question cannot resolve here and then refuse itself at approval time. A
+  question whose destination words fall past that cut simply produces no card.
+
+### Measured evidence
+
+- New `agentNavigationIndex` suite: **20 tests**; mirror gate: **4 tests**.
+- Agent regression across the whole track: **61 files, 816 tests passed**
+  (was 59/776).
+- Architecture audit: **0 fresh findings** (`--json` `fresh: 0`); the single
+  stale `test-only-module:src/shared/agentOperationLog.ts` baseline entry is the
+  same pre-existing one recorded above.
+- `tsc --noEmit`: **392 errors, none in any file this slice created or at any
+  line it added**. The 7 errors in `agentExecutionIpc.test.ts` are the
+  pre-existing `preview`-omission fixtures, unchanged in message and shifted only
+  by the one line inserted above them.
+- All four i18n gates clean across **9,177 English keys**. This slice adds no UI
+  string: the card's title is the user's own question.
+- Focused ESLint: **0 errors, 0 warnings**.
+- Renderer production build: **4,771 modules transformed, exit 0** (was 4,770 —
+  the one new module).
+
+### Live Electron evidence
+
+Driven through the debug bridge against a freshly started dev app (main rebuilt
+from this source), in the Russian locale on the real profile:
+
+- A probe conversation carrying three cards was saved through the real
+  main-owned store. The two query-provenanced cards survived persistence and the
+  one with a navigation effect but **no** query was dropped — the retention rule
+  running in main, not in a test double.
+- `agentNavigation:run` with `approved: false` resolved the good card to
+  `{settings, appearance, ui-language, highlight: true}` and opened nothing.
+- The same card with `page` tampered to `memory` was refused
+  `stale-provenance`.
+- With `approved: true`, the Settings window opened, landed on Appearance,
+  scrolled to the Language card and focused the UI-language segmented control.
+  Screenshot: `debug/shots/win2-1786339196291.png`.
+- The probe conversation was deleted after every run and the remaining
+  conversations compared byte-for-byte against the snapshot taken first —
+  `restored: true` on all three runs. No user data was changed.
+- `/logs?level=error` returned **0 entries** across the whole pass.
+
+### Coverage the index deliberately does not have
+
+`AGENT_SETTINGS_GUIDED_TARGETS` declares **107** page/control pairs. Only **78**
+are indexed, because the other 29 have no `SETTINGS_REGISTRY` entry to mirror:
+28 are absent from that registry entirely — `app-border`, `pillarbox`,
+`environment-preset`, `weather`, `ambient-audio`, `companions-leave-secret`,
+`trinkets`, `os-hotkey`, `global-lookup`, the four `mini-*`, `level`, four of the
+`special/*`, all four `monitors-*`, all four `filedrop-*`, `borderless` and
+`agent-memory` — and `appearance/blanc-mode` is registered on the `special` page
+instead, so the index routes it there.
+
+That is a finding about **Settings' own search**, not only about the Agent: those
+28 controls are highlightable deep-link targets that the settings search box
+cannot find either. Adding them to `SETTINGS_REGISTRY` extends both surfaces at
+once and is the cheapest way to widen this index; doing it here instead would
+have meant inventing terms the mirror gate is specifically built to reject.
+
+### One pre-existing defect this pass surfaced
+
+Approving a navigation when the Settings window is **not already open** returns
+`open-failed` even though the window opens and lands on the correct page. The
+warm path succeeds every time. The cause is in `deliverAgentSettingsDestination`
+(`src/main.ts:1438`), whose acknowledgement requires
+`agentSettingsRenderedTarget` to find the control *already highlighted* — which a
+just-created window has not done yet, so Settings answers `rejected` and the
+retry loop treats that as final. Nothing in this slice touches that path; the
+destination it delivers is correct in both cases. Fixing it means letting a
+first `rejected` from a window that has not yet mounted the target page retry,
+which is a change to the delivery handshake's finality rule and wants its own
+slice.
