@@ -1,0 +1,109 @@
+.agent-context-suggestions {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--agent-line, #493338) 82%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--agent-surface, #171214) 90%, transparent);
+}
+
+.agent-context-suggestions-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--agent-text, #f5edef);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.agent-context-suggestions-heading > :last-child {
+  color: var(--agent-muted, #b6a4a8);
+  font-size: 0.69rem;
+  font-weight: 400;
+}
+
+.agent-context-suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-context-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  max-width: 100%;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--agent-accent, #c84b5f) 42%, var(--agent-line, #493338));
+  border-radius: 999px;
+  color: var(--agent-text, #f5edef);
+  background: color-mix(in srgb, var(--agent-accent, #c84b5f) 9%, var(--agent-surface, #171214));
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.agent-context-suggestion:hover {
+  border-color: color-mix(in srgb, var(--agent-accent, #c84b5f) 76%, white);
+  background: color-mix(in srgb, var(--agent-accent, #c84b5f) 16%, var(--agent-surface, #171214));
+}
+
+.agent-context-suggestion:focus-visible {
+  outline: 2px solid var(--agent-accent, #c84b5f);
+  outline-offset: 2px;
+}
+
+.agent-context-suggestion small {
+  overflow: hidden;
+  max-width: 14rem;
+  color: var(--agent-muted, #b6a4a8);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-context-suggestion-settings {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid rgba(120, 91, 98, 0.42);
+  border-radius: 10px;
+  background: rgba(35, 23, 27, 0.42);
+}
+
+.agent-context-suggestion-settings-copy {
+  display: grid;
+  gap: 3px;
+  color: var(--text, #f4edef);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.agent-context-suggestion-settings-copy small {
+  color: var(--muted, #b7a8ac);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.agent-context-suggestion-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px 14px;
+}
+
+.agent-context-suggestion-settings-grid label {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text, #f4edef);
+  font-size: 0.76rem;
+}
+
+.agent-context-suggestion-settings-grid input[type='checkbox'] {
+  accent-color: var(--accent, #b83d52);
+}
