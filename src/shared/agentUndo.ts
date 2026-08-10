@@ -19,10 +19,44 @@ import {
 } from './localAgent';
 import type { AgentResultCardAction } from './agentWorkspace';
 
-/** Inverses with an installed, live-state-aware renderer adapter in this slice. */
+/**
+ * Inverses with an installed, live-state-aware renderer adapter.
+ *
+ * All four REMOVE what the forward operation created, which is what lets one
+ * post-verification rule serve them: after the inverse runs, none of the entity
+ * ids may still be live. `study.undo-filter` is deliberately absent even though
+ * `AGENT_INVERSE_OPERATIONS` names it — its inverse leaves the workspace alive,
+ * so neither that check nor the `deleted` claim the client writes describes it,
+ * and a log of ids cannot express "the filter reverted".
+ */
 export const AGENT_UNDO_SUPPORTED_OPERATIONS: ReadonlySet<AgentToolOperationId> = new Set([
   'flashcard.delete-cards',
+  'flashcard.delete-deck',
+  'calendar.delete-event',
+  'media.delete-item',
 ]);
+
+/**
+ * The argument objects one inverse needs, in the shape its adapter declares.
+ *
+ * This exists because the shape is NOT uniform and the access check and the
+ * execution must not disagree about it: `flashcard.delete-cards` takes `ids` as
+ * an array, `flashcard.delete-deck` takes a `name`, and the two single-entity
+ * deletes take an `id`. Passing `{ids}` to any of the latter three fails their
+ * `requiredArguments` contract, so `evaluateAgentToolAccess` refuses before the
+ * adapter is ever reached — which is how a single supported operation hid the
+ * defect for as long as it was the only one.
+ *
+ * An operation that deletes one entity per call returns one invocation per id.
+ */
+export function agentUndoInvocations(
+  operation: AgentToolOperationId,
+  entityIds: readonly string[],
+): Array<Record<string, unknown>> {
+  if (operation === 'flashcard.delete-cards') return [{ ids: [...entityIds] }];
+  if (operation === 'flashcard.delete-deck') return entityIds.map((name) => ({ name }));
+  return entityIds.map((id) => ({ id }));
+}
 
 export type AgentUndoFailureCode = AgentOperationInverseFailureCode
   | 'operation-unavailable'
@@ -42,6 +76,13 @@ export interface AgentUndoTarget {
 export type AgentUndoResolution =
   | { ok: true; target: AgentUndoTarget }
   | { ok: false; code: AgentUndoFailureCode };
+
+/**
+ * Live ids for one entity type — decks, folders, calendar events, media items.
+ * A function rather than a set because the resolver does not know which type it
+ * will need until it has read the entry, and the caller cannot know either.
+ */
+export type AgentUndoLiveEntities = (entityType: string) => ReadonlySet<string>;
 
 /**
  * Produces a typed action only while the named effect is currently invertible.
@@ -81,7 +122,7 @@ export function resolveAgentUndo(
   log: AgentOperationLog,
   operationId: string,
   permission: AgentPermissionLevel,
-  liveEntityIds: ReadonlySet<string>,
+  liveEntityIds: AgentUndoLiveEntities,
   allowedOperations?: readonly AgentToolOperationId[],
 ): AgentUndoResolution {
   const resolution = resolveAgentOperationInverseById(log, operationId);
@@ -90,14 +131,18 @@ export function resolveAgentUndo(
   if (!AGENT_UNDO_SUPPORTED_OPERATIONS.has(inverse.operation)) {
     return { ok: false, code: 'operation-unavailable' };
   }
-  if (inverse.entityIds.some((id) => !liveEntityIds.has(id))) {
+  // Scoped BY the entry's own entity type. A flat set forces the caller to guess
+  // which type it will be asked about, and guessing wrong does not error — it
+  // refuses every entry of the other types as `entity-not-found`.
+  const live = liveEntityIds(inverse.entityType);
+  if (inverse.entityIds.some((id) => !live.has(id))) {
     return { ok: false, code: 'entity-not-found' };
   }
   const decision = evaluateAgentToolAccess(
     {
       callId: `undo-${operationId}`,
       operation: inverse.operation,
-      arguments: { ids: [...inverse.entityIds] },
+      arguments: agentUndoInvocations(inverse.operation, inverse.entityIds)[0] ?? {},
     },
     permission,
     allowedOperations,

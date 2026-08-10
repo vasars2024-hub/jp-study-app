@@ -82,10 +82,12 @@ vi.mock('../agentSaveClient', () => ({
 }));
 
 vi.mock('../agentUndoClient', () => ({
-  readAgentUndoContext: () => ({
+  // Async, and the live ids are resolved per entity type — the media set comes
+  // from main, so the whole read had to become a promise.
+  readAgentUndoContext: () => Promise.resolve({
     permission: undoContext.permission,
     allowedOperations: undoContext.allowedOperations,
-    liveEntityIds: new Set(undoContext.liveEntityIds),
+    liveEntityIds: () => new Set(undoContext.liveEntityIds),
   }),
   performAgentUndo: (...args: unknown[]) => {
     undoCalls.push(args);

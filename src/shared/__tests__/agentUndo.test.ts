@@ -8,6 +8,7 @@ import {
   AGENT_UNDO_IDLE,
   agentOperationWasUndone,
   agentUndoActionForCall,
+  agentUndoInvocations,
   agentUndoReduce,
   resolveAgentUndo,
 } from '../agentUndo';
@@ -46,13 +47,16 @@ describe('Agent Undo producer', () => {
   });
 });
 
+/** Live ids for whichever entity type the resolver asks about. */
+const live = (ids: string[]) => () => new Set(ids);
+
 describe('resolveAgentUndo', () => {
   it('re-derives the exact inverse against live entity ids', () => {
     expect(resolveAgentUndo(
       savedLog(),
       'save-call|0',
       'limited-actions',
-      new Set(['card-1']),
+      live(['card-1']),
       ['flashcard.delete-cards'],
     )).toEqual({
       ok: true,
@@ -71,7 +75,7 @@ describe('resolveAgentUndo', () => {
       savedLog(),
       'save-call|0',
       'full-automation',
-      new Set(),
+      live([]),
       ['flashcard.delete-cards'],
     )).toEqual({ ok: false, code: 'entity-not-found' });
   });
@@ -81,7 +85,7 @@ describe('resolveAgentUndo', () => {
       savedLog(),
       'save-call|0',
       'full-automation',
-      new Set(['card-1']),
+      live(['card-1']),
       ['flashcard.add-cards'],
     )).toEqual({ ok: false, code: 'operation-denied' });
   });
@@ -91,7 +95,7 @@ describe('resolveAgentUndo', () => {
       savedLog(),
       'invented',
       'full-automation',
-      new Set(['card-1']),
+      live(['card-1']),
       ['flashcard.delete-cards'],
     )).toEqual({ ok: false, code: 'entry-not-found' });
   });
@@ -120,5 +124,64 @@ describe('agentUndoReduce', () => {
     const failed = agentUndoReduce(running, { type: 'failed', code: 'undo-failed' });
     expect(failed).toMatchObject({ status: 'failed', attempts: 1, code: 'undo-failed' });
     expect(agentUndoReduce(failed, { type: 'retry' })).toEqual({ status: 'idle', attempts: 1 });
+  });
+});
+
+describe('agentUndoInvocations', () => {
+  it('gives each inverse the argument shape its own adapter declares', () => {
+    expect(agentUndoInvocations('flashcard.delete-cards', ['a', 'b']))
+      .toEqual([{ ids: ['a', 'b'] }]);
+    expect(agentUndoInvocations('flashcard.delete-deck', ['Mined']))
+      .toEqual([{ name: 'Mined' }]);
+    expect(agentUndoInvocations('calendar.delete-event', ['e-1']))
+      .toEqual([{ id: 'e-1' }]);
+    expect(agentUndoInvocations('media.delete-item', ['m-1', 'm-2']))
+      .toEqual([{ id: 'm-1' }, { id: 'm-2' }]);
+  });
+
+  it('authorizes each inverse with the arguments it will actually receive', () => {
+    // `flashcard.delete-deck` declares `name` as required. Authorizing it with
+    // `{ids}` — the shape the resolver used to hard-code — is refused, which is
+    // what silently blocked every non-flashcard inverse.
+    const deckLog = agentOperationLogAppend(AGENT_OPERATION_LOG_EMPTY, {
+      operation: 'flashcard.create-deck',
+      claim: 'created',
+      entityType: 'flashcard-deck',
+      entityIds: ['Mined'],
+      callId: 'save-call',
+    }, 100);
+
+    expect(resolveAgentUndo(
+      deckLog,
+      'save-call|0',
+      'full-automation',
+      live(['Mined']),
+      ['flashcard.delete-deck'],
+    )).toMatchObject({ ok: true, target: { operation: 'flashcard.delete-deck' } });
+  });
+
+  it('checks the entity type the entry names, not one flat pool of ids', () => {
+    const deckLog = agentOperationLogAppend(AGENT_OPERATION_LOG_EMPTY, {
+      operation: 'flashcard.create-deck',
+      claim: 'created',
+      entityType: 'flashcard-deck',
+      entityIds: ['Mined'],
+      callId: 'save-call',
+    }, 100);
+
+    const asked: string[] = [];
+    const resolution = resolveAgentUndo(
+      deckLog,
+      'save-call|0',
+      'full-automation',
+      (entityType) => {
+        asked.push(entityType);
+        return new Set(entityType === 'flashcard-deck' ? ['Mined'] : []);
+      },
+      ['flashcard.delete-deck'],
+    );
+
+    expect(asked).toEqual(['flashcard-deck']);
+    expect(resolution).toMatchObject({ ok: true });
   });
 });

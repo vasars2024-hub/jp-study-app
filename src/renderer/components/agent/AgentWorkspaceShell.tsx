@@ -567,11 +567,18 @@ function MessageRow({
     }));
   };
 
-  const reviewUndo = (key: string, cardId: string, actionId: string, operationId: string): void => {
+  const reviewUndo = async (
+    key: string,
+    cardId: string,
+    actionId: string,
+    operationId: string,
+  ): Promise<void> => {
     recordUndo(cardId, actionId, { type: 'review' });
-    let context: ReturnType<typeof readAgentUndoContext>;
+    // Awaited because live media ids come from main; the other three entity
+    // types are local, but one async source makes the whole read async.
+    let context: Awaited<ReturnType<typeof readAgentUndoContext>>;
     try {
-      context = readAgentUndoContext(t);
+      context = await readAgentUndoContext(t);
     } catch {
       dispatchUndo(key, { type: 'refused', code: 'store-failed' });
       recordUndo(cardId, actionId, { type: 'refused', code: 'store-failed' });
@@ -995,7 +1002,7 @@ function MessageRow({
                             <button
                               type="button"
                               className="agent-action agent-card-action"
-                              onClick={() => reviewUndo(
+                              onClick={() => void reviewUndo(
                                 undoKey,
                                 card.id,
                                 undoAction.id,
@@ -1055,7 +1062,7 @@ function MessageRow({
                                 className="agent-action agent-card-action"
                                 onClick={() => {
                                   dispatchUndo(undoKey, { type: 'retry' });
-                                  reviewUndo(
+                                  void reviewUndo(
                                     undoKey,
                                     card.id,
                                     undoAction.id,
@@ -1079,7 +1086,7 @@ function MessageRow({
                                 className="agent-action agent-card-action"
                                 onClick={() => {
                                   dispatchUndo(undoKey, { type: 'retry' });
-                                  reviewUndo(
+                                  void reviewUndo(
                                     undoKey,
                                     card.id,
                                     undoAction.id,

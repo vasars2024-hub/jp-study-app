@@ -4128,3 +4128,67 @@ claim the client writes describes it, and the log — ids only — cannot expres
 "the filter reverted" would mean. `settings.apply-theme` / `apply-css` never enter
 the log at all: they have no `AGENT_OPERATION_RECORD_CONTRACTS` entry, which is
 the intended way to say an operation is not an Undo target.
+
+## Undo widened from one inverse to four — 2026-08-10
+
+### Two defects that only one supported operation could hide
+
+`AGENT_UNDO_SUPPORTED_OPERATIONS` held exactly `flashcard.delete-cards` while
+`AGENT_INVERSE_OPERATIONS` declared eight forward operations with real inverses.
+Adding any of the others would have failed immediately, for two reasons that were
+invisible while a single operation was the only one exercising the path:
+
+1. **The inverse's arguments were hard-coded.** `resolveAgentUndo` called
+   `evaluateAgentToolAccess` with `arguments: { ids: [...entityIds] }` — the shape
+   `flashcard.delete-cards` happens to take. `flashcard.delete-deck` declares
+   `name` as required, `calendar.delete-event` and `media.delete-item` declare
+   `id`. All three would have been refused for a missing required argument before
+   any adapter ran, and the refusal would have read as `operation-denied`, which
+   points at permissions rather than at the real cause.
+2. **`liveEntityIds` was one flat set.** The doc comment said the caller scopes it
+   to the entry's `entityType`, but the type could not express that and the
+   renderer filled it with `loadDeck()` card ids. A calendar entry checked against
+   deck ids refuses as `entity-not-found` every single time — a wrong answer that
+   looks exactly like the correct answer for a deleted entity.
+
+Both are fixed at the type level rather than by convention.
+`agentUndoInvocations(operation, entityIds)` is now the one place the argument
+shape is decided, used by the access check AND the execution so they cannot
+disagree, and it returns one invocation per id for the single-entity deletes.
+`liveEntityIds` is now `(entityType: string) => ReadonlySet<string>`, so the
+resolver asks for the type it actually read off the entry and an unknown type
+yields an empty set — refusing rather than passing a check nothing performed.
+
+Positive controls: collapsing `agentUndoInvocations` back to `{ids}` fails 7
+tests across both files; pinning the live-id resolver to the flashcard set fails
+6. Restored after each.
+
+### What is undoable now
+
+`flashcard.delete-cards`, `flashcard.delete-deck`, `calendar.delete-event` and
+`media.delete-item` — so creating a deck, adding cards, scheduling a session,
+creating a reminder and importing media are all reversible from the result card.
+All four REMOVE what the forward operation created, which is what lets one
+post-verification rule serve them: re-read the live ids for that entity type and
+fail as `undo-failed` if any survive.
+
+`study.undo-filter` stays out deliberately even though the inverse map names it.
+Its inverse leaves the workspace alive, so neither the "ids are gone" check nor
+the `deleted` claim the client writes describes it, and a log that stores ids
+only cannot express what "the filter reverted" would mean. `settings.apply-theme`
+and `apply-css` never enter the log at all — they have no
+`AGENT_OPERATION_RECORD_CONTRACTS` entry, which is this codebase's way of saying
+an operation is not an Undo target.
+
+### The media read is why the context became async
+
+Three of the four entity types are local stores. Media ids come from main, so
+`readAgentUndoContext` is now a promise and `reviewUndo` in the shell awaits it.
+The media read is deliberately fault-tolerant — `window.api?.listMedia?.() ?? []`
+behind a catch — because an Undo of a deck or a calendar event does not need main
+at all, and a missing channel must not take the three local types down with it.
+
+### Gates
+
+Whole suite 498 files / **6724** tests (up 9), `tsc` unchanged at 392 with none
+in the changed files, ESLint exit 0, `architecture-audit` `fresh: 0` exit 0.

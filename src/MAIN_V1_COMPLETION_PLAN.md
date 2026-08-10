@@ -190,17 +190,19 @@ Still required before the Track 3 acceptance can be called complete:
   local tracked-anime record, which is recorded in the ledger so it is not
   re-litigated a fourth time;
 - AI Card Studio conversion to an Agent workflow while retaining its editor;
-- broader planned-operation Undo surfacing and any product decision to make
-  the session-only activity/operation history durable. **The Undo feature itself
-  is now committed** (2026-08-10, `d13c770`/`c04bb60`) — it had never been in the
-  repository despite being written up here as verified; see the ledger's "Track 3
-  was not in the repository". Broadening it is still open, and two concrete
-  defects block it, both recorded in that ledger section: `resolveAgentUndo`
-  hard-codes the inverse's arguments as `{ids}` (so `delete-deck`, which needs
-  `name`, and `delete-event`/`delete-item`, which need `id`, would all be refused
-  as missing a required argument), and `liveEntityIds` is one flat set rather
-  than a per-`entityType` resolver (so a calendar entry gets checked against deck
-  ids). Fix both before adding anything to `AGENT_UNDO_SUPPORTED_OPERATIONS`;
+- **broader Undo surfacing: done.** The feature was committed on 2026-08-10
+  (`d13c770`/`c04bb60`) — it had never been in the repository despite being
+  written up here as verified — and then widened from one inverse to four
+  (`flashcard.delete-cards`, `flashcard.delete-deck`, `calendar.delete-event`,
+  `media.delete-item`), so creating a deck, adding cards, scheduling a session,
+  creating a reminder and importing media are all reversible. Two defects that a
+  single supported operation had been hiding were fixed first: the inverse's
+  arguments were hard-coded to `{ids}`, and `liveEntityIds` was one flat set
+  instead of a per-`entityType` resolver. See the ledger's "Undo widened from one
+  inverse to four". `study.undo-filter` stays out on purpose (its inverse leaves
+  the entity alive, so the removal check and the `deleted` claim both misdescribe
+  it). **Still open**: the product decision on whether the session-only
+  activity/operation history becomes durable;
 - Full-mode memory/profile/permission/automation and real provider-cost
   controls, retained-chat policy and memory scope;
 - final compact-width and complete keyboard/reduced-motion visual matrices.

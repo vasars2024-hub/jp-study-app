@@ -6,12 +6,15 @@ import {
 } from '../shared/localAgentProfiles';
 import type { AgentPermissionLevel, AgentToolOperationId } from '../shared/localAgent';
 import {
+  agentUndoInvocations,
   resolveAgentUndo,
   type AgentUndoFailureCode,
+  type AgentUndoLiveEntities,
   type AgentUndoTarget,
 } from '../shared/agentUndo';
 import type { AgentOperationDraft, AgentOperationLog } from '../shared/agentOperationLog';
-import { loadDeck } from './flashcardDeck';
+import { loadDeck, loadDeckFolders } from './flashcardDeck';
+import { loadEvents } from './calendar';
 import { loadLocalAgentProfiles } from './localAgentProfilesStore';
 import { loadLocalAgentSettings } from './localAgentSettingsStore';
 import {
@@ -23,10 +26,37 @@ import {
 export interface AgentUndoContext {
   permission: AgentPermissionLevel;
   allowedOperations: readonly AgentToolOperationId[];
-  liveEntityIds: ReadonlySet<string>;
+  liveEntityIds: AgentUndoLiveEntities;
 }
 
-export function readAgentUndoContext(t: AgentToolRegistryTranslate): AgentUndoContext {
+/**
+ * Live ids per entity type, read fresh at review time and again after the
+ * inverse runs. `media-item` is the reason this is async: its ids come from
+ * main, and a resolver that could not await would have to leave media out or
+ * answer from a stale copy.
+ *
+ * An unknown entity type yields an EMPTY set, so it refuses as
+ * `entity-not-found` rather than passing a check nothing performed.
+ */
+async function readLiveEntities(): Promise<AgentUndoLiveEntities> {
+  // A missing or failing media channel must not take the three local entity
+  // types down with it — an Undo of a deck or a calendar event does not need
+  // main at all.
+  const media = await Promise.resolve()
+    .then(() => window.api?.listMedia?.() ?? [])
+    .catch(() => []);
+  const byType = new Map<string, ReadonlySet<string>>([
+    ['flashcard', new Set(loadDeck().map((card) => card.id))],
+    ['flashcard-deck', new Set(loadDeckFolders())],
+    ['calendar-event', new Set(loadEvents().map((event) => event.id))],
+    ['media-item', new Set(media.map((item) => item.id))],
+  ]);
+  return (entityType) => byType.get(entityType) ?? new Set<string>();
+}
+
+export async function readAgentUndoContext(
+  t: AgentToolRegistryTranslate,
+): Promise<AgentUndoContext> {
   const profile = getActiveAgentProfile(loadLocalAgentProfiles());
   const handlers = createCentralAgentToolRegistry(t);
   const available = availableAgentToolOperationIds(handlers);
@@ -34,7 +64,7 @@ export function readAgentUndoContext(t: AgentToolRegistryTranslate): AgentUndoCo
   return {
     permission: effectiveAgentPermission(loadLocalAgentSettings().permission, profile),
     allowedOperations: profile ? available.filter((id) => enabled.has(id)) : available,
-    liveEntityIds: new Set(loadDeck().map((card) => card.id)),
+    liveEntityIds: await readLiveEntities(),
   };
 }
 
@@ -53,7 +83,7 @@ export async function performAgentUndo(
 ): Promise<AgentUndoResult> {
   let context: AgentUndoContext;
   try {
-    context = readAgentUndoContext(t);
+    context = await readAgentUndoContext(t);
   } catch {
     return { ok: false, code: 'store-failed' };
   }
@@ -70,8 +100,14 @@ export async function performAgentUndo(
   const handler = createCentralAgentToolRegistry(t)[target.operation];
   if (!handler) return { ok: false, code: 'operation-unavailable' };
   try {
-    await handler({ ids: [...target.entityIds] });
-    const remaining = new Set(loadDeck().map((card) => card.id));
+    // One call per invocation: the single-entity deletes take an `id` each, and
+    // only `flashcard.delete-cards` accepts the whole list at once.
+    for (const invocation of agentUndoInvocations(target.operation, target.entityIds)) {
+      await handler(invocation);
+    }
+    // Re-read live state for THIS entity type. Every supported inverse removes,
+    // so a surviving id means the adapter reported success without doing it.
+    const remaining = (await readLiveEntities())(target.entityType);
     if (target.entityIds.some((id) => remaining.has(id))) {
       return { ok: false, code: 'undo-failed' };
     }
