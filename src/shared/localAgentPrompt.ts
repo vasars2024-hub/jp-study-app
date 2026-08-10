@@ -53,11 +53,23 @@ export function selectLocalAgentApprovedOperations(
 
 export function buildLocalAgentSystemPrompt(context: LocalAgentPromptContext): string {
   const approved = new Set(selectLocalAgentApprovedOperations(context));
+  // `requiredArguments` and `argumentHints` are both omitted when empty rather than sent as
+  // `[]`/`{}`: the listing is repeated ~60 times in the prompt, and an empty field on every
+  // entry teaches a 1.7B model that the field is noise. Their absence already means "this
+  // operation needs nothing" — which is exactly what a zero-argument operation wants to say.
   const available = AGENT_TOOL_OPERATIONS.filter((definition) => approved.has(definition.id))
     .map((definition) => ({
     operation: definition.id,
     label: definition.label,
     confirmation: definition.confirmation ?? 'none',
+    // Previously absent, so every argument was a guess: the model was told an operation
+    // existed and never what to pass it. Required fields come from the runnability contract
+    // the parser already enforces, so listing them here cannot drift from the refusal the
+    // model would otherwise hit at parse time.
+    ...(definition.requiredArguments.length
+      ? { requiredArguments: definition.requiredArguments }
+      : {}),
+    ...(definition.argumentHints ? { optionalArguments: definition.argumentHints } : {}),
     }));
   const promptContext = boundedJson({
     memories: context.memories ?? [],

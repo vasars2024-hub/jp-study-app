@@ -64,6 +64,45 @@ describe('local agent model boundary', () => {
       .toThrow('unavailable operation');
   });
 
+  it('tells the model which arguments an operation requires, not just that it exists', () => {
+    const prompt = buildLocalAgentSystemPrompt({ permission: 'full-automation' });
+    // The runnability contract the parser enforces anyway. Listing it here is what
+    // stops the model from planning a step that is refused for a nameable reason.
+    expect(prompt).toContain('"requiredArguments"');
+    expect(prompt).toContain('"term"');
+  });
+
+  it('advertises the optional arguments of generate-cards, including the chapter range', () => {
+    const prompt = buildLocalAgentSystemPrompt({ permission: 'full-automation' });
+    // Without these the `book` source is unreachable: the model can route the
+    // operation but has no way to discover that a chapter range exists.
+    expect(prompt).toContain('"optionalArguments"');
+    expect(prompt).toContain('chapterFrom');
+    expect(prompt).toContain('chapterTo');
+    expect(prompt).toContain("'book' mines a chapter range");
+  });
+
+  it('omits the argument fields for an operation that reads nothing', () => {
+    const prompt = buildLocalAgentSystemPrompt({
+      permission: 'read-only',
+      availableOperations: ['flashcard.list-decks'],
+    });
+    // A `requiredArguments: []` on every entry would teach a 1.7B model to ignore
+    // the field on the entries that do carry one.
+    expect(prompt).toContain('flashcard.list-decks');
+    expect(prompt).not.toContain('"requiredArguments"');
+    expect(prompt).not.toContain('"optionalArguments"');
+  });
+
+  it('keeps the whole operations listing inside the prompt budget', () => {
+    const prompt = buildLocalAgentSystemPrompt({ permission: 'full-automation' });
+    // `boundedJson` truncates at 16k. The listing grew when arguments were added,
+    // and a silent truncation would drop the LAST operations from the model's view
+    // entirely rather than failing — the settings.* block is alphabetically last.
+    expect(prompt).not.toContain('[context truncated]');
+    expect(prompt).toContain('settings.reset-css');
+  });
+
   it('turns valid structured model output into a controller task', () => {
     const parsed = parseLocalAgentModelPlan(JSON.stringify({
       summary: 'Look up the requested word.',

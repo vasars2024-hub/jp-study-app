@@ -100,6 +100,21 @@ export interface AgentToolOperationDefinition {
    * inventing a contract for a handler that does not exist would be guessing.
    */
   requiredArguments: readonly string[];
+  /**
+   * What the OPTIONAL arguments mean, for the planning prompt.
+   *
+   * `requiredArguments` answers "is this step complete enough to run"; it says nothing about
+   * the arguments an operation merely *accepts*. The prompt used to list only the operation id,
+   * its label and its confirmation reason, so an argument that was not required was an argument
+   * the model had no way to discover — it could route `flashcard.generate-cards` but not learn
+   * that `source: 'book'` and a chapter range exist, which made a shipped capability
+   * unreachable in practice.
+   *
+   * Same discipline as `REQUIRED_ARGUMENTS`: an entry is written only where the adapter that
+   * executes it has actually been read. Inventing a hint would be worse than omitting one,
+   * because the model believes it.
+   */
+  argumentHints?: Readonly<Record<string, string>>;
 }
 
 const REQUIRED_ARGUMENTS: Partial<Record<AgentToolOperationId, readonly string[]>> = {
@@ -135,6 +150,31 @@ const REQUIRED_ARGUMENTS: Partial<Record<AgentToolOperationId, readonly string[]
   'visual-novel.generate-vocabulary': ['id'],
 };
 
+/**
+ * Optional-argument documentation, read off the adapter in each case.
+ *
+ * Only `cardStudioAgentHandlers.ts` is covered so far, because it is the only adapter whose
+ * every branch has been read end to end. The rest are absent rather than guessed — see
+ * `AgentToolOperationDefinition.argumentHints`.
+ */
+const ARGUMENT_HINTS: Partial<Record<AgentToolOperationId, Readonly<Record<string, string>>>> = {
+  'flashcard.generate-cards': {
+    source:
+      "'preset' invents new words; 'dictionary' uses the terms you pass or the user's starred words; 'book' mines a chapter range from a library EPUB. Defaults to 'preset'.",
+    itemId: "Library item id of the EPUB. Required when source is 'book'.",
+    chapterFrom:
+      "First chapter, 1-based and inclusive. Omit both bounds to mine the whole book. Out-of-range values are clamped, not refused.",
+    chapterTo: 'Last chapter, 1-based and inclusive. A single bound means that one chapter.',
+    terms:
+      "[{ term, reading, sentence }] to build cards from when source is 'dictionary'. Falls back to the user's starred words when omitted.",
+    wordCount: "How many words to invent when source is 'preset'. Capped at 25.",
+    cardCount: 'Cards per word. Capped at 10.',
+    termLimit: "Most terms to enrich for a 'book' run. Capped at 25; each one is a paid call.",
+    presetId: 'Preset id from flashcard.list-card-presets. Defaults to the saved preset.',
+    formatId: 'Format id from flashcard.list-card-presets. Defaults to the saved format.',
+  },
+};
+
 const operation = (
   id: AgentToolOperationId,
   tool: AgentToolId,
@@ -147,6 +187,7 @@ const operation = (
   label,
   minimumPermission,
   ...(confirmation ? { confirmation } : {}),
+  ...(ARGUMENT_HINTS[id] ? { argumentHints: ARGUMENT_HINTS[id] } : {}),
   requiredArguments: REQUIRED_ARGUMENTS[id] ?? [],
 });
 
