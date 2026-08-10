@@ -119,6 +119,10 @@ const REQUIRED_ARGUMENTS: Partial<Record<AgentToolOperationId, readonly string[]
   'settings.configure-module': ['key', 'value'],
   'settings.preview-css': ['css'],
   'settings.apply-css': ['css'],
+  'visual-novel.add': ['title'],
+  'visual-novel.track-route': ['id', 'name'],
+  'visual-novel.extract-text': ['id'],
+  'visual-novel.generate-vocabulary': ['id'],
 };
 
 const operation = (

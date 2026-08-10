@@ -3724,3 +3724,95 @@ text, `fresh: []`, `tsc` unchanged at 392, ESLint exit 0.
   from context items — `AgentAttachment`, not `AgentContextItem` — and the lens
   already captures `screenshotDataUrl` in its `reading` state, so the material
   exists and only the attachment producer and its privacy floor are missing.
+
+## The visual-novel adapters, and the update that replaces the route list — 2026-08-10
+
+### What was unavailable, and what is now installed
+
+`agentToolCapabilityMatrix` classified **17** declared operations as having no
+adapter. Five of them were the whole `visual-novel` tool, and every service they
+needed was already in the app: `visual-novel:list`, `:add`, `:updateRoutes`,
+`:readClipboard` and `:captureText` are the same IPC the Immersion panel drives.
+The unavailable surface is now **12** — three media, six anime, two dictionary
+(`dedicated-analysis-required`) and one flashcard (`false-success-stub-removed`),
+none of which this slice touched.
+
+The five adapters live in `renderer/visualNovelAgentHandlers.ts` and are spread
+into `createCentralAgentToolRegistry` beside `createStudyAgentHandlers()`. All
+five were already in `DEFAULT_AGENT_PROFILES`' `enabledOperations`, so installing
+the adapter is the only thing that stood between them and running — the
+capability directory now reports them `available` rather than
+`adapter-not-implemented`.
+
+### `visual-novel:updateRoutes` REPLACES the route list
+
+The finding worth the slice. The channel takes `(id, routes)` and writes that
+array as the entry's complete route list. An adapter that forwarded the one route
+the model asked about would therefore **delete every other route** — and the
+damage does not stop at the routes: `applyVisualNovelRoutes` clears the entry's
+`currentRouteId` outright when the surviving set no longer contains it
+(`shared/visualNovel.ts:694`), while the captures keep a `routeId` that now
+resolves to nothing. A "mark Yukine completed" step would have silently unpicked
+the player's place in the novel and orphaned every line they had captured.
+
+So `visual-novel.track-route` reads the entry, rebuilds the full route list as
+`VisualNovelRouteInput[]`, and patches one element in place — matching on
+`routeId` when given and on route name otherwise, appending when neither matches.
+Fields the caller did not mention (`guideNotes`, `endings`, `character`) are
+carried through from the stored route rather than defaulted away.
+
+Positive control: sending `[patch]` instead of the merged list fails the
+preservation test *and* the append test; restored byte-identical afterwards.
+
+### `tokenizeSync` returns `[]` when kuromoji has not been built
+
+`renderer/tokenizer.ts:121` opens with `if (!tok) return []`. A
+`generate-vocabulary` adapter that called it directly would report zero words for
+a novel with thousands of captured lines whenever the renderer had not already
+built the tokenizer for some other reason — a false success of exactly the kind
+`false-success-stub-removed` exists to keep out of this registry. The adapter
+therefore awaits `getTokenizer()` first and turns a build failure into
+`blanc.agent.error.tokenizerUnavailable`. A test asserts the *order* (build
+before the first tokenize call), not merely that words come back.
+
+An empty result is still distinguishable from a missing one: the adapter throws
+`visualNovelNoText` when the novel (or the named route) has no captures at all,
+and otherwise returns `capturesScanned` and `distinctWords` alongside the list.
+
+### `extract-text` is the clipboard lane, and only that
+
+The three extraction lanes are not equivalent. The hook lane needs a running
+game and a user answering a process picker; the OCR lane needs Reading Lens over
+a live window. The clipboard lane is the one an agent can drive on its own — it
+is what `VisualNovelPanel`'s poller reads, and it is where every Japanese text
+hooker writes. The adapter reuses that poller's own Japanese guard, refuses a
+clipboard with no Japanese in it, and returns `{captured: false, reason:
+'unchanged'}` rather than storing a duplicate when the newest capture already
+holds that text. Route, chapter and scene default to the entry's current values,
+the same three the panel sends.
+
+### Titles are accepted as ids, but only when they are unambiguous
+
+A local model passes a title where an id is asked for. `resolveEntry` falls back
+to an exact case-insensitive match over `title`, `japaneseTitle`, `englishTitle`
+and `alternativeTitles`, and accepts it **only when exactly one entry matches** —
+two matches refuse, the same way the navigation index refuses a tie. Every result
+returns the resolved id so the model can use the real one next time.
+
+### Gates
+
+`vitest run agent i18n lens settings flashcard visualNovel` — 88 files / 1181
+tests. `i18n-check` clean at 9,202 keys (four new `blanc.agent.error.*` keys,
+translated in ja/zh/ru). `i18n-hardcoded-check` clean. `architecture-audit`
+`fresh: 0`. `tsc --noEmit` unchanged at 392 errors with none in the touched
+files. ESLint exit 0 over the changed paths.
+
+### Still open after this
+
+- **Twelve operations remain unavailable.** The three media ones
+  (`analyze-subtitles`, `generate-profile`, `organize-files`) have a real local
+  substrate in the subtitle discovery records and would be the next adapters to
+  take. The six anime ones do not: `anime.search` and `anime.check-releases` read
+  as local, but the MAL list arrives over `mal:fetchList` and the schedule over
+  the scraper, so "search *tracked* anime" needs a decision about what a cached
+  local anime record even is before an adapter can honestly answer it.

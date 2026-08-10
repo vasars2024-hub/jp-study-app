@@ -27,6 +27,7 @@ import { applyBlancCustomCss } from './blancCustomCssApply';
 import { loadToolboxSettings, saveToolboxSettings } from './toolboxSettings';
 import { recordBlancThemeHistory, undoBlancThemeHistory } from './blancThemeHistoryStore';
 import { createStudyAgentHandlers } from './studyAgentHandlers';
+import { createVisualNovelAgentHandlers } from './visualNovelAgentHandlers';
 
 export type AgentToolRegistryTranslate = (key: string, vars?: TVars) => string;
 
@@ -53,11 +54,6 @@ const UNAVAILABLE: Readonly<Partial<Record<AgentToolOperationId, AgentToolUnavai
   'anime.update-metadata': 'adapter-not-implemented',
   'anime.analyze-difficulty': 'adapter-not-implemented',
   'anime.fetch-external-metadata': 'adapter-not-implemented',
-  'visual-novel.search': 'adapter-not-implemented',
-  'visual-novel.add': 'adapter-not-implemented',
-  'visual-novel.track-route': 'adapter-not-implemented',
-  'visual-novel.extract-text': 'adapter-not-implemented',
-  'visual-novel.generate-vocabulary': 'adapter-not-implemented',
   'flashcard.schedule-reviews': 'false-success-stub-removed',
   'dictionary.explain-grammar': 'dedicated-analysis-required',
   'dictionary.analyze-sentence': 'dedicated-analysis-required',
@@ -129,6 +125,7 @@ function safeCalendarEntry(
 export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): AgentToolHandlers {
   const handlers: AgentToolHandlers = {
     ...createStudyAgentHandlers(),
+    ...createVisualNovelAgentHandlers(t),
     'dictionary.lookup': async (arguments_) => (
       window.api.lookupTerm(textArgument(t, arguments_, 'term'))
     ),
