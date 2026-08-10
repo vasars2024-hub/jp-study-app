@@ -14,6 +14,7 @@
 
 import {
   pipelineVerdict,
+  summarizeArguments,
   type AgentPipelineLine,
 } from '../shared/agentPipelineTrace';
 import type { AgentOperationLog } from '../shared/agentOperationLog';
@@ -122,7 +123,10 @@ export function buildAgentPipelineLines(log: AgentOperationLog): AgentPipelineLi
         seq: entry.sequence,
         operation: entry.operation,
         status: 'ok' as const,
-        argumentSummary: '',
+        // Summarized at render time, not stored pre-rendered: the record keeps
+        // structured arguments so the terminal stays free to show them
+        // differently without rewriting history.
+        argumentSummary: summarizeArguments(entry.arguments),
         claim: entry.claim,
         entityType: entry.entityType,
         claimedIds: entry.entityIds,

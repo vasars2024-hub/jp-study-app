@@ -122,6 +122,10 @@ export async function performAgentUndo(
       claim: 'deleted',
       entityType: target.entityType,
       entityIds: [...target.entityIds],
+      // An undo has one real input: the step it reverses. Naming it is what
+      // makes the terminal's two lines readable as a pair rather than as an
+      // unexplained delete that appeared after a create.
+      arguments: { inverts: target.sequence },
       callId: `undo|${operationId}`,
       invertsSequence: target.sequence,
     },

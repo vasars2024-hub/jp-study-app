@@ -103,6 +103,19 @@ export interface AgentOperationEntry {
   claim: AgentOperationClaim;
   entityType: string;
   entityIds: readonly string[];
+  /**
+   * What the step was ASKED to do, as opposed to what it reports having done.
+   *
+   * The pipeline terminal needs both: `entityIds` answer "did something land",
+   * and only these answer "did it aim at the book and the chapters the user
+   * meant". A step that created three cards from the wrong chapter is
+   * indistinguishable from a correct one without them.
+   *
+   * Optional because not every effect has arguments — an undo takes none beyond
+   * the entry it reverses — and because an entry recorded before this field
+   * existed is still a valid record, not a broken one.
+   */
+  arguments?: Readonly<Record<string, unknown>>;
   callId: string;
   /** Exact conversation origin when the operation came from a conversation plan. */
   conversationId?: string;
@@ -154,6 +167,13 @@ export function agentOperationLogAppend(
   const entry: AgentOperationEntry = {
     ...draft,
     entityIds: [...draft.entityIds],
+    // Copied for the same reason `entityIds` is: the caller usually passes the
+    // live `step.request.arguments`, and a record that changes when its source
+    // is edited later is not a record. The copy is shallow, which covers exactly
+    // what the terminal renders — the keys, the primitives, and an array's
+    // length. A nested array's CONTENTS are still shared and are not part of the
+    // record's guarantee.
+    ...(draft.arguments ? { arguments: { ...draft.arguments } } : {}),
     sequence,
     id: `${draft.callId}|${sequence}`,
     recordedAt: now,

@@ -154,6 +154,10 @@ export function agentOperationDraftFromExecution(
     claim: contract.claim,
     entityType: contract.entityType,
     entityIds,
+    // The request's own arguments, not a reconstruction: the terminal's whole
+    // claim is that it reports what the step was given, and anything rebuilt
+    // here could differ from what the handler actually received.
+    arguments: step.request.arguments,
     callId: step.request.callId,
     conversationId,
     taskId: task.id,

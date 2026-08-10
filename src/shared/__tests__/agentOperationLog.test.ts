@@ -58,6 +58,24 @@ describe('agentOperationLogAppend', () => {
     expect(log.entries[0].entityIds).toEqual(['card-1']);
   });
 
+  it('snapshots the arguments, which callers pass live from the request', () => {
+    // The executor hands over `step.request.arguments` itself. If the log kept
+    // that reference, editing the plan afterwards would rewrite what the
+    // terminal reports the step was asked to do.
+    const arguments_: Record<string, unknown> = { bookId: 'novel-7', from: 1, to: 5 };
+    const log = agentOperationLogAppend(AGENT_OPERATION_LOG_EMPTY, draft({ arguments: arguments_ }), NOW);
+    arguments_.to = 60;
+    delete arguments_.bookId;
+    expect(log.entries[0].arguments).toEqual({ bookId: 'novel-7', from: 1, to: 5 });
+  });
+
+  it('records no arguments at all rather than an empty object', () => {
+    // An operation that genuinely takes none must be distinguishable from one
+    // whose arguments were lost on the way into the log.
+    const log = agentOperationLogAppend(AGENT_OPERATION_LOG_EMPTY, draft(), NOW);
+    expect('arguments' in log.entries[0]).toBe(false);
+  });
+
   it('drops the oldest at the bound and counts what it dropped', () => {
     const drafts = Array.from({ length: AGENT_OPERATION_LOG_LIMIT + 3 }, (_unused, index) => (
       draft({ callId: `call-${index}`, entityIds: [`card-${index}`] })

@@ -104,6 +104,10 @@ export function saveAgentEntity(target: AgentSaveTarget, callId: string): AgentS
         claim: 'created',
         entityType: target.entityType,
         entityIds: [created[0].id],
+        // The row as it was actually written — `word` is the trimmed value that
+        // went into the deck, not `target.word`, so the terminal shows the card
+        // that exists rather than the one that was requested.
+        arguments: { word, meaning: target.meaning },
         callId,
       },
     };

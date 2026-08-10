@@ -12,11 +12,12 @@ const NOW = 1_700_000_000_000;
 function completedTask(
   operation: Parameters<typeof createAgentTask>[2][number]['request']['operation'],
   result: unknown,
+  arguments_: Record<string, unknown> = {},
 ) {
   const queued = createAgentTask('task-1', 'Do the thing', [{
     id: 'step-1',
     label: 'First step',
-    request: { callId: 'call-1', operation, arguments: {} },
+    request: { callId: 'call-1', operation, arguments: arguments_ },
   }], NOW);
   const running = updateAgentTask(queued, { type: 'start-step', stepId: 'step-1' }, NOW + 1);
   return updateAgentTask(
@@ -43,10 +44,11 @@ function event(
 
 describe('agentOperationDraftFromExecution', () => {
   it('records exact returned ids with full conversation-plan provenance', () => {
-    const task = completedTask('flashcard.add-cards', {
-      cards: 12,
-      createdIds: ['card-1', 'card-2', 'card-1'],
-    });
+    const task = completedTask(
+      'flashcard.add-cards',
+      { cards: 12, createdIds: ['card-1', 'card-2', 'card-1'] },
+      { bookId: 'novel-7', from: 1, to: 5 },
+    );
     expect(agentOperationDraftFromExecution(
       'conversation-1',
       task,
@@ -57,11 +59,32 @@ describe('agentOperationDraftFromExecution', () => {
       claim: 'created',
       entityType: 'flashcard',
       entityIds: ['card-1', 'card-2'],
+      // What the step was asked to do. Without it the record says two cards
+      // landed but not which book or chapters they were supposed to come from,
+      // which is the half the user is actually checking.
+      arguments: { bookId: 'novel-7', from: 1, to: 5 },
       callId: 'call-1',
       conversationId: 'conversation-1',
       taskId: 'task-1',
       stepId: 'step-1',
     });
+  });
+
+  it('carries the request arguments rather than rebuilding them', () => {
+    // Two runs that differ ONLY in the chapters they targeted must produce two
+    // distinguishable records — that is the whole point of storing arguments.
+    const draft = (from: number, to: number) => agentOperationDraftFromExecution(
+      'chat',
+      completedTask(
+        'flashcard.add-cards',
+        { createdIds: ['card-1'] },
+        { bookId: 'novel-7', from, to },
+      ),
+      'step-1',
+      [event('tool-completed')],
+    );
+    expect(draft(1, 5)?.arguments).toEqual({ bookId: 'novel-7', from: 1, to: 5 });
+    expect(draft(6, 9)?.arguments).toEqual({ bookId: 'novel-7', from: 6, to: 9 });
   });
 
   it('requires exactly one matching real completion event', () => {

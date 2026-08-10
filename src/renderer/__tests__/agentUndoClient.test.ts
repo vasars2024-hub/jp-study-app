@@ -142,6 +142,9 @@ describe('performAgentUndo', () => {
         claim: 'deleted',
         entityType: 'flashcard',
         entityIds: ['card-1'],
+        // An undo's one real input is the step it reverses, which is what makes
+        // the pair readable in the terminal.
+        arguments: { inverts: 0 },
         callId: 'undo|save-call|0',
         invertsSequence: 0,
       },

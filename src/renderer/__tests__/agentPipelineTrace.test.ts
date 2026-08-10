@@ -7,7 +7,17 @@ import {
   summarizeArguments,
   type AgentPipelineLine,
 } from '../../shared/agentPipelineTrace';
-import { resolveAgentEntities, resolvableEntityTypes } from '../agentPipelineVerify';
+import {
+  buildAgentPipelineLines,
+  resolveAgentEntities,
+  resolvableEntityTypes,
+} from '../agentPipelineVerify';
+import {
+  AGENT_OPERATION_LOG_EMPTY,
+  agentOperationLogAppend,
+  type AgentOperationDraft,
+  type AgentOperationLog,
+} from '../../shared/agentOperationLog';
 import { addDeckCardsTracked, createDeckFolder } from '../flashcardDeck';
 
 function line(overrides: Partial<AgentPipelineLine>): AgentPipelineLine {
@@ -149,5 +159,79 @@ describe('resolveAgentEntities', () => {
 
   it('declares exactly which entity types it can prove', () => {
     expect(resolvableEntityTypes()).toEqual(['calendar-event', 'flashcard', 'flashcard-deck']);
+  });
+});
+
+describe('buildAgentPipelineLines', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  const logOf = (...drafts: AgentOperationDraft[]): AgentOperationLog => drafts.reduce(
+    (log, entry, index) => agentOperationLogAppend(log, entry, 1_700_000_000_000 + index),
+    AGENT_OPERATION_LOG_EMPTY,
+  );
+
+  it('shows what each step targeted, not just what it produced', () => {
+    // The question the terminal exists to answer is "did it aim at the right
+    // book and chapters", and the destination alone cannot answer it: two runs
+    // over different chapters land in the same deck group.
+    const created = addDeckCardsTracked([
+      { word: '猫', reading: 'ねこ', meaning: 'cat', source: 'import', bookTitle: 'Novel — Ch. 1-5' },
+    ]);
+    const lines = buildAgentPipelineLines(logOf({
+      operation: 'flashcard.add-cards',
+      claim: 'created',
+      entityType: 'flashcard',
+      entityIds: created.map((card) => card.id),
+      arguments: { bookId: 'novel-7', from: 1, to: 5 },
+      callId: 'call-1',
+    }));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0].argumentSummary).toBe('bookId="novel-7" from=1 to=5');
+    expect(lines[0].verdict).toBe('verified');
+    expect(lines[0].destination).toBe('Novel — Ch. 1-5');
+  });
+
+  it('distinguishes two steps that differ only in what they targeted', () => {
+    const lines = buildAgentPipelineLines(logOf(
+      {
+        operation: 'flashcard.add-cards',
+        claim: 'created',
+        entityType: 'flashcard',
+        entityIds: ['ghost-1'],
+        arguments: { bookId: 'novel-7', from: 1, to: 5 },
+        callId: 'call-1',
+      },
+      {
+        operation: 'flashcard.add-cards',
+        claim: 'created',
+        entityType: 'flashcard',
+        entityIds: ['ghost-2'],
+        arguments: { bookId: 'novel-7', from: 6, to: 9 },
+        callId: 'call-2',
+      },
+    ));
+
+    // Oldest first: the log is newest-first for Undo, a terminal reads downward.
+    expect(lines.map((entry) => entry.seq)).toEqual([0, 1]);
+    expect(lines.map((entry) => entry.argumentSummary)).toEqual([
+      'bookId="novel-7" from=1 to=5',
+      'bookId="novel-7" from=6 to=9',
+    ]);
+    // Neither was actually written, so both must read as false successes.
+    expect(lines.every((entry) => entry.verdict === 'missing')).toBe(true);
+  });
+
+  it('renders an empty summary for an operation that took no arguments', () => {
+    const lines = buildAgentPipelineLines(logOf({
+      operation: 'flashcard.add-cards',
+      claim: 'created',
+      entityType: 'flashcard',
+      entityIds: ['ghost-1'],
+      callId: 'call-1',
+    }));
+    expect(lines[0].argumentSummary).toBe('');
   });
 });

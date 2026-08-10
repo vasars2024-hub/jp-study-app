@@ -151,6 +151,9 @@ describe('grantAgentSave', () => {
         claim: 'created',
         entityType: 'flashcard',
         entityIds: ['created-1'],
+        // The row as written, so the pipeline terminal can show WHICH word this
+        // step saved rather than only that one card appeared.
+        arguments: { word: '積ん読', meaning: 'books bought and left unread' },
         callId: 'save|chat-1|msg-1|card-1|save-1',
       },
     });
