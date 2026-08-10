@@ -28,6 +28,7 @@ import {
   recordCueAudio,
   type CapturedAsset,
 } from './cueAudioCapture';
+import MediaCueAgentHandoffButton from './MediaCueAgentHandoffButton';
 
 interface Props {
   cue: VideoCoreStudyCue | null;
@@ -613,6 +614,14 @@ export default function VideoCoreMiningPanel({
             ? t('mediaWorkspace.mining.mining')
             : t('mediaWorkspace.mining.mine')}
         </button>
+        {/* Beside Mine rather than among the capture buttons: this is a second thing to
+            *do* with the line, not a third asset to arm. It makes its own bounded frame,
+            so it neither needs nor consumes whatever the screenshot button attached. */}
+        <MediaCueAgentHandoffButton
+          line={draft.sentence.trim() || draft.provenance.cue.text}
+          mediaTitle={source.mediaTitle || source.localFilePath || source.playbackId}
+          video={video}
+        />
         {missingTerm && (
           <small className="study-mining-hint">{t('mediaWorkspace.mining.missingText')}</small>
         )}

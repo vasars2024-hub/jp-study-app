@@ -5234,3 +5234,174 @@ Those nine files fail at HEAD for the same reason the imports fail: the
 committed tree is missing other tracks' uncommitted work. In the shared working
 tree all 505 files pass. **Nobody should read the nine as a regression**, and
 nobody should read a green working-tree run as proof the branch builds.
+
+## The last capture surface, and the 27 MiB it would have sent — 2026-08-11
+
+The section above left two things open. One of them turns out to have been closed
+by somebody else's earlier work and only *read* as open, which is the fourth time
+running this ledger's own "still open" list has been wrong — so it is worth
+saying plainly before the slice itself.
+
+### One of the two was never open
+
+"`visualNovels.ts`'s `saveCaptureScreenshot` path … hands nothing to the Agent"
+described a producer that does not exist. `saveCaptureScreenshot` is called from
+exactly one place — `visual-novel:captureMany`, on `options.screenshotDataUrl`
+(`visualNovels.ts:977-987`) — and that channel has exactly one renderer caller,
+**ReadingLens** (`ReadingLensOverlay.tsx:498-508`). The other capture gestures
+all go through `visual-novel:captureText`, whose input has no image field at all:
+the clipboard poller and the manual `captureLine` textarea in `VisualNovelPanel`,
+and the Agent's own `visual-novel.capture-line` adapter. So there is nothing for
+that path to hand over that the lens has not already handed over itself. Every screenshot it persists therefore *already* reaches the
+Agent twice over: once from the lens at capture time, and once from the VN
+library through `VisualNovelAgentHandoffButton` reading it back. Nothing was
+missing; the entry named a file rather than a gesture.
+
+That leaves **the media player**, which was genuinely open, and is this slice.
+
+### The frame is only ever now
+
+`VideoCoreMiningPanel` is where the player captures. It is the third producer
+that can carry a picture and the first whose picture does not exist until the
+gesture asks for it — the lens hands over a JPEG main has just made, a VN
+capture's screenshot was saved when the line was captured, and a video frame is
+only ever the current one. So this one makes its capture at click time.
+
+The panel's own `captureFrame` was **deliberately not reused**, and the reason is
+not stylistic. It builds an Anki card asset: a full-resolution PNG with the
+subtitle burned into it. Measured live in the running renderer against a 4K frame
+of incompressible noise:
+
+| | bytes | verdict |
+| --- | --- | --- |
+| what `captureFrame` produces (3840×2160 PNG) | **28,535,646** | over `AGENT_EXECUTION_IMAGE_BYTES_LIMIT` |
+| what this slice produces (bounded JPEG) | **225,525** | inside the 900 KiB target |
+
+27.2 MiB against a 4 MiB bound. Reusing the mining capture would not have been a
+smaller diff with a worse picture — it would have been a control that reaches the
+user as `image-failed` on any high-resolution release. The second reason is
+smaller and still real: the burned-in cue is the line a second time, in the one
+place the model was going to look at the scene.
+
+`cueFrameCapture.ts` is therefore a separate, clean, bounded JPEG, and its policy
+is deliberately **`screenOcr.ts`'s `boundedScreenshotDataUrl`, rung for rung** —
+1280 longest side at q72, falling back to 800 at q52 then q35, targeting 900 KiB.
+The lens and the player now hand the Agent pictures of the same kind of thing;
+two different answers to "how big may a capture be" would be two policies to keep
+in step.
+
+### Two things this producer deliberately does not say
+
+- **No scene.** `mediaCueAgentContext`'s second argument is the turns around the
+  line, and the panel is handed one cue with nothing either side of it. An empty
+  scene falls back to the line, which the producer already does and its tests
+  already pin. Filling the field from the draft's *translation* would put a
+  translation where the prompt builder renders surrounding Japanese.
+- **No `entityId`.** `VideoCoreMiningSource.mediaId` is an AniList id;
+  `MediaStudyMode`, the other `media-cue` producer, discloses a media-library
+  item id. `media-cue` keys its identity on the line alone — the looseness this
+  ledger recorded one section ago and again declines to widen — so the same line
+  watched through both surfaces is **one** shelf entry, and an id from whichever
+  namespace happened to be last would be provenance that is *wrong* rather than
+  merely absent. The show is still named: it titles the conversation, exactly as
+  `MediaStudyMode` titles it. A test pins the absence so a later "improvement"
+  has to argue with it.
+
+The route is `player` and not the producer's own `media`, for the reason
+`MediaStudyMode` already records: `media` names no window and would yield a
+navigation suggestion that could only fail its allowlist check.
+
+### Live acceptance
+
+Driven through the bridge against a **fresh boot** — the recorded `bridge.json`
+port refused connections, so no dev instance was running and one was started.
+
+The two new modules were imported in the **real renderer**, not vitest's module
+graph, which would not catch an import path the bundler rejects: both resolve,
+`MediaCueAgentHandoffButton`'s default export is a function, so every import it
+names resolves too.
+
+The ladder was then run against a real Chromium 2D context and a real JPEG
+encoder — the half the unit tests cannot reach, since the node environment they
+run in has no canvas. The 4K noise frame above came back `image/jpeg`, and the
+renderer's own `decodedBase64Bytes` agreed with the measurement to the byte
+(225,525 both ways). `normalizeAgentImageStageRequest` **accepted** it, so what
+this surface produces is not merely small, it is something the staging door on
+the other side takes.
+
+`VideoCoreMiningPanel` itself was then mounted live with a fixture cue. The
+button is present, sits beside Mine (`['mine-card', 'ask-agent']`), is enabled —
+and rendered **`Спросить Агента`**, because the app's UI language happens to be
+Russian right now. That is a stronger result than the four-language probe beside
+it: the key resolved through the *running* catalog, not through a probe's own
+`translate` call. All four were checked anyway, through `ensureCatalog` and
+`core.translate`:
+
+| lang | `mediaWorkspace.mining.askAgent` | `agent.handoff.frame.name` |
+| --- | --- | --- |
+| en | `Ask the Agent` | `Video frame` |
+| ja | `エージェントに聞く` | `映像フレーム` |
+| zh | `询问智能体` | `视频画面` |
+| ru | `Спросить Агента` | `Кадр видео` |
+
+No key rendered as its own text, and `agent.conversation.fromMedia`'s `{label}`
+interpolates (`Watching: 夜のクラゲ` / `Просмотр: 夜のクラゲ`). `/logs` shows
+eight entries, all ordinary startup, **zero errors**, and no foreign
+`[vite] hot updated` paths.
+
+The mount writes nothing: `jp-video-core-mining-history-v1` was captured before
+it and compared after, unchanged, and again after unmounting. Every probe global
+was deleted and re-read as absent, the detached host removed, and the three
+helper scripts written under `debug/` (which is gitignored) deleted.
+
+### What was deliberately not verified
+
+**The button was not clicked in the live app.** Doing so writes a real
+conversation into the user's own workspace. What the click would add over what is
+proven — the frame encodes, the staging normalizer accepts it, the producers emit
+the right shapes, the button renders and is enabled, every import resolves — is a
+click, not a fact. The lens and visual-novel slices drew this line in the same
+place for the same reason.
+
+### The test that guards the image, proved to guard it
+
+`carries the frame as a bounded JPEG attachment` was run against a producer whose
+image argument had been replaced with `undefined`, and **failed**
+(`× carries the frame as a bounded JPEG attachment`); the file was then restored
+and verified byte-identical (`SequenceEqual === True`). A regression test that
+has never been seen to fail is not yet evidence.
+
+### Gates
+
+`npx vitest run`: 506 passed / 1 skipped of 507 files, **6,881 passed** / 6
+skipped of 6,887 — up exactly 23 from `2a228cf`'s 6,858, matching the 23 tests
+added. `node tools/i18n-check.cjs`: clean, all **9,252** English keys translated
+in ja/zh/ru (up 3, matching the three keys added). `node
+tools/architecture-audit.cjs`: nothing new, the same 3 known pending findings.
+`npx eslint` on the ten touched paths: **0 errors, 0 warnings**. `tsc --noEmit`
+is not a gate here; **392** pre-existing errors, the recorded baseline, and 0 in
+any file this slice touches.
+
+### Staged against a shared tree
+
+Five of the seven modified files carry another track's uncommitted work — the
+four catalogs (~2,492 foreign insertions) and `VideoCoreMiningPanel.tsx` (its
+`translationText` prop and the mining-history merge fix). Those five were
+committed as **reconstructed blobs**: HEAD plus this slice's lines only, each
+anchor asserted to match exactly once, each HEAD blob asserted LF-only before the
+edit and hashed with `--no-filters` so no CRLF conversion could enter the object.
+`src/shared/mediaWorkspaceI18n.ts` and the ledger have no foreign hunks and were
+staged normally; the four new files are new. The working tree's foreign state is
+untouched.
+
+### Still open
+
+- **`mediaCueAgentContext`'s identity ignores `mediaId`**, so the same subtitle
+  line in two different shows is one shelf entry. Unchanged for the third
+  section running: fixing it changes ids that have already shipped, and it now
+  has three producers rather than two, which raises the cost rather than the
+  case.
+- **The branch still does not build from its own HEAD** — the five untracked
+  `src/shared/i18n/*/` directories the section above describes. Nothing here
+  changes that, and this slice's four catalog edits sit in the same files whose
+  imports point at them.

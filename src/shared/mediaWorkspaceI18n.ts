@@ -10,4 +10,5 @@ export const ADOPTED_MEDIA_I18N_SURFACES = [
   'src/media/StudyPlayerSlice.tsx',
   'src/media/VideoCoreMiningPanel.tsx',
   'src/media/VideoCoreStudyOverlay.tsx',
+  'src/media/MediaCueAgentHandoffButton.tsx',
 ] as const;
