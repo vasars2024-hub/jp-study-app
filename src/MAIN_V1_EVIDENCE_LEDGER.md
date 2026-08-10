@@ -4639,3 +4639,34 @@ store to tidy up after a test.
 `click.ps1`'s hit-test refused twice, correctly, when the toggle had scrolled to
 `y = -520`. That is the guard working, not a failure — and it is the difference
 between "the control did nothing" and "the control was not under the cursor".
+
+## Re-audit: the "async resolvers" slice was already done — 2026-08-10
+
+A prior session's own closing summary named "async resolvers for entity types"
+as the next slice, "a separate work item." Re-deriving from source rather than
+trusting that claim: it is already fully implemented, and was before this
+session started.
+
+`readAgentUndoContext` / `readLiveEntities` (`renderer/agentUndoClient.ts:41-55`)
+is already `async` and already covers all four entity types the four supported
+inverses need — `flashcard`, `flashcard-deck`, `calendar-event`, `media-item` —
+with `media-item` read through `window.api.listMedia()` precisely because it
+lives in main, exactly as the function's own comment already documented. There
+is no synchronous caller left to convert. `src/shared/__tests__/agentUndo.test.ts`
+and `src/renderer/__tests__/agentUndoClient.test.ts` both pass (21/21) and
+already exercise this path — this is a re-verification, not new coverage.
+
+The real next slice, per `MAIN_V1_COMPLETION_PLAN.md`'s "Still required" list,
+is the vision-input screenshot/OCR attachment context. Before starting it, note
+one constraint the plan doc doesn't spell out: `AgentExecutionAttachment`
+(`shared/agentExecutionBridge.ts:49-58`) is `kind: 'text' | 'document'` with a
+`contentText: string` payload, and `normalizeExecutionAttachment` *rejects any
+object carrying a field named* `localPath`, `path`, `bytes`, `contentBytes`,
+`data`, `base64`, or `buffer` (`FORBIDDEN_ATTACHMENT_FIELDS`, same file). That
+list exists on purpose, to keep binary payloads out of this channel — it is not
+an oversight that happens to be in the way. A `kind: 'image'` addition needs its
+own field name (not one of the forbidden ones), its own explicit size bound and
+`sensitivity` floor, and a decision on which of the two cloud providers
+(`gemini-2.5-flash`, `deepseek-v4-flash`/`-pro`) actually accept image input —
+the local Qwen3-1.7B backend does not. Treat the forbidden-fields set as a
+boundary to extend deliberately, not a check to route around.
