@@ -83,6 +83,17 @@ import {
   setSettingsAdvanced,
 } from '../../settingsAdvanced';
 import { getReduceMotion, setReduceMotion } from '../../displayPrefs';
+import {
+  AGENT_NAVIGATION_CHANNELS,
+  type AgentSettingsNavigationDelivery,
+} from '../../../shared/agentNavigationBridge';
+import {
+  AGENT_SETTINGS_ACK_BUDGET_MS,
+  agentSettingsRenderedTarget,
+  createAgentSettingsAckScheduler,
+  focusAgentSettingsRenderedTarget,
+  normalizeAgentSettingsNavigationLink,
+} from './agentSettingsNavigation';
 
 
 function applyMotion(reduce: boolean): void {
@@ -94,6 +105,7 @@ export default function SettingsApp(props: SettingsWallProps) {
   const aero = useAeroMaterials();
   const [page, setPage] = useState<SettingsPageId>('home');
   const [focusSettingId, setFocusSettingId] = useState<string | null>(null);
+  const [guidedPage, setGuidedPage] = useState<SettingsPageId | null>(null);
   const [look, setLook] = useState<OsPersonalization>(loadPersonalization);
   const [deskPrefs, setDeskPrefs] = useState<DesktopPrefs>(loadDesktopPrefs);
   const [env, setEnv] = useState<EnvironmentSettings>(loadEnvironment);
@@ -115,6 +127,7 @@ export default function SettingsApp(props: SettingsWallProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   const navigate = useCallback((next: SettingsPageId, settingId?: string) => {
+    setGuidedPage(null);
     setPage(next);
     pushRecentPage(next);
     setFocusSettingId(settingId ?? null);
@@ -151,6 +164,72 @@ export default function SettingsApp(props: SettingsWallProps) {
     window.addEventListener('settings:navigate', onNav);
     return () => window.removeEventListener('settings:navigate', onNav);
   }, [navigate]);
+
+  // Main delivers only a destination it has freshly re-resolved from the
+  // persisted action and live route context. Settings still validates the
+  // shared static page/control registry and acknowledges only after the exact
+  // page/control has rendered with its visible highlight.
+  useEffect(() => {
+    const scheduler = createAgentSettingsAckScheduler({
+      visibility: () => document.visibilityState,
+      requestFrame: (callback) => window.requestAnimationFrame(() => callback()),
+      cancelFrame: (handle) => window.cancelAnimationFrame(handle),
+      setTimer: (callback, ms) => window.setTimeout(callback, ms),
+      clearTimer: (handle) => window.clearTimeout(handle),
+    });
+    // Main re-offers the same destination until it is acknowledged, so a later
+    // delivery supersedes any attempt still looking for the previous one.
+    let generation = 0;
+    const onAgentNavigation = (event: Event): void => {
+      const detail = (event as CustomEvent<AgentSettingsNavigationDelivery>).detail;
+      if (!detail || typeof detail.handled !== 'function') return;
+      detail.handled();
+      const destination = normalizeAgentSettingsNavigationLink({
+        section: detail.section,
+        ...(detail.page ? { page: detail.page } : {}),
+        ...(detail.controlId ? { controlId: detail.controlId } : {}),
+        ...(detail.highlight === true ? { highlight: true } : {}),
+      });
+      if (
+        !destination
+        || !pageMeta(destination.page as SettingsPageId)
+      ) {
+        event.preventDefault();
+        // A judgement about the destination, not about this moment: final.
+        detail.reject('invalid');
+        return;
+      }
+
+      const mine = ++generation;
+      const nextPage = destination.page as SettingsPageId;
+      setGuidedPage(nextPage);
+      setPage(nextPage);
+      pushRecentPage(nextPage);
+      setFocusSettingId(destination.controlId ?? null);
+      contentRef.current?.scrollTo({ top: 0 });
+
+      const deadline = Date.now() + AGENT_SETTINGS_ACK_BUDGET_MS;
+      const acknowledgeRenderedTarget = (): void => {
+        if (mine !== generation) return;
+        const rendered = agentSettingsRenderedTarget(contentRef.current, destination);
+        if (!rendered) {
+          if (Date.now() < deadline) scheduler.schedule(acknowledgeRenderedTarget);
+          // Says nothing about the destination — this window just cannot answer
+          // yet, and main is free to offer it again.
+          else detail.reject('not-ready');
+          return;
+        }
+        focusAgentSettingsRenderedTarget(rendered);
+        detail.accept();
+      };
+      scheduler.schedule(acknowledgeRenderedTarget);
+    };
+    window.addEventListener(AGENT_NAVIGATION_CHANNELS.settingsDelivery, onAgentNavigation);
+    return () => {
+      window.removeEventListener(AGENT_NAVIGATION_CHANNELS.settingsDelivery, onAgentNavigation);
+      scheduler.cancelAll();
+    };
+  }, []);
 
   // Clear highlight after a short beat so re-navigation can re-trigger
   useEffect(() => {
@@ -369,10 +448,10 @@ export default function SettingsApp(props: SettingsWallProps) {
 
   // If user turns Advanced off while on an advanced-only page, bounce home.
   useEffect(() => {
-    if (!advancedMode && meta?.advanced && page !== 'home') {
+    if (!advancedMode && meta?.advanced && page !== 'home' && guidedPage !== page) {
       navigate('home');
     }
-  }, [advancedMode, meta?.advanced, page, navigate]);
+  }, [advancedMode, meta?.advanced, page, guidedPage, navigate]);
 
   return (
     <SettingsProvider value={ctrl}>
@@ -433,6 +512,8 @@ export default function SettingsApp(props: SettingsWallProps) {
               ref={contentRef}
               className={`os-set-pane-v2${reduceMotion ? '' : ' os-set-pane-anim'}`}
               key={page}
+              data-settings-page={page}
+              tabIndex={-1}
               role="main"
               aria-label={meta ? t(meta.labelKey) : t('settings.appTitle')}
             >

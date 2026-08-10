@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AgentNavigationDestination } from '../../shared/agentNavigation';
 import { AGENT_NAVIGATION_CHANNELS } from '../../shared/agentNavigationBridge';
 import type { AgentWorkspaceState } from '../../shared/agentWorkspace';
 
@@ -39,7 +40,7 @@ import { createAgentWorkspaceStore, type AgentWorkspaceStore } from '../agentWor
 
 let root = '';
 let store: AgentWorkspaceStore;
-let opened: string[];
+let opened: AgentNavigationDestination[];
 
 function workspace(): AgentWorkspaceState {
   return {
@@ -105,14 +106,39 @@ const invoke = async (payload: unknown): Promise<unknown> => {
   return await handler({}, payload);
 };
 
-function register(open?: (section: string) => boolean | Promise<boolean>): void {
+function register(
+  open?: (destination: AgentNavigationDestination) => boolean | Promise<boolean>,
+): void {
   registerAgentNavigationIpc({
     resolveStore: () => store,
-    openSection: (section) => {
-      opened.push(section);
-      return open ? open(section) : true;
+    openSection: (destination) => {
+      opened.push(destination);
+      return open ? open(destination) : true;
     },
   });
+}
+
+function useExactSettingsDestination(): AgentNavigationDestination {
+  const destination: AgentNavigationDestination = {
+    section: 'settings',
+    page: 'appearance',
+    controlId: 'theme',
+    highlight: true,
+  };
+  const state = store.read();
+  state.conversations[0].context[0].label = 'Theme setting';
+  state.conversations[0].context[0].source = {
+    app: destination.section,
+    route: destination.page,
+    controlId: destination.controlId,
+    highlight: true,
+  };
+  state.conversations[0].messages[0].cards[0].actions[0].effect = {
+    type: 'navigate',
+    ...destination,
+  };
+  store.write(state);
+  return destination;
 }
 
 beforeEach(() => {
@@ -152,7 +178,26 @@ describe('Agent navigation IPC', () => {
       destination: { section: 'dictionary', page: 'entry/猫' },
       opened: true,
     });
-    expect(opened).toEqual(['dictionary']);
+    expect(opened).toEqual([{ section: 'dictionary', page: 'entry/猫' }]);
+  });
+
+  it('delivers one exact registered Settings page/control/highlight destination', async () => {
+    const destination = useExactSettingsDestination();
+    register();
+
+    expect(await invoke(request({ approved: false }))).toEqual({
+      ok: true,
+      destination,
+      opened: false,
+    });
+    expect(opened).toEqual([]);
+
+    expect(await invoke(request())).toEqual({
+      ok: true,
+      destination,
+      opened: true,
+    });
+    expect(opened).toEqual([destination]);
   });
 
   it('refuses a request that tries to name its own destination', async () => {
@@ -225,7 +270,7 @@ describe('Agent navigation IPC', () => {
   it('reports an opener that refuses, rather than claiming a window exists', async () => {
     register(() => false);
     expect(await invoke(request())).toEqual({ ok: false, code: 'open-failed' });
-    expect(opened).toEqual(['dictionary']);
+    expect(opened).toEqual([{ section: 'dictionary', page: 'entry/猫' }]);
   });
 
   it('reports an opener that throws as a failure, not as a crash', async () => {
@@ -253,7 +298,7 @@ describe('Agent navigation IPC', () => {
       destination: { section: 'dictionary', page: 'entry/猫' },
       opened: true,
     });
-    expect(opened).toEqual(['dictionary']);
+    expect(opened).toEqual([{ section: 'dictionary', page: 'entry/猫' }]);
   });
 
   it('allows a retry after the first attempt failed', async () => {
@@ -268,7 +313,10 @@ describe('Agent navigation IPC', () => {
       destination: { section: 'dictionary', page: 'entry/猫' },
       opened: true,
     });
-    expect(opened).toEqual(['dictionary', 'dictionary']);
+    expect(opened).toEqual([
+      { section: 'dictionary', page: 'entry/猫' },
+      { section: 'dictionary', page: 'entry/猫' },
+    ]);
   });
 
   it('reports a missing opener rather than silently succeeding', async () => {
@@ -277,8 +325,8 @@ describe('Agent navigation IPC', () => {
   });
 
   it('uses the opener handed over by the main entry point', async () => {
-    setAgentNavigationOpener((section) => {
-      opened.push(section);
+    setAgentNavigationOpener((destination) => {
+      opened.push(destination);
       return true;
     });
     registerAgentNavigationIpc({ resolveStore: () => store });
@@ -287,7 +335,7 @@ describe('Agent navigation IPC', () => {
       destination: { section: 'dictionary', page: 'entry/猫' },
       opened: true,
     });
-    expect(opened).toEqual(['dictionary']);
+    expect(opened).toEqual([{ section: 'dictionary', page: 'entry/猫' }]);
   });
 
   it('reports a store that cannot be read', async () => {
@@ -295,8 +343,8 @@ describe('Agent navigation IPC', () => {
       resolveStore: () => {
         throw new Error('unreadable');
       },
-      openSection: (section) => {
-        opened.push(section);
+      openSection: (destination) => {
+        opened.push(destination);
         return true;
       },
     });

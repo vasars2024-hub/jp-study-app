@@ -20,14 +20,87 @@
  */
 
 import {
-  isAgentNavigableSection,
+  isAgentNavigationDestination,
   type AgentNavigationDestination,
   type AgentNavigationFailureCode,
 } from './agentNavigation';
 
 export const AGENT_NAVIGATION_CHANNELS = {
   run: 'agentNavigation:run',
+  settingsDelivery: 'agentNavigation:settings-delivery',
 } as const;
+
+/** Destination-only payload main delivers to an already-authorized Settings window. */
+export type AgentSettingsNavigationLink = AgentNavigationDestination & {
+  section: 'settings';
+  page: string;
+};
+
+/**
+ * Why Settings refused one delivery.
+ *
+ * The distinction is the whole finality rule. `invalid` is a judgement about the
+ * *destination* — it failed the registry check — and nothing about asking again
+ * would change it. `not-ready` is a statement about this *window*: it cannot
+ * answer yet. Collapsing the two is what made an approved cold open report
+ * failure while the correct page sat open on screen.
+ */
+export type AgentSettingsDeliveryRefusal = 'invalid' | 'not-ready';
+
+/**
+ * In-process acknowledgement added by main's delivery script. It cannot cross
+ * IPC and is never renderer input to the navigation run channel.
+ */
+export interface AgentSettingsNavigationDelivery extends AgentSettingsNavigationLink {
+  handled: () => void;
+  accept: () => void;
+  /** An unqualified refusal is treated as `invalid`, and so is final. */
+  reject: (refusal?: AgentSettingsDeliveryRefusal) => void;
+}
+
+/** What one delivery attempt resolved to, as main's injected script reports it. */
+export type AgentSettingsDeliveryOutcome =
+  | 'accepted'
+  /** Settings judged the destination itself unusable. */
+  | 'invalid'
+  /** Settings took the event but cannot acknowledge yet, or went quiet. */
+  | 'not-ready'
+  /** No listener claimed the event — Settings has not mounted it yet. */
+  | 'unhandled';
+
+export type AgentSettingsDeliveryDecision = 'accept' | 'retry' | 'fail';
+
+/**
+ * How long main keeps re-offering one destination to a Settings window, measured
+ * from the load rather than counted in attempts, and how long it waits on a
+ * window that took the event and then went quiet.
+ *
+ * Sized from measurement, not taste. A cold pop-out on this machine needed about
+ * 3.2 s to load and a further ~2 s before React had mounted the listener, and an
+ * occluded window throttles its own timers to roughly one tick per second — so a
+ * budget in the low seconds fails the exact case it exists to serve.
+ */
+export const AGENT_SETTINGS_DELIVERY_BUDGET_MS = 8000;
+export const AGENT_SETTINGS_DELIVERY_ATTEMPT_MS = 3000;
+
+/**
+ * The finality rule, kept here as one pure function so it is testable without
+ * Electron and cannot drift between main and its tests.
+ *
+ * An `invalid` refusal fails immediately and is never reconsidered — a
+ * destination Settings has judged unusable must not become a success because
+ * main asked a second time. Everything else is a window that is not ready, and
+ * is retried until the budget runs out and then fails honestly.
+ */
+export function agentSettingsDeliveryDecision(
+  outcome: AgentSettingsDeliveryOutcome,
+  elapsedMs: number,
+  budgetMs: number = AGENT_SETTINGS_DELIVERY_BUDGET_MS,
+): AgentSettingsDeliveryDecision {
+  if (outcome === 'accepted') return 'accept';
+  if (outcome === 'invalid') return 'fail';
+  return elapsedMs < budgetMs ? 'retry' : 'fail';
+}
 
 export interface AgentNavigationRequest {
   conversationId: string;
@@ -118,11 +191,15 @@ export function normalizeAgentNavigationResult(value: unknown): AgentNavigationR
   const raw = record(value);
   if (raw.ok === true) {
     const destination = record(raw.destination);
-    if (isAgentNavigableSection(destination.section)) {
-      const page = typeof destination.page === 'string' ? destination.page.slice(0, 500) : '';
+    if (isAgentNavigationDestination(destination)) {
       return {
         ok: true,
-        destination: { section: destination.section, ...(page ? { page } : {}) },
+        destination: {
+          section: destination.section,
+          ...(destination.page ? { page: destination.page.slice(0, 500) } : {}),
+          ...(destination.controlId ? { controlId: destination.controlId.slice(0, 240) } : {}),
+          ...(destination.highlight === true ? { highlight: true } : {}),
+        },
         opened: raw.opened === true,
       };
     }

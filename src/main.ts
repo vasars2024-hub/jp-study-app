@@ -52,6 +52,14 @@ import {
 import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
 import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
+import type { AgentNavigationDestination } from './shared/agentNavigation';
+import {
+  AGENT_NAVIGATION_CHANNELS,
+  AGENT_SETTINGS_DELIVERY_ATTEMPT_MS,
+  AGENT_SETTINGS_DELIVERY_BUDGET_MS,
+  agentSettingsDeliveryDecision,
+  type AgentSettingsDeliveryOutcome,
+} from './shared/agentNavigationBridge';
 import {
   automationBuilderDirectCommand,
   type AutomationBuilderLaunchResult,
@@ -1391,6 +1399,105 @@ function createPopoutWindow(section: string): boolean {
   return true;
 }
 
+function waitForPopoutLoad(win: BrowserWindow): Promise<boolean> {
+  if (win.isDestroyed() || win.webContents.isDestroyed()) return Promise.resolve(false);
+  if (!win.webContents.isLoading()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const finish = (loaded: boolean) => {
+      win.webContents.removeListener('did-finish-load', onLoaded);
+      win.webContents.removeListener('did-fail-load', onFailed);
+      win.removeListener('closed', onClosed);
+      resolve(loaded);
+    };
+    const onLoaded = () => finish(true);
+    const onFailed = () => finish(false);
+    const onClosed = () => finish(false);
+    win.webContents.once('did-finish-load', onLoaded);
+    win.webContents.once('did-fail-load', onFailed);
+    win.once('closed', onClosed);
+  });
+}
+
+async function deliverAgentSettingsDestination(
+  win: BrowserWindow,
+  destination: AgentNavigationDestination & { section: 'settings'; page: string },
+): Promise<boolean> {
+  if (!await waitForPopoutLoad(win)) return false;
+  const encoded = Buffer.from(JSON.stringify(destination), 'utf8').toString('base64');
+  // The payload is main-resolved and base64 encoded before it enters source;
+  // no renderer-provided text is interpolated as JavaScript. The three callbacks
+  // stay inside this one renderer and let Settings acknowledge only after its
+  // static registry and rendered-control checks both pass.
+  const script = `(() => new Promise((resolve) => {
+    let handled = false;
+    let settled = false;
+    const finish = (outcome) => {
+      if (settled) return;
+      settled = true;
+      resolve(outcome);
+    };
+    const detail = JSON.parse(atob('${encoded}'));
+    detail.handled = () => { handled = true; };
+    detail.accept = () => finish('accepted');
+    // Only the explicit transient refusal is retryable. Anything else — including
+    // a bare reject() from some future caller — is read as a judgement on the
+    // destination and ends the delivery.
+    detail.reject = (refusal) => finish(refusal === 'not-ready' ? 'not-ready' : 'invalid');
+    window.dispatchEvent(new CustomEvent('${AGENT_NAVIGATION_CHANNELS.settingsDelivery}', {
+      detail,
+      cancelable: true,
+    }));
+    // dispatchEvent is synchronous, so a mounted listener has already claimed
+    // this attempt. Checking that inline rather than on a timer matters: an
+    // occluded window throttles setTimeout to about one tick per second, and
+    // this is the branch taken by every attempt made while Settings is still
+    // mounting.
+    if (!handled) { finish('unhandled'); return; }
+    // Settings took the event and then went quiet. That is a window which cannot
+    // answer yet, not a window that judged the destination.
+    setTimeout(() => finish('not-ready'), ${AGENT_SETTINGS_DELIVERY_ATTEMPT_MS});
+  }))()`;
+
+  // did-finish-load precedes React mounting, and a pop-out main just opened is
+  // usually occluded, which stops its requestAnimationFrame callbacks outright.
+  // So "no answer yet" is the normal state of a correct window for the first few
+  // seconds and must be retried. What stays final is a judgement about the
+  // destination: an `invalid` refusal is never re-offered, so a page Settings
+  // rejected cannot become a success because main asked again.
+  const started = Date.now();
+  for (;;) {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return false;
+    let outcome: AgentSettingsDeliveryOutcome;
+    try {
+      outcome = await win.webContents.executeJavaScript(script) as AgentSettingsDeliveryOutcome;
+    } catch {
+      return false;
+    }
+    const decision = agentSettingsDeliveryDecision(
+      outcome,
+      Date.now() - started,
+      AGENT_SETTINGS_DELIVERY_BUDGET_MS,
+    );
+    if (decision === 'accept') return true;
+    if (decision === 'fail') return false;
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+async function openAgentNavigationDestination(
+  destination: AgentNavigationDestination,
+): Promise<boolean> {
+  if (!createPopoutWindow(destination.section)) return false;
+  if (destination.section !== 'settings' || !destination.page) return true;
+  const win = popoutWindows.get('settings');
+  if (!win || win.isDestroyed()) return false;
+  return deliverAgentSettingsDestination(win, {
+    ...destination,
+    section: 'settings',
+    page: destination.page,
+  });
+}
+
 function registerPopoutIpc(): void {
   openSectionHandler = (section: string) => {
     createPopoutWindow(section);
@@ -1400,7 +1507,7 @@ function registerPopoutIpc(): void {
   // and `popoutWindows` stay the single owner of what a section means and of the
   // one-window-per-section rule. The gate's own allowlist in
   // `shared/agentNavigation.ts` mirrors this set and is tested against it.
-  setAgentNavigationOpener((section) => createPopoutWindow(section));
+  setAgentNavigationOpener(openAgentNavigationDestination);
   if (pendingOpenSection) {
     createPopoutWindow(pendingOpenSection);
     pendingOpenSection = null;

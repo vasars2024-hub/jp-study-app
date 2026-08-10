@@ -28,11 +28,12 @@ import {
   normalizeAgentNavigationRequest,
   type AgentNavigationResult,
 } from '../shared/agentNavigationBridge';
-import type { DesktopWinSection } from '../shared/desktop';
 import { getAgentWorkspaceStore, type AgentWorkspaceStore } from './agentWorkspaceStore';
 
-/** Returns whether a real window now exists for that section. */
-export type AgentNavigationOpener = (section: DesktopWinSection) => boolean | Promise<boolean>;
+/** Returns whether the exact resolved destination was opened and delivered. */
+export type AgentNavigationOpener = (
+  destination: AgentNavigationDestination,
+) => boolean | Promise<boolean>;
 
 let opener: AgentNavigationOpener | null = null;
 
@@ -112,7 +113,7 @@ export function registerAgentNavigationIpc(
       try {
         const open = openSection();
         if (!open) return agentNavigationFailure('bridge-unavailable');
-        const opened = await open(destination.section);
+        const opened = await open(destination);
         // An opener that reports failure fails honestly rather than reporting a
         // window the user will look for and not find.
         if (!opened) return agentNavigationFailure('open-failed');

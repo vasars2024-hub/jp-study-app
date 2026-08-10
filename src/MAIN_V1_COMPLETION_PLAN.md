@@ -131,17 +131,25 @@ Completed in the current source tree:
   — which widens Settings' own search box by the same 26 rows. The remaining
   three declared pairs are duplicate coordinates of cards already indexed, held
   by a gate that makes each name its stand-in (2026-08-10 — see the ledger's
-  "The 29 guided controls Settings' own search could not find either").
+  "The 29 guided controls Settings' own search could not find either");
+- an approved navigation that has to **open** the Settings window now
+  acknowledges, where it previously reported `open-failed` after landing on the
+  correct page. The cause was not a timing margin: the acknowledgement was polled
+  through `requestAnimationFrame`, which Chromium does not run at all for a
+  hidden document, and a pop-out main has just opened is routinely occluded. The
+  poll now picks its clock from `document.visibilityState`, and a refusal is
+  typed `invalid` (final) or `not-ready` (retried within a budget), so a
+  destination Settings judged unusable still never becomes a success
+  (2026-08-10 — see the ledger's "Cold open acknowledges, and the delivery
+  handshake finally enters history"). That commit is also the first time the
+  delivery handshake itself entered history; it had lived only in the working
+  tree.
 
 Still required before the Track 3 acceptance can be called complete:
 
 - answering a question asked in a language other than English — index terms and
   `SETTINGS_REGISTRY.keywords` are both English by design, so a Russian, Japanese
   or Chinese question resolves nothing even though the UI is translated;
-- letting a cold-open navigation acknowledge: approving one while the Settings
-  window is closed still returns `open-failed` after opening the correct page,
-  because `deliverAgentSettingsDestination` (`src/main.ts:1438`) treats the first
-  `rejected` from a window that has not yet mounted the page as final;
 - canonical ReadingLens, Flashcards and Settings handoffs, study/saved-word
   context producers, and screenshot/OCR attachment context;
 - the remaining unavailable dictionary/media/anime/visual-novel adapters;

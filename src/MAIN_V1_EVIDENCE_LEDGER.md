@@ -3269,3 +3269,138 @@ against the working tree** until the i18n track commits its per-language module
 split and whoever owns Monitors / File drops / API keys / Help commits their
 `SETTINGS_NAV` entries. Running it in a clean checkout and reading the result as a
 defect in this track would be wrong twice over.
+
+## Cold open acknowledges, and the delivery handshake finally enters history — 2026-08-10
+
+Two things were wrong here, and the smaller one is the one the previous sections
+predicted.
+
+### The handshake had never been committed
+
+The three sections above describe the Settings delivery handshake as existing
+infrastructure and its cold-open failure as pre-existing. Both readings are true
+of the *working tree*. Neither was true of *history*: `69d9165` touched no
+`main.ts`, no `SettingsApp.tsx` and no `agentNavigationBridge.ts` at all, and the
+last agent commit to reach `main.ts` is `3fc91ca`, which installed a
+**section-only** opener — `setAgentNavigationOpener((section) => createPopoutWindow(section))`
+— that is still what HEAD contains. The whole page/control/highlight delivery
+lived only in the working tree, together with two untracked files
+(`agentSettingsNavigation.ts` and its test).
+
+That is coherent rather than careless: the feature was held out of history
+because it did not work cold. Fixing cold open is what made it committable, so
+this commit carries both.
+
+### The cause was not a timing margin
+
+The prediction on record was that 16 animation frames were too few for a
+just-mounted window, so the fix would be to let a first `rejected` retry.
+Measured against the running app, that is not what happens.
+
+`agentSettingsRenderedTarget` is polled through `requestAnimationFrame`, and
+**Chromium runs no `requestAnimationFrame` callbacks at all for a document whose
+`visibilityState` is `hidden`.** A pop-out that main has just opened is routinely
+occluded at the instant main delivers to it. Measured in the cold-opened Settings
+window:
+
+| Window state | rAF callbacks in 600 ms |
+| --- | --- |
+| occluded, `visibilityState: hidden` | **0** |
+| after `/focus`, `visible` | **30** |
+
+So the acknowledgement never ran, the renderer never answered at all, and main's
+750 ms silence timer turned that into `rejected` — which the loop treated as
+final. Every one of the three conditions the renderer checks was **already
+satisfied** while it was failing: the pane read `data-settings-page="appearance"`,
+exactly one `[data-setting-id="theme"]` existed, and it carried
+`class="os-set-card is-highlight"`.
+
+The decisive measurement is that **retrying alone would not have fixed it**. A
+replica of main's dispatch loop, run against a cold window and deliberately *not*
+stopping on refusal, produced `unhandled` at 12 ms, 336 ms and 1962 ms and then
+`rejected` at 3337, 5344, 7345, 9340 and 11340 ms — still refusing at 11.3 s,
+never once accepting. The ~2 s spacing is itself the signature of the same cause:
+an occluded window throttles its own timers to roughly one tick per second.
+
+### The fix, in two halves
+
+**Schedule on a clock that runs.** `createAgentSettingsAckScheduler` picks rAF
+when the document is visible and a timer when it is hidden, choosing per attempt
+so a window that becomes visible mid-poll gets frames again. The renderer's
+patience is now wall-clock (`AGENT_SETTINGS_ACK_BUDGET_MS`) rather than a frame
+count, because the frame is exactly what a hidden window does not get.
+
+**Type the refusal, so finality means something.** `reject()` became
+`reject(refusal?)` over `'invalid' | 'not-ready'`, and main's outcomes became
+`accepted | invalid | not-ready | unhandled`. `agentSettingsDeliveryDecision` is
+the whole finality rule as one pure function: `invalid` fails at any elapsed time,
+everything else retries until `AGENT_SETTINGS_DELIVERY_BUDGET_MS` and then fails
+honestly. The security property is unchanged and now asserted directly — a
+destination Settings judged unusable never becomes a success because main asked
+again.
+
+Both halves are required. The first alone still dies on main's per-attempt
+timeout; the second alone is the 11.3 s measurement above.
+
+One incidental correctness gain: the script's "did anyone claim this?" check moved
+from `setTimeout(…, 0)` to an inline test straight after `dispatchEvent`, which is
+synchronous. Every attempt made while Settings is still mounting used to cost a
+throttled ~1 s tick.
+
+### Measured evidence
+
+- Agent regression: **61 files, 862 tests passed** (was 61/854).
+- `tsc --noEmit`: **392 errors, identical to the pre-slice total.** The one error
+  in a file this slice touches is `SettingsApp.tsx:332` `meta?.label`, another
+  track's `SettingsNavPage` rename that never updated this call site; it is far
+  from any edit here and predates them.
+- `node tools/i18n-check.cjs`: clean at **9,189** keys — this slice adds no UI text.
+- `node tools/architecture-audit.cjs --json`: **`fresh: []`**.
+- Focused ESLint over all six paths: **exit 0** (12 pre-existing `main.ts`
+  non-null-assertion warnings, none in the edited region).
+
+### Live Electron evidence
+
+Driven through the debug bridge against a dev app restarted on this source, on the
+real profile, with a probe conversation carrying an index-provenanced card
+(`query: "where is the theme setting"` → `settings/appearance/theme`) saved
+through the real main-owned store:
+
+| Path | Before | After |
+| --- | --- | --- |
+| cold open (Settings closed) | `open-failed` after **5208 ms** | **`{ok:true, opened:true}` after 4580 ms** |
+| warm open (Settings already open) | `{ok:true}` in 83 ms | `{ok:true}` in **90 ms** |
+
+- The cold-opened window read **`visibilityState: hidden` at the moment it
+  acknowledged** — the exact state that produced 0 rAF callbacks and made
+  acknowledgement impossible before. Since acknowledgement *requires*
+  `agentSettingsRenderedTarget` to resolve, `ok:true` is itself proof the
+  highlighted control was found; a sampler installed in the window separately
+  caught the highlight at 279 ms.
+- Both refusals still refuse. A card with `page` tampered to `memory` while its
+  query still resolved to `appearance` returned **`stale-provenance`**, refused at
+  the IPC layer before any window work. Dispatching a delivery for a page that is
+  not registered made the renderer call **`reject('invalid')`** — the final
+  refusal, not the retryable one.
+- `/logs?level=error` returned **0 entries** across the whole pass, and no
+  `hot updated` entries, so no other agent edited the tree under measurement.
+- The probe conversation was deleted and the workspace asserted back to its exact
+  three conversation ids, titles and `activeConversationId`.
+  `jp-settings-advanced-v1` was never touched (`"0"`), and the only agent-shaped
+  localStorage key remains the deliberately renderer-owned
+  `jp-study-local-agent-settings-v1`.
+
+**One restore this pass cannot claim.** `jp-os-settings-recent-v1` now carries
+`appearance` at the head of its `pages` list, because navigating there is what the
+feature does. That key was **not** snapshotted before the run, so unlike the
+previous pass this one cannot assert it byte-for-byte — only that the change is
+exactly one page moved to the front of a recents list, with the seven entries
+behind it untouched. Snapshot it first next time; `pushRecentPage` is reached by
+every successful delivery.
+
+### Still open after this
+
+- **A question asked in Russian, Japanese or Chinese still resolves nothing.** Now
+  the oldest thing on this track's list.
+- The three guided pairs stay unindexed by design and the four literal card
+  headings stay literal, both unchanged and recorded above.
