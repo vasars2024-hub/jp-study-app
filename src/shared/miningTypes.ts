@@ -104,6 +104,26 @@ export interface MiningCandidate {
   nameTag?: NameTag;
 }
 
+/**
+ * One spine item of an EPUB — the book's own division, which is what a reader
+ * calls a chapter. Carries no text: the picker only needs to label and size the
+ * sections, and shipping every chapter's body to the renderer to draw a list
+ * would move the whole book across the IPC boundary.
+ */
+export interface EpubSectionSummary {
+  /** 1-based, matching how a chapter range is written. */
+  index: number;
+  /** Heading found in the section, else its first line. Empty when not read. */
+  title: string;
+  /**
+   * Absent when this run skipped the section. A scoped analysis decodes only its
+   * own range, and reporting 0 for the rest would be indistinguishable from a
+   * genuinely empty chapter.
+   */
+  characters?: number;
+  href: string;
+}
+
 export interface EpubMiningAnalysis {
   itemId: string;
   title: string;
@@ -111,6 +131,10 @@ export interface EpubMiningAnalysis {
   analyzer: MiningAnalyzer;
   candidates: MiningCandidate[];
   generatedAt: number;
+  /** The chapter span this analysis covers. Absent means the whole book. */
+  range?: { from: number; to: number };
+  /** Sections in the book, so a re-scope needs no second extraction. */
+  sections?: EpubSectionSummary[];
   /** True when the run was cancelled and enrichment is partial. */
   cancelled?: boolean;
   /** User-visible problems (e.g. Qwen model missing) — never silent blanks. */

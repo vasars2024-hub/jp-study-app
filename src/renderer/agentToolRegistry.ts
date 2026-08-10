@@ -31,6 +31,7 @@ import { createStudyAgentHandlers } from './studyAgentHandlers';
 import { createVisualNovelAgentHandlers } from './visualNovelAgentHandlers';
 import { createMediaAgentHandlers } from './mediaAgentHandlers';
 import { createAnimeAgentHandlers } from './animeAgentHandlers';
+import { createCardStudioAgentHandlers } from './cardStudioAgentHandlers';
 
 export type AgentToolRegistryTranslate = (key: string, vars?: TVars) => string;
 
@@ -122,6 +123,7 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
     ...createVisualNovelAgentHandlers(t),
     ...createMediaAgentHandlers(t),
     ...createAnimeAgentHandlers(t),
+    ...createCardStudioAgentHandlers(t),
     'dictionary.lookup': async (arguments_) => (
       window.api.lookupTerm(textArgument(t, arguments_, 'term'))
     ),

@@ -3227,6 +3227,132 @@ h1 {
   width: 100%;
 }
 
+/* Agent pipeline terminal. Monospace because it is a read-out of commands and
+   ids, where column alignment is what makes a discrepancy visible at a glance. */
+.agent-pipeline-body {
+  font-family: var(--mono-font, ui-monospace, 'Cascadia Mono', Consolas, monospace);
+  font-size: 12px;
+}
+
+.agent-pipeline-line {
+  padding: 4px 0;
+}
+
+.agent-pipeline-line + .agent-pipeline-line {
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+}
+
+.agent-pipeline-command,
+.agent-pipeline-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agent-pipeline-seq {
+  opacity: 0.5;
+  min-width: 20px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-pipeline-op {
+  font-weight: 600;
+}
+
+.agent-pipeline-args,
+.agent-pipeline-destination {
+  opacity: 0.75;
+}
+
+.agent-pipeline-result {
+  padding-left: 28px;
+}
+
+.agent-pipeline-arrow {
+  opacity: 0.5;
+}
+
+.agent-pipeline-verdict {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+}
+
+.agent-pipeline-verdict.is-verified {
+  color: var(--ok, #4caf82);
+}
+
+/* Both of these mean the claim outran the data, so they share the alert colour
+   rather than being graded — a partial write is not a mild success. */
+.agent-pipeline-verdict.is-missing,
+.agent-pipeline-verdict.is-partial {
+  color: var(--danger, #e0575b);
+}
+
+.agent-pipeline-verdict.is-unverifiable {
+  opacity: 0.6;
+}
+
+.agent-pipeline-error {
+  color: var(--danger, #e0575b);
+}
+
+.agent-pipeline-alert {
+  margin: 6px 0;
+}
+
+/* Chapter-range picker in the EPUB mining panel. The list is capped and scrolls
+   because a light novel volume can carry a hundred spine items, and the panel
+   must not grow without bound. */
+.epub-mining-chapters {
+  margin-top: 12px;
+}
+
+.epub-mining-chapter-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+}
+
+.epub-mining-chapter-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.epub-mining-chapter-list li + li {
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+}
+
+/* Out-of-range sections stay legible rather than hidden: the user is choosing a
+   range, so what is excluded is as informative as what is included. */
+.epub-mining-chapter-list li.is-out-of-range {
+  opacity: 0.45;
+}
+
+.epub-mining-chapter-pick {
+  min-width: 34px;
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.epub-mining-chapter-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Shared control skin for the AI Card Studio and Advanced EPUB mining forms.
    Native selects had no styling at all, so Windows drew them as stock white
    controls that clashed with the dark panels. Uses the same tokens as the

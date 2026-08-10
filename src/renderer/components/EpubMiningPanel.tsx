@@ -4,6 +4,7 @@ import type {
   EpubDeckRow,
   EpubExportFormat,
   EpubMiningAnalysis,
+  EpubSectionSummary,
   FrequencyDictionarySummary,
   MiningEnrichProgress,
   TraditionalMiningConfig,
@@ -34,6 +35,11 @@ import { getActiveProfile } from '../profileState';
 import Icon from './Icons';
 import MiningProgressPanel from './MiningProgressPanel';
 import { addDeckCards } from '../flashcardDeck';
+import {
+  formatChapterRange,
+  miningDeckIdentity,
+  normalizeChapterRange,
+} from '../../shared/chapterRange';
 
 const FORMAT_IDS: EpubExportFormat[] = ['anki', 'txt', 'txt-rep', 'csv', 'yomitan'];
 
@@ -75,6 +81,12 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
   const [analysis, setAnalysis] = useState<EpubMiningAnalysis | null>(null);
   const [selectedBookId, setSelectedBookId] = useState('');
   const [deckLabel, setDeckLabel] = useState('');
+  const [sections, setSections] = useState<EpubSectionSummary[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
+  // Kept as strings so the inputs can be emptied — an empty box means "unbounded
+  // on this side", which `normalizeChapterRange` reads as a single chapter.
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState('');
@@ -287,6 +299,64 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
     });
   }
 
+  // The spine, loaded as soon as a book is picked. This is extraction only — no
+  // tokenizing — so it can run ahead of the user committing to an analysis.
+  useEffect(() => {
+    if (!selectedBookId) {
+      setSections([]);
+      setRangeFrom('');
+      setRangeTo('');
+      return;
+    }
+    let cancelled = false;
+    setSectionsLoading(true);
+    setSections([]);
+    setRangeFrom('');
+    setRangeTo('');
+    window.api
+      .miningListEpubSections(selectedBookId)
+      .then((result) => {
+        if (!cancelled) setSections(result.sections);
+      })
+      .catch(() => {
+        // A book whose spine cannot be read is still minable whole — the range
+        // control simply stays hidden rather than blocking the panel.
+        if (!cancelled) setSections([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSectionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBookId]);
+
+  const chapterRange = useMemo(
+    () =>
+      normalizeChapterRange(
+        {
+          from: rangeFrom.trim() ? Number(rangeFrom) : null,
+          to: rangeTo.trim() ? Number(rangeTo) : null,
+        },
+        sections.length,
+      ),
+    [rangeFrom, rangeTo, sections.length],
+  );
+
+  /**
+   * The one name this scope produces. Everything that writes — the local deck
+   * group, the Anki deck, the exported file — reads it from here so a chapter
+   * range cannot be labelled three different ways.
+   */
+  const deckIdentity = useMemo(() => {
+    const book = books.find((candidate) => candidate.id === selectedBookId);
+    return miningDeckIdentity({
+      itemId: selectedBookId,
+      bookTitle: analysis?.title || book?.title || '',
+      range: chapterRange,
+    });
+  }, [books, selectedBookId, analysis?.title, chapterRange]);
+
   async function runAnalysis(): Promise<void> {
     if (!selectedBookId) return;
     const gen = ++analyzeGenRef.current;
@@ -296,11 +366,17 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
     setEnrichPhase('');
     setEnrichProgress(null);
     try {
-      const result = await window.api.miningAnalyzeEpub(selectedBookId, config);
+      const result = await window.api.miningAnalyzeEpub(selectedBookId, config, chapterRange);
       // A cancelled or superseded run must never snap the panel back.
       if (analyzeGenRef.current !== gen) return;
       setAnalysis(result);
-      setDeckLabel(result.title);
+      setDeckLabel(
+        miningDeckIdentity({
+          itemId: selectedBookId,
+          bookTitle: result.title,
+          range: chapterRange,
+        }).deckTitle,
+      );
       setWarnings(result.warnings ?? []);
       const glossCount = result.candidates.filter((c) => c.glosses && Object.keys(c.glosses).length).length;
       setStatus(
@@ -355,8 +431,11 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
         front: row.front,
         back: row.back,
         source: 'epub' as const,
-        bookId: analysis.itemId,
-        bookTitle: deckLabel.trim() || analysis.title,
+        // The range-aware id, not the bare item id: two chapter ranges of one
+        // book must land in two groups, and the deck store keys on the
+        // (bookId, bookTitle) pair.
+        bookId: deckIdentity.bookId,
+        bookTitle: deckLabel.trim() || deckIdentity.deckTitle,
       })),
     );
   }
@@ -412,7 +491,10 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
       const deck = result.deck;
       const format = exp.format === 'anki' ? 'csv' : exp.format;
       const file = exportDeckFileContent(deck, format);
-      const title = deckLabel.trim() || deck.title;
+      // Same identity the local deck and Anki use, so the file on disk carries
+      // the chapter range in its name rather than silently overwriting the
+      // previous range's export.
+      const title = deckLabel.trim() || deckIdentity.fileBaseName || deck.title;
       const res = await window.api.miningSaveEpubDeckFile(file.content, title, file.ext);
       if (res.ok && res.path) {
         saveDeckLocally(deck.rows);
@@ -476,6 +558,93 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
             />
           </label>
         </div>
+        {selectedBookId && (sectionsLoading || sections.length > 0) && (
+          <div className="epub-mining-chapters">
+            <span className="download-deck-label">{t('epub.mining.chapters.label')}</span>
+            {sectionsLoading ? (
+              <p className="muted epub-mining-step-note">{t('epub.mining.chapters.loading')}</p>
+            ) : (
+              <>
+                <div className="mining-form-grid">
+                  <label>
+                    {t('epub.mining.chapters.from')}
+                    <input
+                      type="number"
+                      min={1}
+                      max={sections.length}
+                      value={rangeFrom}
+                      onChange={(e) => setRangeFrom(e.target.value)}
+                      placeholder="1"
+                    />
+                  </label>
+                  <label>
+                    {t('epub.mining.chapters.to')}
+                    <input
+                      type="number"
+                      min={1}
+                      max={sections.length}
+                      value={rangeTo}
+                      onChange={(e) => setRangeTo(e.target.value)}
+                      placeholder={String(sections.length)}
+                    />
+                  </label>
+                </div>
+                <p className="muted epub-mining-step-note">
+                  {t('epub.mining.chapters.scope', {
+                    scope: formatChapterRange(chapterRange),
+                    count: chapterRange
+                      ? chapterRange.to - chapterRange.from + 1
+                      : sections.length,
+                    total: sections.length,
+                  })}
+                  {(rangeFrom || rangeTo) && (
+                    <button
+                      type="button"
+                      className="btn subtle"
+                      onClick={() => {
+                        setRangeFrom('');
+                        setRangeTo('');
+                      }}
+                    >
+                      {t('epub.mining.chapters.all')}
+                    </button>
+                  )}
+                </p>
+                <ul className="epub-mining-chapter-list">
+                  {sections.map((section) => {
+                    const inRange =
+                      !chapterRange
+                      || (section.index >= chapterRange.from && section.index <= chapterRange.to);
+                    return (
+                      <li
+                        key={section.index}
+                        className={inRange ? 'is-in-range' : 'is-out-of-range'}
+                      >
+                        <button
+                          type="button"
+                          className="btn subtle epub-mining-chapter-pick"
+                          title={t('epub.mining.chapters.only', { index: section.index })}
+                          onClick={() => {
+                            setRangeFrom(String(section.index));
+                            setRangeTo(String(section.index));
+                          }}
+                        >
+                          {section.index}
+                        </button>
+                        <span className="epub-mining-chapter-title">
+                          {section.title || t('epub.mining.chapters.untitled')}
+                        </span>
+                        {typeof section.characters === 'number' && (
+                          <span className="muted">{section.characters}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="anki-card epub-mining-step">

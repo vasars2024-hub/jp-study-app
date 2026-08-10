@@ -41,6 +41,11 @@ import {
   resolveTraditionalTemplates,
 } from '../shared/epubEnrichment';
 import { shouldDropMiningCandidate } from '../shared/miningBlacklist';
+import {
+  normalizeChapterRange,
+  type ChapterRange,
+  type ChapterRangeInput,
+} from '../shared/chapterRange';
 import { kataToHira } from '../shared/langs';
 import { pickLemmaReading } from '../shared/readings';
 import {
@@ -385,17 +390,58 @@ function zipEntryForPath(zip: AdmZip, relPath: string): AdmZip.IZipEntry | null 
   return zip.getEntries().find((entry) => entry.entryName.replace(/\\/g, '/').toLowerCase() === lower) ?? null;
 }
 
-function extractHtmlTextFromZipEntry(entry: AdmZip.IZipEntry): string {
+function decodeZipEntryHtml(entry: AdmZip.IZipEntry): string {
   const raw = entry.getData();
   let html = raw.toString('utf-8');
   if (!html.trim() && raw.length >= 2) {
     if (raw[0] === 0xff && raw[1] === 0xfe) html = raw.toString('utf16le');
     else if (raw[0] === 0xfe && raw[1] === 0xff) html = raw.toString('utf16le');
   }
-  return stripHtml(html);
+  return html;
 }
 
-function extractEpubText(epubPath: string): { title: string; text: string } {
+/**
+ * A section's own heading, for labelling the chapter picker.
+ *
+ * Falls back to the first line of body text, and then to nothing — the caller
+ * numbers the section instead. It never invents a title, because a wrong chapter
+ * label is worse than a bare number when the user is choosing what to mine.
+ */
+function epubSectionHeading(html: string, text: string): string {
+  const heading = html.match(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/i);
+  const fromHeading = heading ? stripHtml(heading[1]).trim() : '';
+  if (fromHeading) return fromHeading.replace(/\s+/g, ' ').slice(0, 80);
+  const firstLine = text.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+  return firstLine.replace(/\s+/g, ' ').slice(0, 80);
+}
+
+export interface EpubSection {
+  /** 1-based spine position. Stable regardless of what was decoded. */
+  index: number;
+  /** Empty when the section was skipped — a heading cannot be read without decoding. */
+  title: string;
+  href: string;
+  /** Empty when skipped. Check `decoded` rather than treating this as "no text". */
+  text: string;
+  decoded: boolean;
+}
+
+/**
+ * The EPUB's spine, one entry per section, in reading order.
+ *
+ * This is the structure the old whole-book extractor always built and then
+ * destroyed on its last line (`parts.join('\n')`). Chapter-range mining needed
+ * nothing more than not throwing it away.
+ *
+ * A spine item is the book's own division, which is usually but not always a
+ * chapter — front matter, a colophon and an afterword are spine items too. The
+ * picker therefore shows what is really there, numbered as it really is, rather
+ * than pretending section 1 is chapter 1.
+ */
+export function extractEpubSections(
+  epubPath: string,
+  rangeInput?: ChapterRangeInput | null,
+): { title: string; sectionCount: number; range: ChapterRange | null; sections: EpubSection[] } {
   const zip = new AdmZip(epubPath);
   const container = zip.getEntry('META-INF/container.xml');
   if (!container) throw new Error('EPUB container.xml is missing.');
@@ -419,26 +465,43 @@ function extractEpubText(epubPath: string): { title: string; text: string } {
     .map((match) => parseXmlTagAttr(match[0], 'idref'))
     .filter((id): id is string => Boolean(id));
   const title = extractEpubTitleFromOpf(opfXml) ?? 'EPUB';
-  const parts: string[] = [];
+
+  // Phase 1 — establish the running order WITHOUT decoding anything. Section
+  // numbers are spine positions, so a section's number does not depend on
+  // whether any other section was read. That is what makes phase 2 skippable and
+  // what keeps the number the picker showed the same number the analysis used.
+  const ordered: Array<{ href: string; entry: AdmZip.IZipEntry }> = [];
   for (const id of spineIds) {
     const href = manifest.get(id);
     if (!href) continue;
     const full = opfDir && opfDir !== '.' ? path.posix.normalize(path.posix.join(opfDir, href)) : href;
     const entry = zipEntryForPath(zip, full);
-    if (!entry) continue;
-    const text = extractHtmlTextFromZipEntry(entry);
-    if (text) parts.push(text);
+    if (entry) ordered.push({ href: full, entry });
   }
-  if (!parts.length) {
+  if (!ordered.length) {
     for (const entry of zip.getEntries()) {
       const name = entry.entryName.replace(/\\/g, '/').toLowerCase();
       if (!/\.(xhtml|html|htm)$/.test(name)) continue;
       if (/(^|\/)nav\.xhtml$/.test(name) || name.includes('toc')) continue;
-      const text = extractHtmlTextFromZipEntry(entry);
-      if (text) parts.push(text);
+      ordered.push({ href: entry.entryName.replace(/\\/g, '/'), entry });
     }
   }
-  return { title, text: parts.join('\n') };
+
+  // Phase 2 — decode only what was asked for. A range over a long novel now
+  // costs the sections in the range, not the whole book: the unzip and the HTML
+  // strip are the expensive part of extraction, and both are skipped outright.
+  const range = normalizeChapterRange(rangeInput, ordered.length);
+  const sections: EpubSection[] = ordered.map((item, offset) => {
+    const index = offset + 1;
+    if (range && (index < range.from || index > range.to)) {
+      return { index, title: '', href: item.href, text: '', decoded: false };
+    }
+    const html = decodeZipEntryHtml(item.entry);
+    const text = stripHtml(html);
+    return { index, title: epubSectionHeading(html, text), href: item.href, text, decoded: true };
+  });
+
+  return { title, sectionCount: ordered.length, range, sections };
 }
 
 function splitSentences(text: string): string[] {
@@ -1473,7 +1536,11 @@ async function enrichSingleCandidate(
   }
 }
 
-async function analyzeBook(itemId: string, override?: Partial<TraditionalMiningConfig>): Promise<EpubMiningAnalysis> {
+async function analyzeBook(
+  itemId: string,
+  override?: Partial<TraditionalMiningConfig>,
+  rangeInput?: ChapterRangeInput | null,
+): Promise<EpubMiningAnalysis> {
   await ensureAllFrequencyDictionariesReady();
   const fullConfig = readMiningConfig();
   const traditional = {
@@ -1495,10 +1562,23 @@ async function analyzeBook(itemId: string, override?: Partial<TraditionalMiningC
   analyzeCancelRequested = false;
   const fullPath = resolveItemEpubPath(itemId);
   if (!fullPath) throw new Error('EPUB file not found in the library.');
-  const { title, text } = extractEpubText(fullPath);
+  // The range goes INTO the extractor, not around it: out-of-range sections are
+  // never unzipped or stripped, so mining chapters 1–5 of a 60-chapter novel
+  // costs five chapters of extraction rather than sixty.
+  const { title, sections, range } = extractEpubSections(fullPath, rangeInput);
+  const text = sections
+    .filter((section) => section.decoded)
+    .map((section) => section.text)
+    .join('\n');
   if (!text.trim()) {
+    // A scoped run that finds nothing is a different problem from a book that
+    // cannot be read at all, and the fix is different too — reporting the EPUB as
+    // broken when the user simply picked a front-matter section would send them
+    // to re-import a book that is fine.
     throw new Error(
-      'No readable text found in this EPUB. If the book opens in the reader, try Re-importing it — some publishers use non-standard EPUB layouts.',
+      range
+        ? `No readable text in chapters ${range.from}–${range.to}. That range may be front matter or images; try a different range.`
+        : 'No readable text found in this EPUB. If the book opens in the reader, try Re-importing it — some publishers use non-standard EPUB layouts.',
     );
   }
   const japanese = isJapaneseText(text);
@@ -1553,6 +1633,16 @@ async function analyzeBook(itemId: string, override?: Partial<TraditionalMiningC
     analyzer,
     candidates,
     generatedAt: Date.now(),
+    ...(range ? { range } : {}),
+    // Every section the book has, so the panel knows the full numbering it can
+    // re-scope to. Title and size are reported only for sections this run
+    // actually read — inventing 0 for a skipped chapter would read as "empty".
+    sections: sections.map((section) => ({
+      index: section.index,
+      title: section.title,
+      href: section.href,
+      ...(section.decoded ? { characters: section.text.replace(/\s+/g, '').length } : {}),
+    })),
     cancelled: cancelled || undefined,
     warnings: warnings.length ? warnings : undefined,
   };
@@ -1720,9 +1810,35 @@ export function registerMiningIpc(): void {
   bind('mining:setFrequencyEnabled', (_e, id: string, enabled: boolean) =>
     setFrequencyDictionaryEnabled(id, enabled),
   );
-  bind('mining:analyzeEpub', (_e, itemId: string, config?: Partial<TraditionalMiningConfig>) =>
-    analyzeBook(itemId, config),
+  bind(
+    'mining:analyzeEpub',
+    (
+      _e,
+      itemId: string,
+      config?: Partial<TraditionalMiningConfig>,
+      range?: ChapterRangeInput | null,
+    ) => analyzeBook(itemId, config, range),
   );
+  // Reads the spine only — no tokenizing, no enrichment — so the chapter picker
+  // can populate before the user has committed to an analysis run.
+  bind('mining:listEpubSections', (_e, itemId: string) => {
+    const fullPath = resolveItemEpubPath(itemId);
+    if (!fullPath) throw new Error('EPUB file not found in the library.');
+    // Deliberately unscoped: the picker needs a heading and a size for every
+    // section in order to be a picker at all. This is extraction only — no
+    // tokenizing and no enrichment, which are what actually make analysis slow.
+    const { title, sections } = extractEpubSections(fullPath);
+    return {
+      itemId,
+      title,
+      sections: sections.map((section) => ({
+        index: section.index,
+        title: section.title,
+        characters: section.text.replace(/\s+/g, '').length,
+        href: section.href,
+      })),
+    };
+  });
   bind('mining:cancelAnalyze', () => {
     analyzeCancelRequested = true;
     return { ok: true };
@@ -1747,7 +1863,12 @@ export function registerMiningIpc(): void {
   );
   bind(
     'mining:buildEpubDeck',
-    async (_e, itemId: string, config?: Partial<TraditionalMiningConfig>) => {
+    async (
+      _e,
+      itemId: string,
+      config?: Partial<TraditionalMiningConfig>,
+      range?: ChapterRangeInput | null,
+    ) => {
       await ensureAllFrequencyDictionariesReady();
       const fullConfig = readMiningConfig();
       const traditional: TraditionalMiningConfig = {
@@ -1757,7 +1878,7 @@ export function registerMiningIpc(): void {
         templates: { ...fullConfig.traditional.templates, ...(config?.templates ?? {}) },
         export: { ...fullConfig.traditional.export, ...(config?.export ?? {}) },
       };
-      const analysis = await analyzeBook(itemId, traditional);
+      const analysis = await analyzeBook(itemId, traditional, range);
       return exportEpubDeckFromAnalysis(analysis, traditional);
     },
   );

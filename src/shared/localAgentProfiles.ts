@@ -46,6 +46,7 @@ const ALL_OPERATIONS: AgentToolOperationId[] = [
   'visual-novel.track-route', 'visual-novel.extract-text', 'visual-novel.generate-vocabulary',
   'flashcard.list-decks', 'flashcard.create-deck', 'flashcard.add-cards', 'flashcard.delete-cards',
   'flashcard.modify-cards', 'flashcard.schedule-reviews', 'flashcard.delete-deck',
+  'flashcard.list-card-presets', 'flashcard.generate-cards',
   'study.get-context', 'study.list-opportunities', 'study.prepare-media',
   'study.filter-vocabulary', 'study.undo-filter', 'study.preview-cards',
   'study.create-cards', 'study.preview-anki', 'study.export-anki',
@@ -69,7 +70,8 @@ const CORRECTION_STYLES = new Set<AgentCorrectionStyle>(['gentle', 'detailed', '
 const TUTOR_OPERATIONS: AgentToolOperationId[] = [
   'dictionary.lookup', 'dictionary.explain-grammar', 'dictionary.analyze-sentence',
   'dictionary.search-knowledge', 'flashcard.list-decks', 'flashcard.add-cards', 'flashcard.delete-cards',
-  'flashcard.create-deck', 'calendar.list', 'calendar.schedule-session',
+  'flashcard.create-deck', 'flashcard.list-card-presets', 'flashcard.generate-cards',
+  'calendar.list', 'calendar.schedule-session',
   'study.get-context', 'study.list-opportunities', 'study.filter-vocabulary',
   'study.undo-filter', 'study.preview-cards', 'study.create-cards',
   'study.preview-anki', 'study.export-anki', 'study.resume-session', 'study.open-context',

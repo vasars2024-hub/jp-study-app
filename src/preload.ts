@@ -1298,7 +1298,16 @@ const api = {
   miningAnalyzeEpub: (
     itemId: string,
     config?: Partial<TraditionalMiningConfig>,
-  ): Promise<EpubMiningAnalysis> => ipcRenderer.invoke('mining:analyzeEpub', itemId, config),
+    range?: { from?: number | null; to?: number | null } | null,
+  ): Promise<EpubMiningAnalysis> =>
+    ipcRenderer.invoke('mining:analyzeEpub', itemId, config, range),
+  miningListEpubSections: (
+    itemId: string,
+  ): Promise<{
+    itemId: string;
+    title: string;
+    sections: import('./shared/mining').EpubSectionSummary[];
+  }> => ipcRenderer.invoke('mining:listEpubSections', itemId),
   miningCancelAnalyze: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('mining:cancelAnalyze'),
   miningEnrichCandidate: (
     candidate: MiningCandidate,

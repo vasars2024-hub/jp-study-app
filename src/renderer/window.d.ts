@@ -839,7 +839,13 @@ declare global {
       miningAnalyzeEpub(
         itemId: string,
         config?: Partial<TraditionalMiningConfig>,
+        range?: { from?: number | null; to?: number | null } | null,
       ): Promise<EpubMiningAnalysis>;
+      miningListEpubSections(itemId: string): Promise<{
+        itemId: string;
+        title: string;
+        sections: import('../shared/mining').EpubSectionSummary[];
+      }>;
       miningCancelAnalyze(): Promise<{ ok: boolean }>;
       miningEnrichCandidate(
         candidate: MiningCandidate,

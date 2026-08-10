@@ -62,6 +62,8 @@ import { AgentConversationPlanQueue } from './AgentConversationPlanQueue';
 import { AgentCapabilityDirectory } from './AgentCapabilityDirectory';
 import { AgentPromptLibrary } from './AgentPromptLibrary';
 import { AgentContextSuggestions } from './AgentContextSuggestions';
+import { AgentPipelineTerminal } from './AgentPipelineTerminal';
+import { buildAgentPipelineLines } from '../../agentPipelineVerify';
 import {
   AGENT_NAVIGATION_IDLE,
   AGENT_NAVIGATION_SECTION_LABEL_KEYS,
@@ -1297,6 +1299,13 @@ export default function AgentWorkspaceShell() {
     setOperationLog((previous) => agentOperationLogAppend(previous, operation, Date.now()));
   }, []);
 
+  /**
+   * The pipeline terminal's lines. Recomputed when the operation log changes,
+   * which re-reads the live stores — so a card deleted by hand after the Agent
+   * created it stops being reported as verified the next time a step lands.
+   */
+  const pipelineLines = useMemo(() => buildAgentPipelineLines(operationLog), [operationLog]);
+
   const recordTimelineProjection = useCallback((projection: AgentTimelineProjection): void => {
     const startedAt = Date.now();
     setTimeline((previous) => projection.events.reduce(
@@ -2344,6 +2353,7 @@ export default function AgentWorkspaceShell() {
                         onTimeline={recordTimelineProjection}
                         onOperation={appendOperation}
                       />
+                      <AgentPipelineTerminal lines={pipelineLines} />
                       {planQueueFailure ? (
                         <p className="agent-plan-error" role="alert">
                           {t(`agent.plan.queue.error.${planQueueFailure}`)}

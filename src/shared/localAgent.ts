@@ -41,6 +41,8 @@ export type AgentToolOperationId =
   | 'flashcard.modify-cards'
   | 'flashcard.schedule-reviews'
   | 'flashcard.delete-deck'
+  | 'flashcard.list-card-presets'
+  | 'flashcard.generate-cards'
   | 'study.get-context'
   | 'study.list-opportunities'
   | 'study.prepare-media'
@@ -184,6 +186,20 @@ export const AGENT_TOOL_OPERATIONS: readonly AgentToolOperationDefinition[] = [
   operation('flashcard.modify-cards', 'flashcard', 'Modify flashcards', 'limited-actions'),
   operation('flashcard.schedule-reviews', 'flashcard', 'Schedule reviews', 'limited-actions'),
   operation('flashcard.delete-deck', 'flashcard', 'Delete a flashcard deck', 'full-automation', 'delete-data'),
+  operation('flashcard.list-card-presets', 'flashcard', 'List AI card presets', 'read-only'),
+  // `external-connection` even though the local-qwen engine sends nothing outward:
+  // the confirmation reason is a property of the OPERATION, not of the engine the
+  // config happens to hold when the plan is built, and the engine can change
+  // between planning and execution. The conservative reason is the only one that
+  // is true in both states. Which provider actually received the text is reported
+  // per run, in the adapter's `sentToProvider`.
+  operation(
+    'flashcard.generate-cards',
+    'flashcard',
+    'Generate AI cards',
+    'limited-actions',
+    'external-connection',
+  ),
   operation('study.get-context', 'study', 'Read the active Study context', 'read-only'),
   operation('study.list-opportunities', 'study', 'List Study opportunities', 'read-only'),
   operation('study.prepare-media', 'study', 'Prepare media for Study Mode', 'limited-actions'),
