@@ -177,17 +177,20 @@ Still required before the Track 3 acceptance can be called complete:
   The material is ready — ReadingLens holds `screenshotDataUrl` in its `reading`
   state and `visualNovels.ts:985` already persists one via
   `saveCaptureScreenshot`;
-- **partly done.** The five `visual-novel` adapters are installed
-  (`renderer/visualNovelAgentHandlers.ts`, 2026-08-10 — see the ledger's "The
-  visual-novel adapters, and the update that replaces the route list"), taking
-  the unavailable surface from 17 operations to 12. **Still required**: the three
-  media adapters, which have a real local substrate in the subtitle discovery
-  records; the six anime adapters, which do **not** — `anime.search` and
-  `anime.check-releases` read as local but the MAL list arrives over
-  `mal:fetchList` and the schedule over the scraper, so what a *tracked* anime
-  record is locally has to be decided before an adapter can honestly answer;
-  and the two `dictionary` operations, which stay `dedicated-analysis-required`
-  by an earlier decision and are not adapter work at all;
+- **done, except where a decision blocks it.** The five `visual-novel` adapters
+  and the three `media` adapters are installed
+  (`renderer/visualNovelAgentHandlers.ts`, `renderer/mediaAgentHandlers.ts`,
+  2026-08-10 — see the ledger's "The visual-novel adapters, and the update that
+  replaces the route list" and "The media adapters, and the two writes they
+  make"), taking the unavailable surface from 17 operations to 9. **No remaining
+  operation is unavailable for want of an adapter.** The six anime operations
+  need a product decision first — `anime.search` and `anime.check-releases` read
+  as local, but the MAL list arrives over `mal:fetchList` and the schedule over
+  the scraper, so there is no local "tracked anime" record to search and what
+  that record should be has to be decided before an adapter can honestly answer.
+  The two `dictionary` operations (`dedicated-analysis-required`) and
+  `flashcard.schedule-reviews` (`false-success-stub-removed`) are unavailable by
+  earlier decisions and are not adapter work;
 - AI Card Studio conversion to an Agent workflow while retaining its editor;
 - broader planned-operation Undo surfacing and any product decision to make
   the session-only activity/operation history durable;

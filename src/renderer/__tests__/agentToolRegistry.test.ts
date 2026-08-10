@@ -28,7 +28,7 @@ describe('central Agent tool registry', () => {
     expect(matrix.filter((entry) => entry.available).map((entry) => entry.definition.id).sort())
       .toEqual(Object.keys(handlers).sort());
     expect(availableAgentToolOperationIds(handlers))
-      .toHaveLength(AGENT_TOOL_OPERATIONS.length - 12);
+      .toHaveLength(AGENT_TOOL_OPERATIONS.length - 9);
   });
 
   it('does not advertise lookup and queue stubs as grammar, analysis or scheduling', () => {
@@ -64,9 +64,6 @@ describe('central Agent tool registry', () => {
       'dictionary.analyze-sentence',
       'dictionary.explain-grammar',
       'flashcard.schedule-reviews',
-      'media.analyze-subtitles',
-      'media.generate-profile',
-      'media.organize-files',
     ]);
   });
 });

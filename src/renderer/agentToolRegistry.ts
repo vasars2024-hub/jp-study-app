@@ -28,6 +28,7 @@ import { loadToolboxSettings, saveToolboxSettings } from './toolboxSettings';
 import { recordBlancThemeHistory, undoBlancThemeHistory } from './blancThemeHistoryStore';
 import { createStudyAgentHandlers } from './studyAgentHandlers';
 import { createVisualNovelAgentHandlers } from './visualNovelAgentHandlers';
+import { createMediaAgentHandlers } from './mediaAgentHandlers';
 
 export type AgentToolRegistryTranslate = (key: string, vars?: TVars) => string;
 
@@ -45,9 +46,6 @@ export type AgentToolCapability =
     };
 
 const UNAVAILABLE: Readonly<Partial<Record<AgentToolOperationId, AgentToolUnavailableReason>>> = {
-  'media.analyze-subtitles': 'adapter-not-implemented',
-  'media.generate-profile': 'adapter-not-implemented',
-  'media.organize-files': 'adapter-not-implemented',
   'anime.search': 'adapter-not-implemented',
   'anime.track': 'adapter-not-implemented',
   'anime.check-releases': 'adapter-not-implemented',
@@ -126,6 +124,7 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
   const handlers: AgentToolHandlers = {
     ...createStudyAgentHandlers(),
     ...createVisualNovelAgentHandlers(t),
+    ...createMediaAgentHandlers(t),
     'dictionary.lookup': async (arguments_) => (
       window.api.lookupTerm(textArgument(t, arguments_, 'term'))
     ),

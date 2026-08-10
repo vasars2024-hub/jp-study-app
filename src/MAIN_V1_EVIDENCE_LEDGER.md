@@ -3816,3 +3816,103 @@ files. ESLint exit 0 over the changed paths.
   as local, but the MAL list arrives over `mal:fetchList` and the schedule over
   the scraper, so "search *tracked* anime" needs a decision about what a cached
   local anime record even is before an adapter can honestly answer it.
+
+## The media adapters, and the two writes they make — 2026-08-10
+
+### What is installed
+
+`media.analyze-subtitles`, `media.generate-profile` and `media.organize-files`,
+in `renderer/mediaAgentHandlers.ts`. The unavailable surface is now **9**: six
+anime, two dictionary (`dedicated-analysis-required`) and one flashcard
+(`false-success-stub-removed`). Every remaining one is unavailable by a decision,
+not by a missing adapter — see "Still open" below.
+
+The analysis is not new code. `analyzeMediaStudyCues` (`mediaStudyWorkflow.ts:65`)
+already awaits the tokenizer, builds the corpus through `buildMediaStudyCorpus`,
+and estimates level and comprehensibility; `selectJapaneseStudySubtitle` already
+picks the `ja` record. The adapters compose those, which is why
+`analyze-subtitles` does **not** duplicate `study.prepare-media`: prepare-media
+creates a Study *workspace*, analyze-subtitles creates nothing and returns what
+the corpus measured.
+
+### `generate-profile` writes a level only when the estimator stood behind it
+
+`updateMediaMetadata` accepts `jlptLevel`, `vocabularyCount` and `kanjiCount`, and
+until now **nothing in the renderer called it** — this is the first writer.
+`vocabularyCount` and `kanjiCount` are counts the corpus measured, so they are
+written unconditionally. `jlptLevel` is not: `BookLevelEstimate` carries
+`metThreshold`, and below that threshold the label is the estimator's best guess
+rather than its finding. `jlptLevel` is a field the rest of the app filters and
+sorts on, so an unmarked guess there is worse than a blank. The adapter writes it
+only when `scheme === 'jlpt' && metThreshold`, and otherwise returns
+`jlptLevelDeclined` as `below-threshold`, `other-scheme` or
+`no-level-bands-configured` — the caller is told which, rather than left to infer
+from an absent field.
+
+Positive control: dropping `metThreshold` from that condition fails the
+"does not write a level the estimator did not stand behind" test.
+
+### `media:organize` rewrites the library title, and that is now reported
+
+Measured, not assumed. On a successful move `media.ts`'s `media:organize` sets
+`item.title = path.basename(target, ext)`, and the target leaf is
+`sanitizeMediaPathSegment(item.title …)` (`mediaFileIdentity.ts:545`), which
+replaces every character illegal in a path. So organizing a title like
+`Snow: Episode 1` files it correctly **and renames the library entry to
+`Snow Episode 1`**. That is existing behaviour of the channel and not this
+slice's to change, but an agent that moves a file and says nothing about the
+rename is hiding half of what it did. The adapter re-reads the item and returns
+`titleRewritten: {from, to}` when the title moved.
+
+### The conflict refusal is duplicated on purpose
+
+`media:organize` defaults `choice` to `keep-existing`, and with a `conflict`
+preview that combination returns `{ok: false}` with a message. The adapter
+refuses first, with `reason: 'duplicate-choice-required'`, the conflicting item
+ids, and the four legal choices. Reaching main's refusal instead would give the
+model a bare error string for a situation that has a specific, answerable
+question in it. `noop` is likewise answered without calling `organize` at all.
+
+The root is a required argument: there is no stored Hub root to fall back on —
+`MediaContent.tsx:2288` keeps it in component state from a text input, so the
+agent must be told where the library is rather than inventing a path to move a
+user's files into.
+
+### A stale example in an UNTRACKED test — fixed in the tree, not in this commit
+
+`agentCapabilityDirectory.test.ts` used `media.organize-files` as its example of
+an operation that is unavailable *and* carries a confirmation. That example is
+now available, so installing the adapter broke their test.
+
+The whole capability-directory feature — `renderer/agentCapabilityDirectory.ts`,
+`components/agent/AgentCapabilityDirectory.tsx` and that test — is **untracked**:
+another track's in-flight work, absent from HEAD. So the fix was made in the
+working tree and deliberately left out of this commit, to land with their file
+when they commit it. It re-points the assertion at
+`anime.fetch-external-metadata` (`external-connection`, still adapter-less) and
+adds a second one that `media.organize-files` keeps
+`confirmation: 'organize-files'` **while available** — covering both directions
+rather than losing a case.
+
+Whoever commits that feature: the fix is already in your working copy. Do not
+re-derive it, and do not restore the old assertion — `media.organize-files` has
+an adapter now.
+
+### Gates
+
+`vitest run agent i18n lens settings flashcard visualNovel media` — 141 files /
+1686 tests. `i18n-check` clean at 9,208 keys (six new `blanc.agent.error.*`).
+`i18n-hardcoded-check` clean. `architecture-audit` `fresh: 0`. `tsc --noEmit`
+unchanged at 392; the one error in a file this slice touched
+(`agentCapabilityDirectory.test.ts` TS2769) is the same error at the same message,
+shifted from line 139 to 147 by the added assertions. ESLint exit 0.
+
+### Still open after this
+
+- **Nine operations remain unavailable, none of them for want of an adapter.**
+  The six anime operations need a product decision first: `anime.search` and
+  `anime.check-releases` sound local, but the MAL list arrives over
+  `mal:fetchList` and the schedule over the scraper, so there is no local
+  "tracked anime" record to search. Deciding what that record is comes before any
+  adapter. The two `dictionary` operations and `flashcard.schedule-reviews` are
+  unavailable by earlier decisions and are not adapter work.
