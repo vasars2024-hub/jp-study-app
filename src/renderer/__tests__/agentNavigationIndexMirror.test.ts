@@ -12,16 +12,48 @@
  * fail here instead of silently routing a user to a place that no longer exists.
  */
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_NAVIGATION_INDEX,
   type AgentNavigationIndexEntry,
 } from '../../shared/agentNavigationIndex';
-import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
+import {
+  AGENT_NAVIGATION_SECTION_LABEL_KEYS,
+  AGENT_SETTINGS_GUIDED_TARGETS,
+} from '../../shared/agentNavigation';
 import { SETTINGS_NAV, SETTINGS_REGISTRY } from '../components/settings/settingsRegistry';
 import { en } from '../../shared/i18n/catalogs';
 
 const catalog = en as unknown as Record<string, unknown>;
+
+/**
+ * Guided pairs the index deliberately does not carry, each mapped to the
+ * coordinate that answers for it.
+ *
+ * Every one of these is the *same card* reachable under a second id or on a
+ * second page. Indexing both would make every term they share ambiguous, and
+ * ambiguity refuses — so adding the duplicate would remove an answer rather than
+ * add one. Requiring a stand-in here is what stops this list from becoming a
+ * place to park controls nobody got round to.
+ */
+const DUPLICATE_GUIDED_TARGETS: Readonly<Record<string, string>> = {
+  // A second guided id for the Window chrome card, which highlights on either.
+  'display/borderless': 'display/window-chrome',
+  // Blanc Mode renders on Appearance and on Special; SETTINGS_REGISTRY registers
+  // it on Special, so that is the coordinate the index can mirror.
+  'appearance/blanc-mode': 'special/blanc-mode',
+  // "Leave secret OS" renders on both pages. The Companions copy is the indexed
+  // one because the Special page is Advanced-only.
+  'special/secret-os-leave': 'companions/companions-leave-secret',
+};
+
+function indexedControls(): Set<string> {
+  return new Set(
+    AGENT_NAVIGATION_INDEX.filter((entry) => entry.controlId)
+      .map((entry) => `${entry.page}/${entry.controlId}`),
+  );
+}
 
 function words(value: string): string[] {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
@@ -109,5 +141,35 @@ describe('agent navigation index mirrors the live Settings surface', () => {
     for (const nav of SETTINGS_NAV) {
       expect(indexed.has(nav.id), `${nav.id} has no index entry`).toBe(true);
     }
+  });
+
+  it('indexes every guided control except the declared duplicates', () => {
+    const indexed = indexedControls();
+    const missing: string[] = [];
+    for (const [page, controls] of Object.entries(AGENT_SETTINGS_GUIDED_TARGETS)) {
+      for (const controlId of controls as readonly string[]) {
+        const key = `${page}/${controlId}`;
+        if (indexed.has(key) || key in DUPLICATE_GUIDED_TARGETS) continue;
+        missing.push(key);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('answers for every duplicate it skipped, and skips every one it declared', () => {
+    const indexed = indexedControls();
+    for (const [skipped, coveredBy] of Object.entries(DUPLICATE_GUIDED_TARGETS)) {
+      expect(indexed.has(skipped), `${skipped} is declared a duplicate but is indexed`)
+        .toBe(false);
+      expect(indexed.has(coveredBy), `${skipped} has no indexed stand-in`).toBe(true);
+    }
+  });
+
+  it('proves the one duplicate that is not two cards is really one card', () => {
+    // `display/borderless` has no card of its own — DisplayPage highlights the
+    // Window chrome card for either id. If that ever stops being true, the entry
+    // above becomes a control with no destination at all.
+    const src = readFileSync('src/renderer/components/settings/pages/DisplayPage.tsx', 'utf8');
+    expect(src).toContain("focusSettingId === 'window-chrome' || focusSettingId === 'borderless'");
   });
 });

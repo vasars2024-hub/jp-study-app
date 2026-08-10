@@ -1056,6 +1056,240 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'memory',
     group: 'System',
   },
+
+  // ---------------------------------------------------------------------
+  // Guided targets the search box could not reach.
+  //
+  // `AGENT_SETTINGS_GUIDED_TARGETS` (shared/agentNavigation.ts) declares 107
+  // page/control pairs that Settings scrolls to and highlights on request. The
+  // 26 cards below were declared there and rendered on their page, but had no
+  // entry here at all — so typing their own name into this search box returned
+  // nothing. That is a Settings defect in its own right; the Agent's navigation
+  // index is only what surfaced it.
+  //
+  // Keywords are words those cards already use in their heading, body or
+  // options — `agentNavigationIndexMirror.test.ts` rejects any search term the
+  // index matches on that is not one of them, so inventing vocabulary here would
+  // widen the Agent's reach past what Settings itself calls these things.
+  //
+  // `advanced` marks a card that only renders once the user has reached a state
+  // of their own (the Aero / WIRED secret shells): offering the row to everyone
+  // else would scroll to nothing and give the secret away in the same click.
+  // ---------------------------------------------------------------------
+  {
+    id: 'app-border',
+    titleKey: 'settings.appearance.border.title',
+    descKey: 'settings.appearance.border.desc',
+    keywords: ['app borders', 'border', 'window frame', 'frame', 'aero', 'secret os', 'style', 'width'],
+    pageId: 'appearance',
+    group: 'Personalization',
+    advanced: true,
+  },
+  {
+    id: 'pillarbox',
+    titleKey: 'settings.appearance.pillarbox.title',
+    descKey: 'settings.appearance.pillarbox.desc',
+    keywords: ['pillarbox style', 'pillarbox', 'letterbox', 'outer border', 'background', 'aero', 'secret os'],
+    pageId: 'appearance',
+    group: 'Personalization',
+    advanced: true,
+  },
+  {
+    id: 'environment-preset',
+    titleKey: 'settings.atmosphere.environment.title',
+    descKey: 'settings.atmosphere.environment.desc',
+    keywords: ['environment', 'environment preset', 'preset', 'place', 'scene', 'atmosphere'],
+    pageId: 'atmosphere',
+    group: 'Personalization',
+  },
+  {
+    id: 'weather',
+    titleKey: 'settings.atmosphere.weather.title',
+    descKey: 'settings.atmosphere.weather.desc',
+    keywords: ['weather', 'fog', 'clouds', 'rain', 'snow', 'precipitation'],
+    pageId: 'atmosphere',
+    group: 'Personalization',
+  },
+  {
+    id: 'ambient-audio',
+    titleKey: 'settings.atmosphere.ambientAudio.title',
+    descKey: 'settings.atmosphere.ambientAudio.desc',
+    keywords: ['ambient audio', 'ambience', 'soundscape', 'sound', 'volume', 'loop'],
+    pageId: 'atmosphere',
+    group: 'Personalization',
+  },
+  {
+    // The same action also renders as `special/secret-os-leave`. Only this one is
+    // registered: the Special page is Advanced-only, so a user who wants out of a
+    // secret shell can reach the Companions copy and not that one.
+    id: 'companions-leave-secret',
+    titleKey: 'special.leave.title',
+    descKey: 'special.leave.desc',
+    keywords: ['leave secret os', 'leave', 'exit', 'secret os', 'aero', 'wired', 'restore theme'],
+    pageId: 'companions',
+    group: 'Personalization',
+    advanced: true,
+  },
+  {
+    id: 'trinkets',
+    titleKey: 'companion.trinket.section.title',
+    descKey: 'companion.trinket.section.desc',
+    keywords: ['trinkets', 'trinket', 'keepsake', 'collectible', 'streak', 'unlock'],
+    pageId: 'companions',
+    group: 'Personalization',
+  },
+  {
+    id: 'os-hotkey',
+    titleKey: 'settings.osHotkey.title',
+    descKey: 'settings.osHotkey.desc',
+    keywords: ['os hotkey', 'startup helper', 'global hotkey', 'windows', 'startup', 'autostart', 'helper'],
+    pageId: 'shortcuts',
+    group: 'Desktop',
+  },
+  {
+    id: 'global-lookup',
+    titleKey: 'settings.dict.globalLookup',
+    descKey: 'settings.dict.globalLookupHint',
+    keywords: ['app wide lookup', 'app wide', 'lookup', 'popup', 'trigger', 'shift click'],
+    pageId: 'shortcuts',
+    group: 'Desktop',
+  },
+  {
+    id: 'mini-enable',
+    titleKey: 'settings.mini.enable.title',
+    descKey: 'settings.mini.enable.desc',
+    keywords: ['mini view', 'mini', 'craft window', 'pop out', 'launcher'],
+    pageId: 'mini',
+    group: 'Desktop',
+  },
+  {
+    id: 'mini-apps',
+    titleKey: 'search.miniApps',
+    descKey: 'search.miniApps.desc',
+    keywords: ['pinned apps', 'mini apps', 'pin', 'slots', 'grid', 'add app'],
+    pageId: 'mini',
+    group: 'Desktop',
+  },
+  {
+    id: 'mini-routines',
+    titleKey: 'search.miniRoutines',
+    descKey: 'search.miniRoutines.desc',
+    keywords: ['mini routines', 'routines', 'buddy routines', 'one click', 'widget'],
+    pageId: 'mini',
+    group: 'Desktop',
+  },
+  {
+    id: 'mini-look',
+    titleKey: 'settings.mini.look.title',
+    descKey: 'settings.mini.look.desc',
+    keywords: ['mini look', 'density', 'tint', 'clock', 'auto open', 'mono'],
+    pageId: 'mini',
+    group: 'Desktop',
+  },
+  {
+    id: 'level',
+    titleKey: 'settings.study.level.title',
+    descKey: 'settings.study.level.desc',
+    keywords: ['level', 'proficiency', 'jlpt', 'hsk', 'known words', 'apkg'],
+    pageId: 'study',
+    group: 'Study',
+  },
+  {
+    id: 'special-locked',
+    titleKey: 'search.specialLocked',
+    descKey: 'search.specialLocked.desc',
+    keywords: ['special modules locked', 'modules locked', 'locked', 'secret', 'discover'],
+    pageId: 'special',
+    group: 'System',
+  },
+  {
+    id: 'wired-arcade',
+    titleKey: 'search.wiredArcade',
+    descKey: 'search.wiredArcade.desc',
+    keywords: ['wired games', 'wired arcade', 'micro games', 'minigames', 'arcade'],
+    pageId: 'special',
+    group: 'System',
+  },
+  {
+    id: 'aero-arcade',
+    titleKey: 'search.aeroArcade',
+    descKey: 'search.aeroArcade.desc',
+    keywords: ['aero games', 'aero arcade', 'xp', 'vista', 'arcade', 'launcher'],
+    pageId: 'special',
+    group: 'System',
+  },
+  {
+    id: 'monitors-list',
+    titleKey: 'settings.monitors.displays',
+    descKey: 'settings.monitors.displays.desc',
+    keywords: ['connected displays', 'displays', 'screens', 'monitors', 'second monitor', 'per screen'],
+    pageId: 'monitors',
+    group: 'System',
+  },
+  {
+    id: 'monitors-layout-remap',
+    titleKey: 'settings.monitors.remap',
+    descKey: 'settings.monitors.remap.desc',
+    keywords: ['remap', 'other screens', 'layouts on other screens', 'rescale', 'resize'],
+    pageId: 'monitors',
+    group: 'System',
+  },
+  {
+    id: 'monitors-simulated',
+    titleKey: 'settings.monitors.simulated',
+    descKey: 'settings.monitors.simulated.desc',
+    keywords: ['simulated displays', 'simulated', 'fake screens', 'virtual display', 'test'],
+    pageId: 'monitors',
+    group: 'System',
+  },
+  {
+    id: 'monitors-reset',
+    titleKey: 'settings.monitors.reset',
+    descKey: 'settings.monitors.reset.desc',
+    keywords: ['reset display setup', 'forget screens', 'reset', 'clear screen settings'],
+    pageId: 'monitors',
+    group: 'System',
+  },
+  {
+    id: 'filedrop-auto',
+    titleKey: 'settings.fileDrops.auto',
+    descKey: 'settings.fileDrops.auto.desc',
+    keywords: ['automatic routing', 'routing', 'dropped files', 'drag and drop', 'always ask'],
+    pageId: 'file-drops',
+    group: 'System',
+  },
+  {
+    id: 'filedrop-overrides',
+    titleKey: 'settings.fileDrops.overrides',
+    descKey: 'settings.fileDrops.overrides.desc',
+    keywords: ['per type destinations', 'overrides', 'file type', 'destination'],
+    pageId: 'file-drops',
+    group: 'System',
+  },
+  {
+    id: 'filedrop-undo',
+    titleKey: 'settings.fileDrops.undo',
+    descKey: 'settings.fileDrops.undo.desc',
+    keywords: ['undo history', 'undo', 'reverse', 'toast'],
+    pageId: 'file-drops',
+    group: 'System',
+  },
+  {
+    id: 'filedrop-reset',
+    titleKey: 'settings.fileDrops.reset',
+    descKey: 'settings.fileDrops.reset.desc',
+    keywords: ['reset drop settings', 'drop settings', 'reset', 'defaults'],
+    pageId: 'file-drops',
+    group: 'System',
+  },
+  {
+    id: 'agent-memory',
+    titleKey: 'search.agentMemory',
+    descKey: 'search.agentMemory.desc',
+    keywords: ['agent memory', 'local agent memory', 'assistant', 'remembers', 'forget', 'offline'],
+    pageId: 'memory',
+    group: 'System',
+  },
 ];
 
 export function searchSettings(

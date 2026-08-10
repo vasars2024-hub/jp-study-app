@@ -3100,3 +3100,142 @@ destination it delivers is correct in both cases. Fixing it means letting a
 first `rejected` from a window that has not yet mounted the target page retry,
 which is a change to the delivery handshake's finality rule and wants its own
 slice.
+
+## The 29 guided controls Settings' own search could not find either — 2026-08-10
+
+The section above closed on a finding rather than a gap. `AGENT_SETTINGS_GUIDED_TARGETS`
+declares **107** page/control pairs and the index carried **78**; the 29 it left
+out were not omitted because the index was narrow. They had **no
+`SETTINGS_REGISTRY` entry at all**, so typing one of those cards' own names into
+Settings' search box returned nothing — for every user, whether or not they have
+ever opened the Agent. The Agent index is only what surfaced that. This slice
+fixes the Settings defect first, and the index follows from it.
+
+`settingsRegistry.ts` gains **26 entries** and `agentNavigationIndex.ts` gains the
+same 26 coordinates, taking the index from 124 destinations to **150** — 22
+sections, 24 Settings pages, **104 of the 107 guided controls**.
+
+### Why 26 and not 29
+
+The other three pairs are not three cards. Each is a card already indexed under a
+different coordinate, and indexing the second one would have made every term the
+two share ambiguous — and ambiguity refuses. Adding them would have *removed*
+answers:
+
+| Declared pair | Answered by | Because |
+| --- | --- | --- |
+| `display/borderless` | `display/window-chrome` | no card of its own; `DisplayPage` highlights Window chrome for either id |
+| `appearance/blanc-mode` | `special/blanc-mode` | Blanc Mode renders on both pages, and the registry registers it on Special |
+| `special/secret-os-leave` | `companions/companions-leave-secret` | "Leave secret OS" renders on both; the Companions copy is indexed because the Special page is Advanced-only |
+
+That list is not a comment. `agentNavigationIndexMirror.test.ts` now walks all 107
+declared pairs and fails on any that is neither indexed nor in it, **and** requires
+each listed pair to name an indexed stand-in — so the allowlist cannot become a
+place to park controls nobody got round to. A fourth test reads `DisplayPage.tsx`
+as source and asserts the `focusSettingId === 'window-chrome' || focusSettingId
+=== 'borderless'` branch still exists, because that is the one alias claim the
+registry cannot corroborate.
+
+### The constraint that chose every term
+
+The index scores by exact token and refuses a tie inside a precedence band. With
+78 entries already in place, almost every obvious word for a new control was
+**already some older entry's word** — and a second claimant does not lose the
+word, it ties for it and takes the answer away from both. So the design work was
+mostly subtraction: `rain` and `snow` stayed with Particles rather than moving to
+Weather, `preset` stayed with the desktop icon preset, `routine` with the buddy
+programmer, `jlpt` with the study profile, `craft window` with the Mini wallpaper,
+`multi monitor` with the OS pets card, `ambient` with Lighting, `audio` with the
+mining profile rules, and bare `aero` with the Special page. Each new control is
+reached by the phrase only it uses. Eight of those words are now asserted to
+resolve exactly where they did before, and `snow` and `hotkey` are asserted to
+stay *refused* — a word that was already ambiguous must not look fixed.
+
+Two behaviours did change on purpose, both by the declared precedence ladder
+rather than by accident: `environment` now names the Environment card instead of
+merely being a keyword of the Living layer (it is the only entry that is *named*
+it, so the position-0 bonus decides it), and `mini view` now highlights the Mini
+View switch rather than stopping at the page that holds it.
+
+### Twelve catalog keys, and the four headings that are still literal
+
+Twenty-two of the 26 entries reuse their card's own `titleKey`. Six could not:
+`mini-apps` and `mini-routines` have parameterised headings (`Pinned apps
+({count}/{max})`), which would render the placeholders verbatim in a search row,
+and `agent-memory`, `special-locked`, `wired-arcade` and `aero-arcade` still carry
+literal English titles in their page components. Those six get `search.*` keys in
+all four catalogs, following the convention the registry already uses for
+`search.theme` and its neighbours.
+
+That leaves those four **card headings** untranslated — a pre-existing i18n defect
+this slice did not create and did not fix. Their search rows are now translated
+while their cards are not; converting the cards belongs to the i18n track, and
+`tools/i18n-hardcoded-check.cjs` reports no new violation either way.
+
+### Measured evidence
+
+- Agent regression: **61 files, 854 tests passed** (was 61/816). The index suite
+  goes 20 → 55 tests, the mirror gate 4 → 7.
+- `node tools/i18n-check.cjs`: **clean at 9,189 English keys** (was 9,177 — the 12
+  added here), all translated in ja/zh/ru.
+- `node tools/i18n-hardcoded-check.cjs`: no new component renders UI text without
+  i18n; 6 files baselined, unchanged.
+- `node tools/architecture-audit.cjs --json`: **`fresh: []`**. Exit 1 comes from
+  the same pre-existing stale `test-only-module:src/shared/agentOperationLog.ts`
+  baseline entry recorded above.
+- `tsc --noEmit`: **392 errors, the same total as before this slice, and none in
+  any of the eight files it touches.**
+- Focused ESLint over all eight paths: **exit 0**.
+- Settings/i18n/monitors suites: 18 files, 226 tests passed.
+
+### Live Electron evidence
+
+Driven through the debug bridge against a freshly started dev app (main rebuilt
+from this source) on the real profile, whose UI language is Russian:
+
+- A probe conversation carrying two index cards — one resolving
+  `monitors/monitors-list`, one with `page` tampered to `memory` — was saved
+  through the real main-owned store. Both survived persistence, which is the
+  query-provenance retention rule running in main.
+- `agentNavigation:run` with `approved: false` resolved the good card to
+  `{settings, monitors, monitors-list, highlight: true}` — a control that had no
+  registry entry to mirror an hour earlier — and refused the tampered one
+  `stale-provenance`.
+- With `approved: true` and Settings **not** already open: `open-failed`, while
+  the window opened on the Monitors page with exactly its four cards rendered.
+  That is the pre-existing cold-open defect from the section above, reproduced
+  unchanged and still untouched by this slice.
+- With Settings already open: `{ok: true, opened: true}`, and a sampler installed
+  in the Settings window recorded `monitors-list` carrying `is-highlight`.
+- Settings search with Advanced Mode **off**: `trinkets` → «Вещицы», `undo
+  history` → «История отмен», `simulated displays` → «Виртуальные мониторы»,
+  `agent memory` → «Локальная память агента», `pinned apps` → «Закреплённые
+  приложения», `level` → «Уровень». English keywords against a Russian UI, which
+  is the property the index inherits from this registry.
+- `weather` returned nothing there — and so did `lighting` and `wired archive`,
+  which have been registered for months. The blank is the pre-existing
+  page-level Advanced gate, not a bad entry.
+- With Advanced Mode on, each of the gated additions ranks first: `weather` →
+  «Погода», `ambient audio` → «Фоновый звук», `environment preset` →
+  «Окружение», `wired games` → «Игры WIRED», `aero games` → «Игры Aero», `app
+  borders` → «Рамки приложения», `pillarbox` → «Стиль полей».
+- Clicking the new «Вещицы» row navigated to Companions and highlighted the
+  `trinkets` card. Screenshot: `debug/shots/win2-1786341154131.png`.
+- Restores, all asserted rather than eyeballed: `jp-settings-advanced-v1` and
+  `jp-os-settings-recent-v1` both put back byte-for-byte; the probe conversation
+  deleted and the remaining three hashed identical to the pre-run snapshot
+  (`7318042f:4972`). `/logs?level=error` returned **0 entries** across the whole
+  pass, and localStorage carries zero `agentWorkspace` / `agent.context.*` keys —
+  the only agent-shaped key is the deliberately renderer-owned
+  `jp-study-local-agent-settings-v1`.
+
+### Still open after this
+
+- **Cold-open still answers `open-failed`.** Unchanged, and it is now the oldest
+  thing on this track's list.
+- **A question asked in Russian, Japanese or Chinese still resolves nothing.**
+  The live pass above is the sharpest statement of that limit: this app's UI is
+  Russian, its search box answers English feature names, and so does the index.
+- Three guided pairs stay unindexed by design, and the four literal card
+  headings stay literal. Both are recorded above rather than left to be
+  rediscovered.

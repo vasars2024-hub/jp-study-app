@@ -201,3 +201,84 @@ describe('agent navigation index — resolving a fresh question', () => {
     expect(resolveAgentNavigationQuery(42 as unknown as string)).toBeNull();
   });
 });
+
+describe('agent navigation index — the controls the settings registry had missed', () => {
+  const control = (page: string, controlId: string) => ({
+    section: 'settings',
+    page,
+    controlId,
+    highlight: true,
+  });
+
+  it.each([
+    ['where do I change the app borders', 'appearance', 'app-border'],
+    ['pillarbox style', 'appearance', 'pillarbox'],
+    ['pick an environment', 'atmosphere', 'environment-preset'],
+    ['turn off the weather', 'atmosphere', 'weather'],
+    ['where is the ambient audio setting', 'atmosphere', 'ambient-audio'],
+    ['how do I leave the secret os', 'companions', 'companions-leave-secret'],
+    ['where are my trinkets', 'companions', 'trinkets'],
+    ['set up the startup helper', 'shortcuts', 'os-hotkey'],
+    ['turn on app wide lookup', 'shortcuts', 'global-lookup'],
+    ['where is mini view', 'mini', 'mini-enable'],
+    ['change my pinned apps', 'mini', 'mini-apps'],
+    ['mini routines', 'mini', 'mini-routines'],
+    ['mini look', 'mini', 'mini-look'],
+    ['where do I set my level', 'study', 'level'],
+    ['why are the special modules locked', 'special', 'special-locked'],
+    ['open the wired games', 'special', 'wired-arcade'],
+    ['aero games', 'special', 'aero-arcade'],
+    ['set up my second monitor', 'monitors', 'monitors-list'],
+    ['remap the layout', 'monitors', 'monitors-layout-remap'],
+    ['add a simulated display', 'monitors', 'monitors-simulated'],
+    ['reset display setup', 'monitors', 'monitors-reset'],
+    ['turn off automatic routing', 'file-drops', 'filedrop-auto'],
+    ['pin a destination for a file type', 'file-drops', 'filedrop-overrides'],
+    ['how long is the undo history', 'file-drops', 'filedrop-undo'],
+    ['reset drop settings', 'file-drops', 'filedrop-reset'],
+    ['what is in the agent memory', 'memory', 'agent-memory'],
+  ])('routes %j to %s/%s', (query, page, controlId) => {
+    expect(destinationFor(query)).toEqual(control(page, controlId));
+  });
+});
+
+/**
+ * The 26 additions above are the whole reason this block exists.
+ *
+ * Every term one of them could plausibly have claimed is already a word some
+ * older entry answers to, and a second claimant does not merely lose — it *ties*,
+ * and a tie refuses. So each case below is a word this slice deliberately left
+ * out of a new entry's terms, asserted to still resolve exactly where it did.
+ */
+describe('agent navigation index — words a new entry deliberately did not claim', () => {
+  it.each([
+    // `weather` mentions rain and snow; Particles keeps them.
+    ['rain', { section: 'settings', page: 'atmosphere', controlId: 'particles', highlight: true }],
+    // `environment-preset` is a preset, but the desktop icon preset owns the word.
+    ['preset', { section: 'settings', page: 'desktop-layout', controlId: 'icon-recommended', highlight: true }],
+    // `mini-routines` pins buddy routines; the buddy programmer defines them.
+    ['routine', { section: 'settings', page: 'companions', controlId: 'buddy-programmer', highlight: true }],
+    // `level` is computed from JLPT decks; the study profile owns "jlpt".
+    ['jlpt', { section: 'settings', page: 'study', controlId: 'profile', highlight: true }],
+    // `mini-enable` is the craft window's switch; the Mini wallpaper names it.
+    ['craft window', { section: 'settings', page: 'wallpaper', controlId: 'mini-wallpaper', highlight: true }],
+    // Both Aero cards mention multi-monitor; the OS pets card claims the phrase.
+    ['multi monitor', { section: 'settings', page: 'companions', controlId: 'os-pets', highlight: true }],
+    // Two new Aero-only appearance cards, and neither takes "aero" off the page.
+    ['aero', { section: 'settings', page: 'special' }],
+    // `agent-memory` is a settings card; the bare word still opens the Agent.
+    ['agent', { section: 'agent' }],
+  ])('still resolves %j unchanged', (query, expected) => {
+    expect(destinationFor(query)).toEqual(expected);
+  });
+
+  it('leaves an already-refused word refused rather than breaking the tie by accident', () => {
+    // Particles and Snow accumulation have tied on "snow" since the index
+    // shipped. Weather mentions snow too — adding it as a term would have looked
+    // like a fix and changed nothing, so it was left out and this stays null.
+    expect(resolveAgentNavigationQuery('snow')).toBeNull();
+    // Three controls answer to "hotkey"; the new OS hotkey card is reached by
+    // "os hotkey" instead of making that four.
+    expect(resolveAgentNavigationQuery('hotkey')).toBeNull();
+  });
+});

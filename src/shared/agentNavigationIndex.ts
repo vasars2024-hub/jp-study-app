@@ -122,6 +122,14 @@ const PAGE_ENTRIES: readonly AgentNavigationIndexEntry[] = [
  * Every registered guided control, with the terms its own Settings search entry
  * already uses. `terms[0]` is that entry's English title; the rest are its
  * `keywords`, verbatim — the mirror test refuses anything invented here.
+ *
+ * Three of the 107 declared guided pairs are deliberately absent, and
+ * `agentNavigationIndexMirror.test.ts` holds that list so it cannot quietly grow:
+ * `display/borderless` is a second id for the `window-chrome` card (already
+ * indexed, and it highlights on either id), while `appearance/blanc-mode` and
+ * `special/secret-os-leave` are second renderings of a card indexed on its other
+ * page. Indexing a duplicate would make every term it shares with the original
+ * ambiguous, and ambiguity refuses — so adding them would *remove* answers.
  */
 const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'appearance', controlId: 'appearance-preview', terms: ['preview', 'try', 'draft', 'before', 'appearance', 'look'] },
@@ -130,27 +138,52 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'appearance', controlId: 'accent', terms: ['accent colour', 'accent', 'color', 'colour', 'red', 'personalization'] },
   { section: 'settings', page: 'appearance', controlId: 'typography', terms: ['typography density', 'font', 'density', 'corners', 'typography', 'spacing'] },
   { section: 'settings', page: 'appearance', controlId: 'materials', terms: ['shape materials', 'chrome', 'frosted', 'shadow', 'materials', 'glass'] },
+  // Aero-only cards. `aero` is a term of the Special *page*, so it stays out of
+  // both of these: two controls claiming it would tie, and a tie refuses.
+  { section: 'settings', page: 'appearance', controlId: 'app-border', terms: ['app borders', 'border'] },
+  { section: 'settings', page: 'appearance', controlId: 'pillarbox', terms: ['pillarbox style', 'pillarbox'] },
   { section: 'settings', page: 'appearance', controlId: 'custom-css', terms: ['custom css', 'css', 'advanced', 'sandbox', 'style'] },
   { section: 'settings', page: 'wallpaper', controlId: 'wallpaper', terms: ['wallpaper', 'background', 'image', 'video', 'live', 'slideshow', 'folder', 'cycle', 'shuffle'] },
   { section: 'settings', page: 'wallpaper', controlId: 'wallpaper-dim', terms: ['wallpaper dim', 'dim', 'brightness'] },
   { section: 'settings', page: 'wallpaper', controlId: 'rotation', terms: ['wallpaper rotation', 'rotation', 'playlist', 'schedule', 'day cycle', 'calendar walls'] },
   { section: 'settings', page: 'wallpaper', controlId: 'mini-wallpaper', terms: ['mini wallpaper', 'mini backdrop', 'craft window', 'app icons', 'mosaic', 'blur'] },
   { section: 'settings', page: 'atmosphere', controlId: 'living-layer', terms: ['living desktop layer', 'living', 'atmosphere', 'environment', 'layer'] },
+  // `environment` is a keyword on three entries; only this one is *named* it, so
+  // the position-0 bonus is what decides the word rather than an arbitrary tie.
+  { section: 'settings', page: 'atmosphere', controlId: 'environment-preset', terms: ['environment', 'environment preset'] },
   { section: 'settings', page: 'atmosphere', controlId: 'lighting', terms: ['day cycle lighting', 'lighting', 'ambient', 'dawn', 'night', 'wash'] },
   { section: 'settings', page: 'atmosphere', controlId: 'particles', terms: ['particles', 'fireflies', 'snow', 'rain', 'dust', 'intensity', 'density', 'size'] },
   { section: 'settings', page: 'atmosphere', controlId: 'particle-size', terms: ['particle size', 'size', 'radius', 'flake size', 'scale'] },
   { section: 'settings', page: 'atmosphere', controlId: 'snow-accumulation', terms: ['snow accumulation', 'snow', 'accumulation', 'piles', 'winter'] },
+  // `rain` and `snow` are Particles' words and stay there; weather is reached by
+  // the two forms only it has.
+  { section: 'settings', page: 'atmosphere', controlId: 'weather', terms: ['weather', 'fog', 'clouds'] },
+  // `ambient` alone belongs to Lighting, and `audio` to the mining profile rules.
+  { section: 'settings', page: 'atmosphere', controlId: 'ambient-audio', terms: ['ambient audio', 'soundscape', 'ambience'] },
   { section: 'settings', page: 'atmosphere', controlId: 'achievements', terms: ['achievements', 'streak', 'celebration', 'milestone'] },
+  // The Companions copy of "Leave secret OS", not the Special one: the Special
+  // page is Advanced-only, so this is the card a user in that state can reach.
+  { section: 'settings', page: 'companions', controlId: 'companions-leave-secret', terms: ['leave secret os', 'leave secret'] },
   { section: 'settings', page: 'companions', controlId: 'companions', terms: ['companions', 'pets', 'critter', 'buddy', 'shimeji'] },
   { section: 'settings', page: 'companions', controlId: 'companion-activeness', terms: ['companion speed', 'speed', 'activeness', 'animation', 'walk', 'shimeji', 'pace'] },
   { section: 'settings', page: 'companions', controlId: 'buddy-programmer', terms: ['buddy programmer', 'buddy', 'routine', 'macro', 'command chain', 'program', 'automate', 'companion script'] },
   { section: 'settings', page: 'companions', controlId: 'os-pets', terms: ['windows desktop pets', 'os desktop', 'overlay', 'host', 'multi-monitor', 'monitors'] },
+  { section: 'settings', page: 'companions', controlId: 'trinkets', terms: ['trinkets', 'keepsake', 'collectible'] },
   { section: 'settings', page: 'desktop-layout', controlId: 'icons', terms: ['icons', 'snap', 'grid', 'label', 'desktop'] },
   { section: 'settings', page: 'desktop-layout', controlId: 'icon-recommended', terms: ['recommended', 'preset', 'layout', 'arrange', 'placement', 'icons', 'desktop'] },
   { section: 'settings', page: 'desktop-layout', controlId: 'taskbar', terms: ['taskbar', 'clock', '24h', 'time'] },
   { section: 'settings', page: 'desktop-layout', controlId: 'start-menu', terms: ['start menu', 'start', 'menu', 'columns'] },
   { section: 'settings', page: 'desktop-layout', controlId: 'session', terms: ['session restore', 'session', 'restore', 'windows', 'launch'] },
+  // Bare `hotkey` is already a three-way tie and stays refused; these two are
+  // reached by the compound each of them alone owns.
+  { section: 'settings', page: 'shortcuts', controlId: 'os-hotkey', terms: ['os hotkey', 'startup helper'] },
+  { section: 'settings', page: 'shortcuts', controlId: 'global-lookup', terms: ['app wide lookup', 'app wide'] },
   { section: 'settings', page: 'shortcuts', controlId: 'shortcuts', terms: ['keyboard shortcuts', 'shortcut', 'keybind', 'hotkey', 'keyboard', 'mouse', 'ctrl', 'binding'] },
+  { section: 'settings', page: 'mini', controlId: 'mini-enable', terms: ['mini view', 'mini'] },
+  { section: 'settings', page: 'mini', controlId: 'mini-apps', terms: ['pinned apps', 'mini apps'] },
+  // `routine` belongs to the buddy programmer; only the two-word form is ours.
+  { section: 'settings', page: 'mini', controlId: 'mini-routines', terms: ['mini routines'] },
+  { section: 'settings', page: 'mini', controlId: 'mini-look', terms: ['mini look'] },
   { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-enable', terms: ['lockscreen', 'lock', 'pin', 'passcode', 'password', 'security', 'login'] },
   { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-pin', terms: ['lockscreen passcode', 'pin', 'passcode', 'password', '4 digit', 'lock'] },
   { section: 'settings', page: 'lockscreen', controlId: 'lockscreen-tint', terms: ['lockscreen look', 'lockscreen', 'tint', 'look', 'theme'] },
@@ -159,6 +192,8 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'study', controlId: 'focus-default-tab', terms: ['focus default tab', 'focus', 'tab', 'library', 'dictionary', 'anki', 'default'] },
   { section: 'settings', page: 'study', controlId: 'focus-distractions', terms: ['focus distractions', 'focus', 'music', 'chrome', 'minimal', 'hide', 'distraction'] },
   { section: 'settings', page: 'study', controlId: 'focus-auto-enter', terms: ['auto enter focus', 'focus', 'launch', 'startup', 'auto', 'enter', 'boot'] },
+  // `jlpt` is the study profile's word; `level` and `hsk` are only this card's.
+  { section: 'settings', page: 'study', controlId: 'level', terms: ['level', 'proficiency', 'hsk'] },
   { section: 'settings', page: 'study', controlId: 'game-arena', terms: ['game arena', 'minigames', 'mirror writing', 'source language', 'badges', 'xp'] },
   { section: 'settings', page: 'study', controlId: 'profile', terms: ['study profile', 'profile', 'study', 'jlpt'] },
   { section: 'settings', page: 'study', controlId: 'dictionary', terms: ['dictionary', 'yomitan', 'lookup'] },
@@ -174,9 +209,26 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'visualizer', controlId: 'visualizer', terms: ['music visualizer', 'visualizer', 'spectrum', 'music', 'fft'] },
   { section: 'settings', page: 'visualizer', controlId: 'lyrics', terms: ['lyrics lookup', 'lyrics', 'album', 'search'] },
   { section: 'settings', page: 'special', controlId: 'blanc-mode', terms: ['blanc mode', 'blanc', 'toolbox', 'toolbox os', 'minimal', 'plain mode', 'white mode', 'simple shell', 'mode', 'side agent'] },
+  { section: 'settings', page: 'special', controlId: 'special-locked', terms: ['special modules locked', 'modules locked'] },
   { section: 'settings', page: 'special', controlId: 'wired-archive', terms: ['wired archive', 'crt', 'boot replay', 'static', 'terminal ambient'] },
   { section: 'settings', page: 'special', controlId: 'wired-finding-terminal', terms: ['navi terminal', 'wired finding', 'lyrics', 'shimeji', 'radar', 'surveillance', 'hacker terminal', 'fateburn'] },
+  { section: 'settings', page: 'special', controlId: 'wired-arcade', terms: ['wired games', 'wired arcade'] },
   { section: 'settings', page: 'special', controlId: 'aero-gadget-lab', terms: ['aero gadget lab', 'xp', 'vista', 'windows media player', 'msn', 'cmd', 'legacy'] },
+  { section: 'settings', page: 'special', controlId: 'aero-arcade', terms: ['aero games', 'aero arcade'] },
+  // `monitors` itself resolves to the page, which is where three of these four
+  // live side by side; each control is named by the phrase only it uses.
+  { section: 'settings', page: 'monitors', controlId: 'monitors-list', terms: ['connected displays', 'second monitor'] },
+  { section: 'settings', page: 'monitors', controlId: 'monitors-layout-remap', terms: ['remap', 'other screens'] },
+  { section: 'settings', page: 'monitors', controlId: 'monitors-simulated', terms: ['simulated displays', 'simulated', 'fake screens'] },
+  { section: 'settings', page: 'monitors', controlId: 'monitors-reset', terms: ['reset display setup', 'forget screens'] },
+  // `dropped files` stays with the File drops page: it names the page, not the
+  // one card on it that decides where they go.
+  { section: 'settings', page: 'file-drops', controlId: 'filedrop-auto', terms: ['automatic routing', 'routing'] },
+  { section: 'settings', page: 'file-drops', controlId: 'filedrop-overrides', terms: ['per type destinations', 'overrides', 'file type'] },
+  { section: 'settings', page: 'file-drops', controlId: 'filedrop-undo', terms: ['undo history', 'undo'] },
+  { section: 'settings', page: 'file-drops', controlId: 'filedrop-reset', terms: ['reset drop settings', 'drop settings'] },
+  // `borderless` is this same card's second guided id; it highlights on either,
+  // so the term below is the whole of that coordinate's coverage.
   { section: 'settings', page: 'display', controlId: 'window-chrome', terms: ['window chrome', 'borderless', 'frameless', 'title bar', 'window', 'chrome', 'fullscreen', 'standard'] },
   { section: 'settings', page: 'display', controlId: 'zoom', terms: ['app zoom', 'zoom', 'scale', 'size', 'accessibility', 'display'] },
   { section: 'settings', page: 'display', controlId: 'base-font', terms: ['base text size', 'font', 'text size', 'bold', 'display', 'typography'] },
@@ -199,6 +251,8 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'memory', controlId: 'system-memory', terms: ['system memory', 'ram', 'memory', 'cpu', 'uptime', 'system'] },
   { section: 'settings', page: 'memory', controlId: 'storage-usage', terms: ['app storage', 'usage', 'quota', 'disk', 'space', 'used'] },
   { section: 'settings', page: 'memory', controlId: 'storage-inventory', terms: ['data inventory', 'inventory', 'list', 'size', 'indexeddb', 'localstorage'] },
+  // Bare `agent` still opens the Agent window: neither term below matches it.
+  { section: 'settings', page: 'memory', controlId: 'agent-memory', terms: ['agent memory', 'local agent memory'] },
   { section: 'settings', page: 'memory', controlId: 'backup', terms: ['backup restore', 'backup', 'export', 'import', 'restore', 'json'] },
   { section: 'settings', page: 'memory', controlId: 'clear-data', terms: ['clear data', 'clear', 'delete', 'decks', 'csv', 'clipboard', 'lyrics', 'calendar', 'cache'] },
   { section: 'settings', page: 'memory', controlId: 'factory-reset', terms: ['factory reset', 'factory', 'reset', 'wipe', 'erase', 'fresh'] },

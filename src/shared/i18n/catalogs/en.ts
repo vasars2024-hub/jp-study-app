@@ -3267,6 +3267,21 @@ export const en: Catalog = {
   'search.clearData.desc': 'Delete decks, CSV draft, clipboard, lyrics, or calendar',
   'search.factoryReset': 'Factory reset',
   'search.factoryReset.desc': 'Wipe all local data and restart',
+  // Search rows for guided Settings targets whose own card heading cannot be
+  // reused here: two are parameterised ("Pinned apps ({count}/{max})") and four
+  // are still literal English in their page component. See settingsRegistry.ts.
+  'search.miniApps': 'Pinned apps',
+  'search.miniApps.desc': 'Choose which apps Mini View pins in its grid',
+  'search.miniRoutines': 'Mini routines',
+  'search.miniRoutines.desc': 'Pin buddy routines as one-click buttons in Mini',
+  'search.agentMemory': 'Local agent memory',
+  'search.agentMemory.desc': 'Review and control what the offline assistant remembers',
+  'search.specialLocked': 'Special modules locked',
+  'search.specialLocked.desc': 'WIRED and Aero appear here once those modes are discovered',
+  'search.wiredArcade': 'WIRED games',
+  'search.wiredArcade.desc': 'Sci-fi micro-games unlocked with the WIRED archive',
+  'search.aeroArcade': 'Aero games',
+  'search.aeroArcade.desc': 'XP and Vista launchers for the same arcade modules',
 
   // Desktop shell (taskbar, Start menu, windows, desktop icons) — the real
   // primary nav. Section app names reuse palette.section.* (see CommandPalette).

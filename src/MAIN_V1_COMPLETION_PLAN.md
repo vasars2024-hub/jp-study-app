@@ -125,13 +125,23 @@ Completed in the current source tree:
 - deterministic fresh-query routing to 124 app/settings destinations through a
   static index, re-derived at review and approval and refusing on ambiguity
   (2026-08-10 — see the evidence ledger's "Deterministic fresh-query
-  navigation" section).
+  navigation" section);
+- that index widened to **150 destinations covering 104 of the 107 guided
+  controls**, by giving the 26 controls that had no `SETTINGS_REGISTRY` entry one
+  — which widens Settings' own search box by the same 26 rows. The remaining
+  three declared pairs are duplicate coordinates of cards already indexed, held
+  by a gate that makes each name its stand-in (2026-08-10 — see the ledger's
+  "The 29 guided controls Settings' own search could not find either").
 
 Still required before the Track 3 acceptance can be called complete:
 
-- widening that index past the 78 of 107 guided controls that have a
-  `SETTINGS_REGISTRY` entry to mirror, and answering a question asked in a
-  language other than English;
+- answering a question asked in a language other than English — index terms and
+  `SETTINGS_REGISTRY.keywords` are both English by design, so a Russian, Japanese
+  or Chinese question resolves nothing even though the UI is translated;
+- letting a cold-open navigation acknowledge: approving one while the Settings
+  window is closed still returns `open-failed` after opening the correct page,
+  because `deliverAgentSettingsDestination` (`src/main.ts:1438`) treats the first
+  `rejected` from a window that has not yet mounted the page as final;
 - canonical ReadingLens, Flashcards and Settings handoffs, study/saved-word
   context producers, and screenshot/OCR attachment context;
 - the remaining unavailable dictionary/media/anime/visual-novel adapters;
