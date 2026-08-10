@@ -4428,3 +4428,137 @@ Committed as `edadeeb`.
   does. That parity gap is the natural next slice.
 - `AiCardStudio.runGenerate` still saves unconditionally before its preview
   renders, through `replaceImportedDeck`. Unchanged on purpose.
+
+## The Agent can finally say "chapters 3 to 7" — 2026-08-10
+
+Traditional mining has had a chapter range since `EpubMiningPanel` grew one.
+`flashcard.generate-cards` could generate from invented words (`preset`) or
+starred ones (`dictionary`), and had no way to express a book at all. That was
+the last parity gap between the manual mining path and the agent one.
+
+A third source, `book`, closes it. It calls `miningAnalyzeEpub` — the same IPC
+the manual panel calls, with the same arguments — and turns what it finds into
+generation terms.
+
+Four decisions worth not re-litigating:
+
+- **The range is normalized by main, not here.** `normalizeChapterRange` needs
+  the book's real section count and only main has it before extraction runs.
+  Main normalizes internally and reports back the range it *applied*, and
+  `miningDeckIdentity` names the deck from that. So asking for 2–99 in a
+  three-section book lands in the same deck as asking for 2–3, rather than
+  minting a second identity that a re-run would never update in place.
+  Clamping a second time on this side would have been guessing.
+- **It still writes nothing.** That property is the whole reason the adapter is
+  safe: it keeps the destructive `replaceImportedDeck` behind the gated, logged,
+  invertible `flashcard.add-cards`. It is now *measured* rather than asserted —
+  a snapshot of the whole of `localStorage` before and after a book run, with a
+  deck already in the store, which catches any write path including ones the
+  test did not think to name. An earlier draft named three `window.api` methods;
+  two of them (`aiSaveDeck`, `saveAiResultsToDeck`) do not exist on `window.api`
+  at all, so that test would have been two-thirds vacuous.
+- **`book` is an adapter-level source.** Main knows only "invent words" and "use
+  the terms I gave you". A book run sends `source: 'dictionary'` with mined
+  terms and reports `source: 'book'` with `termSource: 'book-chapters'` to the
+  user. The distinction stays honest where it is read.
+- **Terms are ordered by count with a code-unit tie-break.** `analyzeBook`
+  returns candidates in tokenizer order, which carries no signal about which
+  words are worth a card, so an unsorted cap would take whatever appears first
+  in chapter one. `localeCompare` was rejected because its ordering follows the
+  host's ICU data and this must not vary by machine.
+
+The mined line rides along as `terms[].sentence` — a contract main has honoured
+since the dictionary path was written, and the reason mining a range beats
+starring words by hand.
+
+**The adapter had no tests whatsoever** — 259 lines, a gated operation that
+spends the user's provider quota, zero coverage. It has 22 now.
+
+Two new i18n keys (`aiNoBook`, `aiNoBookTerms`), translated in all four
+catalogs. Both are genuinely distinct user actions: one names a missing book,
+the other a range that extracted fine but cleared no frequency floor — which
+main does not refuse, because main only refuses a range with no readable *text*.
+
+### Gates
+
+`npx vitest run` **6794** passed, 0 failures (+22, exactly what was added). tsc
+392 / 224 distinct `(file, message)` pairs, set-differenced against a baseline
+captured by reverting this slice's two owned files: **0 new, 0 gone, per-file
+counts identical across 142 files**. eslint 0. `i18n-check` exit 0 at 9,242
+keys. `i18n-hardcoded-check` exit 0. `architecture-audit` exit 0.
+
+Positive-controlled three times, each failing exactly the intended tests and no
+others: a `localStorage` write fails only the no-write test; sourcing the
+identity from the *requested* range instead of the applied one fails only the
+applied-range test; unrouting `book` fails exactly the four book-routing tests
+and correctly leaves the no-write and card-shape tests passing. All restores
+hash-compared byte-identical.
+
+The four catalogs carry four tracks' uncommitted work, so their keys were
+spliced into the index blob rather than `git add`ed — 4 lines each, confirmed
+key *and* value, against the bug that produced a broken commit last session.
+The staged tree was then verified in a detached probe worktree: the 22 tests
+pass, and `i18n.test.ts` fails the same three catalog-hygiene tests **by name**
+at HEAD and at the staged tree, so nothing here added a failure.
+
+Committed as `34b0cba`.
+
+## The model was never told what to pass — 2026-08-10
+
+Immediately after the above, the `book` source was **unreachable**. The system
+prompt listed each approved operation as `{operation, label, confirmation}` and
+nothing more, so no model could discover that a chapter range existed. A
+capability that ships and cannot be found is not shipped.
+
+The same gap cost something on required arguments too: they were discoverable
+only by having the plan rejected. `parseLocalAgentModelPlan` refuses with a good
+message naming the field, but only after a full generation.
+
+- **`requiredArguments` now reaches the prompt.** It is the same runnability
+  contract the parser already enforces, so the listing cannot drift from the
+  refusal the model would otherwise hit.
+- **`argumentHints` is new and deliberately sparse.** It documents arguments an
+  operation merely *accepts*. Only `flashcard.generate-cards` is covered,
+  because it is the only adapter read end to end. The rest are absent rather
+  than guessed — same discipline as `REQUIRED_ARGUMENTS`, and for a sharper
+  reason: a wrong hint is worse than a missing one, because the model believes
+  it.
+- **Both are omitted when empty, not sent as `[]`/`{}`.** The listing repeats
+  ~60 times; an empty field on every entry teaches a 1.7B model that the field
+  is noise on the entries that do carry one.
+
+The operations listing is now **9,267 characters against `boundedJson`'s 16,000
+budget**. A breach would not fail — it would silently truncate and drop the
+alphabetically last operations from the model's view — so a test asserts the
+`[context truncated]` marker is absent and that `settings.reset-css` survives.
+Roughly six more operations can be documented at this density before that test
+starts earning its keep.
+
+### Gates
+
+`npx vitest run` **6798** passed, 0 failures (+4, exactly what was added). tsc
+392 / 224 distinct pairs, set-differenced against the previous commit: 0 new, 0
+gone. eslint 0. `i18n-check` exit 0. `architecture-audit` exit 0. No new i18n
+keys — the prompt is model-facing text, not chrome.
+
+Positive-controlled: dropping the two spreads fails exactly the two tests
+asserting the new content, and correctly leaves the omit-when-empty and budget
+tests passing. Restore hash-compared byte-identical.
+
+Committed as `1479960`.
+
+### Still open
+
+- **The terminal has still never been seen rendered.** Two sessions of evidence
+  here are entirely by test. This is the single largest unverified claim on the
+  track.
+- `AiCardStudio.runGenerate` still saves unconditionally before its preview
+  renders, through `replaceImportedDeck`, which deletes the matched
+  `(bookId, bookTitle)` group first. Unchanged on purpose: changing a shipped
+  surface's write behaviour is the user's call, not an agent's.
+- `agentPipelineVerify.ts` still reports `resolvable: false` for
+  study-workspace, media-item and visual-novel. Resolvers for them need
+  `buildAgentPipelineLines` to become async end to end; reporting them verified
+  without that would be a lie.
+- The five i18n modules HEAD imports but never committed are still untracked.
+  Every commit on this branch is gated by set-difference because of it.
