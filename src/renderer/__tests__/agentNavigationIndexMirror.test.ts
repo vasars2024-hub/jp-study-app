@@ -110,6 +110,41 @@ describe('agent navigation index mirrors the live Settings surface', () => {
     }
   });
 
+  it('gives every destination the title key its own surface uses', () => {
+    // `titleKey` is what a non-English question resolves through, and `shared`
+    // cannot import the registry to look it up. So it is copied — and a copy is
+    // only safe while something holds it to the original.
+    for (const entry of AGENT_NAVIGATION_INDEX) {
+      const coord = entry.page
+        ? `${entry.page}${entry.controlId ? `/${entry.controlId}` : ''}`
+        : entry.section;
+      expect(entry.titleKey, `${coord} carries no titleKey`).toBeTruthy();
+
+      if (entry.controlId) {
+        const registered = SETTINGS_REGISTRY.find((c) => c.id === entry.controlId);
+        expect(entry.titleKey, `${coord} titleKey drifted from SETTINGS_REGISTRY`)
+          .toBe(registered?.titleKey);
+      } else if (entry.page) {
+        const nav = SETTINGS_NAV.find((p) => p.id === entry.page);
+        expect(entry.titleKey, `${coord} titleKey drifted from SETTINGS_NAV`)
+          .toBe(nav?.labelKey);
+      } else {
+        expect(entry.titleKey, `${coord} titleKey drifted from the section labels`)
+          .toBe(AGENT_NAVIGATION_SECTION_LABEL_KEYS[entry.section]);
+      }
+    }
+  });
+
+  it('resolves every title key against the English catalog', () => {
+    // A key that names nothing translates to nothing, and the destination would
+    // simply be unreachable in ja/zh/ru while looking perfectly indexed here.
+    for (const entry of AGENT_NAVIGATION_INDEX) {
+      const value = entry.titleKey ? catalog[entry.titleKey] : undefined;
+      expect(typeof value, `${entry.titleKey} is not a string in the en catalog`)
+        .toBe('string');
+    }
+  });
+
   it('points every page at a real sidebar page', () => {
     for (const entry of AGENT_NAVIGATION_INDEX) {
       if (!entry.page || entry.controlId) continue;

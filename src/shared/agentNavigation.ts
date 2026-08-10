@@ -36,7 +36,10 @@
  */
 
 import type { DesktopWinSection } from './desktop';
-import { resolveAgentNavigationQuery } from './agentNavigationIndex';
+import {
+  resolveAgentNavigationQuery,
+  type AgentNavigationTranslatedTitles,
+} from './agentNavigationIndex';
 import {
   findUnambiguousAgentCardAction,
   type AgentConversation,
@@ -274,6 +277,14 @@ export function resolveAgentNavigation(
   messageId: string,
   cardId: string,
   actionId: string,
+  /**
+   * Translated titles for an index-resolved card, so a question asked in another
+   * language resolves. Whatever a caller passes here it must pass *identically*
+   * at review and at approval: the re-derivation below demands the stored effect
+   * still agree in every coordinate, so a set that changed between the two would
+   * read as tampering and refuse.
+   */
+  titles?: AgentNavigationTranslatedTitles,
 ): AgentNavigationResolution {
   const result = navigationEffect(conversation, messageId, cardId, actionId);
   if (typeof result === 'string') return { ok: false, code: result };
@@ -288,7 +299,7 @@ export function resolveAgentNavigation(
   // deliberately checked *first*: a card carrying a query is an index card, and
   // must never be able to borrow an unrelated route item to authorize itself.
   if (effect.query) {
-    const answer = resolveAgentNavigationQuery(effect.query);
+    const answer = resolveAgentNavigationQuery(effect.query, undefined, titles);
     if (!answer) return { ok: false, code: 'stale-provenance' };
     if (answer.section !== effect.section) return { ok: false, code: 'stale-provenance' };
     if (answer.page !== effect.page) return { ok: false, code: 'stale-provenance' };

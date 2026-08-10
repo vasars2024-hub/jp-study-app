@@ -3,7 +3,11 @@ import {
   AGENT_NAVIGATION_INDEX,
   resolveAgentNavigationQuery,
   type AgentNavigationIndexEntry,
+  type AgentNavigationTranslatedTitles,
 } from '../agentNavigationIndex';
+// Tests may reach the all-languages aggregate; `i18nSplit.test.ts` scans app
+// code only, and asserting against invented translations would prove nothing.
+import { en, ja, ru, zh } from '../i18n/catalogs/all';
 import {
   AGENT_NAVIGABLE_SECTIONS,
   isAgentNavigableSection,
@@ -280,5 +284,102 @@ describe('agent navigation index — words a new entry deliberately did not clai
     // Three controls answer to "hotkey"; the new OS hotkey card is reached by
     // "os hotkey" instead of making that four.
     expect(resolveAgentNavigationQuery('hotkey')).toBeNull();
+  });
+});
+
+describe('agent navigation index — a question asked in another language', () => {
+  // The real catalogs. A test fixture of invented translations would pass while
+  // the shipped ones failed, which is the only way this could matter.
+  const titles = { ja, zh, ru } as unknown as AgentNavigationTranslatedTitles;
+
+  it('resolved nothing at all before the titles were supplied', () => {
+    // Not a missing-terms problem: `tokenize` strips every non-ASCII character,
+    // so these produced an empty token set and could never match anything. This
+    // is the defect, pinned so the fix cannot silently regress into it.
+    expect(resolveAgentNavigationQuery('где словарь')).toBeNull();
+    expect(resolveAgentNavigationQuery('辞書はどこですか')).toBeNull();
+    expect(resolveAgentNavigationQuery('词典在哪里')).toBeNull();
+  });
+
+  it('answers a Russian question from the translated title', () => {
+    expect(resolveAgentNavigationQuery('где словарь', undefined, titles))
+      .toEqual({ section: 'dictionary' });
+    expect(resolveAgentNavigationQuery('где тема', undefined, titles))
+      .toEqual({ section: 'settings', page: 'appearance', controlId: 'theme', highlight: true });
+  });
+
+  it('answers a Japanese question, which has no spaces to tokenize on', () => {
+    expect(resolveAgentNavigationQuery('辞書はどこですか', undefined, titles))
+      .toEqual({ section: 'dictionary' });
+    expect(resolveAgentNavigationQuery('テーマを変えたい', undefined, titles))
+      .toEqual({ section: 'settings', page: 'appearance', controlId: 'theme', highlight: true });
+  });
+
+  it('answers a Chinese question', () => {
+    expect(resolveAgentNavigationQuery('词典在哪里', undefined, titles))
+      .toEqual({ section: 'dictionary' });
+    expect(resolveAgentNavigationQuery('主题在哪里', undefined, titles))
+      .toEqual({ section: 'settings', page: 'appearance', controlId: 'theme', highlight: true });
+  });
+
+  it('sends a translated question to the same place its English twin goes', () => {
+    // The property worth having, and the one that keeps the precedence ladder
+    // honest: "где обои" lands on the Wallpaper *control* rather than the page
+    // holding it, because a control outranks its page — exactly as "wallpaper"
+    // has always done in English.
+    for (const [asked, english] of [
+      ['где обои', 'wallpaper'],
+      ['壁紙を変えたい', 'wallpaper'],
+      ['壁纸在哪里', 'wallpaper'],
+      ['где словарь', 'dictionary'],
+      ['辞書はどこですか', 'dictionary'],
+    ] as const) {
+      expect(
+        resolveAgentNavigationQuery(asked, undefined, titles),
+        `"${asked}" and "${english}" disagree`,
+      ).toEqual(resolveAgentNavigationQuery(english));
+    }
+  });
+
+  it('leaves every English answer exactly where it was', () => {
+    // The property that makes this slice safe. English is scored only through
+    // the hand-tuned terms, so supplying catalogs must move nothing — including
+    // the words a previous slice deliberately left ambiguous.
+    for (const query of [
+      'dictionary', 'rain', 'snow', 'preset', 'routine', 'jlpt',
+      'craft window', 'multi monitor', 'ambient', 'aero', 'hotkey',
+      'mini view', 'environment', 'theme', 'wallpaper', 'weather',
+    ]) {
+      expect(
+        resolveAgentNavigationQuery(query, undefined, titles),
+        `"${query}" moved when the catalogs were supplied`,
+      ).toEqual(resolveAgentNavigationQuery(query));
+    }
+  });
+
+  it('still refuses an ambiguous question rather than guessing', () => {
+    const ambiguous: AgentNavigationIndexEntry[] = [
+      { section: 'music', titleKey: 'x.one', terms: ['music'] },
+      { section: 'video', titleKey: 'x.two', terms: ['video'] },
+    ];
+    const shared = { ru: { 'x.one': 'Звук', 'x.two': 'Звук' } } as unknown as
+      AgentNavigationTranslatedTitles;
+    expect(resolveAgentNavigationQuery('где звук', ambiguous, shared)).toBeNull();
+  });
+
+  it('does not let a one-character CJK title match everything', () => {
+    const tiny: AgentNavigationIndexEntry[] = [
+      { section: 'music', titleKey: 'x.tiny', terms: ['music'] },
+    ];
+    const short = { ja: { 'x.tiny': '音' } } as unknown as AgentNavigationTranslatedTitles;
+    expect(resolveAgentNavigationQuery('音楽はどこ', tiny, short)).toBeNull();
+  });
+
+  it('ignores an English catalog handed in among the translations', () => {
+    // `ensureCatalog` falls back to English when a language fails to load, and
+    // English text scored through this lane would move answers pinned above.
+    const withEn = { en } as unknown as AgentNavigationTranslatedTitles;
+    expect(resolveAgentNavigationQuery('theme', undefined, withEn))
+      .toEqual(resolveAgentNavigationQuery('theme'));
   });
 });

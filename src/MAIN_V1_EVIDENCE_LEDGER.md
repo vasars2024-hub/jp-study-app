@@ -3404,3 +3404,119 @@ every successful delivery.
   the oldest thing on this track's list.
 - The three guided pairs stay unindexed by design and the four literal card
   headings stay literal, both unchanged and recorded above.
+
+## "где тема" resolves — 2026-08-10
+
+### The blocker was the tokenizer, not the vocabulary
+
+The standing description of this gap was that index terms and
+`SETTINGS_REGISTRY.keywords` are English by design, so a translated question has
+nothing to match. That is true and it is not the reason. `tokenize` is
+
+```js
+.replace(/[^a-z0-9]+/g, ' ')
+```
+
+so a Cyrillic or Japanese query reduced to **no tokens at all** and returned
+`null` before scoring anything. Adding translated terms alone would have changed
+nothing whatsoever. This is pinned as a test rather than described, so the fix
+cannot quietly regress into it.
+
+### The mechanism, and why this one
+
+Each of the 150 entries now carries `titleKey`, and a caller may pass the
+translated catalogs; a non-English query is matched against the title the UI
+already renders. The alternative considered was hand-written per-language term
+lists — roughly 450 of them — which buys better recall and pays for it in
+authorship and in drift: nothing would tie those lists to the translations the
+app actually shows. A title cannot drift from itself.
+
+Two rules keep it from disturbing what already worked:
+
+- **English is never scored through the translated lane.** `en` is skipped even
+  when handed in. Sixteen English queries — including `rain`, `snow`, `preset`,
+  `routine`, `aero` and `hotkey`, the words earlier slices deliberately left
+  ambiguous — are asserted to return *exactly* what they return with no catalogs
+  supplied.
+- **Substring matching is confined to Japanese and Chinese**, which have no word
+  boundaries to tokenize on: 「テーマはどこ」 contains 「テーマ」 and no splitting
+  rule available in `shared` would find that. Cyrillic and Latin titles still
+  match whole tokens, so the "ai" ⊄ "said" property survives everywhere it can. A
+  two-character floor stops a one-character CJK title becoming a wildcard, and
+  that is asserted too.
+
+`terms` stays a second, English-only lane rather than being replaced: it is
+hand-tuned, it is what the 55 existing index assertions pin, and the translated
+titles are one string per destination where the English terms are several.
+
+### Three constraints that shaped it
+
+- **`shared` cannot import `renderer`**, so the keys are copied rather than
+  looked up — and the mirror gate now holds every one of the 150 to the
+  `SETTINGS_REGISTRY` entry, `SETTINGS_NAV` page or section-label map it came
+  from, and separately asserts each resolves to a string in the `en` catalog. A
+  key that names nothing would leave a destination unreachable in ja/zh/ru while
+  looking perfectly indexed.
+- **`agentNavigation.ts` already imports this index** (`:39`), so the index cannot
+  import `AGENT_NAVIGATION_SECTION_LABEL_KEYS` back without a cycle. The 22
+  section entries therefore carry their own copy, gate-checked against that map.
+- **`catalogFor()` falls back to English when a language is not loaded**, and
+  `ensureCatalog()` resolves to the English catalog on failure. Either would put
+  English text under a `ja` key and score English questions through the
+  translated lane. `agentNavigationIpc` drops any language whose catalog is
+  identical to `en`, and a test asserts an English catalog handed in among the
+  translations changes nothing.
+
+The catalogs are loaded once in `agentNavigationIpc` and **awaited by every
+call**, not read opportunistically: the resolver re-derives an index card's
+destination at review and again at approval and demands the two agree in every
+coordinate, so a catalog set that grew between them would make an honest approval
+look like tampering.
+
+### What the precedence ladder does to a translated question
+
+«где обои» resolves to the Wallpaper **control**, not the Wallpaper page — the
+page and the control share a title, and a control outranks the page holding it.
+That is the declared ladder behaving as designed, and it is what `wallpaper` has
+always done in English. The test asserts the equivalence directly: a translated
+question lands where its English twin lands.
+
+### Measured evidence
+
+- Agent + i18n regression: **67 files, 932 tests passed** (was 61/862 for agent
+  alone; this slice adds 14 index assertions and 2 mirror assertions).
+- `tsc --noEmit`: **392, unchanged**, none in any file this slice touches.
+- `node tools/i18n-check.cjs`: clean at **9,189** — this slice adds no keys, it
+  only starts reading the ones already there.
+- `node tools/architecture-audit.cjs --json`: **`fresh: []`**.
+- Focused ESLint over all five paths: **exit 0**.
+
+### Live Electron evidence
+
+Driven through the debug bridge against a dev app restarted on this source, real
+profile, UI language Russian (`document.documentElement.lang === "ru"`), with the
+probe cards saved through the real main-owned store:
+
+- «где тема» resolved in **main** to `{settings, appearance, theme, highlight}` —
+  which also proves main can dynamic-`import()` the `ru` catalog inside its own
+  bundle, the part of this design most likely to fail in Electron rather than in
+  vitest.
+- 「辞書はどこですか」 and 「词典在哪里」 both resolved to `{section: dictionary}`.
+- Approving the Russian card with Settings **closed** returned
+  `{ok:true, opened:true}` in **2800 ms** and landed on Appearance — so the
+  cold-open fix above holds for a question that was not asked in English either.
+- Restores asserted, including the one the previous pass could not:
+  `jp-os-settings-recent-v1` came back **byte-for-byte identical**,
+  `jp-settings-advanced-v1` untouched, the workspace back to its exact three
+  conversation ids and active id, and `/logs?level=error` **0 entries**.
+
+### Limits, stated rather than discovered later
+
+- **One title per destination.** English reaches Particles through eight phrases;
+  Russian reaches it through «Частицы» and nothing else.
+- **No morphology.** Russian matches whole tokens, so «где словарь» resolves and
+  «в словаре» does not. Adding stemming would weaken the exact-token property
+  every English answer depends on, so it was not done here.
+- The four card headings that are still literal English (`agent-memory`,
+  `special-locked`, `wired-arcade`, `aero-arcade`) resolve through their
+  translated `search.*` rows, which is why they work at all.

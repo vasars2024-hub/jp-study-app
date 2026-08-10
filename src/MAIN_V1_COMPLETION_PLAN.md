@@ -145,11 +145,17 @@ Completed in the current source tree:
   delivery handshake itself entered history; it had lived only in the working
   tree.
 
+- a question asked in Russian, Japanese or Chinese now resolves. The blocker was
+  the tokenizer rather than the vocabulary — it stripped every non-ASCII
+  character, so such a query produced no tokens at all — and the fix reuses the
+  translated titles the UI already renders (a `titleKey` on all 150 entries, held
+  to `SETTINGS_REGISTRY` by the mirror gate) instead of hand-writing per-language
+  term lists that could drift from them. English is never scored through that
+  lane and is asserted unchanged (2026-08-10 — see the ledger's "«где тема»
+  resolves").
+
 Still required before the Track 3 acceptance can be called complete:
 
-- answering a question asked in a language other than English — index terms and
-  `SETTINGS_REGISTRY.keywords` are both English by design, so a Russian, Japanese
-  or Chinese question resolves nothing even though the UI is translated;
 - canonical ReadingLens, Flashcards and Settings handoffs, study/saved-word
   context producers, and screenshot/OCR attachment context;
 - the remaining unavailable dictionary/media/anime/visual-novel adapters;

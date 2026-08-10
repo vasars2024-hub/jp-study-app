@@ -28,7 +28,44 @@ import {
   normalizeAgentNavigationRequest,
   type AgentNavigationResult,
 } from '../shared/agentNavigationBridge';
+import type { AgentNavigationTranslatedTitles } from '../shared/agentNavigationIndex';
+import { en, ensureCatalog } from '../shared/i18n/catalogs';
+import { UI_LANGS, type UiLang } from '../shared/i18n/core';
 import { getAgentWorkspaceStore, type AgentWorkspaceStore } from './agentWorkspaceStore';
+
+const TRANSLATED_LANGS: readonly UiLang[] = UI_LANGS.filter((lang) => lang !== 'en');
+
+let translatedTitles: Promise<AgentNavigationTranslatedTitles> | null = null;
+
+/**
+ * The non-English catalogs, so "где тема" resolves the same way "where is the
+ * theme setting" does.
+ *
+ * Loaded once and awaited by every call rather than read opportunistically. The
+ * resolver re-derives an index card's destination at review *and* again at
+ * approval and demands both agree exactly, so a set of catalogs that grew
+ * between the two would make an honest approval look like tampering.
+ *
+ * A language that failed to load is dropped rather than kept: `ensureCatalog`
+ * resolves to the English catalog on failure, and letting English text in under
+ * a `ja` key would score English questions through the translated lane and
+ * quietly move answers this index has assertions pinning in place.
+ */
+function loadTranslatedTitles(): Promise<AgentNavigationTranslatedTitles> {
+  if (!translatedTitles) {
+    translatedTitles = Promise.all(
+      TRANSLATED_LANGS.map(async (lang) => [lang, await ensureCatalog(lang)] as const),
+    ).then((pairs) => Object.fromEntries(
+      pairs.filter(([, catalog]) => catalog !== en),
+    ) as AgentNavigationTranslatedTitles);
+  }
+  return translatedTitles;
+}
+
+/** Test seam: drops the memoized catalogs so a case can supply its own. */
+export function resetAgentNavigationTitlesForTest(): void {
+  translatedTitles = null;
+}
 
 /** Returns whether the exact resolved destination was opened and delivered. */
 export type AgentNavigationOpener = (
@@ -76,6 +113,8 @@ export function registerAgentNavigationIpc(
       const request = normalizeAgentNavigationRequest(raw);
       if (!request) return agentNavigationFailure('invalid-request');
 
+      const titles = await loadTranslatedTitles();
+
       let destination: AgentNavigationDestination;
       try {
         const state = resolveStore().read();
@@ -88,6 +127,7 @@ export function registerAgentNavigationIpc(
           request.messageId,
           request.cardId,
           request.actionId,
+          titles,
         );
         if (!resolution.ok) return agentNavigationFailure(resolution.code);
         destination = resolution.destination;
