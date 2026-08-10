@@ -4924,8 +4924,8 @@ export const ja: Catalog = {
   'aiStudio.hint.localMissing':
     'オフライン生成には、翻訳ビューで Qwen3-1.7B をインストールするか Downloads に GGUF を置いてください。',
   'aiStudio.hint.starOrPreset': '辞書で語を調べてスターを付けるか、ソースをプリセット生成に切り替えてください。',
-  'aiStudio.status.generatedPreset': '{count} 件の考案項目から {cards} カードを生成 · フラッシュカードに {saved} 枚保存。',
-  'aiStudio.status.generatedDict': '{count} 語から {cards} カードを生成 · フラッシュカードに {saved} 枚保存。',
+  'aiStudio.status.generatedPreset': '{count} 件の考案項目から {cards} カードを生成 · 下で確認してから「フラッシュカードに保存」を押してください。',
+  'aiStudio.status.generatedDict': '{count} 語から {cards} カードを生成 · 下で確認してから「フラッシュカードに保存」を押してください。',
   'aiStudio.status.csvSaved': 'CSV を {path} に保存しました',
   'aiStudio.status.csvFail': 'CSV を保存できませんでした。',
   'aiStudio.status.sentAnki': '{total} 枚中 {ok} 枚を Anki に送信しました。',

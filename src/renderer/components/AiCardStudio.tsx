@@ -404,13 +404,18 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
       const results = await window.api.aiGenerateDeck(deckGenerationRequest());
       setBatchResults(results);
       const cards = results.reduce((n, r) => n + r.cards.length, 0);
-      const deckTitle = `${selectedPreset?.label ?? 'AI'} studio`;
-      const saved = saveAiResultsToDeck(results, deckTitle);
-      if (saved) onDeckImported?.();
+      // Generation does NOT write. It used to call `saveAiResultsToDeck` right
+      // here — before this preview had rendered — and that goes through
+      // `replaceImportedDeck`, which deletes every card in the matched
+      // `(bookId, bookTitle)` group before inserting. Both batches land under
+      // `<preset> studio`, so generating a second time silently destroyed the
+      // first, with no confirmation and nothing to undo. The Save to flashcards
+      // button below has always existed; it is now the only way in, which makes
+      // the destructive write an explicit choice made against a visible preview.
       setStatus(
         t(
           generationSource === 'preset' ? 'aiStudio.status.generatedPreset' : 'aiStudio.status.generatedDict',
-          { cards, count: results.length, saved },
+          { cards, count: results.length },
         ),
       );
       setLogLines((lines) =>

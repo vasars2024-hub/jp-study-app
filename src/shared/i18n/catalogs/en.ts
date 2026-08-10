@@ -5192,8 +5192,8 @@ export const en: Catalog = {
   'aiStudio.hint.localMissing':
     'Install Qwen3-1.7B via Translate (or place the GGUF in Downloads) to generate offline.',
   'aiStudio.hint.starOrPreset': 'Open Dictionary, look up words, and tap the star icon — or switch source to preset generation.',
-  'aiStudio.status.generatedPreset': 'Generated {cards} cards from {count} invented items · {saved} saved to Flashcards.',
-  'aiStudio.status.generatedDict': 'Generated {cards} cards from {count} words · {saved} saved to Flashcards.',
+  'aiStudio.status.generatedPreset': 'Generated {cards} cards from {count} invented items · review them below, then Save to flashcards.',
+  'aiStudio.status.generatedDict': 'Generated {cards} cards from {count} words · review them below, then Save to flashcards.',
   'aiStudio.status.csvSaved': 'CSV saved to {path}',
   'aiStudio.status.csvFail': 'Could not save CSV.',
   'aiStudio.status.sentAnki': 'Sent {ok} of {total} cards to Anki.',

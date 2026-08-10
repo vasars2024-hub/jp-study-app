@@ -5413,8 +5413,8 @@ export const ru: Catalog = {
   'aiStudio.hint.localMissing':
     'Для офлайн-генерации установите Qwen3-1.7B через «Перевод» или положите GGUF в Downloads.',
   'aiStudio.hint.starOrPreset': 'Откройте Словарь, найдите слова и нажмите звезду — или переключите источник на пресет.',
-  'aiStudio.status.generatedPreset': 'Создано {cards} карт из {count} придуманных элементов · {saved} сохранено во флэш-карточки.',
-  'aiStudio.status.generatedDict': 'Создано {cards} карт из {count} слов · {saved} сохранено во флэш-карточки.',
+  'aiStudio.status.generatedPreset': 'Создано {cards} карт из {count} придуманных элементов · проверьте их ниже и нажмите «Сохранить во флэш-карточки».',
+  'aiStudio.status.generatedDict': 'Создано {cards} карт из {count} слов · проверьте их ниже и нажмите «Сохранить во флэш-карточки».',
   'aiStudio.status.csvSaved': 'CSV сохранён в {path}',
   'aiStudio.status.csvFail': 'Не удалось сохранить CSV.',
   'aiStudio.status.sentAnki': 'Отправлено в Anki {ok} из {total} карт.',

@@ -4899,8 +4899,8 @@ export const zh: Catalog = {
   'aiStudio.hint.localMissing':
     '离线生成请通过「翻译」安装 Qwen3-1.7B，或将 GGUF 放到 Downloads。',
   'aiStudio.hint.starOrPreset': '打开词典查词并点星标 — 或将来源切换为预设生成。',
-  'aiStudio.status.generatedPreset': '从 {count} 个创造项生成了 {cards} 张卡 · 已保存 {saved} 张到抽认卡。',
-  'aiStudio.status.generatedDict': '从 {count} 个词生成了 {cards} 张卡 · 已保存 {saved} 张到抽认卡。',
+  'aiStudio.status.generatedPreset': '从 {count} 个创造项生成了 {cards} 张卡 · 请在下方查看后点击「保存到抽认卡」。',
+  'aiStudio.status.generatedDict': '从 {count} 个词生成了 {cards} 张卡 · 请在下方查看后点击「保存到抽认卡」。',
   'aiStudio.status.csvSaved': 'CSV 已保存到 {path}',
   'aiStudio.status.csvFail': '无法保存 CSV。',
   'aiStudio.status.sentAnki': '已向 Anki 发送 {total} 张中的 {ok} 张。',
