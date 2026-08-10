@@ -131,6 +131,25 @@ describe('resolveAgentSave', () => {
     ).toEqual({ ok: false, code: 'action-not-found' });
   });
 
+  it('fails closed on duplicate card coordinates regardless of their order', () => {
+    const base = conversation();
+    const message = base.messages[0];
+    const first = message.cards[0];
+    const second = { ...first, title: 'A second malformed card with the same id' };
+    const malformed: AgentConversation = {
+      ...base,
+      messages: [{ ...message, cards: [first, second] }],
+    };
+
+    // This typed state intentionally skips the persistence normalizer. The
+    // resolver itself must reject ambiguity instead of choosing array order.
+    expect(resolve(malformed)).toEqual({ ok: false, code: 'action-not-found' });
+    expect(resolve({
+      ...malformed,
+      messages: [{ ...malformed.messages[0], cards: [...malformed.messages[0].cards].reverse() }],
+    })).toEqual({ ok: false, code: 'action-not-found' });
+  });
+
   it('refuses a card that declares no provenance rather than passing it', () => {
     const chat = conversation(
       { type: 'save', entityType: 'flashcard', entityId: 'ctx-word' },

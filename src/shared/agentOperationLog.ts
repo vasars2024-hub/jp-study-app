@@ -71,7 +71,7 @@ export const AGENT_INVERSE_OPERATIONS: Readonly<
   Partial<Record<AgentToolOperationId, AgentToolOperationId>>
 > = {
   'flashcard.create-deck': 'flashcard.delete-deck',
-  'flashcard.add-cards': 'flashcard.modify-cards',
+  'flashcard.add-cards': 'flashcard.delete-cards',
   'media.add-item': 'media.delete-item',
   'calendar.schedule-session': 'calendar.delete-event',
   'calendar.create-reminder': 'calendar.delete-event',
@@ -104,6 +104,8 @@ export interface AgentOperationEntry {
   entityType: string;
   entityIds: readonly string[];
   callId: string;
+  /** Exact conversation origin when the operation came from a conversation plan. */
+  conversationId?: string;
   taskId?: string;
   stepId?: string;
   recordedAt: number;
@@ -171,6 +173,14 @@ export function agentOperationEntry(
   sequence: number,
 ): AgentOperationEntry | null {
   return log.entries.find((entry) => entry.sequence === sequence) ?? null;
+}
+
+/** The retained entry with this stable id, or `null` when it is absent. */
+export function agentOperationEntryById(
+  log: AgentOperationLog,
+  id: string,
+): AgentOperationEntry | null {
+  return log.entries.find((entry) => entry.id === id) ?? null;
 }
 
 export type AgentOperationInverseFailureCode =
@@ -269,4 +279,28 @@ export function resolveAgentOperationInverse(
       ...(entry.stepId !== undefined ? { stepId: entry.stepId } : {}),
     },
   };
+}
+
+/** Resolves the persisted `undo.operationId` without trusting it as a sequence. */
+export function resolveAgentOperationInverseById(
+  log: AgentOperationLog,
+  operationId: string,
+): AgentOperationInverseResolution {
+  if (typeof operationId !== 'string' || !operationId.trim()) {
+    return { ok: false, code: 'invalid-request' };
+  }
+  const entry = agentOperationEntryById(log, operationId);
+  if (!entry) return { ok: false, code: 'entry-not-found' };
+  return resolveAgentOperationInverse(log, entry.sequence);
+}
+
+/** Newest currently invertible entry, used by the deterministic card producer. */
+export function latestAgentOperationInverse(
+  log: AgentOperationLog,
+): { entry: AgentOperationEntry; inverse: AgentOperationInverse } | null {
+  for (const entry of log.entries) {
+    const resolution = resolveAgentOperationInverse(log, entry.sequence);
+    if (resolution.ok) return { entry, inverse: resolution.inverse };
+  }
+  return null;
 }

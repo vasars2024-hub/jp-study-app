@@ -12,7 +12,7 @@
  * storage, and a gate that read its own inputs could not be tested without one.
  */
 
-import { addDeckCards, loadDeck } from './flashcardDeck';
+import { addDeckCardsTracked, loadDeck } from './flashcardDeck';
 import { loadLocalAgentProfiles } from './localAgentProfilesStore';
 import { loadLocalAgentSettings } from './localAgentSettingsStore';
 import {
@@ -25,7 +25,14 @@ import {
   type AgentToolRegistryTranslate,
 } from './agentToolRegistry';
 import type { AgentPermissionLevel, AgentToolOperationId } from '../shared/localAgent';
-import type { AgentSaveFailureCode, AgentSaveTarget } from '../shared/agentSave';
+import {
+  agentSaveOperationCallId,
+  resolveAgentSave,
+  type AgentSaveFailureCode,
+  type AgentSaveTarget,
+} from '../shared/agentSave';
+import type { AgentConversation } from '../shared/agentWorkspace';
+import type { AgentOperationDraft } from '../shared/agentOperationLog';
 
 export interface AgentSaveContext {
   permission: AgentPermissionLevel;
@@ -53,7 +60,9 @@ export function readAgentSaveContext(t: AgentToolRegistryTranslate): AgentSaveCo
   };
 }
 
-export type AgentSaveResult = { ok: true } | { ok: false; code: AgentSaveFailureCode };
+export type AgentSaveResult =
+  | { ok: true; operation: AgentOperationDraft }
+  | { ok: false; code: AgentSaveFailureCode };
 
 /**
  * Writes the one row the confirmation authorized.
@@ -63,7 +72,7 @@ export type AgentSaveResult = { ok: true } | { ok: false; code: AgentSaveFailure
  * returns the whole deck, so a row that did not appear is reported as a failure
  * instead of a save the user never got.
  */
-export function saveAgentEntity(target: AgentSaveTarget): AgentSaveResult {
+export function saveAgentEntity(target: AgentSaveTarget, callId: string): AgentSaveResult {
   let before: ReturnType<typeof loadDeck>;
   try {
     before = loadDeck();
@@ -76,7 +85,7 @@ export function saveAgentEntity(target: AgentSaveTarget): AgentSaveResult {
   }
 
   try {
-    const after = addDeckCards([{
+    const created = addDeckCardsTracked([{
       word,
       reading: '',
       meaning: target.meaning,
@@ -85,11 +94,49 @@ export function saveAgentEntity(target: AgentSaveTarget): AgentSaveResult {
       // `FlashcardSource` for a row that behaves exactly like an import.
       source: 'import',
     }]);
-    if (!after.some((card) => card.word.trim() === word)) {
+    if (created.length !== 1 || created[0].word.trim() !== word) {
       return { ok: false, code: 'save-failed' };
     }
+    return {
+      ok: true,
+      operation: {
+        operation: 'flashcard.add-cards',
+        claim: 'created',
+        entityType: target.entityType,
+        entityIds: [created[0].id],
+        callId,
+      },
+    };
   } catch {
     return { ok: false, code: 'save-failed' };
   }
-  return { ok: true };
+}
+
+/**
+ * Re-runs the complete Save gate at confirmation time, then writes only the
+ * target derived by that fresh resolution. A target shown during review is
+ * presentation state, never execution authority.
+ */
+export function grantAgentSave(
+  conversation: AgentConversation,
+  messageId: string,
+  cardId: string,
+  actionId: string,
+  t: AgentToolRegistryTranslate,
+): AgentSaveResult {
+  const context = readAgentSaveContext(t);
+  const resolution = resolveAgentSave(
+    conversation,
+    messageId,
+    cardId,
+    actionId,
+    context.permission,
+    context.savedWords,
+    context.allowedOperations,
+  );
+  if (!resolution.ok) return resolution;
+  return saveAgentEntity(
+    resolution.target,
+    agentSaveOperationCallId(conversation.id, messageId, cardId, actionId),
+  );
 }

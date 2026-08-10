@@ -96,7 +96,7 @@ describe('resolveAgentOperationInverse', () => {
       ok: true,
       inverse: {
         sequence: 0,
-        operation: 'flashcard.modify-cards',
+        operation: 'flashcard.delete-cards',
         entityType: 'flashcard',
         entityIds: ['card-1', 'card-2'],
         taskId: 'task-1',
@@ -111,7 +111,7 @@ describe('resolveAgentOperationInverse', () => {
       ok: true,
       inverse: {
         sequence: 0,
-        operation: 'flashcard.modify-cards',
+        operation: 'flashcard.delete-cards',
         entityType: 'flashcard',
         entityIds: ['card-1'],
       },

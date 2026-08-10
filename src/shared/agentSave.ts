@@ -29,7 +29,11 @@
  *    quietly creating a duplicate the user has to find and delete.
  */
 
-import type { AgentConversation, AgentContextItem } from './agentWorkspace';
+import {
+  findUnambiguousAgentCardAction,
+  type AgentConversation,
+  type AgentContextItem,
+} from './agentWorkspace';
 import {
   evaluateAgentToolAccess,
   type AgentPermissionLevel,
@@ -42,6 +46,16 @@ import {
  * authorized.
  */
 export const AGENT_SAVE_OPERATION: AgentToolOperationId = 'flashcard.add-cards';
+
+/** Stable id shared by the write record and the Undo producer. */
+export function agentSaveOperationCallId(
+  conversationId: string,
+  messageId: string,
+  cardId: string,
+  actionId: string,
+): string {
+  return `save|${conversationId}|${messageId}|${cardId}|${actionId}`;
+}
 
 /**
  * The entity types a `save` effect may name. `entityType` is a free-form string
@@ -99,23 +113,24 @@ function saveEffect(
   cardId: string,
   actionId: string,
 ): { entityType: string; entityId: string } | AgentSaveFailureCode {
-  const message = conversation.messages.find((entry) => entry.id === messageId);
-  const card = message?.cards.find((entry) => entry.id === cardId);
-  const action = card?.actions.find((entry) => entry.id === actionId);
-  if (!message || !card || !action) return 'action-not-found';
-  if (action.effect.type !== 'save') return 'not-savable';
-  if (!AGENT_SAVABLE_ENTITY_TYPES.includes(action.effect.entityType)) {
+  const coordinate = findUnambiguousAgentCardAction(conversation, messageId, cardId, actionId);
+  if (!coordinate) return 'action-not-found';
+  if (coordinate.action.effect.type !== 'save') return 'not-savable';
+  if (!AGENT_SAVABLE_ENTITY_TYPES.includes(coordinate.action.effect.entityType)) {
     return 'unknown-entity-type';
   }
   // Provenance is the card's, and an empty list is not a pass — the same
   // fail-closed rule the navigation and approval gates use.
-  if (card.sourceContextIds.length === 0) return 'stale-provenance';
-  if (!card.sourceContextIds.some((contextId) => (
+  if (coordinate.card.sourceContextIds.length === 0) return 'stale-provenance';
+  if (!coordinate.card.sourceContextIds.some((contextId) => (
     conversation.context.some((item) => item.id === contextId)
   ))) {
     return 'stale-provenance';
   }
-  return { entityType: action.effect.entityType, entityId: action.effect.entityId };
+  return {
+    entityType: coordinate.action.effect.entityType,
+    entityId: coordinate.action.effect.entityId,
+  };
 }
 
 /**
