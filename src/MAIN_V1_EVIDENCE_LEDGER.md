@@ -3916,3 +3916,103 @@ shifted from line 139 to 147 by the added assertions. ESLint exit 0.
   "tracked anime" record to search. Deciding what that record is comes before any
   adapter. The two `dictionary` operations and `flashcard.schedule-reviews` are
   unavailable by earlier decisions and are not adapter work.
+
+## The anime adapters, and the decision that was already made in code — 2026-08-10
+
+### The blocking "product decision" did not exist
+
+Two sessions recorded that the six anime operations could not be built until
+someone decided what a locally *tracked* anime record is, because the MAL list
+arrives over `mal:fetchList` and the schedule over the scraper. That reading was
+wrong, and it cost the item two sessions.
+
+`jp-media-tracking-v1` is exactly that record, and it has been there all along:
+`MediaTrackingRecord` (`shared/mediaTracking.ts:81`) carries `identityId`,
+`contentType`, `status`, `progress`, a `MediaReleaseSchedule`, `preferences`,
+`rating` and `notes`; it is versioned, migrated, validated, projected
+(`projectMediaTracking`), and already rendered by a dashboard. `contentType` has
+an `'anime'` member. Titles resolve offline through
+`mergeStoredMediaResults(loadMediaProvidersDocument())`, which reads the user's
+own stored search snapshots.
+
+So the decision was made when that model was designed. **A tracked anime is a
+`MediaTrackingRecord` with `contentType: 'anime'`.** All six adapters follow from
+it, and five of them touch no network at all.
+
+`MediaReleaseSchedule`'s own comment settles `check-releases` too: *"Detection /
+record only — nothing is polled."* The operation is declared `read-only`, and
+"cached release data" is that stored schedule. It returns `checkedAt: null`
+deliberately — there is no fetch to timestamp, and inventing one would imply a
+freshness the record does not have. Refreshing is `anime.fetch-external-metadata`,
+which is the only anime operation that leaves the machine and the only one
+carrying an `external-connection` confirmation.
+
+### `presentStoredMediaResults` filters as well as orders
+
+Caught by a test, and the kind of thing that ships silently. The first
+`anime.search` reported `catalogue: results.length` — but that helper both
+filters by query and orders, so with a query the "catalogue" figure was the match
+count. "You have 1 anime stored" would have been true only for whatever the model
+last searched. The catalogue is now counted before the presenter runs.
+
+### A tracked record whose catalogue entry has gone is still tracked
+
+`anime.search` reads two stores that can disagree: the tracking document keeps a
+record forever, while the providers document only holds what recent searches
+stored. An identity present in one and absent from the other is normal. Dropping
+those rows would make "what am I watching?" quietly wrong, so they are returned
+with `catalogueEntryMissing: true` and the identity as the title — visible rather
+than silently missing.
+
+`anime.track` takes the opposite rule: it refuses an identity the catalogue does
+not know. A record created for an unknown id would render as its own raw
+identity string in every surface, and the tracking store has no way to learn a
+title later. Reading tolerates the mismatch; writing does not create it.
+Positive control: relaxing that check to fall through to a bare identity fails
+the refusal test.
+
+### `localStorage.clear()` does NOT reset `mediaTrackingStore`
+
+Measured while writing the tests, and worth knowing outside them. The store keeps
+a module-level `memoryFallback` (`mediaTrackingStore.ts:58`) and
+`loadMediaTrackingDocument` returns it whenever the key is absent — a deliberate
+resilience choice so a failed read does not blank a user's library. The
+consequence is that cleared storage reads back as *the last document this
+renderer wrote*, not as empty. Tests reset it by writing
+`createEmptyMediaTrackingDocument()`; anything else leaks state between cases,
+which is how the first run of these tests failed.
+
+### Reuse rather than a second analyzer
+
+`anime.analyze-difficulty` measures difficulty from Japanese subtitles, and a
+tracking record holds no text. It resolves to a media item — the caller's
+`mediaId` when given, otherwise the tracked title, which must identify exactly
+one item — and then calls the media slice's own `resolveMedia` and
+`analyzeSubtitles`, now exported for that purpose. Two resolvers over the same
+library would drift apart, and analysing the wrong episode is a silently wrong
+answer rather than a visible failure.
+
+### Gates
+
+`vitest run agent i18n lens settings flashcard visualNovel media anime` — 161
+files / 2041 tests. `i18n-check` clean at 9,211 keys. `i18n-hardcoded-check`
+clean. `architecture-audit` `fresh: 0`. `tsc --noEmit` unchanged at 392 — one
+intermediate run read 393 from a `MediaTrackingPatch` import taken from
+`shared/mediaTracking` when it is exported by `renderer/mediaTrackingStore`;
+fixed, not baselined. ESLint exit 0.
+
+### What `adapter-not-implemented` means now: nothing
+
+**No declared operation reports `adapter-not-implemented` any more.** The
+registry test asserts that as a property, not just as a list. Three operations
+remain unavailable and all three are decisions: `dictionary.explain-grammar` and
+`dictionary.analyze-sentence` (`dedicated-analysis-required`) and
+`flashcard.schedule-reviews` (`false-success-stub-removed`).
+
+The untracked capability-directory test needed two more repairs for the same
+reason as last slice — it used `anime.search` and `anime.fetch-external-metadata`
+as its adapter-less examples. Both now have adapters, so those assertions were
+re-pointed at the two dictionary operations and `flashcard.schedule-reviews`, and
+a property assertion added that no row reports `adapter-not-implemented`. Those
+edits are in the working tree only; that feature is still another track's
+uncommitted work.

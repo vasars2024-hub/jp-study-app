@@ -29,6 +29,7 @@ import { recordBlancThemeHistory, undoBlancThemeHistory } from './blancThemeHist
 import { createStudyAgentHandlers } from './studyAgentHandlers';
 import { createVisualNovelAgentHandlers } from './visualNovelAgentHandlers';
 import { createMediaAgentHandlers } from './mediaAgentHandlers';
+import { createAnimeAgentHandlers } from './animeAgentHandlers';
 
 export type AgentToolRegistryTranslate = (key: string, vars?: TVars) => string;
 
@@ -46,12 +47,6 @@ export type AgentToolCapability =
     };
 
 const UNAVAILABLE: Readonly<Partial<Record<AgentToolOperationId, AgentToolUnavailableReason>>> = {
-  'anime.search': 'adapter-not-implemented',
-  'anime.track': 'adapter-not-implemented',
-  'anime.check-releases': 'adapter-not-implemented',
-  'anime.update-metadata': 'adapter-not-implemented',
-  'anime.analyze-difficulty': 'adapter-not-implemented',
-  'anime.fetch-external-metadata': 'adapter-not-implemented',
   'flashcard.schedule-reviews': 'false-success-stub-removed',
   'dictionary.explain-grammar': 'dedicated-analysis-required',
   'dictionary.analyze-sentence': 'dedicated-analysis-required',
@@ -125,6 +120,7 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
     ...createStudyAgentHandlers(),
     ...createVisualNovelAgentHandlers(t),
     ...createMediaAgentHandlers(t),
+    ...createAnimeAgentHandlers(t),
     'dictionary.lookup': async (arguments_) => (
       window.api.lookupTerm(textArgument(t, arguments_, 'term'))
     ),

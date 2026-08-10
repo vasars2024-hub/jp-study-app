@@ -33,8 +33,12 @@ function boundedCount(value: unknown, fallback: number, maximum: number): number
   return Math.max(1, Math.min(maximum, Math.floor(value)));
 }
 
-/** Same rule as `resolveEntry` in the visual-novel adapters: a title only when it is unique. */
-async function resolveMedia(t: MediaAgentTranslate, id: string): Promise<MediaItem> {
+/**
+ * Same rule as `resolveEntry` in the visual-novel adapters: a title only when it
+ * is unique. Exported because `anime.analyze-difficulty` reaches a tracked title
+ * through the same library, and two resolvers would drift apart.
+ */
+export async function resolveMedia(t: MediaAgentTranslate, id: string): Promise<MediaItem> {
   const items = await window.api.listMedia();
   const byId = items.find((item) => item.id === id);
   if (byId) return byId;
@@ -46,7 +50,7 @@ async function resolveMedia(t: MediaAgentTranslate, id: string): Promise<MediaIt
   throw new Error(t('blanc.agent.error.mediaNotFound'));
 }
 
-interface SubtitleAnalysis {
+export interface SubtitleAnalysis {
   record: SubtitleRecord;
   cueCount: number;
   analysis: MediaStudyAnalysis;
@@ -57,7 +61,7 @@ interface SubtitleAnalysis {
  * `analyzeMediaStudyCues` awaits the tokenizer itself, so a cold renderer cannot
  * report an empty corpus the way a bare `tokenizeSync` would.
  */
-async function analyzeSubtitles(
+export async function analyzeSubtitles(
   t: MediaAgentTranslate,
   item: MediaItem,
   arguments_: Readonly<Record<string, unknown>>,
