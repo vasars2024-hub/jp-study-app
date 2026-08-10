@@ -3239,3 +3239,33 @@ from this source) on the real profile, whose UI language is Russian:
 - Three guided pairs stay unindexed by design, and the four literal card
   headings stay literal. Both are recorded above rather than left to be
   rediscovered.
+
+### What the commit does on its own, measured rather than assumed
+
+`settingsRegistry.ts` and the four catalogs were staged as HEAD-plus-these-edits
+blobs, so `e5ae8a8` carries none of the other tracks' uncommitted work. Checked
+out detached, with `node_modules` junctioned in:
+
+- `agentNavigationIndex.test.ts` — **55 of 55 pass**. Nothing in the index itself
+  depends on another track.
+- `agentNavigationIndexMirror.test.ts` — will not even load, because
+  `catalogs/en.ts` at HEAD imports `../gameArena/en`, `../mooncapLore/en` and
+  `../miningUi/en`, and those module directories **exist only as untracked files**
+  in the working tree. Copying those three in is enough to run it, and then **5 of
+  7 pass**.
+- The two that fail are `points every page at a real sidebar page` (`monitors is
+  not in SETTINGS_NAV`) and `matches only on words the destination already uses`
+  (`settings/scraper/-: "providers"`). Both come from the other track's unstaged
+  `settingsRegistry.ts` nav pages and its `settings.nav.scraper.desc` rewrite.
+
+**Every one of those three conditions is byte-identical at `69d9165`** — the same
+load error, and the same two assertions failing there with 22 of 24 passing. So
+this slice adds 38 tests, all of which pass on the commit alone, and changes
+neither pre-existing failure. That is the measurement, not an assumption: both
+commits were checked out and run side by side.
+
+The practical consequence for the next session: **the mirror gate can only be run
+against the working tree** until the i18n track commits its per-language module
+split and whoever owns Monitors / File drops / API keys / Help commits their
+`SETTINGS_NAV` entries. Running it in a clean checkout and reading the result as a
+defect in this track would be wrong twice over.
