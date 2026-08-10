@@ -33,6 +33,7 @@ vi.mock('../i18n', () => ({
     t: (key: string, vars?: Record<string, string | number>) => {
       if (vars && 'count' in vars) return `${key}=${vars.count}`;
       if (vars && 'section' in vars) return `${key}:${vars.section}`;
+      if (vars && 'control' in vars) return `${key}:${vars.control}`;
       if (vars && 'objective' in vars) return `${key}:${vars.objective}`;
       if (vars && 'step' in vars) return `${key}:${vars.step}`;
       if (vars && 'operation' in vars) return `${key}:${vars.operation}`;
@@ -52,6 +53,14 @@ vi.mock('../i18n', () => ({
  */
 vi.mock('../agentStepApprovalClient', () => ({
   readAgentStepApprovalContext: () => approvalContext,
+  observeAgentStepApprovalContext: (
+    _t: unknown,
+    listener: (context: typeof approvalContext) => void,
+  ) => {
+    approvalObservers.add(listener);
+    if (approvalObserverHydrated) listener(approvalContext);
+    return () => approvalObservers.delete(listener);
+  },
   grantAgentStepApproval: (...args: unknown[]) => {
     grantCalls.push(args);
     return Promise.resolve(grantResult);
@@ -66,10 +75,37 @@ vi.mock('../agentSaveClient', () => ({
     allowedOperations: saveContext.allowedOperations,
     savedWords: new Set(saveContext.savedWords),
   }),
-  saveAgentEntity: (...args: unknown[]) => {
+  grantAgentSave: (...args: unknown[]) => {
     saveCalls.push(args);
     return saveResult;
   },
+}));
+
+vi.mock('../agentUndoClient', () => ({
+  readAgentUndoContext: () => ({
+    permission: undoContext.permission,
+    allowedOperations: undoContext.allowedOperations,
+    liveEntityIds: new Set(undoContext.liveEntityIds),
+  }),
+  performAgentUndo: (...args: unknown[]) => {
+    undoCalls.push(args);
+    return Promise.resolve(undoResult);
+  },
+}));
+
+vi.mock('../agentConversationPlanner', () => ({
+  AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT: 500,
+  createAgentConversationPlan: (...args: unknown[]) => {
+    plannerCalls.push(args);
+    return Promise.resolve(plannerResult);
+  },
+  updateAgentConversationPlanQueue: (...args: unknown[]) => {
+    planQueueActionCalls.push(args);
+    return planQueueActionResult;
+  },
+  runAgentConversationPlan: () => Promise.resolve({ ok: false, code: 'task-not-found' }),
+  isAgentConversationPlanQuarantined: () => false,
+  retryAgentConversationPlanSave: () => Promise.resolve({ ok: false, code: 'task-not-found' }),
 }));
 
 import { AGENT_WORKSPACE_SCHEMA_VERSION, type AgentWorkspaceState } from '../../shared/agentWorkspace';
@@ -98,6 +134,8 @@ let approvalContext: {
 };
 let grantResult: unknown;
 let grantCalls: unknown[][];
+let approvalObserverHydrated: boolean;
+let approvalObservers: Set<(context: typeof approvalContext) => void>;
 let saveContext: {
   permission: string;
   allowedOperations: string[];
@@ -105,6 +143,17 @@ let saveContext: {
 };
 let saveResult: unknown;
 let saveCalls: unknown[][];
+let undoContext: {
+  permission: string;
+  allowedOperations: string[];
+  liveEntityIds: string[];
+};
+let undoResult: unknown;
+let undoCalls: unknown[][];
+let plannerResult: unknown;
+let plannerCalls: unknown[][];
+let planQueueActionResult: unknown;
+let planQueueActionCalls: unknown[][];
 
 function state(overrides: Partial<AgentWorkspaceState> = {}): AgentWorkspaceState {
   return {
@@ -359,6 +408,12 @@ async function click(button: HTMLButtonElement): Promise<void> {
   });
 }
 
+async function publishApprovalContext(): Promise<void> {
+  await act(async () => {
+    for (const listener of approvalObservers) listener(approvalContext);
+  });
+}
+
 async function setTextarea(value: string): Promise<void> {
   const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
   await act(async () => {
@@ -407,13 +462,50 @@ beforeEach(() => {
   };
   grantResult = { ok: true };
   grantCalls = [];
+  approvalObserverHydrated = true;
+  approvalObservers = new Set();
   saveContext = {
     permission: 'full-automation',
     allowedOperations: ['flashcard.add-cards'],
     savedWords: [],
   };
-  saveResult = { ok: true };
+  saveResult = {
+    ok: true,
+    operation: {
+      operation: 'flashcard.add-cards',
+      claim: 'created',
+      entityType: 'flashcard',
+      entityIds: ['saved-card-1'],
+      callId: 'save|chat-1|msg-1|entry-card|save',
+    },
+  };
   saveCalls = [];
+  undoContext = {
+    permission: 'full-automation',
+    allowedOperations: ['flashcard.delete-cards'],
+    liveEntityIds: ['saved-card-1'],
+  };
+  undoResult = {
+    ok: true,
+    operation: {
+      operation: 'flashcard.delete-cards',
+      claim: 'deleted',
+      entityType: 'flashcard',
+      entityIds: ['saved-card-1'],
+      callId: 'undo|save|chat-1|msg-1|entry-card|save|0',
+      invertsSequence: 0,
+    },
+  };
+  undoCalls = [];
+  plannerResult = {
+    ok: true,
+    taskId: 'task-plan',
+    summary: 'One safe step',
+    queue: { version: 1, items: [{ id: 'task-plan', task: { steps: [{}] } }] },
+  };
+  plannerCalls = [];
+  planQueueActionResult = { ok: true, queue: { version: 1, items: [] } };
+  planQueueActionCalls = [];
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -475,7 +567,90 @@ describe('Agent workspace shell', () => {
     expect(selected?.textContent).toContain('Particle question');
   });
 
-  it('opens a card source by scrolling to and focusing its exact context shelf item', async () => {
+  it('prefills the composer from attached-context suggestions without executing', async () => {
+    stored = populated();
+    await mount();
+
+    const suggestion = host.querySelector<HTMLButtonElement>('.agent-context-suggestion');
+    expect(suggestion?.textContent).toContain('agent.suggestions.action.reading');
+    await click(suggestion as HTMLButtonElement);
+
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value)
+      .toBe('agent.suggestions.prompt.reading');
+    expect(calls.map((call) => call.method)).toEqual(['load']);
+  });
+
+  it('defaults to a clean Simple view and reveals advanced controls in Full view', async () => {
+    stored = populated();
+    await mount();
+
+    const simple = buttonWith('agent.view.simple');
+    const full = buttonWith('agent.view.full');
+    expect(simple.getAttribute('aria-pressed')).toBe('true');
+    expect(full.getAttribute('aria-pressed')).toBe('false');
+    expect((host.querySelector('.agent-composer-options') as HTMLElement).hidden).toBe(true);
+    expect((host.querySelector('.agent-full-inspector') as HTMLElement).hidden).toBe(true);
+
+    await click(full);
+
+    expect(simple.getAttribute('aria-pressed')).toBe('false');
+    expect(full.getAttribute('aria-pressed')).toBe('true');
+    expect((host.querySelector('.agent-composer-options') as HTMLElement).hidden).toBe(false);
+    expect((host.querySelector('.agent-full-inspector') as HTMLElement).hidden).toBe(false);
+  });
+
+  it('collapses the context and activity inspector without persisting a workspace change', async () => {
+    stored = populated();
+    await mount();
+
+    const toggle = buttonWith('agent.inspector.title');
+    const contentId = toggle.getAttribute('aria-controls');
+    const content = contentId ? document.getElementById(contentId) : null;
+    expect(toggle.tagName).toBe('BUTTON');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.getAttribute('aria-label')).toBe('agent.inspector.collapse');
+    expect(content?.hidden).toBe(false);
+    expect(content?.querySelector('.agent-context')).not.toBeNull();
+
+    await click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(toggle.getAttribute('aria-label')).toBe('agent.inspector.expand');
+    expect(content?.hidden).toBe(true);
+    expect(host.querySelector('.agent-conversation-workspace')?.classList)
+      .toContain('is-inspector-collapsed');
+    expect(calls.map((call) => call.method)).toEqual(['load']);
+
+    await click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(content?.hidden).toBe(false);
+    expect(calls.map((call) => call.method)).toEqual(['load']);
+  });
+
+  it('switches the inspector shelf and filtered activity with the selected conversation', async () => {
+    stored = navigationWorkspace();
+    await mount();
+    navigationApproved = { ok: false, code: 'open-failed' };
+    await click(buttonWith('agent.card.navigate.review'));
+    await click(buttonWith('agent.card.navigate.approve'));
+
+    expect(host.querySelector('[data-agent-context="ctx-route"]')).not.toBeNull();
+    expect(host.querySelector('.agent-timeline')?.closest('.agent-inspector')).not.toBeNull();
+
+    const second = [...host.querySelectorAll<HTMLButtonElement>('[data-agent-conversation]')]
+      .find((entry) => entry.dataset.agentConversation === 'chat-2');
+    await click(second as HTMLButtonElement);
+    expect(host.querySelector('[data-agent-context="ctx-route"]')).toBeNull();
+    expect(text()).toContain('agent.context.empty');
+    expect(host.querySelector('.agent-timeline')).toBeNull();
+
+    const first = [...host.querySelectorAll<HTMLButtonElement>('[data-agent-conversation]')]
+      .find((entry) => entry.dataset.agentConversation === 'chat-1');
+    await click(first as HTMLButtonElement);
+    expect(host.querySelector('[data-agent-context="ctx-route"]')).not.toBeNull();
+    expect(host.querySelector('.agent-timeline')).not.toBeNull();
+  });
+
+  it('opens a collapsed inspector, then scrolls to and focuses the exact context shelf item', async () => {
     stored = populated();
     stored.conversations[0].messages[0].cards = [{
       id: 'card-1',
@@ -498,6 +673,9 @@ describe('Agent workspace shell', () => {
     const scrollIntoView = vi.fn();
     Object.defineProperty(contextItem, 'scrollIntoView', { value: scrollIntoView });
     const action = buttonWith('agent.context.source');
+    const inspectorToggle = buttonWith('agent.inspector.title');
+    await click(inspectorToggle);
+    expect(inspectorToggle.getAttribute('aria-expanded')).toBe('false');
 
     expect(text()).not.toContain('Model supplied label');
     expect(text()).not.toContain('Do not navigate');
@@ -507,6 +685,7 @@ describe('Agent workspace shell', () => {
     expect(text()).not.toContain('agent.card.navigate.destination');
     await click(action);
 
+    expect(inspectorToggle.getAttribute('aria-expanded')).toBe('true');
     expect(scrollIntoView).toHaveBeenCalledWith({
       behavior: 'auto',
       block: 'nearest',
@@ -595,6 +774,56 @@ describe('Agent workspace shell', () => {
       .toEqual(['actionId', 'approved', 'cardId', 'conversationId', 'messageId']);
     expect(text()).toContain('agent.card.navigate.opened');
     expect(text()).not.toContain('agent.card.navigate.approve');
+  });
+
+  it('reviews an exact Settings page/control link while sending only action coordinates', async () => {
+    stored = navigationWorkspace();
+    stored.conversations[0].context[0].label = 'Theme setting';
+    stored.conversations[0].context[0].source = {
+      app: 'settings',
+      route: 'appearance',
+      controlId: 'theme',
+      highlight: true,
+    };
+    stored.conversations[0].messages[0].cards[0].actions[0].effect = {
+      type: 'navigate',
+      section: 'settings',
+      page: 'appearance',
+      controlId: 'theme',
+      highlight: true,
+    };
+    const destination = {
+      section: 'settings',
+      page: 'appearance',
+      controlId: 'theme',
+      highlight: true,
+    };
+    navigationReview = { ok: true, destination, opened: false };
+    navigationApproved = { ok: true, destination, opened: true };
+    await mount();
+
+    await click(buttonWith('agent.card.navigate.review'));
+    expect(text()).toContain('agent.card.navigate.destination:palette.section.settings');
+    expect(text()).toContain('agent.card.navigate.page');
+    expect(text()).toContain('agent.card.navigate.control:theme');
+    expect(text()).toContain('agent.card.navigate.highlight');
+    const review = calls.find((call) => call.method === 'navigate');
+    expect(review?.args[0]).toEqual({
+      conversationId: 'chat-1',
+      messageId: 'msg-1',
+      cardId: 'navigation-card',
+      actionId: 'navigate',
+      approved: false,
+    });
+    expect(JSON.stringify(review?.args[0])).not.toContain('appearance');
+    expect(JSON.stringify(review?.args[0])).not.toContain('theme');
+
+    await click(buttonWith('agent.card.navigate.approve'));
+    const approval = calls.filter((call) => call.method === 'navigate')[1];
+    expect(approval?.args[0]).toMatchObject({ approved: true });
+    expect(Object.keys(approval?.args[0] as object).sort())
+      .toEqual(['actionId', 'approved', 'cardId', 'conversationId', 'messageId']);
+    expect(text()).toContain('agent.card.navigate.opened');
   });
 
   it('records each attempt on the activity timeline, keeping the failure a retry follows', async () => {
@@ -721,30 +950,71 @@ describe('Agent workspace shell', () => {
     expect(text()).toContain('agent.timeline.status.succeeded');
   });
 
-  it('refuses a step the profile no longer permits, and never runs it', async () => {
+  it('shows a passive refusal when the profile no longer permits a step', async () => {
     stored = approvalWorkspace();
     // The card was produced while the operation was enabled; the profile has
     // since been narrowed. The real gate is what decides this.
     approvalContext.allowedOperations = ['flashcard.list-decks'];
     await mount();
-    await click(buttonWith('agent.card.approve.review'));
 
     expect(text()).toContain('agent.approve.error.operation-denied');
+    expect(buttons().some((button) => button.textContent?.includes('agent.card.approve.review')))
+      .toBe(false);
     expect(text()).not.toContain('agent.card.approve.grant');
     expect(grantCalls).toHaveLength(0);
-    expect(text()).toContain('agent.timeline.status.failed');
+    expect(text()).not.toContain('agent.timeline.effect.approve-step');
+    expect(text()).not.toContain('Live objective from the queue');
+    expect(text()).not.toContain('Live step from the queue');
+    expect(text()).not.toContain('flashcard.add-cards');
+    expect(text()).not.toContain('Stored label nobody reads');
   });
 
-  it('refuses a step that stopped waiting while the card sat on screen', async () => {
+  it('shows a passive refusal when a step stopped waiting', async () => {
     stored = approvalWorkspace();
     const queue = waitingQueue();
     (queue.items[0] as { task: { steps: { status: string }[] } }).task.steps[0].status = 'completed';
     approvalContext.queue = queue;
     await mount();
-    await click(buttonWith('agent.card.approve.review'));
 
     expect(text()).toContain('agent.approve.error.step-not-awaiting');
     expect(grantCalls).toHaveLength(0);
+    expect(text()).not.toContain('agent.timeline.effect.approve-step');
+  });
+
+  it('checks availability passively until operational hydration completes', async () => {
+    stored = approvalWorkspace();
+    approvalObserverHydrated = false;
+    await mount();
+
+    expect(text()).toContain('agent.card.approve.checking');
+    expect(buttons().some((button) => button.textContent?.includes('agent.card.approve.review')))
+      .toBe(false);
+    expect(text()).not.toContain('agent.timeline.effect.approve-step');
+
+    approvalObserverHydrated = true;
+    await publishApprovalContext();
+    expect(buttonWith('agent.card.approve.review')).toBeTruthy();
+    expect(text()).not.toContain('agent.timeline.effect.approve-step');
+  });
+
+  it('updates an idle approval in place when live authority narrows and widens', async () => {
+    stored = approvalWorkspace();
+    await mount();
+    expect(buttonWith('agent.card.approve.review')).toBeTruthy();
+
+    approvalContext = { ...approvalContext, allowedOperations: ['flashcard.list-decks'] };
+    await publishApprovalContext();
+    expect(text()).toContain('agent.approve.error.operation-denied');
+    expect(buttons().some((button) => button.textContent?.includes('agent.card.approve.review')))
+      .toBe(false);
+    expect(text()).not.toContain('Live objective from the queue');
+    expect(text()).not.toContain('flashcard.add-cards');
+    expect(text()).not.toContain('agent.timeline.effect.approve-step');
+
+    approvalContext = { ...approvalContext, allowedOperations: ['flashcard.add-cards'] };
+    await publishApprovalContext();
+    expect(buttonWith('agent.card.approve.review')).toBeTruthy();
+    expect(text()).not.toContain('agent.timeline.effect.approve-step');
   });
 
   it('keeps a failed run in the record beneath the retry that follows it', async () => {
@@ -790,12 +1060,7 @@ describe('Agent workspace shell', () => {
 
     await click(buttonWith('agent.card.save.confirm'));
     expect(saveCalls).toHaveLength(1);
-    expect(saveCalls[0][0]).toMatchObject({
-      entityType: 'flashcard',
-      entityId: 'ctx-word',
-      word: '積ん読',
-      meaning: 'books bought and left unread',
-    });
+    expect(saveCalls[0].slice(1, 4)).toEqual(['msg-1', 'entry-card', 'save']);
     expect(text()).toContain('agent.card.save.saved');
     expect(text()).toContain('agent.timeline.effect.save');
     expect(text()).toContain('agent.timeline.status.succeeded');
@@ -844,6 +1109,41 @@ describe('Agent workspace shell', () => {
     expect(text()).toContain('agent.save.error.save-failed');
     expect(text()).not.toContain('agent.card.save.saved');
     expect(text()).toContain('agent.timeline.status.failed');
+  });
+
+  it('reviews and confirms a deterministic Undo, then records the inverse', async () => {
+    stored = saveWorkspace();
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+    await click(buttonWith('agent.card.save.confirm'));
+
+    await click(buttonWith('agent.card.undo.review'));
+    expect(text()).toContain('agent.card.undo.target=1');
+    expect(undoCalls).toHaveLength(0);
+
+    await click(buttonWith('agent.card.undo.confirm'));
+    expect(undoCalls).toHaveLength(1);
+    expect(text()).toContain('agent.card.undo.undone');
+    expect(text()).toContain('agent.timeline.effect.undo');
+    expect(text()).toContain('agent.timeline.status.succeeded');
+  });
+
+  it('keeps a valid Undo visible after switching away from the saved message', async () => {
+    stored = saveWorkspace();
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+    await click(buttonWith('agent.card.save.confirm'));
+
+    const second = [...host.querySelectorAll<HTMLButtonElement>('[data-agent-conversation]')]
+      .find((entry) => entry.dataset.agentConversation === 'chat-2');
+    await click(second as HTMLButtonElement);
+    const first = [...host.querySelectorAll<HTMLButtonElement>('[data-agent-conversation]')]
+      .find((entry) => entry.dataset.agentConversation === 'chat-1');
+    await click(first as HTMLButtonElement);
+
+    expect(buttons().some((button) => button.textContent?.includes('agent.card.undo.review'))).toBe(true);
+    expect(buttons().some((button) => button.textContent?.includes('agent.card.save.review'))).toBe(false);
+    expect(text()).toContain('agent.card.save.saved');
   });
 
   it('announces stale or undeclared card context without moving focus or mutating state', async () => {
@@ -1063,7 +1363,9 @@ describe('Agent workspace shell', () => {
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => {
-      buttonWith('agent.execute.send').click();
+      const send = buttonWith('agent.execute.send');
+      expect(send.disabled).toBe(false);
+      send.click();
       await pending;
     });
 
@@ -1212,7 +1514,7 @@ describe('Agent workspace shell', () => {
 
     const send = buttonWith('agent.execute.send');
     expect(send.disabled).toBe(true);
-    expect(text()).toContain('agent.attachment.cloudConsent');
+    expect(text()).toContain('agent.execute.sensitiveConsent');
     expect(calls.some((call) => call.method === 'execute')).toBe(false);
 
     const consent = host.querySelector('.agent-attachment-consent input') as HTMLInputElement;
@@ -1233,6 +1535,103 @@ describe('Agent workspace shell', () => {
     expect(request.attachments).toHaveLength(1);
   });
 
+  it('requires per-request consent for selected sensitive context without an attachment', async () => {
+    stored = populated();
+    stored.conversations[0].context[0].sensitivity = 'sensitive';
+    await mount();
+    await setTextarea('Explain my selection');
+
+    const provider = host.querySelector('.agent-composer-options select') as HTMLSelectElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
+        ?.call(provider, 'gemini-2.5-flash');
+      provider.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(buttonWith('agent.execute.send').disabled).toBe(true);
+    expect(text()).toContain('agent.execute.sensitiveConsent');
+    expect(host.querySelectorAll('.agent-attachment-chip')).toHaveLength(0);
+
+    await act(async () => {
+      (host.querySelector('.agent-attachment-consent input') as HTMLInputElement).click();
+    });
+    expect((host.querySelector('.agent-attachment-consent input') as HTMLInputElement).checked)
+      .toBe(true);
+
+    stored = {
+      ...stored,
+      conversations: stored.conversations.map((conversation) => (
+        conversation.id === 'chat-1'
+          ? {
+              ...conversation,
+              context: conversation.context.map((item) => (
+                item.id === 'ctx-1' ? { ...item, preview: 'Updated private selection' } : item
+              )),
+            }
+          : conversation
+      )),
+    };
+    await act(async () => {
+      workspaceListener?.(stored);
+    });
+    expect((host.querySelector('.agent-attachment-consent input') as HTMLInputElement).checked)
+      .toBe(false);
+    expect(buttonWith('agent.execute.send').disabled).toBe(true);
+
+    await act(async () => {
+      (host.querySelector('.agent-attachment-consent input') as HTMLInputElement).click();
+    });
+    await click(buttonWith('agent.execute.send'));
+
+    const request = calls.find((call) => call.method === 'execute')?.args[0] as {
+      policy: { allowSensitiveContext: boolean };
+      attachments: unknown[];
+    };
+    expect(request.policy.allowSensitiveContext).toBe(true);
+    expect(request.attachments).toEqual([]);
+  });
+
+  it('sends the visible per-request input and output budgets to main', async () => {
+    stored = populated();
+    await mount();
+    await setTextarea('Bound this answer');
+    const budgets = [...host.querySelectorAll<HTMLInputElement>('.agent-budget-field input')];
+
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        ?.call(budgets[0], '12000');
+      budgets[0].dispatchEvent(new Event('input', { bubbles: true }));
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        ?.call(budgets[1], '777');
+      budgets[1].dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await click(buttonWith('agent.execute.send'));
+
+    const request = calls.find((call) => call.method === 'execute')?.args[0] as {
+      policy: { maxInputChars: number; maxOutputTokens: number };
+    };
+    expect(request.policy).toMatchObject({
+      maxInputChars: 12_000,
+      maxOutputTokens: 777,
+    });
+  });
+
+  it('refuses known prompt and file content over the selected input budget before IPC', async () => {
+    stored = populated();
+    await mount();
+    await setTextarea('Five!');
+    const inputBudget = host.querySelector('.agent-budget-field input') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        ?.call(inputBudget, '4');
+      inputBudget.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    expect(buttonWith('agent.execute.send').disabled).toBe(true);
+    expect(text()).toContain('agent.execute.inputOverBudget');
+    expect(calls.some((call) => call.method === 'execute')).toBe(false);
+  });
+
   it('clears selected files only after a successful request', async () => {
     stored = populated();
     await mount();
@@ -1250,5 +1649,74 @@ describe('Agent workspace shell', () => {
     await click(buttonWith('agent.execute.send'));
     expect(text()).not.toContain('done.txt');
     expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('creates an Agent-origin plan without sending or clearing the composer draft', async () => {
+    stored = populated();
+    approvalContext = { ...approvalContext, queue: { version: 1, items: [] } };
+    await mount();
+    await setTextarea('Look up the selected term');
+
+    await click(buttonWith('agent.plan.create'));
+
+    expect(plannerCalls).toHaveLength(1);
+    expect(plannerCalls[0][0]).toMatchObject({ id: 'chat-1' });
+    expect(plannerCalls[0][1]).toBe('Look up the selected term');
+    expect(text()).toContain('agent.plan.queued=1');
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value)
+      .toBe('Look up the selected term');
+    expect(calls.some((call) => call.method === 'execute')).toBe(false);
+  });
+
+  it('discloses that selected files are excluded and disables plan creation', async () => {
+    stored = populated();
+    await mount();
+    await setTextarea('Use this file');
+    await selectFile('notes.txt', 'private notes');
+
+    const plan = buttonWith('agent.plan.create');
+    expect(plan.disabled).toBe(true);
+    expect(text()).toContain('agent.plan.attachmentsUnsupported');
+    expect(plannerCalls).toHaveLength(0);
+  });
+
+  it('shows and controls only plans with this conversation origin', async () => {
+    stored = populated();
+    const own = waitingQueue().items[0] as Record<string, unknown>;
+    const foreign = {
+      ...own,
+      id: 'task-foreign',
+      origin: { conversationId: 'chat-2', contextIds: [] },
+      task: { ...(own.task as object), id: 'task-foreign', objective: 'Foreign queue plan' },
+    };
+    approvalContext = {
+      ...approvalContext,
+      queue: {
+        version: 1,
+        items: [{
+          ...own,
+          status: 'queued',
+          origin: { conversationId: 'chat-1', contextIds: ['ctx-1'] },
+          task: {
+            ...(own.task as object),
+            objective: 'Visible queue plan',
+            status: 'queued',
+            steps: [{
+              ...((own.task as { steps: object[] }).steps[0]),
+              status: 'pending',
+              result: { found: true },
+            }],
+          },
+        }, foreign],
+      },
+    };
+
+    await mount();
+
+    expect(text()).toContain('Visible queue plan');
+    expect(text()).not.toContain('Foreign queue plan');
+    expect(text()).toContain('flashcard.add-cards');
+    await click(buttonWith('common.pause'));
+    expect(planQueueActionCalls).toEqual([['chat-1', 'task-1', 'pause']]);
   });
 });

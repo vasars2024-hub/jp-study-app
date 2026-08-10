@@ -15,13 +15,20 @@
  * the grant supplies exactly one call id, for exactly one run.
  */
 
+import { runAgentTaskStep } from './localAgentQueueRun';
 import {
-  runAgentTaskStep,
-  applyAgentRunToQueue,
-} from './localAgentQueueRun';
-import { loadLocalAgentTaskQueue, saveLocalAgentTaskQueue } from './localAgentTaskQueueStore';
-import { loadLocalAgentProfiles } from './localAgentProfilesStore';
-import { loadLocalAgentSettings } from './localAgentSettingsStore';
+  loadLocalAgentTaskQueue,
+  onLocalAgentTaskQueueChanged,
+} from './localAgentTaskQueueStore';
+import {
+  loadLocalAgentProfiles,
+  onLocalAgentProfilesChanged,
+} from './localAgentProfilesStore';
+import {
+  loadLocalAgentSettings,
+  onLocalAgentSettingsChanged,
+} from './localAgentSettingsStore';
+import { initAgentOperationalState } from './agentOperationalClient';
 import {
   effectiveAgentPermission,
   getActiveAgentProfile,
@@ -75,6 +82,44 @@ export function readAgentStepApprovalContext(
     permission: effectiveAgentPermission(loadLocalAgentSettings().permission, profile),
     allowedOperations: profile ? available.filter((id) => enabled.has(id)) : available,
     handlers,
+  };
+}
+
+/**
+ * Publishes one hydrated, live approval context to a shell-level owner.
+ *
+ * The subscriptions are installed before hydration so no change can fall into
+ * the gap between the main-owned queue load and listener registration. Their
+ * callbacks remain muted until hydration resolves; the explicit read after that
+ * resolution incorporates any event that arrived while the queue was loading.
+ * A shell can pass the resulting snapshot to every historical message instead
+ * of installing a queue/profile/settings listener for each card.
+ */
+export function observeAgentStepApprovalContext(
+  t: AgentToolRegistryTranslate,
+  listener: (context: AgentStepApprovalContext) => void,
+): () => void {
+  let active = true;
+  let hydrated = false;
+  const publish = (): void => {
+    if (active && hydrated) listener(readAgentStepApprovalContext(t));
+  };
+
+  const offQueue = onLocalAgentTaskQueueChanged(publish);
+  const offProfiles = onLocalAgentProfilesChanged(publish);
+  const offSettings = onLocalAgentSettingsChanged(publish);
+
+  void initAgentOperationalState().then(() => {
+    if (!active) return;
+    hydrated = true;
+    publish();
+  });
+
+  return () => {
+    active = false;
+    offQueue();
+    offProfiles();
+    offSettings();
   };
 }
 
@@ -137,12 +182,9 @@ export async function grantAgentStepApproval(
   } catch {
     return { ok: false, code: 'approve-failed' };
   }
-
-  try {
-    saveLocalAgentTaskQueue(applyAgentRunToQueue(loadLocalAgentTaskQueue(), result.task));
-  } catch {
-    return { ok: false, code: 'store-failed' };
-  }
+  if (result.leaseRefusal) return { ok: false, code: 'step-not-found' };
+  if (result.leaseCommitFailure) return { ok: false, code: 'store-failed' };
+  if (result.refusal) return { ok: false, code: result.refusal.code };
 
   // The step ran; whether it *succeeded* is the task's own report, and saying
   // otherwise would make this control the second place a step's outcome is

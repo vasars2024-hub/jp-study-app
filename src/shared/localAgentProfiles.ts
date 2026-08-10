@@ -44,7 +44,7 @@ const ALL_OPERATIONS: AgentToolOperationId[] = [
   'anime.check-releases', 'anime.update-metadata', 'anime.analyze-difficulty',
   'anime.fetch-external-metadata', 'visual-novel.search', 'visual-novel.add',
   'visual-novel.track-route', 'visual-novel.extract-text', 'visual-novel.generate-vocabulary',
-  'flashcard.list-decks', 'flashcard.create-deck', 'flashcard.add-cards',
+  'flashcard.list-decks', 'flashcard.create-deck', 'flashcard.add-cards', 'flashcard.delete-cards',
   'flashcard.modify-cards', 'flashcard.schedule-reviews', 'flashcard.delete-deck',
   'study.get-context', 'study.list-opportunities', 'study.prepare-media',
   'study.filter-vocabulary', 'study.undo-filter', 'study.preview-cards',
@@ -68,7 +68,7 @@ const CORRECTION_STYLES = new Set<AgentCorrectionStyle>(['gentle', 'detailed', '
 
 const TUTOR_OPERATIONS: AgentToolOperationId[] = [
   'dictionary.lookup', 'dictionary.explain-grammar', 'dictionary.analyze-sentence',
-  'dictionary.search-knowledge', 'flashcard.list-decks', 'flashcard.add-cards',
+  'dictionary.search-knowledge', 'flashcard.list-decks', 'flashcard.add-cards', 'flashcard.delete-cards',
   'flashcard.create-deck', 'calendar.list', 'calendar.schedule-session',
   'study.get-context', 'study.list-opportunities', 'study.filter-vocabulary',
   'study.undo-filter', 'study.preview-cards', 'study.create-cards',
@@ -88,7 +88,7 @@ const RESEARCH_OPERATIONS: AgentToolOperationId[] = [
 ];
 const AUTOMATION_OPERATIONS: AgentToolOperationId[] = [
   'media.search', 'media.organize-files', 'anime.check-releases', 'flashcard.list-decks',
-  'flashcard.create-deck', 'flashcard.add-cards', 'flashcard.schedule-reviews',
+  'flashcard.create-deck', 'flashcard.add-cards', 'flashcard.delete-cards', 'flashcard.schedule-reviews',
   'calendar.list', 'calendar.schedule-session', 'calendar.create-reminder',
   'study.get-context', 'study.list-opportunities', 'study.prepare-media',
   'study.filter-vocabulary', 'study.undo-filter', 'study.preview-cards',

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -20,6 +21,12 @@ import {
 } from '../../../shared/agentWorkspace';
 import type { AiProviderId } from '../../../shared/aiProviders';
 import {
+  AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
+  AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
+  AGENT_EXECUTION_INPUT_BUDGET_MAX,
+  AGENT_EXECUTION_INPUT_BUDGET_MIN,
+  AGENT_EXECUTION_OUTPUT_BUDGET_MAX,
+  AGENT_EXECUTION_OUTPUT_BUDGET_MIN,
   agentExecutionMessageIds,
   defaultAgentExecutionPolicy,
   type AgentExecutionFailureCode,
@@ -42,6 +49,20 @@ import {
   executeAgentPrompt,
 } from '../../agentExecutionClient';
 import {
+  agentKnownInputChars,
+  agentSensitiveContextKey,
+  clampAgentExecutionBudget,
+} from '../../agentExecutionPolicyDraft';
+import {
+  AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT,
+  createAgentConversationPlan,
+  type AgentConversationPlanFailureCode,
+} from '../../agentConversationPlanner';
+import { AgentConversationPlanQueue } from './AgentConversationPlanQueue';
+import { AgentCapabilityDirectory } from './AgentCapabilityDirectory';
+import { AgentPromptLibrary } from './AgentPromptLibrary';
+import { AgentContextSuggestions } from './AgentContextSuggestions';
+import {
   AGENT_NAVIGATION_IDLE,
   AGENT_NAVIGATION_SECTION_LABEL_KEYS,
   agentNavigationReduce,
@@ -55,6 +76,7 @@ import {
   type AgentTimelineEntry,
   type AgentTimelineEvent,
 } from '../../../shared/agentTimeline';
+import type { AgentTimelineProjection } from '../../../shared/agentExecutionRecord';
 import {
   AGENT_STEP_APPROVAL_IDLE,
   agentStepApprovalReduce,
@@ -64,16 +86,35 @@ import {
 } from '../../../shared/agentStepApproval';
 import {
   grantAgentStepApproval,
+  observeAgentStepApprovalContext,
   readAgentStepApprovalContext,
+  type AgentStepApprovalContext,
 } from '../../agentStepApprovalClient';
 import {
   AGENT_SAVE_IDLE,
+  agentSaveOperationCallId,
   agentSaveReduce,
   resolveAgentSave,
   type AgentSaveEvent,
   type AgentSaveRun,
 } from '../../../shared/agentSave';
-import { readAgentSaveContext, saveAgentEntity } from '../../agentSaveClient';
+import { grantAgentSave, readAgentSaveContext } from '../../agentSaveClient';
+import {
+  AGENT_OPERATION_LOG_EMPTY,
+  agentOperationLogAppend,
+  type AgentOperationDraft,
+  type AgentOperationLog,
+} from '../../../shared/agentOperationLog';
+import {
+  AGENT_UNDO_IDLE,
+  agentOperationWasUndone,
+  agentUndoActionForCall,
+  agentUndoReduce,
+  resolveAgentUndo,
+  type AgentUndoEvent,
+  type AgentUndoRun,
+} from '../../../shared/agentUndo';
+import { performAgentUndo, readAgentUndoContext } from '../../agentUndoClient';
 import { runAgentNavigation } from '../../agentNavigationClient';
 import {
   AGENT_ATTACHMENT_ACCEPT,
@@ -160,6 +201,10 @@ function executionErrorKey(code: AgentExecutionFailureCode): string {
     return 'agent.execute.error.provider';
   }
   return 'agent.execute.error.request';
+}
+
+function planFailureKey(code: AgentConversationPlanFailureCode): string {
+  return `agent.plan.error.${code}`;
 }
 
 function attachmentErrorKey(code: AgentAttachmentReadFailureCode): string {
@@ -271,11 +316,17 @@ function ContextShelf({
 function MessageRow({
   message,
   conversation,
+  approvalContext,
+  operationLog,
+  onAppendOperation,
   onOpenContext,
   onRecord,
 }: {
   message: AgentMessage;
   conversation: AgentConversation;
+  approvalContext: AgentStepApprovalContext | null;
+  operationLog: AgentOperationLog;
+  onAppendOperation: (operation: AgentOperationDraft) => void;
   onOpenContext: (contextId: string, sourceContextIds: readonly string[]) => boolean;
   /**
    * Reports a navigation transition to the conversation's timeline. The runs
@@ -304,6 +355,9 @@ function MessageRow({
   const recordSave = (cardId: string, actionId: string, event: AgentTimelineEvent): void => {
     onRecord(cardId, actionId, 'save', event);
   };
+  const recordUndo = (cardId: string, actionId: string, event: AgentTimelineEvent): void => {
+    onRecord(cardId, actionId, 'undo', event);
+  };
   const [failedActionId, setFailedActionId] = useState<string | null>(null);
   /**
    * One lifecycle per navigation action, keyed by card and action.
@@ -318,6 +372,8 @@ function MessageRow({
   const [approvalRuns, setApprovalRuns] = useState<Record<string, AgentStepApprovalRun>>({});
   /** And one per save action. */
   const [saveRuns, setSaveRuns] = useState<Record<string, AgentSaveRun>>({});
+  /** One per deterministic Undo action emitted from the session operation log. */
+  const [undoRuns, setUndoRuns] = useState<Record<string, AgentUndoRun>>({});
   const provider = message.provider;
 
   const dispatchNavigation = (key: string, event: AgentNavigationEvent): void => {
@@ -491,15 +547,70 @@ function MessageRow({
   const confirmSave = (key: string, cardId: string, actionId: string): void => {
     const current = saveRuns[key];
     if (current?.status !== 'review' || !current.target) return;
-    const target = current.target;
     dispatchSave(key, { type: 'confirm' });
-    const result = saveAgentEntity(target);
+    // The reviewed target is display-only. Confirmation re-reads the shelf,
+    // deck, permission and profile allow-list before it writes anything.
+    const result = grantAgentSave(conversation, message.id, cardId, actionId, t);
     if (result.ok) {
+      onAppendOperation(result.operation);
       recordSave(cardId, actionId, { type: 'succeeded' });
       return;
     }
     dispatchSave(key, { type: 'failed', code: result.code });
     recordSave(cardId, actionId, { type: 'failed', code: result.code });
+  };
+
+  const dispatchUndo = (key: string, event: AgentUndoEvent): void => {
+    setUndoRuns((previous) => ({
+      ...previous,
+      [key]: agentUndoReduce(previous[key] ?? AGENT_UNDO_IDLE, event),
+    }));
+  };
+
+  const reviewUndo = (key: string, cardId: string, actionId: string, operationId: string): void => {
+    recordUndo(cardId, actionId, { type: 'review' });
+    let context: ReturnType<typeof readAgentUndoContext>;
+    try {
+      context = readAgentUndoContext(t);
+    } catch {
+      dispatchUndo(key, { type: 'refused', code: 'store-failed' });
+      recordUndo(cardId, actionId, { type: 'refused', code: 'store-failed' });
+      return;
+    }
+    const resolution = resolveAgentUndo(
+      operationLog,
+      operationId,
+      context.permission,
+      context.liveEntityIds,
+      context.allowedOperations,
+    );
+    if (!resolution.ok) {
+      dispatchUndo(key, { type: 'refused', code: resolution.code });
+      recordUndo(cardId, actionId, { type: 'refused', code: resolution.code });
+      return;
+    }
+    dispatchUndo(key, { type: 'review', target: resolution.target });
+  };
+
+  const confirmUndo = async (
+    key: string,
+    cardId: string,
+    actionId: string,
+    operationId: string,
+  ): Promise<void> => {
+    const current = undoRuns[key];
+    if (current?.status !== 'review' || !current.target) return;
+    dispatchUndo(key, { type: 'confirm' });
+    recordUndo(cardId, actionId, { type: 'running' });
+    const result = await performAgentUndo(operationLog, operationId, t);
+    if (result.ok) {
+      onAppendOperation(result.operation);
+      dispatchUndo(key, { type: 'succeeded' });
+      recordUndo(cardId, actionId, { type: 'succeeded' });
+      return;
+    }
+    dispatchUndo(key, { type: 'failed', code: result.code });
+    recordUndo(cardId, actionId, { type: 'failed', code: result.code });
   };
   return (
     <li className={`agent-message agent-message-${message.role}`}>
@@ -599,6 +710,12 @@ function MessageRow({
                             {destination.page
                               ? ` · ${t('agent.card.navigate.page', { page: destination.page })}`
                               : ''}
+                            {destination.controlId
+                              ? ` · ${t('agent.card.navigate.control', { control: destination.controlId })}`
+                              : ''}
+                            {destination.highlight === true
+                              ? ` · ${t('agent.card.navigate.highlight')}`
+                              : ''}
                           </span>
                           <button
                             type="button"
@@ -670,10 +787,27 @@ function MessageRow({
                   if (action.effect.type !== 'approve-step') return null;
                   const key = `${card.id}:${action.id}`;
                   const run = approvalRuns[key] ?? AGENT_STEP_APPROVAL_IDLE;
+                  const availability = approvalContext === null
+                    ? null
+                    : resolveAgentStepApproval(
+                        conversation,
+                        approvalContext.queue,
+                        message.id,
+                        card.id,
+                        action.id,
+                        approvalContext.permission,
+                        approvalContext.allowedOperations,
+                      );
+                  const liveApproval = availability?.ok ? availability.approval : null;
+                  const canAct = liveApproval !== null;
+                  const availabilityStatus = availability === null
+                    ? t('agent.card.approve.checking')
+                    : availability.ok
+                      ? null
+                      : t(`agent.approve.error.${availability.code}`);
                   // Every word of the objective, the step and the operation comes
                   // from the gate's resolution against the live queue. The stored
                   // action label is never shown and names nothing.
-                  const approval = run.approval;
                   return (
                     <span
                       key={action.id}
@@ -681,7 +815,7 @@ function MessageRow({
                       role="group"
                       aria-label={t('agent.card.approve.title')}
                     >
-                      {run.status === 'idle' ? (
+                      {run.status === 'idle' && canAct ? (
                         <button
                           type="button"
                           className="agent-action agent-card-action"
@@ -691,12 +825,12 @@ function MessageRow({
                           {t('agent.card.approve.review')}
                         </button>
                       ) : null}
-                      {run.status === 'review' && approval ? (
+                      {run.status === 'review' && liveApproval ? (
                         <>
                           <span className="agent-card-approve-step">
-                            {t('agent.card.approve.objective', { objective: approval.objective })}
+                            {t('agent.card.approve.objective', { objective: liveApproval.objective })}
                             {' · '}
-                            {t('agent.card.approve.step', { step: approval.label })}
+                            {t('agent.card.approve.step', { step: liveApproval.label })}
                           </span>
                           <span className="agent-card-approve-operation">
                             {/*
@@ -707,7 +841,7 @@ function MessageRow({
                               friendlier name for it here would be the one place
                               this control could misdescribe what it runs.
                             */}
-                            {t('agent.card.approve.operation', { operation: approval.operation })}
+                            {t('agent.card.approve.operation', { operation: liveApproval.operation })}
                           </span>
                           <button
                             type="button"
@@ -734,7 +868,7 @@ function MessageRow({
                           {t('agent.card.approve.granted')}
                         </span>
                       ) : null}
-                      {run.status === 'cancelled' ? (
+                      {run.status === 'cancelled' && canAct ? (
                         <>
                           <span className="agent-card-approve-status">
                             {t('agent.card.approve.cancelled')}
@@ -751,7 +885,7 @@ function MessageRow({
                           </button>
                         </>
                       ) : null}
-                      {run.status === 'failed' ? (
+                      {run.status === 'failed' && canAct ? (
                         <>
                           <span className="agent-card-action-error" role="alert">
                             {t(`agent.approve.error.${run.code ?? 'approve-failed'}`)}
@@ -768,6 +902,19 @@ function MessageRow({
                           </button>
                         </>
                       ) : null}
+                      {(run.status === 'idle'
+                        || run.status === 'review'
+                        || run.status === 'cancelled'
+                        || run.status === 'failed') && availabilityStatus ? (
+                        <span
+                          className="agent-card-approve-availability"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <Icon name="lock" size={13} />
+                          {availabilityStatus}
+                        </span>
+                      ) : null}
                     </span>
                   );
                 })}
@@ -778,6 +925,19 @@ function MessageRow({
                   // The word and the gloss come from the gate's resolution
                   // against the live shelf item; the stored label names nothing.
                   const target = run.target;
+                  const saveCallId = agentSaveOperationCallId(
+                    conversation.id,
+                    message.id,
+                    card.id,
+                    action.id,
+                  );
+                  const undoAction = agentUndoActionForCall(operationLog, saveCallId);
+                  const undoKey = `${key}:undo`;
+                  const undoRun = undoRuns[undoKey] ?? AGENT_UNDO_IDLE;
+                  const wasUndone = agentOperationWasUndone(operationLog, saveCallId);
+                  const saveRecorded = operationLog.entries.some(
+                    (entry) => entry.callId === saveCallId && entry.operation === 'flashcard.add-cards',
+                  );
                   return (
                     <span
                       key={action.id}
@@ -785,7 +945,7 @@ function MessageRow({
                       role="group"
                       aria-label={t('agent.card.save.title')}
                     >
-                      {run.status === 'idle' ? (
+                      {run.status === 'idle' && !saveRecorded ? (
                         <button
                           type="button"
                           className="agent-action agent-card-action"
@@ -820,10 +980,123 @@ function MessageRow({
                           </button>
                         </>
                       ) : null}
-                      {run.status === 'saved' ? (
+                      {run.status === 'saved' || saveRecorded ? (
                         <span className="agent-card-save-status">
                           {t('agent.card.save.saved')}
                         </span>
+                      ) : null}
+                      {(run.status === 'saved' || saveRecorded) && undoAction ? (
+                        <span
+                          className={`agent-card-undo agent-undo-${undoRun.status}`}
+                          role="group"
+                          aria-label={t('agent.card.undo.title')}
+                        >
+                          {undoRun.status === 'idle' ? (
+                            <button
+                              type="button"
+                              className="agent-action agent-card-action"
+                              onClick={() => reviewUndo(
+                                undoKey,
+                                card.id,
+                                undoAction.id,
+                                undoAction.effect.type === 'undo'
+                                  ? undoAction.effect.operationId
+                                  : '',
+                              )}
+                            >
+                              <Icon name="refresh" size={13} />
+                              {t('agent.card.undo.review')}
+                            </button>
+                          ) : null}
+                          {undoRun.status === 'review' && undoRun.target ? (
+                            <>
+                              <span className="agent-card-save-entry">
+                                {t('agent.card.undo.target', {
+                                  operation: undoRun.target.operation,
+                                  count: undoRun.target.entityIds.length,
+                                })}
+                              </span>
+                              <button
+                                type="button"
+                                className="agent-action agent-card-action agent-card-undo-confirm"
+                                onClick={() => void confirmUndo(
+                                  undoKey,
+                                  card.id,
+                                  undoAction.id,
+                                  undoAction.effect.type === 'undo'
+                                    ? undoAction.effect.operationId
+                                    : '',
+                                )}
+                              >
+                                {t('agent.card.undo.confirm')}
+                              </button>
+                              <button
+                                type="button"
+                                className="agent-action agent-card-action"
+                                onClick={() => {
+                                  dispatchUndo(undoKey, { type: 'cancel' });
+                                  recordUndo(card.id, undoAction.id, { type: 'cancelled' });
+                                }}
+                              >
+                                {t('agent.card.undo.cancel')}
+                              </button>
+                            </>
+                          ) : null}
+                          {undoRun.status === 'running' ? (
+                            <span className="agent-card-save-status">{t('agent.card.undo.running')}</span>
+                          ) : null}
+                          {undoRun.status === 'cancelled' ? (
+                            <>
+                              <span className="agent-card-save-status">
+                                {t('agent.card.undo.cancelled')}
+                              </span>
+                              <button
+                                type="button"
+                                className="agent-action agent-card-action"
+                                onClick={() => {
+                                  dispatchUndo(undoKey, { type: 'retry' });
+                                  reviewUndo(
+                                    undoKey,
+                                    card.id,
+                                    undoAction.id,
+                                    undoAction.effect.type === 'undo'
+                                      ? undoAction.effect.operationId
+                                      : '',
+                                  );
+                                }}
+                              >
+                                {t('agent.card.undo.review')}
+                              </button>
+                            </>
+                          ) : null}
+                          {undoRun.status === 'failed' ? (
+                            <>
+                              <span className="agent-card-action-error" role="alert">
+                                {t(`agent.undo.error.${undoRun.code ?? 'undo-failed'}`)}
+                              </span>
+                              <button
+                                type="button"
+                                className="agent-action agent-card-action"
+                                onClick={() => {
+                                  dispatchUndo(undoKey, { type: 'retry' });
+                                  reviewUndo(
+                                    undoKey,
+                                    card.id,
+                                    undoAction.id,
+                                    undoAction.effect.type === 'undo'
+                                      ? undoAction.effect.operationId
+                                      : '',
+                                  );
+                                }}
+                              >
+                                {t('agent.card.undo.retry')}
+                              </button>
+                            </>
+                          ) : null}
+                        </span>
+                      ) : null}
+                      {(run.status === 'saved' || saveRecorded) && wasUndone ? (
+                        <span className="agent-card-save-status">{t('agent.card.undo.undone')}</span>
                       ) : null}
                       {run.status === 'cancelled' ? (
                         <>
@@ -864,10 +1137,11 @@ function MessageRow({
                 })}
                 {card.actions.some((action) => action.effect.type === 'open-context') ? (
                   <span className="agent-card-actions">
-                    {card.actions.map((action) => {
-                      if (action.effect.type !== 'open-context') return null;
-                      const target = conversation.context.find(
-                        (item) => item.id === action.effect.contextId,
+                     {card.actions.map((action) => {
+                       if (action.effect.type !== 'open-context') return null;
+                       const contextId = action.effect.contextId;
+                       const target = conversation.context.find(
+                         (item) => item.id === contextId,
                       );
                       const actionKey = `${card.id}:${action.id}`;
                       const label = target
@@ -881,7 +1155,7 @@ function MessageRow({
                             aria-label={label}
                             onClick={() => {
                               const opened = onOpenContext(
-                                action.effect.contextId,
+                                contextId,
                                 card.sourceContextIds,
                               );
                               setFailedActionId(opened ? null : actionKey);
@@ -940,7 +1214,11 @@ function ActivityTimeline({ entries }: { entries: readonly AgentTimelineEntry[] 
             ) : null}
             {entry.code ? (
               <span className="agent-timeline-code">
-                {t(`agent.navigate.error.${entry.code}`)}
+                {entry.effect === 'execute-step'
+                  ? t('agent.plan.queue.error.run-failed')
+                  : entry.effect === 'plan-control' || entry.effect === 'plan-save'
+                    ? t(`agent.plan.queue.error.${entry.code}`)
+                    : t(`agent.${entry.effect === 'approve-step' ? 'approve' : entry.effect}.error.${entry.code}`)}
               </span>
             ) : null}
           </li>
@@ -961,7 +1239,25 @@ export default function AgentWorkspaceShell() {
   const [draft, setDraft] = useState('');
   const [target, setTarget] = useState<AgentTargetChoice>('local');
   const [allowLocalFallback, setAllowLocalFallback] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [planNotice, setPlanNotice] = useState<{
+    kind: 'status' | 'error';
+    text: string;
+  } | null>(null);
+  const [planQueueFailure, setPlanQueueFailure] = useState<string | null>(null);
+  const [maxInputChars, setMaxInputChars] = useState(AGENT_EXECUTION_DEFAULT_INPUT_BUDGET);
+  const [maxOutputTokens, setMaxOutputTokens] = useState(AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET);
   const [attachments, setAttachments] = useState<AgentExecutionAttachment[]>([]);
+  /**
+   * A view preference for this window only. The inspector disclosure never
+   * enters the main-owned workspace document, so another window and the next
+   * launch are not made to inherit a momentary layout choice.
+   */
+  const [inspectorExpanded, setInspectorExpanded] = useState(true);
+  const [capabilitiesExpanded, setCapabilitiesExpanded] = useState(false);
+  const [promptLibraryExpanded, setPromptLibraryExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'simple' | 'full'>('simple');
+  const inspectorContentId = `agent-inspector-${useId().replace(/:/g, '')}`;
   /**
    * What this window actually tried to do, newest attempt first.
    *
@@ -971,6 +1267,41 @@ export default function AgentWorkspaceShell() {
    * front of another window's user.
    */
   const [timeline, setTimeline] = useState<AgentTimelineEntry[]>([]);
+  /**
+   * What this window actually changed, ids only and bounded by the shared log.
+   * It is session-only for the same reason the execution timeline is: another
+   * window did not witness or authorize these effects.
+   */
+  const [operationLog, setOperationLog] = useState<AgentOperationLog>(AGENT_OPERATION_LOG_EMPTY);
+  /**
+   * One hydrated authority snapshot for the whole shell. Historical messages
+   * share it so the number of queue/profile/settings listeners never grows with
+   * the conversation. A null snapshot is rendered as a passive availability
+   * check, never as an optimistic Review control.
+   */
+  const [approvalContext, setApprovalContext] = useState<AgentStepApprovalContext | null>(null);
+
+  useEffect(() => {
+    setApprovalContext(null);
+    return observeAgentStepApprovalContext(t, setApprovalContext);
+  }, [lang, t]);
+
+  const appendOperation = useCallback((operation: AgentOperationDraft): void => {
+    setOperationLog((previous) => agentOperationLogAppend(previous, operation, Date.now()));
+  }, []);
+
+  const recordTimelineProjection = useCallback((projection: AgentTimelineProjection): void => {
+    const startedAt = Date.now();
+    setTimeline((previous) => projection.events.reduce(
+      (current, event, index) => agentTimelineRecord(
+        current,
+        projection.target,
+        event,
+        startedAt + index,
+      ),
+      previous,
+    ));
+  }, []);
 
   const recordTimeline = (
     conversationId: string,
@@ -992,7 +1323,7 @@ export default function AgentWorkspaceShell() {
     fileName?: string;
   } | null>(null);
   const [attachmentReading, setAttachmentReading] = useState(false);
-  const [cloudAttachmentConsent, setCloudAttachmentConsent] = useState(false);
+  const [cloudSensitiveConsent, setCloudSensitiveConsent] = useState(false);
   const [runningRequestId, setRunningRequestId] = useState<string | null>(null);
   const [runningPrompt, setRunningPrompt] = useState('');
   const [streamedText, setStreamedText] = useState('');
@@ -1067,7 +1398,7 @@ export default function AgentWorkspaceShell() {
   const phase = agentShellPhase({ loading, failure, state });
   const activeId = state?.activeConversationId ?? null;
   const executing = runningRequestId !== null;
-  const blocked = busy || executing;
+  const blocked = busy || executing || planning;
   const runningMessageIds = runningRequestId
     ? agentExecutionMessageIds(runningRequestId)
     : null;
@@ -1075,7 +1406,21 @@ export default function AgentWorkspaceShell() {
     runningMessageIds
     && selected?.messages.some((message) => message.id === runningMessageIds.assistant),
   );
-  const attachmentConsentRequired = target !== 'local' && attachments.length > 0;
+  const sensitiveContextKey = agentSensitiveContextKey(activeId, selected?.context ?? []);
+  const hasSensitiveContext = selected?.context.some(
+    (item) => item.sensitivity === 'sensitive',
+  ) ?? false;
+  const sensitiveConsentRequired = target !== 'local'
+    && (attachments.length > 0 || hasSensitiveContext);
+  const knownInputChars = agentKnownInputChars(draft, attachments);
+  const knownInputOverBudget = knownInputChars > maxInputChars;
+  const planObjectiveTooLong = draft.trim().length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT;
+
+  // Consent is scoped to this exact conversation/sensitive-context snapshot.
+  // A context shelf update or conversation switch must require a fresh choice.
+  useEffect(() => {
+    setCloudSensitiveConsent(false);
+  }, [sensitiveContextKey]);
 
   const selectAttachments = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
@@ -1091,13 +1436,13 @@ export default function AgentWorkspaceShell() {
     }
     setAttachments(result.attachments);
     setAttachmentFailure(null);
-    setCloudAttachmentConsent(false);
+    setCloudSensitiveConsent(false);
   }, [attachments]);
 
   const removeAttachment = useCallback((attachmentId: string) => {
     setAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
     setAttachmentFailure(null);
-    setCloudAttachmentConsent(false);
+    setCloudSensitiveConsent(false);
   }, []);
 
   const submitPrompt = useCallback(async (event: FormEvent<HTMLFormElement>) => {
@@ -1108,7 +1453,8 @@ export default function AgentWorkspaceShell() {
       || !prompt
       || executing
       || attachmentReading
-      || (attachmentConsentRequired && !cloudAttachmentConsent)
+      || knownInputOverBudget
+      || (sensitiveConsentRequired && !cloudSensitiveConsent)
     ) return;
     const requestId = newExecutionId();
     const basePolicy = defaultAgentExecutionPolicy(target);
@@ -1118,7 +1464,9 @@ export default function AgentWorkspaceShell() {
       prompt,
       policy: {
         ...basePolicy,
-        allowSensitiveContext: attachmentConsentRequired && cloudAttachmentConsent,
+        allowSensitiveContext: sensitiveConsentRequired && cloudSensitiveConsent,
+        maxInputChars,
+        maxOutputTokens,
       },
       allowLocalFallback: target === 'local' ? false : allowLocalFallback,
       attachments,
@@ -1135,7 +1483,7 @@ export default function AgentWorkspaceShell() {
       setDraft('');
       setAttachments([]);
       setAttachmentFailure(null);
-      setCloudAttachmentConsent(false);
+      setCloudSensitiveConsent(false);
     } else if (result.state) {
       // The failed assistant row is a real workspace change. Adopt it without
       // clearing the prompt or selected files so the user can retry.
@@ -1148,19 +1496,48 @@ export default function AgentWorkspaceShell() {
   }, [
     allowLocalFallback,
     apply,
-    attachmentConsentRequired,
+    knownInputOverBudget,
     attachmentReading,
     attachments,
-    cloudAttachmentConsent,
+    cloudSensitiveConsent,
     draft,
     executing,
     selected,
+    sensitiveConsentRequired,
     target,
+    maxInputChars,
+    maxOutputTokens,
   ]);
 
   const cancelExecution = useCallback(() => {
     if (runningRequestId) void cancelAgentPrompt(runningRequestId);
   }, [runningRequestId]);
+
+  const createPlan = useCallback(async (): Promise<void> => {
+    if (!selected || planning || attachments.length > 0) return;
+    const objective = draft.trim();
+    if (!objective || objective.length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT) return;
+    setPlanning(true);
+    setPlanNotice({ kind: 'status', text: t('agent.plan.planning') });
+    const result = await createAgentConversationPlan(selected, objective, t);
+    if (result.ok) {
+      setPlanNotice({
+        kind: 'status',
+        text: t('agent.plan.queued', {
+          summary: result.summary,
+          count: result.queue.items.find((item) => item.id === result.taskId)?.task.steps.length ?? 0,
+        }),
+      });
+      setPlanQueueFailure(null);
+    } else {
+      const base = result.summary || t(planFailureKey(result.code));
+      setPlanNotice({
+        kind: result.code === 'no-approved-actions' ? 'status' : 'error',
+        text: base,
+      });
+    }
+    setPlanning(false);
+  }, [attachments.length, draft, planning, selected, t]);
 
   const createConversation = useCallback(() => {
     const base = state ?? emptyAgentWorkspaceState();
@@ -1231,11 +1608,22 @@ export default function AgentWorkspaceShell() {
     else contextItemRefs.current.delete(contextId);
   }, []);
 
+  useEffect(() => {
+    if (!inspectorExpanded || !openedContext || openedContext.conversationId !== selected?.id) {
+      return;
+    }
+    const element = contextItemRefs.current.get(openedContext.contextId);
+    if (!element) return;
+    element.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+    element.focus({ preventScroll: true });
+  }, [inspectorExpanded, openedContext, selected?.id]);
+
   /**
    * Result cards are provider-authored data, so an effect is never used as a
    * selector or a route. The only connected slice resolves an exact id through
    * the selected conversation and the card's declared provenance, then moves
-   * focus to the already-rendered shelf item. Everything else remains inert.
+   * focus to its shelf item. A source action also opens the presentation-only
+   * inspector when needed; it still does not navigate or mutate the workspace.
    */
   const openContext = useCallback((
     contextId: string,
@@ -1243,10 +1631,8 @@ export default function AgentWorkspaceShell() {
   ): boolean => {
     if (!selected || !sourceContextIds.includes(contextId)) return false;
     const item = selected.context.find((candidate) => candidate.id === contextId);
-    const element = contextItemRefs.current.get(contextId);
-    if (!item || !element) return false;
-    element.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
-    element.focus({ preventScroll: true });
+    if (!item) return false;
+    setInspectorExpanded(true);
     setOpenedContext({ conversationId: selected.id, contextId });
     return true;
   }, [selected]);
@@ -1503,6 +1889,19 @@ export default function AgentWorkspaceShell() {
                     </select>
                   </label>
                 </div>
+                <div className="agent-view-toggle" role="group" aria-label={t('agent.view.label')}>
+                  {(['simple', 'full'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`agent-view-toggle-button${viewMode === mode ? ' is-selected' : ''}`}
+                      aria-pressed={viewMode === mode}
+                      onClick={() => setViewMode(mode)}
+                    >
+                      {t(`agent.view.${mode}`)}
+                    </button>
+                  ))}
+                </div>
                 {pendingDeleteId === selected.id ? (
                   <div className="agent-conversation-actions">
                     <button
@@ -1535,20 +1934,13 @@ export default function AgentWorkspaceShell() {
                 )}
               </header>
 
-              <section className="agent-context" aria-label={t('agent.context.title')}>
-                <h3 className="agent-subheading">{t('agent.context.title')}</h3>
-                <ContextShelf
-                  conversation={selected}
-                  onRemove={removeContext}
-                  onItemRef={registerContextItem}
-                  openedContextId={openedContext?.conversationId === selected.id
-                    ? openedContext.contextId
-                    : null}
-                  disabled={blocked}
-                />
-              </section>
-
-              {selected.messages.length === 0 ? (
+              <div
+                className={`agent-conversation-workspace${inspectorExpanded
+                  ? ' is-inspector-expanded'
+                  : ' is-inspector-collapsed'}`}
+              >
+                <div className="agent-conversation-main">
+                {selected.messages.length === 0 ? (
                 <p className="agent-placeholder">{t('agent.conversation.empty')}</p>
               ) : (
                 <>
@@ -1568,6 +1960,9 @@ export default function AgentWorkspaceShell() {
                         <MessageRow
                           key={message.id}
                           conversation={selected}
+                          approvalContext={approvalContext}
+                          operationLog={operationLog}
+                          onAppendOperation={appendOperation}
                           onOpenContext={openContext}
                           onRecord={(cardId, actionId, effect, event) => recordTimeline(
                             selected.id,
@@ -1589,8 +1984,6 @@ export default function AgentWorkspaceShell() {
                   </ul>
                 </>
               )}
-
-              <ActivityTimeline entries={agentTimelineForConversation(timeline, selected.id)} />
 
               {executing && !hasPersistedRunningExchange ? (
                 <div className="agent-live-exchange" role="status" aria-live="polite">
@@ -1615,14 +2008,14 @@ export default function AgentWorkspaceShell() {
               ) : null}
 
               <form className="agent-composer" onSubmit={submitPrompt}>
-                <div className="agent-composer-options">
+                <div className="agent-composer-options" hidden={viewMode === 'simple'}>
                   <label className="agent-field">
                     <span>{t('agent.execute.provider')}</span>
                     <select
                       value={target}
                       onChange={(event) => {
                         setTarget(event.target.value as AgentTargetChoice);
-                        setCloudAttachmentConsent(false);
+                        setCloudSensitiveConsent(false);
                       }}
                       disabled={blocked}
                     >
@@ -1650,6 +2043,53 @@ export default function AgentWorkspaceShell() {
                     </label>
                   ) : null}
                 </div>
+
+                <details className="agent-execution-limits" hidden={viewMode === 'simple'}>
+                  <summary>{t('agent.execute.limits')}</summary>
+                  <div className="agent-execution-limit-grid">
+                    <label className="agent-field agent-budget-field">
+                      <span>{t('agent.execute.inputBudget')}</span>
+                      <input
+                        type="number"
+                        min={AGENT_EXECUTION_INPUT_BUDGET_MIN}
+                        max={AGENT_EXECUTION_INPUT_BUDGET_MAX}
+                        step={1}
+                        value={maxInputChars}
+                        onChange={(event) => setMaxInputChars(clampAgentExecutionBudget(
+                          event.currentTarget.valueAsNumber,
+                          AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
+                          AGENT_EXECUTION_INPUT_BUDGET_MIN,
+                          AGENT_EXECUTION_INPUT_BUDGET_MAX,
+                        ))}
+                        disabled={blocked}
+                      />
+                    </label>
+                    <label className="agent-field agent-budget-field">
+                      <span>{t('agent.execute.outputBudget')}</span>
+                      <input
+                        type="number"
+                        min={AGENT_EXECUTION_OUTPUT_BUDGET_MIN}
+                        max={AGENT_EXECUTION_OUTPUT_BUDGET_MAX}
+                        step={1}
+                        value={maxOutputTokens}
+                        onChange={(event) => setMaxOutputTokens(clampAgentExecutionBudget(
+                          event.currentTarget.valueAsNumber,
+                          AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
+                          AGENT_EXECUTION_OUTPUT_BUDGET_MIN,
+                          AGENT_EXECUTION_OUTPUT_BUDGET_MAX,
+                        ))}
+                        disabled={blocked}
+                      />
+                    </label>
+                  </div>
+                  <p className="agent-budget-usage">
+                    {t('agent.execute.inputUsage', {
+                      count: knownInputChars,
+                      limit: maxInputChars,
+                    })}
+                  </p>
+                  <p className="agent-budget-note">{t('agent.execute.inputBudgetNote')}</p>
+                </details>
 
                 {target !== 'local' ? (
                   <p className="agent-cloud-notice">
@@ -1718,17 +2158,19 @@ export default function AgentWorkspaceShell() {
                   </p>
                 ) : null}
 
-                {attachmentConsentRequired ? (
+                {sensitiveConsentRequired ? (
                   <label className="agent-check agent-attachment-consent">
                     <input
                       type="checkbox"
-                      checked={cloudAttachmentConsent}
-                      onChange={(event) => setCloudAttachmentConsent(event.target.checked)}
+                      checked={cloudSensitiveConsent}
+                      onChange={(event) => setCloudSensitiveConsent(event.target.checked)}
                       disabled={blocked || attachmentReading}
                     />
-                    <span>{t('agent.attachment.cloudConsent', { provider: target })}</span>
+                    <span>{t('agent.execute.sensitiveConsent', { provider: target })}</span>
                   </label>
                 ) : null}
+
+                <AgentContextSuggestions conversation={selected} onUse={(text) => setDraft(text)} />
 
                 <label className="agent-prompt-label">
                   <span className="sr-only">{t('agent.execute.prompt')}</span>
@@ -1748,6 +2190,35 @@ export default function AgentWorkspaceShell() {
                   </p>
                 ) : null}
 
+                {knownInputOverBudget ? (
+                  <p className="agent-message-error" role="alert">
+                    {t('agent.execute.inputOverBudget', { limit: maxInputChars })}
+                  </p>
+                ) : null}
+
+                {planObjectiveTooLong ? (
+                  <p className="agent-message-error" role="alert">
+                    {t('agent.plan.error.invalid-objective')}
+                  </p>
+                ) : null}
+
+                {attachments.length > 0 ? (
+                  <p className="agent-plan-notice">
+                    {t('agent.plan.attachmentsUnsupported')}
+                  </p>
+                ) : null}
+
+                {planNotice ? (
+                  <p
+                    className={planNotice.kind === 'error'
+                      ? 'agent-message-error agent-plan-notice'
+                      : 'agent-plan-notice'}
+                    role={planNotice.kind === 'error' ? 'alert' : 'status'}
+                  >
+                    {planNotice.text}
+                  </p>
+                ) : null}
+
                 <div className="agent-composer-actions">
                   {executing ? (
                     <button
@@ -1758,19 +2229,39 @@ export default function AgentWorkspaceShell() {
                       {t('agent.execute.cancel')}
                     </button>
                   ) : (
-                    <button
-                      type="submit"
-                      className="agent-action agent-action-primary"
-                      disabled={
-                        busy
-                        || attachmentReading
-                        || draft.trim().length === 0
-                        || (attachmentConsentRequired && !cloudAttachmentConsent)
-                      }
-                    >
-                      <Icon name="chat" size={15} />
-                      {t('agent.execute.send')}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="agent-action agent-plan-create"
+                        disabled={
+                          busy
+                          || planning
+                          || attachmentReading
+                          || attachments.length > 0
+                          || draft.trim().length === 0
+                          || planObjectiveTooLong
+                        }
+                        onClick={() => void createPlan()}
+                      >
+                        <Icon name="sparkle" size={15} />
+                        {planning ? t('agent.plan.planning') : t('agent.plan.create')}
+                      </button>
+                      <button
+                        type="submit"
+                        className="agent-action agent-action-primary"
+                        disabled={
+                          busy
+                          || planning
+                          || attachmentReading
+                          || draft.trim().length === 0
+                          || knownInputOverBudget
+                          || (sensitiveConsentRequired && !cloudSensitiveConsent)
+                        }
+                      >
+                        <Icon name="chat" size={15} />
+                        {t('agent.execute.send')}
+                      </button>
+                    </>
                   )}
                 </div>
               </form>
@@ -1779,6 +2270,83 @@ export default function AgentWorkspaceShell() {
                 <p>{t('agent.notice.scope')}</p>
                 <p>{t('agent.notice.retention')}</p>
               </footer>
+                </div>
+
+                <aside
+                  className={`agent-inspector${inspectorExpanded ? '' : ' is-collapsed'}`}
+                  aria-label={t('agent.inspector.title')}
+                >
+                  <button
+                    type="button"
+                    className="agent-inspector-toggle"
+                    aria-expanded={inspectorExpanded}
+                    aria-controls={inspectorContentId}
+                    aria-label={t(inspectorExpanded
+                      ? 'agent.inspector.collapse'
+                      : 'agent.inspector.expand')}
+                    onClick={() => setInspectorExpanded((expanded) => !expanded)}
+                  >
+                    <Icon name="chevron" size={14} className="agent-inspector-chevron" flat />
+                    <span className="agent-inspector-toggle-label">
+                      {t('agent.inspector.title')}
+                    </span>
+                  </button>
+                  <div
+                    id={inspectorContentId}
+                    className="agent-inspector-content"
+                    hidden={!inspectorExpanded}
+                  >
+                    <section className="agent-context" aria-label={t('agent.context.title')}>
+                      <h3 className="agent-subheading">{t('agent.context.title')}</h3>
+                      <ContextShelf
+                        conversation={selected}
+                        onRemove={removeContext}
+                        onItemRef={registerContextItem}
+                        openedContextId={openedContext?.conversationId === selected.id
+                          ? openedContext.contextId
+                          : null}
+                        disabled={blocked}
+                      />
+                    </section>
+                    <div className="agent-full-inspector" hidden={viewMode === 'simple'}>
+                      <button
+                        type="button"
+                        className="agent-action agent-prompt-library-open"
+                        aria-expanded={promptLibraryExpanded}
+                        onClick={() => setPromptLibraryExpanded((expanded) => !expanded)}
+                      >
+                        {t('agent.promptLibrary.title')}
+                      </button>
+                      {promptLibraryExpanded ? (
+                        <AgentPromptLibrary onUse={(text) => setDraft(text)} />
+                      ) : null}
+                      <button
+                        type="button"
+                        className="agent-action agent-capability-open"
+                        aria-expanded={capabilitiesExpanded}
+                        onClick={() => setCapabilitiesExpanded((expanded) => !expanded)}
+                      >
+                        {t('agent.capabilities.title')}
+                      </button>
+                      {capabilitiesExpanded ? <AgentCapabilityDirectory /> : null}
+                      <AgentConversationPlanQueue
+                        conversationId={selected.id}
+                        queue={approvalContext?.queue ?? null}
+                        disabled={blocked}
+                        onFailure={setPlanQueueFailure}
+                        onTimeline={recordTimelineProjection}
+                        onOperation={appendOperation}
+                      />
+                      {planQueueFailure ? (
+                        <p className="agent-plan-error" role="alert">
+                          {t(`agent.plan.queue.error.${planQueueFailure}`)}
+                        </p>
+                      ) : null}
+                      <ActivityTimeline entries={agentTimelineForConversation(timeline, selected.id)} />
+                    </div>
+                  </div>
+                </aside>
+              </div>
             </article>
           ) : null}
         </div>

@@ -37,6 +37,7 @@ export type AgentToolOperationId =
   | 'flashcard.list-decks'
   | 'flashcard.create-deck'
   | 'flashcard.add-cards'
+  | 'flashcard.delete-cards'
   | 'flashcard.modify-cards'
   | 'flashcard.schedule-reviews'
   | 'flashcard.delete-deck'
@@ -104,6 +105,7 @@ const REQUIRED_ARGUMENTS: Partial<Record<AgentToolOperationId, readonly string[]
   'media.delete-item': ['id'],
   'flashcard.create-deck': ['name'],
   'flashcard.add-cards': ['cards'],
+  'flashcard.delete-cards': ['ids'],
   'flashcard.modify-cards': ['id', 'patch'],
   'flashcard.delete-deck': ['name'],
   'study.prepare-media': ['mediaId'],
@@ -178,6 +180,7 @@ export const AGENT_TOOL_OPERATIONS: readonly AgentToolOperationDefinition[] = [
   operation('flashcard.list-decks', 'flashcard', 'List flashcard decks', 'read-only'),
   operation('flashcard.create-deck', 'flashcard', 'Create a flashcard deck', 'limited-actions'),
   operation('flashcard.add-cards', 'flashcard', 'Add flashcards', 'limited-actions'),
+  operation('flashcard.delete-cards', 'flashcard', 'Delete flashcards', 'limited-actions', 'delete-data'),
   operation('flashcard.modify-cards', 'flashcard', 'Modify flashcards', 'limited-actions'),
   operation('flashcard.schedule-reviews', 'flashcard', 'Schedule reviews', 'limited-actions'),
   operation('flashcard.delete-deck', 'flashcard', 'Delete a flashcard deck', 'full-automation', 'delete-data'),
@@ -532,6 +535,19 @@ export interface AgentExecutionEvent {
 export interface AgentExecutionResult {
   task: AgentTask;
   events: AgentExecutionEvent[];
+  /**
+   * Authorization declined before the step started.
+   *
+   * This is deliberately not represented as a failed task. A queued plan can
+   * outlive the profile that created it; narrowing that profile declines the
+   * next attempted step, but it does not mean the tool ran and failed. Keeping
+   * the original task and an empty event list also prevents a refusal from
+   * manufacturing `tool-started` audit history.
+   */
+  refusal?: {
+    code: 'operation-denied';
+    reason: string;
+  };
 }
 
 export interface AgentExecutionOptions {
@@ -580,35 +596,24 @@ export async function executeAgentTaskStep(
     };
   }
 
+  if (access.status === 'denied') {
+    return {
+      task,
+      events: [],
+      refusal: {
+        code: 'operation-denied',
+        reason: access.reason,
+      },
+    };
+  }
+
   const startedAt = now();
-  let runningTask = updateAgentTask(task, { type: 'start-step', stepId }, startedAt);
+  const runningTask = updateAgentTask(task, { type: 'start-step', stepId }, startedAt);
   const startedEvent: AgentExecutionEvent = {
     ...eventBase,
     type: 'tool-started',
     timestamp: startedAt,
   };
-  if (access.status === 'denied') {
-    const failedAt = now();
-    runningTask = updateAgentTask(
-      runningTask,
-      { type: 'fail-step', stepId, error: access.reason },
-      failedAt,
-    );
-    return {
-      task: runningTask,
-      events: [
-        startedEvent,
-        {
-          ...eventBase,
-          type: 'tool-failed',
-          timestamp: failedAt,
-          durationMs: Math.max(0, failedAt - startedAt),
-          error: access.reason,
-        },
-      ],
-    };
-  }
-
   const handler = options.handlers[step.request.operation];
   if (!handler) {
     const failedAt = now();

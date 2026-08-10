@@ -47,6 +47,16 @@ import {
   type AgentQueueStatus,
   type AgentTaskQueue,
 } from '../shared/localAgentTaskQueue';
+import type {
+  AgentExecutionLeaseAction,
+  AgentExecutionLeaseFailureCode,
+} from '../shared/agentExecutionLeaseBridge';
+import {
+  acquireAgentExecutionLease,
+  commitAgentExecutionLease,
+  keepAgentExecutionLeaseAlive,
+  releaseAgentExecutionLease,
+} from './agentExecutionLeaseClient';
 
 /** `next` is what *Run next approved step* runs; `confirm` is what *Confirm sensitive step* runs. */
 export type AgentStepPick = 'next' | 'confirm';
@@ -71,13 +81,37 @@ export interface AgentQueueRunOptions {
   allowedOperations: readonly AgentToolOperationId[] | undefined;
   handlers: AgentToolHandlers;
   confirmedCallIds?: ReadonlySet<string>;
+  /** Explicit only for a failed-task retry, whose executable task is a derived snapshot. */
+  leaseAction?: AgentExecutionLeaseAction;
+  /** Test seam; production always uses the main-owned bridge client below. */
+  leaseClient?: AgentQueueExecutionLeaseClient;
   now?: () => number;
 }
+
+export interface AgentQueueExecutionLeaseClient {
+  acquire: typeof acquireAgentExecutionLease;
+  keepAlive: typeof keepAgentExecutionLeaseAlive;
+  commit: typeof commitAgentExecutionLease;
+  release: typeof releaseAgentExecutionLease;
+}
+
+const MAIN_EXECUTION_LEASE_CLIENT: AgentQueueExecutionLeaseClient = {
+  acquire: acquireAgentExecutionLease,
+  keepAlive: keepAgentExecutionLeaseAlive,
+  commit: commitAgentExecutionLease,
+  release: releaseAgentExecutionLease,
+};
 
 export interface AgentQueueRunResult {
   queue: AgentTaskQueue;
   task: AgentTask;
   events: AgentExecutionEvent[];
+  refusal?: {
+    code: 'operation-denied';
+    reason: string;
+  };
+  leaseRefusal?: { code: AgentExecutionLeaseFailureCode };
+  leaseCommitFailure?: { code: AgentExecutionLeaseFailureCode };
 }
 
 export function pendingAgentTaskStep(task: AgentTask, pick: AgentStepPick): AgentTaskStep | null {
@@ -134,15 +168,18 @@ export function selectAgentQueueRun(queue: AgentTaskQueue, id?: string): AgentQu
     ? nextRunnableAgentQueueItem(queue)
     : queue.items.find((candidate) => candidate.id === id) ?? null;
   if (!item) return { ok: false, reason: id === undefined ? 'no-runnable-item' : 'item-not-found' };
-  if (item.status !== 'queued') return { ok: false, reason: 'item-not-runnable' };
+  if (item.status !== 'queued' || item.execution) {
+    return { ok: false, reason: 'item-not-runnable' };
+  }
   const step = pendingAgentTaskStep(item.task, 'next');
   if (!step) return { ok: false, reason: 'no-pending-step' };
   return { ok: true, item, step };
 }
 
 /**
- * Run one step and write the outcome back onto the queue, so a refusal or a completion survives
- * the session that produced it instead of living only in component state.
+ * Run one step and write an actual execution outcome back onto the queue.
+ * Authorization refusal is different: no step started, so the original task
+ * and queue are returned rather than persisting a fictional failed run.
  */
 export async function runAgentTaskStep(
   queue: AgentTaskQueue,
@@ -150,17 +187,73 @@ export async function runAgentTaskStep(
   step: AgentTaskStep,
   options: AgentQueueRunOptions,
 ): Promise<AgentQueueRunResult> {
-  const result = await executeAgentTaskStep(task, step.id, {
-    permission: options.permission,
-    // Re-checked at EXECUTION, not only when the plan was built: a queued task outlives the
-    // profile that authorized it, and since slice 51 such a task can genuinely be run.
-    allowedOperations: options.allowedOperations,
-    handlers: options.handlers,
-    ...(options.confirmedCallIds ? { confirmedCallIds: options.confirmedCallIds } : {}),
-    ...(options.now ? { now: options.now } : {}),
+  const expectedItem = queue.items.find((item) => item.id === task.id);
+  if (!expectedItem) {
+    return {
+      queue,
+      task,
+      events: [],
+      leaseRefusal: { code: 'task-not-found' },
+    };
+  }
+  const action = options.leaseAction
+    ?? (options.confirmedCallIds?.has(step.request.callId) ? 'confirm' : 'run-next');
+  const leaseClient = options.leaseClient ?? MAIN_EXECUTION_LEASE_CLIENT;
+  const acquired = await leaseClient.acquire({
+    taskId: expectedItem.id,
+    origin: expectedItem.origin ?? null,
+    stepId: step.id,
+    callId: step.request.callId,
+    action,
+    expectedStatus: expectedItem.status,
+    expectedUpdatedAt: expectedItem.updatedAt,
+    expectedTask: expectedItem.task,
+    ...(action === 'confirm' ? { confirmedCallId: step.request.callId } : {}),
   });
+  if (!acquired.ok) {
+    return { queue, task, events: [], leaseRefusal: { code: acquired.code } };
+  }
+  const stopRenewing = leaseClient.keepAlive(expectedItem.id, acquired.token);
+  let result: Awaited<ReturnType<typeof executeAgentTaskStep>>;
+  try {
+    result = await executeAgentTaskStep(task, step.id, {
+      permission: options.permission,
+      // Re-checked at EXECUTION, not only when the plan was built: a queued task outlives the
+      // profile that authorized it, and since slice 51 such a task can genuinely be run.
+      allowedOperations: options.allowedOperations,
+      handlers: options.handlers,
+      ...(options.confirmedCallIds ? { confirmedCallIds: options.confirmedCallIds } : {}),
+      ...(options.now ? { now: options.now } : {}),
+    });
+  } catch (error) {
+    stopRenewing();
+    throw error;
+  }
+  if (result.refusal) {
+    stopRenewing();
+    // `executeAgentTaskStep` returns a refusal before resolving a handler. This
+    // is the only safe release path; all uncertain post-start failures remain
+    // durably `running` for explicit recovery.
+    await leaseClient.release(expectedItem.id, acquired.token);
+    return {
+      queue,
+      task,
+      events: [],
+      refusal: result.refusal,
+    };
+  }
+  stopRenewing();
+  const committed = await leaseClient.commit(expectedItem.id, acquired.token, result.task);
+  if (!committed.ok) {
+    return {
+      queue: acquired.state.queue,
+      task: result.task,
+      events: result.events,
+      leaseCommitFailure: { code: committed.code },
+    };
+  }
   return {
-    queue: applyAgentRunToQueue(queue, result.task),
+    queue: committed.state.queue,
     task: result.task,
     events: result.events,
   };

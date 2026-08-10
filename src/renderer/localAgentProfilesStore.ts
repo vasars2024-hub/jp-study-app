@@ -8,6 +8,7 @@ import {
 import type { AgentToolOperationId } from '../shared/localAgent';
 
 const STORAGE_KEY = 'jp-study-local-agent-profiles-v1';
+const CHANGED_EVENT = 'jp-study-local-agent-profiles-changed';
 let fallback: AgentProfileStore = normalizeAgentProfiles(EMPTY_AGENT_PROFILE_STORE);
 
 export function loadLocalAgentProfiles(): AgentProfileStore {
@@ -27,8 +28,42 @@ export function saveLocalAgentProfiles(store: AgentProfileStore): AgentProfileSt
   } catch {
     // The current session still uses the normalized profile store.
   }
-  window.dispatchEvent(new CustomEvent('jp-study-local-agent-profiles-changed', { detail: fallback }));
+  window.dispatchEvent(new CustomEvent(CHANGED_EVENT, { detail: fallback }));
   return fallback;
+}
+
+/**
+ * Observes profile edits in this renderer and in sibling Electron windows.
+ *
+ * A same-window `localStorage` write does not emit the native `storage` event,
+ * while that event is the only notification a different window receives. The
+ * custom event and the native event are therefore complementary, not duplicate
+ * paths. Native payloads are normalized before they replace the module cache so
+ * the next synchronous reader sees the same profile store as the listener.
+ */
+export function onLocalAgentProfilesChanged(
+  listener: (store: AgentProfileStore) => void,
+): () => void {
+  const onChanged = (event: Event): void => {
+    listener((event as CustomEvent<AgentProfileStore>).detail);
+  };
+  const onStorage = (event: StorageEvent): void => {
+    if (event.key !== STORAGE_KEY) return;
+    try {
+      fallback = event.newValue
+        ? normalizeAgentProfiles(JSON.parse(event.newValue))
+        : normalizeAgentProfiles(EMPTY_AGENT_PROFILE_STORE);
+    } catch {
+      fallback = normalizeAgentProfiles(EMPTY_AGENT_PROFILE_STORE);
+    }
+    listener(fallback);
+  };
+  window.addEventListener(CHANGED_EVENT, onChanged);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(CHANGED_EVENT, onChanged);
+    window.removeEventListener('storage', onStorage);
+  };
 }
 
 /**

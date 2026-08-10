@@ -52,7 +52,14 @@ export type AgentTimelineStatus =
  * it here before it has a gate would put a claim in the record that nothing
  * checked.
  */
-export type AgentTimelineEffect = 'navigate' | 'approve-step' | 'save';
+export type AgentTimelineEffect =
+  | 'navigate'
+  | 'approve-step'
+  | 'save'
+  | 'undo'
+  | 'execute-step'
+  | 'plan-control'
+  | 'plan-save';
 
 export interface AgentTimelineTarget {
   conversationId: string;
@@ -60,6 +67,11 @@ export interface AgentTimelineTarget {
   cardId: string;
   actionId: string;
   effect: AgentTimelineEffect;
+  /** Exact plan provenance; absent for message-card actions. */
+  taskId?: string;
+  stepId?: string;
+  callId?: string;
+  operation?: import('./localAgent').AgentToolOperationId;
 }
 
 export interface AgentTimelineEntry extends AgentTimelineTarget {

@@ -12,11 +12,12 @@ import { sanitizeCustomCss } from '../shared/blancCustomCss';
 import { loadLocalAgentMemory } from './localAgentMemoryStore';
 import { loadLocalAgentSettings, saveLocalAgentSettings } from './localAgentSettingsStore';
 import {
-  addDeckCards,
+  addDeckCardsTracked,
   createDeckFolder,
   deleteDeckFolder,
   loadDeck,
   loadDeckFolders,
+  removeDeckCards,
   updateDeckCard,
   type DeckFlashcard,
 } from './flashcardDeck';
@@ -143,9 +144,15 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
       });
     },
     'flashcard.list-decks': () => ({ folders: loadDeckFolders(), cards: loadDeck().length }),
-    'flashcard.create-deck': (arguments_) => ({
-      folders: createDeckFolder(textArgument(t, arguments_, 'name')),
-    }),
+    'flashcard.create-deck': (arguments_) => {
+      const name = textArgument(t, arguments_, 'name');
+      const existed = loadDeckFolders().includes(name);
+      const folders = createDeckFolder(name);
+      return {
+        folders,
+        ...(!existed && folders.includes(name) ? { createdName: name } : {}),
+      };
+    },
     'flashcard.add-cards': (arguments_) => {
       if (!Array.isArray(arguments_.cards) || arguments_.cards.length < 1) {
         throw new Error(t('blanc.agent.error.needsCards'));
@@ -162,7 +169,26 @@ export function createCentralAgentToolRegistry(t: AgentToolRegistryTranslate): A
           folder: typeof card.folder === 'string' ? card.folder.slice(0, 120) : undefined,
         };
       });
-      return { cards: addDeckCards(cards).length };
+      const created = addDeckCardsTracked(cards);
+      return {
+        cards: loadDeck().length,
+        createdIds: created.map((card) => card.id),
+      };
+    },
+    'flashcard.delete-cards': (arguments_) => {
+      if (!Array.isArray(arguments_.ids)) {
+        throw new Error(t('blanc.agent.error.needsArgument', { name: 'ids' }));
+      }
+      const ids = [...new Set(arguments_.ids
+        .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+        .map((value) => value.trim()))].slice(0, 50);
+      if (!ids.length) throw new Error(t('blanc.agent.error.needsArgument', { name: 'ids' }));
+      const before = loadDeck();
+      const existing = new Set(before.map((card) => card.id));
+      if (ids.some((id) => !existing.has(id))) {
+        throw new Error(t('blanc.agent.error.cardNotFound'));
+      }
+      return { cards: removeDeckCards(ids).length, removed: ids.length };
     },
     'flashcard.modify-cards': (arguments_) => ({
       cards: updateDeckCard(

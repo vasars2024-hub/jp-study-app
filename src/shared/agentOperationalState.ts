@@ -18,11 +18,11 @@
  *    truncated the whole document, and completed queue rows accumulated forever
  *    until the 100-item cap silently dropped the oldest.
  *
- * So the three become one versioned main-owned document. They stay three
- * *sections* rather than being merged into one list: they have genuinely
+ * So the three become one versioned main-owned document. They stay separate
+ * *sections* rather than being merged into one list, joined by the Agent's
+ * small cross-window suggestion-preference section: they have genuinely
  * different lifetimes (a queue row is transient, a memory entry is long-lived,
- * an automation is a user-authored schedule) and three separate normalizers that
- * already exist and are already tested.
+ * an automation is a user-authored schedule) and dedicated normalizers.
  *
  * Nothing here decides *authorization*. Whether a queued step may run is still
  * re-checked at execution time by `evaluateAgentToolAccess`, reached through
@@ -42,6 +42,11 @@ import {
   normalizeAgentAutomations,
   type AgentAutomation,
 } from './localAgentAutomation';
+import {
+  DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES,
+  normalizeAgentContextSuggestionPreferences,
+  type AgentContextSuggestionPreferences,
+} from './agentContextSuggestions';
 
 export const AGENT_OPERATIONAL_SCHEMA_VERSION = 1;
 
@@ -50,6 +55,8 @@ export interface AgentOperationalState {
   queue: AgentTaskQueue;
   memory: AgentMemoryStore;
   automations: AgentAutomation[];
+  /** Main-owned, cross-window preferences for inert context suggestion chips. */
+  suggestions?: AgentContextSuggestionPreferences;
   /**
    * When the one-way `localStorage` adoption ran, or `null` if it never has.
    *
@@ -80,6 +87,9 @@ export function emptyAgentOperationalState(): AgentOperationalState {
     queue: { version: 1, items: [] },
     memory: { version: 1, entries: [] },
     automations: [],
+    suggestions: normalizeAgentContextSuggestionPreferences(
+      DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES,
+    ),
     legacyMigratedAt: null,
   };
 }
@@ -126,6 +136,7 @@ export function normalizeAgentOperationalState(input: unknown): AgentOperational
     queue: normalizeAgentTaskQueue(raw.queue),
     memory: normalizeAgentMemory(raw.memory),
     automations: normalizeAgentAutomations(raw.automations),
+    suggestions: normalizeAgentContextSuggestionPreferences(raw.suggestions),
     legacyMigratedAt: finiteTimestamp(raw.legacyMigratedAt),
   };
 }
@@ -170,6 +181,7 @@ export function adoptLegacyAgentOperationalState(
     ? state.automations
     : normalizeAgentAutomations(payload.automations);
   return {
+    ...state,
     version: AGENT_OPERATIONAL_SCHEMA_VERSION,
     queue,
     memory,

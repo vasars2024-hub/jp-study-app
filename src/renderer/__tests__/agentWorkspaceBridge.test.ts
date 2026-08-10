@@ -22,6 +22,7 @@ import {
   saveAgentWorkspace,
   updateAgentWorkspace,
 } from '../agentWorkspaceClient';
+import { agentWorkspaceWithPromptSaved } from '../agentPromptLibraryModel';
 
 const ROOT = resolve(__dirname, '..', '..', '..');
 const read = (relative: string): string => readFileSync(resolve(ROOT, relative), 'utf8');
@@ -210,6 +211,49 @@ describe('Agent workspace bridge consumption', () => {
       revision: 1,
       activeConversationId: null,
       conversations: [expect.objectContaining({ id: 'newer' })],
+    });
+  });
+
+  it('re-applies a prompt-library edit without erasing a prompt saved by another window', async () => {
+    const base = emptyAgentWorkspaceState();
+    const latest = {
+      ...base,
+      revision: 1,
+      prompts: [{
+        id: 'other-window',
+        title: 'Other window',
+        text: 'Already committed',
+        createdAt: 1,
+        updatedAt: 1,
+      }],
+    };
+    const posted: unknown[] = [];
+    stubApi({
+      agentWorkspaceSave: (state: unknown) => {
+        posted.push(state);
+        return Promise.resolve(posted.length === 1
+          ? { ok: false, code: 'conflict', state: latest }
+          : { ok: true, state: { ...(state as object), revision: 2 } });
+      },
+    });
+
+    const result = await updateAgentWorkspace(base, (current) => (
+      agentWorkspaceWithPromptSaved(current, {
+        id: 'this-window',
+        title: 'This window',
+        text: 'New reusable prompt',
+        now: 2,
+      })
+    ));
+
+    expect(result.ok).toBe(true);
+    expect(posted).toHaveLength(2);
+    expect(posted[1]).toMatchObject({
+      revision: 1,
+      prompts: [
+        expect.objectContaining({ id: 'this-window' }),
+        expect.objectContaining({ id: 'other-window' }),
+      ],
     });
   });
 

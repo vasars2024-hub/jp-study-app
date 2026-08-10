@@ -45,8 +45,33 @@ import {
   pendingAgentTaskStep,
   runAgentTaskStep,
   selectAgentQueueRun,
+  type AgentQueueExecutionLeaseClient,
 } from '../localAgentQueueRun';
 import { normalizeAgentOperationalState } from '../../shared/agentOperationalState';
+import type { AgentTaskQueue } from '../../shared/localAgentTaskQueue';
+
+function inMemoryLeaseClient(queue: AgentTaskQueue): AgentQueueExecutionLeaseClient {
+  return {
+    acquire: async () => ({
+      ok: true,
+      token: 'lease-test',
+      expiresAt: Date.now() + 30_000,
+      state: { version: 1, queue, memory: { version: 1, entries: [] }, automations: [], legacyMigratedAt: null },
+    }),
+    keepAlive: () => () => undefined,
+    release: async () => ({
+      ok: true,
+      state: { version: 1, queue, memory: { version: 1, entries: [] }, automations: [], legacyMigratedAt: null },
+    }),
+    commit: async (_taskId, _token, nextTask) => {
+      const committed = applyAgentRunToQueue(queue, nextTask);
+      return {
+        ok: true,
+        state: { version: 1, queue: committed, memory: { version: 1, entries: [] }, automations: [], legacyMigratedAt: null },
+      };
+    },
+  };
+}
 
 const REPO = resolve(__dirname, '../../..');
 const PANEL = 'src/renderer/components/blanc/BlancReadyToolPanels.tsx';
@@ -129,7 +154,9 @@ describe('the queue is reachable from production code', () => {
     // A queue ROW must reach the runner (an id is passed), and the runner must go through the
     // selector rather than setting `task` on its own.
     expect(/onClick=\{\(\) => void runQueued\(item\.id\)\}/.test(source)).toBe(true);
-    expect(/const runQueued[\s\S]{0,200}?selectAgentQueueRun\(taskQueue, id\)/.test(source)).toBe(true);
+    // Selection re-reads the main-owned snapshot at the click. React state is
+    // only the displayed copy and may lag a pause/cancel from another window.
+    expect(/const runQueued[\s\S]{0,300}?loadLocalAgentTaskQueue\(\)[\s\S]{0,100}?selectAgentQueueRun\(live, id\)/.test(source)).toBe(true);
   });
 
   it('keeps ONE execution boundary in the renderer, and it passes the allow-list', () => {
@@ -209,7 +236,28 @@ describe('selecting work out of the persisted queue', () => {
 describe('the allow-list still bites on the newly-runnable path', () => {
   const ALLOWED: readonly AgentToolOperationId[] = ['flashcard.create-deck'];
 
-  it('refuses a queued task whose operation the profile no longer enables', async () => {
+  it('never resolves a tool handler when main refuses the execution lease', async () => {
+    const queue = rehydrated(deleteDeckTask('lease-held'));
+    const selection = selectAgentQueueRun(queue, 'lease-held');
+    if (!selection.ok) throw new Error(`expected a runnable selection, got ${selection.reason}`);
+    const handler = vi.fn(() => ({ deleted: true }));
+    const leaseClient = inMemoryLeaseClient(queue);
+    leaseClient.acquire = async () => ({ ok: false, code: 'lease-held' });
+
+    const result = await runAgentTaskStep(queue, selection.item.task, selection.step, {
+      permission: 'full-automation',
+      allowedOperations: ['flashcard.delete-deck'],
+      handlers: { 'flashcard.delete-deck': handler },
+      confirmedCallIds: new Set(['call-lease-held']),
+      leaseClient,
+    });
+
+    expect(result.leaseRefusal).toEqual({ code: 'lease-held' });
+    expect(handler).not.toHaveBeenCalled();
+    expect(result.events).toEqual([]);
+  });
+
+  it('refuses a queued task before start when its operation is no longer enabled', async () => {
     // The cross-session case slice 47e was written for, now that it can actually arise: the
     // task was planned when the profile allowed `flashcard.delete-deck`, persisted, and is run
     // after the operation was removed from the profile. Permission is `full-automation` and the
@@ -219,19 +267,34 @@ describe('the allow-list still bites on the newly-runnable path', () => {
     if (!selection.ok) throw new Error(`expected a runnable selection, got ${selection.reason}`);
     const handler = vi.fn(() => ({ deleted: true }));
 
+    const now = vi.fn(() => 20);
     const result = await runAgentTaskStep(queue, selection.item.task, selection.step, {
       permission: 'full-automation',
       allowedOperations: ALLOWED,
       handlers: { 'flashcard.delete-deck': handler },
       confirmedCallIds: new Set(['call-stale']),
+      leaseClient: inMemoryLeaseClient(queue),
+      now,
     });
 
     expect(handler).not.toHaveBeenCalled();
-    expect(result.task.status).toBe('failed');
-    expect(result.task.steps[0].error).toMatch(/not enabled for the active agent profile/);
-    expect(result.events.map((event) => event.type)).toEqual(['tool-started', 'tool-failed']);
-    // and the refusal is persisted back onto the queue item, not just held in the component
-    expect(result.queue.items.find((item) => item.id === 'stale')?.status).toBe('failed');
+    expect(now).not.toHaveBeenCalled();
+    expect(result.task).toBe(selection.item.task);
+    expect(result.task).toMatchObject({ status: 'queued' });
+    expect(result.task.steps[0]).toMatchObject({ status: 'pending' });
+    expect(result.task.steps[0]).not.toHaveProperty('error');
+    expect(result.events).toEqual([]);
+    expect(result.refusal).toMatchObject({
+      code: 'operation-denied',
+      reason: expect.stringContaining('not enabled for the active agent profile'),
+    });
+    // A refusal is not an execution outcome. The persisted queue is returned
+    // byte-for-byte, so Run next and Run queued cannot turn a declined step
+    // into a failed plan.
+    expect(result.queue).toBe(queue);
+    expect(result.queue.items.find((item) => item.id === 'stale')).toEqual(
+      queue.items.find((item) => item.id === 'stale'),
+    );
   });
 
   it('runs a queued task whose operation the profile still enables', async () => {
@@ -253,6 +316,7 @@ describe('the allow-list still bites on the newly-runnable path', () => {
       permission: 'limited-actions',
       allowedOperations: ALLOWED,
       handlers: { 'flashcard.create-deck': handler },
+      leaseClient: inMemoryLeaseClient(queue),
     });
 
     expect(handler).toHaveBeenCalledTimes(1);
@@ -274,6 +338,7 @@ describe('the allow-list still bites on the newly-runnable path', () => {
       allowedOperations: undefined,
       handlers: { 'flashcard.delete-deck': handler },
       confirmedCallIds: new Set(['call-no-profile']),
+      leaseClient: inMemoryLeaseClient(queue),
     });
 
     expect(handler).toHaveBeenCalledTimes(1);
@@ -291,6 +356,7 @@ describe('the allow-list still bites on the newly-runnable path', () => {
       permission: 'full-automation',
       allowedOperations: ['flashcard.delete-deck'],
       handlers: { 'flashcard.delete-deck': handler },
+      leaseClient: inMemoryLeaseClient(queue),
     });
 
     expect(handler).not.toHaveBeenCalled();
@@ -340,11 +406,20 @@ describe('a task restored from main-owned persistence is still re-checked', () =
       allowedOperations: ['flashcard.create-deck'],
       handlers: { 'flashcard.delete-deck': handler },
       confirmedCallIds: new Set(['call-restored']),
+      leaseClient: inMemoryLeaseClient(queue),
     });
 
     expect(handler).not.toHaveBeenCalled();
-    expect(result.task.status).toBe('failed');
-    expect(result.task.steps[0].error).toMatch(/not enabled for the active agent profile/);
+    expect(result.task).toBe(selection.item.task);
+    expect(result.task.status).toBe('queued');
+    expect(result.task.steps[0]).toMatchObject({ status: 'pending' });
+    expect(result.task.steps[0]).not.toHaveProperty('error');
+    expect(result.events).toEqual([]);
+    expect(result.refusal).toMatchObject({
+      code: 'operation-denied',
+      reason: expect.stringContaining('not enabled for the active agent profile'),
+    });
+    expect(result.queue).toBe(queue);
   });
 });
 

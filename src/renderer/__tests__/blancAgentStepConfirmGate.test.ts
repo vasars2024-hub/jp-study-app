@@ -74,6 +74,19 @@ vi.mock('../localAgentQueueRun', async (importOriginal) => {
     runAgentTaskStep: (...args: unknown[]) => {
       runCalls.push(args);
       const task = args[1] as AgentTask;
+      const step = args[2] as AgentTask['steps'][number];
+      const options = args[3] as { allowedOperations?: readonly string[] };
+      if (options.allowedOperations && !options.allowedOperations.includes(step.request.operation)) {
+        return Promise.resolve({
+          queue: args[0],
+          task,
+          events: [],
+          refusal: {
+            code: 'operation-denied',
+            reason: `${step.request.operation} is not enabled for the active agent profile.`,
+          },
+        });
+      }
       return Promise.resolve({
         queue: args[0],
         task: {
@@ -90,9 +103,14 @@ vi.mock('../localAgentQueueRun', async (importOriginal) => {
 import { LocalAgentPanel } from '../components/blanc/BlancReadyToolPanels';
 import { resetAgentOperationalStateForTests } from '../agentOperationalClient';
 import { loadLocalAgentTaskQueue } from '../localAgentTaskQueueStore';
+import {
+  loadLocalAgentProfiles,
+  setLocalAgentProfileOperations,
+} from '../localAgentProfilesStore';
 import { en } from '../../shared/i18n/catalogs';
 
 const SETTINGS_KEY = 'jp-study-local-agent-settings-v1';
+const PROFILES_KEY = 'jp-study-local-agent-profiles-v1';
 
 /** A plan whose only step is sensitive, which is what the Confirm verb is for. */
 function plannedTask(): AgentTask {
@@ -149,6 +167,14 @@ beforeEach(() => {
     backend: 'local-gguf',
     permission: 'limited-actions',
   }));
+  // The store also keeps an in-memory fallback across tests. Supplying an
+  // explicit raw store makes each mount normalize from factory profiles again
+  // after the preceding parameterized case narrows one of them.
+  localStorage.setItem(PROFILES_KEY, JSON.stringify({
+    version: 1,
+    activeProfileId: 'study-tutor',
+    profiles: [],
+  }));
   vi.stubGlobal('api', {
     ...BOOT_API,
     onLocalAgentTrigger: () => () => undefined,
@@ -193,6 +219,16 @@ async function click(label: string): Promise<void> {
   await act(async () => {
     target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
+}
+
+async function disableOperation(operation: string): Promise<void> {
+  const target = container?.querySelector(`input[data-operation="${operation}"]`) as HTMLInputElement | null;
+  if (!target) throw new Error(`no operation checkbox for "${operation}"`);
+  expect(target.checked).toBe(true);
+  await act(async () => {
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  expect(target.checked).toBe(false);
 }
 
 function status(): string {
@@ -284,5 +320,75 @@ describe('Blanc confirm-step verb', () => {
     await click(english('blanc.agent.action.confirmStep'));
     expect(runCalls).toHaveLength(0);
     expect(status()).toBe(english('blanc.agent.approvalRefusal.operationDenied'));
+  });
+});
+
+describe('Blanc non-confirm run verbs', () => {
+  it.each([
+    ['run next', 'blanc.agent.action.runNext'],
+    ['run queued', 'blanc.agent.action.runQueued'],
+  ] as const)('renders a refusal and preserves the queue when %s loses profile access', async (_name, verb) => {
+    await planASensitiveStep();
+    const before = loadLocalAgentTaskQueue();
+
+    // The task was planned while Add flashcards was enabled. Narrow the live
+    // built-in profile after planning, then drive each ordinary run button.
+    await disableOperation('flashcard.add-cards');
+    await click(english(verb));
+
+    expect(runCalls).toHaveLength(1);
+    const options = runCalls[0][3] as { allowedOperations?: readonly string[] };
+    expect(options.allowedOperations).not.toContain('flashcard.add-cards');
+    expect(status()).toBe(english('blanc.agent.approvalRefusal.operationDenied'));
+    expect(loadLocalAgentTaskQueue()).toEqual(before);
+    expect(loadLocalAgentTaskQueue().items[0]?.task).toMatchObject({
+      status: 'waiting-confirmation',
+      steps: [expect.objectContaining({ status: 'waiting-confirmation' })],
+    });
+  });
+
+  it.each([
+    ['cancelled', 'common.cancel'],
+    ['paused', 'common.pause'],
+  ] as const)('Run next respects a live %s queue row instead of using its stale task copy', async (_status, stopVerb) => {
+    await planASensitiveStep();
+    await click(english(stopVerb));
+    const before = loadLocalAgentTaskQueue();
+
+    await click(english('blanc.agent.action.runNext'));
+
+    expect(runCalls).toHaveLength(0);
+    expect(status()).toBe(english('blanc.agent.refusal.itemNotRunnable'));
+    expect(loadLocalAgentTaskQueue()).toEqual(before);
+  });
+
+  it('re-reads a profile narrowed outside this mounted panel', async () => {
+    await planASensitiveStep();
+    const rendered = container?.querySelector(
+      'input[data-operation="flashcard.add-cards"]',
+    ) as HTMLInputElement | null;
+    expect(rendered?.checked).toBe(true);
+
+    // Simulate another window editing the shared renderer store. This panel
+    // intentionally still renders its old checkbox; execution must not use it
+    // as authority.
+    const store = loadLocalAgentProfiles();
+    const active = store.profiles.find((profile) => profile.id === store.activeProfileId);
+    if (!active) throw new Error('expected an active profile');
+    setLocalAgentProfileOperations(
+      store,
+      active.id,
+      active.enabledOperations.filter((operation) => operation !== 'flashcard.add-cards'),
+    );
+    expect(rendered?.checked).toBe(true);
+
+    const before = loadLocalAgentTaskQueue();
+    await click(english('blanc.agent.action.runNext'));
+
+    expect(runCalls).toHaveLength(1);
+    const options = runCalls[0][3] as { allowedOperations?: readonly string[] };
+    expect(options.allowedOperations).not.toContain('flashcard.add-cards');
+    expect(status()).toBe(english('blanc.agent.approvalRefusal.operationDenied'));
+    expect(loadLocalAgentTaskQueue()).toEqual(before);
   });
 });

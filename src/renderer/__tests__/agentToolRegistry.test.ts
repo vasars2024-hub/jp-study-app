@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../i18n', () => ({
   t: (key: string): string => key,
@@ -11,11 +11,14 @@ import {
   createCentralAgentToolRegistry,
   type AgentToolCapability,
 } from '../agentToolRegistry';
+import { addDeckCardsTracked, loadDeck } from '../flashcardDeck';
 
 const t = (key: string): string => key;
 const unavailableCapability = (
   entry: AgentToolCapability,
 ): entry is Extract<AgentToolCapability, { available: false }> => !entry.available;
+
+beforeEach(() => localStorage.clear());
 
 describe('central Agent tool registry', () => {
   it('classifies every declared operation as installed or explicitly unavailable', () => {
@@ -65,5 +68,45 @@ describe('central Agent tool registry', () => {
       .filter(unavailableCapability)
       .map((entry) => entry.reason)))
       .not.toContain('adapter-not-implemented');
+  });
+
+  it('deletes only the exact flashcard ids supplied to the inverse adapter', async () => {
+    const created = addDeckCardsTracked([{
+      word: '積ん読',
+      reading: 'つんどく',
+      meaning: 'unread books',
+      source: 'import',
+    }, {
+      word: '本',
+      reading: 'ほん',
+      meaning: 'book',
+      source: 'import',
+    }]);
+    const handler = createCentralAgentToolRegistry(t)['flashcard.delete-cards'];
+    expect(handler).toBeTypeOf('function');
+
+    await handler?.({ ids: [created[0].id] });
+
+    expect(loadDeck().map((card) => card.id)).toEqual([created[1].id]);
+    expect(() => handler?.({ ids: ['missing-card'] })).toThrow();
+    expect(loadDeck().map((card) => card.id)).toEqual([created[1].id]);
+  });
+
+  it('returns authoritative ids for newly created decks and cards', async () => {
+    const handlers = createCentralAgentToolRegistry(t);
+    const deck = await handlers['flashcard.create-deck']?.({ name: 'Tracked deck' });
+    expect(deck).toMatchObject({ createdName: 'Tracked deck' });
+
+    const duplicate = await handlers['flashcard.create-deck']?.({ name: 'Tracked deck' });
+    expect(duplicate).not.toHaveProperty('createdName');
+
+    const cards = await handlers['flashcard.add-cards']?.({
+      cards: [{ word: '記録', reading: 'きろく', meaning: 'record' }],
+    });
+    expect(cards).toMatchObject({ cards: 1 });
+    expect(cards).toHaveProperty('createdIds');
+    const createdIds = (cards as { createdIds: string[] }).createdIds;
+    expect(createdIds).toHaveLength(1);
+    expect(loadDeck().map((card) => card.id)).toContain(createdIds[0]);
   });
 });

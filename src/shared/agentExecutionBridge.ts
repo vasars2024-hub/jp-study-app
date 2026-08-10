@@ -103,6 +103,14 @@ export interface AgentExecutionCancelResult {
   cancelled: boolean;
 }
 
+/** Renderer-visible bounds for the two request budgets enforced again by main. */
+export const AGENT_EXECUTION_INPUT_BUDGET_MIN = 1;
+export const AGENT_EXECUTION_INPUT_BUDGET_MAX = 200_000;
+export const AGENT_EXECUTION_OUTPUT_BUDGET_MIN = 1;
+export const AGENT_EXECUTION_OUTPUT_BUDGET_MAX = 16_384;
+export const AGENT_EXECUTION_DEFAULT_INPUT_BUDGET = 50_000;
+export const AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET = 1_500;
+
 const CLOUD_PROVIDERS = new Set<AiProviderId>([
   'gemini-2.5-flash',
   'deepseek-v4-flash',
@@ -247,8 +255,18 @@ function normalizePolicy(value: unknown): AgentProviderPolicy | null {
     target: normalizedTarget,
     allowCloud: raw.allowCloud === true,
     allowSensitiveContext: raw.allowSensitiveContext === true,
-    maxInputChars: boundedInteger(raw.maxInputChars, 50_000, 1, 200_000),
-    maxOutputTokens: boundedInteger(raw.maxOutputTokens, 1_500, 1, 16_384),
+    maxInputChars: boundedInteger(
+      raw.maxInputChars,
+      AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
+      AGENT_EXECUTION_INPUT_BUDGET_MIN,
+      AGENT_EXECUTION_INPUT_BUDGET_MAX,
+    ),
+    maxOutputTokens: boundedInteger(
+      raw.maxOutputTokens,
+      AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
+      AGENT_EXECUTION_OUTPUT_BUDGET_MIN,
+      AGENT_EXECUTION_OUTPUT_BUDGET_MAX,
+    ),
     ...(maxEstimatedCostUsd !== undefined ? { maxEstimatedCostUsd } : {}),
     cache,
     retryAttempts: boundedInteger(raw.retryAttempts, 1, 0, 3),
@@ -267,8 +285,8 @@ export function defaultAgentExecutionPolicy(
       : { kind: 'cloud', providerId: target },
     allowCloud: !local,
     allowSensitiveContext: false,
-    maxInputChars: 50_000,
-    maxOutputTokens: 1_500,
+    maxInputChars: AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
+    maxOutputTokens: AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
     cache: 'off',
     retryAttempts: 1,
     timeoutMs: 120_000,

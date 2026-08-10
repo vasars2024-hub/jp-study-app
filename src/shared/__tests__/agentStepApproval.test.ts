@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AGENT_STEP_APPROVAL_IDLE,
   agentStepApprovalReduce,
-  pendingAgentStepApproval,
+  pendingAgentStepApprovalReference,
   resolveAgentQueuedStepApproval,
   resolveAgentStepApproval,
   type AgentStepApproval,
@@ -49,6 +49,7 @@ const queue = (over: Partial<AgentQueueItem> = {}): AgentTaskQueue => ({
   items: [{
     id: 'task-1',
     task: task(),
+    origin: { conversationId: 'chat-1', contextIds: ['ctx-1'] },
     priority: 0,
     status: 'running',
     createdAt: NOW,
@@ -56,6 +57,16 @@ const queue = (over: Partial<AgentQueueItem> = {}): AgentTaskQueue => ({
     ...over,
   }],
 });
+
+const approvalSource = (contextIds: readonly string[] = ['ctx-1']) => ({
+  conversationId: 'chat-1',
+  contextIds,
+});
+
+const pending = (
+  q: AgentTaskQueue = queue(),
+  source = approvalSource(),
+) => pendingAgentStepApprovalReference(q, source);
 
 const conversation = (
   effect: AgentResultEffect = { type: 'approve-step', taskId: 'task-1', stepId: 'step-1' },
@@ -146,6 +157,35 @@ describe('resolveAgentStepApproval', () => {
     ).toEqual({ ok: false, code: 'action-not-found' });
   });
 
+  it('fails closed on duplicate action coordinates regardless of their order', () => {
+    const base = conversation();
+    const message = base.messages[0];
+    const card = message.cards[0];
+    const first = card.actions[0];
+    const second = { ...first, label: 'A second malformed action with the same id' };
+    const malformed: AgentConversation = {
+      ...base,
+      messages: [{
+        ...message,
+        cards: [{ ...card, actions: [first, second] }],
+      }],
+    };
+
+    // No normalizer is involved here: a direct malformed state must not let
+    // either duplicate win merely because it appears first.
+    expect(resolve(malformed)).toEqual({ ok: false, code: 'action-not-found' });
+    expect(resolve({
+      ...malformed,
+      messages: [{
+        ...malformed.messages[0],
+        cards: [{
+          ...malformed.messages[0].cards[0],
+          actions: [...malformed.messages[0].cards[0].actions].reverse(),
+        }],
+      }],
+    })).toEqual({ ok: false, code: 'action-not-found' });
+  });
+
   it('refuses a card that declares no provenance rather than passing it', () => {
     const chat = conversation(
       { type: 'approve-step', taskId: 'task-1', stepId: 'step-1' },
@@ -200,6 +240,11 @@ describe('resolveAgentStepApproval', () => {
         currentStepId: 'step-0',
       }),
     });
+    expect(resolve(conversation(), q)).toEqual({ ok: false, code: 'step-not-current' });
+  });
+
+  it('refuses a waiting step when the task has no current step', () => {
+    const q = queue({ task: task({ currentStepId: undefined }) });
     expect(resolve(conversation(), q)).toEqual({ ok: false, code: 'step-not-current' });
   });
 
@@ -292,6 +337,14 @@ describe('resolveAgentQueuedStepApproval', () => {
     },
   );
 
+  it.each(['queued', 'running', 'completed', 'failed', 'cancelled'] as const)(
+    'refuses a structurally contradictory %s task status',
+    (status) => {
+      expect(resolveQueued(queue({ task: task({ status }) })))
+        .toEqual({ ok: false, code: 'task-not-runnable' });
+    },
+  );
+
   it('refuses a task the queue no longer holds', () => {
     expect(resolveQueued({ version: 1, items: [] })).toEqual({ ok: false, code: 'task-not-found' });
   });
@@ -319,6 +372,11 @@ describe('resolveAgentQueuedStepApproval', () => {
     expect(resolveQueued(q)).toEqual({ ok: false, code: 'step-not-current' });
   });
 
+  it('refuses a waiting step when currentStepId is absent', () => {
+    expect(resolveQueued(queue({ task: task({ currentStepId: undefined }) })))
+      .toEqual({ ok: false, code: 'step-not-current' });
+  });
+
   it('re-authorizes against the permission level and the allow-list as they are now', () => {
     expect(resolveQueued(queue(), 'read-only')).toEqual({ ok: false, code: 'operation-denied' });
     expect(resolveQueued(queue(), 'full-automation', ['flashcard.list-decks']))
@@ -327,14 +385,18 @@ describe('resolveAgentQueuedStepApproval', () => {
   });
 });
 
-describe('pendingAgentStepApproval', () => {
+describe('pendingAgentStepApprovalReference', () => {
   it('offers the step the task is actually waiting on', () => {
-    expect(pendingAgentStepApproval(queue())).toEqual({ taskId: 'task-1', stepId: 'step-1' });
+    expect(pending()).toEqual({
+      taskId: 'task-1',
+      stepId: 'step-1',
+      sourceContextIds: ['ctx-1'],
+    });
   });
 
   it('offers nothing when no step is waiting', () => {
     const q = queue({ task: task({ steps: [step({ status: 'running' })] }) });
-    expect(pendingAgentStepApproval(q)).toBeNull();
+    expect(pending(q)).toBeNull();
   });
 
   it('offers nothing when the waiting step is not the current one', () => {
@@ -344,13 +406,13 @@ describe('pendingAgentStepApproval', () => {
         currentStepId: 'step-0',
       }),
     });
-    expect(pendingAgentStepApproval(q)).toBeNull();
+    expect(pending(q)).toBeNull();
   });
 
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'offers nothing from a %s queue item',
     (status) => {
-      expect(pendingAgentStepApproval(queue({ status }))).toBeNull();
+      expect(pending(queue({ status }))).toBeNull();
     },
   );
 
@@ -358,18 +420,66 @@ describe('pendingAgentStepApproval', () => {
     // Kept in step with the gate on purpose. The producer's own docstring says
     // both sides ask the same questions; a producer that still offered a paused
     // row would put an approve button on screen that the gate always refuses.
-    expect(pendingAgentStepApproval(queue({ status: 'paused' }))).toBeNull();
+    expect(pending(queue({ status: 'paused' }))).toBeNull();
   });
 
-  it('agrees with the resolver — anything it offers, the gate accepts', () => {
-    const offered = pendingAgentStepApproval(queue());
-    if (!offered) throw new Error('the producer offered nothing to check the gate against');
-    const chat = conversation({
-      type: 'approve-step',
-      taskId: offered.taskId,
-      stepId: offered.stepId,
+  it.each(['queued', 'running', 'completed', 'failed', 'cancelled'] as const)(
+    'offers nothing from a task whose status is %s',
+    (status) => {
+      expect(pending(queue({ task: task({ status }) }))).toBeNull();
+    },
+  );
+
+  it('offers nothing when the task has no current step', () => {
+    expect(pending(queue({ task: task({ currentStepId: undefined }) })))
+      .toBeNull();
+  });
+
+  it.each([
+    ['originless', undefined],
+    ['wrong conversation', { conversationId: 'chat-other', contextIds: ['ctx-1'] }],
+    ['empty context', { conversationId: 'chat-1', contextIds: [] }],
+    ['disjoint context', { conversationId: 'chat-1', contextIds: ['ctx-other'] }],
+  ] satisfies Array<[string, AgentQueueItem['origin']]>) (
+    'offers nothing from an %s task origin',
+    (_name, origin) => {
+      expect(pending(queue({ origin }))).toBeNull();
+    },
+  );
+
+  it('requires an origin context to remain live and provider-disclosed', () => {
+    const q = queue({
+      origin: { conversationId: 'chat-1', contextIds: ['ctx-removed', 'ctx-live'] },
     });
-    expect(resolve(chat).ok).toBe(true);
+    expect(pending(q, approvalSource(['ctx-undisclosed']))).toBeNull();
+    expect(pending(q, approvalSource(['ctx-live']))).toEqual({
+      taskId: 'task-1',
+      stepId: 'step-1',
+      sourceContextIds: ['ctx-live'],
+    });
+  });
+
+  it('returns each matched origin id once and in task-origin order', () => {
+    const q = queue({
+      origin: {
+        conversationId: 'chat-1',
+        contextIds: ['ctx-two', 'ctx-one', 'ctx-two', 'ctx-hidden'],
+      },
+    });
+    expect(pending(q, approvalSource(['ctx-one', 'ctx-two']))).toMatchObject({
+      sourceContextIds: ['ctx-two', 'ctx-one'],
+    });
+  });
+
+  it('produces a structural reference that renderer authority may still deny', () => {
+    const offered = pending();
+    if (!offered) throw new Error('the producer offered nothing to check the gate against');
+    expect(resolveAgentQueuedStepApproval(
+      queue(),
+      offered.taskId,
+      offered.stepId,
+      'read-only',
+    )).toEqual({ ok: false, code: 'operation-denied' });
   });
 
   it('picks the approval that has been blocking longest, not the newest', () => {
@@ -377,8 +487,18 @@ describe('pendingAgentStepApproval', () => {
       version: 1,
       items: [
         {
+          id: 'task-unrelated-oldest',
+          task: task({ id: 'task-unrelated-oldest' }),
+          origin: { conversationId: 'chat-other', contextIds: ['ctx-1'] },
+          priority: 100,
+          status: 'queued',
+          createdAt: NOW - 5_000,
+          updatedAt: NOW - 5_000,
+        },
+        {
           id: 'task-new',
           task: task({ id: 'task-new' }),
+          origin: { conversationId: 'chat-1', contextIds: ['ctx-1'] },
           priority: 100,
           status: 'queued',
           createdAt: NOW + 5_000,
@@ -387,6 +507,7 @@ describe('pendingAgentStepApproval', () => {
         {
           id: 'task-old',
           task: task({ id: 'task-old' }),
+          origin: { conversationId: 'chat-1', contextIds: ['ctx-1'] },
           priority: 0,
           status: 'queued',
           createdAt: NOW,
@@ -397,9 +518,13 @@ describe('pendingAgentStepApproval', () => {
     // Priority orders what the runner does next; it does not order who has been
     // kept waiting. Only one approval is ever offered, so the choice must be
     // stable regardless of array order.
-    expect(pendingAgentStepApproval(q)).toEqual({ taskId: 'task-old', stepId: 'step-1' });
-    expect(pendingAgentStepApproval({ ...q, items: [...q.items].reverse() }))
-      .toEqual({ taskId: 'task-old', stepId: 'step-1' });
+    expect(pending(q)).toEqual({
+      taskId: 'task-old',
+      stepId: 'step-1',
+      sourceContextIds: ['ctx-1'],
+    });
+    expect(pending({ ...q, items: [...q.items].reverse() }))
+      .toEqual({ taskId: 'task-old', stepId: 'step-1', sourceContextIds: ['ctx-1'] });
   });
 });
 

@@ -16,8 +16,15 @@ const NOW = 1_700_000_000_000;
 let queue: AgentTaskQueue;
 let permission: string;
 let enabledOperations: string[];
+let availableOperations: string[];
 let runCalls: unknown[][];
 let saved: AgentTaskQueue[];
+let runnerRefuses: boolean;
+let queueListeners: Set<() => void>;
+let profileListeners: Set<() => void>;
+let settingsListeners: Set<() => void>;
+let operationalHydration: Promise<void>;
+let resolveOperationalHydration: () => void;
 
 vi.mock('../localAgentTaskQueueStore', () => ({
   loadLocalAgentTaskQueue: () => queue,
@@ -25,14 +32,30 @@ vi.mock('../localAgentTaskQueueStore', () => ({
     saved.push(next);
     return next;
   },
+  onLocalAgentTaskQueueChanged: (listener: () => void) => {
+    queueListeners.add(listener);
+    return () => queueListeners.delete(listener);
+  },
 }));
 
 vi.mock('../localAgentProfilesStore', () => ({
   loadLocalAgentProfiles: () => ({ version: 1, activeProfileId: 'p', profiles: [] }),
+  onLocalAgentProfilesChanged: (listener: () => void) => {
+    profileListeners.add(listener);
+    return () => profileListeners.delete(listener);
+  },
 }));
 
 vi.mock('../localAgentSettingsStore', () => ({
   loadLocalAgentSettings: () => ({ permission }),
+  onLocalAgentSettingsChanged: (listener: () => void) => {
+    settingsListeners.add(listener);
+    return () => settingsListeners.delete(listener);
+  },
+}));
+
+vi.mock('../agentOperationalClient', () => ({
+  initAgentOperationalState: () => operationalHydration,
 }));
 
 vi.mock('../../shared/localAgentProfiles', async (importOriginal) => ({
@@ -47,13 +70,24 @@ vi.mock('../../shared/localAgentProfiles', async (importOriginal) => ({
 
 vi.mock('../agentToolRegistry', () => ({
   createCentralAgentToolRegistry: () => ({}),
-  availableAgentToolOperationIds: () => ['flashcard.add-cards', 'flashcard.delete-deck'],
+  availableAgentToolOperationIds: () => availableOperations,
 }));
 
 vi.mock('../localAgentQueueRun', () => ({
   runAgentTaskStep: (...args: unknown[]) => {
     runCalls.push(args);
     const task = args[1] as { steps: { id: string; status: string }[] };
+    if (runnerRefuses) {
+      return Promise.resolve({
+        queue,
+        task,
+        events: [],
+        refusal: {
+          code: 'operation-denied',
+          reason: 'The operation was narrowed before execution.',
+        },
+      });
+    }
     return Promise.resolve({
       queue,
       task: { ...task, steps: task.steps.map((s) => ({ ...s, status: 'completed' })) },
@@ -63,7 +97,12 @@ vi.mock('../localAgentQueueRun', () => ({
   applyAgentRunToQueue: (q: AgentTaskQueue) => q,
 }));
 
-import { grantAgentStepApproval } from '../agentStepApprovalClient';
+import {
+  grantAgentStepApproval,
+  observeAgentStepApprovalContext,
+  readAgentStepApprovalContext,
+  type AgentStepApprovalContext,
+} from '../agentStepApprovalClient';
 
 const t = (key: string): string => key;
 
@@ -141,8 +180,107 @@ beforeEach(() => {
   queue = taskQueue();
   permission = 'full-automation';
   enabledOperations = ['flashcard.add-cards', 'flashcard.delete-deck'];
+  availableOperations = ['flashcard.add-cards', 'flashcard.delete-deck'];
   runCalls = [];
   saved = [];
+  runnerRefuses = false;
+  queueListeners = new Set();
+  profileListeners = new Set();
+  settingsListeners = new Set();
+  operationalHydration = new Promise<void>((resolve) => {
+    resolveOperationalHydration = resolve;
+  });
+});
+
+async function finishOperationalHydration(): Promise<void> {
+  resolveOperationalHydration();
+  await operationalHydration;
+  // The observer publishes from a `.then`, one microtask after the mocked
+  // hydration promise settles.
+  await Promise.resolve();
+}
+
+function emit(listeners: ReadonlySet<() => void>): void {
+  for (const listener of [...listeners]) listener();
+}
+
+describe('observeAgentStepApprovalContext', () => {
+  it('intersects the active profile allow-list with handlers installed in this renderer', () => {
+    availableOperations = ['flashcard.add-cards'];
+    expect(readAgentStepApprovalContext(t).allowedOperations).toEqual(['flashcard.add-cards']);
+  });
+
+  it('stays silent while the operational queue is hydrating, then publishes one fresh context', async () => {
+    const seen: AgentStepApprovalContext[] = [];
+    const stop = observeAgentStepApprovalContext(t, (context) => seen.push(context));
+
+    expect(seen).toEqual([]);
+    expect(queueListeners.size).toBe(1);
+    expect(profileListeners.size).toBe(1);
+    expect(settingsListeners.size).toBe(1);
+
+    // These values change after observation begins but before hydration lands.
+    // The first publication must read them now, not expose the pre-hydration
+    // empty queue or a context captured when the listeners were registered.
+    queue = { version: 1, items: [] };
+    permission = 'read-only';
+    enabledOperations = ['flashcard.add-cards'];
+    emit(queueListeners);
+    emit(profileListeners);
+    emit(settingsListeners);
+    expect(seen).toEqual([]);
+
+    await finishOperationalHydration();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].queue.items).toEqual([]);
+    expect(seen[0].permission).toBe('read-only');
+    expect(seen[0].allowedOperations).toEqual(['flashcard.add-cards']);
+    stop();
+  });
+
+  it('publishes a freshly read context for queue, settings, and profile changes', async () => {
+    const seen: AgentStepApprovalContext[] = [];
+    const stop = observeAgentStepApprovalContext(t, (context) => seen.push(context));
+    await finishOperationalHydration();
+    seen.length = 0;
+
+    queue = { version: 1, items: [] };
+    emit(queueListeners);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].queue.items).toEqual([]);
+
+    permission = 'confirmation-required';
+    emit(settingsListeners);
+    expect(seen).toHaveLength(2);
+    expect(seen[1].permission).toBe('confirmation-required');
+
+    enabledOperations = ['flashcard.add-cards'];
+    emit(profileListeners);
+    expect(seen).toHaveLength(3);
+    expect(seen[2].allowedOperations).toEqual(['flashcard.add-cards']);
+    stop();
+  });
+
+  it('removes every subscription and ignores captured callbacks after cleanup', async () => {
+    const seen: AgentStepApprovalContext[] = [];
+    const stop = observeAgentStepApprovalContext(t, (context) => seen.push(context));
+    const captured = [
+      ...queueListeners,
+      ...profileListeners,
+      ...settingsListeners,
+    ];
+    await finishOperationalHydration();
+    expect(seen).toHaveLength(1);
+
+    stop();
+    expect(queueListeners.size).toBe(0);
+    expect(profileListeners.size).toBe(0);
+    expect(settingsListeners.size).toBe(0);
+
+    for (const listener of captured) listener();
+    expect(seen).toHaveLength(1);
+  });
 });
 
 describe('grantAgentStepApproval', () => {
@@ -203,5 +341,16 @@ describe('grantAgentStepApproval', () => {
     await grant();
     const options = runCalls[0][3] as { confirmedCallIds: Set<string> };
     expect([...options.confirmedCallIds]).toEqual(['call-1']);
+  });
+
+  it('propagates a final execution-boundary refusal without writing the queue', async () => {
+    // The review resolver and runner normally read the same context, but the
+    // execution result is a typed union now. A future asynchronous authority
+    // source must not make this consumer persist the untouched task and report
+    // a misleading lifecycle error.
+    runnerRefuses = true;
+    await expect(grant()).resolves.toEqual({ ok: false, code: 'operation-denied' });
+    expect(runCalls).toHaveLength(1);
+    expect(saved).toHaveLength(0);
   });
 });

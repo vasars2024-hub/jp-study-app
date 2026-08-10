@@ -13,6 +13,8 @@ import {
   AGENT_QUEUE_CHANGED_EVENT,
   getAgentTaskQueueSnapshot,
   setAgentTaskQueueSnapshot,
+  setAgentTaskQueueSnapshotDurably,
+  type AgentOperationalSaveReceipt,
 } from './agentOperationalClient';
 
 export function loadLocalAgentTaskQueue(): AgentTaskQueue {
@@ -21,6 +23,17 @@ export function loadLocalAgentTaskQueue(): AgentTaskQueue {
 
 export function saveLocalAgentTaskQueue(queue: AgentTaskQueue): AgentTaskQueue {
   return setAgentTaskQueueSnapshot(normalizeAgentTaskQueue(queue));
+}
+
+/**
+ * The planner uses this variant when it must distinguish an optimistic queue
+ * update from one main actually committed to disk. Existing consumers retain
+ * the synchronous setter above.
+ */
+export function saveLocalAgentTaskQueueDurably(
+  queue: AgentTaskQueue,
+): Promise<AgentOperationalSaveReceipt> {
+  return setAgentTaskQueueSnapshotDurably(normalizeAgentTaskQueue(queue));
 }
 
 /**

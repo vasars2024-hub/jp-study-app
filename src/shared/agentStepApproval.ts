@@ -39,11 +39,10 @@
  * half, so there is no second place for it to be decided differently.
  */
 
-import type { AgentConversation } from './agentWorkspace';
+import { findUnambiguousAgentCardAction, type AgentConversation } from './agentWorkspace';
 import {
   evaluateAgentToolAccess,
   type AgentPermissionLevel,
-  type AgentTask,
   type AgentTaskStep,
   type AgentToolOperationId,
 } from './localAgent';
@@ -133,36 +132,40 @@ function approvalEffect(
   cardId: string,
   actionId: string,
 ): { taskId: string; stepId: string } | AgentStepApprovalFailureCode {
-  const message = conversation.messages.find((entry) => entry.id === messageId);
-  const card = message?.cards.find((entry) => entry.id === cardId);
-  const action = card?.actions.find((entry) => entry.id === actionId);
-  if (!message || !card || !action) return 'action-not-found';
-  if (action.effect.type !== 'approve-step') return 'not-approvable';
+  const coordinate = findUnambiguousAgentCardAction(conversation, messageId, cardId, actionId);
+  if (!coordinate) return 'action-not-found';
+  if (coordinate.action.effect.type !== 'approve-step') return 'not-approvable';
   // Provenance is the card's, and an empty list is not a pass. This mirrors the
   // navigation resolver rather than the persistence rule it grew out of: a card
   // declaring no source has nothing to check, so it gets refused rather than
   // treated as trivially satisfied.
-  if (card.sourceContextIds.length === 0) return 'stale-provenance';
-  if (!card.sourceContextIds.some((contextId) => (
+  if (coordinate.card.sourceContextIds.length === 0) return 'stale-provenance';
+  if (!coordinate.card.sourceContextIds.some((contextId) => (
     conversation.context.some((item) => item.id === contextId)
   ))) {
     return 'stale-provenance';
   }
-  return { taskId: action.effect.taskId, stepId: action.effect.stepId };
+  return {
+    taskId: coordinate.action.effect.taskId,
+    stepId: coordinate.action.effect.stepId,
+  };
 }
 
-function liveStep(
-  task: AgentTask,
+function approvalCandidate(
+  item: AgentQueueItem,
   stepId: string,
 ): AgentTaskStep | AgentQueuedStepApprovalFailureCode {
-  const step = task.steps.find((entry) => entry.id === stepId);
+  if (!RUNNABLE_QUEUE_STATUS.has(item.status)) return 'task-not-runnable';
+  if (item.task.status !== 'waiting-confirmation') return 'task-not-runnable';
+
+  const step = item.task.steps.find((entry) => entry.id === stepId);
   if (!step) return 'step-not-found';
   // Two separate refusals, because they mean different things to the user. A
   // step that is not waiting for confirmation is not asking; a step that is
   // waiting but is not the current one would be approved out of order, granting
   // permission for work whose predecessor has not run.
   if (step.status !== 'waiting-confirmation') return 'step-not-awaiting';
-  if (task.currentStepId !== undefined && task.currentStepId !== stepId) return 'step-not-current';
+  if (item.task.currentStepId !== stepId) return 'step-not-current';
   return step;
 }
 
@@ -195,9 +198,8 @@ export function resolveAgentQueuedStepApproval(
 ): AgentQueuedStepApprovalResolution {
   const item = queue.items.find((entry) => entry.task.id === taskId);
   if (!item) return { ok: false, code: 'task-not-found' };
-  if (!RUNNABLE_QUEUE_STATUS.has(item.status)) return { ok: false, code: 'task-not-runnable' };
 
-  const step = liveStep(item.task, stepId);
+  const step = approvalCandidate(item, stepId);
   if (typeof step === 'string') return { ok: false, code: step };
 
   // The third boundary. `confirmed` is deliberately not set: asking whether the
@@ -267,35 +269,60 @@ export function resolveAgentStepApproval(
 /* ---------- Producer ------------------------------------------------------ */
 
 /**
- * The step a card may offer to approve, or `null`.
+ * The queue-only reference a card may persist, plus the live source ids that
+ * causally authorize this particular attachment, or `null`.
  *
  * This lives beside the resolver on purpose. A producer that decided "waiting on
  * the user" by its own reading of the queue would eventually disagree with the
  * gate, and the visible form of that disagreement is a button that exists and
- * always refuses. Both sides ask the same two questions here: is the queue item
- * still runnable, and is its *current* step the one waiting.
+ * always refuses. This selector deliberately says nothing about renderer-owned
+ * authority (permission, active-profile allow-list, or installed handlers); it
+ * guarantees that the referenced queue/task/step structure is coherent and
+ * that the task originated from this conversation and at least one currently
+ * live provider-disclosed context. Originless legacy tasks remain runnable in
+ * the queue, but cannot be attributed to an arbitrary later reply.
+ * The renderer must still resolve the reference against its live authority
+ * before it offers an actionable approval control.
  *
- * Selection is FIFO over the oldest queue item, tie-broken by id. It is
- * deliberately independent of the reply it will be attached to: the card offers
- * the approval that has been blocking longest, not one chosen by anything the
- * provider wrote. Only one is ever offered, because a message that sprouted four
- * approve buttons would be a queue view, and the queue already has one.
+ * Selection is FIFO over matching queue items, tie-broken by id. Only one is
+ * ever offered, because a message that sprouted four approve buttons would be a
+ * queue view, and the queue already has one.
  */
-export function pendingAgentStepApproval(
+export interface AgentStepApprovalSourceScope {
+  conversationId: string;
+  /** Context ids that are both live and disclosed for the completed reply. */
+  contextIds: readonly string[];
+}
+
+export interface AgentStepApprovalReference {
+  taskId: string;
+  stepId: string;
+  sourceContextIds: string[];
+}
+
+export function pendingAgentStepApprovalReference(
   queue: AgentTaskQueue,
-): { taskId: string; stepId: string } | null {
+  source: AgentStepApprovalSourceScope,
+): AgentStepApprovalReference | null {
+  const liveSourceIds = new Set(source.contextIds);
   const waiting = queue.items
-    .filter((item) => {
-      if (!RUNNABLE_QUEUE_STATUS.has(item.status)) return false;
+    .flatMap((item): Array<{ item: AgentQueueItem; sourceContextIds: string[] }> => {
       const stepId = item.task.currentStepId;
-      if (!stepId) return false;
-      const step = item.task.steps.find((entry) => entry.id === stepId);
-      return step?.status === 'waiting-confirmation';
+      if (!stepId || typeof approvalCandidate(item, stepId) === 'string') return [];
+      if (!item.origin || item.origin.conversationId !== source.conversationId) return [];
+      const sourceContextIds = [...new Set(item.origin.contextIds.filter((id) => liveSourceIds.has(id)))];
+      return sourceContextIds.length > 0 ? [{ item, sourceContextIds }] : [];
     })
-    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+    .sort((a, b) => (
+      a.item.createdAt - b.item.createdAt || a.item.id.localeCompare(b.item.id)
+    ));
   const chosen = waiting[0];
-  if (!chosen?.task.currentStepId) return null;
-  return { taskId: chosen.task.id, stepId: chosen.task.currentStepId };
+  if (!chosen?.item.task.currentStepId) return null;
+  return {
+    taskId: chosen.item.task.id,
+    stepId: chosen.item.task.currentStepId,
+    sourceContextIds: chosen.sourceContextIds,
+  };
 }
 
 /* ---------- Lifecycle ----------------------------------------------------- */

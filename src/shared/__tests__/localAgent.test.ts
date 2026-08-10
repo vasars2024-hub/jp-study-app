@@ -135,8 +135,15 @@ describe('local agent controller execution', () => {
       confirmedCallIds: new Set(['call-delete']),
       now: () => 20,
     });
-    expect(result.task.status).toBe('failed');
-    expect(result.task.steps[0].error).toContain('not enabled for the active agent profile');
+    expect(result.task).toBe(task);
+    expect(result.task.status).toBe('queued');
+    expect(result.task.steps[0]).toMatchObject({ status: 'pending' });
+    expect(result.task.steps[0]).not.toHaveProperty('error');
+    expect(result.events).toEqual([]);
+    expect(result.refusal).toMatchObject({
+      code: 'operation-denied',
+      reason: expect.stringContaining('not enabled for the active agent profile'),
+    });
     expect(calls).toBe(0);
   });
 
@@ -225,7 +232,14 @@ describe('local agent controller execution', () => {
       permission: 'read-only',
       handlers: { 'flashcard.create-deck': () => ({ created: true }) },
     });
-    expect(denied.task.steps[0]).toMatchObject({ status: 'failed' });
+    expect(denied.task).toBe(mutationTask);
+    expect(denied.task.steps[0]).toMatchObject({ status: 'pending' });
+    expect(denied.task.steps[0]).not.toHaveProperty('error');
+    expect(denied.events).toEqual([]);
+    expect(denied.refusal).toMatchObject({
+      code: 'operation-denied',
+      reason: expect.stringContaining('requires limited-actions permission'),
+    });
 
     const readTask = createAgentTask('task-2', 'Read settings', [{
       id: 'read',
