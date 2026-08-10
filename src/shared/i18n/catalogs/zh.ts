@@ -2086,6 +2086,7 @@ export const zh: Catalog = {
   'agent.conversation.fromReading': '阅读：{label}',
   'agent.conversation.fromMedia': '观看：{label}',
   'agent.conversation.fromSettings': '设置: {label}',
+  'agent.conversation.fromFlashcards': '记忆卡: 已保存的单词',
   'dictionary.askAgent': '就该词询问智能助手',
   'agent.conversation.delete': '删除',
   'agent.conversation.deleteConfirm': '确认删除',
@@ -5064,6 +5065,8 @@ export const zh: Catalog = {
   'csv.preview.emptyValue': '—',
 
   'flash.reviewDictionary': '复习词典',
+  'flash.askAgent': '询问助手',
+  'flash.askAgent.shelf': '已保存的单词',
   'flash.reviewDictionaryCount': '复习词典（{count}）',
   'flash.tab.epubDecks': 'EPUB 卡组（{count}）',
   'flash.tab.dictionary': '词典（{count}）',

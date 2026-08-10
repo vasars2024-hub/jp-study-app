@@ -3646,11 +3646,55 @@ Russian-UI dev app, real profile, driven through the debug bridge:
   **byte-for-byte identical**, `jp-settings-advanced-v1` untouched, and
   `/logs?level=error` **0 entries**.
 
+### Flashcards, so the producers are not unreachable machinery either
+
+`savedWordsAgentContext` shipped in the section above with no call site, which is
+the same shape of defect this slice exists to fix. `FlashcardDeckOverview` now
+carries the hand-off, in the `view-head` actions beside "Review dictionary",
+where `saved` is already in scope.
+
+The list is **bounded at 40** before it leaves. Someone with four thousand mined
+words must not send all of them to a provider because they clicked one button —
+the same rule `mediaCueAgentContext` records for a subtitle scene, where "this
+line" must not become "this episode". The most recent are taken, because those
+are what the user has been working on.
+
+`studySessionAgentContext` still has no call site: it wants the live review
+session, which is `FlashcardReviewMode`'s state rather than the overview's, and
+is a separate gesture ("ask about how this session went") from "ask about my
+saved words". It stays tested and unused, recorded here rather than quietly.
+
+**Live, with three words seeded into an empty profile** (no `jp-saved-words-*`
+key existed at all, so the restore is its absence, asserted):
+
+```json
+{ "id": "saved-words:2f578c85e5e68f09", "label": "Сохранённые слова",
+  "preview": "食べる、飲む、走る",
+  "source": { "app": "flashcards" },
+  "sensitivity": "personal", "retained": false }
+```
+
+Two properties worth naming because they are the privacy floor working rather
+than a coincidence. The identity is **opaque** — `2f578c85e5e68f09`, not the
+words — because `saved-words` floors at `personal` and `createAgentContextItem`
+hashes any identity above `ordinary`, so the vocabulary never becomes a
+reference id copied into messages and provider disclosures. And `retained:
+false`, so the list is gone at the next launch. The `route:flashcards` place item
+landed beside it, labelled «Карточки» from the section's own catalog key.
+
+Restores: both items removed by kind, the seeded key deleted and
+`jp-saved-words-*` asserted back to **none**, the workspace back to its exact
+three conversation ids, `jp-os-settings-recent-v1` unchanged, 0 error entries.
+
+Gates after this: **62 files / 884 tests** on `flashcard agent`, i18n clean at
+**9,195** keys, no new hardcoded UI text, `fresh: []`, `tsc` unchanged at 392
+(the three `FlashcardsContent.tsx` errors are pre-existing and predate this
+edit), focused ESLint exit 0.
+
 ### Still open after this
 
-- **Flashcards has producers but no call site.** `studySessionAgentContext` and
-  `savedWordsAgentContext` are tested and unused: `FlashcardsView` is a thin
-  wrapper and the session state lives in `FlashcardsContent.tsx` (1,677 lines),
-  which is where the button has to go. That is the remaining third of this plan
-  bullet, along with screenshot/OCR *attachment* context — a different mechanism
-  from context items, and untouched here.
+- `studySessionAgentContext` has no call site, as above.
+- **Screenshot/OCR attachment context** is untouched. It is a different mechanism
+  from context items — `AgentAttachment`, not `AgentContextItem` — and the lens
+  already captures `screenshotDataUrl` in its `reading` state, so the material
+  exists and only the attachment producer and its privacy floor are missing.

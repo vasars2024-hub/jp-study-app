@@ -161,10 +161,13 @@ Still required before the Track 3 acceptance can be called complete:
   no context item could satisfy the guided check `resolveAgentNavigation` runs —
   the provenance half of guided navigation had never once run (2026-08-10 — see
   the ledger's "The context producers, and the field that was being thrown
-  away"). **Still required**: the Flashcards call site — the producers are unused
-  because the session state lives in `FlashcardsContent.tsx` rather than the thin
-  `FlashcardsView` — and screenshot/OCR *attachment* context, which is a
-  different mechanism from context items and untouched;
+  away"). ReadingLens, Settings and Flashcards all hand off now, the last through
+  `FlashcardDeckOverview` with the word list bounded at 40 before it leaves.
+  **Still required**: a call site for `studySessionAgentContext`, which wants the
+  live review session in `FlashcardReviewMode` rather than the overview; and
+  screenshot/OCR *attachment* context, a different mechanism from context items
+  (`AgentAttachment`) whose material the lens already captures as
+  `screenshotDataUrl`, leaving only the producer and its privacy floor;
 - the remaining unavailable dictionary/media/anime/visual-novel adapters;
 - AI Card Studio conversion to an Agent workflow while retaining its editor;
 - broader planned-operation Undo surfacing and any product decision to make

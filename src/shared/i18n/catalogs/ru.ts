@@ -2254,6 +2254,7 @@ export const ru: Catalog = {
   'agent.conversation.fromReading': 'Чтение: {label}',
   'agent.conversation.fromMedia': 'Просмотр: {label}',
   'agent.conversation.fromSettings': 'Настройки: {label}',
+  'agent.conversation.fromFlashcards': 'Карточки: сохранённые слова',
   'dictionary.askAgent': 'Спросить агента об этом слове',
   'agent.conversation.delete': 'Удалить',
   'agent.conversation.deleteConfirm': 'Подтвердить удаление',
@@ -5611,6 +5612,8 @@ export const ru: Catalog = {
   'csv.preview.emptyValue': '—',
 
   'flash.reviewDictionary': 'Повторить словарь',
+  'flash.askAgent': 'Спросить агента',
+  'flash.askAgent.shelf': 'Сохранённые слова',
   'flash.reviewDictionaryCount': 'Повторить словарь ({count})',
   'flash.tab.epubDecks': 'Колоды EPUB ({count})',
   'flash.tab.dictionary': 'Словарь ({count})',

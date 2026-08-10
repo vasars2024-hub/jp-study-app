@@ -2095,6 +2095,7 @@ export const ja: Catalog = {
   'agent.conversation.fromReading': '読書: {label}',
   'agent.conversation.fromMedia': '視聴: {label}',
   'agent.conversation.fromSettings': '設定: {label}',
+  'agent.conversation.fromFlashcards': 'フラッシュカード: 保存した単語',
   'dictionary.askAgent': 'この単語についてエージェントに質問',
   'agent.conversation.delete': '削除',
   'agent.conversation.deleteConfirm': '削除を確認',
@@ -5089,6 +5090,8 @@ export const ja: Catalog = {
   'csv.preview.emptyValue': '—',
 
   'flash.reviewDictionary': '辞書を復習',
+  'flash.askAgent': 'エージェントに聞く',
+  'flash.askAgent.shelf': '保存した単語',
   'flash.reviewDictionaryCount': '辞書を復習（{count}）',
   'flash.tab.epubDecks': 'EPUBデッキ（{count}）',
   'flash.tab.dictionary': '辞書（{count}）',

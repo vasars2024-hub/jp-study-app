@@ -67,6 +67,12 @@ import {
 } from '../../flashcardDeck';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
+import {
+  handOffToAgent,
+  routeAgentContext,
+  savedWordsAgentContext,
+} from '../../agentContextHandoff';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import { registerCommandHandler } from '../../keyboardShortcuts';
 import { useT } from '../../i18n';
 import { useWiredMaterials } from '../ui';
@@ -1165,6 +1171,17 @@ const SAVED_LIST_MAX_HEIGHT = 560;
  * Study OS's aero overview is a distinct layout that keeps `Toolbar`/`Button`
  * and stays in `FlashcardsView`; both shells share this one.
  */
+/**
+ * How many saved words one hand-off may carry.
+ *
+ * Someone with four thousand mined words must not send all of them to a provider
+ * because they clicked one button — the same rule `mediaCueAgentContext` records
+ * for a subtitle scene, where "this line" must not become "this episode". The
+ * most recently saved are the ones taken, because they are what the user has
+ * been working on.
+ */
+const ASK_AGENT_SAVED_LIMIT = 40;
+
 export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   const { t } = useT();
   const {
@@ -1194,6 +1211,24 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     hideAiStudio,
   } = state;
 
+  /**
+   * The saved-word list, bounded, with the place it came from attached.
+   *
+   * Not a `useCallback`: it calls `t()`, and depending on `t` is the documented
+   * way to go stale across a language switch (CLAUDE.md §6).
+   */
+  const askAgent = (): void => {
+    if (saved.length === 0) return;
+    const words = saved
+      .slice(0, ASK_AGENT_SAVED_LIMIT)
+      .map((entry) => entry.word);
+    void handOffToAgent(
+      savedWordsAgentContext(words, t('flash.askAgent.shelf')),
+      t('agent.conversation.fromFlashcards'),
+      routeAgentContext('flashcards', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.flashcards)),
+    );
+  };
+
   return (
     <div className="flash-view flash-view-decks">
       <div className="view-head">
@@ -1216,6 +1251,9 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               {t('flash.aiCardStudio')}
             </button>
           )}
+          <button className="btn" onClick={askAgent} disabled={saved.length === 0}>
+            {t('flash.askAgent')}
+          </button>
           <button className="btn primary" onClick={state.startReview} disabled={saved.length === 0}>
             {saved.length ? t('flash.reviewDictionaryCount', { count: saved.length }) : t('flash.reviewDictionary')}
           </button>

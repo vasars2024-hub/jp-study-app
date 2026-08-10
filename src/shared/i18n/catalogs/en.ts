@@ -2236,6 +2236,7 @@ export const en: Catalog = {
   'agent.conversation.fromReading': 'Reading: {label}',
   'agent.conversation.fromMedia': 'Watching: {label}',
   'agent.conversation.fromSettings': 'Settings: {label}',
+  'agent.conversation.fromFlashcards': 'Flashcards: saved words',
   'dictionary.askAgent': 'Ask the Agent about this word',
   'agent.conversation.delete': 'Delete',
   'agent.conversation.deleteConfirm': 'Confirm delete',
@@ -5368,6 +5369,8 @@ export const en: Catalog = {
   'csv.preview.emptyValue': '—',
 
   'flash.reviewDictionary': 'Review dictionary',
+  'flash.askAgent': 'Ask the Agent',
+  'flash.askAgent.shelf': 'Saved words',
   'flash.reviewDictionaryCount': 'Review dictionary ({count})',
   'flash.tab.epubDecks': 'EPUB decks ({count})',
   'flash.tab.dictionary': 'Dictionary ({count})',
