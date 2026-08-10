@@ -99,6 +99,38 @@ describe('agent operational store', () => {
     expect(reread.automations.map((entry) => entry.id)).toEqual(['a1']);
   });
 
+  it('round-trips normalized task origin coordinates without inventing them for legacy rows', () => {
+    store.write({
+      version: 1,
+      queue: {
+        version: 1,
+        items: [
+          {
+            ...queueItem('with-origin', 'queued', NOW),
+            origin: {
+              conversationId: ' chat-1 ',
+              contextIds: [' ctx-one ', 'ctx-one', 'ctx-two'],
+            },
+          },
+          queueItem('legacy', 'queued', NOW),
+        ],
+      },
+    });
+
+    const reread = createAgentOperationalStore(root, () => NOW).read();
+    expect(reread.queue.items[0].origin).toEqual({
+      conversationId: 'chat-1',
+      contextIds: ['ctx-one', 'ctx-two'],
+    });
+    expect(reread.queue.items[1]).not.toHaveProperty('origin');
+    const raw = JSON.parse(fs.readFileSync(store.filePath, 'utf8'));
+    expect(raw.queue.items[0].origin).toEqual({
+      conversationId: 'chat-1',
+      contextIds: ['ctx-one', 'ctx-two'],
+    });
+    expect(raw.queue.items[1]).not.toHaveProperty('origin');
+  });
+
   it('writes the document atomically and leaves no temporary file behind', () => {
     store.write({ version: 1, queue: { version: 1, items: [queueItem('t1', 'queued', NOW)] } });
     const directory = path.dirname(store.filePath);

@@ -22,11 +22,27 @@ import {
   isLegacyAgentOperationalPayload,
   type AgentOperationalResult,
 } from '../shared/agentOperationalBridge';
-import type { AgentOperationalState } from '../shared/agentOperationalState';
+import {
+  AGENT_EXECUTION_LEASE_CHANNELS,
+  normalizeAgentExecutionLeaseAcquireRequest,
+  normalizeAgentExecutionLeaseCommitRequest,
+  normalizeAgentExecutionLeaseTokenRequest,
+  normalizeAgentExecutionLeaseRecoverRequest,
+  type AgentExecutionLeaseAcquireResult,
+  type AgentExecutionLeaseCommitResult,
+  type AgentExecutionLeaseReleaseResult,
+  type AgentExecutionLeaseRenewResult,
+  type AgentExecutionLeaseRecoverResult,
+} from '../shared/agentExecutionLeaseBridge';
+import {
+  normalizeAgentOperationalState,
+  type AgentOperationalState,
+} from '../shared/agentOperationalState';
 import {
   getAgentOperationalStore,
   type AgentOperationalStore,
 } from './agentOperationalStore';
+import { createAgentExecutionLeaseManager } from './agentExecutionLease';
 
 function broadcast(state: AgentOperationalState, origin: WebContents | null): void {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -44,6 +60,7 @@ function broadcast(state: AgentOperationalState, origin: WebContents | null): vo
 export function registerAgentOperationalIpc(
   resolveStore: () => AgentOperationalStore = getAgentOperationalStore,
 ): void {
+  const leases = createAgentExecutionLeaseManager(resolveStore);
   ipcMain.handle('agentOperational:load', (): AgentOperationalResult => {
     try {
       return agentOperationalSuccess(resolveStore().read());
@@ -59,7 +76,7 @@ export function registerAgentOperationalIpc(
     // schedule. See `isAgentOperationalSavePayload`.
     if (!isAgentOperationalSavePayload(raw)) return agentOperationalFailure('invalid-request');
     try {
-      const state = resolveStore().write(raw);
+      const state = resolveStore().write(leases.rebaseSave(normalizeAgentOperationalState(raw)));
       broadcast(state, event.sender);
       return agentOperationalSuccess(state);
     } catch {
@@ -77,4 +94,74 @@ export function registerAgentOperationalIpc(
       return agentOperationalFailure('write-failed');
     }
   });
+
+  ipcMain.handle(
+    AGENT_EXECUTION_LEASE_CHANNELS.acquire,
+    (event, raw: unknown): AgentExecutionLeaseAcquireResult => {
+      const request = normalizeAgentExecutionLeaseAcquireRequest(raw);
+      if (!request) return { ok: false, code: 'invalid-request' };
+      try {
+        const result = leases.acquire(request, event.sender.id);
+        if (result.ok) broadcast(result.state, event.sender);
+        return result;
+      } catch {
+        return { ok: false, code: 'write-failed' };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    AGENT_EXECUTION_LEASE_CHANNELS.renew,
+    (event, raw: unknown): AgentExecutionLeaseRenewResult => {
+      const request = normalizeAgentExecutionLeaseTokenRequest(raw);
+      return request
+        ? leases.renew(request, event.sender.id)
+        : { ok: false, code: 'invalid-request' };
+    },
+  );
+
+  ipcMain.handle(
+    AGENT_EXECUTION_LEASE_CHANNELS.release,
+    (event, raw: unknown): AgentExecutionLeaseReleaseResult => {
+      const request = normalizeAgentExecutionLeaseTokenRequest(raw);
+      if (!request) return { ok: false, code: 'invalid-request' };
+      try {
+        const result = leases.release(request, event.sender.id);
+        if (result.ok) broadcast(result.state, event.sender);
+        return result;
+      } catch {
+        return { ok: false, code: 'write-failed' };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    AGENT_EXECUTION_LEASE_CHANNELS.commit,
+    (event, raw: unknown): AgentExecutionLeaseCommitResult => {
+      const request = normalizeAgentExecutionLeaseCommitRequest(raw);
+      if (!request) return { ok: false, code: 'invalid-request' };
+      try {
+        const result = leases.commit(request, event.sender.id);
+        if (result.ok) broadcast(result.state, event.sender);
+        return result;
+      } catch {
+        return { ok: false, code: 'write-failed' };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    AGENT_EXECUTION_LEASE_CHANNELS.recover,
+    (event, raw: unknown): AgentExecutionLeaseRecoverResult => {
+      const request = normalizeAgentExecutionLeaseRecoverRequest(raw);
+      if (!request) return { ok: false, code: 'invalid-request' };
+      try {
+        const result = leases.recover(request);
+        if (result.ok) broadcast(result.state, event.sender);
+        return result;
+      } catch {
+        return { ok: false, code: 'write-failed' };
+      }
+    },
+  );
 }

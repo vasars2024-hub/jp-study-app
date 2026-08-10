@@ -35,6 +35,7 @@ import {
   loadLocalAgentTaskQueue,
   onLocalAgentTaskQueueChanged,
   saveLocalAgentTaskQueue,
+  saveLocalAgentTaskQueueDurably,
 } from '../localAgentTaskQueueStore';
 import {
   loadLocalAgentMemory,
@@ -339,6 +340,131 @@ describe('writes', () => {
     };
     expect(last.automations.map((entry) => entry.id)).toEqual(['a1']);
     expect(last.memory.entries.map((entry) => entry.id)).toEqual(['m1']);
+  });
+
+  it('returns a generation-bound receipt when main refuses the write', async () => {
+    installBridge({
+      agentOperationalSave: async () => ({ ok: false, code: 'write-failed' }),
+    });
+    await initAgentOperationalState();
+
+    const receipt = await saveLocalAgentTaskQueueDurably({
+      version: 1,
+      items: [queueItem('failed')],
+    });
+
+    expect(receipt).toEqual({
+      ok: false,
+      code: 'write-failed',
+      requestedGeneration: 1,
+      attemptGeneration: 1,
+    });
+    // The synchronous contract remains optimistic even when durability fails.
+    expect(loadLocalAgentTaskQueue().items.map((item) => item.id)).toEqual(['failed']);
+  });
+
+  it('returns bridge-unavailable without hanging when no save method exists', async () => {
+    installBridge({ agentOperationalSave: undefined });
+    await initAgentOperationalState();
+
+    await expect(
+      saveLocalAgentTaskQueueDurably({ version: 1, items: [queueItem('session-only')] }),
+    ).resolves.toEqual({
+      ok: false,
+      code: 'bridge-unavailable',
+      requestedGeneration: 1,
+      attemptGeneration: 1,
+    });
+  });
+
+  it('binds each receipt to the save attempt that covered its generation', async () => {
+    let releaseFirst: (() => void) | null = null;
+    const saves: unknown[] = [];
+    installBridge({
+      agentOperationalSave: async (state: unknown) => {
+        saves.push(structuredClone(state));
+        if (saves.length === 1) {
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+        }
+        return { ok: true, state };
+      },
+    });
+    await initAgentOperationalState();
+
+    const first = saveLocalAgentTaskQueueDurably({
+      version: 1,
+      items: [queueItem('t1')],
+    });
+    const second = saveLocalAgentTaskQueueDurably({
+      version: 1,
+      items: [queueItem('t1'), queueItem('t2')],
+    });
+    const third = saveLocalAgentTaskQueueDurably({
+      version: 1,
+      items: [queueItem('t1'), queueItem('t2'), queueItem('t3')],
+    });
+
+    releaseFirst?.();
+
+    await expect(first).resolves.toMatchObject({
+      ok: true,
+      requestedGeneration: 1,
+      attemptGeneration: 1,
+    });
+    await expect(second).resolves.toMatchObject({
+      ok: true,
+      requestedGeneration: 2,
+      attemptGeneration: 3,
+    });
+    await expect(third).resolves.toMatchObject({
+      ok: true,
+      requestedGeneration: 3,
+      attemptGeneration: 3,
+    });
+    expect(saves).toHaveLength(2);
+  });
+
+  it('keeps durable saves single-flight and never adopts an older reply state', async () => {
+    let releaseFirst: (() => void) | null = null;
+    let inFlight = 0;
+    let maximumInFlight = 0;
+    let calls = 0;
+    installBridge({
+      agentOperationalSave: async (state: unknown) => {
+        calls += 1;
+        inFlight += 1;
+        maximumInFlight = Math.max(maximumInFlight, inFlight);
+        if (calls === 1) {
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+          inFlight -= 1;
+          return {
+            ok: true,
+            state: { ...emptyDocument(), queue: { version: 1, items: [queueItem('stale')] } },
+          };
+        }
+        inFlight -= 1;
+        return { ok: true, state };
+      },
+    });
+    await initAgentOperationalState();
+
+    const first = saveLocalAgentTaskQueueDurably({
+      version: 1,
+      items: [queueItem('first')],
+    });
+    const latest = saveLocalAgentTaskQueueDurably({
+      version: 1,
+      items: [queueItem('latest')],
+    });
+    releaseFirst?.();
+
+    await Promise.all([first, latest]);
+    expect(maximumInFlight).toBe(1);
+    expect(loadLocalAgentTaskQueue().items.map((item) => item.id)).toEqual(['latest']);
   });
 });
 

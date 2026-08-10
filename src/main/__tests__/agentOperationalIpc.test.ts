@@ -50,6 +50,7 @@ vi.mock('electron', () => ({
 }));
 
 import { AGENT_OPERATIONAL_CHANNELS } from '../../shared/agentOperationalBridge';
+import { AGENT_EXECUTION_LEASE_CHANNELS } from '../../shared/agentExecutionLeaseBridge';
 import type { AgentOperationalResult } from '../../shared/agentOperationalBridge';
 import {
   createAgentOperationalStore,
@@ -111,8 +112,9 @@ afterEach(() => {
 });
 
 describe('agent operational IPC', () => {
-  it('registers exactly its three handlers, once each', () => {
+  it('registers the operational and execution-lease handlers once each', () => {
     expect([...registry.handlers.keys()].sort()).toEqual([
+      ...Object.values(AGENT_EXECUTION_LEASE_CHANNELS),
       AGENT_OPERATIONAL_CHANNELS.load,
       AGENT_OPERATIONAL_CHANNELS.migrateLegacy,
       AGENT_OPERATIONAL_CHANNELS.save,

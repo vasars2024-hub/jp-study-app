@@ -1,6 +1,6 @@
 /**
  * Renderer side of the Agent operational bridge — the one place in `src/renderer`
- * that holds the task queue, memory and automations.
+ * that holds the task queue, memory, automations and context-suggestion preferences.
  *
  * The hard constraint this module exists to satisfy: **the consumers are
  * synchronous.** `loadLocalAgentMemory()` is called from inside a tool adapter in
@@ -39,11 +39,16 @@ import {
   agentOperationalFailure,
   isAgentOperationalSavePayload,
   normalizeAgentOperationalResult,
+  type AgentOperationalFailureCode,
   type AgentOperationalResult,
 } from '../shared/agentOperationalBridge';
 import type { AgentTaskQueue } from '../shared/localAgentTaskQueue';
 import type { AgentMemoryStore } from '../shared/localAgentMemory';
 import type { AgentAutomation } from '../shared/localAgentAutomation';
+import {
+  normalizeAgentContextSuggestionPreferences,
+  type AgentContextSuggestionPreferences,
+} from '../shared/agentContextSuggestions';
 
 /** The three documents the renderer used to own outright. */
 export const LEGACY_AGENT_QUEUE_KEY = 'jp-study-local-agent-task-queue-v1';
@@ -58,6 +63,7 @@ export const LEGACY_AGENT_AUTOMATIONS_KEY = 'jp-study-local-agent-automations-v1
 export const AGENT_QUEUE_CHANGED_EVENT = 'jp-study-local-agent-task-queue-changed';
 export const AGENT_MEMORY_CHANGED_EVENT = 'jp-study-local-agent-memory-changed';
 export const AGENT_AUTOMATIONS_CHANGED_EVENT = 'jp-study-local-agent-automations-changed';
+export const AGENT_SUGGESTIONS_CHANGED_EVENT = 'jp-study-agent-context-suggestions-changed';
 
 interface AgentOperationalBridge {
   agentOperationalLoad(): Promise<unknown>;
@@ -72,6 +78,37 @@ let snapshot: AgentOperationalState = emptyAgentOperationalState();
 let initPromise: Promise<void> | null = null;
 let saving: Promise<void> | null = null;
 let dirty = false;
+let saveGeneration = 0;
+
+/**
+ * Proof that the main-owned operational document accepted (or refused) the
+ * save attempt that covered a renderer mutation.
+ *
+ * `requestedGeneration` identifies the mutation which asked for durability.
+ * `attemptGeneration` identifies the snapshot actually sent to main. They can
+ * differ when later synchronous writes are coalesced into the same attempt.
+ * Deliberately no state is returned: a reply can already be stale by the time
+ * it arrives, so the optimistic snapshot remains the renderer's only cache.
+ */
+export type AgentOperationalSaveReceipt =
+  | {
+      ok: true;
+      requestedGeneration: number;
+      attemptGeneration: number;
+    }
+  | {
+      ok: false;
+      requestedGeneration: number;
+      attemptGeneration: number;
+      code: AgentOperationalFailureCode;
+    };
+
+interface PendingSaveReceipt {
+  requestedGeneration: number;
+  resolve(receipt: AgentOperationalSaveReceipt): void;
+}
+
+let pendingSaveReceipts: PendingSaveReceipt[] = [];
 
 /**
  * `window.api` is declared by `window.d.ts`, but this can run in a window that
@@ -110,7 +147,7 @@ function emit(name: string, detail: unknown): void {
  * Reference equality is the fast path and covers every local write, which passes
  * the previous reference through for sections it did not touch. It is not enough
  * for a document that arrived from main: normalization allocates a fresh object
- * for all three sections, so an incoming push would look like "everything
+ * for every section, so an incoming push would look like "everything
  * changed" and wake every subscriber — a memory edit in another window would
  * re-render this window's queue panel. Both sides are normalized output with a
  * stable key order, so serializing is a sound deep comparison here.
@@ -133,6 +170,9 @@ function applySnapshot(incoming: AgentOperationalState): void {
     automations: sameSection(previous.automations, incoming.automations)
       ? previous.automations
       : incoming.automations,
+    suggestions: sameSection(previous.suggestions, incoming.suggestions)
+      ? previous.suggestions
+      : incoming.suggestions,
   };
   snapshot = next;
   if (previous.queue !== next.queue) emit(AGENT_QUEUE_CHANGED_EVENT, next.queue);
@@ -140,6 +180,14 @@ function applySnapshot(incoming: AgentOperationalState): void {
   if (previous.automations !== next.automations) {
     emit(AGENT_AUTOMATIONS_CHANGED_EVENT, next.automations);
   }
+  if (previous.suggestions !== next.suggestions) {
+    emit(AGENT_SUGGESTIONS_CHANGED_EVENT, next.suggestions);
+  }
+}
+
+/** Applies an authoritative state returned by another main-owned mutation. */
+export function applyAgentOperationalStateFromMain(state: AgentOperationalState): void {
+  applySnapshot(normalizeIncoming(state));
 }
 
 /**
@@ -153,21 +201,60 @@ function applySnapshot(incoming: AgentOperationalState): void {
  * state we already hold, and adopting it would clobber a write made while the
  * save was in flight.
  */
-function schedulePersist(): void {
+function settleSaveReceipts(
+  attemptGeneration: number,
+  result: AgentOperationalResult,
+): void {
+  const covered = pendingSaveReceipts.filter(
+    ({ requestedGeneration }) => requestedGeneration <= attemptGeneration,
+  );
+  pendingSaveReceipts = pendingSaveReceipts.filter(
+    ({ requestedGeneration }) => requestedGeneration > attemptGeneration,
+  );
+  for (const pending of covered) {
+    pending.resolve(
+      result.ok
+        ? {
+            ok: true,
+            requestedGeneration: pending.requestedGeneration,
+            attemptGeneration,
+          }
+        : {
+            ok: false,
+            requestedGeneration: pending.requestedGeneration,
+            attemptGeneration,
+            code: result.code,
+          },
+    );
+  }
+}
+
+function schedulePersist(): number {
   dirty = true;
-  if (saving) return;
+  saveGeneration += 1;
+  const requestedGeneration = saveGeneration;
+  if (saving) return requestedGeneration;
   saving = (async () => {
     try {
       while (dirty) {
         dirty = false;
         const method = bridgeMethod('agentOperationalSave');
         const pending = snapshot;
-        await call(method && (() => method(pending)), 'write-failed');
+        const attemptGeneration = saveGeneration;
+        const result = await call(method && (() => method(pending)), 'write-failed');
+        settleSaveReceipts(attemptGeneration, result);
       }
     } finally {
       saving = null;
     }
   })();
+  return requestedGeneration;
+}
+
+function waitForSaveReceipt(requestedGeneration: number): Promise<AgentOperationalSaveReceipt> {
+  return new Promise((resolve) => {
+    pendingSaveReceipts.push({ requestedGeneration, resolve });
+  });
 }
 
 /** Resolves once every queued save has been flushed. Used by tests and shutdown. */
@@ -191,10 +278,27 @@ export function getAgentAutomationsSnapshot(): readonly AgentAutomation[] {
   return snapshot.automations;
 }
 
+export function getAgentContextSuggestionPreferencesSnapshot(): AgentContextSuggestionPreferences {
+  return normalizeAgentContextSuggestionPreferences(snapshot.suggestions);
+}
+
 export function setAgentTaskQueueSnapshot(queue: AgentTaskQueue): AgentTaskQueue {
   applySnapshot({ ...snapshot, queue });
   schedulePersist();
   return snapshot.queue;
+}
+
+/**
+ * Optimistically applies a queue update like the synchronous setter, then
+ * resolves only after the single-flight loop has attempted to persist a
+ * snapshot containing that update.
+ */
+export function setAgentTaskQueueSnapshotDurably(
+  queue: AgentTaskQueue,
+): Promise<AgentOperationalSaveReceipt> {
+  applySnapshot({ ...snapshot, queue });
+  const requestedGeneration = schedulePersist();
+  return waitForSaveReceipt(requestedGeneration);
 }
 
 export function setAgentMemorySnapshot(memory: AgentMemoryStore): AgentMemoryStore {
@@ -209,6 +313,15 @@ export function setAgentAutomationsSnapshot(
   applySnapshot({ ...snapshot, automations });
   schedulePersist();
   return snapshot.automations;
+}
+
+export function setAgentContextSuggestionPreferencesSnapshot(
+  preferences: AgentContextSuggestionPreferences,
+): AgentContextSuggestionPreferences {
+  const suggestions = normalizeAgentContextSuggestionPreferences(preferences);
+  applySnapshot({ ...snapshot, suggestions });
+  schedulePersist();
+  return getAgentContextSuggestionPreferencesSnapshot();
 }
 
 function readLegacyKey(key: string): unknown {
@@ -316,4 +429,6 @@ export function resetAgentOperationalStateForTests(
   initPromise = null;
   saving = null;
   dirty = false;
+  saveGeneration = 0;
+  pendingSaveReceipts = [];
 }

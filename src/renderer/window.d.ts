@@ -63,6 +63,17 @@ import type {
 } from '../shared/agentOperationalState';
 import type { AgentOperationalResult } from '../shared/agentOperationalBridge';
 import type {
+  AgentExecutionLeaseAcquireRequest,
+  AgentExecutionLeaseAcquireResult,
+  AgentExecutionLeaseCommitRequest,
+  AgentExecutionLeaseCommitResult,
+  AgentExecutionLeaseReleaseResult,
+  AgentExecutionLeaseRenewResult,
+  AgentExecutionLeaseTokenRequest,
+  AgentExecutionLeaseRecoverRequest,
+  AgentExecutionLeaseRecoverResult,
+} from '../shared/agentExecutionLeaseBridge';
+import type {
   StudyAnalysisRequest,
   StudyAnkiExportResult,
   StudyAnkiPreview,
@@ -880,6 +891,21 @@ declare global {
         payload: LegacyAgentOperationalPayload,
       ): Promise<AgentOperationalResult>;
       onAgentOperationalChanged(cb: (state: AgentOperationalState) => void): () => void;
+      agentExecutionLeaseAcquire(
+        request: AgentExecutionLeaseAcquireRequest,
+      ): Promise<AgentExecutionLeaseAcquireResult>;
+      agentExecutionLeaseRenew(
+        request: AgentExecutionLeaseTokenRequest,
+      ): Promise<AgentExecutionLeaseRenewResult>;
+      agentExecutionLeaseCommit(
+        request: AgentExecutionLeaseCommitRequest,
+      ): Promise<AgentExecutionLeaseCommitResult>;
+      agentExecutionLeaseRelease(
+        request: AgentExecutionLeaseTokenRequest,
+      ): Promise<AgentExecutionLeaseReleaseResult>;
+      agentExecutionLeaseRecover(
+        request: AgentExecutionLeaseRecoverRequest,
+      ): Promise<AgentExecutionLeaseRecoverResult>;
       agentExecutionRun(request: AgentExecutionRequest): Promise<AgentExecutionResult>;
       agentExecutionCancel(requestId: string): Promise<AgentExecutionCancelResult>;
       onAgentExecutionEvent(cb: (event: AgentExecutionEvent) => void): () => void;

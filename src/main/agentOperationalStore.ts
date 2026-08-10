@@ -1,5 +1,6 @@
 /**
- * The main-owned store for the Agent's task queue, memory and automations.
+ * The main-owned store for the Agent's task queue, memory, automations and
+ * context-suggestion preferences.
  *
  * Deliberately a sibling of `agentWorkspaceStore.ts` rather than a second
  * document inside it: the workspace is conversation content and this is

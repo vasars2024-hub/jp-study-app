@@ -87,6 +87,17 @@ import type {
 } from './shared/agentOperationalState';
 import type { AgentOperationalResult } from './shared/agentOperationalBridge';
 import type {
+  AgentExecutionLeaseAcquireRequest,
+  AgentExecutionLeaseAcquireResult,
+  AgentExecutionLeaseCommitRequest,
+  AgentExecutionLeaseCommitResult,
+  AgentExecutionLeaseReleaseResult,
+  AgentExecutionLeaseRenewResult,
+  AgentExecutionLeaseTokenRequest,
+  AgentExecutionLeaseRecoverRequest,
+  AgentExecutionLeaseRecoverResult,
+} from './shared/agentExecutionLeaseBridge';
+import type {
   StudyAnalysisRequest,
   StudyAnkiExportResult,
   StudyAnkiPreview,
@@ -1368,6 +1379,26 @@ const api = {
   ): Promise<AgentOperationalResult> =>
     ipcRenderer.invoke('agentOperational:migrateLegacy', payload),
   onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
+  agentExecutionLeaseAcquire: (
+    request: AgentExecutionLeaseAcquireRequest,
+  ): Promise<AgentExecutionLeaseAcquireResult> =>
+    ipcRenderer.invoke('agentExecutionLease:acquire', request),
+  agentExecutionLeaseRenew: (
+    request: AgentExecutionLeaseTokenRequest,
+  ): Promise<AgentExecutionLeaseRenewResult> =>
+    ipcRenderer.invoke('agentExecutionLease:renew', request),
+  agentExecutionLeaseCommit: (
+    request: AgentExecutionLeaseCommitRequest,
+  ): Promise<AgentExecutionLeaseCommitResult> =>
+    ipcRenderer.invoke('agentExecutionLease:commit', request),
+  agentExecutionLeaseRelease: (
+    request: AgentExecutionLeaseTokenRequest,
+  ): Promise<AgentExecutionLeaseReleaseResult> =>
+    ipcRenderer.invoke('agentExecutionLease:release', request),
+  agentExecutionLeaseRecover: (
+    request: AgentExecutionLeaseRecoverRequest,
+  ): Promise<AgentExecutionLeaseRecoverResult> =>
+    ipcRenderer.invoke('agentExecutionLease:recover', request),
     const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
     ipcRenderer.on('agentOperational:changed', handler);
     return () => ipcRenderer.removeListener('agentOperational:changed', handler);
