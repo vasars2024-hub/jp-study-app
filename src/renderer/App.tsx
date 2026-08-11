@@ -34,6 +34,7 @@ const BlancLockscreen = lazy(() =>
   import('./components/blanc/BlancShell').then((m) => ({ default: m.BlancLockscreen })),
 );
 import ToastHost from './components/ToastHost';
+import { getAssignment, onDesktopChanged } from './desktopState';
 import SeanimeDevPanel from './components/SeanimeDevPanel';
 import MediaWorkspaceHost from '../media/MediaWorkspaceHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
@@ -169,6 +170,22 @@ function isLockscreenWindow(): boolean {
   return new URLSearchParams(window.location.search).get('lockscreen') === '1';
 }
 
+/**
+ * A per-monitor desktop window (`?desk=<index>&displayKey=<key>`).
+ *
+ * The main Study OS window carries a *bare* query string and always will:
+ * `main/debugBridge.ts` identifies it that way, so a second bare desktop would
+ * break the `jp-bridge` harness (B6). Every secondary is tagged.
+ */
+function secondaryDesktop(): { desktopIndex: number; displayKey: string } | null {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('desk');
+  if (raw == null) return null;
+  const desktopIndex = Number.parseInt(raw, 10);
+  if (!Number.isInteger(desktopIndex) || desktopIndex < 0) return null;
+  return { desktopIndex, displayKey: params.get('displayKey') ?? '' };
+}
+
 // Study OS: the desktop shell is the whole app. Opening a book/manga takes over
 // the window with the reader; closing it returns to the desktop. A pop-out
 // window (?popout=…) instead shows just one app, full-window.
@@ -185,10 +202,12 @@ export default function App() {
   });
   const [studyBootNonce, setStudyBootNonce] = useState(0);
   const popout = popoutSection();
+  const [secondary] = useState(secondaryDesktop);
   const showMainChrome =
     chromeMode === 'borderless' &&
     !locked &&
     !popout &&
+    !secondary &&
     !isMiniWidgetWindow() &&
     !isLockscreenWindow() &&
     !isBlancWindow() &&
@@ -610,7 +629,7 @@ export default function App() {
 
   // PIN gate — full-screen lock UI over a pre-mounted desktop so the unlock
   // fade never reveals an empty black canvas behind it.
-  if (locked && !popout) {
+  if (locked && !popout && !secondary) {
     return (
       <>
         <div className="desktop-root desktop-root--lock-prewarm" inert aria-hidden="true">
@@ -624,8 +643,10 @@ export default function App() {
     );
   }
 
-  // Focus mode: no desktop / living layer / clipboard chrome
-  if (focusMode && !popout) {
+  // Focus mode: no desktop / living layer / clipboard chrome.
+  // A per-monitor desktop never enters focus/mini/lock — those are modes of the
+  // main window, and mirroring them onto every monitor would blank them all.
+  if (focusMode && !popout && !secondary) {
     return (
       <>
         <FocusShell
@@ -640,7 +661,7 @@ export default function App() {
 
   // Main window: if Mini is enabled, spawn/focus the widget and stay hidden.
   // Do not paint MiniShell into the large desktop canvas.
-  if (mini.enabled && !popout && !reading) {
+  if (mini.enabled && !popout && !reading && !secondary) {
     return (
       <>
         <MiniMainBridge />
@@ -663,6 +684,16 @@ export default function App() {
         <GlobalDictionaryOverlay />
         <ToastHost />
       </>
+    );
+  }
+
+  if (secondary) {
+    return (
+      <SecondaryDesktopWindow
+        desktopIndex={secondary.desktopIndex}
+        displayKey={secondary.displayKey}
+        onOpenBook={setReading}
+      />
     );
   }
 
@@ -713,6 +744,59 @@ export default function App() {
       {/* Phase-1 Seanime proof. Self-hides unless the sidecar flag is armed. */}
       <SeanimeDevPanel />
       {/* Phase-2 MEDIA workspace (adopted library/lists). Same self-hiding rule. */}
+      <MediaWorkspaceHost />
+    </>
+  );
+}
+
+/**
+ * One monitor's desktop, in its own window.
+ *
+ * Two things differ from the main window. The desktop index is pinned rather
+ * than read from `activeDesktopIndex`, and `main/desktopWindows.ts` can retarget
+ * it in place when the user reassigns the display in Settings — cheaper and less
+ * jarring than tearing the window down and rebuilding it.
+ *
+ * B8: the fixed 1280x960 Aero canvas letterboxes badly on a portrait or
+ * ultrawide monitor, so each display can opt out of it independently.
+ */
+function SecondaryDesktopWindow({
+  desktopIndex,
+  displayKey,
+  onOpenBook,
+}: {
+  desktopIndex: number;
+  displayKey: string;
+  onOpenBook: (item: LibraryItem) => void;
+}) {
+  const [index, setIndex] = useState(desktopIndex);
+  const [aero, setAero] = useState(true);
+
+  useEffect(() => {
+    return window.api.onDeskRetarget((payload) => {
+      if (payload.displayKey === displayKey) setIndex(payload.desktopIndex);
+    });
+  }, [displayKey]);
+
+  useEffect(() => {
+    const read = (): void => {
+      setAero(getAssignment(displayKey)?.aero !== false);
+    };
+    read();
+    return onDesktopChanged(read);
+  }, [displayKey]);
+
+  const shell = (
+    <DesktopShell onOpenBook={onOpenBook} desktopIndex={index} displayKey={displayKey} secondary />
+  );
+
+  return (
+    <>
+      <div className="desktop-root desktop-root-secondary">
+        {aero ? <AeroViewport>{shell}</AeroViewport> : shell}
+      </div>
+      <GlobalDictionaryOverlay />
+      <ToastHost />
       <MediaWorkspaceHost />
     </>
   );
