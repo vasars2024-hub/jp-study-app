@@ -5841,3 +5841,43 @@ touched paths: **0 errors, 0 warnings**.
   section running.
 - **The five untracked `src/shared/i18n/*/` directories** — unchanged and still
   not this track's to adopt.
+
+## What a detached worktree says about HEAD — 2026-08-11
+
+The commit above was verified the way this repository's rules require a
+reconstructed blob to be verified: checked out into a **detached worktree** and
+exercised there, rather than trusted from the tree it was built in. Three
+measurements came back, and the last two are about the branch rather than the
+commit.
+
+**The reconstructed catalogs are sound.** With `node_modules` junctioned in,
+`node tools/i18n-check.cjs` at `d92b221` reports **8,924 English keys, all
+translated in ja/zh/ru, exit 0**. That is the committed number; the working tree
+reads 9,264, and the 340-key gap is the other tracks' uncommitted keys measured
+in the section above. The four spliced files parse, and every key this commit
+adds is present in all four languages at the commit.
+
+**`i18n-check` cannot run from a clean checkout at all.** Before the junction and
+before copying anything in, it fails with **20 esbuild resolution errors** —
+`Could not resolve "../gameArena/en"`, `"../mooncapLore/en"`, `"../miningUi/en"`,
+`"../malSync/en"`, `"../scraperUi/en"`, four languages each. HEAD's `en.ts`
+imports five directories that have never been committed. This ledger has recorded
+those five as untracked twice; what is new is the consequence: **one of the four
+gates is unrunnable from the branch's own history.** The check only passes here
+because everyone runs it in a working tree that happens to contain them. They
+were copied in for this verification and are not adopted.
+
+**Three `i18n.test.ts` hygiene tests fail from HEAD, and they are not this
+commit's.** `does not let a new block of English be spread into every catalog`,
+`does not let a new component render UI text without adopting i18n` and `does not
+let a date or time be formatted in the OS locale` fail at `d92b221` — and the
+**identical three fail at its parent `c7d9d63`**, which does not contain any of
+this slice's changes. So the set is pre-existing and inherited, not introduced.
+The commit's own four test files pass in the worktree (64 of 67, the three being
+exactly that inherited set).
+
+That comparison is the whole point of running it twice. A worktree run of a
+single commit produces a list of failures and no way to tell which of them the
+commit caused; the parent is the only control that separates "this broke it" from
+"this is what the branch already was". Whoever next verifies a commit here should
+budget for the second run rather than reporting the first as a regression.
