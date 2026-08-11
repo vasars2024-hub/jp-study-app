@@ -20,6 +20,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   globalShortcut,
   ipcMain,
   screen,
@@ -27,6 +28,8 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
+import type { ReadingLensCapture } from '../shared/readingLens';
+import { createReadingLensClipboardCapture } from './readingLensClipboard';
 
 export interface ReadingLensSettings {
   enabled: boolean;
@@ -40,13 +43,15 @@ export interface ReadingLensStatus extends ReadingLensSettings {
   open: boolean;
 }
 
-export type LensOpenMode = 'select' | 'auto';
+export type LensOpenMode = 'select' | 'auto' | 'clipboard';
 
 export interface LensInit {
   /** The window covers this display; renderer coords are display-local DIP. */
   bounds: Electron.Rectangle;
   mode: LensOpenMode;
   scaleFactor: number;
+  /** Present only for an explicit clipboard open; never populated by a screen scan. */
+  capture?: ReadingLensCapture;
 }
 
 const STATE_FILE = 'reading-lens.json';
@@ -128,7 +133,21 @@ function openLens(mode: LensOpenMode): void {
   const display = displayUnderCursor();
   lensDisplayId = display.id;
   const bounds = display.bounds;
-  pendingInit = { bounds, mode, scaleFactor: display.scaleFactor || 1 };
+  let capture: ReadingLensCapture | null = null;
+  if (mode === 'clipboard') {
+    try {
+      capture = createReadingLensClipboardCapture(clipboard.readText());
+    } catch {
+      // Clipboard access is explicit but can still be denied by the OS. The
+      // renderer receives an empty clipboard state rather than losing the Lens.
+    }
+  }
+  pendingInit = {
+    bounds,
+    mode,
+    scaleFactor: display.scaleFactor || 1,
+    ...(capture ? { capture } : {}),
+  };
 
   if (lens && !lens.isDestroyed()) {
     lens.setBounds(bounds);
@@ -202,7 +221,7 @@ function trigger(): void {
 // ---- Global shortcut ----------------------------------------------------
 
 function toAccelerator(chord: string): string {
-  return chord.split('|')[0]!.trim().replace(/\bMeta\b/g, 'Super');
+  return (chord.split('|')[0] ?? '').trim().replace(/\bMeta\b/g, 'Super');
 }
 
 function unregisterShortcut(): void {
@@ -303,7 +322,7 @@ export function registerReadingLensIpc(): void {
 
   // Programmatic open (Settings button / testing) mirrors the hotkey path.
   ipcMain.handle('lens:open', (_e, mode: unknown): void => {
-    openLens(mode === 'auto' ? 'auto' : 'select');
+    openLens(mode === 'auto' || mode === 'clipboard' ? mode : 'select');
   });
 
   ipcMain.handle('lens:getInit', (): LensInit | null => pendingInit);

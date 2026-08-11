@@ -7880,3 +7880,445 @@ was staged. The index remained empty, so there is no partial checkpoint and no f
 work. A Git-writable relay must stage the four clean/new implementation-test paths and a
 reconstructed `HEAD + only this section` ledger blob, verify the resulting commit in a detached
 worktree, and create the checkpoint.
+
+## The OCR confidence that travelled all the way to a hidden field — 2026-08-11
+
+State was re-derived from source before editing. `docs/audit/RELAY_BOSS_AUDIT.md` still does not
+exist, the plan's dependency order and the previous final section keep Main V1 on **Track 5**, and
+the confidence requirement was genuinely open. `screenOcr.ts` already returned a confidence for
+every line, `normalizeReadingLensCapture` bounded it, and `ReadingLensOverlay` copied it into each
+live `LensLine`. No renderer branch read that value. The Lens therefore showed a questionable OCR
+read with exactly the same treatment as a reliable one even though it already knew the difference.
+
+The concurrent capture-history work is still foreign and uncommitted: its record call in
+`ReadingLensOverlay.tsx`, the main/preload/settings/catalog changes and the two history modules were
+left intact. This slice does not claim that work.
+
+### What changed, and the honesty boundary
+
+`shared/readingLensConfidence.ts` is the pure presentation policy. A line at 0.85 or above is
+`high`, matching the OCR service's existing `MIN_CONF_OK` retry boundary; 0.65-0.849 is `review`;
+anything below that is `low`. Non-finite and out-of-range values are bounded before display. The
+capture headline is the unweighted mean of the engine's line confidences, consistent with the OCR
+service's own selection metric, while `reviewLineCount` independently counts every line below the
+reliable boundary so one short bad line cannot disappear inside a good average.
+
+The live Lens chrome now shows a localized percentage and status. Review and low-confidence lines
+also receive distinct amber/red inset markers and a localized per-line confidence title; reliable
+lines retain the existing quiet treatment. The status is typography and Fluent colour, with no
+decorative emoji. Five new keys are present in en/ja/zh/ru.
+
+Alternate candidates were deliberately **not** invented here. Neither `LensOcrResult` nor either
+OCR adapter returns candidates, so a candidate UI would be fabricated certainty or would require
+running and retaining a second engine result. That remains a separate implementation/product
+slice. Editable corrections also remain separate because they have to update the capture text,
+history and downstream Agent/Workbench handoffs atomically rather than merely changing a label.
+
+### Tests and required gates
+
+- `shared/__tests__/readingLensConfidence.test.ts`: four cases hold the exact thresholds, malformed
+  value bounding, mean plus independent review count, and the honest empty state.
+- `renderer/__tests__/readingLensConfidence.test.tsx`: renders the actual exported `LensChrome` and
+  proves that the computed level class and exact percent/review-count arguments reach i18n.
+- Focused result: **2 files / 5 tests passed**.
+- `npx vitest run`: **527 passed / 1 skipped of 528 files**, **7,140 passed / 6 skipped of 7,146
+  tests**.
+- `node tools/i18n-check.cjs`: the direct invocation hit the known esbuild parent-directory ACL
+  artifact before catalog evaluation; the exact command passed from a temporary `R:` mapping rooted
+  at this workspace: all **9,304** English keys translated in ja/zh/ru. The mapping was removed and
+  verified absent.
+- `node tools/architecture-audit.cjs`: **exit 0**, 1,705 modules, nothing new, the same 3 known
+  pending findings.
+- `npx eslint` on all touched TS/TSX paths: **exit 0, 0 errors, 0 warnings**. CSS is not an ESLint
+  input in this repository (passing it produces a parser error), so it was verified by the renderer
+  transform, focused/full Vitest runs and live rendering.
+- `tsc --noEmit` was not run; it is not a gate in this repository.
+
+### Live Electron acceptance
+
+Driven through the authenticated HTTP debug bridge, never mouse/keyboard automation and never
+Computer Use. The running Electron renderer imported the current Vite modules for
+`ReadingLensOverlay.tsx` and `readingLensConfidence.ts`, then rendered the actual `LensChrome` into
+a transient React root with three controlled engine confidences: 0.96, 0.72 and 0.41.
+
+- Both the helper and `LensChrome` exports were functions in the running bundle.
+- The live summary was **70%, review, 2 lines to review**.
+- After the running i18n module initialized its already-selected Russian catalog, the badge read
+  `OCR 70% · проверьте` and its title used the correct Russian plural form, `Проверьте 2 строки`.
+- The DOM carried `lens-confidence-badge lens-confidence-review`, measured 120.22 × 22 DIP, and
+  resolved the intended amber `rgba(215, 150, 48, 0.22)` background plus the subtle border. No raw
+  catalog key was visible.
+- A bridge screenshot was inspected: the compact badge remained legible inside the existing chrome
+  capsule at the bottom of the 1,264 × 821 content area. The screenshot was then deleted.
+- `/logs?level=error` was **0 before and after**. The React root was unmounted, its host and both
+  probe globals were deleted and verified absent. No storage API, userData file, persisted setting,
+  OCR engine, screen capture or window geometry was touched.
+
+This is a controlled UI acceptance rather than a claim that a new main process performed OCR: the
+confidence transport itself is already covered at the OCR/capture boundaries and the change is a
+renderer presentation slice. Exercising a real OCR engine would add model/capture variability while
+testing no additional code in this change.
+
+### Track 5 disposition and next slice
+
+This closes the explicit **OCR confidence presentation** portion of Track 5. Editable corrections,
+real alternate candidates, the mixed-panel reading-order model, clipboard captures and persistent
+pins remain open. The foreign capture-history slice must be re-derived after it lands rather than
+assumed complete. Blanc and Aero remain ineligible.
+
+### Checkpoint
+
+The path-scoped checkpoint was attempted after all gates and live cleanup. Git could not create
+`.git/index.lock` under this worker's permission profile (`Permission denied`), before any path was
+staged. The index was empty before the attempt and remained empty after it.
+
+A Git-writable relay can stage the clean/new confidence policy, its two tests and
+`readingLens.css` directly. `ReadingLensOverlay.tsx` must be reconstructed as `HEAD + only the
+confidence imports, line treatment, summary prop and exported chrome`; its foreign history-record
+hunk must stay out. Each catalog must be reconstructed as `HEAD + only the five confidence keys`,
+and this ledger as `HEAD + only this dated section`. Test that exact staged tree in a detached
+worktree before creating the checkpoint.
+
+## The OCR typo that no longer survived the Edit button — 2026-08-11
+
+State was re-derived from source before editing. The boss-audit file still does not exist, the
+plan's dependency order and the previous final section keep Main V1 on **Track 5**, and editable
+OCR text was genuinely open. The line-order and confidence slices were present but uncommitted,
+along with a foreign capture-history implementation; none was treated as landed or claimed here.
+
+### One correction envelope, not a painted-over label
+
+shared/readingLensCorrection.ts is the pure correction boundary. It replaces one normalized OCR
+line and rebuilds the capture's canonical passage through joinReadingLensLines, while retaining
+the original capture id, screenshot, OCR hash, timestamp, line geometry, orientation and
+confidence. An empty correction or an invalid line index is rejected without mutating the source
+capture. This keeps the edit honest: it repairs OCR text but does not pretend the image or engine
+result changed.
+
+The live overlay now has a localized **Edit text / Done** state. In edit mode, each detected line is
+a controlled, keyboard-operable Japanese text input in its original position. Enter commits after
+IME composition; Escape restores the source line; an empty value is rolled back. Editing suspends
+the auto-dismiss timer and the automatic AI panel. A successful commit rebuilds both the rendered
+token lines and state.capture; leaving edit mode therefore reopens AI analysis from the corrected
+capture, while Agent and visual-novel actions consume the corrected live lines. The screenshot
+evidence remains attached to the corrected capture.
+
+The concurrent history bridge is feature-detected rather than made a prerequisite for this
+checkpoint. When it is present, it receives that same corrected capture, so its stored text can be
+replaced without retaining screenshot bytes. Persistence remains deliberately best-effort under
+the foreign history slice's existing contract; this section does **not** claim that uncommitted
+history work or a transactional disk guarantee.
+
+Five new strings are localized in en/ja/zh/ru. The controls use typography and the existing Fluent
+deep-red treatment, with no decorative emoji.
+
+### Tests and required gates
+
+- shared/__tests__/readingLensCorrection.test.ts: three cases prove canonical passage rebuild,
+  preservation of source evidence and geometry, NFKC/line-ending normalization, invalid-index
+  rejection and empty-edit rejection.
+- renderer/__tests__/readingLensCorrectionEditor.test.tsx: two interaction cases drive the actual
+  controlled input through Enter and blur, and prove a rejected correction restores source text.
+- Focused result: **2 files / 5 tests passed**.
+- npx vitest run through Vitest's direct Node entrypoint: **529 passed / 1 skipped of 530 files**,
+  **7,145 passed / 6 skipped of 7,151 tests**.
+- node tools/i18n-check.cjs: the direct invocation hit the known esbuild parent-directory ACL
+  artifact before catalog evaluation. The exact command passed from a temporary R: mapping rooted
+  at this workspace: all **9,309** English keys translated in ja/zh/ru. The mapping was removed and
+  verified absent.
+- node tools/architecture-audit.cjs: **exit 0**, 1,708 modules, nothing new, the same 3 known
+  pending findings.
+- npx eslint on only the four touched TS/TSX implementation/test paths: **exit 0, 0 errors,
+  0 warnings**. CSS was verified through the renderer transform, full suite and live render.
+- tsc --noEmit was not run; it is not a gate in this repository.
+
+### Live Electron acceptance
+
+Driven through the authenticated HTTP debug bridge against the running app, never mouse/keyboard
+automation and never Computer Use. The live renderer imported the actual current
+ReadingLensOverlay.tsx module and initialized its already-selected Russian catalog, then mounted a
+transient React root using the exported chrome and line editor.
+
+- The localized state changed from Исправить текст to Готово.
+- The editor's accessible name was Исправить строку OCR 1.
+- A controlled correction from 猫てある to 猫である committed exactly once on Enter, and 猫である
+  remained after leaving edit mode.
+- The live input retained the low-confidence treatment and no raw lens.edit.* or lens.confidence.*
+  key was visible.
+- A 1,264 × 821 bridge screenshot was inspected with the real .lens-root variable scope: the white
+  Japanese text, deep-red focus ring, confidence badge and compact chrome were legible without
+  clipping. The screenshot was deleted.
+- /logs?level=error was **0 before and after**. Both transient roots, both probe globals and all
+  probe hosts were removed and verified absent. No storage API, userData file, persisted setting,
+  OCR engine, screen capture or window geometry was touched.
+
+### Track 5 disposition and next slice
+
+This closes the bounded **in-session editable OCR correction** slice. Alternate candidates and a
+mixed-panel reading-order model still require explicit provider/product decisions. Clipboard
+captures, persistent pins, progressive Read mode and the remaining shared handoffs remain open.
+The foreign capture-history slice still has to be re-derived and checkpointed by its owner; once it
+lands, its correction/update semantics should be verified against this same-envelope handoff rather
+than assumed. Blanc and Aero remain ineligible.
+
+### Checkpoint
+
+The path-scoped checkpoint was attempted after all gates and live cleanup. Git could not write the
+first new blob: git hash-object -w src/shared/readingLensCorrection.ts failed with **insufficient
+permission for adding an object to repository database .git/objects**. This was before staging;
+git diff --cached --name-only remained empty. A detached staged-tree verification and commit are
+therefore impossible under this worker's read-only .git permission.
+
+A Git-writable relay must reconstruct the checkpoint as the new correction policy and its two
+tests, only the edit state/editor/state-flow hunks in ReadingLensOverlay.tsx, only the editor styles
+in readingLens.css, only the five lens.edit.* keys in each catalog, and only this dated ledger
+section. Foreign confidence and history hunks must remain out of the index. Test that exact staged
+tree in a detached worktree before creating the checkpoint.
+
+
+## The clipboard became a capture, not a fake OCR box — 2026-08-11
+
+State was re-derived before editing. The boss-audit file still does not exist, the plan's
+dependency order and the latest ledger section keep Main V1 on **Track 5**, and the clipboard
+requirement was genuinely open. The relay's screenshot/OCR Agent hint was stale: that vision lane
+is already recorded as complete. The shared ReadingLens source enum and normalization tests named
+clipboard captures, but no main action could read the clipboard and no reachable Lens UI could
+display a text-only capture.
+
+### One explicit read, one existing retention boundary
+
+main/readingLensClipboard.ts is the text-only boundary. It normalizes an explicitly read clipboard
+value through normalizeReadingLensCapture, applies the existing 20,000-character cap and NFKC /
+newline cleanup, marks the source as clipboard with engine none, and hashes the normalized text
+with SHA-256. Equivalent width and newline forms therefore share one stable capture/history id.
+Empty and non-text values fail closed. No image, raw binary field or alternate payload is accepted.
+
+The privacy decision is deliberately narrow:
+
+- Electron clipboard.readText runs only after the user chooses **Read clipboard** or a caller
+  explicitly opens the Lens in clipboard mode. The existing global region hotkey never reads it.
+- No provider is called by the capture boundary. If the user already selected the Lens's visible AI
+  mode, the existing sentence-analysis policy applies after the capture exactly as it does to a
+  screen scan; dictionary mode stays local.
+- Clipboard text enters the already-visible Reading Lens capture history policy: text/source
+  metadata only, at most 200 entries. The existing history projection still drops screenshots.
+  This slice adds no new retention store, no clipboard monitoring and no background read.
+- The Agent handoff receives normalized text only. The shared image-staging lane and its forbidden
+  raw attachment fields are untouched because a text clipboard capture has no image evidence.
+
+LensOpenMode now includes clipboard and LensInit may carry the normalized capture. The existing
+lens:open main handler recognizes that exact mode, reads once, and delivers either the bounded
+capture or an honest empty state. This extends the handler rather than adding a preload-only
+binding.
+
+The selection overlay exposes a localized **Read clipboard** button. A clipboard capture has no OCR
+geometry, so LensClipboardPassage renders a centered, scrollable passage instead of inventing line
+boxes or confidence. Japanese tokens remain dictionary actions; the existing Dictionary AI / AI
+OCR choice, Agent handoff, capture history, new-region action and close action all consume the same
+normalized capture. Four languages include the new action, empty state and source badge. The panel
+uses the existing Fluent deep-red variables and no decorative emoji.
+
+A pre-existing non-null assertion in main/readingLens.ts was replaced with a null-safe accelerator
+fallback so the touched-file ESLint gate is warning-free.
+
+### Tests and required gates
+
+- main/__tests__/readingLensClipboard.test.ts: three cases prove text-only normalization, the
+  20k-boundary normalizer's NFKC/newline behavior, stable normalized hashing, timestamp freshness,
+  and empty/non-text rejection.
+- renderer/__tests__/readingLensClipboardPassage.test.tsx: the real passage component renders its
+  localized source chrome, applies bounded geometry, keeps Japanese words interactive and exposes
+  the Agent action.
+- Focused result including the existing capture/correction/confidence boundaries:
+  **5 files / 15 tests passed**.
+- npx vitest run through Vitest's direct Node entrypoint: **531 passed / 1 skipped of 532 files**,
+  **7,149 passed / 6 skipped of 7,155 tests**.
+- node tools/i18n-check.cjs: the direct invocation hit the known esbuild parent-directory ACL
+  artifact before catalog evaluation. The exact command passed from a temporary R: mapping rooted
+  at this workspace: all **9,312** English keys translated in ja/zh/ru. The mapping was removed and
+  verified absent.
+- node tools/architecture-audit.cjs: **exit 0**, 1,712 modules, nothing new, the same 3 known
+  pending findings.
+- ESLint on only the ten touched TS/TSX implementation/test/catalog paths: **exit 0, 0 errors,
+  0 warnings**. CSS was verified through the renderer transform, focused/full suite and live render.
+- tsc --noEmit was not run; it is not a gate in this repository.
+
+### Live Electron acceptance
+
+Driven through the authenticated HTTP debug bridge, never mouse/keyboard automation and never
+Computer Use. The existing Electron process exposed one blank dev renderer with no window.api;
+a bridge reload remained blank and did not restore preload. Windows also denied process
+enumeration/termination to this worker, so a main-process restart could not be performed safely.
+The attempted call therefore never reached lens:open, and this section **does not claim live main
+handler acceptance**. The next ordinary app restart must invoke lensOpen('clipboard') and inspect
+the resulting Reading Lens window before the handler portion is called live-complete.
+
+The live renderer did load the actual current Vite transforms for LensClipboardPassage,
+ReadingLensOverlay, the shared capture normalizer and the already-selected Russian catalog. A
+transient React root rendered a normalized clipboard passage and was driven through DOM calls:
+
+- the source badge read БУФЕР; Dictionary AI / AI OCR and all actions were localized, with no raw
+  lens.* key visible;
+- clicking the first live Japanese token reported exactly 猫 once, and the Agent action reported
+  exactly one invocation;
+- the panel measured 720 x 190.06 DIP at (180, 130); its text area had 90 px scroll and client
+  heights, so it did not clip or overflow;
+- computed variables were accent #b23b47, ink #f4f4f6 and background rgba(16,17,22,0.86); the badge
+  resolved to the intended deep red;
+- a 1,264 x 821 bridge screenshot was inspected: the Japanese passage, Russian chrome and compact
+  actions were legible, balanced and unclipped.
+
+The fallback file editor briefly caused Vite to observe a truncate event and cache an empty CSS
+transform even though the completed file on disk was intact. After the completed writes, timestamps
+were refreshed without changing content; the served transform was rechecked at 16,009 characters
+with .lens-root present before the final render. Both transient screenshots were deleted and
+verified absent. The root, host and probe globals were removed and verified absent.
+/logs?level=error was **0 before and after**. No clipboard value, storage API, userData file,
+persisted setting, screen capture, OCR engine or window geometry was changed.
+
+### Track 5 disposition and next slice
+
+This closes the source, renderer and automated-test portions of explicit **clipboard captures**.
+It remains live-main-pending solely because this worker could not restart the already-running
+process. Persistent pinned captures, progressive passage Read mode, remaining Lexicon/Workbench/
+Reading handoffs and privacy/default controls remain open. Alternate OCR candidates and a
+mixed-panel order model still require explicit provider/product decisions. Blanc and Aero remain
+ineligible.
+
+### Checkpoint
+
+The path-scoped checkpoint could not be created. Before staging, git diff --cached --name-only was
+empty. git add -- src/main/readingLensClipboard.ts then failed because .git/index.lock could not be
+created (**Permission denied**); the index remained empty afterward.
+
+A Git-writable relay should stage the five clean/new clipboard helper, passage, CSS and test paths
+directly. It must reconstruct main/readingLens.ts as HEAD plus only the Electron clipboard import,
+ReadingLensCapture/helper imports, clipboard mode/init/read/handler changes and the null-safe
+accelerator line; its foreign capture-history hunks stay out. It must reconstruct
+ReadingLensOverlay.tsx as HEAD plus the clipboard component/state/begin/workflow/pass-through/
+Agent/selection/passage/analysis hunks while retaining but not staging foreign confidence,
+correction and history work. readingLens.css contributes only the lens-select-clipboard block;
+each catalog contributes only the three lens clipboard keys; this ledger contributes only this
+dated section. Verify that exact staged tree in a detached worktree before creating the checkpoint.
+
+## Four slices that were finished but never committed, and a red HEAD — 2026-08-11
+
+State was re-derived from source, not from any closing summary. `docs/audit/RELAY_BOSS_AUDIT.md`
+still does not exist. The plan's dependency order keeps Main V1 on Track 4/5, so Blanc and Aero
+remain ineligible. What re-derivation actually found was not an open implementation slice: it was
+that **HEAD's ledger ended at "The cover art the shipped build could never have painted"** while the
+working tree carried five further completed, gated, live-driven sections. Every one of them ends in
+a Checkpoint paragraph reporting that Git refused the worker — `.git/index.lock` permission denied,
+or `insufficient permission for adding an object to repository database .git/objects`.
+
+This worker can write Git objects (`git hash-object -w` and `git add` both succeed), so the work of
+this hop was to land that backlog correctly rather than to add a sixth stranded slice on top.
+
+### What was committed
+
+- `9ec7a87` the discovery cover fallback. `ReadingUnifiedDiscovery.tsx` was reconstructed as HEAD
+  plus only this slice's `coverArt` import and cover markup; the component's foreign, uncommitted
+  action-host work stayed in the working tree and out of the index.
+- `3831188` the OCR line-order repair. `screenOcr.ts` and its test were dirty from this slice alone,
+  so those two plus the new shared orderer and its test staged directly.
+- `1116a84` the stranded `.tsx` test glob (below).
+- this commit: the confidence, correction and clipboard slices together.
+
+The last three Lens slices layer on the same `ReadingLensOverlay.tsx`, `readingLens.css` and four
+catalogs. Splitting them would have meant hand-reconstructing two intermediate states of a 35 KB
+component, which is the kind of surgery that invents a defect. They are therefore **one** checkpoint,
+with each slice's own dated section left intact above.
+
+### The two reconstructions that changed committed behaviour
+
+`window.api.lensHistoryRecord` **does not exist at HEAD** — the capture-history slice's preload
+binding is still uncommitted. The working tree called it unconditionally in two places, so
+committing either verbatim would have shipped a `TypeError` on the first capture.
+
+- The scan path's record call and its comment were dropped entirely; they belong to the history
+  slice and will land with it.
+- The clipboard path's call was converted to the same feature-detected optional form the correction
+  slice already uses a few dozen lines below it, so a clipboard capture still reaches history when
+  that slice lands and is a no-op until then.
+
+`main/readingLens.ts` was reconstructed as the working file minus the four `lens:history:*` handlers
+and the `readingLensHistory` imports. The catalogs were rebuilt hunk-by-hunk from HEAD, admitting
+only the 13 keys matching `lens.select.clipboard`, `lens.clipboard.*`, `lens.edit.*`,
+`lens.badge.source.clipboard` and `lens.confidence.*` — 16/13/13/18 added lines in en/ja/zh/ru,
+matching the classifier's count exactly. No preload, settings page or history module is in this
+commit.
+
+### The finding: HEAD does not pass its own gates, and nobody had measured that
+
+Every recent section reports a green `npx vitest run`. Those runs were performed in the **working
+tree**, which contains every track's uncommitted work. Exported as a tree and run on its own, the
+branch tells a different story:
+
+- `HEAD` before this hop: **488 files, 6,608 tests, 46 failing in 9 files.**
+- after this hop's commits: **499 files, 6,661 tests, 46 failing in the same 9 files — 0 new.**
+
+The 46 are pre-existing and belong to other tracks' uncommitted work, not to this one:
+`scraperQbittorrent` (28, the credential vault), `agentContextSuggestions`,
+`agentNavigationIndexMirror`, `blancAgentStepConfirmGate`, `localAgentQueueRun`,
+`novelReaderProgressGuard`, `architectureBaseline`, `credentialRegistry` and `i18n` catalog hygiene.
+`src/main/credentials/ipc.ts` is committed with nothing importing it; the wiring that would import
+it is not. **A gate run against the working tree is not evidence about the branch.** Future sections
+should say which tree they measured.
+
+### The stranded test glob
+
+`vitest.config.ts`'s renderer include has been `*.test.{ts,tsx}` in the working tree since the
+2026-08-04 U9 audit — with a long comment explaining why — and was never committed. At HEAD the glob
+was `*.test.ts`, so **every `.test.tsx` in the repository was silently uncollected**: not skipped,
+not reported, invisible. That includes eight tracked files, three of them the renderer tests the
+confidence, correction and clipboard sections above cite as evidence.
+
+`src/renderer/__tests__/helpers/i18nLeak.ts` had to land with it: `readingLensI18n.test.tsx` is
+already tracked and imports that helper, so the glob alone would have broken the suite. With both,
+the eight tracked `.tsx` files pass — **43 tests** — and the set-difference against HEAD is zero new
+failures. The five untracked `.tsx` files (aero, arcade, blanc, tour, visual-novel, wallpaper) are
+other tracks' and were left untouched.
+
+### Required gates, measured on the exported commit tree
+
+Not on the working tree. Each was run in a detached checkout of `git write-tree`'s output with
+`node_modules` junctioned in.
+
+- `npx vitest run`: 499 files / 6,661 tests; **0 new failures** by set-difference on file+test name
+  against HEAD's own 46.
+- `node tools/i18n-check.cjs`: **exit 0**, all **8,971** English keys translated in ja/zh/ru. (The
+  working tree's 9,312 includes other tracks' uncommitted keys.)
+- `node tools/architecture-audit.cjs`: exit 1 with **exactly** the same six unclassified findings as
+  HEAD — three `credentials:*` dead-ipc, two orphan modules, one test-only module. **0 new.** This
+  gate is red at HEAD for reasons that predate this hop.
+- `npx eslint --max-warnings 0` on all sixteen touched TS/TSX paths: **exit 0**.
+- `tsc --noEmit` was not run; it is not a gate in this repository.
+
+### Live Electron acceptance — not performed, and why
+
+There is no running app to drive: no `electron` process exists and the debug bridge port refuses
+connection. Nothing was mouse- or keyboard-automated and Computer Use was not used.
+
+This is stated plainly rather than worked around. The confidence, correction and clipboard behaviour
+*was* driven live by the sections above, and those sections stand. What has **never** been driven
+live is `lensOpen('clipboard')` reaching the main handler — three consecutive workers were denied
+process termination and could not restart Electron. It is still the outstanding acceptance item, and
+running the app now would exercise the working tree, not the reconstructed blobs this commit
+contains, so it would not have validated the thing that actually changed here.
+
+### Disposition and next slice
+
+The Lens backlog is now on the branch. Still open in Track 5: persistent pinned captures, progressive
+passage Read mode, the remaining Lexicon/Workbench/Reading handoffs, and privacy/default controls.
+Alternate OCR candidates and a mixed-panel order model still need explicit provider/product
+decisions.
+
+Two things outrank a new feature slice for whoever runs next:
+
+1. **`lensOpen('clipboard')` live**, on the next ordinary app start.
+2. **The 46 red tests at HEAD.** They are other tracks' stranded work, exactly as the Lens slices
+   were. The remedy is the same one applied here — commit it, path-scoped, verified against an
+   exported tree. The capture-history slice (`main/readingLensHistory.ts`,
+   `shared/readingLensHistory.ts`, `preload.ts`, `ReadingLensSection.tsx` and its overlay hunks) is
+   still uncommitted and is the natural next one, since two call sites in this commit are already
+   feature-detecting it.

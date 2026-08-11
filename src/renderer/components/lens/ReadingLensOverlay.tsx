@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import LensReaderPanel from './LensReaderPanel';
 import LensAnalysisPanel from './LensAnalysisPanel';
+import LensClipboardPassage from './LensClipboardPassage';
 import { useT } from '../../i18n';
 import { handOffToAgent, readingPassageAgentContext } from '../../agentContextHandoff';
 import { getTokenizer, tokenizeSync, tokenizerReady, type JpToken } from '../../tokenizer';
@@ -16,6 +17,11 @@ import {
   type ReadingLensCapture,
   type ReadingLensLine,
 } from '../../../shared/readingLens';
+import {
+  readingLensConfidenceLevel,
+  summarizeReadingLensConfidence,
+} from '../../../shared/readingLensConfidence';
+import { correctReadingLensLine } from '../../../shared/readingLensCorrection';
 import './readingLens.css';
 
 /**
@@ -64,10 +70,27 @@ type LensState =
     capture: ReadingLensCapture;
     screenshotDataUrl?: string;
   }
+  | {
+      kind: 'passage';
+      region: Rect;
+      capture: ReadingLensCapture;
+      tokens: JpToken[];
+    }
   | { kind: 'empty'; region: Rect }
   | { kind: 'error'; region: Rect | null; message: string; canRetry: boolean };
 
 const MIN_REGION = 12;
+
+function passageRegion(width: number, height: number): Rect {
+  const passageWidth = Math.max(320, Math.min(720, width - 48));
+  const passageHeight = Math.max(220, Math.min(560, height - 96));
+  return {
+    x: Math.max(24, (width - passageWidth) / 2),
+    y: Math.max(24, (height - passageHeight) / 2),
+    width: passageWidth,
+    height: passageHeight,
+  };
+}
 
 /**
  * What a scan resolves to.
@@ -120,6 +143,7 @@ export default function ReadingLensOverlay() {
   const [mode, setModeState] = useState<LensMode>(loadMode);
   /** The sentence the AI panel is currently explaining; null when it is closed. */
   const [analysisText, setAnalysisText] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   // Drag selection scratch state.
   const dragStart = useRef<{ x: number; y: number } | null>(null);
@@ -164,6 +188,7 @@ export default function ReadingLensOverlay() {
   const begin = useCallback((init: LensInit) => {
     setPopup(null);
     setAnalysisText(null);
+    setEditMode(false);
     setDragRect(null);
     dragStart.current = null;
     setVisualNovelSaveState('idle');
@@ -176,7 +201,27 @@ export default function ReadingLensOverlay() {
     }
     setVisualNovelTarget(target);
     interactiveRef.current = true; // main re-enabled the mouse on open
-    if (init.mode === 'auto') {
+    if (init.mode === 'clipboard') {
+      const capture = normalizeReadingLensCapture(init.capture);
+      if (!capture) {
+        setState({ kind: 'error', region: null, message: t('lens.clipboard.empty'), canRetry: false });
+        return;
+      }
+      // Capture history is landing concurrently and is optional at this
+      // boundary too; a clipboard read must not depend on it to display.
+      const clipboardHistoryApi = window.api as typeof window.api & {
+        lensHistoryRecord?: (entry: ReadingLensCapture) => Promise<unknown>;
+      };
+      void clipboardHistoryApi.lensHistoryRecord?.(capture).catch(() => undefined);
+      setState({
+        kind: 'passage',
+        region: passageRegion(init.bounds.width, init.bounds.height),
+        capture,
+        tokens: tokenizerReady()
+          ? tokenizeSync(capture.text)
+          : [{ surface: capture.text, lemma: capture.text } as JpToken],
+      });
+    } else if (init.mode === 'auto') {
       setState({
         kind: 'scanning',
         region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
@@ -185,7 +230,7 @@ export default function ReadingLensOverlay() {
     } else {
       setState({ kind: 'selecting' });
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let alive = true;
@@ -287,17 +332,18 @@ export default function ReadingLensOverlay() {
   // AI mode analyses the scan as soon as it lands, without a second click. The
   // shared workflow contract supplies the same normalized passage that a future
   // Reading workspace handoff will receive.
-  const readingCapture = state.kind === 'reading' ? state.capture : null;
+  const readingCapture = state.kind === 'reading' || state.kind === 'passage' ? state.capture : null;
   useEffect(() => {
-    if (mode !== 'ai' || !readingCapture) return;
+    if (mode !== 'ai' || !readingCapture || editMode) return;
     const workflow = resolveReadingLensWorkflow(readingCapture, 'compact');
     if (workflow.depth === 'compact' && workflow.input.text) setAnalysisText(workflow.input.text);
-  }, [mode, readingCapture]);
+  }, [mode, readingCapture, editMode]);
 
   // Pass-through: once we're reading (or showing a message), let clicks fall
   // through to the app below except over interactive elements.
   useEffect(() => {
-    const reading = state.kind === 'reading' || state.kind === 'empty' || state.kind === 'error';
+    const reading =
+      state.kind === 'reading' || state.kind === 'passage' || state.kind === 'empty' || state.kind === 'error';
     if (!reading) {
       setInteractive(true);
       return;
@@ -322,7 +368,7 @@ export default function ReadingLensOverlay() {
   // you actually reading — never makes it vanish, and an open reader panel
   // suspends it entirely.
   useEffect(() => {
-    if (state.kind !== 'reading' || popup || analysisText) {
+    if (state.kind !== 'reading' || popup || analysisText || editMode) {
       setDimmed(false);
       return;
     }
@@ -367,7 +413,7 @@ export default function ReadingLensOverlay() {
       window.removeEventListener('mousemove', onMove);
       clear();
     };
-  }, [state, popup, analysisText, close]);
+  }, [state, popup, analysisText, editMode, close]);
 
   // Escape always dismisses.
   useEffect(() => {
@@ -456,16 +502,54 @@ export default function ReadingLensOverlay() {
     );
   };
 
+  const askAgentCapture = (capture: ReadingLensCapture): void => {
+    const text = capture.text.trim();
+    if (!text) return;
+    void handOffToAgent(
+      readingPassageAgentContext(text),
+      t('agent.conversation.fromReading', { label: text.slice(0, 40) }),
+      undefined,
+      capture.screenshotDataUrl
+        ? { dataUrl: capture.screenshotDataUrl, name: t('agent.handoff.capture.name') }
+        : undefined,
+    );
+  };
+
   const rescan = (engine: 'auto' | 'manga' | 'web') => {
     const region =
       state.kind === 'reading' || state.kind === 'empty' || (state.kind === 'error' && state.region)
         ? (state as { region: Rect }).region
         : null;
-    if (region) setState({
-      kind: 'scanning',
-      region,
-      engine,
+    if (region) {
+      setEditMode(false);
+      setState({
+        kind: 'scanning',
+        region,
+        engine,
+      });
+    }
+  };
+
+  const correctLine = (lineIndex: number, nextText: string): boolean => {
+    if (state.kind !== 'reading') return false;
+    const result = correctReadingLensLine(state.capture, lineIndex, nextText);
+    if (!result.ok) return false;
+
+    const correctedCapture = result.capture;
+    setState({
+      ...state,
+      capture: correctedCapture,
+      lines: buildLines(correctedCapture.lines),
     });
+
+    // Capture history is landing concurrently and is intentionally optional at
+    // this boundary. When present, overwrite its text from the same corrected
+    // envelope; a persistence failure must not roll back the visible repair.
+    const historyApi = window.api as typeof window.api & {
+      lensHistoryRecord?: (capture: ReadingLensCapture) => Promise<unknown>;
+    };
+    void historyApi.lensHistoryRecord?.(correctedCapture).catch(() => undefined);
+    return true;
   };
 
   const onWordClick = (
@@ -534,6 +618,14 @@ export default function ReadingLensOverlay() {
             <div className="lens-select-hint">
               <div className="lens-select-hint-title">{t('lens.select.hint')}</div>
               <div className="lens-select-hint-sub">{t('lens.select.sub')}</div>
+              <button
+                type="button"
+                className="lens-select-clipboard lens-interactive"
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={() => void window.api.lensOpen('clipboard')}
+              >
+                {t('lens.select.clipboard')}
+              </button>
             </div>
           )}
         </div>
@@ -559,17 +651,35 @@ export default function ReadingLensOverlay() {
           {state.lines.map((line, i) => {
             const [bx, by, bw, bh] = line.box;
             const fontPx = Math.max(11, Math.min(line.vertical ? bw * 0.78 : bh * 0.78, 30));
+            const confidenceLevel = readingLensConfidenceLevel(line.confidence);
+            const confidencePercent = Math.round(line.confidence * 100);
+            const lineStyle = {
+              left: state.region.x + bx,
+              top: state.region.y + by,
+              minWidth: bw,
+              minHeight: bh,
+              fontSize: fontPx,
+            };
+            if (editMode) {
+              return (
+                <LensLineEditor
+                  key={i}
+                  text={line.text}
+                  vertical={line.vertical}
+                  confidenceLevel={confidenceLevel}
+                  style={lineStyle}
+                  label={t('lens.edit.lineLabel', { index: i + 1 })}
+                  autoFocus={i === 0}
+                  onCommit={(nextText) => correctLine(i, nextText)}
+                />
+              );
+            }
             return (
               <div
                 key={i}
-                className={`lens-line lens-interactive ${line.vertical ? 'lens-line-v' : ''}`}
-                style={{
-                  left: state.region.x + bx,
-                  top: state.region.y + by,
-                  minWidth: bw,
-                  minHeight: bh,
-                  fontSize: fontPx,
-                }}
+                className={`lens-line lens-interactive lens-confidence-${confidenceLevel} ${line.vertical ? 'lens-line-v' : ''}`}
+                title={t('lens.confidence.line', { percent: confidencePercent })}
+                style={lineStyle}
               >
                 {line.tokens.map((tok, j) =>
                   isJapaneseWord(tok.surface) ? (
@@ -592,8 +702,17 @@ export default function ReadingLensOverlay() {
           <LensChrome
             t={t}
             engine={state.engine}
+            confidence={summarizeReadingLensConfidence(state.lines)}
             mode={mode}
             onModeChange={setMode}
+            editing={editMode}
+            onEditingChange={(editing) => {
+              setEditMode(editing);
+              if (editing) {
+                setPopup(null);
+                setAnalysisText(null);
+              }
+            }}
             onRescan={rescan}
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
@@ -603,6 +722,23 @@ export default function ReadingLensOverlay() {
             onSaveToVisualNovel={() => void saveToVisualNovel()}
           />
         </>
+      )}
+
+      {state.kind === 'passage' && (
+        <LensClipboardPassage
+          capture={state.capture}
+          tokens={state.tokens}
+          region={state.region}
+          mode={mode}
+          t={t}
+          onModeChange={setMode}
+          onWordClick={(event, surface) =>
+            onWordClick(event, surface, state.capture.text, state.tokens)
+          }
+          onAskAgent={() => askAgentCapture(state.capture)}
+          onNewRegion={() => setState({ kind: 'selecting' })}
+          onClose={close}
+        />
       )}
 
       {/* Empty / error messages live inside the region. */}
@@ -640,7 +776,7 @@ export default function ReadingLensOverlay() {
         </div>
       )}
 
-      {analysisText && state.kind === 'reading' && (
+      {analysisText && (state.kind === 'reading' || state.kind === 'passage') && (
         <LensAnalysisPanel
           text={analysisText}
           region={state.region}
@@ -673,11 +809,14 @@ export default function ReadingLensOverlay() {
   );
 }
 
-function LensChrome({
+export function LensChrome({
   t,
   engine,
+  confidence,
   mode,
   onModeChange,
+  editing = false,
+  onEditingChange,
   onRescan,
   onNewRegion,
   onClose,
@@ -688,8 +827,11 @@ function LensChrome({
 }: {
   t: (k: string, v?: Record<string, unknown>) => string;
   engine: string;
+  confidence: ReturnType<typeof summarizeReadingLensConfidence>;
   mode: LensMode;
   onModeChange: (mode: LensMode) => void;
+  editing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
   onRescan: (engine: 'auto' | 'manga' | 'web') => void;
   onNewRegion: () => void;
   onClose: () => void;
@@ -701,6 +843,23 @@ function LensChrome({
   return (
     <div className="lens-chrome lens-interactive">
       <span className="lens-source-badge">{t('lens.badge.source.screen')}</span>
+      <span
+        className={`lens-confidence-badge lens-confidence-${confidence.level}`}
+        title={t('lens.confidence.reviewLines', { count: confidence.reviewLineCount })}
+      >
+        {t(`lens.confidence.${confidence.level}`, { percent: confidence.percent })}
+      </span>
+      {onEditingChange && (
+        <button
+          type="button"
+          className={editing ? 'active' : undefined}
+          aria-pressed={editing}
+          onClick={() => onEditingChange(!editing)}
+          title={editing ? t('lens.edit.doneHint') : t('lens.edit.startHint')}
+        >
+          {editing ? t('lens.edit.done') : t('lens.edit.start')}
+        </button>
+      )}
       <button type="button" onClick={onAskAgent} title={t('lens.action.askAgent')}>
         {t('lens.action.askAgent')}
       </button>
@@ -753,5 +912,59 @@ function LensChrome({
         ×
       </button>
     </div>
+  );
+}
+
+export function LensLineEditor({
+  text,
+  vertical,
+  confidenceLevel,
+  style,
+  label,
+  autoFocus = false,
+  onCommit,
+}: {
+  text: string;
+  vertical: boolean;
+  confidenceLevel: 'high' | 'review' | 'low';
+  style: { left: number; top: number; minWidth: number; minHeight: number; fontSize: number };
+  label: string;
+  autoFocus?: boolean;
+  onCommit: (text: string) => boolean;
+}) {
+  const [draft, setDraft] = useState(text);
+
+  useEffect(() => {
+    setDraft(text);
+  }, [text]);
+
+  const commit = () => {
+    if (draft === text) return;
+    if (!onCommit(draft)) setDraft(text);
+  };
+
+  return (
+    <input
+      type="text"
+      className={`lens-line lens-line-editor lens-interactive lens-confidence-${confidenceLevel} ${vertical ? 'lens-line-v' : ''}`}
+      style={style}
+      value={draft}
+      aria-label={label}
+      title={label}
+      lang="ja"
+      spellCheck={false}
+      autoFocus={autoFocus}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          setDraft(text);
+          event.currentTarget.blur();
+        } else if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
   );
 }

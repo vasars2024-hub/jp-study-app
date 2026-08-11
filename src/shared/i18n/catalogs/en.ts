@@ -2859,6 +2859,8 @@ export const en: Catalog = {
   // Reading Lens — OS-wide screen-region OCR reader.
   'lens.select.hint': 'Drag over Japanese text',
   'lens.select.sub': 'or press A to read this screen · Esc to cancel',
+  'lens.select.clipboard': 'Read clipboard',
+  'lens.clipboard.empty': 'The clipboard has no text to read.',
   'lens.scanning': 'Reading…',
   'lens.empty.title': 'No Japanese found here',
   'lens.empty.hint': 'Try a tighter region, or switch to Manga mode.',
@@ -2869,6 +2871,11 @@ export const en: Catalog = {
   'lens.error.generic': 'Something went wrong while reading.',
   'lens.action.rescan': 'Re-scan',
   'lens.action.askAgent': 'Ask the Agent',
+  'lens.edit.start': 'Edit text',
+  'lens.edit.done': 'Done',
+  'lens.edit.startHint': 'Correct OCR text',
+  'lens.edit.doneHint': 'Finish correcting OCR text',
+  'lens.edit.lineLabel': 'Edit OCR line {index}',
   'settings.action.askAgent': 'Ask the Agent',
   'lens.action.manga': 'Manga mode',
   'lens.action.web': 'Text mode',
@@ -2879,6 +2886,15 @@ export const en: Catalog = {
   'lens.action.savedToVn': 'Saved to visual novel',
   'lens.action.saveToVnFailed': 'Save failed — retry',
   'lens.badge.source.screen': 'SCREEN',
+  'lens.badge.source.clipboard': 'CLIPBOARD',
+  'lens.confidence.high': 'OCR {percent}% · reliable',
+  'lens.confidence.review': 'OCR {percent}% · review',
+  'lens.confidence.low': 'OCR {percent}% · low confidence',
+  'lens.confidence.line': 'OCR confidence {percent}%',
+  'lens.confidence.reviewLines': {
+    one: '{count} line should be reviewed',
+    other: '{count} lines should be reviewed',
+  },
   'lens.wordCount': { one: '{count} word', other: '{count} words' },
 
   // Reading Lens — progressive word panel (Glance / Expand / Deep)

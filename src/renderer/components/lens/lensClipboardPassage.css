@@ -1,0 +1,82 @@
+.lens-clipboard-passage {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: var(--lens-bg);
+  color: var(--lens-ink);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.lens-clipboard-head,
+.lens-clipboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.lens-clipboard-head {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lens-clipboard-head .lens-mode {
+  margin-left: auto;
+}
+
+.lens-clipboard-head .lens-mode-btn,
+.lens-clipboard-actions button {
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lens-ink);
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lens-clipboard-head .lens-mode-btn.active {
+  background: var(--lens-accent);
+  color: #fff;
+}
+
+.lens-clipboard-text {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: 'Yu Gothic', 'Meiryo', 'MS Gothic', 'Segoe UI', sans-serif;
+  font-size: clamp(18px, 2.2vw, 28px);
+  line-height: 1.8;
+}
+
+.lens-clipboard-word {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  padding: 0 1px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lens-clipboard-word:hover,
+.lens-clipboard-word:focus-visible,
+.lens-clipboard-actions button:hover,
+.lens-clipboard-actions button:focus-visible {
+  outline: none;
+  background: var(--lens-accent);
+  color: #fff;
+}
+
+.lens-clipboard-actions {
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
