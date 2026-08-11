@@ -22,6 +22,7 @@ import {
   parseModels,
   type ApkgImportResult,
 } from '../../shared/apkgParse';
+import { notesToCards, type ApkgCardsResult, type RawNote } from '../../shared/apkgCards';
 import { mt } from '../i18n';
 
 function focusedWindow(): BrowserWindow | undefined {
@@ -99,27 +100,64 @@ function readCollectionBytes(zip: AdmZip): Uint8Array {
   throw new Error('That file is not an Anki deck (no collection database inside).');
 }
 
-/** Read (mid, flds) note rows and the models blob out of an open collection. */
-function readNotes(db: Database): ApkgImportResult {
+/**
+ * Note types, from whichever schema this collection uses.
+ *
+ * Extracted so the card importer and the level-meter path resolve fields
+ * identically — two copies of this ladder would drift, and the failure mode is
+ * silent (a wrong field imported as the studied word).
+ */
+function readModels(db: Database): ReturnType<typeof parseModels> {
+  /*
+   * The legacy `col.models` blob, then the normalized `notetypes`/`fields`
+   * tables — but the fallback is chosen on whether models were actually
+   * FOUND, not on whether the column looked non-blank.
+   *
+   * A real schema-18 collection stores `col.models = ''`, which is falsy, so
+   * the old `modelsJson.trim() ? …` test happened to route those correctly.
+   * The narrow door it left open is `'{}'`: non-blank, so it took the legacy
+   * branch, parsed to an EMPTY model map, and never looked at the normalized
+   * tables at all. With no models, no field can be matched by name against
+   * `EXPRESSION_FIELD_RE`, so the importer falls back to a positional guess
+   * and silently mines the wrong field — a Reading or a Meaning imported as
+   * the studied word, with nothing on screen to say so. Audit F10; the
+   * standing claim named the wrong mechanism but the risk is real.
+   */
+  const readNormalizedModels = () => {
+    const normalized = db.exec(`
+      SELECT n.id, n.name, f.ord, f.name
+      FROM notetypes n
+      JOIN fields f ON f.ntid = n.id
+      ORDER BY n.id, f.ord
+    `);
+    const rows = normalized[0]?.values ?? [];
+    return modelsFromNormalizedRows(rows.map((row) => ({
+      mid: String(row[0]),
+      modelName: String(row[1] ?? ''),
+      ord: Number(row[2] ?? 0),
+      fieldName: String(row[3] ?? ''),
+    })));
+  };
+
   const modelsRes = db.exec('SELECT models FROM col LIMIT 1');
   const modelsJson = (modelsRes[0]?.values?.[0]?.[0] as string | undefined) ?? '';
-  const models = modelsJson.trim()
-    ? parseModels(modelsJson)
-    : (() => {
-      const normalized = db.exec(`
-        SELECT n.id, n.name, f.ord, f.name
-        FROM notetypes n
-        JOIN fields f ON f.ntid = n.id
-        ORDER BY n.id, f.ord
-      `);
-      const rows = normalized[0]?.values ?? [];
-      return modelsFromNormalizedRows(rows.map((row) => ({
-        mid: String(row[0]),
-        modelName: String(row[1] ?? ''),
-        ord: Number(row[2] ?? 0),
-        fieldName: String(row[3] ?? ''),
-      })));
-    })();
+  // A malformed blob is the same situation as an empty one: something is there
+  // but it yields no models, so ask the tables rather than proceeding blind.
+  let models: ReturnType<typeof parseModels> = {};
+  if (modelsJson.trim()) {
+    try {
+      models = parseModels(modelsJson);
+    } catch {
+      models = {};
+    }
+  }
+  if (Object.keys(models).length === 0) models = readNormalizedModels();
+  return models;
+}
+
+/** Read (mid, flds) note rows out of an open collection, for the Level Meter. */
+function readNotes(db: Database): ApkgImportResult {
+  const models = readModels(db);
 
   const notesRes = db.exec('SELECT mid, flds FROM notes');
   const rows = notesRes[0]?.values ?? [];
@@ -130,6 +168,84 @@ function readNotes(db: Database): ApkgImportResult {
   // importing its single "upgrade Anki" note as vocabulary.
   if (looksLikeUpgradeStub(expressions, noteCount)) throw new Error(COMPRESSED_HELP);
   return { ok: true, expressions, noteCount };
+}
+
+/**
+ * Deck id -> deck name, from either schema.
+ *
+ * Legacy collections keep a `col.decks` JSON blob; schema 18+ has a `decks`
+ * table. Both are optional as far as this importer is concerned — a deck name is
+ * a nicety for grouping, so every failure here degrades to "no deck name"
+ * rather than failing the import.
+ */
+function readDeckNames(db: Database): Map<string, string> {
+  const out = new Map<string, string>();
+  try {
+    const res = db.exec('SELECT id, name FROM decks');
+    for (const row of res[0]?.values ?? []) {
+      out.set(String(row[0]), String(row[1] ?? ''));
+    }
+    if (out.size) return out;
+  } catch {
+    /* no normalized decks table — try the legacy blob */
+  }
+  try {
+    const res = db.exec('SELECT decks FROM col LIMIT 1');
+    const raw = res[0]?.values?.[0]?.[0];
+    if (typeof raw === 'string' && raw.trim()) {
+      const parsed = JSON.parse(raw) as Record<string, { name?: unknown }>;
+      for (const [id, deck] of Object.entries(parsed)) {
+        if (typeof deck?.name === 'string') out.set(id, deck.name);
+      }
+    }
+  } catch {
+    /* leave the map empty */
+  }
+  return out;
+}
+
+/**
+ * Read whole notes — expression, reading, meaning, sentence, deck and tags.
+ *
+ * Separate from `readNotes` on purpose: that one exists to feed the Level Meter
+ * and deliberately reduces a note to one string. Widening it would have made the
+ * level-check path carry data it does not use, on decks of 30k notes.
+ *
+ * The deck name comes from the note's first card. A note with cards in several
+ * decks is filed under the first, which matches how Anki's own browser shows it.
+ */
+function readCards(db: Database): ApkgCardsResult {
+  const models = readModels(db);
+  const deckNames = readDeckNames(db);
+
+  let rows: unknown[][] = [];
+  try {
+    // The MIN(c.did) subquery keeps this one row per note.
+    const res = db.exec(`
+      SELECT n.mid, n.flds, n.tags, (SELECT c.did FROM cards c WHERE c.nid = n.id LIMIT 1)
+      FROM notes n
+    `);
+    rows = res[0]?.values ?? [];
+  } catch {
+    // No cards table (or an unexpected shape) — fall back to notes alone.
+    const res = db.exec('SELECT mid, flds, tags FROM notes');
+    rows = res[0]?.values ?? [];
+  }
+
+  const notes: RawNote[] = rows.map((r) => ({
+    mid: String(r[0]),
+    flds: String(r[1] ?? ''),
+    tags: typeof r[2] === 'string' ? r[2] : undefined,
+    deck: r[3] != null ? deckNames.get(String(r[3])) : undefined,
+  }));
+
+  const { cards, noteCount } = notesToCards(notes, models);
+
+  // Same decoy guard as the level path: a modern .apkg carries a legacy
+  // `collection.anki2` holding one "please upgrade" note.
+  if (looksLikeUpgradeStub(cards.map((c) => c.word), noteCount)) throw new Error(COMPRESSED_HELP);
+
+  return { ok: true, cards, noteCount };
 }
 
 async function importApkg(filePath?: string): Promise<ApkgImportResult> {
@@ -167,6 +283,49 @@ async function importApkg(filePath?: string): Promise<ApkgImportResult> {
   }
 }
 
+/**
+ * Import a deck as CARDS rather than as a word list.
+ *
+ * Shares the zip/zstd/sql.js ladder with `importApkg` — the hard,
+ * failure-prone part of reading an .apkg is getting to the right collection
+ * database, and that had already been solved and hardened here.
+ */
+async function importApkgCards(filePath?: string): Promise<ApkgCardsResult> {
+  let file = filePath;
+  if (!file) {
+    const win = focusedWindow();
+    const opts = {
+      title: mt('dialog.importAnkiDeck.title'),
+      filters: [{ name: mt('dialog.filter.ankiDeck'), extensions: ['apkg', 'colpkg'] }],
+      properties: ['openFile' as const],
+    };
+    const picked = win
+      ? await dialog.showOpenDialog(win, opts)
+      : await dialog.showOpenDialog(opts);
+    if (picked.canceled || !picked.filePaths[0]) return { ok: false, error: 'cancelled' };
+    file = picked.filePaths[0];
+  }
+
+  let db: Database | null = null;
+  try {
+    const zip = new AdmZip(file);
+    const bytes = readCollectionBytes(zip);
+    const SQL = await getSql();
+    db = new SQL.Database(bytes);
+    const result = readCards(db);
+    return { ...result, fileName: path.basename(file) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* already closed */
+    }
+  }
+}
+
 export function registerApkgIpc(): void {
   ipcMain.handle('apkg:import', (_e, filePath?: string) => importApkg(filePath));
+  ipcMain.handle('apkg:importCards', (_e, filePath?: string) => importApkgCards(filePath));
 }

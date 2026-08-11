@@ -6,6 +6,9 @@
 // freezes the UI thread.
 
 import { getTokenizer, tokenizeSync } from './tokenizer';
+import { deckLabel } from '../shared/apkgCards';
+import { deckBookId } from '../shared/deckImport';
+import { addDeckCardsTracked, type DeckFlashcard } from './flashcardDeck';
 
 export interface ApkgLemmaResult {
   ok: boolean;
@@ -17,6 +20,65 @@ export interface ApkgLemmaResult {
   rawCount?: number;
   fileName?: string;
   error?: string;
+}
+
+export interface ApkgCardImportResult {
+  ok: boolean;
+  /** Cards actually written to the deck. */
+  added?: DeckFlashcard[];
+  /** Notes scanned in the collection, before empties and duplicates were dropped. */
+  noteCount?: number;
+  /** Folder the cards were filed under, for the confirmation message. */
+  deckName?: string;
+  fileName?: string;
+  error?: string;
+}
+
+/**
+ * Import an .apkg as flashcards in the local deck.
+ *
+ * The sibling of `importApkgWords`, which reads the same file for the Level
+ * Meter and keeps only a word list. This one keeps the note: reading, meaning
+ * and example sentence come across, so an imported deck is reviewable rather
+ * than just counted.
+ *
+ * Cards are filed under the Anki deck's own name where the collection provides
+ * one, so re-importing the same deck replaces that group instead of piling up
+ * a second copy — the behaviour `replaceImportedDeck` already gives CSV imports.
+ */
+export async function importApkgCards(filePath?: string): Promise<ApkgCardImportResult> {
+  let res;
+  try {
+    res = await window.api.importApkgCards(filePath);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  if (!res.ok) return { ok: false, error: res.error };
+
+  const cards = res.cards ?? [];
+  if (!cards.length) {
+    return { ok: false, error: 'no-cards', noteCount: res.noteCount, fileName: res.fileName };
+  }
+
+  // Anki decks nest; the file name is the honest fallback when the collection
+  // carries no usable deck name.
+  const fallback = (res.fileName ?? 'Anki deck').replace(/\.(apkg|colpkg)$/i, '');
+  const deckName = deckLabel(cards.find((c) => c.deck)?.deck, fallback);
+  const bookId = deckBookId(`anki-${deckName}`);
+
+  const added = addDeckCardsTracked(
+    cards.map((c) => ({
+      word: c.word,
+      reading: c.reading,
+      meaning: c.meaning,
+      sentence: c.sentence,
+      source: 'import' as const,
+      bookId,
+      bookTitle: deckName,
+    })),
+  );
+
+  return { ok: true, added, noteCount: res.noteCount, deckName, fileName: res.fileName };
 }
 
 function lemmaOfSync(expr: string): string {

@@ -24,6 +24,7 @@ import type { AnimeScheduleRequest, AnimeScheduleResponse } from '../shared/anim
 import type { DueForecast } from '../shared/reviewForecast';
 import type { PitchLookup } from '../shared/pitchAccent';
 import type { ApkgImportResult } from '../shared/apkgParse';
+import type { ApkgCardsResult } from '../shared/apkgCards';
 import type { AssetError, AssetSpec, AssetStatus } from '../shared/assetRegistry';
 import type { ReverifyOutcome, AssetIntegrity } from '../main/downloads';
 import type {
@@ -362,6 +363,7 @@ declare global {
       /** Structured pitch-accent data for a term. */
       dictPitch(term: string, reading?: string): Promise<PitchLookup>;
       importApkg(filePath?: string): Promise<ApkgImportResult>;
+      importApkgCards(filePath?: string): Promise<ApkgCardsResult>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;
       desktopCommitLayout(

@@ -54,6 +54,7 @@ import type {
 import type { DueForecast } from './shared/reviewForecast';
 import type { PitchLookup } from './shared/pitchAccent';
 import type { ApkgImportResult } from './shared/apkgParse';
+import type { ApkgCardsResult } from './shared/apkgCards';
 import type {
   AiEngineConfig,
   AiEngineKind,
@@ -446,6 +447,9 @@ const api = {
   /** Parse an Anki .apkg and return its (raw, pre-lemmatization) expressions. */
   importApkg: (filePath?: string): Promise<ApkgImportResult> =>
     ipcRenderer.invoke('apkg:import', filePath),
+  /** Parse an Anki .apkg into whole study cards (word/reading/meaning/sentence). */
+  importApkgCards: (filePath?: string): Promise<ApkgCardsResult> =>
+    ipcRenderer.invoke('apkg:importCards', filePath),
   dictListYomitan: (): Promise<YomitanDictInfo[]> => ipcRenderer.invoke('dict:listYomitan'),
   dictRemoveYomitan: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:removeYomitan', id),
