@@ -28,6 +28,13 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
+import {
+  clearCaptures,
+  listCaptures,
+  recordCapture,
+  removeCapture,
+} from './readingLensHistory';
+import type { ReadingLensHistoryEntry } from '../shared/readingLensHistory';
 import type { ReadingLensCapture } from '../shared/readingLens';
 import { createReadingLensClipboardCapture } from './readingLensClipboard';
 
@@ -354,6 +361,17 @@ export function registerReadingLensIpc(): void {
   });
 
   ipcMain.handle('lens:close', (): void => closeLens());
+
+  // Capture history. The lens window is destroyed per capture, so the record
+  // call comes from a renderer that is about to go away — main owns the store.
+  ipcMain.handle('lens:history:record', (_e, capture: unknown): ReadingLensHistoryEntry | null =>
+    recordCapture(capture),
+  );
+  ipcMain.handle('lens:history:list', (_e, query: unknown): ReadingLensHistoryEntry[] =>
+    listCaptures(query),
+  );
+  ipcMain.handle('lens:history:remove', (_e, captureId: unknown): number => removeCapture(captureId));
+  ipcMain.handle('lens:history:clear', (): void => clearCaptures());
 }
 
 export const __readingLensTestables = {

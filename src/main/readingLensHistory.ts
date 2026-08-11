@@ -1,0 +1,113 @@
+/**
+ * Reading Lens capture history — persistence.
+ *
+ * The shape, the bounded insert and the search all live in
+ * `shared/readingLensHistory.ts`; this file is only the disk half, so the store
+ * and any renderer surface cannot disagree about what an entry is.
+ *
+ * Why main owns the file rather than the lens renderer owning localStorage: the
+ * lens window is created and destroyed per capture, and captures arrive from a
+ * window that is about to close. A store that lives in the lens renderer would
+ * lose the last capture of every session. Main outlives every capture.
+ */
+
+import { app } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  READING_LENS_HISTORY_LIMIT,
+  READING_LENS_HISTORY_VERSION,
+  normalizeReadingLensHistory,
+  readingLensHistoryEntryOf,
+  recordReadingLensHistory,
+  removeReadingLensHistoryEntry,
+  searchReadingLensHistory,
+  type ReadingLensHistoryEntry,
+  type ReadingLensHistoryQuery,
+} from '../shared/readingLensHistory';
+import { normalizeReadingLensCapture } from '../shared/readingLens';
+
+const HISTORY_FILE = 'reading-lens-history.json';
+
+/**
+ * Loaded once and kept in memory. The file is at most a few hundred short
+ * strings, and a capture must not pay a synchronous read to be recorded.
+ */
+let entries: ReadingLensHistoryEntry[] | null = null;
+
+function historyPath(): string {
+  return path.join(app.getPath('userData'), HISTORY_FILE);
+}
+
+function load(): ReadingLensHistoryEntry[] {
+  if (entries) return entries;
+  try {
+    entries = normalizeReadingLensHistory(JSON.parse(fs.readFileSync(historyPath(), 'utf8')));
+  } catch {
+    // No file yet, or a corrupt one: an empty history is the correct degraded
+    // state — this feature must never block a capture from being read.
+    entries = [];
+  }
+  return entries;
+}
+
+function persist(): void {
+  try {
+    fs.writeFileSync(
+      historyPath(),
+      JSON.stringify({ schemaVersion: READING_LENS_HISTORY_VERSION, entries: entries ?? [] }, null, 2),
+      'utf8',
+    );
+  } catch (err) {
+    console.error('[readingLensHistory] failed to persist', err);
+  }
+}
+
+/**
+ * Record a capture. The value crosses IPC from the lens renderer, so it is
+ * re-validated through the same capture normalizer the renderer used rather
+ * than trusted — and the screenshot is dropped by `readingLensHistoryEntryOf`.
+ */
+export function recordCapture(value: unknown): ReadingLensHistoryEntry | null {
+  const capture = normalizeReadingLensCapture(value);
+  if (!capture) return null;
+  const entry = readingLensHistoryEntryOf(capture);
+  if (!entry) return null;
+
+  entries = recordReadingLensHistory(load(), entry, READING_LENS_HISTORY_LIMIT);
+  persist();
+  return entries[0] ?? null;
+}
+
+/** Search the persisted history. An absent/garbage query returns everything. */
+export function listCaptures(query: unknown): ReadingLensHistoryEntry[] {
+  const raw = (query ?? {}) as Partial<ReadingLensHistoryQuery>;
+  return searchReadingLensHistory(load(), {
+    query: typeof raw.query === 'string' ? raw.query : '',
+    source: typeof raw.source === 'string' ? (raw.source as ReadingLensHistoryQuery['source']) : 'all',
+    limit: typeof raw.limit === 'number' ? raw.limit : undefined,
+  });
+}
+
+/** Forget one capture. Returns the remaining count. */
+export function removeCapture(captureId: unknown): number {
+  const id = typeof captureId === 'string' ? captureId : '';
+  const next = removeReadingLensHistoryEntry(load(), id);
+  if (next !== entries) {
+    entries = next;
+    persist();
+  }
+  return (entries ?? []).length;
+}
+
+/** Forget everything. The file is rewritten empty rather than deleted, so the
+ * next read does not have to distinguish "cleared" from "never used". */
+export function clearCaptures(): void {
+  entries = [];
+  persist();
+}
+
+/** Test seam: drop the in-memory copy so the next call re-reads from disk. */
+export function resetReadingLensHistoryCache(): void {
+  entries = null;
+}

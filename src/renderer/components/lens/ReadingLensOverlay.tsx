@@ -207,12 +207,7 @@ export default function ReadingLensOverlay() {
         setState({ kind: 'error', region: null, message: t('lens.clipboard.empty'), canRetry: false });
         return;
       }
-      // Capture history is landing concurrently and is optional at this
-      // boundary too; a clipboard read must not depend on it to display.
-      const clipboardHistoryApi = window.api as typeof window.api & {
-        lensHistoryRecord?: (entry: ReadingLensCapture) => Promise<unknown>;
-      };
-      void clipboardHistoryApi.lensHistoryRecord?.(capture).catch(() => undefined);
+      void window.api.lensHistoryRecord(capture).catch(() => undefined);
       setState({
         kind: 'passage',
         region: passageRegion(init.bounds.width, init.bounds.height),
@@ -308,6 +303,10 @@ export default function ReadingLensOverlay() {
           if (!capture || !lines.length) {
             setState({ kind: 'empty', region });
           } else {
+            // Keep the capture past this window's life. The lens is destroyed
+            // per capture, so this has to be fire-and-forget from here — a
+            // failed record must never cost the read that is already on screen.
+            void window.api.lensHistoryRecord(capture).catch(() => undefined);
             setState({
               kind: 'reading',
               region,
@@ -542,13 +541,10 @@ export default function ReadingLensOverlay() {
       lines: buildLines(correctedCapture.lines),
     });
 
-    // Capture history is landing concurrently and is intentionally optional at
-    // this boundary. When present, overwrite its text from the same corrected
-    // envelope; a persistence failure must not roll back the visible repair.
-    const historyApi = window.api as typeof window.api & {
-      lensHistoryRecord?: (capture: ReadingLensCapture) => Promise<unknown>;
-    };
-    void historyApi.lensHistoryRecord?.(correctedCapture).catch(() => undefined);
+    // Re-record from the same corrected envelope, so history keeps the repaired
+    // text rather than the OCR's mistake. Fire-and-forget: a persistence failure
+    // must not roll back the visible repair.
+    void window.api.lensHistoryRecord(correctedCapture).catch(() => undefined);
     return true;
   };
 

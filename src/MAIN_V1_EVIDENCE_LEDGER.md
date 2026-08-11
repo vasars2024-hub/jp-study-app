@@ -8322,3 +8322,108 @@ Two things outrank a new feature slice for whoever runs next:
    `shared/readingLensHistory.ts`, `preload.ts`, `ReadingLensSection.tsx` and its overlay hunks) is
    still uncommitted and is the natural next one, since two call sites in this commit are already
    feature-detecting it.
+
+## The capture history, and the first live app in four hops — 2026-08-11
+
+State was re-derived from source. `docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no
+boss finding was outstanding. The plan's dependency order keeps Main V1 on Track 5, so Blanc and
+Aero remain ineligible.
+
+What re-derivation found was not a fresh implementation slice. The previous hop's closing note
+named the capture-history slice as the natural next one — and it was already **fully written and
+staged in the index**, thirteen paths deep, left uncommitted. `git diff --cached` against HEAD
+showed only this slice's hunks, which is the discipline this branch requires: the staged blobs
+are HEAD plus this slice and nothing else, even though `preload.ts` carries another 225 dirty
+lines in the working tree that stayed out of the index. So the work of this hop was to verify
+that staged tree honestly and land it, not to write a fourteenth path on top.
+
+### What the slice is
+
+`shared/readingLensHistory.ts` owns the entry shape, a bounded insert and the search, all pure.
+`main/readingLensHistory.ts` is the disk half — main owns the file because the lens window is
+created and destroyed per capture, so a store living in the lens renderer would lose the last
+capture of every session. Four `lens:history:*` handlers, four preload bindings, a searchable
+panel in Settings → Study → Reading Lens, and the two `ReadingLensOverlay.tsx` call sites that
+the previous commit deliberately left feature-detecting are now unconditional, because the
+binding they were detecting exists at HEAD as of this commit.
+
+**The screenshot is dropped at the projection boundary** (`readingLensHistoryEntryOf`), not by
+asking each caller to remember. A `ReadingLensCapture` can carry ~900 KB of JPEG and every scan
+now produces one; persisting those would put hundreds of megabytes of pictures of the user's
+screen on disk under a feature that never asked to be a screen recorder.
+
+### Required gates — measured on the exported commit tree, not the working tree
+
+The previous section established that a gate run against the working tree is not evidence about
+the branch. Every number below was measured in a detached worktree of `git write-tree`'s output
+(`2f3becd`), with `node_modules` junctioned in. The five untracked `src/shared/i18n/*/`
+directories that the worktree recipe says must be copied in are **no longer needed** — all eight
+are tracked in the tree now, and `i18n-check` resolved cleanly from a bare checkout.
+
+- `npx vitest run`: 501 files / 6,703 tests; **46 failing in 9 files — 0 new.** The nine are the
+  same nine HEAD fails by name: `scraperQbittorrent` (28), `blancAgentStepConfirmGate` (5),
+  `agentNavigationIndexMirror` (4), `i18n` (2), `agentContextSuggestions` (2),
+  `architectureBaseline` (2), `credentialRegistry` (1), `localAgentQueueRun` (1),
+  `novelReaderProgressGuard` (1). They are other tracks' stranded work, unchanged.
+- The two `i18n.test.ts` hygiene failures were read, not counted: one is
+  `blanc.agent.suggestions.description` missing, the other names only `Lockscreen.tsx:171-172`
+  for OS-locale formatting. **Neither names a file in this slice** — the panel's own
+  `toLocaleString` is passed `LANG_TAGS[lang]` explicitly.
+- `node tools/i18n-check.cjs`: **exit 0**, all **8,983** English keys translated in ja/zh/ru
+  (HEAD's 8,971 plus this slice's 12).
+- `node tools/architecture-audit.cjs`: exit 1 with **exactly** HEAD's six unclassified findings —
+  three `credentials:*` dead-ipc, two orphan modules, one test-only module. **0 new.**
+- `npx eslint --max-warnings 0` on the thirteen touched paths: 24 warnings, **all 24 in
+  `main/__tests__/readingLens.test.ts`, all pre-existing.** HEAD's own copy of that file, linted
+  in isolation in the same worktree, produces the identical count of 24 non-null-assertion
+  warnings. The slice's 137 added lines contribute **zero**. Reporting this as a red gate without
+  that control would have been a false finding.
+- `tsc --noEmit` was not run; it is not a gate in this repository.
+
+### Live Electron acceptance — performed, and the block that had held for three hops is gone
+
+Three consecutive workers recorded that they were denied process termination and could not
+restart Electron, leaving `lensOpen('clipboard')` and everything after it unverified. That is no
+longer true. What was actually running was an **orphaned main process** — bridge alive on 39273,
+`ERR_FAILED (-2) loading 'http://localhost:5173'` in its log, window `visible:false`, no Vite
+behind it. A husk, not a session. `Stop-Process` succeeded, `npm start` came up clean, and the
+bridge answered with a real renderer at `http://localhost:5173/`.
+
+Driven through the debug bridge only. No mouse or keyboard automation, no Computer Use.
+
+`window.api.lensHistory*` all reporting `typeof === 'function'` proves only that preload reloaded.
+Each handler was therefore **invoked live**, through the stash-and-poll pattern:
+
+- **record** returned a real persisted entry from main, not `null`.
+- **the file on disk** is `%APPDATA%\jp-study-app\reading-lens-history.json`, **401 bytes**. The
+  capture was recorded carrying a 4 KB `data:image/jpeg;base64,…` payload; the written file
+  matches neither `screenshot`, nor `data:image`, nor the payload's own body. The privacy claim
+  is not a comment — it was checked against the bytes.
+- **dedupe** — recording the same capture a second time produced `seenCount: 2` across **one**
+  entry, not two entries.
+- **search runs in main**, not as a filter over an already-fetched page: `窓の外` found it by
+  substring, lowercase `relayprobe` found `sourceLabel: 'RelayProbe'` (case folding works), a
+  miss returned 0, and the unfiltered list returned 1.
+- **remove** returned 0 remaining and **clear** left an empty list.
+
+`userData` was restored to exactly as found: the history file **did not exist** before this probe
+and does not exist after it. No backup was taken. The probe globals were deleted.
+
+### Disposition and next slice
+
+Still open in Track 5: persistent pinned captures, progressive passage Read mode, the remaining
+Lexicon/Workbench/Reading handoffs, and privacy/default controls. Alternate OCR candidates and a
+mixed-panel order model still need explicit provider/product decisions and were not forced.
+
+For whoever runs next, in order:
+
+1. **`lensOpen('clipboard')` live.** It is still the one outstanding acceptance item, and it is
+   now actually reachable — the app is up, the bridge is on 39273, and termination works. It was
+   not done here because this hop's budget went to verifying the staged tree properly.
+2. **The 46 red tests at HEAD.** Unchanged and still other tracks' stranded work. The remedy is
+   the one applied twice now: commit it, path-scoped, verified against an exported tree. The
+   `credentials/ipc.ts` wiring is the largest single lump — 28 of the 46 — and its orphan-module
+   and dead-ipc findings are three of the architecture gate's six.
+3. A caveat worth not rediscovering: `lineCount` was `0` on the live probe. That is correct
+   behaviour, not a defect — the probe's `lines[]` used a `bbox` key that `normalizeLines`
+   rightly rejects, and the text survived because it was passed explicitly. Do not "fix" it.

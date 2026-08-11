@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../../i18n';
+import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { ReadingLensStatus } from '../../../../main/readingLens';
+import type { ReadingLensSource } from '../../../../shared/readingLens';
+import type { ReadingLensHistoryEntry } from '../../../../shared/readingLensHistory';
 
 const DEFAULT_STATUS: ReadingLensStatus = {
   enabled: false,
@@ -8,6 +11,13 @@ const DEFAULT_STATUS: ReadingLensStatus = {
   supported: true,
   registered: false,
   open: false,
+};
+
+const SOURCE_LABEL_KEYS: Record<ReadingLensSource, string> = {
+  screen: 'settings.lens.history.source.screen',
+  clipboard: 'settings.lens.history.source.clipboard',
+  image: 'settings.lens.history.source.image',
+  text: 'settings.lens.history.source.text',
 };
 
 /** Build an accelerator chord ("Ctrl+Shift+D") from a captured keydown. */
@@ -22,6 +32,116 @@ function chordFromEvent(e: KeyboardEvent): string | null {
   if (!mods.length) return null; // a global shortcut needs a modifier
   const main = key.length === 1 ? key.toUpperCase() : key;
   return [...mods, main].join('+');
+}
+
+/**
+ * Every capture the Lens has read, searchable.
+ *
+ * The store is in main (`main/readingLensHistory.ts`) and holds text plus source
+ * metadata only — never the screenshot — so this list is safe to render in a
+ * settings page that is not behind any further consent.
+ *
+ * Search runs in main against the whole history rather than filtering a page
+ * that was already fetched, so a match older than the visible window is still
+ * findable.
+ */
+function LensCaptureHistory() {
+  const { t, lang } = useT();
+  const [entries, setEntries] = useState<ReadingLensHistoryEntry[]>([]);
+  const [query, setQuery] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  const refresh = useCallback(async (search: string) => {
+    try {
+      setEntries(await window.api.lensHistoryList({ query: search, limit: 50 }));
+    } catch {
+      setEntries([]);
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  // Debounced so typing a query does not cross IPC on every keystroke.
+  useEffect(() => {
+    const id = window.setTimeout(() => void refresh(query), query ? 180 : 0);
+    return () => window.clearTimeout(id);
+  }, [query, refresh]);
+
+  const remove = useCallback(
+    async (captureId: string) => {
+      await window.api.lensHistoryRemove(captureId);
+      await refresh(query);
+    },
+    [query, refresh],
+  );
+
+  const clear = useCallback(async () => {
+    await window.api.lensHistoryClear();
+    await refresh(query);
+  }, [query, refresh]);
+
+  const formatWhen = useMemo(
+    () => (at: number) => new Date(at).toLocaleString(LANG_TAGS[lang]),
+    [lang],
+  );
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div className="os-viz-row" style={{ alignItems: 'center', gap: 8 }}>
+        <span className="muted">{t('settings.lens.history.title')}</span>
+        <input
+          type="search"
+          className="os-input"
+          style={{ flex: 1, minWidth: 120 }}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('settings.lens.history.searchPlaceholder')}
+          aria-label={t('settings.lens.history.searchPlaceholder')}
+        />
+        <button
+          type="button"
+          className="btn small"
+          disabled={!entries.length && !query}
+          onClick={() => void clear()}
+        >
+          {t('settings.lens.history.clear')}
+        </button>
+      </div>
+
+      {loaded && !entries.length && (
+        <p className="muted os-set-hint">
+          {query ? t('settings.lens.history.noMatches') : t('settings.lens.history.empty')}
+        </p>
+      )}
+
+      {entries.length > 0 && (
+        <ul className="os-set-list" style={{ marginTop: 8 }}>
+          {entries.map((entry) => (
+            <li key={entry.captureId} className="os-viz-row" style={{ alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ overflowWrap: 'anywhere' }}>{entry.text}</div>
+                <div className="muted" style={{ fontSize: '0.85em' }}>
+                  {t(SOURCE_LABEL_KEYS[entry.source])} · {formatWhen(entry.capturedAt)}
+                  {entry.seenCount > 1 && ` · ${t('settings.lens.history.seen', { count: entry.seenCount })}`}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => void remove(entry.captureId)}
+                aria-label={t('settings.lens.history.remove')}
+                title={t('settings.lens.history.remove')}
+              >
+                {t('settings.lens.history.remove')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="muted os-set-hint">{t('settings.lens.history.hint')}</p>
+    </div>
+  );
 }
 
 /**
@@ -125,6 +245,8 @@ export default function ReadingLensSection() {
           {t('settings.lens.openNow')}
         </button>
       </div>
+
+      <LensCaptureHistory />
     </>
   );
 }

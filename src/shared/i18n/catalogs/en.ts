@@ -3071,6 +3071,24 @@ export const en: Catalog = {
   'settings.lens.unsupported': 'Screen capture for the Lens is available on Windows.',
   'settings.lens.openNow': 'Open the Lens now',
 
+  // Reading Lens — capture history
+  'settings.lens.history.title': 'Capture history',
+  'settings.lens.history.searchPlaceholder': 'Search captures',
+  'settings.lens.history.clear': 'Clear all',
+  'settings.lens.history.remove': 'Forget',
+  'settings.lens.history.empty': 'Nothing captured yet. Text you read with the Lens is kept here.',
+  'settings.lens.history.noMatches': 'No capture matches that search.',
+  'settings.lens.history.seen': {
+    one: 'seen {count} time',
+    other: 'seen {count} times',
+  },
+  'settings.lens.history.hint':
+    'The last 200 captures are kept on this device — the text and where it came from, never the screenshot.',
+  'settings.lens.history.source.screen': 'Screen',
+  'settings.lens.history.source.clipboard': 'Clipboard',
+  'settings.lens.history.source.image': 'Image',
+  'settings.lens.history.source.text': 'Text',
+
   'search.reading': 'Reading settings',
   'search.reading.desc': 'Reader typography and layout',
   'search.whisper': 'Transcription device',

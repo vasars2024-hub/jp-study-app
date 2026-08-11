@@ -9,6 +9,11 @@ import {
 } from './shared/seanime';
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
+import type { ReadingLensCapture } from './shared/readingLens';
+import type {
+  ReadingLensHistoryEntry,
+  ReadingLensHistoryQuery,
+} from './shared/readingLensHistory';
 import type { LensOcrResult, RegionRect } from './main/screenOcr';
 import type { ReverifyOutcome, AssetIntegrity } from './main/downloads';
 import {
@@ -1896,6 +1901,20 @@ const api = {
     ipcRenderer.send('lens:setInteractive', interactive);
   },
   lensClose: (): Promise<void> => ipcRenderer.invoke('lens:close'),
+
+  /**
+   * Capture history. Main owns the store because the lens window is destroyed
+   * per capture; the screenshot on a capture is dropped before anything is
+   * written to disk (see shared/readingLensHistory.ts).
+   */
+  lensHistoryRecord: (capture: ReadingLensCapture): Promise<ReadingLensHistoryEntry | null> =>
+    ipcRenderer.invoke('lens:history:record', capture),
+  lensHistoryList: (query: ReadingLensHistoryQuery = {}): Promise<ReadingLensHistoryEntry[]> =>
+    ipcRenderer.invoke('lens:history:list', query),
+  lensHistoryRemove: (captureId: string): Promise<number> =>
+    ipcRenderer.invoke('lens:history:remove', captureId),
+  lensHistoryClear: (): Promise<void> => ipcRenderer.invoke('lens:history:clear'),
+
   onLensOpen: (cb: (init: LensInit) => void): (() => void) => {
     const handler = (_e: unknown, init: LensInit): void => cb(init);
     ipcRenderer.on('lens:open', handler);

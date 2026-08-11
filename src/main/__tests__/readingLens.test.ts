@@ -457,6 +457,142 @@ describe('persistence', () => {
   });
 });
 
+// ---- capture history ----------------------------------------------------
+
+/**
+ * The four `lens:history:*` handlers, driven through the IPC map rather than by
+ * calling the store directly. That is the point: `main/readingLensHistory.ts`
+ * has its own pure tests, but nothing else proves the *handlers* are registered,
+ * validate their argument, and write the file the next boot reads.
+ *
+ * The screenshot assertion is the one that must never regress. A lens scan
+ * carries a bounded JPEG and the store's whole privacy contract is that it never
+ * reaches disk — so it is asserted against the bytes on disk, not against the
+ * returned object, because only the file is what a user would find later.
+ */
+describe('capture history IPC', () => {
+  const HISTORY = 'reading-lens-history.json';
+  const historyPath = (): string => path.join(tmpRoot, HISTORY);
+  const readHistoryRaw = (): string => fs.readFileSync(historyPath(), 'utf8');
+
+  const capture = (patch: Record<string, unknown> = {}): Record<string, unknown> => ({
+    captureId: 'cap-1',
+    source: 'screen',
+    sourceLabel: 'Steam — VN',
+    sourceRef: 'game://vn/ch1',
+    capturedAt: 1_700_000_000_000,
+    language: 'ja',
+    engine: 'auto',
+    hash: 'h1',
+    text: '猫が好きです',
+    lines: [{ text: '猫が好きです', box: [0, 0, 100, 20] }],
+    ...patch,
+  });
+
+  const handler = (channel: string): ((...a: unknown[]) => unknown) => {
+    const fn = h.ipc.handlers.get(channel);
+    if (!fn) throw new Error(`no handler registered for ${channel}`);
+    return fn;
+  };
+
+  async function withHistory() {
+    const m = await load();
+    m.registerReadingLensIpc();
+    return {
+      record: (value: unknown) => handler('lens:history:record')({}, value),
+      list: (query?: unknown) => handler('lens:history:list')({}, query),
+      remove: (id: unknown) => handler('lens:history:remove')({}, id),
+      clear: () => handler('lens:history:clear')({}),
+    };
+  }
+
+  beforeEach(() => {
+    fs.rmSync(historyPath(), { force: true });
+  });
+
+  it('records a capture and reads it back', async () => {
+    const api = await withHistory();
+    await api.record(capture());
+
+    const listed = (await api.list()) as Array<{ captureId: string; text: string }>;
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ captureId: 'cap-1', text: '猫が好きです' });
+  });
+
+  it('never writes the screenshot to disk', async () => {
+    const api = await withHistory();
+    await api.record(
+      capture({ screenshotDataUrl: `data:image/jpeg;base64,${'A'.repeat(4_000)}` }),
+    );
+
+    const raw = readHistoryRaw();
+    expect(raw).not.toContain('data:image');
+    expect(raw).not.toContain('screenshotDataUrl');
+    expect(raw.length).toBeLessThan(2_000);
+  });
+
+  it('survives a restart — the file is what the next boot reads', async () => {
+    const first = await withHistory();
+    await first.record(capture());
+
+    const second = await withHistory();
+    expect((await second.list()) as unknown[]).toHaveLength(1);
+  });
+
+  it('degrades a corrupt history file to empty rather than taking the handler down', async () => {
+    fs.writeFileSync(historyPath(), '{ not json', 'utf8');
+    const api = await withHistory();
+
+    expect((await api.list()) as unknown[]).toEqual([]);
+  });
+
+  it('rejects a payload that is not a capture instead of storing garbage', async () => {
+    const api = await withHistory();
+
+    expect(await api.record(null)).toBeNull();
+    expect(await api.record({ nope: true })).toBeNull();
+    expect(fs.existsSync(historyPath())).toBe(false);
+  });
+
+  it('searches through the handler, not only in the renderer', async () => {
+    const api = await withHistory();
+    await api.record(capture({ captureId: 'a', hash: 'ha', text: '猫が好きです' }));
+    await api.record(capture({ captureId: 'b', hash: 'hb', text: '犬も好きです' }));
+
+    const hits = (await api.list({ query: '犬' })) as Array<{ captureId: string }>;
+    expect(hits.map((e) => e.captureId)).toEqual(['b']);
+  });
+
+  it('forgets one capture and clears the rest', async () => {
+    const api = await withHistory();
+    await api.record(capture({ captureId: 'a', hash: 'ha' }));
+    await api.record(capture({ captureId: 'b', hash: 'hb', text: '犬も好きです' }));
+
+    expect(await api.remove('a')).toBe(1);
+    expect((await api.list()) as unknown[]).toHaveLength(1);
+
+    await api.clear();
+    expect((await api.list()) as unknown[]).toEqual([]);
+    // Rewritten empty rather than deleted, so the next read does not have to
+    // tell "cleared" apart from "never used".
+    expect(fs.existsSync(historyPath())).toBe(true);
+  });
+
+  it('does not throw when the history file cannot be written', async () => {
+    const api = await withHistory();
+    const spy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {
+      throw new Error('EACCES');
+    });
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(await api.record(capture())).toMatchObject({ captureId: 'cap-1' });
+    expect(errSpy).toHaveBeenCalled();
+
+    spy.mockRestore();
+    errSpy.mockRestore();
+  });
+});
+
 // ---- IPC surface --------------------------------------------------------
 
 describe('lens:ocr region coercion', () => {
@@ -502,7 +638,7 @@ describe('IPC registration', () => {
   it('registers every channel preload expects', async () => {
     const m = await load();
     m.registerReadingLensIpc();
-    for (const ch of ['lens:getSettings', 'lens:setEnabled', 'lens:setHotkey', 'lens:open', 'lens:getInit', 'lens:ocr', 'lens:close']) {
+    for (const ch of ['lens:getSettings', 'lens:setEnabled', 'lens:setHotkey', 'lens:open', 'lens:getInit', 'lens:ocr', 'lens:close', 'lens:history:record', 'lens:history:list', 'lens:history:remove', 'lens:history:clear']) {
       expect(h.ipc.handlers.has(ch)).toBe(true);
     }
     expect(h.ipc.listeners.has('lens:setInteractive')).toBe(true);
