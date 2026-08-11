@@ -9410,3 +9410,120 @@ in all four catalogs. That is what turns the four remaining `agentNavigationInde
 failures green. Two traps, both confirmed this hop: `settingsRegistry.ts`'s diff contains a
 foreign `aero-safe-mode` entry that must not be swept in, and the four catalogs carry the
 separate Scraper reorganisation's descriptions, which are still foreign work.
+
+## The renderer half, and the 97 keys the router had been naming into thin air — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The previous entry named this slice exactly: land `MonitorsPage` / `FileDropsPage` / `HelpPage`,
+their `SETTINGS_NAV` entries, `SettingsApp.tsx`'s routing, `multiMonitor.css`, the preference
+stores, and the catalog keys. Commit `b63846e`, 17 paths, **1,540 insertions / 11 deletions**.
+
+### What re-deriving changed about the previous entry's plan
+
+Three corrections, all found before any file was written:
+
+- **`agentNavigationIndexMirror` closes completely, not partially.** The entry two hops back
+  said its fourth failure (`"providers" is not a word of that destination`) needed the Scraper
+  reorganisation. That reword had **already landed in `37643f8`**. Measured at pristine `HEAD`
+  in a second detached worktree: the file is 4/9 red. With this slice it is **9/9 green**, and
+  the whole run drops one failing file.
+- **`HelpPage.tsx` needs `renderer/onboardingStore.ts`**, which was untracked and is the T1
+  onboarding track's file. It landed here because this page is its only committed consumer;
+  `TourOverlay.tsx` and `tourOverlay.test.tsx`, its other two consumers, stay behind.
+- **`DesktopShell.tsx` is not in this slice and could not be.** Its working-tree diff is
+  +555/-68 across 22 hunks interleaving this subsystem with `deskDrag` and `studyBlockWindows`.
+  The three pages import nothing from it, so the slice holds together without it — that was
+  checked by import graph, not assumed.
+
+### What was deliberately withheld
+
+`multiMonitor.css` landed **whole** (372 lines), so the commit carries `.deskdrag-*` and
+`.dropr-*` rules whose components are still uncommitted. That is a sheet with unused selectors,
+which is inert. The catalog keys are the opposite case and were treated the opposite way: the
+extraction cut at `fileDrop.reason.folderSlideshow`, and the 14 `fileDrop.affordance` /
+`fileDrop.triage` / `fileDrop.toast` / `fileDrop.action` keys plus `desktop.task.onDesktop`
+were **left in the working tree**, because their only consumers are `DropRouter.tsx` and
+`DesktopShell.tsx`. Landing vocabulary ahead of its consumer is the exact defect `a701ba8` was
+criticised for in this ledger; it is not repeated.
+
+### The candidate, and the two anchors that refused
+
+`HEAD` is `c5d92d4`. A build script wrote `git show HEAD:<path>` plus this slice's insertions
+into the detached worktree `~\jp-wt-head`, asserting every anchor occurs **exactly once** and
+throwing otherwise. It threw, and the throw was real:
+
+- `id: 'api-keys',` occurs **twice** in `settingsRegistry.ts` — once in `SETTINGS_NAV`, once in
+  `SETTINGS_REGISTRY`. Anchoring on the id alone would have inserted two nav pages into the
+  search registry. The anchor now includes the following `labelKey:` line.
+- The catalog block extractor asserts each language's extracted key set is **identical to
+  English's** and that none of the 97 keys already exists at `HEAD`. All four passed at 97.
+
+The script also asserts the two known foreign strings never appear in the output —
+`aero-safe-mode` in `settingsRegistry.ts`, `aeroSafeMode` / `aero-safe-mode.css` in `main.tsx`.
+Both hunks are still in the working tree after the commit, unmoved; that was verified by
+re-reading `git diff` on those two files afterwards.
+
+The commit was staged by `git hash-object -w --path=<p>` on the **candidate's** bytes plus
+`git update-index --cacheinfo`, never `git add` of the shared tree, so what shipped is
+byte-identical to what was gated. `git show --numstat` matches the candidate's
+`git diff --numstat` line for line.
+
+### Four gates
+
+- `npx vitest run`: **14 failed / 6 files -> 10 failed / 5 files**, 6,815 tests. The `14/6`
+  baseline was re-measured this hop at pristine `c5d92d4` in `~\jp-wt-base`, not taken from the
+  previous entry. The four that closed are all `agentNavigationIndexMirror`. The ten survivors
+  are the same foreign files: `blancAgentStepConfirmGate` (5), `localAgentQueueRun` (1),
+  `novelReaderProgressGuard` (1), `architectureBaseline` (1), `i18n` (2). **Both `i18n`
+  failures were read by name**: the OS-locale list is `Lockscreen.tsx:171-172` only, and the
+  hardcoded-string list is 37 other-track files — **none of the three new pages is in either.**
+- `node tools/i18n-check.cjs`: **exit 0, 9,040 -> 9,137 English keys**, all complete in ja/zh/ru.
+- `node tools/architecture-audit.cjs`: 1,645 -> **1,650 modules**, one unclassified finding —
+  the same foreign `orphan-module:src/shared/i18n/catalogs/mooncapLore.ts`. **No new finding**,
+  and none of the five new modules is an orphan, which is the check that the pages are wired.
+- `npx eslint --no-ignore` on all 17 paths: **exit 0 with zero output** — not even a warning.
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance — Russian UI, the lazy catalog path
+
+Existing bridge on 39273, one window, `/focus` first, driven only through authenticated
+debug-bridge evaluation. **The sidebar could not be clicked by coordinate**: `elementFromPoint`
+at the exact centre of the `Мониторы` button returned a `NAV` belonging to the Agent window
+stacked above it. Raising Settings would have rewritten `desktop-layout.json`, so navigation
+used `element.click()` through `/eval` instead — a real bubbling MouseEvent React handles,
+with no z-order write. The hit-test refusal is exactly why that check exists.
+
+- **Sidebar**: 20 entries, with `Мониторы` / `Перетаскивание файлов` / `Справка` present under
+  `СИСТЕМА`, all resolved through the *lazy* Russian catalog a key-count check cannot exercise.
+- **Monitors**: rendered the machine's one real display — `1920×1080`, `Display`, `Основной`,
+  `Масштаб 1.00×` — so `display:list` is answering, not a placeholder. The host-desktop select
+  offered `Study`, `City`, `Desktop 3…5`; the taskbar segmented control offered
+  `Полная / Только окна / Скрыта`; the simulated-display row offered `Выкл. / 1 / 2 / 3`.
+- **File drops**: six override rows (`.zip .apkg .json .png .jpg .txt`), each select carrying
+  translated `fileDrop.target.*` options. Setting `.zip` wrote
+  `{"autoRoute":true,"alwaysTriage":false,"undoDepth":10,"overrides":{".zip":"library-manga"}}`
+  and the control **read it back** as `Библиотека — манга`, so the store round-trips.
+- **Help**: `Последний раз пройден 07.08.2026` — a `ru-RU` date from `LANG_TAGS`, not the OS
+  locale. **Replay was actually clicked**, not grepped: `replays` went 8 -> 9, `completedAt`
+  went to `null`, the line flipped to `Ещё не пройден`, and `Тур начнётся заново прямо сейчас.`
+  appeared. `TourOverlay` reads `shouldRunTour()` in a `useState` lazy initialiser, so an
+  already-mounted window cannot spawn the tour from that write — checked before clicking.
+- **No raw `settings.monitors.` / `settings.fileDrops.` / `fileDrop.target.` / `help.tour.`
+  key rendered anywhere**, and the bridge reported **0 error entries**.
+
+**Restoration.** Three keys were written and all three were restored and asserted equal in the
+same call: `jp-study.onboarding.v1` (back to `replays: 8`), `jp-os-filedrop-prefs-v1` (removed —
+it had not existed), and `jp-os-settings-recent-v1`, whose MRU reordered to
+`["file-drops","help","monitors",…]` and was put back verbatim. All three probe globals were
+deleted. No userData backup was taken, and no `desktop-layout.json` write was provoked.
+
+### Exact next slice
+
+`DesktopShell.tsx` + `DropRouter.tsx` — the last uncommitted renderer piece of this subsystem,
+and the consumer for the 14 withheld `fileDrop.affordance` / `triage` / `toast` keys and
+`desktop.task.onDesktop`. It is genuinely hard and should be sized as its own hop: the
+`DesktopShell.tsx` diff is +555/-68 over 22 hunks and **interleaves three tracks** (this
+subsystem, `deskDrag`, `studyBlockWindows`), so it needs hunk-level reconstruction against
+`HEAD` rather than a file copy. `DropRouter.tsx` is untracked and should be checked for its own
+foreign dependencies first — `onboardingStore.ts` was that surprise this hop.
