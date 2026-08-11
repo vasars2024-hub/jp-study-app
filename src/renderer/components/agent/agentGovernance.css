@@ -1,0 +1,94 @@
+.agent-governance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+  min-width: 0;
+  color: var(--agent-text);
+}
+
+.agent-governance-intro,
+.agent-governance-note {
+  margin: 0;
+  color: var(--agent-muted);
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-governance-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.agent-governance-label {
+  color: var(--agent-text);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 600;
+}
+
+.agent-governance-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--agent-surface-2);
+}
+
+.agent-governance-choice {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm, 6px) - 2px);
+  background: transparent;
+  color: var(--agent-muted);
+  font: inherit;
+  font-size: var(--font-size-xs, 0.75rem);
+  cursor: pointer;
+}
+
+.agent-governance-choice:hover,
+.agent-governance-choice:focus-visible {
+  color: var(--agent-text);
+}
+
+.agent-governance-choice:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--agent-accent) 65%, white);
+  outline-offset: 1px;
+}
+
+.agent-governance-choice.is-selected {
+  border-color: var(--agent-line);
+  background: var(--agent-surface);
+  color: var(--agent-text);
+}
+
+.agent-governance-select {
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--agent-surface-2);
+  color: var(--agent-text);
+  font: inherit;
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
+.agent-governance-select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--agent-accent) 65%, white);
+  outline-offset: 1px;
+}
+
+.agent-governance-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--agent-text);
+  font-size: var(--font-size-xs, 0.75rem);
+  cursor: pointer;
+}
+
+.agent-governance-switch input {
+  accent-color: var(--agent-accent);
+}

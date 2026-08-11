@@ -5881,3 +5881,135 @@ single commit produces a list of failures and no way to tell which of them the
 commit caused; the parent is the only control that separates "this broke it" from
 "this is what the branch already was". Whoever next verifies a commit here should
 budget for the second run rather than reporting the first as a regression.
+
+## The Agent's own governance, written from the app that owns it — 2026-08-11
+
+The previous section closed the provider-cost half of the plan bullet and named the other
+half as still open: "Full-mode memory/profile/permission/automation controls". Re-deriving
+that claim from source rather than trusting it confirmed it exactly, and sharpened it.
+
+**The only writer for `localAgentSettings` or the agent profile store in the entire
+repository was `BlancReadyToolPanels`** — plus `AgentProfileOperations`, also under
+`components/blanc/`. Grepping every caller of `saveLocalAgentSettings`,
+`saveLocalAgentProfiles`, `setLocalAgentProfileOperations` and `createLocalAgentProfile`
+returns Blanc's shell and one other thing: `agentToolRegistry`, which is the *Agent's own
+tool* writing settings on the model's behalf. So the user-facing count from the main app was
+zero. The central Agent's permission ceiling, its active profile and its memory switch were
+read-only from the app that owns the Agent — `AgentCapabilityDirectory` mounts in the Full
+inspector, reads all three, and renders `permission-insufficient` with no control anywhere in
+that shell to resolve it.
+
+### What the slice added
+
+`AgentGovernancePanel` in `components/agent/`, behind the same Full-mode inspector as the
+capability directory it answers, with the three controls the plan bullet names. Two rules
+carry it, and both are pinned by a test proved to guard by positive control.
+
+**Activating a profile enables it in the same write.** `normalizeAgentProfiles` accepts
+`activeProfileId` only when the named profile is `enabled` and falls back to `study-tutor`
+otherwise (`localAgentProfiles.ts:344`). So the write every existing caller makes — Blanc's
+`changeProfile` at `BlancReadyToolPanels.tsx:476` is the live example — appears to switch to a
+disabled profile and actually switches to a different one, reporting success either way. The
+new `activateLocalAgentProfile` writes `enabled: true` alongside the id. The picker labels the
+option `(disabled)` before it is chosen and the note states what choosing it will do, so the
+enable is disclosed rather than silent.
+
+**The ceiling is displayed next to what it resolves to.** `effectiveAgentPermission` takes the
+LOWER of the global ceiling and the profile's own, so raising the ceiling against a narrower
+profile changes nothing that runs. The effective row states that outcome and names the capping
+profile instead of leaving the ceiling to imply it.
+
+| test | run against | result |
+| --- | --- | --- |
+| `enables the profile it activates` + the picker's UI twin | the `enabled: true` removed from `activateLocalAgentProfile` | **both failed**, 2 of 6 |
+| `states the permission operations actually run at` | `effectiveAgentPermission(...)` to `settings.permission` | **failed, alone** (1 of 6) |
+| `reaches the governance panel from Full view` | the panel's render replaced with `{null}` in the shell | **failed, alone** (1 of 54) |
+
+That third row is the one worth keeping. `architecture-audit` is satisfied by a module being
+*referenced*; it cannot tell a rendered panel from an imported one, and this branch has now
+produced three separate sections about code that existed and was never reached. The pin walks
+the user's path — Full view, then the disclosure button — so a future refactor that drops the
+render fails a gate instead of quietly restoring the defect this slice fixed.
+
+### Live acceptance, on a fresh boot
+
+The recorded `bridge.json` port refused connections — an unclean exit, per the bridge's own
+teardown contract — so one was started. `/logs` was clean on arrival and reports **zero
+errors** across the whole run, with no foreign `[vite] hot updated` paths.
+
+The panel lives behind Full mode inside a stacked `.fwin`, which is the known instrumentation
+limit recorded in the previous section. Rather than stop at the store round-trip, the real
+component was **mounted into the running renderer** from its real module URL and driven with
+real clicks against real `localStorage` — which is what a click through the surface would have
+established, minus the click. (Bare `import('react')` does not resolve from `/eval`; the
+prebundled `/node_modules/.vite/deps/react.js` does.)
+
+| probe | result |
+| --- | --- |
+| three dynamic imports | `AgentGovernancePanel`, `activateLocalAgentProfile`, `saveLocalAgentSettings` all `function` |
+| panel mounted, rendered | all three controls present; **every one of the 10 new keys resolved through the live ru catalog**, none as its own key |
+| click "full automation" | `localStorage` permission = `full-automation`; effective row reads **"Ограниченные действия"** and names «Study Tutor» |
+| pick `automation-assistant` | written to real storage; effective row flips to the uncapped "Полная автоматизация" |
+| pick a **disabled** probe profile | panel to `probe-off`; the naive write against the same store to **`study-tutor`** |
+
+The app's UI language was Russian, which made the i18n evidence stronger than a key count: the
+strings came out of the live catalog at runtime. Profile names stayed English (`Study Tutor`),
+which is correct — they are a data module, not chrome.
+
+**The capability directory is the measurement that makes this a fix rather than a control.**
+Built against the live registry with the Agent enabled:
+
+| ceiling / profile | `permission-insufficient` | available |
+| --- | --- | --- |
+| read-only · Study Tutor | 11 | 9 |
+| full-automation · Study Tutor | **2** | 18 |
+| full-automation · Automation Assistant | **0** | 28 |
+
+The first two rows are what the ceiling control now does: nine operations the directory
+reported as blocked become available. The third is what the profile picker does with the
+residual two — Study Tutor caps at `limited-actions`, so the ceiling alone cannot clear them,
+which is exactly why the panel shows the effective permission rather than the ceiling.
+
+Both storage keys were captured first and restored after: settings compared **identical** to
+the captured string, and the profiles key — which did not exist before the run — was removed
+rather than left as an empty store. The probe host and all nine probe globals were deleted and
+re-read as absent.
+
+### Gates
+
+`npx vitest run`: **510 passed / 1 skipped of 511 files**, **6,965 passed** / 6 skipped —
+up 7 from `5696d39`'s 6,958: the 6 new governance tests plus the shell wiring pin. One full
+run in between reported a single failure that three consecutive later runs did not reproduce
+and which the new suites did not reproduce in 3/3 repeats; it happened while a second `vitest`
+process was running concurrently, and is recorded here rather than dropped.
+`node tools/i18n-check.cjs`: clean, **9,274** English keys translated in ja/zh/ru, up 10.
+`node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+`npx eslint` on all nine touched paths: **0 errors, 0 warnings**.
+
+### Staged against a shared tree
+
+The four catalogs still carry several hundred lines of other tracks' uncommitted work and were
+committed as **reconstructed blobs** — HEAD verbatim plus this slice's 10 `agent.governance.*`
+lines, lifted by key prefix and spliced at the `agent.capabilities.title` anchor. The splice
+refuses unless it finds exactly 10 lines per language and unless HEAD has none already. The
+other six files were clean before editing and carry nothing but this lane; their combined diff
+is 64 insertions and 0 deletions.
+
+### Still open
+
+- **Automations, the fourth word in the plan bullet.** Deliberately not built here.
+  `saveLocalAgentAutomation`/`removeLocalAgentAutomation` are a scheduler lane with main-side
+  ownership, not a store toggle, and the entry it writes freezes
+  `effectiveAgentPermission(...)` at creation time (`BlancReadyToolPanels.tsx:461`) — so an
+  automation created before a ceiling change keeps the old authority. Whether that snapshot is
+  the intended contract or a bug is a **product decision**, and building a main-app writer over
+  it without settling that would ship the ambiguity into a second surface.
+- **Retained-chat policy and memory scope** — untouched; neither has any state behind it yet.
+  `memoryEnabled` is a switch, not a scope.
+- **Blanc's `changeProfile` still makes the naive write** (`BlancReadyToolPanels.tsx:476`) and
+  should move to `activateLocalAgentProfile`. Left alone deliberately: `components/blanc/` is
+  another track's directory, and the defect is now proved and named here for whoever owns it.
+- **The 340 non-`agent.*` catalog keys missing at HEAD** — unchanged, belonging to other tracks.
+- **`mediaCueAgentContext`'s identity ignores `mediaId`** — unchanged, sixth section running.
+- **The five untracked `src/shared/i18n/*/` directories** — unchanged; one of the four gates
+  still cannot run from the branch's own history because of them.

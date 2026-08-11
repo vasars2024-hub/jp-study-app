@@ -90,6 +90,31 @@ export function setLocalAgentProfileOperations(
   });
 }
 
+/**
+ * Make one profile the active one, and enable it in the same write.
+ *
+ * `normalizeAgentProfiles` accepts `activeProfileId` only when the named profile is `enabled`, and
+ * falls back to the built-in default otherwise. So writing `activeProfileId` alone — which is what
+ * every caller did before this existed — silently activates a DIFFERENT profile whenever the chosen
+ * one happens to be disabled, and the picker that made the request reports success. Enabling here
+ * makes the write mean what the caller asked for.
+ *
+ * Takes the store rather than reading it back, for the same reason `setLocalAgentProfileOperations`
+ * does: the value the caller is rendering is the value that gets edited.
+ */
+export function activateLocalAgentProfile(
+  store: AgentProfileStore,
+  profileId: string,
+): AgentProfileStore {
+  return saveLocalAgentProfiles({
+    ...store,
+    activeProfileId: profileId,
+    profiles: store.profiles.map((profile) => (
+      profile.id === profileId && !profile.enabled ? { ...profile, enabled: true } : profile
+    )),
+  });
+}
+
 export function createLocalAgentProfile(name: string): AgentProfileStore {
   const store = loadLocalAgentProfiles();
   const id = `custom-${Date.now().toString(36)}`;

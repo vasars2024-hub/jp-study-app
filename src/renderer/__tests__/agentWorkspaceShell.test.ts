@@ -626,6 +626,34 @@ describe('Agent workspace shell', () => {
     expect((host.querySelector('.agent-full-inspector') as HTMLElement).hidden).toBe(false);
   });
 
+  it('reaches the governance panel from Full view, which is the only route the main app has', async () => {
+    stored = populated();
+    await mount();
+
+    // The panel writes `localAgentSettings` and the profile store. Until it was wired here the
+    // only writer for either in the whole repository lived in Blanc's separate shell, so the app
+    // that owns the Agent could read its permission ceiling and change nothing. An import alone
+    // does not prove that — `architecture-audit` is satisfied by a module being referenced, not
+    // rendered — so this walks the same path a user does: Full view, then the disclosure button.
+    expect(host.querySelector('.agent-governance')).toBeNull();
+
+    await click(buttonWith('agent.view.full'));
+    const open = buttonWith('agent.governance.title');
+    expect(open.getAttribute('aria-expanded')).toBe('false');
+    expect(host.querySelector('.agent-governance')).toBeNull();
+
+    await click(open);
+
+    expect(open.getAttribute('aria-expanded')).toBe('true');
+    expect(host.querySelector('.agent-governance')).not.toBeNull();
+    // The three controls the plan bullet names, reachable rather than merely present in a module.
+    expect(host.querySelector('[data-testid="agent-governance-permission-full-automation"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="agent-governance-profile"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="agent-governance-memory"]')).not.toBeNull();
+    // It lives inside the Full-mode inspector, so Simple view does not expose the ceiling.
+    expect((host.querySelector('.agent-full-inspector') as HTMLElement).hidden).toBe(false);
+  });
+
   it('collapses the context and activity inspector without persisting a workspace change', async () => {
     stored = populated();
     await mount();

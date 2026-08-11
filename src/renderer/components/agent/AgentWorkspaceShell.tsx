@@ -80,6 +80,7 @@ import {
 } from '../../agentConversationPlanner';
 import { AgentConversationPlanQueue } from './AgentConversationPlanQueue';
 import { AgentCapabilityDirectory } from './AgentCapabilityDirectory';
+import { AgentGovernancePanel } from './AgentGovernancePanel';
 import { AgentPromptLibrary } from './AgentPromptLibrary';
 import { AgentContextSuggestions } from './AgentContextSuggestions';
 import { AgentPipelineTerminal } from './AgentPipelineTerminal';
@@ -1333,6 +1334,7 @@ export default function AgentWorkspaceShell() {
    */
   const [inspectorExpanded, setInspectorExpanded] = useState(true);
   const [capabilitiesExpanded, setCapabilitiesExpanded] = useState(false);
+  const [governanceExpanded, setGovernanceExpanded] = useState(false);
   const [promptLibraryExpanded, setPromptLibraryExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<'simple' | 'full'>('simple');
   const inspectorContentId = `agent-inspector-${useId().replace(/:/g, '')}`;
@@ -2612,6 +2614,15 @@ export default function AgentWorkspaceShell() {
                         {t('agent.capabilities.title')}
                       </button>
                       {capabilitiesExpanded ? <AgentCapabilityDirectory /> : null}
+                      <button
+                        type="button"
+                        className="agent-action agent-governance-open"
+                        aria-expanded={governanceExpanded}
+                        onClick={() => setGovernanceExpanded((expanded) => !expanded)}
+                      >
+                        {t('agent.governance.title')}
+                      </button>
+                      {governanceExpanded ? <AgentGovernancePanel /> : null}
                       <AgentConversationPlanQueue
                         conversationId={selected.id}
                         queue={approvalContext?.queue ?? null}
