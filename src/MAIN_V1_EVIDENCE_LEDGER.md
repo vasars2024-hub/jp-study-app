@@ -10312,3 +10312,108 @@ Two things this hop measured that the next should not re-derive:
 - `desktopGetLayout()`'s array is `viewports`, keyed `desktopIndex`/`name`/`authoredW`/
   `authoredH`/`windows` — not `desktops`. A probe reading `.desktops` returns an empty list and
   looks like an empty layout.
+
+## The authored-origin decision was already made, and it does not reach the disk — 2026-08-12
+
+**Correction to the entry immediately above, written an hour earlier in the same hop.** It says
+the `authoredW/H` question "is still the product decision the previous two entries deferred".
+That was wrong, and re-deriving instead of trusting it is what found the error: the decision had
+already been made *and implemented*, sitting **untracked** on this tree.
+
+- `src/renderer/desktopLayoutFit.ts` — untracked. `clampLayoutToViewport` lifted out of
+  `DesktopShell.tsx` verbatim, with the write at the end changed to
+  `authoredW: rescaled || !known ? vw : layout.authoredW`.
+- `src/renderer/__tests__/desktopLayoutFitAuthored.test.ts` — untracked, 8 tests, all passing.
+- `src/renderer/components/DesktopShell.tsx` — dirty at **+1 / -83**, and that diff is *exactly*
+  the extraction: one added import, the 83-line function removed. Read hunk by hunk; no foreign
+  track is in it, and the only importer of the symbol anywhere in `src/**` is `DesktopShell.tsx`
+  itself at `:740`.
+
+The rule it settled is the defensible one: `authoredW/H` names the space the **returned**
+coordinates are in. A proportional pass multiplies every coordinate by `vw/authoredW`, so it may
+stamp; a clamp pass leaves `sx = sy = 1` and returns a fitting window byte-for-byte unchanged, so
+it must preserve a known origin; an unknown origin has nothing to protect and is always stamped.
+That module's own docblock also corrects an earlier note of mine: "it is exported, so it is
+unit-testable without mounting the shell" was **false** — importing `DesktopShell.tsx` under
+vitest dies at `playerBus.ts:182` (`document.createElement('audio')` at module eval, via
+`VisualizerCanvas.tsx`) in `node` and at `window.api.playerWindowId()` in `jsdom`. Extraction was
+the prerequisite, not a tidiness preference.
+
+### The live pass says the fix does not change what gets stored
+
+This is the part no unit test could have reported, and it is why the lane was worth driving
+rather than just reading. Second dev app of the hop (pid 89224, `/logs?match=hot` empty again).
+Desktop **2** was chosen deliberately: authored **944x453**, one window, and an 880-wide tear-off
+is exactly the mismatch that used to re-stamp.
+
+| viewport | before opening desktop 2 | after |
+|---|---|---|
+| 0 | 1264x765 | 1264x765 |
+| 1 | 880x507 | 880x507 |
+| **2** | **944x453** | **880x507** |
+| 3 (control, never opened) | 944x453 | 944x453 |
+| 4 | 880x393 | 880x393 |
+
+`deskwinOpenDesktop(2)` mounted `?desk=2&spawned=1` at an 880x563 canvas with 1 `.os-task-win`,
+and desktop 2 came back claiming it was authored at 880x507 anyway. The persisted
+`desktop-layout.json` changed with it (same 5,508 bytes, different sha256). Desktop 3 not moving
+is the control that rules out "everything got re-stamped at launch".
+
+So the fit path is now honest and **the stored value is still re-authored**, because a second,
+independent writer does it: `buildLayout(…, deskSize())` at `DesktopShell.tsx:786`, `:795` and
+`:2131` stamps `authoredW/H` from the live viewport on **every** commit, and the first commit
+fires right after hydrate — the `hydrating.current` guard at `:774` is already cleared by the
+time React runs that effect. Fixing the pure function without the commit path fixes the value
+that gets *computed*, not the value that gets *kept*.
+
+Committed anyway, and deliberately: the module is strictly more correct than what it replaces,
+it is tested, it is a prerequisite for testing anything here at all, and leaving finished work
+untracked is the exact failure this ledger keeps recording. What is **not** claimed is any
+change in observable behaviour — measured, and it is none.
+
+### Gates
+
+The tree these ran against is byte-identical to the tree being committed (only
+`MAIN_V1_EVIDENCE_LEDGER.md`, a `.md`, changed after them):
+
+- `npx vitest run`: **537 files, 7,226 passed, 0 failed** — with both untracked files already on
+  disk, so the 8 new tests are inside that number. No set-difference needed against a red
+  baseline; nothing is red.
+- `node tools/i18n-check.cjs`: **exit 0**. Pure geometry, no strings.
+- `node tools/architecture-audit.cjs`: **exit 0**, 1,718 modules, "Nothing new" — the new module
+  is not an orphan because `DesktopShell.tsx` imports it.
+- `npx eslint --no-ignore` on the three paths: **exit 0**. Four `no-unused-vars` warnings, all in
+  `DesktopShell.tsx` and all pre-existing — `snapValue` appears exactly once at `HEAD` too
+  (line 71) and once now (line 72), so the extraction did not orphan it.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### The probe wrote, and this time it was put back
+
+`desktop-layout.json` was copied byte-for-byte before the run (5,508 bytes, sha256
+`836E8EC0…5836`), changed during it (sha256 `E805E9CF…B0D1`), and **restored after the app was
+stopped** — verified by `SequenceEqual` over the raw bytes, not by eye: `True`, 5,508 = 5,508,
+sha back to `836E8EC0…5836`. Only that single 5 KB file was copied; no userData backup was taken.
+The earlier tear-off pass in this hop needed no restore because it wrote nothing.
+
+### Exact next slice
+
+**Make the commit path stop re-stamping `authoredW/H` on a hydrate it did not author.** The three
+call sites are `DesktopShell.tsx:786`, `:795`, `:2131`, all passing `deskSize()` into
+`buildLayout`'s `authored` parameter. The shape that matches the module's rule: remember what
+`clampLayoutToViewport` returned for `authoredW/H` at hydrate (`applyDesktopLayout`, `:738-741`)
+in a ref, and commit *that* instead of the live viewport — the live viewport is only the honest
+answer when a proportional pass rescaled into it, or when the origin was unknown.
+
+Two cautions for whoever takes it:
+
+- **There is a genuine product question underneath, and it is narrower than it looks.** If a user
+  clamp-opens a 3440-authored desk on 1920 and then rearranges every window there, the coordinates
+  really are 1920-space now, and a strict "never re-stamp in clamp mode" rule would send them back
+  to 3440 unscaled. Distinguishing a user edit from a post-hydrate echo commit is the actual
+  design work; both currently arrive through the same debounced effect at `:773`.
+- **It cannot be unit-tested through the shell** (see the import failures above), so its evidence
+  has to be live: open a desk whose authored size differs from the window canvas and assert
+  `desktopGetLayout()` still reports the original pair. Desktop **3** (944x453, 0 windows) is the
+  natural fixture: it was the control here and was never opened. Desktop 2 is also usable — the
+  restore above put it back to 944x453 — but it is the one this hop already re-stamped once, so
+  prefer 3 and keep 2 as a second shot.
