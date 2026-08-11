@@ -35,12 +35,17 @@ export type SettingsPageId =
   | 'transcription'
   | 'visualizer'
   | 'special'
+  // Note the neighbour: `display` below is *visual accessibility* (contrast,
+  // zoom, scrollbars), not monitors. `monitors` is the physical-display page.
+  | 'monitors'
+  | 'file-drops'
   // Phase 0 credentials vault — every API key in the app, one page.
   | 'api-keys'
   | 'display'
   | 'motion'
   | 'storage'
-  | 'memory';
+  | 'memory'
+  | 'help';
 
 export interface SettingsNavPage {
   id: SettingsPageId;

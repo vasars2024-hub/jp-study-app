@@ -1,0 +1,372 @@
+/*
+ * Multi-monitor desktops, cross-monitor drag, and the universal drop router.
+ *
+ * A separate file on purpose: `styles.css` is 621 KB and single-owner by
+ * jp-dispatch §1, so a feature that needs new rules brings its own sheet
+ * rather than queueing behind whoever holds that file this wave.
+ */
+
+/* ---------- Secondary desktop window ---------- */
+
+.desktop-root-secondary {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* ---------- Cross-monitor drag ghost ---------- */
+
+/*
+ * Shown on the RECEIVING desktop while an item hovers over it from another
+ * monitor. Nothing is committed at this point — the ghost is the only feedback
+ * the user gets that the drop will land here, because the real item is still
+ * being painted by the window they started the drag in.
+ */
+.deskdrag-ghost {
+  position: absolute;
+  z-index: 9000;
+  pointer-events: none;
+  border-radius: 10px;
+  border: 2px dashed color-mix(in srgb, var(--accent, #b03040) 70%, transparent);
+  background: color-mix(in srgb, var(--accent, #b03040) 14%, transparent);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
+  animation: deskdrag-ghost-in 140ms ease-out;
+  transform: translate(-8px, -8px);
+}
+
+.deskdrag-ghost-window {
+  width: 260px;
+  height: 170px;
+}
+
+.deskdrag-ghost-widget {
+  width: 200px;
+  height: 140px;
+}
+
+.deskdrag-ghost-icon,
+.deskdrag-ghost-note {
+  width: 76px;
+  height: 84px;
+}
+
+@keyframes deskdrag-ghost-in {
+  from {
+    opacity: 0;
+    transform: translate(-8px, -8px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-8px, -8px) scale(1);
+  }
+}
+
+.reduce-motion .deskdrag-ghost {
+  animation: none;
+}
+
+/* ---------- Drop affordance ---------- */
+
+/*
+ * The desktop previously had no drop affordance at all: files could be dropped
+ * and were, silently, with no indication that a drop target existed.
+ */
+.dropr-affordance {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgb(6 5 9 / 42%);
+  backdrop-filter: blur(3px);
+  animation: dropr-fade-in 120ms ease-out;
+}
+
+.dropr-affordance-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 40px;
+  border-radius: 16px;
+  border: 2px dashed color-mix(in srgb, var(--accent, #b03040) 78%, transparent);
+  background: color-mix(in srgb, var(--panel, #17151d) 88%, transparent);
+  color: var(--text, #ece9f1);
+  text-align: center;
+  max-width: min(420px, 80vw);
+}
+
+.dropr-affordance-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.dropr-affordance-hint {
+  font-size: 0.82rem;
+  opacity: 0.72;
+  line-height: 1.45;
+}
+
+@keyframes dropr-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.reduce-motion .dropr-affordance {
+  animation: none;
+}
+
+/* ---------- Triage sheet ---------- */
+
+.dropr-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 9600;
+  display: grid;
+  place-items: center;
+  background: rgb(4 3 6 / 58%);
+  padding: 24px;
+}
+
+.dropr-sheet {
+  width: min(620px, 100%);
+  max-height: min(76vh, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  border: 1px solid var(--line, #2a2632);
+  background: var(--panel, #17151d);
+  color: var(--text, #ece9f1);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 52%);
+}
+
+.dropr-sheet-title {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 600;
+}
+
+.dropr-sheet-sub {
+  margin: 0;
+  font-size: 0.84rem;
+  opacity: 0.72;
+}
+
+.dropr-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.dropr-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-2, #201d28) 92%, transparent);
+  border: 1px solid var(--line, #2a2632);
+}
+
+.dropr-row-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.88rem;
+  word-break: break-word;
+}
+
+.dropr-row-meta,
+.dropr-row-reason {
+  font-size: 0.74rem;
+  opacity: 0.62;
+}
+
+.dropr-row-pick select {
+  min-width: 190px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #2a2632);
+  background: var(--panel, #17151d);
+  color: inherit;
+  font: inherit;
+}
+
+.dropr-sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------- Toast action (Undo) ---------- */
+
+.os-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.os-toast-text {
+  min-width: 0;
+}
+
+.os-toast-action {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, currentcolor 34%, transparent);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.os-toast-action:hover {
+  background: color-mix(in srgb, currentcolor 12%, transparent);
+}
+
+/* ---------- Monitors settings page ---------- */
+
+.os-monitors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.os-monitor-row {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line, #2a2632);
+  background: color-mix(in srgb, var(--panel-2, #201d28) 90%, transparent);
+}
+
+.os-monitor-preview {
+  flex: none;
+  width: 128px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 2px solid var(--line, #2a2632);
+  background: linear-gradient(140deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 2%));
+}
+
+.os-monitor-preview-label {
+  font-size: 0.7rem;
+  opacity: 0.66;
+  font-variant-numeric: tabular-nums;
+}
+
+.os-monitor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.os-monitor-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.94rem;
+}
+
+.os-monitor-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--accent, #b03040) 26%, transparent);
+}
+
+.os-monitor-tag-sim {
+  background: color-mix(in srgb, #5a7fb0 30%, transparent);
+}
+
+.os-monitor-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.84rem;
+}
+
+.os-monitor-field select {
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #2a2632);
+  background: var(--panel, #17151d);
+  color: inherit;
+  font: inherit;
+}
+
+/* ---------- File drop settings page ---------- */
+
+.os-filedrop-overrides {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.os-filedrop-override {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.os-filedrop-ext {
+  flex: none;
+  min-width: 52px;
+  font-family: var(--mono, ui-monospace, monospace);
+  opacity: 0.78;
+}
+
+.os-filedrop-override select {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #2a2632);
+  background: var(--panel, #17151d);
+  color: inherit;
+  font: inherit;
+}
+
+/* Narrow monitors: stack the preview above the controls. */
+@media (max-width: 640px) {
+  .os-monitor-row {
+    flex-direction: column;
+  }
+
+  .os-monitor-preview {
+    width: 100%;
+    max-height: 90px;
+  }
+
+  .dropr-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .dropr-row-pick select {
+    width: 100%;
+  }
+}

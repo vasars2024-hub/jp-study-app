@@ -126,7 +126,18 @@ export function bootDesktopPrefs(): void {
 export function onDesktopPrefsChanged(cb: (s: DesktopPrefs) => void): () => void {
   const handler = (e: Event): void => cb((e as CustomEvent<DesktopPrefs>).detail);
   window.addEventListener(EVENT, handler);
-  return () => window.removeEventListener(EVENT, handler);
+  // B7: `EVENT` is window-local. Without this, changing icon size or taskbar
+  // height on one monitor left every other desktop window on the old value
+  // until it reloaded.
+  const onStorage = (e: StorageEvent): void => {
+    if (e.key !== KEY) return;
+    cb(loadDesktopPrefs());
+  };
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(EVENT, handler);
+    window.removeEventListener('storage', onStorage);
+  };
 }
 
 export function snapValue(n: number, grid: SnapGridId): number {

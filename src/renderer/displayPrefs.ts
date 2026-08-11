@@ -35,11 +35,32 @@ export interface DisplayPrefs {
   underlineLinks: boolean;
   /** Native window chrome: standard OS bar, in-app bar, or fully frameless. */
   windowChromeMode: WindowChromeMode;
+  /**
+   * Multi-monitor: scale a desktop's absolute-px geometry when it is shown on a
+   * differently-sized monitor, rather than only pulling out-of-bounds items back
+   * in.
+   *
+   * ON by default. The original rationale for off — "clamping never shrinks a
+   * window the user sized" — does not survive contact with a narrower monitor:
+   * clamp mode leaves the scale at 1, so EVERY window wider than the target
+   * viewport is set to exactly the viewport width at x=0. Showing a 1280px-wide
+   * desktop on a 960px one therefore collapsed all six windows into one
+   * full-width stack at the origin, which is a bigger change to the user's
+   * arrangement than scaling it would have been. Measured live 2026-08-07.
+   */
+  remapLayoutProportionally: boolean;
 }
 
 const KEY = 'jp-os-display-prefs-v1';
 const EVENT = 'jp-os-display-prefs-changed';
 const MOTION_KEY = 'jp-os-reduce-motion';
+
+/**
+ * One renderer-lifetime listener is enough. Every desktop window boots this
+ * module independently, while repeated React mounts in the same window must
+ * not multiply storage handlers.
+ */
+let displayPrefsSyncCleanup: (() => void) | null = null;
 
 const DEFAULTS: DisplayPrefs = {
   baseFontPx: 14,
@@ -59,6 +80,7 @@ const DEFAULTS: DisplayPrefs = {
   reduceFlashes: false,
   underlineLinks: false,
   windowChromeMode: 'standard',
+  remapLayoutProportionally: true,
 };
 
 function clamp(n: number, a: number, b: number): number {
@@ -66,13 +88,20 @@ function clamp(n: number, a: number, b: number): number {
   return Math.min(b, Math.max(a, n));
 }
 
+function displayPrefsFromRaw(raw: string | null): DisplayPrefs {
+  if (!raw) return { ...DEFAULTS };
+  try {
+    const p = JSON.parse(raw) as Partial<DisplayPrefs> & { borderless?: boolean };
+    return normalize({ ...DEFAULTS, ...p, windowChromeMode: chromeFromStored(p) });
+  } catch {
+    return { ...DEFAULTS };
+  }
+}
+
 export function loadDisplayPrefs(): DisplayPrefs {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as Partial<DisplayPrefs> & { borderless?: boolean };
-      return normalize({ ...DEFAULTS, ...p, windowChromeMode: chromeFromStored(p) });
-    }
+    if (raw) return displayPrefsFromRaw(raw);
   } catch {
     /* ignore */
   }
@@ -132,10 +161,11 @@ function normalize(s: DisplayPrefs): DisplayPrefs {
     reduceFlashes: s.reduceFlashes === true,
     underlineLinks: s.underlineLinks === true,
     windowChromeMode: parseWindowChromeMode(s.windowChromeMode),
+    remapLayoutProportionally: s.remapLayoutProportionally === true,
   };
 }
 
-export function applyDisplayPrefs(s: DisplayPrefs): void {
+function applyDisplayPrefsInternal(s: DisplayPrefs, persistMotionMirror: boolean): void {
   const root = document.documentElement;
   const st = root.style;
   const n = normalize(s);
@@ -186,14 +216,20 @@ export function applyDisplayPrefs(s: DisplayPrefs): void {
   // Keep legacy reduce-motion class in sync for existing CSS.
   const reduce = n.animationLevel === 'reduced' || n.animationLevel === 'none';
   root.classList.toggle('reduce-motion', reduce);
-  try {
-    localStorage.setItem(MOTION_KEY, reduce ? '1' : '0');
-  } catch {
-    /* ignore */
+  if (persistMotionMirror) {
+    try {
+      localStorage.setItem(MOTION_KEY, reduce ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
   }
 
   // Smooth scroll on the scrolling document / panes
   root.style.setProperty('scroll-behavior', n.smoothScroll && !reduce ? 'smooth' : 'auto');
+}
+
+export function applyDisplayPrefs(s: DisplayPrefs): void {
+  applyDisplayPrefsInternal(s, true);
 }
 
 function letterSpacingCss(id: LetterSpacingId): string {
@@ -249,12 +285,41 @@ export function setReduceMotion(on: boolean): void {
 
 export function bootDisplayPrefs(): void {
   applyDisplayPrefs(loadDisplayPrefs());
+  startDisplayPrefsSync();
 }
 
 export function onDisplayPrefsChanged(cb: (s: DisplayPrefs) => void): () => void {
+  startDisplayPrefsSync();
   const h = (e: Event): void => cb((e as CustomEvent<DisplayPrefs>).detail);
   window.addEventListener(EVENT, h);
   return () => window.removeEventListener(EVENT, h);
+}
+
+/**
+ * Apply pref changes written by another window even when nothing has subscribed
+ * through `onDisplayPrefsChanged`. Booted once per renderer.
+ */
+export function startDisplayPrefsSync(): () => void {
+  if (displayPrefsSyncCleanup) return displayPrefsSyncCleanup;
+
+  const onStorage = (e: StorageEvent): void => {
+    if (e.key !== KEY) return;
+    // `storage` already describes the sibling's committed value. Parsing that
+    // exact payload makes deletion/corruption deterministic in this renderer
+    // and avoids racing a second read. Do not rewrite the legacy motion mirror
+    // here: that would turn a one-way sibling event into an echo write.
+    const next = displayPrefsFromRaw(e.newValue);
+    applyDisplayPrefsInternal(next, false);
+    window.dispatchEvent(new CustomEvent<DisplayPrefs>(EVENT, { detail: next }));
+  };
+  window.addEventListener('storage', onStorage);
+  const cleanup = (): void => {
+    if (displayPrefsSyncCleanup !== cleanup) return;
+    window.removeEventListener('storage', onStorage);
+    displayPrefsSyncCleanup = null;
+  };
+  displayPrefsSyncCleanup = cleanup;
+  return cleanup;
 }
 
 export function resetDisplayPrefs(): DisplayPrefs {

@@ -124,6 +124,20 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     advanced: true,
   },
   {
+    id: 'monitors',
+    labelKey: 'settings.nav.monitors',
+    icon: 'monitor',
+    group: 'System',
+    descKey: 'settings.nav.monitors.desc',
+  },
+  {
+    id: 'file-drops',
+    labelKey: 'settings.nav.fileDrops',
+    icon: 'download',
+    group: 'System',
+    descKey: 'settings.nav.fileDrops.desc',
+  },
+  {
     id: 'api-keys',
     labelKey: 'settings.nav.apiKeys',
     icon: 'lock',
@@ -157,6 +171,15 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     icon: 'folder',
     group: 'System',
     descKey: 'settings.nav.memory.desc',
+  },
+  // Audit T1: the plan's own file list names a Help section here, as the home
+  // for "Replay tour". Without it the tour is unrepeatable once dismissed.
+  {
+    id: 'help',
+    labelKey: 'settings.nav.help',
+    icon: 'info',
+    group: 'System',
+    descKey: 'settings.nav.help.desc',
   },
 ];
 

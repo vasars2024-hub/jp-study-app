@@ -65,9 +65,12 @@ import ScraperPage from './pages/ScraperPage';
 import StoragePage from './pages/StoragePage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
+import MonitorsPage from './pages/MonitorsPage';
+import FileDropsPage from './pages/FileDropsPage';
 import ApiKeysPage from './pages/ApiKeysPage';
 import MotionPage from './pages/MotionPage';
 import MemoryPage from './pages/MemoryPage';
+import HelpPage from './pages/HelpPage';
 import MiniModePage from './pages/MiniModePage';
 import LockscreenPage from './pages/LockscreenPage';
 import SpecialPage from './pages/SpecialPage';
@@ -596,11 +599,14 @@ export default function SettingsApp(props: SettingsWallProps) {
               {page === 'scraper' && <ScraperPage />}
               {page === 'visualizer' && <VisualizerPage />}
               {page === 'special' && <SpecialPage />}
+              {page === 'monitors' && <MonitorsPage />}
+              {page === 'file-drops' && <FileDropsPage />}
               {page === 'api-keys' && <ApiKeysPage />}
               {page === 'display' && <DisplayPage />}
               {page === 'motion' && <MotionPage />}
               {page === 'storage' && <StoragePage />}
               {page === 'memory' && <MemoryPage />}
+              {page === 'help' && <HelpPage />}
             </div>
           </div>
         </div>

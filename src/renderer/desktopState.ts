@@ -2,6 +2,7 @@ import type {
   DesktopIndex,
   DesktopLayout,
   DesktopLayoutSnapshot,
+  DisplayAssignment,
 } from '../shared/desktop';
 import {
   DESKTOP_CITY,
@@ -27,6 +28,7 @@ function seedSnapshot(): DesktopLayoutSnapshot {
   return {
     activeDesktopIndex: DESKTOP_STUDY,
     viewports: [seedLayout(DESKTOP_STUDY), seedLayout(DESKTOP_CITY)],
+    assignments: [],
     globalZTop: 10,
     switching: false,
   };
@@ -56,6 +58,23 @@ export function getActiveDesktopIndex(): DesktopIndex {
 
 export function getDesktopLayout(index: DesktopIndex): DesktopLayout {
   return snapshot.viewports.find((layout) => layout.desktopIndex === index) ?? seedLayout(index);
+}
+
+export function getDesktopCount(): number {
+  return Math.max(1, snapshot.viewports.length);
+}
+
+export function getDesktopName(index: DesktopIndex): string {
+  return snapshot.viewports.find((layout) => layout.desktopIndex === index)?.name ?? `Desktop ${index + 1}`;
+}
+
+export function getAssignments(): DisplayAssignment[] {
+  return snapshot.assignments ?? [];
+}
+
+/** Assignment for one display, or null when that display is unconfigured. */
+export function getAssignment(displayKey: string): DisplayAssignment | null {
+  return getAssignments().find((a) => a.displayKey === displayKey) ?? null;
 }
 
 export function onDesktopChanged(cb: (snap: DesktopLayoutSnapshot) => void): () => void {

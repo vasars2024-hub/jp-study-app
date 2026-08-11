@@ -46,6 +46,9 @@ import './theme/a11y.css';
 import './theme/perf.css';
 // Shell panel base styles (Phase 2) — Notification Center, Quick Settings.
 import './components/shell/shell.css';
+// Multi-monitor desktops, cross-monitor drag ghost, drop router, and the two
+// settings pages they add. Its own sheet — styles.css is single-owner.
+import './multiMonitor.css';
 // Aero desktop-shell glass (Phase 2 · M1) — scoped to [data-materials='aero'],
 // loaded after shell.css so Aero flyout/palette corrections win over base shell styles.
 import './theme/aero-shell.css';
