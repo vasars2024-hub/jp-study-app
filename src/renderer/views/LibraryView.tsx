@@ -40,6 +40,13 @@ import {
   levelSortKey,
 } from '../../shared/libraryLevel';
 import { useCoverArt } from '../utils/coverArt';
+import {
+  DEFAULT_LIBRARY_LAYOUT,
+  LIBRARY_LAYOUTS,
+  drawerState,
+  resolveSelection,
+  type LibraryLayout,
+} from '../utils/libraryShelf';
 import { takeHandoff } from '../pendingHandoff';
 
 interface Props {
@@ -128,6 +135,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
   const [active, setActive] = useState<FolderFilter>('all');
   const [sortBy, setSortBy] = useState<LibrarySort>('date-desc');
   const [groupBy, setGroupBy] = useState<LibraryGroup>('none');
+  const [layout, setLayout] = useState<LibraryLayout>(DEFAULT_LIBRARY_LAYOUT);
   const [langFilter, setLangFilter] = useState<InboxLangFilter>('all');
   const [levelFilter, setLevelFilter] = useState<'all' | '1' | '2' | '3' | '4' | '5' | '6' | '7'>('all');
   const [watchFolder, setWatchFolder] = useState<string | null>(null);
@@ -549,13 +557,126 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
       ),
     [items, bookLevels],
   );
-  const selectedItem = visible.find((it) => it.id === selectedId) ?? visible[0] ?? null;
+  // Deliberately not backfilled with the first visible item — see
+  // resolveSelection. A drawer that re-selects something the moment you close
+  // it is a drawer that cannot be closed.
+  const selectedItem = resolveSelection(visible, selectedId);
   const activeLabel =
     active === 'all'
       ? t('library.filter.allItems')
       : active === 'unfiled'
         ? t('library.filter.unfiled')
         : String(active);
+
+  /**
+   * The detail drawer's body, built once and mounted by whichever shell is
+   * live. Both the Aero workbench and the Study OS shelf show the same facts
+   * and the same actions — a drawer that differs by theme is two products.
+   */
+  const detailBody = selectedItem ? (
+    <>
+      <CoverPreview item={selectedItem}>
+        <CoverLevelBadge estimate={bookLevels[selectedItem.id]} t={t} lang={lang} />
+      </CoverPreview>
+      <h3 title={selectedItem.title}>{selectedItem.title}</h3>
+      <dl className="aero-library-meta lib-drawer-meta">
+        <div>
+          <dt>{t('library.table.type')}</dt>
+          <dd>{libraryKindLabel(selectedItem, t)}</dd>
+        </div>
+        <div>
+          <dt>{t('library.table.progress')}</dt>
+          <dd>{Math.round((selectedItem.progress?.percent ?? 0) * 100)}%</dd>
+        </div>
+        <div>
+          <dt>{t('library.table.folder')}</dt>
+          <dd>
+            {selectedItem.folder && folders.includes(selectedItem.folder)
+              ? selectedItem.folder
+              : t('library.filter.unfiled')}
+          </dd>
+        </div>
+        <div>
+          <dt>{t('library.inspector.added')}</dt>
+          <dd>{new Date(selectedItem.createdAt).toLocaleDateString(LANG_TAGS[lang])}</dd>
+        </div>
+      </dl>
+      <div className="aero-library-inspector-actions lib-drawer-actions">
+        <Button variant="primary" leftIcon={<Icon name="novels" size={14} />} onClick={() => onOpen(selectedItem)}>
+          {t('library.open')}
+        </Button>
+        {selectedItem.kind === 'manga' && (
+          <Button
+            leftIcon={<Icon name="image" size={14} />}
+            onClick={(e) => void openCoverMenu(e, selectedItem.id)}
+          >
+            {t('library.card.setCoverTitle')}
+          </Button>
+        )}
+        <Button leftIcon={<Icon name="close" size={14} />} onClick={() => void removeItem(selectedItem.id)}>
+          {t('common.remove')}
+        </Button>
+      </div>
+      {coverMenu === selectedItem.id && (
+        <div className="card-cover-menu aero-library-cover-menu" onClick={(e) => e.stopPropagation()}>
+          {coverMenuPages.length === 0 ? (
+            <div className="card-file-empty muted">{t('library.card.loadingPages')}</div>
+          ) : (
+            coverMenuPages.map((pageUrl) => (
+              <button
+                key={pageUrl}
+                className="card-cover-thumb"
+                onClick={(e) => void setCoverFromPage(e, selectedItem.id, pageUrl)}
+              >
+                <img src={pageUrl} alt="" draggable={false} />
+              </button>
+            ))
+          )}
+        </div>
+      )}
+      {/* Only page-image items have anything to OCR; a normal EPUB already has text. */}
+      {canOcrToText(selectedItem) && <BookOcrPanel item={selectedItem} />}
+    </>
+  ) : null;
+
+  /** The drawer's own header: a title and the one control that closes it. */
+  const drawerHead = (
+    <div className="aero-library-drawer-head">
+      <div className="aero-library-pane-title">{t('library.inspector.details')}</div>
+      <button
+        type="button"
+        className="aero-library-drawer-close"
+        aria-label={t('common.close')}
+        title={t('common.close')}
+        onClick={() => setSelectedId(null)}
+      >
+        <Icon name="close" size={13} />
+      </button>
+    </div>
+  );
+
+  /** The layout switch, shared by both shells so the shapes stay the same two. */
+  const layoutSwitch = (
+    <div className="aero-library-layout-switch" role="group" aria-label={t('library.layout.aria')}>
+      {LIBRARY_LAYOUTS.map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          className={`lib-folder-chip${layout === mode ? ' active' : ''}`}
+          data-library-layout={mode}
+          aria-pressed={layout === mode}
+          onClick={() => setLayout(mode)}
+        >
+          <Icon
+            name={mode === 'grid' ? 'image' : 'library'}
+            size={12}
+            style={{ marginRight: 4, verticalAlign: '-2px' }}
+          />
+          {t(`library.layout.${mode}`)}
+        </button>
+      ))}
+    </div>
+  );
 
   // Digital Library chrome — Aero only (AppChrome pass-through in default theme).
   // Rebuild each render so t() stays current after language / shelf changes.
@@ -763,7 +884,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
       )}
 
       {aero ? (
-        <div className="aero-library-workbench">
+        <div className="aero-library-workbench" data-drawer={drawerState(selectedItem)}>
           <aside className="aero-library-tree" aria-label={t('library.aero.foldersAria')}>
             <div className="aero-library-pane-title">{t('library.aero.shelves')}</div>
             <button
@@ -876,6 +997,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                 {t('library.toolbar.youtube')}
               </Button>
               <ToolbarSpacer />
+              {layoutSwitch}
               <label className="muted" htmlFor="aero-lib-sort" style={{ fontSize: 11 }}>
                 {t('library.sort.label')}
               </label>
@@ -949,6 +1071,32 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                 <h2>{t('library.emptyFolder.title')}</h2>
                 <p className="muted">{t('library.emptyFolder.desc')}</p>
               </div>
+            ) : layout === 'grid' ? (
+              <div className="aero-library-shelf">
+                {groupedVisible.map((group) => (
+                  <div key={group.key || 'flat'} className="lib-group">
+                    {groupBy !== 'none' && group.key ? (
+                      <div className="lib-group-head muted" style={{ fontSize: 12, padding: '8px 4px 4px', fontWeight: 600 }}>
+                        {group.key}
+                      </div>
+                    ) : null}
+                    <div className="aero-library-grid" role="group" aria-label={t('library.table.aria')}>
+                      {group.items.map((it) => (
+                        <LibraryTile
+                          key={it.id}
+                          item={it}
+                          t={t}
+                          lang={lang}
+                          estimate={bookLevels[it.id]}
+                          selected={selectedItem?.id === it.id}
+                          onSelect={() => setSelectedId(it.id)}
+                          onOpen={() => onOpen(it)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="aero-library-table" role="table" aria-label={t('library.table.aria')}>
                 <div className="aero-library-row aero-library-row-head" role="row">
@@ -1000,76 +1148,17 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
             )}
           </main>
 
-          <aside className="aero-library-inspector" aria-label={t('library.inspector.aria')}>
-            <div className="aero-library-pane-title">{t('library.inspector.details')}</div>
-            {selectedItem ? (
-              <>
-                <CoverPreview item={selectedItem}>
-                  <CoverLevelBadge estimate={bookLevels[selectedItem.id]} t={t} lang={lang} />
-                </CoverPreview>
-                <h3 title={selectedItem.title}>{selectedItem.title}</h3>
-                <dl className="aero-library-meta">
-                  <div>
-                    <dt>{t('library.table.type')}</dt>
-                    <dd>{libraryKindLabel(selectedItem, t)}</dd>
-                  </div>
-                  <div>
-                    <dt>{t('library.table.progress')}</dt>
-                    <dd>{Math.round((selectedItem.progress?.percent ?? 0) * 100)}%</dd>
-                  </div>
-                  <div>
-                    <dt>{t('library.table.folder')}</dt>
-                    <dd>
-                      {selectedItem.folder && folders.includes(selectedItem.folder)
-                        ? selectedItem.folder
-                        : t('library.filter.unfiled')}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t('library.inspector.added')}</dt>
-                    <dd>{new Date(selectedItem.createdAt).toLocaleDateString(LANG_TAGS[lang])}</dd>
-                  </div>
-                </dl>
-                <div className="aero-library-inspector-actions">
-                  <Button variant="primary" leftIcon={<Icon name="novels" size={14} />} onClick={() => onOpen(selectedItem)}>
-                    {t('library.open')}
-                  </Button>
-                  {selectedItem.kind === 'manga' && (
-                    <Button
-                      leftIcon={<Icon name="image" size={14} />}
-                      onClick={(e) => void openCoverMenu(e, selectedItem.id)}
-                    >
-                      {t('library.card.setCoverTitle')}
-                    </Button>
-                  )}
-                  <Button leftIcon={<Icon name="close" size={14} />} onClick={() => void removeItem(selectedItem.id)}>
-                    {t('common.remove')}
-                  </Button>
-                </div>
-                {coverMenu === selectedItem.id && (
-                  <div className="card-cover-menu aero-library-cover-menu" onClick={(e) => e.stopPropagation()}>
-                    {coverMenuPages.length === 0 ? (
-                      <div className="card-file-empty muted">{t('library.card.loadingPages')}</div>
-                    ) : (
-                      coverMenuPages.map((pageUrl) => (
-                        <button
-                          key={pageUrl}
-                          className="card-cover-thumb"
-                          onClick={(e) => void setCoverFromPage(e, selectedItem.id, pageUrl)}
-                        >
-                          <img src={pageUrl} alt="" draggable={false} />
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-                {/* Only page-image items have anything to OCR; a normal EPUB already has text. */}
-                {canOcrToText(selectedItem) && <BookOcrPanel item={selectedItem} />}
-              </>
-            ) : (
-              <p className="muted">{t('library.inspector.selectHint')}</p>
-            )}
-          </aside>
+          {/*
+            The detail pane is contextual, not permanent: with nothing selected
+            it is not in the layout at all, and the shelf takes the width back.
+            That is the whole difference between a drawer and a third column.
+          */}
+          {selectedItem && (
+            <aside className="aero-library-inspector" aria-label={t('library.inspector.aria')}>
+              {drawerHead}
+              {detailBody}
+            </aside>
+          )}
         </div>
       ) : (
         <>
@@ -1217,6 +1306,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
           <option value="level">{t('library.group.level')}</option>
           <option value="source">{t('library.group.source')}</option>
         </select>
+        {layoutSwitch}
         <button type="button" className="btn small" onClick={() => setActive(INBOX_FOLDER)}>
           {t('library.toolbar.inbox')}
         </button>
@@ -1278,6 +1368,57 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
           <p className="muted">{t('library.emptyFolder.descClassic')}</p>
         </div>
       ) : (
+        <div className="lib-shell" data-drawer={drawerState(layout === 'list' ? selectedItem : null)}>
+        {layout === 'list' ? (
+          <div className="lib-list-groups">
+            {groupedVisible.map((group) => (
+              <div key={group.key || 'flat'} className="lib-group">
+                {groupBy !== 'none' && group.key ? (
+                  <div className="lib-group-head muted" style={{ fontSize: 12, margin: '8px 0 6px', fontWeight: 600 }}>
+                    {group.key}
+                  </div>
+                ) : null}
+                <div className="lib-list" role="group" aria-label={t('library.table.aria')}>
+                  <div className="lib-list-row lib-list-head" aria-hidden="true">
+                    <span>{t('library.table.title')}</span>
+                    <span>{t('library.table.type')}</span>
+                    <span>{t('library.table.progress')}</span>
+                    <span>{t('library.table.folder')}</span>
+                  </div>
+                  {group.items.map((it) => {
+                    const pct = Math.round((it.progress?.percent ?? 0) * 100);
+                    return (
+                      <button
+                        key={it.id}
+                        type="button"
+                        className={`lib-list-row${selectedItem?.id === it.id ? ' active' : ''}`}
+                        aria-pressed={selectedItem?.id === it.id}
+                        data-library-row={it.id}
+                        onClick={() => setSelectedId(it.id)}
+                        onDoubleClick={() => onOpen(it)}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('app/lib-item', it.id);
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                      >
+                        <span className="lib-list-title">
+                          <CoverThumb item={it} />
+                          <span title={it.title}>{it.title}</span>
+                        </span>
+                        <span>{levelChipLabel(it) ?? libraryKindLabel(it, t)}</span>
+                        <span>{pct > 0 ? `${pct}%` : t('library.progress.notStarted')}</span>
+                        <span>
+                          {it.folder && folders.includes(it.folder) ? it.folder : t('library.filter.unfiled')}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="lib-groups">
           {groupedVisible.map((group) => (
             <div key={group.key || 'flat'} className="lib-group">
@@ -1448,6 +1589,20 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
             </div>
           ))}
         </div>
+        )}
+        {/*
+          Classic shell: the drawer belongs to the compact list, where a row has
+          nowhere to put its actions. A grid card already carries its own — and
+          `selectedId` there drives the inline OCR panel, so opening a drawer on
+          the same state would answer one click with two panels.
+        */}
+        {layout === 'list' && selectedItem && (
+          <aside className="lib-drawer" aria-label={t('library.inspector.aria')}>
+            {drawerHead}
+            {detailBody}
+          </aside>
+        )}
+        </div>
       )}
         </>
       )}
@@ -1462,6 +1617,75 @@ function libraryKindLabel(
 ): string {
   if (it.kind === 'manga') return t('library.pages', { count: it.pageCount ?? 0 });
   return it.epubFile?.toLowerCase().endsWith('.pdf') ? t('library.kind.pdf') : t('library.kind.epub');
+}
+
+/**
+ * One shelf tile: the cover-first unit the grid is built from.
+ *
+ * Selection and opening are deliberately the same gestures the compact list
+ * uses — single click (or Enter/Space) selects and fills the detail drawer,
+ * double click opens — so switching layout does not change what a click means.
+ * It stays draggable because filing into a folder by dragging is the only way
+ * to file without going through the drawer.
+ */
+function LibraryTile({
+  item,
+  t,
+  lang,
+  estimate,
+  selected,
+  onSelect,
+  onOpen,
+}: {
+  item: LibraryItem;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  lang: string;
+  estimate: BookLevelEstimate | undefined;
+  selected: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+}) {
+  const pct = Math.round((item.progress?.percent ?? 0) * 100);
+  const chip = levelChipLabel(item);
+  return (
+    <div
+      className={`aero-library-tile${selected ? ' active' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      data-library-tile={item.id}
+      onClick={onSelect}
+      onDoubleClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        // Space would scroll the shelf out from under the tile that was just picked.
+        e.preventDefault();
+        onSelect();
+      }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('app/lib-item', item.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+    >
+      <CoverCard item={item}>
+        {chip && <span className="kind-badge">{chip}</span>}
+        <CoverLevelBadge estimate={estimate} t={t} lang={lang} />
+        {pct > 0 && (
+          <div className="card-progress">
+            <div style={{ width: `${pct}%` }} />
+          </div>
+        )}
+      </CoverCard>
+      <span className="aero-library-tile-title" title={item.title}>
+        {item.title}
+      </span>
+      <span className="aero-library-tile-sub muted">
+        {libraryKindLabel(item, t)}
+        {pct > 0 ? ` · ${pct}%` : ''}
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -1484,7 +1708,7 @@ function CoverCard({ item, children }: { item: LibraryItem; children: ReactNode 
 function CoverPreview({ item, children }: { item: LibraryItem; children: ReactNode }) {
   const { style, hasArt, resolution } = useCoverArt(item.title, item.coverPath, item.id);
   return (
-    <div className="aero-library-preview" style={style} data-cover={resolution}>
+    <div className="aero-library-preview lib-drawer-cover" style={style} data-cover={resolution}>
       {!hasArt && <span>{item.title}</span>}
       {children}
     </div>

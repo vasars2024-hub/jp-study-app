@@ -25565,3 +25565,183 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
   margin-top: 10px;
   font-size: 12px;
 }
+
+/* ---------- Library: compact list + contextual detail drawer (Study OS) -----
+   The cover grid above is what the Library opens as. These two shapes are what
+   it was missing: a dense list for scanning progress and folders down a long
+   collection, and a drawer that details one item without the grid having to
+   give up a permanent column for it. `data-drawer` is set from the same
+   `drawerState()` the Aero workbench uses, so the two shells cannot drift. */
+.lib-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.lib-shell[data-drawer='open'] {
+  grid-template-columns: minmax(0, 1fr) 262px;
+}
+@media (max-width: 900px) {
+  .lib-shell[data-drawer='open'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.lib-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lib-list-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 96px 92px 128px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.lib-list-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-list-row:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
+}
+.lib-list-row.active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+}
+.lib-list-head {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: default;
+}
+.lib-list-title {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.lib-list-title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The compact-list thumbnail is aero-scoped for size elsewhere; give it one
+   here too, or the classic list paints a zero-height gradient. */
+.lib-list-title .aero-library-thumb {
+  width: 24px;
+  height: 31px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-position: center;
+  background-size: cover;
+}
+
+.lib-drawer {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel, transparent);
+}
+.lib-drawer .aero-library-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.lib-drawer .aero-library-pane-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.lib-drawer .aero-library-drawer-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lib-drawer .aero-library-drawer-close:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+.lib-drawer .lib-drawer-cover {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background-position: center;
+  background-size: cover;
+}
+.lib-drawer .lib-drawer-cover > span {
+  padding: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.lib-drawer h3 {
+  margin: 10px 0 8px;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+}
+.lib-drawer-meta {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.lib-drawer-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lib-drawer-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.lib-drawer-meta dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
