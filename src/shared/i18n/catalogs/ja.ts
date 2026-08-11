@@ -3797,6 +3797,17 @@ export const ja: Catalog = {
   'reading.fetch.opening': '開いています…',
   'reading.comprehension': '既知の単語 {pct}%',
 
+  // 統一リーディング操作セット (shared/readingWorkspaceActions.ts)
+  'reading.action.read': '読む',
+  'reading.action.progress': '読書位置',
+  'reading.action.import': '取り込む',
+  'reading.action.extract': 'テキストを抽出',
+  'reading.action.plan': '計画に追加',
+  'reading.action.analyze': '理解度を分析',
+  'reading.action.dictionary': '辞書で調べる',
+  'reading.action.mine': '語彙を採取',
+  'reading.action.jitenVocabulary': 'Jiten の語彙',
+
   // Library view (ja)
   'library.intro': '本やマンガをここに集めて、読み始めましょう。',
   'library.menu.file': 'ファイル',

@@ -3780,6 +3780,17 @@ export const zh: Catalog = {
   'reading.fetch.opening': '正在打开…',
   'reading.comprehension': '已掌握 {pct}% 的词汇',
 
+  // 统一阅读操作集 (shared/readingWorkspaceActions.ts)
+  'reading.action.read': '阅读',
+  'reading.action.progress': '阅读进度',
+  'reading.action.import': '导入',
+  'reading.action.extract': '提取文本',
+  'reading.action.plan': '加入计划',
+  'reading.action.analyze': '分析理解度',
+  'reading.action.dictionary': '查词典',
+  'reading.action.mine': '采集词汇',
+  'reading.action.jitenVocabulary': 'Jiten 词汇',
+
   // Library view (zh)
   'library.intro': '你的图书和漫画。导入文件即可开始阅读。',
   'library.menu.file': '文件',

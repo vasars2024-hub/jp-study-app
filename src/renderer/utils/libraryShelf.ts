@@ -11,6 +11,9 @@
  * and the shelf could never take the width back.
  */
 
+import type { LibraryItem } from '../../shared/types';
+import type { ReadingWorkspaceActionId } from '../../shared/readingWorkspaceActions';
+
 /**
  * How the shelf paints its items. `grid` is the default because a library is
  * browsed by recognising covers; `list` is for scanning progress, type and
@@ -42,4 +45,28 @@ export function resolveSelection<T extends { id: string }>(
 /** What the workbench publishes so CSS can drop the drawer's column entirely. */
 export function drawerState(selected: unknown): 'open' | 'closed' {
   return selected ? 'open' : 'closed';
+}
+
+/**
+ * What the Library shelf can genuinely perform from its detail drawer.
+ *
+ * This is the host half of `resolveReadingWorkspaceActions`'s intersection —
+ * the shared registry decides which actions an *entry* supports, this decides
+ * which of them this *surface* can actually carry out. It is a function of the
+ * item rather than a constant because mining is only truthful for the exact
+ * books the mining panel would list: `EpubMiningSimplePanel` filters its own
+ * picker to `kind === 'book'` with a real `.epub` file, so handing it anything
+ * else would open a surface that cannot find the book you clicked.
+ *
+ * `import`, `extract`, `plan`, `analyze`, `progress` and `jitenVocabulary` are
+ * absent because nothing on this surface performs them yet. Absent, not
+ * disabled: a button that is rendered and can never fire is a promise the app
+ * does not keep.
+ */
+export function libraryHostedActions(
+  item: Pick<LibraryItem, 'kind' | 'epubFile'>,
+): ReadingWorkspaceActionId[] {
+  const hosted: ReadingWorkspaceActionId[] = ['read', 'dictionary'];
+  if (item.kind === 'book' && item.epubFile?.toLowerCase().endsWith('.epub')) hosted.push('mine');
+  return hosted;
 }

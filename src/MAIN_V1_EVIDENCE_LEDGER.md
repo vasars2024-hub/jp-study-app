@@ -7150,3 +7150,132 @@ to Blanc.
 ### Checkpoint
 
 One path-scoped commit: **3e6f4e0**.
+
+## Nine capabilities, one name each — 2026-08-11
+
+State was re-derived from source before anything was written: this file's last section, then the
+plan's "Dependency order". Main V1 is still in **Track 4**; Blanc and Aero remain ineligible.
+Of the three items the previous entry left open, one turned out to be **already done** — Jiten's
+API key is in the credential vault (`main/jiten.ts:32,84,133,455` read/write/clear through
+`credentials/vault`, with a one-way migration off the plaintext `jiten.json` and a test for it).
+That leaves the unified action set and the preserved deep links. This is the action set.
+
+### What the plan was actually complaining about
+
+"Unify planning, import/download, web extraction, comprehension analysis, Novel Reader,
+progress, dictionary, mining, and Jiten vocabulary actions" reads like a feature request. It is
+a naming complaint, and the tree shows the exact shape of it: `NovelsContent` calls them
+`analyzeSelected` / `mineJitenSelected` / `planSelected`, the Finder's site modal calls the same
+two capabilities `reading.fetch.go` and `reading.fetch.openInReader`, and the Library drawer
+offered one button, `library.open`. The same capability had three names, three icons and three
+orderings depending on which door you came through.
+
+`shared/readingWorkspaceActions.ts` is the vocabulary those doors now share: nine ids, one
+`labelKey` and one icon each, in one fixed render order grouped `read` -> `acquire` -> `study`.
+It is pure and host-free — it decides *which* actions a card can offer, never how any of them
+are performed, which is what keeps it from becoming a second dispatch layer.
+
+### The honesty rule, and why it is the load-bearing part
+
+`resolveReadingWorkspaceActions(entry, hosted)` intersects two things: what the **entry**
+supports and what the **host** can actually carry out. Both must be true or nothing renders.
+Nothing is ever rendered permanently disabled — a button that can never fire is a claim the app
+does not keep, and this repo has a whole audit vocabulary for that failure.
+
+Entry-side rules are real constraints, not taste. `mine` requires `edition.format === 'epub'`
+because the mining pipeline walks EPUB sections; a plain-text item has tokens but no structure,
+so it is analysable without being minable. `extract` is withheld from something already
+readable — there is nothing left to extract. `jitenVocabulary` needs `source.kind === 'jiten'`.
+
+Host-side, `libraryHostedActions` in `renderer/utils/libraryShelf.ts` claims exactly three:
+`read`, `dictionary`, and `mine` **only** for `kind === 'book'` with a real `.epub`, which
+mirrors `EpubMiningSimplePanel`'s own picker filter character for character. Handing the mining
+panel anything else would open a surface that cannot find the book you clicked. `import`,
+`extract`, `plan`, `analyze`, `progress` and `jitenVocabulary` are *absent from the Library*,
+not greyed out, because nothing on that surface performs them yet.
+
+### Unifying the set must not fork the mechanism
+
+Every branch of the drawer's dispatcher reuses wiring that already existed. `dict:lookup` is
+the `GlobalDictionaryOverlay`'s own channel. The mining handoff is byte-for-byte what
+`NovelsContent.analyzeSelected` dispatches — `setHandoffJson('epubMining', { bookId, ui })`,
+then `os:open`->`flashcards`, then `flashcards:openEpubMining`. A test asserts all three strings
+appear in *both* files, so the two surfaces cannot drift into two mechanisms behind one name.
+
+The dictionary action looks up `titleNative || title` — the same expression the registry's own
+applicability rule reasons about, so what gets looked up is what made the action available.
+
+Shelf management (set cover from a page, remove) stays outside the shared set: neither is a
+Reading action and no registry id covers them.
+
+Nine new i18n keys (`reading.action.*`) in all four catalogs.
+
+### Gates
+
+- `npx vitest run`: **520 passed / 1 skipped of 521 files**, **7,072 passed / 6 skipped of
+  7,078 tests** — the previous entry's 7,041 passing plus this slice's 31 and no new failure.
+- `node tools/i18n-check.cjs`: exit 0, all **9,298** English keys translated.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- `npx eslint --max-warnings 0` on the touched paths: **0 errors**; the one warning is the
+  pre-existing `BookOcrPanel` named-as-default import on an untouched line.
+- Not a gate, but measured: `npx tsc --noEmit` names **zero** errors in any file this slice
+  writes.
+
+Four source-level assertions were proved to guard by their own mutation before being trusted:
+deleting `data-reading-action`, replacing `t(action.labelKey)` with a hard-coded key, dropping
+the empty-query guard, and hosting `mine` unconditionally each flip their assertion to failing,
+and both mutated files restored byte-identical (`cmp`).
+
+### Live Electron acceptance
+
+Driven through the authenticated debug bridge against the running app — never mouse or keyboard
+automation, never Computer Use. (`mcp__jp-app__*` is permission-blocked for this worker; the
+skill's own `scripts/eval.ps1` reaches the same bridge and was used instead.)
+
+| probe | observed result |
+| --- | --- |
+| EPUB selected in the list drawer | `read:Read` (primary, icon), `dictionary:Look up`, `mine:Mine vocabulary` — registry order, all three with SVG icons |
+| its drawer meta | `Type=EPUB / Progress=2% / Folder=Unfiled / Added=24.07.2026` |
+| manga selected (`Type=17 pages`) | exactly `read`, `dictionary` — **`mine` withheld**, and `Set cover from a page` / `Remove` still present outside the set |
+| clicking `Look up` on the manga | one `dict:lookup` dispatched; `.dict-popup` opened, `.dict-q` = the title truncated to 40 chars |
+| clicking `Look up` on the EPUB after the titleNative fix | dispatched and painted `悪の教典 02` |
+| clicking `Mine vocabulary` | `os:open`->`flashcards` x1 and `flashcards:openEpubMining` x1; `.epub-mining-simple` mounted with its 21-option book picker **preselected to 悪の教典 02** — the book that was selected in the Library |
+| `/logs?level=error` | 0 entries |
+
+That last row is the whole point: the action did not merely navigate, it carried the selection
+with it.
+
+**Not verified live: `read`.** Its handler is the pre-existing `onOpen(selectedItem)` call,
+unchanged and identical to the row double-click, and opening a book writes `lastReadAt`/progress
+into the 8.6 GB real profile. The source test pins that the registry routes `read` to it.
+**Also not verified live: the Aero half**, for the same reason as the previous entry — reaching
+it needs `data-materials='aero'`, which the bridge skill's §2 forbids entering to test. The
+drawer body is one shared value, so both shells render the same set.
+
+Restored afterwards to the opening state: grid layout, drawer closed, dictionary popup closed,
+the Flashcards window my probe opened closed again, back to the same nine windows. Every probe
+global was deleted and verified gone; no window was moved and no persisted setting or storage
+API was touched.
+
+### Staging, on a shared tree
+
+`LibraryView.tsx` and `utils/libraryShelf.ts` were clean at HEAD and the three new modules are
+new, so those were plain `git add`. The four catalogs carry other tracks' uncommitted work and
+were staged as **HEAD-plus-this-edit blobs** (`git show HEAD:<path>` -> same edit -> `git
+hash-object -w` -> `git update-index --cacheinfo`), never the working-tree file. The staged
+catalog diff is 9 keys per language and nothing else.
+
+### Still open in Track 4
+
+The unified set has **one** host. Discover/Finder and Novels/Plan still paint their own buttons
+for `extract`, `import`, `analyze`, `plan` and `jitenVocabulary`; adopting the registry there is
+the next slice and needs no new decision — the ids, labels and icons already exist. After that,
+Track 4's last bullet: preserved plans/imports/progress/deep links, of which the route
+vocabulary half is done (`SECTION_ALIASES` maps `reading-finder`/`readingfinder` -> `discover`,
+and `normalizeReadingWorkspaceRoute` accepts the old string forms and `reading://workspace/...`)
+but the *preservation* half is unverified. Jiten's credential-vault item is **done** — do not
+redo it. Tracks 5-9 and the fresh Main V1 audit remain after Track 4; do not advance to Blanc.
+
+### Checkpoint
+
+One path-scoped commit: see the commit that carries this entry.

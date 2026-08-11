@@ -4024,6 +4024,19 @@ export const en: Catalog = {
   'reading.fetch.opening': 'Opening…',
   'reading.comprehension': '{pct}% of words you already know',
 
+  // The unified Reading action set (shared/readingWorkspaceActions.ts). One
+  // name per capability, so the same action never reads differently depending
+  // on which Reading surface you reached it from.
+  'reading.action.read': 'Read',
+  'reading.action.progress': 'Reading position',
+  'reading.action.import': 'Import',
+  'reading.action.extract': 'Extract text',
+  'reading.action.plan': 'Add to plan',
+  'reading.action.analyze': 'Analyze comprehension',
+  'reading.action.dictionary': 'Look up',
+  'reading.action.mine': 'Mine vocabulary',
+  'reading.action.jitenVocabulary': 'Jiten vocabulary',
+
   // Library view (en)
   'library.intro': 'Your books and manga. Import files to start reading.',
   'library.menu.file': 'File',

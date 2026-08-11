@@ -44,10 +44,14 @@ import {
   DEFAULT_LIBRARY_LAYOUT,
   LIBRARY_LAYOUTS,
   drawerState,
+  libraryHostedActions,
   resolveSelection,
   type LibraryLayout,
 } from '../utils/libraryShelf';
-import { takeHandoff } from '../pendingHandoff';
+import { setHandoffJson, takeHandoff } from '../pendingHandoff';
+import { readingWorkspaceEntryFromLibraryItem } from '../../shared/readingWorkspace';
+import { resolveReadingWorkspaceActions } from '../../shared/readingWorkspaceActions';
+import type { ReadingWorkspaceActionId } from '../../shared/readingWorkspaceActions';
 
 interface Props {
   onOpen: (item: LibraryItem) => void;
@@ -127,6 +131,36 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
       window.dispatchEvent(new CustomEvent('wired:tape-seek'));
     }
     onOpenProp(item);
+  };
+  /**
+   * Performs one action from the shared Reading set.
+   *
+   * Every branch reuses wiring that already exists somewhere else in the app —
+   * `dict:lookup` is the global dictionary overlay's own channel, and the
+   * mining handoff is byte-for-byte what `NovelsContent.analyzeSelected`
+   * dispatches. That is the point: unifying the *set* must not fork the
+   * *mechanism*, or the same button would behave differently per surface.
+   */
+  const runReadingAction = (id: ReadingWorkspaceActionId, item: LibraryItem) => {
+    if (id === 'read') {
+      onOpen(item);
+      return;
+    }
+    if (id === 'dictionary') {
+      // The same expression the registry's applicability rule reasons about,
+      // so what is looked up is what made the action available in the first
+      // place. A provider-supplied native title is the better query whenever
+      // one exists; a scanlation's English title is not a word.
+      const work = readingWorkspaceEntryFromLibraryItem(item).work;
+      const query = (work.titleNative || work.title).trim();
+      if (query) window.dispatchEvent(new CustomEvent('dict:lookup', { detail: { query } }));
+      return;
+    }
+    if (id === 'mine') {
+      setHandoffJson('epubMining', { bookId: item.id, ui: 'simple' });
+      window.dispatchEvent(new CustomEvent('os:open', { detail: 'flashcards' }));
+      window.dispatchEvent(new CustomEvent('flashcards:openEpubMining'));
+    }
   };
   const { t, lang } = useT();
   const aero = useAeroMaterials();
@@ -602,9 +636,28 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
         </div>
       </dl>
       <div className="aero-library-inspector-actions lib-drawer-actions">
-        <Button variant="primary" leftIcon={<Icon name="novels" size={14} />} onClick={() => onOpen(selectedItem)}>
-          {t('library.open')}
-        </Button>
+        {/*
+          The unified Reading action set, not a Library-specific button row.
+          Order, label and icon all come from the shared registry, so "Mine
+          vocabulary" here is the same words and the same glyph as it is in
+          Novels and Discover once those adopt it too.
+        */}
+        {resolveReadingWorkspaceActions(
+          readingWorkspaceEntryFromLibraryItem(selectedItem),
+          libraryHostedActions(selectedItem),
+        ).map((action) => (
+          <Button
+            key={action.id}
+            variant={action.primary ? 'primary' : undefined}
+            data-reading-action={action.id}
+            leftIcon={<Icon name={action.icon as Parameters<typeof Icon>[0]['name']} size={14} />}
+            onClick={() => runReadingAction(action.id, selectedItem)}
+          >
+            {t(action.labelKey)}
+          </Button>
+        ))}
+        {/* Shelf management, deliberately outside the shared set: neither
+            belongs to Reading, and neither is offered by any other surface. */}
         {selectedItem.kind === 'manga' && (
           <Button
             leftIcon={<Icon name="image" size={14} />}

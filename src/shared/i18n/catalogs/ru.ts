@@ -4191,6 +4191,17 @@ export const ru: Catalog = {
   'reading.fetch.opening': 'Открывается…',
   'reading.comprehension': 'Известно {pct}% слов',
 
+  // Единый набор действий чтения (shared/readingWorkspaceActions.ts)
+  'reading.action.read': 'Читать',
+  'reading.action.progress': 'Позиция чтения',
+  'reading.action.import': 'Импортировать',
+  'reading.action.extract': 'Извлечь текст',
+  'reading.action.plan': 'Добавить в план',
+  'reading.action.analyze': 'Анализ понимания',
+  'reading.action.dictionary': 'Найти в словаре',
+  'reading.action.mine': 'Собрать лексику',
+  'reading.action.jitenVocabulary': 'Лексика Jiten',
+
   // Library view (ru)
   'library.intro': 'Ваши книги и манга. Импортируйте файлы, чтобы начать читать.',
   'library.menu.file': 'Файл',
