@@ -81,6 +81,31 @@ function displayKeyOfWindow(win: BrowserWindow): string | null {
   return realKeyForWindow(win);
 }
 
+/**
+ * Identity of a desktop renderer, including a taskbar tear-off.
+ *
+ * A spawned desktop is intentionally absent from the display-assignment
+ * registry, so deriving both fields from its geometric display reports the
+ * main desktop index instead of the index pinned in its URL. Keep the two
+ * questions separate: geometry still tells the renderer which physical
+ * display it occupies, while the spawned registry owns its desktop index.
+ */
+export function desktopIdentityForWindow(win: BrowserWindow): {
+  displayKey: string | null;
+  desktopIndex: DesktopIndex | null;
+} {
+  const displayKey = displayKeyOfWindow(win);
+  for (const [desktopIndex, candidate] of spawnedWindows) {
+    if (candidate === win && !candidate.isDestroyed()) {
+      return { displayKey, desktopIndex };
+    }
+  }
+  return {
+    displayKey,
+    desktopIndex: displayKey ? desktopIndexForDisplayKey(displayKey) : null,
+  };
+}
+
 function createDesktopWindow(assignment: DisplayAssignment, display: DisplaySummary): BrowserWindow {
   const { workArea } = display;
   const win = new BrowserWindow({
@@ -422,8 +447,9 @@ export function registerDesktopWindowsIpc(): void {
   /** Which display+desktop is the caller? Answers for main and secondaries alike. */
   ipcMain.handle('deskwin:whoAmI', (e): { displayKey: string | null; desktopIndex: DesktopIndex | null } => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    const key = win && !win.isDestroyed() ? displayKeyOfWindow(win) : null;
-    return { displayKey: key, desktopIndex: key ? desktopIndexForDisplayKey(key) : null };
+    return win && !win.isDestroyed()
+      ? desktopIdentityForWindow(win)
+      : { displayKey: null, desktopIndex: null };
   });
 
   ipcMain.handle('deskwin:sync', () => {

@@ -195,6 +195,7 @@ vi.mock('../desktop', () => ({
       h.state.setMainCalls.push(key);
     },
     setAssignment: () => undefined,
+    releaseDesktop: () => undefined,
   }),
 }));
 
@@ -219,7 +220,10 @@ function reset(): void {
     // exists by this point. Without one here the primary display looks
     // unoccupied and the fixture would happily open a second shell on top of
     // the main window — a pass that proves nothing.
-    mainWindow: () => ({ isDestroyed: () => false }) as never,
+    mainWindow: () => ({
+      isDestroyed: () => false,
+      getBounds: () => ({ x: 0, y: 0, width: 1280, height: 860 }),
+    }) as never,
   });
 }
 
@@ -375,5 +379,17 @@ describe('desktopWindows', () => {
     h.state.activeDesktopIndex = 1;
     mod.syncDesktopWindows();
     expect(mod.desktopIndexForDisplayKey(PRIMARY_KEY)).toBe(1);
+  });
+
+  it('keeps a spawned window\'s pinned desktop index separate from its physical display', () => {
+    expect(mod.openSpawnedDesktop(3)).toBe(true);
+    const spawned = openWindows()[0];
+
+    // The fake geometry resolver places every unregistered window on the
+    // primary display. That must not make this tear-off claim desktop 0.
+    expect(mod.desktopIdentityForWindow(spawned as never)).toEqual({
+      displayKey: PRIMARY_KEY,
+      desktopIndex: 3,
+    });
   });
 });

@@ -10156,3 +10156,159 @@ Two things measured this hop that the next one should not re-derive:
   a separate main-side registry, gets no `deskwin:retarget`, and `whoAmI` mis-answers for it.
   Anything that needs the *per-display* path needs a second display (real or simulated) — a
   tear-off will not stand in for it.
+
+## The tear-off's desktop identity is fixed in source, but live acceptance is blocked — 2026-08-12
+
+No `docs/audit/RELAY_BOSS_AUDIT.md` exists. The preceding exact-next item requires the product
+decision it says it does, and another track already has dirty `DesktopShell.tsx` work plus an
+untracked `desktopLayoutFitAuthored.test.ts`; this hop did not choose that decision or touch
+either path. The adjacent decision-free defect is the one measured in the previous live pass:
+the spawned `?desk=1&spawned=1` renderer asked `deskwinWhoAmI()` and got desktop 0.
+
+The source fix is present but deliberately **uncommitted**. `desktopIdentityForWindow` now
+answers the two independent facts from their authoritative owners: physical display from window
+geometry / the per-display registry, and a tear-off's pinned desktop index from
+`spawnedWindows`. The IPC handler delegates to it. A regression case opens desktop 3 while
+the fake geometry resolver places the window on the primary display and proves the answer is
+`{ displayKey: PRIMARY_KEY, desktopIndex: 3 }`, not desktop 0. Touched paths are only:
+
+- `src/main/desktopWindows.ts`
+- `src/main/__tests__/desktopWindows.test.ts`
+
+### Automated evidence
+
+- Focused: `desktopWindows.test.ts` — **15/15 passed**. Its first run found an incomplete
+  historical fake (no `getBounds` on the fake main window); the fixture now models that real
+  method and the rerun is green.
+- `npx vitest run` equivalent (direct Vitest Node entry because the shell bootstrap is broken):
+  **exit 0**, whole suite.
+- `node tools/architecture-audit.cjs`: **exit 0**, 1,718 modules / 18 findings, nothing new.
+- touched-path ESLint: **exit 0**, 0 errors and the same 11 old non-null-assertion warnings in
+  `desktopWindows.test.ts`; the new lines are silent.
+- `node tools/i18n-check.cjs`: environment-blocked before checking keys. Esbuild reports
+  `Cannot read directory "../..": Access is denied` and then cannot resolve the existing,
+  readable `src/shared/i18n/catalogs/all.ts`. This is the same sandbox failure recorded
+  repeatedly earlier in this ledger. The slice adds no UI text or catalog dependency; the full
+  suite's i18n tests passed.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### Live gate — not passed
+
+The existing bridge on 39273 was healthy but belonged to pid 17264 and predated the main-process
+edit, so using it would have been false evidence. It was closed through authenticated `/eval`.
+Forge could not restart under this worker because the same esbuild directory-denial prevented it
+from resolving `vite.renderer.config.ts`.
+
+A config-file-free, programmatic Vite build of main and preload did succeed and emitted the
+ignored `.vite/build` artifacts with this source. Two isolated temporary
+`--user-data-dir` launches reached the rebuilt main:
+
+1. pid 85868 logged `[debugBridge] listening on 127.0.0.1:39273`;
+2. Chromium's GPU child then exited repeatedly with `-1073741515` and fatally terminated
+   before `/health` could return a renderer;
+3. a second launch with in-process/software-rendering flags also produced no addressable bridge.
+
+No mouse, keyboard or Computer Use automation was used. No userData backup was taken. The real
+`desktop-layout.json` remains 5,508 bytes with mtime `2026-08-11T20:51:58.617Z`, before
+this hop; the acceptance launches used disposable temp profiles.
+
+### Exact next slice
+
+Run the patched main in a normal interactive-token Electron process, open
+`deskwinOpenDesktop(1)`, target the spawned window through the debug bridge, and prove
+`deskwinWhoAmI().desktopIndex === 1` while its `displayKey` still reflects physical
+geometry. Then re-run the i18n gate in a shell whose sandbox helper is on PATH, append the live
+evidence here, and make the one path-scoped checkpoint commit. Do **not** commit this partial
+before that live assertion.
+
+## The tear-off answers with its own desktop, proved live — 2026-08-12
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist. This hop is the second half of the entry
+above: the source fix was already written and deliberately uncommitted pending a live assertion,
+and both of that entry's blockers turned out to be **worker-local, not tree-local**.
+
+### Both blockers were the previous worker's sandbox, not the repo
+
+- `node tools/i18n-check.cjs` runs here at **exit 0**, `9,324` English keys all translated in
+  ja/zh/ru, with the 130/128/137 baselined-verbatim keys unchanged. The esbuild
+  `Cannot read directory "../.."` denial the previous entry recorded did not reproduce.
+- `npm start` (`electron-forge start`) built `src/main.ts` and `src/preload.ts` and reached a
+  real renderer. No config-file-free workaround build was needed.
+
+The previous hop's two temp-profile Electron trees were still alive as orphans (**pid 62044**,
+`jp-codexa-live-*`, and **pid 85868**, `jp-codexa-accept-*`), and 85868 still **held port 39273**
+while never answering `/health` — a bridge socket with a dead renderer behind it. Both were
+stopped before starting a real app; the fresh dev run took the port as **pid 77100**. A stale
+`debug/bridge.json` naming a pid that no longer serves is worth checking before concluding the
+bridge is broken.
+
+### Live acceptance — the assertion the previous hop could not make
+
+One dev app on the **real** profile, one window at launch, `/logs?match=hot` **empty** (0 entries,
+so no other track was editing during the run). `deskwinOpenDesktop(1)` resolved `{ok:true}` and
+`/health` then listed window **2** at `http://localhost:5173/?desk=1&spawned=1`.
+
+`window.api.deskwinWhoAmI()` through each window's own renderer:
+
+| window | url | `displayKey` | `desktopIndex` |
+|---|---|---|---|
+| 1 (main) | `/` | `display\|1920x1080\|1` | **0** |
+| 2 (tear-off) | `/?desk=1&spawned=1` | `display\|1920x1080\|1` | **1** |
+
+That table is self-contained proof, not just a match against the expected value. The two windows
+report the **same `displayKey`**, and the main window shows what the geometric path answers for
+that key — **0**. So window 2's **1** cannot have come from `desktopIndexForDisplayKey`; it can
+only have come from the `spawnedWindows` lookup the fix added. Before the fix the same probe
+returned desktop 0, measured in the previous live pass. Both fields behaved as intended at once:
+the pinned index moved, the physical display key did not.
+
+Corroboration that the shell really mounted desktop 1: `desktopGetLayout()` reports viewport 1
+`"City"` with **0** windows and viewport 0 `"Study"` with **9**; window 2 renders **0**
+`.os-task-win` and window 1 renders **9**. Window 2 also carries `.desktop-root-secondary`, has
+**0** `.os-desktop-switch`, and measures 880x563 (not 0x0, so nothing was scored through a
+minimised window). The screenshot shows a real desk with the live Russian taskbar and no switcher
+beside Пуск.
+
+### Gates — all four green
+
+- `npx vitest run`: **537 files (1 skipped), 7,226 tests passed, 0 failed**. No set-difference was
+  needed because nothing is red at all on this tree; the ten foreign failures earlier entries
+  compensated for are gone.
+- `node tools/i18n-check.cjs`: **exit 0**. This slice adds no UI string.
+- `node tools/architecture-audit.cjs`: **exit 0**, 1,718 modules / 18 findings, "Nothing new".
+- `npx eslint --no-ignore` on the two touched paths: **exit 0**, 0 errors. The 11
+  `no-non-null-assertion` warnings are all in `desktopWindows.test.ts` at lines 246-365, i.e.
+  the historical fixtures — the lines this slice adds are silent.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### Nothing persisted drifted
+
+`%APPDATA%\jp-study-app\desktop-layout.json` was captured before the probe (5,508 bytes,
+sha256 `836E8EC0…5836`) and is **byte-identical afterwards** — same length, same hash. Desktop 1
+was already re-authored to 880x507 by the previous hop, so mounting it again wrote nothing, which
+independently confirms that entry's "the re-authoring is one-time, not per-mount churn" reading.
+No userData backup was taken; only that single small file was copied. No mouse, keyboard or
+Computer Use automation was used — everything went through the debug bridge.
+
+Unchanged from the previous entry and still **not** claimed: `onDeskRetarget` is unexercised, the
+`aero: false` branch is unrendered, and a tear-off is still not a stand-in for a per-display
+window. What *is* now claimed and was not before: a tear-off reports its own pinned desktop.
+
+### Exact next slice
+
+The open item is still the product decision the previous two entries deferred: **should
+`clampLayoutToViewport` write `authoredW/H` in `clamp` mode?** (`DesktopShell.tsx:605`, called at
+`:822`, the unconditional write at `:673`). Fresh evidence for it from this hop — desktop 0's
+`authoredW/H` is now **1264x765**, whereas an earlier entry measured it as 1264x821. The field
+tracks whatever canvas last opened the desktop, and this app launch shrank it again purely
+because the window came up at a different size. That is the defect stated in one measurement:
+a desktop opened at a smaller canvas silently loses the size its coordinates were authored
+against.
+
+Two things this hop measured that the next should not re-derive:
+
+- A live app is reachable here through plain `npm start`; the sandbox denials recorded in the two
+  entries above are per-worker, so re-probe them rather than inheriting them as facts.
+- `desktopGetLayout()`'s array is `viewports`, keyed `desktopIndex`/`name`/`authoredW`/
+  `authoredH`/`windows` — not `desktops`. A probe reading `.desktops` returns an empty list and
+  looks like an empty layout.
