@@ -9983,3 +9983,176 @@ Two things measured this hop that the next one should not re-derive:
 - **`os-taskbar-windows-only` has no CSS rule.** That is not a defect — the mode is implemented
   by *not rendering* the Start button and desktop switcher, and `os-taskbar[hidden]` covers
   `none`. The class is a styling hook only. Do not "fix" it by inventing a rule.
+
+## The renderer entry the secondary windows had been loading into nothing — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The previous entry's "Exact next slice" asked for the renderer entry that a
+`deskwinOpenDesktop()` window loads. Re-deriving it against the tree changed the shape of the
+job: the entry was **already written and uncommitted**. `src/renderer/App.tsx` was dirty at
++180/-74, and inside that diff sat `secondaryDesktop()`, the `if (secondary)` branch and a
+`SecondaryDesktopWindow` component. Main's half needed nothing — `desktopWindows.ts` has
+appended `?desk=<index>&displayKey=<key>` (and `desk=<i>&spawned=1` for a tear-off) since the
+subsystem landed.
+
+So this hop was a reconstruction, not an implementation.
+
+### The pending diff interleaves four tracks, and only one is this one
+
+`App.tsx`'s +180/-74 is **four** tracks, verified line by line:
+
+1. **multi-monitor** (mine) — `secondaryDesktop()`, the `!secondary` guards, `SecondaryDesktopWindow`.
+2. **i18n** — `POPOUT_LABELS` -> `POPOUT_LABEL_KEYS`, `popoutLabel()`, `useT()` in `PopoutChrome`,
+   `common.loading`, `appShell.transcriptionFailed`.
+3. **detached Study Block** — `parseDetachTarget`, the lazy `DetachedStudyBlock`, `detachedBlock`.
+4. **tour overlay** — `TourOverlay`.
+
+A fifth thing looks like mine and is not: the extraction of `AeroViewport` into
+`components/AeroViewport.tsx`. That file is **untracked**, and so are `renderer/aeroViewport.ts`
+and two tests (`aeroViewportWiring`, `aeroDisplayModeSync`) — a whole separate Aero display-mode
+lane. `SecondaryDesktopWindow` uses `AeroViewport`, but both live in `App.tsx`, so the committed
+version uses **`HEAD`'s inline component** and takes none of that lane. Taking it would have
+committed a foreign module's first importer.
+
+Every dependency was checked **by name at `HEAD`** rather than assumed: `desktopState`'s
+`getAssignment` / `onDesktopChanged`, `window.d.ts`'s `onDeskRetarget` (payload
+`{desktopIndex, displayKey}`), `preload.ts`'s binding for it, `DisplayAssignment.aero`,
+`multiMonitor.css:11`'s `.desktop-root-secondary`, and `DesktopIndex = number`. All resolve at
+`HEAD`. `initDesktopState()` is called from `main.tsx:257` in **every** renderer window, and it
+ends in `applySnapshot`, which dispatches `DESKTOP_LAYOUT_EVENT` — so the `aero` read re-runs
+through `onDesktopChanged` once the first snapshot lands and cannot stay stale.
+
+### Commit `276b43d`, one path, +88 / -4
+
+Reconstructed from `HEAD` + only this track's hunks: `git show HEAD:src/renderer/App.tsx` into a
+scratch file (hash-verified `bd53edc` = `HEAD`'s blob before editing), edited there, then
+`git hash-object -w --path=` and `git diff --numstat HEAD:<path> <blob>` to prove the result is
+**88/4** — the four deletions being the three guard lines and one comment line this slice
+rewrites, not a foreign hunk. Staged through a temporary index (`GIT_INDEX_FILE`); the shared
+index was never mutated. The branch moved by `git update-ref` with the old value as the
+compare-and-swap argument — the first attempt used a **fabricated** 40-char SHA and git refused
+it, which is the check working.
+
+Residue afterwards: `App.tsx` is still dirty at **93/71**, and grepping that residual diff for
+`secondary|desk=|displayKey|SecondaryDesktopWindow|getAssignment|onDesktopChanged|onDeskRetarget`
+returns **nothing** — the other three tracks are intact and none of mine is left behind. The
+tree's dirty path count stayed **379**, correctly: `App.tsx` was dirty before and is dirty still.
+
+### Four gates, both sides measured in detached worktrees
+
+Baseline `~\jp-wt-head` re-pointed to `327042a`; candidate `~\jp-wt-cand` at `276b43d`, with a
+junctioned `node_modules`.
+
+- `npx vitest run`: **6,872 tests on both sides**, 10 failed / 5 files on both. Compared as a set
+  difference on file + full test name from two JSON reports, **with the worktree path prefix
+  normalised away** — the first comparison reported "10 new, 10 fixed" purely because the two
+  roots differ, which is the trap that would have read as a total regression. Normalised:
+  **0 new, 0 fixed**. Same foreign five: `blancAgentStepConfirmGate` (5), `i18n` (2),
+  `localAgentQueueRun` (1), `novelReaderProgressGuard` (1), `architectureBaseline` (1).
+- `node tools/i18n-check.cjs`: **exit 0** both sides, **9,153** English keys both. This slice adds
+  no new key and no new string: every word a secondary window paints comes from `DesktopShell`,
+  which is already translated.
+- `node tools/architecture-audit.cjs`: exit 1 both sides (the pre-existing unclassified
+  `mooncapLore.ts` orphan). **1,657 modules and 19 findings on both**, output **byte-identical**
+  (448 bytes each).
+- `npx eslint --no-ignore src/renderer/App.tsx`: **exit 0 and silent on both sides**.
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance — a real second window, not a simulation
+
+Existing bridge on 39273, one window (pid 17264). `/logs` showed **0 error entries** and no
+`[vite] hot updated` at all, so nobody else was editing during the run. No `src` file was touched
+while the app was up: the reconstruction happened in a scratch file outside the repo.
+
+`window.api.deskwinOpenDesktop(1)` was invoked through `/eval` and **main really opened a second
+window**: id 2, `http://localhost:5173/?desk=1&spawned=1`. `/health` still resolved `"main"` to
+the bare-query window, so **B6 holds** — `jp-bridge` was not confused by a second desktop.
+
+The same probe expression was run against both windows, and the difference is the evidence:
+
+| | window 1 (main) | window 2 (`?desk=1&spawned=1`) |
+|---|---|---|
+| `.desktop-root-secondary` | absent | **present** |
+| `.os-desktop-switch` count | **2** | **0** |
+| `.os-start-btn` count | 1 | 1 |
+| taskbar class | `os-taskbar os-taskbar-full` | `os-taskbar os-taskbar-full` |
+| `.os-viewport-stage` | present | present |
+| root box | 1264x821 | 880x563 |
+
+The switcher count is the load-bearing row. Both windows render the Start button and both are in
+`taskbarMode: 'full'`, so the switcher's absence is **not** a taskbar-mode effect — it is the
+`!secondary` guard at `DesktopShell.tsx:2827` firing, which can only happen if the `secondary`
+prop actually arrived. Neither box is 0x0, so nothing was scored through a minimised window.
+
+That the *index* arrived was proved separately against the app's own store. `desktopGetLayout()`
+reports desktop 0 "Study" holding **9** windows and desktop 1 "City" holding **0**. Counting
+`.os-task-win` in each window: main renders **9** (`music, novels, calendar, resources, settings,
+translate, agent, blanc, library`), the secondary renders **0**. A shell that had fallen back to
+the active desktop would have listed nine. A screenshot corroborates: a real desk, the live
+Russian taskbar ("Пуск"), no switcher beside Start.
+
+### What this hop is NOT claiming
+
+- **`onDeskRetarget` was never exercised live.** Main sends `deskwin:retarget` only to windows in
+  the `desktopWindows` registry, and a `spawned=1` tear-off is deliberately in a *different*
+  registry. With one physical display there is no registry window to retarget. Do not record the
+  retarget path as verified.
+- **The `aero: false` branch was never rendered.** `getAssignment('')` is null for a tear-off, so
+  the default (`?.aero !== false` -> true) is the only branch reached; the opt-out needs a real
+  per-display assignment. Only the aero-**on** path is live-verified.
+- **`deskwinWhoAmI()` answers wrongly for a tear-off**, and this was measured: from window 2 it
+  returned `display|1920x1080|1` / desktop **0**, because a spawned window is not in the registry
+  and `displayKeyOfWindow` falls back to geometry. Harmless for the pinned index (that comes from
+  the URL prop, not from `whoAmI`), but it means a tear-off registers its drag context under the
+  *main* display's key. That is a real wrinkle for the cross-monitor drag, not for this slice.
+
+### The probe wrote one thing, and it is not restorable
+
+`%APPDATA%\jp-study-app\desktop-layout.json` **changed**: mtime 19:04:28 -> 23:48:52, 5509 ->
+**5508** bytes. Stated plainly because it was not intended and cannot be undone — the prior value
+was not captured first.
+
+What changed is desktop 1's `authoredW`/`authoredH`, now **880x507** — exactly the secondary
+window's inner canvas. The one-byte shrink is consistent with the previous pair having been
+`1264x821`, the main window's own canvas measured earlier in this same run, and with the widget's
+coordinates (`x:74 y:53 w:275 h:131`, `hidden: true`) being untouched. That reconstruction is
+**inferred from the byte delta, not measured**.
+
+A second full open/close cycle then left the file **byte-identical** (SHA equal before, during
+and after; only mtime moved), so mounting a secondary shell is **idempotent** — the write is a
+one-time re-authoring, not per-mount churn.
+
+The mechanism is `clampLayoutToViewport` (`DesktopShell.tsx:605`, called at `:822`). Its mode is
+the user preference `remapLayoutProportionally`, defaulting to **`clamp`** — and in clamp mode
+`sx = sy = 1`, so contents are pulled in bounds but **not** rescaled, while line 673 still returns
+`authoredW: vw, authoredH: vh` unconditionally. A layout authored at 1264x821 that merely *fits*
+inside 880x507 therefore ends up claiming it was authored at 880x507. If that desktop is later
+opened proportionally at 1264x821, its contents scale up by ~1.44x against an origin that was
+never true.
+
+**This is pre-existing behaviour in already-committed code, not code this slice introduces** —
+`clampLayoutToViewport` predates it. What this slice did was make it *reachable*, which is
+exactly the class of thing that only appears once dead code acquires a live caller. It is not
+fixed here because the fix is a real decision (should a clamp-mode fit record the authored size
+at all?) and folding a guess into a wiring commit would bury it.
+
+### Exact next slice
+
+**Decide whether `clampLayoutToViewport` should write `authoredW/H` in `clamp` mode.** Evidence
+above; the call site is `DesktopShell.tsx:822` and the write is `:673`. The argument for leaving
+it: line 628's comment says the bound is an invariant enforced every time and that stale
+bookkeeping caused a real overflow bug, so the field is deliberately re-stamped. The argument
+against: in clamp mode nothing was rescaled, so the field now records a size the coordinates were
+never authored against. Whichever way it goes, it wants a test over `clampLayoutToViewport`
+directly — it is exported, so it is unit-testable without mounting the shell.
+
+Two things measured this hop that the next one should not re-derive:
+
+- **`App.tsx` still needs a reconstruct-from-`HEAD` pass**, not a whole-file take: 93 insertions
+  and 71 deletions still pending there across three foreign tracks plus the untracked
+  `AeroViewport` extraction.
+- **A tear-off window is not a per-display window.** `spawned=1` has an empty `displayKey`, is in
+  a separate main-side registry, gets no `deskwin:retarget`, and `whoAmI` mis-answers for it.
+  Anything that needs the *per-display* path needs a second display (real or simulated) — a
+  tear-off will not stand in for it.
