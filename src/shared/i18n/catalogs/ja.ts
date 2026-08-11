@@ -658,7 +658,7 @@ export const ja: Catalog = {
   'settings.nav.transcription': '文字起こし',
   'settings.nav.transcription.desc': 'Whisper のデバイス設定',
   'settings.nav.scraper': 'スクレイパー',
-  'settings.nav.scraper.desc': 'ネットワーク、ブラウザー、セッションの設定',
+  'settings.nav.scraper.desc': 'ネットワーク、ブラウザー、セッション、プロバイダー、トラッキング、プレーヤー、字幕の設定',
   // Unified Search surface (MASTER_PLAN §6)
   'unifiedSearch.title': '統合検索',
   'unifiedSearch.desc': 'ローカルソースを検索し、ID、ソース範囲、競合を保持した統合メディア結果を表示します。',

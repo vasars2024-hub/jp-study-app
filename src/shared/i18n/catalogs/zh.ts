@@ -656,7 +656,7 @@ export const zh: Catalog = {
   'settings.nav.transcription': '转写',
   'settings.nav.transcription.desc': 'Whisper 设备设置',
   'settings.nav.scraper': '抓取器',
-  'settings.nav.scraper.desc': '网络、浏览器和会话设置',
+  'settings.nav.scraper.desc': '网络、浏览器、会话、提供商、追踪、播放器和字幕设置',
   // Unified Search surface (MASTER_PLAN §6)
   'unifiedSearch.title': '统一搜索',
   'unifiedSearch.desc': '搜索本地来源，并查看按身份合并、保留来源覆盖和冲突信息的媒体结果。',

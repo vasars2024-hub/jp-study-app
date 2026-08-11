@@ -772,7 +772,7 @@ export const ru: Catalog = {
   'settings.nav.transcription': 'Транскрипция',
   'settings.nav.transcription.desc': 'Устройство для Whisper',
   'settings.nav.scraper': 'Скрапер',
-  'settings.nav.scraper.desc': 'Настройки сети, браузера и сессии',
+  'settings.nav.scraper.desc': 'Настройки сети, браузера, сессии, провайдеров, отслеживания, плееров и субтитров',
   // Unified Search surface (MASTER_PLAN §6)
   'unifiedSearch.title': 'Единый поиск',
   'unifiedSearch.desc': 'Ищите в локальных источниках и просматривайте объединённые по идентичности медиа с сохранением охвата и конфликтов.',

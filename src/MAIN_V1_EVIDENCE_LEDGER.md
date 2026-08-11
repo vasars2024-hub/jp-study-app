@@ -9029,3 +9029,278 @@ faked to paper over it.
 3. The forced candidate state is now **14 failures / 6 files**. The shared working tree's own
    suite still runs green off other tracks' stranded work; that is corroboration, never candidate
    evidence.
+
+## The Scraper destination was already truthful; its description was not — 2026-08-11
+
+docs/audit/RELAY_BOSS_AUDIT.md still does not exist, so no boss finding pre-empted Main V1.
+The last ledger entry split the next work into the multi-monitor/file-routing subsystem and the
+separate Scraper reorganisation. Re-deriving the Scraper seam against **HEAD**, rather than
+assuming the whole dirty reorganisation had to land, found one smaller decision-free defect.
+
+### What HEAD actually says
+
+ScraperPage.tsx at HEAD already imports and renders MediaProviderPanel,
+MediaTrackingManager, SubtitleProviderPanel and ExternalPlayerPanel; its own searchable
+terms name providers, tracking, players and subtitles. The page destination in
+shared/agentNavigationIndex.ts names those same four terms. But
+settings.nav.scraper.desc at HEAD says only “Network, browser, and session controls”, so the
+navigation mirror rejects providers before a user can rely on that route.
+
+The working tree's four descriptions are **not this slice**. They describe the foreign, uncommitted
+Scraper reorganisation (“engine settings are in the Scraper app”), whose page diff removes the
+engine controls. The isolated candidate was instead HEAD plus exactly these four truthful
+descriptions:
+
+- en: Network, browser, session, providers, tracking, players, and subtitles
+- ja: ネットワーク、ブラウザー、セッション、プロバイダー、トラッキング、プレーヤー、字幕の設定
+- zh: 网络、浏览器、会话、提供商、追踪、播放器和字幕设置
+- ru: Настройки сети, браузера, сессии, провайдеров, отслеживания, плееров и субтитров
+
+No key was added, no search term was invented, and no Scraper implementation file was touched.
+
+### Automated evidence
+
+A tar candidate built from git archive HEAD plus only those four line replacements produced:
+
+- focused agentNavigationIndexMirror.test.ts on the live tree: **9/9 passed** after the English
+  description was corrected to carry the exact plural subtitles; the first draft's singular
+  subtitle was rejected by the gate, proving the assertion guards this edit;
+- isolated npx vitest run: **14 failing / 6 files, 6,718 tests** — the exact candidate baseline
+  recorded by the previous ledger entry. The same six files fail:
+  agentNavigationIndexMirror, blancAgentStepConfirmGate, localAgentQueueRun,
+  novelReaderProgressGuard, architectureBaseline, and i18n. Nothing new appeared.
+  The mirror still bails first on the unlanded Monitors page, so the full run cannot surface its
+  now-correct later Scraper iteration;
+- node tools/architecture-audit.cjs: the same one unclassified finding,
+  orphan-module:src/shared/i18n/catalogs/mooncapLore.ts; no new finding;
+- npx eslint --no-ignore on the four candidate catalog paths: **exit 0, no output**;
+- node tools/i18n-check.cjs: **environment-blocked**, not claimed green. The command reached
+  esbuild, but this worker's broken Windows sandbox denied esbuild traversal even inside the
+  isolated candidate (Cannot read directory "../../../..": Access is denied). The slice changes
+  no keys and supplies four real translations, but the required command must be rerun by the next
+  worker.
+
+tsc --noEmit was not run; it is not a gate.
+
+### Live Electron acceptance and restoration
+
+Existing bridge 39273, pid 17264, one real 1280×860 desktop window, driven only through authenticated
+debug-bridge evaluation. With Russian active, searching провайдер in Advanced Settings rendered
+the Scraper result with the new description. Selecting it opened
+data-settings-page="scraper"; the live destination visibly contained provider, tracking,
+external-player and subtitle-provider sections. The bridge reported **0 error entries**.
+
+The probe captured jp-settings-advanced-v1, jp-os-settings-recent-v1, and the search value
+before acting. It restored Advanced to "0", the MRU JSON to its exact captured byte string, and
+the query to ""; strict equality was true for all three and Settings returned to home.
+The sole probe global was deleted. No userData backup was taken.
+
+### Why there is no checkpoint commit
+
+This worker cannot write .git: git apply --cached failed before staging with
+Unable to create '.git/index.lock': Permission denied. The normal shell and apply_patch
+were also unavailable because codex-windows-sandbox-setup.exe is missing. To obey the shared-tree
+rule, the four foreign catalog lines were restored exactly after verification; this ledger entry is
+the only retained edit from the hop. No commit is claimed.
+
+### Exact next action
+
+When Git writes are available, stage the four HEAD-to-candidate description lines above (not the
+working tree's future-reorganisation strings), rerun i18n-check.cjs, and checkpoint the four
+catalogs plus this ledger entry. Then return to the actual large remaining landing:
+Monitors/File-drops/Help and the multi-monitor/file-routing subsystem beneath them. The separate
+Scraper reorganisation remains foreign work and must not be swept into that commit.
+
+## The Scraper description checkpoint was re-verified, but Git is still read-only — 2026-08-11
+
+The periodic boss audit still does not exist. Re-reading this ledger's final section and the
+plan's dependency order kept this hop on Main V1 and on the uncommitted Scraper description
+checkpoint; it did not skip ahead to Blanc or Aero.
+
+The live catalog files contain large foreign diffs, including the separate Scraper
+reorganisation. An isolated candidate was therefore rebuilt from `HEAD` (`1f78afb`) plus only
+the four description replacements documented immediately above and this ledger entry. Every
+overlay was read back byte-for-byte before the gates ran.
+
+### Repeated automated evidence
+
+- `npx vitest run`, executed through the candidate's Vitest binary: **14 failing tests in the
+  same six files, 6,718 tests total**. The files were agentNavigationIndexMirror,
+  blancAgentStepConfirmGate, localAgentQueueRun, novelReaderProgressGuard,
+  architectureBaseline and i18n. This exactly matches the previously recorded candidate
+  baseline; no failing file was added. The i18n suite's key parity and translated-catalog
+  coverage assertions passed.
+- `node tools/architecture-audit.cjs`: the same one unclassified finding,
+  `orphan-module:src/shared/i18n/catalogs/mooncapLore.ts`; no new finding.
+- `npx eslint --no-ignore` on the four candidate catalog paths: **exit 0, no output**.
+- `node tools/i18n-check.cjs`: still **environment-blocked**, and still not claimed green.
+  Both the isolated candidate and the live tree reach esbuild, which then reports `Access is
+  denied` while traversing the workspace and says it cannot resolve the existing
+  `src/shared/i18n/catalogs/all.ts`. That file was present in both places. The exact command
+  remains mandatory on a worker whose Windows sandbox permits esbuild traversal.
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live bridge and checkpoint status
+
+The authenticated bridge answered `/health` with one visible, non-minimised 1280×860 main
+window. Its `/logs` response contained foreign HMR updates for AgentGovernancePanel.tsx and
+ApiKeysPage.tsx. The repository bridge discipline says not to drive a shared live app in that
+state, so this hop did not repeat the already-recorded acceptance or mutate any persisted
+value. No userData backup was taken.
+
+Git remains read-only to this worker. Direct blob staging failed before touching the index:
+`git hash-object -w --stdin` reported insufficient permission for `.git/objects`. The index
+was clean before the attempt. Consequently there is still no honest checkpoint commit.
+
+### Exact next action
+
+On a worker with writable Git metadata and working esbuild traversal, reconstruct and stage
+the same four `HEAD`-plus-description blobs (never the foreign full catalog files), include
+the two adjacent ledger sections, run `node tools/i18n-check.cjs`, inspect the cached diff,
+and make the path-scoped checkpoint. Then return to the larger Monitors/File-drops/Help and
+multi-monitor/file-routing landing named above.
+
+
+## The missing i18n gate is green; Git metadata is the sole checkpoint blocker — 2026-08-11
+
+The boss-audit file still does not exist. Re-reading the ledger's final section and the plan's
+dependency order again kept this hop on the uncommitted Scraper-description checkpoint, before
+Monitors/File-drops/Help and long before Blanc or Aero.
+
+### Re-derived candidate
+
+`HEAD` remains `1f78afb`. The shared four catalog files still contain the foreign Scraper
+reorganisation descriptions, so none was edited or staged. An isolated candidate was rebuilt
+from `git archive HEAD`, then given only the four truthful descriptions recorded two sections
+above and the ledger's two post-HEAD sections. Read-back and no-index numstat showed exactly one
+replacement in each catalog and 131/0 lines in this ledger; the live ledger's own Git diff is
+the same 131/0, consisting only of those two sections.
+
+### Required gates, completed on the exact isolated candidate
+
+- `npx vitest run` through the repository's Vitest entry point: **14 failed / 6 files, 6,718
+  tests total**. The files are exactly `architectureBaseline`, `i18n`,
+  `agentNavigationIndexMirror`, `blancAgentStepConfirmGate`, `localAgentQueueRun`, and
+  `novelReaderProgressGuard`, matching the established candidate baseline; no failing file was
+  added.
+- `node tools/i18n-check.cjs`: **exit 0, all 9,040 English keys translated in ja/zh/ru**. The
+  normal temp path reproduced esbuild's parent-directory `Access is denied`; mapping the same
+  unchanged candidate temporarily to `X:` made the real command pass. The mapping was removed
+  immediately and verified absent.
+- `node tools/architecture-audit.cjs`: the same single unclassified foreign finding,
+  `orphan-module:src/shared/i18n/catalogs/mooncapLore.ts`; no new finding.
+- `npx eslint --no-ignore` on the four candidate catalog paths: **exit 0, no output**.
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live and checkpoint status
+
+The authenticated bridge is healthy on port 39273 with one visible, non-minimised 1280x860 main
+window, and its last 120 logs contain no HMR or error entries. The running shared renderer now
+contains the foreign Scraper reorganisation, not this HEAD-based candidate, so it cannot provide
+an honest second acceptance of the candidate without disrupting another track. The exact
+candidate already has live acceptance in the first section above: Russian search, the truthful
+Scraper result, its HEAD destination's provider/tracking/player/subtitle sections, zero errors,
+and byte-exact restoration. This hop did not mutate renderer storage or userData and took no
+backup.
+
+Git metadata is still read-only to this worker. A direct `git hash-object -w --stdin` probe
+failed before creating an object with `insufficient permission for adding an object to repository
+database .git/objects`. The index was not touched. Therefore the path-scoped checkpoint remains
+impossible here and no commit is claimed.
+
+### Exact next action
+
+On a worker with writable `.git`, reconstruct the same four one-line catalog blobs from HEAD,
+stage those plus this ledger's three post-HEAD sections without taking any foreign catalog hunk,
+inspect the cached diff, and make the checkpoint. All four gates and the candidate's live
+acceptance are now present. Only after that should Main V1 advance to the multi-monitor,
+file-routing, and Help landing.
+
+## The four-hop Scraper description checkpoint finally committed — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+Three consecutive hops gated this same slice and could not commit it: each recorded that
+`.git` was read-only to that worker. This hop probed first — `git hash-object -w --stdin`
+returned an object with exit 0 — so the blocker was worker-local, not repository-wide, and the
+checkpoint was completable here.
+
+### Re-derived from source, not from the previous hops' summaries
+
+`HEAD` is still `1f78afb`. The defect was re-confirmed against HEAD directly rather than
+trusted from the ledger:
+
+- `agentNavigationIndex.ts` at HEAD gives the Scraper page the terms `providers`, `tracking`,
+  `players`, `subtitles`;
+- `ScraperPage.tsx` at HEAD imports and renders `MediaProviderPanel`, `MediaTrackingManager`,
+  `SubtitleProviderPanel` and `ExternalPlayerPanel`, so those terms are truthful about the
+  destination;
+- but `settings.nav.scraper.desc` at HEAD read `Network, browser, and session controls` in en,
+  and the equivalent network/browser/session-only string in ja/zh/ru.
+
+`agentNavigationIndexMirror.test.ts`'s `allowedWords` builds a destination's vocabulary from its
+label plus its **description**, so at HEAD all four indexed terms were words the destination did
+not use.
+
+### The candidate never touched the shared tree
+
+The four catalogs carry large foreign hunks from the separate, uncommitted Scraper
+reorganisation, whose descriptions say `engine settings are in the Scraper app` and belong to a
+page diff that removes the engine controls. Those are **not** this slice and were not staged.
+Each catalog blob was rebuilt from `git show HEAD:<path>` with only the one description line
+replaced, hashed with `git hash-object -w --path`, and placed in the index with
+`git update-index --cacheinfo`. The cached diff was then confirmed to be exactly **1/1 per
+catalog** plus this ledger, with no foreign hunk. The working tree was left byte-for-byte as
+found.
+
+### Four gates, run on the exported index tree — not on the dirty working tree
+
+`git write-tree` was exported with `git archive` to an isolated candidate and given a junction
+to `node_modules`:
+
+- `npx vitest run`: **14 failed / 6 files, 6,718 tests**, in exactly `architectureBaseline`,
+  `i18n`, `agentNavigationIndexMirror`, `blancAgentStepConfirmGate`, `localAgentQueueRun` and
+  `novelReaderProgressGuard` — the established candidate baseline, with no failing file added.
+- `node tools/i18n-check.cjs`: **exit 0, all 9,040 English keys translated in ja/zh/ru.** This
+  is the gate three prior hops could not run; this worker's sandbox permitted esbuild traversal
+  with no drive mapping or workaround.
+- `node tools/architecture-audit.cjs`: the same single unclassified foreign finding,
+  `orphan-module:src/shared/i18n/catalogs/mooncapLore.ts`. The candidate differs from HEAD only
+  in i18n string literals, which cannot orphan a module.
+- `npx eslint --no-ignore` on the four catalog paths: **exit 0, no output.**
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### The fix was proved load-bearing, not merely coincident with a green gate
+
+The mirror suite still fails four assertions on the candidate, and all four name `monitors`
+(`monitors is not in SETTINGS_NAV`) — the unlanded Monitors page, pre-existing at HEAD. Because
+`scraper` is indexed *before* `monitors` and the assertion loop throws on its first failure,
+reaching a monitors failure is itself evidence that scraper passed. That was then confirmed
+directly: reverting only the English description inside the candidate moved the failure to
+`settings/scraper/-: "providers" is not a word of that destination`, and restoring it was
+verified byte-identical with `-ceq`. The edit is what makes the assertion pass.
+
+### Live status
+
+The authenticated bridge answered `/health` on port 39273 with one visible, non-minimised
+1280x860 window, **0 error entries** and no HMR churn. The running renderer serves the *foreign*
+working tree, so driving it would prove nothing about this HEAD-based candidate and would
+disturb another track; live acceptance for these exact four strings — Russian search, the
+truthful Scraper result, its provider/tracking/player/subtitle destination sections, zero errors
+and byte-exact restoration — is already recorded three sections above. This hop added only a
+read-only check that the edited key is live-wired: the Vite-served
+`settingsRegistry.ts` carries `descKey: "settings.nav.scraper.desc"` on the Scraper nav page and
+on `scraper-network`. No renderer storage, persisted setting or userData was touched, and no
+backup was taken.
+
+### Exact next slice
+
+This checkpoint closes the Scraper description thread completely; it must not be reopened, and
+the working tree's four reorganisation descriptions remain foreign work belonging to that
+separate track. Main V1 now advances to the landing named by the previous three hops: the
+Monitors, File-drops and Help pages and the multi-monitor / file-routing subsystem beneath them.
+`agentNavigationIndex.ts` already indexes `monitors` and `file-drops`, and `SETTINGS_NAV` does
+not contain them — which is precisely why the mirror suite is red at HEAD. Landing those pages
+is what turns those four remaining mirror failures green.

@@ -753,7 +753,7 @@ export const en: Catalog = {
   'settings.nav.transcription': 'Transcription',
   'settings.nav.transcription.desc': 'Whisper device',
   'settings.nav.scraper': 'Scraper',
-  'settings.nav.scraper.desc': 'Network, browser, and session controls',
+  'settings.nav.scraper.desc': 'Network, browser, session, providers, tracking, players, and subtitles',
   // Unified Search surface (MASTER_PLAN §6)
   'unifiedSearch.title': 'Unified search',
   'unifiedSearch.desc': 'Search local sources and view stored media merged by identity, with source coverage and conflicts preserved.',
