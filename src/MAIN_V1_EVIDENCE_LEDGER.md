@@ -8887,3 +8887,145 @@ from the DOM, `.agent-governance-open` back to 0-width, suggestion shelf still i
 3. The forced remaining candidate state is **15 failures / 6 files**. The shared working tree's
    own suite currently runs green because of other tracks' stranded work; that is corroboration,
    never candidate evidence, and does not belong to any commit.
+
+## The "one commit or none" lump was four lumps, and only one of them existed — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The section above named the next slice: `monitors` + `file-drops` + `api-keys` + `help` as a
+single indivisible commit that would close `agentNavigationIndexMirror`. Re-deriving it from the
+tree instead of from that sentence changed the answer.
+
+### What the re-derivation found — the bundle does not hold together
+
+Two claims in the previous handoff are wrong, and both would have cost the next worker the hop:
+
+- **The four pages are not siblings.** `MonitorsPage.tsx` imports `DisplaySummary` from
+  `main/displays.ts`, and `getAssignments` / `getDesktopCount` / `getDesktopName` from
+  `renderer/desktopState`, and `MAX_DESKTOPS` / `DisplayAssignment` / `TaskbarMode` from
+  `shared/desktop`, and `remapLayoutProportionally` from `renderer/displayPrefs`, and eight
+  `window.api.deskwin*` / `display*` / `desktopResetAssignments` bindings. **None of those
+  exist at HEAD.** `shared/desktop.ts` and `renderer/desktopState.ts` are present but carry
+  none of the named exports; `main/displays.ts`, `main/desktopWindows.ts`, `main/deskDrag.ts`,
+  `main/studyBlockWindows.ts` and `shared/fileRouting.ts` are untracked; `HelpPage.tsx` needs
+  `renderer/onboardingStore.ts`, also untracked. Landing "the four pages" means landing an
+  entire multi-monitor desktop-windows subsystem and a file-routing subsystem, through dirty
+  `main.ts` and `preload.ts`, in one hop. `api-keys` alone depends on nothing outside HEAD but
+  three preload lines and one main registration.
+- **Landing the bundle would not have closed `agentNavigationIndexMirror` anyway.** Its fourth
+  failure is `settings/scraper/-: "providers" is not a word of that destination` — the indexed
+  terms for the Scraper page were written against a **reworded** `settings.nav.scraper.desc`
+  ("Providers, tracking, players and subtitles…") that lives only in the working tree, as part
+  of the Scraper reorganisation whose `ScraperPage.tsx` diff is +111/−633. That is a third,
+  unrelated lump. The other three failures are all the *first* missing page the test reaches;
+  the test bails per `it`, so `file-drops` / `api-keys` / `help` were never even the reason.
+
+So this slice is `api-keys` on its own, and the ledger records the split rather than forcing a
+commit whose parts do not share a dependency.
+
+### Why `api-keys` was the right single piece
+
+It is the only one of the four that is *also* an architecture finding. At HEAD the audit
+reported five unclassified findings; **four of them are this one subsystem**:
+`dead-ipc:credentials:status`, `dead-ipc:credentials:set`, `dead-ipc:credentials:clear` and
+`orphan-module:src/main/credentials/ipc.ts`. The handlers had shipped and nothing registered
+them. `a701ba8` then landed 43 `credential.*` catalog keys that no component rendered. This
+commit is the consumer that makes the vault, its IPC and its vocabulary all real at once.
+
+### Implementation — one page, no new write path
+
+`ApiKeysPage.tsx` renders every entry in `CREDENTIAL_REGISTRY`. **No key reaches the renderer**:
+each row renders from a `CredentialStatus` (`{id, configured, lastTestedAt, lastError}`) and its
+input is write-only, so a stored key shows as a placeholder. Vault-backed rows use the three new
+channels; the rest keep using their owning module's existing channel (`aiSetApiKey`,
+`setSubtitleProviderKey`, `malStatus`) rather than a second write path into stores this page
+does not own. There is still no read channel and there will not be one.
+
+Two defects were found in the drafted page and fixed before it shipped:
+
+- Its `Intl.ListFormat` used `style: 'narrow', type: 'unit'`, with a comment claiming that gives
+  `、` for ja/zh and `, ` for en/ru. Measured in the app's own ICU through the bridge, **every
+  `unit` style emits no separator at all** for ru/ja/zh, and `narrow` drops it for English too —
+  the live page read `создание ИИ-карточек разбор предложений правка OCR`. `conjunction`/`long`
+  gives what the comment promised. This is exactly the class of claim a static check cannot see.
+- Its `// eslint-disable-next-line react-hooks/exhaustive-deps` named a rule this repo's flat
+  config does not load, which eslint reports as an **error** on the disable comment itself.
+- `toLocaleString(lang)` became `toLocaleString(LANG_TAGS[lang])`, matching CLAUDE.md and
+  `HelpPage.tsx`; bare `'zh'` and `'zh-CN'` do not order a date the same way.
+
+The 5 withheld catalog keys (`settings.nav.apiKeys` ×2, `apiKeys.overview.*`, `apiKeys.optional`)
+landed in all four languages, lifted verbatim from the working tree — no English value was copied
+into a translated catalog. The 20-line `.credential-*` CSS block landed with them, so the page is
+not unstyled.
+
+### Required gates — an isolated candidate, never the shared tree
+
+Every touched file carries other tracks' hunks, so `git add` was never available for ten of the
+eleven. A throwaway script rebuilt each as **`git show HEAD:<path>` plus this slice's insertion
+only**, asserting each anchor occurred exactly once and refusing otherwise, and wrote them into
+the detached worktree `~\jp-wt-head`. The result is **486 insertions, 0 deletions** across 11
+paths — a single deletion anywhere would have meant a foreign hunk rode along.
+
+- `npx vitest run`: **15 failing / 6 files → 14 / 6**, 6,718 tests. `architectureBaseline` goes
+  2 → 1. The rest are unchanged and all foreign: `agentNavigationIndexMirror` (4),
+  `blancAgentStepConfirmGate` (5), `localAgentQueueRun` (1), `novelReaderProgressGuard` (1),
+  `i18n` (2). Nothing green went red. Both `i18n` failures were checked by name and are
+  pre-existing — `Lockscreen.tsx:171-172` for the OS-locale rule, and a hardcoded-string
+  baseline listing 30 other-track files; **`ApiKeysPage.tsx` appears in neither list.**
+- `node tools/i18n-check.cjs`: **exit 0, 9,035 → 9,040 keys**, ja/zh/ru complete.
+- `node tools/architecture-audit.cjs`: **5 unclassified → 1**, and **0 new**. The four
+  `credentials:*` findings are gone; `dead-ipc` no longer appears as a category at all. The
+  survivor is `orphan-module:shared/i18n/catalogs/mooncapLore.ts`, another track's file.
+- `npx eslint` on all six touched sources: **0 errors**. `main.ts` carries 12 pre-existing
+  `no-non-null-assertion` warnings; proven pre-existing by set-difference against HEAD's own
+  `main.ts` — same rule, same count, each line number shifted by exactly +1 for the one inserted
+  import. `--max-warnings 0` is therefore not usable on `main.ts` and was not claimed.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance — the handler, not just the binding
+
+Bridge 39273, pid 17264, one real desktop window, driven only over authenticated HTTP. No mouse
+or keyboard automation, no Computer Use.
+
+A preload binding is not proof of a main handler, so `credentials:status` was **invoked for
+real** rather than grepped: it answered `{canStore: true, ids: [gemini, deepseek, jimaku,
+opensubtitles, jiten, mal], configured: [gemini, jimaku]}`. Then the live page:
+
+- **6 credential rows**, named `Google Gemini`, `DeepSeek`, `Jiten.moe`, `Jimaku`,
+  `OpenSubtitles`, `MyAnimeList`;
+- Russian state labels `Настроено` / `Не задано` — the *lazy* catalog path, which a static
+  key-count check cannot exercise;
+- the overview reading **`Настроено 2 из 6`**, agreeing with what the vault itself just said;
+- **5 inputs, every one `type="password"` with an empty `value`** — MyAnimeList has none because
+  it is OAuth. The two configured rows show the placeholder `Ключ сохранён` and nothing more,
+  which is the write-only contract observed rather than asserted;
+- the CSS block live: 1px border, 8px radius, panel-tinted background, a real 948×212 row box;
+- **no raw `apiKeys.` or `credential.` key anywhere in the rendered text**, and **0 error
+  entries** in the bridge.
+
+The `Intl.ListFormat` fix was confirmed through HMR in the same session: the same six rows
+re-rendered as `создание ИИ-карточек, разбор предложений и правка OCR`.
+
+**Restoration, stated honestly.** One probe global, `window.__jpCredProbe`. No key was typed, no
+credential was saved or removed, no setting was toggled, and no userData backup was taken. One
+thing *was* persisted and cannot be restored byte-identically: clicking the sidebar item pushed
+`api-keys` onto `jp-os-settings-recent-v1`, an 8-entry MRU that was already full, so a tail entry
+may have been evicted. It was not read before the click — that was a slip. It is a
+breadcrumb of pages visited, not a setting with behavioural effect, and no `appearance` visit was
+faked to paper over it.
+
+### For whoever runs next
+
+1. **`agentNavigationIndexMirror` needs two more landings, not one.** Three of its four failures
+   need the Monitors/File-drops/Help pages *and* the untracked desktop-windows subsystem beneath
+   them; the fourth needs the reworded `settings.nav.scraper.desc` that belongs to the Scraper
+   reorganisation. Treat those as two separate tracks and size the desktop-windows one properly —
+   it is `main/displays.ts`, `main/desktopWindows.ts`, `main/deskDrag.ts`,
+   `main/studyBlockWindows.ts`, `shared/fileRouting.ts`, `main/fileRouter.ts`, plus additions to
+   `shared/desktop.ts`, `renderer/desktopState.ts`, `renderer/displayPrefs.ts`, `main.ts` and
+   `preload.ts`. It is several hops, not one.
+2. **The architecture audit is down to one finding**, `orphan-module:mooncapLore.ts`, and it is
+   another track's. `architectureBaseline` will not go green from Main V1 work; either that
+   module gets an importer or it gets classified in `tools/architecture-baseline.json`.
+3. The forced candidate state is now **14 failures / 6 files**. The shared working tree's own
+   suite still runs green off other tracks' stranded work; that is corroboration, never candidate
+   evidence.
