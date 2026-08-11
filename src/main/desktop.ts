@@ -6,20 +6,26 @@ import type {
   DesktopLayout,
   DesktopLayoutSnapshot,
   DesktopLayoutStoreSchema,
+  DisplayAssignment,
   IconSnapshot,
   NoteSnapshot,
+  TaskbarMode,
   WallpaperSnapshot,
   WidgetSnapshot,
   WindowSnapshot,
 } from '../shared/desktop';
 import {
+  DEFAULT_ASSIGNMENT,
   DESKTOP_CITY,
+  DESKTOP_COUNT,
   DESKTOP_LAYOUT_SCHEMA_VERSION,
   DESKTOP_STUDY,
+  MAX_DESKTOPS,
   SEED_CITY_ICONS,
   SEED_WALLPAPER,
   SLIDE_DURATION_MS,
 } from '../shared/desktop';
+import { isSimulatedDisplayKey } from '../shared/displayIdentity';
 
 interface CommitLayoutPayload {
   desktopIndex: DesktopIndex;
@@ -51,9 +57,17 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 }
 
+/** Default label for a desktop the user has not renamed. */
+function defaultDesktopName(desktopIndex: DesktopIndex): string {
+  if (desktopIndex === DESKTOP_STUDY) return 'Study';
+  if (desktopIndex === DESKTOP_CITY) return 'City';
+  return `Desktop ${desktopIndex + 1}`;
+}
+
 function seedLayout(desktopIndex: DesktopIndex): DesktopLayout {
   return {
     desktopIndex,
+    name: defaultDesktopName(desktopIndex),
     windows: [],
     icons: desktopIndex === DESKTOP_CITY ? clone(SEED_CITY_ICONS) : [],
     notes: {},
@@ -67,11 +81,29 @@ function seedStore(): DesktopLayoutStoreSchema {
   return {
     schemaVersion: DESKTOP_LAYOUT_SCHEMA_VERSION,
     activeDesktopIndex: DESKTOP_STUDY,
-    viewports: {
-      0: seedLayout(DESKTOP_STUDY),
-      1: seedLayout(DESKTOP_CITY),
-    },
+    desktops: Array.from({ length: DESKTOP_COUNT }, (_, i) => seedLayout(i)),
+    // Deliberately empty. Seeding it needs `screen`, which is unavailable until
+    // `app.whenReady()`, and this store is constructed at module eval.
+    // `syncAssignments()` fills it once the display service is live.
+    assignments: [],
     globalZTop: 10,
+  };
+}
+
+function sanitizeTaskbarMode(value: unknown): TaskbarMode | undefined {
+  return value === 'full' || value === 'windows-only' || value === 'none' ? value : undefined;
+}
+
+function sanitizeAssignment(value: unknown): DisplayAssignment | null {
+  if (!isObject(value) || typeof value.displayKey !== 'string' || !value.displayKey) return null;
+  const idx = typeof value.desktopIndex === 'number' ? Math.floor(value.desktopIndex) : 0;
+  return {
+    displayKey: value.displayKey,
+    desktopIndex: Math.max(0, Math.min(MAX_DESKTOPS - 1, idx)),
+    enabled: value.enabled !== false,
+    aero: value.aero === false ? false : true,
+    taskbar: sanitizeTaskbarMode(value.taskbar) ?? DEFAULT_ASSIGNMENT.taskbar,
+    showAllWindows: value.showAllWindows === true,
   };
 }
 
@@ -219,6 +251,13 @@ class DesktopStore {
   private schema: DesktopLayoutStoreSchema;
   private switching = false;
   private switchTimer: NodeJS.Timeout | null = null;
+  /** Desktops the main window is sliding between; both are locked mid-slide. */
+  private switchFrom: DesktopIndex | null = null;
+  private switchTo: DesktopIndex | null = null;
+  /** Display hosting the main window, so secondary claims can be told apart. */
+  private mainDisplayKey: string | null = null;
+  /** Desktops torn off the taskbar into their own window, so they count as owned. */
+  private spawned = new Set<DesktopIndex>();
 
   constructor() {
     this.schema = this.load();
@@ -232,25 +271,51 @@ class DesktopStore {
         atomicWriteJson(filePath, seed);
         return seed;
       }
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Partial<DesktopLayoutStoreSchema>;
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Partial<DesktopLayoutStoreSchema> & {
+        /** v1/v2 shape — a record keyed 0/1, replaced by `desktops` in v3. */
+        viewports?: Record<number, unknown>;
+      };
       const seed = seedStore();
       const fromVersion = typeof parsed.schemaVersion === 'number' ? parsed.schemaVersion : 1;
+
+      // v2 -> v3: `viewports: {0,1}` becomes the `desktops` list. Read whichever
+      // key this file carries; a v3 file has `desktops`, older ones `viewports`.
+      const rawDesktops: unknown[] = Array.isArray(parsed.desktops)
+        ? parsed.desktops
+        : [parsed.viewports?.[0], parsed.viewports?.[1]];
+
+      const desktops = rawDesktops
+        .slice(0, MAX_DESKTOPS)
+        .map((raw, index) =>
+          index === DESKTOP_CITY
+            ? stripNoctisFromLayout(this.normalizeLayout(raw, index))
+            : this.normalizeLayout(raw, index),
+        );
+      // Never fewer than the seeded pair — Study and City must always exist.
+      while (desktops.length < DESKTOP_COUNT) desktops.push(seedLayout(desktops.length));
+
+      const activeRaw = parsed.activeDesktopIndex;
       const next: DesktopLayoutStoreSchema = {
         schemaVersion: DESKTOP_LAYOUT_SCHEMA_VERSION,
-        activeDesktopIndex: parsed.activeDesktopIndex === DESKTOP_CITY ? DESKTOP_CITY : DESKTOP_STUDY,
+        activeDesktopIndex:
+          typeof activeRaw === 'number' && activeRaw >= 0 && activeRaw < desktops.length
+            ? Math.floor(activeRaw)
+            : DESKTOP_STUDY,
         globalZTop: typeof parsed.globalZTop === 'number' ? parsed.globalZTop : seed.globalZTop,
-        viewports: {
-          0: this.normalizeLayout(parsed.viewports?.[0], DESKTOP_STUDY),
-          1: stripNoctisFromLayout(this.normalizeLayout(parsed.viewports?.[1], DESKTOP_CITY)),
-        },
+        desktops,
+        assignments: Array.isArray(parsed.assignments)
+          ? ((parsed.assignments.map(sanitizeAssignment).filter(Boolean) as DisplayAssignment[])
+              // Simulated displays do not survive a restart, so neither should
+              // their configuration — see SIMULATED_DISPLAY_KEY_PREFIX.
+              .filter((a) => !isSimulatedDisplayKey(a.displayKey)))
+          : [],
       };
 
       let dirty = fromVersion < DESKTOP_LAYOUT_SCHEMA_VERSION;
 
       // One-time: strip auto-seeded app tiles when moving to pin-from-start (v2).
       if (fromVersion < 2) {
-        for (const idx of [DESKTOP_STUDY, DESKTOP_CITY] as DesktopIndex[]) {
-          const layout = next.viewports[idx];
+        for (const layout of next.desktops) {
           const cleaned = migrateIconsToPinFromStart(layout.icons);
           if (cleaned.length !== layout.icons.length) {
             layout.icons = cleaned;
@@ -260,15 +325,15 @@ class DesktopStore {
         }
       }
 
-      const rawCity = this.normalizeLayout(parsed.viewports?.[1], DESKTOP_CITY);
+      const rawCity = this.normalizeLayout(rawDesktops[DESKTOP_CITY], DESKTOP_CITY);
       const migratedCity = stripNoctisFromLayout(rawCity);
       if (
         rawCity.icons.length !== migratedCity.icons.length ||
         rawCity.windows.length !== migratedCity.windows.length
       ) {
         // Re-apply noctis strip on the already-migrated city viewport.
-        next.viewports[1] = stripNoctisFromLayout(next.viewports[1]);
-        next.viewports[1].layoutEpoch += 1;
+        next.desktops[DESKTOP_CITY] = stripNoctisFromLayout(next.desktops[DESKTOP_CITY]);
+        next.desktops[DESKTOP_CITY].layoutEpoch += 1;
         dirty = true;
       }
 
@@ -297,8 +362,16 @@ class DesktopStore {
     const icons = Array.isArray(raw.icons) ? raw.icons.map(sanitizeIcon).filter(Boolean) as IconSnapshot[] : [];
     const cleanedIcons =
       desktopIndex === DESKTOP_CITY ? icons.filter((icon) => !isNoctisIcon(icon)) : icons;
+    const dim = (k: string): number | undefined => {
+      const value = raw[k];
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined;
+      return Math.round(value);
+    };
     return {
       desktopIndex,
+      name: typeof raw.name === 'string' && raw.name.trim() ? raw.name : defaultDesktopName(desktopIndex),
+      authoredW: dim('authoredW'),
+      authoredH: dim('authoredH'),
       windows,
       icons: cleanedIcons,
       notes: sanitizeNotes(raw.notes),
@@ -322,14 +395,179 @@ class DesktopStore {
   snapshot(): DesktopLayoutSnapshot {
     return {
       activeDesktopIndex: this.schema.activeDesktopIndex,
-      viewports: [clone(this.schema.viewports[0]), clone(this.schema.viewports[1])],
+      // Wire name stays `viewports` — see DesktopLayoutSnapshot in shared/desktop.ts.
+      viewports: this.schema.desktops.map((layout) => clone(layout)),
+      assignments: this.schema.assignments.map((a) => ({ ...a })),
       globalZTop: this.schema.globalZTop,
       switching: this.switching,
     };
   }
 
+  /** Desktops currently in the store. Callers index into `snapshot().viewports`. */
+  desktopCount(): number {
+    return this.schema.desktops.length;
+  }
+
+  private ensureDesktop(index: DesktopIndex): DesktopLayout {
+    while (this.schema.desktops.length <= index && this.schema.desktops.length < MAX_DESKTOPS) {
+      this.schema.desktops.push(seedLayout(this.schema.desktops.length));
+    }
+    return this.schema.desktops[index] ?? this.schema.desktops[DESKTOP_STUDY];
+  }
+
+  /**
+   * A desktop index no shell is currently showing, creating it if needed.
+   *
+   * "Free" means neither the desktop the main window is on nor one assigned to a
+   * display. Tearing an app off the taskbar needs somewhere to put it that no
+   * other shell already owns — reusing an owned desktop would put two writers on
+   * one layout (B2) and each would rewrite the other's geometry.
+   *
+   * Returns null when every desktop slot is spoken for, which the caller must
+   * surface rather than silently reusing one.
+   */
+  allocateDesktop(): DesktopIndex | null {
+    const taken = new Set<number>([this.schema.activeDesktopIndex]);
+    for (const assignment of this.schema.assignments) taken.add(assignment.desktopIndex);
+    for (const index of this.spawned) taken.add(index);
+
+    const claim = (index: DesktopIndex): DesktopIndex => {
+      this.ensureDesktop(index);
+      this.spawned.add(index);
+      this.persist();
+      this.broadcast();
+      return index;
+    };
+
+    // Prefer a free desktop that is already empty: the caller puts exactly one
+    // app on it, so handing back a desktop with the user's windows on it would
+    // either destroy them or contradict "only that app".
+    for (let index = 0; index < this.schema.desktops.length; index += 1) {
+      if (taken.has(index)) continue;
+      if ((this.schema.desktops[index]?.windows.length ?? 0) === 0) return claim(index);
+    }
+
+    // Otherwise grow a brand-new one, which is empty by construction.
+    if (this.schema.desktops.length < MAX_DESKTOPS) return claim(this.schema.desktops.length);
+
+    // Every desktop is either owned or has content. Say so rather than
+    // silently reusing one and wiping it.
+    return null;
+  }
+
+  /** Release a torn-off desktop so its index can be reused. */
+  releaseDesktop(index: DesktopIndex): void {
+    this.spawned.delete(index);
+  }
+
+  /**
+   * Reconcile stored assignments against the displays that actually exist.
+   *
+   * Absent displays keep their assignment — the user unplugged a monitor, they
+   * did not reset its configuration. New displays get one desktop each, taking
+   * the lowest index not already claimed, creating desktops as needed.
+   */
+  syncAssignments(present: { key: string; primary: boolean; virtual?: boolean }[]): DesktopLayoutSnapshot {
+    let dirty = false;
+    const claimed = new Set(this.schema.assignments.map((a) => a.desktopIndex));
+
+    for (const display of present) {
+      if (this.schema.assignments.some((a) => a.displayKey === display.key)) continue;
+
+      /*
+       * A secondary display must never be handed the desktop the MAIN window is
+       * currently showing.
+       *
+       * `switchDesktop` already refuses to move main ONTO a secondary's desktop,
+       * but nothing guarded the reverse until now, and the reverse is the case
+       * that actually happens: the user switches main to Desktop 2, *then*
+       * attaches a monitor (or turns simulation on), and the new display is
+       * handed the lowest unclaimed index — which is the one main is on.
+       *
+       * Two shells then own one desktop, breaking the single-writer rule (B2).
+       * They do not merely race: each hydrates the shared layout into its own
+       * viewport and commits the result, so a 1920-wide arrangement viewed on a
+       * 960-wide monitor is persisted back at 960 and the big monitor's
+       * arrangement is destroyed. Observed live 2026-08-07 — desktop 1's windows
+       * went 1920x1009 -> 960x686 permanently.
+       */
+      const isMainDisplay = this.mainDisplayKey != null && display.key === this.mainDisplayKey;
+      const reserved = new Set(claimed);
+      if (!isMainDisplay) reserved.add(this.schema.activeDesktopIndex);
+
+      let desktopIndex = display.primary ? DESKTOP_STUDY : -1;
+      if (desktopIndex < 0 || reserved.has(desktopIndex)) {
+        desktopIndex = 0;
+        while (reserved.has(desktopIndex) && desktopIndex < MAX_DESKTOPS - 1) desktopIndex += 1;
+      }
+      claimed.add(desktopIndex);
+      this.ensureDesktop(desktopIndex);
+      this.schema.assignments.push({
+        displayKey: display.key,
+        desktopIndex,
+        ...DEFAULT_ASSIGNMENT,
+        // A newly attached *physical* monitor opening a full-screen desktop
+        // window unprompted would be a hostile default, so only the primary is
+        // enabled on first sight and the user turns the rest on in
+        // Settings > Monitors.
+        //
+        // A *simulated* display is the exception, and enabling it is the whole
+        // point: the user switched simulation on explicitly, and it exists only
+        // to render a second desktop beside the first. Leaving it off meant
+        // turning simulation on appeared to do nothing at all.
+        enabled: display.primary || display.virtual === true,
+      });
+      dirty = true;
+    }
+
+    if (dirty) {
+      this.persist();
+      this.broadcast();
+    }
+    return this.snapshot();
+  }
+
+  setAssignment(patch: Partial<DisplayAssignment> & { displayKey: string }): DesktopLayoutSnapshot {
+    const existing = this.schema.assignments.find((a) => a.displayKey === patch.displayKey);
+    if (existing) {
+      const merged = sanitizeAssignment({ ...existing, ...patch });
+      if (merged) Object.assign(existing, merged);
+    } else {
+      const created = sanitizeAssignment({
+        ...DEFAULT_ASSIGNMENT,
+        desktopIndex: DESKTOP_STUDY,
+        ...patch,
+      });
+      if (created) this.schema.assignments.push(created);
+    }
+    const target = this.schema.assignments.find((a) => a.displayKey === patch.displayKey);
+    if (target) this.ensureDesktop(target.desktopIndex);
+    this.persist();
+    this.broadcast();
+    return this.snapshot();
+  }
+
+  renameDesktop(index: DesktopIndex, name: string): DesktopLayoutSnapshot {
+    const layout = this.schema.desktops[index];
+    if (layout) {
+      layout.name = name.trim().slice(0, 40) || defaultDesktopName(index);
+      layout.layoutEpoch += 1;
+      this.persist();
+      this.broadcast();
+    }
+    return this.snapshot();
+  }
+
+  /** Forget every per-display setting; desktops and their contents are untouched. */
+  resetAssignments(): DesktopLayoutSnapshot {
+    this.schema.assignments = [];
+    this.persist();
+    this.broadcast();
+    return this.snapshot();
+  }
+
   migrateLegacy(payload: LegacyDesktopPayload): DesktopLayoutSnapshot {
-    const next = this.schema.viewports[DESKTOP_STUDY];
+    const next = this.schema.desktops[DESKTOP_STUDY];
     if (Array.isArray(payload.wins)) next.windows = payload.wins.map(sanitizeWindow).filter(Boolean) as WindowSnapshot[];
     // Only external shortcuts from legacy localStorage — never re-seed app tiles.
     if (Array.isArray(payload.icons)) {
@@ -345,32 +583,77 @@ class DesktopStore {
   }
 
   commitLayout(payload: CommitLayoutPayload): { ok: boolean; error?: string } {
-    if (this.switching) return { ok: false, error: 'desktop-switch-in-progress' };
     const index = payload.desktopIndex;
-    this.schema.viewports[index] = this.normalizeLayout(payload.layout, index);
-    this.schema.viewports[index].layoutEpoch += 1;
+    if (typeof index !== 'number' || index < 0 || index >= MAX_DESKTOPS) {
+      return { ok: false, error: 'invalid-desktop-index' };
+    }
+    // The slide only animates the MAIN window, between two specific desktops.
+    // A secondary window committing an unrelated desktop mid-slide is not a
+    // race, and refusing it would silently drop the user's edit.
+    if (this.switching && (index === this.switchFrom || index === this.switchTo)) {
+      return { ok: false, error: 'desktop-switch-in-progress' };
+    }
+    this.ensureDesktop(index);
+    const previous = this.schema.desktops[index];
+    const nextLayout = this.normalizeLayout(payload.layout, index);
+    // A commit carries geometry only; the name is owned by renameDesktop.
+    nextLayout.name = previous?.name ?? defaultDesktopName(index);
+    this.schema.desktops[index] = nextLayout;
+    this.schema.desktops[index].layoutEpoch += 1;
     this.schema.globalZTop = Math.max(
       this.schema.globalZTop,
-      ...this.schema.viewports[index].windows.map((win) => win.z),
+      ...this.schema.desktops[index].windows.map((win) => win.z),
+      0,
     );
     this.persist();
     this.broadcast();
     return { ok: true };
   }
 
+  /**
+   * Desktop the MAIN window may switch to.
+   *
+   * A desktop hosted by an enabled secondary display is off-limits: if the main
+   * window also showed it, two shells would own one desktop and each would
+   * treat the other's commit as a foreign edit — the B2 ping-pong. Ownership is
+   * disjoint by construction, so it never arises.
+   */
+  private isDesktopClaimedBySecondary(index: DesktopIndex): boolean {
+    return this.schema.assignments.some(
+      (a) => a.enabled && a.desktopIndex === index && a.displayKey !== this.mainDisplayKey,
+    );
+  }
+
+  /** Told by `desktopWindows.ts` which display the main window sits on. */
+  setMainDisplayKey(key: string | null): void {
+    this.mainDisplayKey = key;
+  }
+
   switchDesktop(targetIndex: DesktopIndex): { ok: boolean; error?: string; snapshot: DesktopLayoutSnapshot } {
-    if (targetIndex !== DESKTOP_STUDY && targetIndex !== DESKTOP_CITY) {
+    if (
+      typeof targetIndex !== 'number' ||
+      !Number.isInteger(targetIndex) ||
+      targetIndex < 0 ||
+      targetIndex >= this.schema.desktops.length
+    ) {
       return { ok: false, error: 'invalid-desktop-index', snapshot: this.snapshot() };
+    }
+    if (this.isDesktopClaimedBySecondary(targetIndex)) {
+      return { ok: false, error: 'desktop-on-another-display', snapshot: this.snapshot() };
     }
     if (this.schema.activeDesktopIndex === targetIndex) {
       return { ok: true, snapshot: this.snapshot() };
     }
     this.switching = true;
+    this.switchFrom = this.schema.activeDesktopIndex;
+    this.switchTo = targetIndex;
     this.broadcast();
     if (this.switchTimer) clearTimeout(this.switchTimer);
     this.switchTimer = setTimeout(() => {
       this.schema.activeDesktopIndex = targetIndex;
       this.switching = false;
+      this.switchFrom = null;
+      this.switchTo = null;
       this.persist();
       this.broadcast();
     }, SLIDE_DURATION_MS);
@@ -380,6 +663,11 @@ class DesktopStore {
 
 const store = new DesktopStore();
 
+/** The layout store, for `desktopWindows.ts` and `deskDrag.ts`. */
+export function desktopStore(): DesktopStore {
+  return store;
+}
+
 export function registerDesktopIpc(): void {
   ipcMain.handle('desktop:getLayout', () => store.snapshot());
   ipcMain.handle('desktop:commitLayout', (_e, payload: CommitLayoutPayload) => store.commitLayout(payload));
@@ -387,4 +675,11 @@ export function registerDesktopIpc(): void {
     store.switchDesktop(payload?.targetIndex ?? DESKTOP_STUDY),
   );
   ipcMain.handle('desktop:migrateLegacy', (_e, payload: LegacyDesktopPayload) => store.migrateLegacy(payload ?? {}));
+  ipcMain.handle('desktop:setAssignment', (_e, patch: Partial<DisplayAssignment> & { displayKey: string }) =>
+    store.setAssignment(patch),
+  );
+  ipcMain.handle('desktop:renameDesktop', (_e, payload: { index: DesktopIndex; name: string }) =>
+    store.renameDesktop(payload?.index ?? DESKTOP_STUDY, payload?.name ?? ''),
+  );
+  ipcMain.handle('desktop:resetAssignments', () => store.resetAssignments());
 }

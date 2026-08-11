@@ -9304,3 +9304,109 @@ Monitors, File-drops and Help pages and the multi-monitor / file-routing subsyst
 `agentNavigationIndex.ts` already indexes `monitors` and `file-drops`, and `SETTINGS_NAV` does
 not contain them — which is precisely why the mirror suite is red at HEAD. Landing those pages
 is what turns those four remaining mirror failures green.
+
+## The multi-monitor subsystem that had been sitting uncommitted for four days — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The previous entry closed the Scraper-description thread and named the next landing: the
+Monitors / File-drops / Help pages and the multi-monitor / file-routing subsystem beneath them.
+
+### What re-deriving found, which is not what the previous entry assumed
+
+The previous entry framed this as work to be written. It is not. The working tree already
+carries the whole subsystem, uncommitted, with `LastWriteTime` of **2026-08-07** on every one
+of its own files — a stalled landing, not an in-flight one. On the live tree its own eight test
+files pass 117/117 and `agentNavigationIndexMirror.test.ts` is already **9/9 green**, so the four
+`monitors is not in SETTINGS_NAV` failures that are red at HEAD are red only because this work
+was never staged.
+
+The landing splits cleanly in two, and only the lower half is decision-free:
+
+- **the subsystem** — `shared/displayIdentity.ts`, `shared/fileRouting.ts`, `main/displays.ts`,
+  `main/desktopWindows.ts`, `main/fileRouter.ts`, the schema-v3 migration in `shared/desktop.ts`
+  + `main/desktop.ts`, the extension sets `main/fileRouter.ts` needs from `shared/mediaKind.ts`,
+  and the `main.ts` / `preload.ts` wiring. No i18n key, no renderer surface.
+- **the pages** — `MonitorsPage`/`FileDropsPage`/`HelpPage`, `SETTINGS_NAV`, `types.ts`,
+  `DesktopShell.tsx`, `multiMonitor.css`, and ~40 catalog keys in four languages. Deferred:
+  those files carry today-dated foreign hunks (the Scraper reorganisation, an `aero-safe-mode`
+  registry entry) that cannot be separated in the same pass.
+
+This entry lands the first half only.
+
+### The candidate never touched the shared tree
+
+`HEAD` is `37643f8`. A candidate was built with `git archive HEAD` and given the fourteen
+subsystem files. `main.ts` and `preload.ts` were **not** copied: their working-tree diffs
+interleave this subsystem with two other tracks (`studyBlockWindows`, `deskDrag`), so the
+candidate's HEAD copies were edited to carry only the display / deskwin / filedrop lines. Every
+overlay was hash-compared after writing.
+
+`shared/mediaKind.ts` was not in the previous entry's list and is load-bearing: without its
+`extOf` / `MEDIA_EXT` / `IMAGE_EXT` / `ARCHIVE_EXT` / `BOOK_EXT` / `SUBTITLE_EXT` additions the
+first candidate failed 25 tests with `TypeError: extOf is not a function`. That is the whole
+reason the shared tree's green run cannot be used as evidence for a HEAD-based candidate.
+
+### A defect the live run found, which the tests did not
+
+Driving the newly-registered `filedrop:classify` against real paths through the bridge
+classified this repository's own **`package.json` as a confirmed VN script** — a single `exact`
+candidate, `vn-script/fileDrop.reason.jsonVnConfirmed`, which the drop router auto-routes with
+nothing to confirm. The cause is `sniffJson` treating a bare top-level `scripts` key as a VN
+signal; every npm package has one. `main/fileRouter.ts` now requires `novels`, `scenes`, or a
+`scripts` value that is an **array** — npm maps names to commands, a VN library lists its
+scripts — so `package.json` falls back to the ambiguous three-way extension ranking and is
+asked about instead of imported. `main/__tests__/fileRouterSniff.test.ts` (7 tests) pins that
+and the five sniff outcomes around it; the sniffer had no test at all before.
+
+### Four gates, run on the exported index tree
+
+`git write-tree` was exported and compared file-by-file against the gated candidate: identical
+for every `src` file, modulo the CRLF the checkout filter applies. The gates therefore measure
+the commit, not the working tree.
+
+- `npx vitest run`: **14 failed / 6 files, 6,815 tests**, against a pristine-HEAD baseline of
+  **14 failed / 6 files, 6,718 tests** measured in the same session. The six files are identical
+  (`agentNavigationIndexMirror`, `blancAgentStepConfirmGate`, `localAgentQueueRun`,
+  `novelReaderProgressGuard`, `architectureBaseline`, `i18n`); no failing file was added, and
+  the slice contributes **97 passing tests** across 29 new suites.
+- `node tools/i18n-check.cjs`: **exit 0, all 9,040 English keys translated in ja/zh/ru.** The
+  slice adds no key.
+- `node tools/architecture-audit.cjs`: byte-identical output to the HEAD baseline apart from the
+  module count (1,634 -> 1,645). The same single unclassified foreign finding,
+  `orphan-module:src/shared/i18n/catalogs/mooncapLore.ts`; no new finding.
+- `npx eslint --no-ignore` on all sixteen touched paths: **exit 0**, 30 pre-existing
+  `no-non-null-assertion` warnings (12 of them in `main.ts` at HEAD).
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance
+
+Existing bridge on 39273, one visible non-minimised window, driven only through authenticated
+debug-bridge evaluation. The preload bindings were checked first, then — because a preload
+binding is not proof of a main handler — **every new handler was invoked live**:
+
+- `display:list` returned the one real display, `display|1920x1080|1`, primary, 1920x1080;
+  `display:getVirtualCount` returned 0;
+- `deskwin:list` returned 1 window and `deskwin:whoAmI` answered
+  `{displayKey: 'display|1920x1080|1', desktopIndex: 0}`;
+- `desktop:getLayout` returned a **schema-v3** snapshot: 5 desktops and one assignment carrying
+  the full `DEFAULT_ASSIGNMENT` shape (`enabled/aero/taskbar/showAllWindows`);
+- `filedrop:classify` sniffed `package.json` (4,907 bytes, `sniffed: true`), scanned `src/` as a
+  directory (476 images / 1,066 media / 9 books, `truncated: true` at the 2,000-entry scan
+  limit), and marked an absent path `unknown/fileDrop.reason.unreadable` rather than guessing.
+
+The `package.json` result above is the *before* state of the sniffer defect; the fix is a
+main-process change, and the shared running instance serves the foreign working tree, so it was
+not restarted to re-observe it — the regression test carries that half. No renderer storage,
+persisted setting or userData was touched, and no backup was taken.
+
+### Exact next slice
+
+Land the **renderer half**: `MonitorsPage`/`FileDropsPage`/`HelpPage`, the three `SETTINGS_NAV`
+entries and `SettingsPageId` members, `SettingsApp.tsx`'s routing, `multiMonitor.css`,
+`desktopState`/`desktopPrefs`/`displayPrefs`/`fileDropPrefs`, `DesktopShell.tsx`, and the
+`settings.monitors.*` / `settings.fileDrops.*` / `settings.nav.help*` / `fileDrop.target.*` keys
+in all four catalogs. That is what turns the four remaining `agentNavigationIndexMirror`
+failures green. Two traps, both confirmed this hop: `settingsRegistry.ts`'s diff contains a
+foreign `aero-safe-mode` entry that must not be swept in, and the four catalogs carry the
+separate Scraper reorganisation's descriptions, which are still foreign work.

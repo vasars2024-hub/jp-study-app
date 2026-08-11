@@ -25,6 +25,34 @@ export const AUDIO_EXT = new Set([
   '.opus',
 ]);
 
+export const MEDIA_EXT = new Set([...VIDEO_EXT, ...AUDIO_EXT]);
+
+/** Raster formats the library treats as manga pages / cover art. */
+export const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.bmp']);
+
+/** Containers that may hold a manga volume — or, for `.zip`, a Yomitan dictionary. */
+export const ARCHIVE_EXT = new Set(['.cbz', '.zip']);
+
+/** Text formats the reader opens directly. */
+export const BOOK_EXT = new Set(['.epub', '.pdf', '.txt', '.html', '.htm']);
+
+/**
+ * Wallpaper-capable images. Narrower than IMAGE_EXT on purpose — `.avif` and
+ * `.bmp` are not accepted by the wallpaper pipeline. Hoisted out of the
+ * function body in `main/library.ts` so the drop router can consult it.
+ */
+export const WALL_EXT: readonly string[] = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+
+/** Subtitle / lyric sidecars, with the leading dot (media.ts stores them bare). */
+export const SUBTITLE_EXT = new Set(['.srt', '.vtt', '.ass', '.ssa', '.lrc']);
+
+/** Lowercased extension including the dot, or '' when there is none. */
+export function extOf(fileName: string): string {
+  const base = fileName.replace(/\\/g, '/').split('/').pop() ?? fileName;
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(dot).toLowerCase() : '';
+}
+
 const AUDIOBOOK_HINT =
   /\b(audiobook|audio[\s_-]?book|podcast|講談|朗読|ラジオ|radio[\s_-]?drama|full[\s_-]?cast)\b/i;
 

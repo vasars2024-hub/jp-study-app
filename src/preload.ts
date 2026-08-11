@@ -135,7 +135,11 @@ import type {
   DesktopIndex,
   DesktopLayout,
   DesktopLayoutSnapshot,
+  DisplayAssignment,
 } from './shared/desktop';
+import type { DisplaySummary } from './main/displays';
+import type { DeskWindowInfo } from './main/desktopWindows';
+import type { DropPlan } from './main/fileRouter';
 import type {
   ImmersionMetricsDelta,
   ImmersionMetricsMap,
@@ -551,6 +555,65 @@ const api = {
     ipcRenderer.on('desktop:changed', handler);
     return () => ipcRenderer.removeListener('desktop:changed', handler);
   },
+  desktopSetAssignment: (
+    patch: Partial<DisplayAssignment> & { displayKey: string },
+  ): Promise<DesktopLayoutSnapshot> => ipcRenderer.invoke('desktop:setAssignment', patch),
+  desktopRename: (index: DesktopIndex, name: string): Promise<DesktopLayoutSnapshot> =>
+    ipcRenderer.invoke('desktop:renameDesktop', { index, name }),
+  desktopResetAssignments: (): Promise<DesktopLayoutSnapshot> =>
+    ipcRenderer.invoke('desktop:resetAssignments'),
+
+  // ----- Multi-monitor: displays and secondary desktop windows -----
+  displayList: (): Promise<DisplaySummary[]> => ipcRenderer.invoke('display:list'),
+  displaySetVirtualCount: (count: number): Promise<DisplaySummary[]> =>
+    ipcRenderer.invoke('display:setVirtualCount', count),
+  displayGetVirtualCount: (): Promise<number> => ipcRenderer.invoke('display:getVirtualCount'),
+  onDisplaysChanged: (cb: (displays: DisplaySummary[]) => void): (() => void) => {
+    const handler = (_e: unknown, displays: DisplaySummary[]): void => cb(displays);
+    ipcRenderer.on('display:changed', handler);
+    return () => ipcRenderer.removeListener('display:changed', handler);
+  },
+
+  deskwinAssign: (displayKey: string, desktopIndex: number): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('deskwin:assign', { displayKey, desktopIndex }),
+  deskwinSetOptions: (
+    patch: Partial<DisplayAssignment> & { displayKey: string },
+  ): Promise<{ ok: boolean }> => ipcRenderer.invoke('deskwin:setOptions', patch),
+  deskwinList: (): Promise<DeskWindowInfo[]> => ipcRenderer.invoke('deskwin:list'),
+  /** Claim a desktop no shell is showing, for a taskbar tear-off. */
+  deskwinAllocateDesktop: (): Promise<{ ok: boolean; desktopIndex?: number }> =>
+    ipcRenderer.invoke('deskwin:allocateDesktop'),
+  /** Open a standalone window showing one desktop. */
+  deskwinOpenDesktop: (desktopIndex: number): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('deskwin:openDesktop', desktopIndex),
+  deskwinFocusDesktop: (desktopIndex: number): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('deskwin:focusDesktop', desktopIndex),
+  deskwinSync: (): Promise<DeskWindowInfo[]> => ipcRenderer.invoke('deskwin:sync'),
+  /** Which display + desktop is this window? Answers for main and secondaries alike. */
+  deskwinWhoAmI: (): Promise<{ displayKey: string | null; desktopIndex: DesktopIndex | null }> =>
+    ipcRenderer.invoke('deskwin:whoAmI'),
+  onDeskWindowsChanged: (cb: (info: DeskWindowInfo[]) => void): (() => void) => {
+    const handler = (_e: unknown, info: DeskWindowInfo[]): void => cb(info);
+    ipcRenderer.on('deskwin:changed', handler);
+    return () => ipcRenderer.removeListener('deskwin:changed', handler);
+  },
+  /** The display this window sits on now hosts a different desktop. */
+  onDeskRetarget: (
+    cb: (payload: { desktopIndex: DesktopIndex; displayKey: string }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, payload: { desktopIndex: DesktopIndex; displayKey: string }): void =>
+      cb(payload);
+    ipcRenderer.on('deskwin:retarget', handler);
+    return () => ipcRenderer.removeListener('deskwin:retarget', handler);
+  },
+
+  // ----- Universal file drop routing -----
+  fileDropClassify: (paths: string[]): Promise<DropPlan[]> =>
+    ipcRenderer.invoke('filedrop:classify', paths),
+  fileDropFolderImages: (dirPath: string): Promise<string[]> =>
+    ipcRenderer.invoke('filedrop:listFolderImages', dirPath),
+  fileDropFolderFiles: (dirPath: string): Promise<string[]> =>
+    ipcRenderer.invoke('filedrop:listFolderFiles', dirPath),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

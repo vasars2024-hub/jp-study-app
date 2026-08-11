@@ -13,6 +13,14 @@ import { registerAnkiIpc } from './main/anki';
 import { registerProfileRulesIpc } from './main/profileRules';
 import { registerApkgIpc } from './main/anki/apkgImport';
 import { registerDesktopIpc } from './main/desktop';
+import { registerDisplayIpc } from './main/displays';
+import {
+  closeAllDesktopWindows,
+  configureDesktopWindows,
+  registerDesktopWindowsIpc,
+  syncDesktopWindows,
+} from './main/desktopWindows';
+import { registerFileRouterIpc } from './main/fileRouter';
 import { registerTranslateIpc } from './main/translate';
 import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
 import { registerSentenceAnalysisIpc } from './main/sentenceAnalysis';
@@ -712,6 +720,9 @@ const createWindow = (restore?: {
       lockscreenWindow.close();
     }
     closeCompanionHost();
+    // Secondary desktops are layered on the main window, not peers of it —
+    // they must never keep the app alive on their own (B5).
+    closeAllDesktopWindows();
     stopBuddyScheduler();
   });
 
@@ -1584,6 +1595,16 @@ app.whenReady().then(async () => {
   registerProfileRulesIpc();
   registerApkgIpc();
   registerDesktopIpc();
+  registerDisplayIpc();
+  configureDesktopWindows({
+    rendererUrl,
+    attachNavGuards,
+    forwardConsole: forwardRendererConsole,
+    isDevServer: isDevServer(),
+    mainWindow: () => mainWindow,
+  });
+  registerDesktopWindowsIpc();
+  registerFileRouterIpc();
   registerTranslateIpc();
   registerTranslateAnalysisIpc();
   registerSentenceAnalysisIpc();
@@ -1649,6 +1670,9 @@ app.whenReady().then(async () => {
   });
   registerReadingLensIpc();
   createWindow();
+  // Assignments are seeded from `screen`, which is only live now. Run once the
+  // main window exists, so its own display is excluded from the secondaries.
+  syncDesktopWindows();
   // Cold-start `--open=library` (etc.): main boots for services, then open the pop-out.
   const coldOpen = argvOpenSection(process.argv);
   if (coldOpen) createPopoutWindow(coldOpen);
