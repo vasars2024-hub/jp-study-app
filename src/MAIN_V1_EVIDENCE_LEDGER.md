@@ -9817,3 +9817,169 @@ Two things to budget for, both measured rather than assumed:
   22 hunks came back empty for `aero` / `blanc` / `nyaa` / `subtitle` / `lexicon` / `agent` /
   `mooncap`, and `studyBlock` occurs 0 times. That remains a marker scan, not a line-by-line
   read. Confirm per hunk before relying on it.
+
+## The drop router landed, and two things that only a live app could have told me — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The previous entry's "Exact next slice" named `ToastHost.tsx` + `renderer/deskDrag.ts` +
+`DropRouter.tsx` + `DesktopShell.tsx` as mutually dependent, and that held on re-derivation:
+`DropRouter.tsx` (386 lines) and `renderer/deskDrag.ts` (205) were untracked, `ToastHost.tsx`
+and `DesktopShell.tsx` tracked-and-dirty, and a fifth file the note did not mention —
+`src/renderer/__tests__/deskDragClient.test.ts`, 302 lines, 18 tests — was untracked alongside
+them.
+
+Every import the slice reaches for was checked **by name at `HEAD`**, not assumed:
+`main/fileRouter`'s `DropPlan`, `shared/fileRouting`'s `DropTargetId`, `mediaKind.extOf`,
+`fileDropPrefs`'s three exports, `apkgImport.importApkgCards`, `flashcardDeck.removeDeckCards`,
+`shared/desktop`'s `DESKTOP_STUDY` / `DisplayAssignment` / `TaskbarMode` / `authoredW|H`, and
+`desktopState`'s `getAssignment` / `getAssignments` / `getDesktopCount` / `getDesktopName`. All
+resolve. So do the main handlers: `filedrop:classify`, `filedrop:listFolderImages` and
+`filedrop:listFolderFiles` are registered from `main.ts:1609` via `registerFileRouterIpc()`.
+
+### One thing the previous entry got wrong, and a defect at `HEAD` it did not know about
+
+- **`DesktopShell.tsx` was takeable whole, and this time it was read rather than marker-scanned.**
+  All 22 hunks were read line by line; every one belongs to the multi-monitor / drop-router
+  track. The previous entry flagged its own scan as "a marker scan, not a line-by-line read" and
+  asked for confirmation before relying on it — confirmed. `ToastHost.tsx` (55/7) and
+  `multiMonitor.css` (+37/0, later +46) are likewise single-track.
+
+- **`HEAD` was carrying a live `ReferenceError`.** `BOOK_DROP` and `MEDIA_DROP` are referenced at
+  `HEAD:src/renderer/components/DesktopShell.tsx:1431-1432`, but their definitions were already
+  removed — `HEAD` line 234 is a comment saying so. Three occurrences in the whole file: one
+  comment, two uses, zero definitions. Any file dropped on the desktop at `HEAD` therefore threw.
+  Those two lines die with the old two-bucket handler this slice replaces, so the fix ships here
+  rather than as a separate commit; it is called out in the commit message.
+
+### Commit `92d5090`, eleven paths, +1655 / −75
+
+- **Whole-file takes** (dirty only with this track's own hunks, each verified by reading the
+  full diff): `ToastHost.tsx`, `DesktopShell.tsx`, `multiMonitor.css`, plus the three untracked
+  files `DropRouter.tsx`, `renderer/deskDrag.ts`, `__tests__/deskDragClient.test.ts`.
+- **Reconstructed from `HEAD` + only this slice's insertions**: `window.d.ts` and all four
+  catalogs. `window.d.ts`'s pending diff interleaves **six** tracks — multi-monitor and fileDrop
+  (mine), plus `studyBlock*`, `malStatus`/`credential*`, `subtitleForPath`/`subtitleSyncOffset`,
+  and an `onAgentOperationalChanged` reorder (all foreign). Only the first two were taken:
+  **+34 / 0**. The catalogs took exactly 16 keys each: **en +19, ja +16, zh +16, ru +21**, the
+  spread being the CLDR plural object for `fileDrop.toast.routedMany` (`ru` has four forms).
+  Each candidate blob was proved a pure insertion by `git diff --numstat HEAD:<path> <blob>`
+  before anything was staged.
+
+Staging used a **temporary index** (`GIT_INDEX_FILE`) with `git hash-object -w --path=` and
+`git write-tree`/`git commit-tree`; the shared index was never mutated. The branch moved by
+`git update-ref` **with the old value as the compare-and-swap argument**, then `git reset --` on
+those eleven paths only. The foreign hunks are untouched: the four catalogs' pending insertions
+went 684/677/675/717 -> **665/661/659/696**, down by exactly 19/16/16/21, and the tree's dirty
+path count went 385 -> **379**, exactly the six files that became clean.
+
+The 16 keys withheld by the previous entry are now all four catalogs' — it called them "14
+`fileDrop.*` keys and `desktop.task.onDesktop`"; the true count is 16, because
+`desktop.tearOff.noneFree` and `desktop.tearOff.failed` were owed as well.
+
+### Four gates, both sides measured in detached worktrees
+
+Baseline `~\jp-wt-head` at `fe7e06a`; candidate `~\jp-wt-cand`, both with a junctioned
+`node_modules`. All four were re-run **from scratch on the final commit**, not inherited from the
+earlier candidate — the slice was rebuilt twice (once for the `pointer-events` fix, once to drop
+a stray blank line), and a gate result belongs to the commit it ran on.
+
+- `npx vitest run`: 10 failed / 5 files on both sides, 6,845 -> **6,863 tests**. Compared as a
+  **set difference on file + full test name** from two JSON reports: **0 new failures, 0 fixed**.
+  The failing set is the same foreign five — `blancAgentStepConfirmGate` (5), `i18n` (2),
+  `localAgentQueueRun` (1), `novelReaderProgressGuard` (1), `architectureBaseline` (1). The 18
+  new tests are `deskDragClient.test.ts`, all green.
+- `node tools/i18n-check.cjs`: **exit 0** both sides. 9,137 -> **9,153** English keys, +16
+  exactly, all three of ja/zh/ru complete.
+- `node tools/architecture-audit.cjs`: exit 1 both sides (the pre-existing unclassified
+  `mooncapLore.ts` orphan). 1,654 -> **1,657** modules, finding list **byte-identical**, 19
+  findings. That `renderer/deskDrag.ts` and `DropRouter.tsx` are *not* reported as orphans is the
+  check that they are genuinely imported — which is exactly what rejected the previous hop's
+  attempt to land `deskDrag.ts` alone.
+- `npx eslint --no-ignore` on all eleven paths: **identical to baseline** by set difference on
+  rule + message with line numbers normalised away — 7 problems, 3 errors, 4 warnings, all
+  pre-existing (`window.d.ts`'s two `adjacent-overload-signatures`, the CSS parse error eslint
+  always emits, four `DesktopShell` unused-vars). `DropRouter.tsx`, `deskDrag.ts` and the new
+  test are **silent**.
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance — and the two defects it caught
+
+Existing bridge on 39273, one window (pid 17264), driven only through authenticated `/eval`.
+`/logs` showed no foreign `[vite] hot updated` for another track's files, so nobody else was
+editing during the run.
+
+- **The affordance is real.** A synthetic `dragenter` carrying a `DataTransfer` with one file
+  (`types` = `['Files']`) mounted `.dropr-affordance` at **1264x821**, `display: grid`, with a
+  painted card background — and its title and hint came back in **Russian**, from the running
+  app's own catalog. That is the strongest evidence available that the 16 new keys resolve live,
+  and it is not something a key-count check can tell you. A matching `dragleave` retracted it to
+  0, so the nested-enter depth counter balances.
+- **The classifier round-trips.** `window.api.fileDropClassify` over four real paths returned
+  four `DropPlan`s down four different branches: a sniffed JSON (`jsonVnConfirmed`), an
+  unreadable file, a **directory** with a real `folderSummary` (475 images / 1067 media / 9
+  books, `truncated: true`), and a nonexistent path. Each carries a `reasonKey` the triage sheet
+  renders. A preload binding with no main handler cannot produce that.
+
+Two defects were found this way, both fixed in this commit:
+
+1. **The Undo button could be seen and not pressed.** `.os-toast-host` is `pointer-events: none`
+   (`styles.css:17948`) so an informational toast never eats a click meant for the desktop
+   beneath it — and `pointer-events` **inherits**. `.os-toast-action` is the first interactive
+   element ever put inside a toast, so it hit-tested to whatever sat behind it: with an agent
+   card open, `elementFromPoint` at the button's own centre returned
+   `agent-action agent-card-action`. The button painted perfectly and was inert. It now sets
+   `pointer-events: auto` explicitly, with the reason in the rule. **This was caught only because
+   the click was hit-tested before being sent**; a bare `btn.click()` dispatches straight to the
+   element and would have passed happily, which is the whole argument for the hit-test rule.
+2. **A gratuitous double blank line** in the committed `window.d.ts` — the reconstruction
+   appended a separator that `HEAD` already had. Caught by the residual working-tree diff showing
+   a *deletion* that was not the known foreign one. Rebuilt; the residue is now 66/**1**, and
+   that single deletion is the foreign `onAgentOperationalChanged` move.
+
+After the fix, re-driven: the button hit-tests to itself (`pointer-events: auto` on the button,
+`none` still on the host), and clicking it ran its callback **exactly once**. Selective dismissal
+was proved with two simultaneous actioned toasts — clicking `UNDO-A` gave `ran: ["A"]` and left
+`PROBE B` standing, so the action closes its own toast and not the stack. A plain toast rendered
+with **no** action button, so the additive path is genuinely additive.
+
+Also confirmed live: `deskwinWhoAmI()` -> `display|1920x1080|1` / desktop 0 (the input
+`registerDeskContext` consumes), the taskbar carrying its new per-display class
+`os-taskbar os-taskbar-full`, and the `.deskdrag-ghost` rule present in a live stylesheet.
+
+**Nothing was persisted.** `%APPDATA%\jp-study-app\desktop-layout.json` still has mtime
+19:04:28, hours before these probes — no probe added an icon, moved a window, or touched a
+setting. All five probe globals were deleted and their absence asserted; no toast, affordance or
+triage sheet was left in the DOM. The bridge reported **0 error entries**. No userData backup was
+taken.
+
+### What this slice deliberately does not do
+
+The **triage sheet was never rendered live**. Reaching it needs a real `drop` event carrying real
+`File` objects, because `DropRouter` resolves paths through `window.api.getFilePath(f)`, and a
+synthetic `DataTransfer` file has no path. Its inputs were verified instead — the classifier
+returns the ambiguous/unknown plans that force `mustAsk`, and every label it renders is a key
+that exists in all four catalogs. Driving the sheet itself needs a real OS drag, which the bridge
+cannot originate. **Do not record it as verified.**
+
+`fileDropFolderImages` is declared in `window.d.ts` but has no caller in this slice; it is
+`HEAD`'s preload binding and `HEAD`'s main handler, declared alongside its two siblings rather
+than left undeclared.
+
+### Exact next slice
+
+`DesktopShell.tsx` now accepts `desktopIndex` / `displayKey` / `secondary` props, and **nothing
+passes them** — every live render is the main window taking the defaults. The secondary
+per-monitor window entry point is the next slice: find or write the renderer entry that a
+`deskwinOpenDesktop()` window loads, and have it pass its assigned index and display key. Until
+that exists, `secondary`, the pinned-desktop branch, `taskbarMode` other than `full`, and the
+`foreignWins` badge list are all code with no live caller — the drag *receiving* side is
+likewise only reachable once a second desktop window exists.
+
+Two things measured this hop that the next one should not re-derive:
+
+- **`window.d.ts` still needs a reconstruct-from-`HEAD` pass**, not a whole-file take: 66
+  insertions and 1 deletion still pending there across four foreign tracks.
+- **`os-taskbar-windows-only` has no CSS rule.** That is not a defect — the mode is implemented
+  by *not rendering* the Start button and desktop switcher, and `os-taskbar[hidden]` covers
+  `none`. The class is a styling hook only. Do not "fix" it by inventing a rule.
