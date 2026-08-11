@@ -1,6 +1,7 @@
 import type { AiProviderId } from './aiProviders';
 import { normalizeAgentProviderPrice } from './agentProviderPricing';
 import {
+  AGENT_HISTORY_TURN_CEILING,
   AGENT_WORKSPACE_SCHEMA_VERSION,
   normalizeAgentWorkspaceState,
   type AgentProviderPolicy,
@@ -395,10 +396,18 @@ function normalizePolicy(value: unknown): AgentProviderPolicy | null {
   // that silently refuses nothing — the exact false assurance this lane was held
   // back for. Dropped here, in shared code, so both ends and a test agree.
   const maxEstimatedCostUsd = pricing ? requestedCostBudget : undefined;
+  // Carried only when the sender actually stated a policy. Absent stays absent
+  // rather than becoming a number, because the router reads absence as "no user
+  // policy, use the ceiling" — and a value invented here would be indistinguishable
+  // from one the user chose. Clamped so this field can never widen the ceiling.
+  const historyTurns = typeof raw.historyTurns === 'number' && Number.isFinite(raw.historyTurns)
+    ? Math.min(AGENT_HISTORY_TURN_CEILING, Math.max(0, Math.floor(raw.historyTurns)))
+    : undefined;
   return {
     target: normalizedTarget,
     allowCloud: raw.allowCloud === true,
     allowSensitiveContext: raw.allowSensitiveContext === true,
+    ...(historyTurns !== undefined ? { historyTurns } : {}),
     maxInputChars: boundedInteger(
       raw.maxInputChars,
       AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,

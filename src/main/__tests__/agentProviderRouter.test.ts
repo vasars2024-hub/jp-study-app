@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  AGENT_HISTORY_TURN_CEILING,
   AGENT_WORKSPACE_MODES,
   type AgentContextItem,
   type AgentProviderPolicy,
@@ -567,5 +568,63 @@ describe('workflow-preset modes', () => {
     expect(routed).toContain('b'.repeat(100));
     expect(routed).not.toContain('a'.repeat(100));
     expect(result.provider.historyMessageIds).toEqual(['history-2']);
+  });
+
+  it('sends no prior turn at all when the retained-chat policy is off', async () => {
+    let routed = '';
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockImplementation(async (prompt) => {
+      routed = prompt;
+      return 'ok';
+    });
+    const result = await runAgentProviderPrompt(
+      policy({ maxInputChars: 20_000, historyTurns: 0 }),
+      'Continue.',
+      { history: Array.from({ length: 6 }, (_, index) => history(index)) },
+    );
+
+    expect(routed).not.toContain('turn-5');
+    expect(routed).not.toContain('Conversation so far');
+    expect(routed).toContain('Continue.');
+    expect(result.provider.historyMessageIds).toEqual([]);
+  });
+
+  it('narrows to the requested number of turns, newest first', async () => {
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockResolvedValue('ok');
+    const result = await runAgentProviderPrompt(
+      policy({ maxInputChars: 20_000, historyTurns: 2 }),
+      'Continue.',
+      { history: Array.from({ length: 6 }, (_, index) => history(index)) },
+    );
+
+    expect(result.provider.historyMessageIds).toEqual(['history-4', 'history-5']);
+  });
+
+  /**
+   * The load-bearing direction. `historyTurns` reaches this router from a
+   * renderer through the IPC surface, so if it could raise the limit it would be
+   * a privacy control that doubles as a way to send MORE of the conversation
+   * than the app has ever sent. The router takes the lower of the two.
+   */
+  it('refuses to let a policy widen the built-in history ceiling', async () => {
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockResolvedValue('ok');
+    const result = await runAgentProviderPrompt(
+      policy({ maxInputChars: 200_000, historyTurns: 500 }),
+      'Continue.',
+      { history: Array.from({ length: 30 }, (_, index) => history(index)) },
+    );
+
+    expect(result.provider.historyMessageIds).toHaveLength(AGENT_HISTORY_TURN_CEILING);
+    expect(result.provider.historyMessageIds[0]).toBe(`history-${30 - AGENT_HISTORY_TURN_CEILING}`);
+  });
+
+  it('keeps the ceiling when no policy is expressed', async () => {
+    vi.spyOn(translate, 'runLocalQwenPrompt').mockResolvedValue('ok');
+    const result = await runAgentProviderPrompt(
+      policy({ maxInputChars: 200_000 }),
+      'Continue.',
+      { history: Array.from({ length: 30 }, (_, index) => history(index)) },
+    );
+
+    expect(result.provider.historyMessageIds).toHaveLength(AGENT_HISTORY_TURN_CEILING);
   });
 });

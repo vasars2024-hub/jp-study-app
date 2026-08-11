@@ -92,3 +92,24 @@
 .agent-governance-switch input {
   accent-color: var(--agent-accent);
 }
+
+.agent-governance-switch input:disabled {
+  cursor: not-allowed;
+}
+
+.agent-governance-switch:has(input:disabled) {
+  color: var(--agent-muted);
+  cursor: not-allowed;
+}
+
+.agent-governance-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--agent-line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--agent-surface-2);
+}

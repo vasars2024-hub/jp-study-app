@@ -63,6 +63,15 @@ export type AgentProviderTarget =
   | { kind: 'local'; backend: 'local-qwen'; model?: string }
   | { kind: 'cloud'; providerId: AiProviderId; model?: string };
 
+/**
+ * The most prior turns any request may replay, whatever a policy asks for.
+ *
+ * The router owned this number privately. It is shared now because the
+ * retained-chat control has to describe the ceiling it is narrowing, and a
+ * second hand-written 12 in the settings module is the thing that would drift.
+ */
+export const AGENT_HISTORY_TURN_CEILING = 12;
+
 export interface AgentProviderPolicy {
   target: AgentProviderTarget;
   allowCloud: boolean;
@@ -70,6 +79,17 @@ export interface AgentProviderPolicy {
   maxInputChars: number;
   maxOutputTokens: number;
   maxEstimatedCostUsd?: number;
+  /**
+   * The user's retained-chat policy: how many prior turns this request may
+   * replay to the provider. Absent means the user expressed no policy and the
+   * built-in ceiling applies.
+   *
+   * **It can only narrow.** The router takes the LOWER of this and
+   * `AGENT_HISTORY_TURN_CEILING`, so a renderer — or anything that reaches the
+   * IPC surface — cannot use a privacy control as a way to send *more* of the
+   * conversation than the app has ever sent.
+   */
+  historyTurns?: number;
   /**
    * The user's own per-million-token rates for this target. Absent for a local
    * target and for a cloud target the user has not priced; `maxEstimatedCostUsd`

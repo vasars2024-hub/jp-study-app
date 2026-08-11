@@ -1554,6 +1554,33 @@ describe('Agent workspace shell', () => {
     expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Use my notes');
   });
 
+  /**
+   * The governance panel writes `chatHistory`; main narrows on `policy.historyTurns`.
+   * Nothing connects the two but this composer, and this branch has now produced
+   * three separate ledger sections about code that existed and was never reached.
+   * So the pin is on the request the shell actually builds, read out of the
+   * production execution client rather than off a mocked policy.
+   */
+  it('forwards the stored retained-chat policy on the request it sends', async () => {
+    const SETTINGS_KEY = 'jp-study-local-agent-settings-v1';
+    const previous = localStorage.getItem(SETTINGS_KEY);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, chatHistory: 'off' }));
+    try {
+      stored = populated();
+      await mount();
+      await setTextarea('Explain this');
+      await click(buttonWith('agent.execute.send'));
+
+      const request = calls.find((call) => call.method === 'execute')?.args[0] as {
+        policy: { historyTurns?: number };
+      };
+      expect(request.policy.historyTurns).toBe(0);
+    } finally {
+      if (previous === null) localStorage.removeItem(SETTINGS_KEY);
+      else localStorage.setItem(SETTINGS_KEY, previous);
+    }
+  });
+
   it('blocks cloud attachment sending until the visible per-request consent is checked', async () => {
     stored = populated();
     await mount();

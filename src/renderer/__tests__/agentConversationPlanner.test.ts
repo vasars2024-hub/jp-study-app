@@ -22,6 +22,8 @@ const harness = vi.hoisted(() => ({
     backgroundProcessing: false,
     permission: 'limited-actions' as const,
     memoryEnabled: true,
+    memoryScope: ['user-preference' as const, 'learning' as const, 'application' as const],
+    chatHistory: 'full' as const,
     privacyMode: false,
     debugMode: false,
   },

@@ -9,7 +9,11 @@ import {
   selectLocalAgentApprovedOperations,
 } from '../shared/localAgentPrompt';
 import { AGENT_TOOL_OPERATIONS, type AgentToolOperationId } from '../shared/localAgent';
-import { normalizeLocalAgentSettings, type LocalAgentSettings } from '../shared/localAgentSettings';
+import {
+  memoriesInAgentScope,
+  normalizeLocalAgentSettings,
+  type LocalAgentSettings,
+} from '../shared/localAgentSettings';
 import { effectiveAgentPermission } from '../shared/localAgentProfiles';
 import { recommendedLocalAgentModels } from '../shared/localAgentModels';
 import type {
@@ -217,7 +221,9 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
         permission,
         profile: request.profile,
         availableOperations: normalizeAvailableOperations(request.availableOperations),
-        memories: settings.memoryEnabled ? request.memories : [],
+        // Applied here, not at the producers: this handler is the choke point
+        // the central Agent's planner and Blanc's separate shell both reach.
+        memories: memoriesInAgentScope(settings, request.memories),
         applicationState: settings.privacyMode ? {} : request.applicationState,
       };
       const approvedOperations = selectLocalAgentApprovedOperations(promptContext);

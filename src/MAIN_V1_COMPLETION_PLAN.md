@@ -254,9 +254,34 @@ Still required before the Track 3 acceptance can be called complete:
   branch's history; this commit verified and landed it, and added the two tests
   that hold its rules (2026-08-11 — see the ledger's "The cost control that had
   been written and never committed"). **Still open** from this bullet:
-  Full-mode memory/profile/permission/automation controls — the main app has no
-  writer for `localAgentSettings` or the agent profile store at all, only Blanc
-  does — plus retained-chat policy and memory scope;
+  none — the two bullets below close what this one named. **Full-mode
+  memory/profile/permission controls: done.** `AgentGovernancePanel` is the main
+  app's writer for the permission ceiling, the active profile and the memory
+  switch; until it existed the only writer for `localAgentSettings` or the
+  profile store in the whole repository was Blanc's shell, so the app that owns
+  the Agent could read all three and change none (2026-08-11 — see the ledger's
+  "The Agent's own governance, written from the app that owns it");
+- **Retained-chat policy and memory scope: done.** `memoryScope` narrows which
+  memory categories a request may draw on. It is enforced in
+  `main/localAgent.ts`, the choke point the Agent's planner and Blanc's separate
+  shell both arrive at, rather than at either producer — so the scope cannot be
+  bypassed by a surface outside this track, and Blanc is covered without editing
+  its directory. `chatHistory` bounds how many prior turns reach a provider,
+  carried as `AgentProviderPolicy.historyTurns` and applied as the LOWER of it
+  and `AGENT_HISTORY_TURN_CEILING`, so a policy arriving over IPC can only ever
+  narrow what is sent, never widen it; the bridge normalizer clamps to the same
+  ceiling and never invents a value where the sender stated none. An absent
+  `memoryScope` restores every category — a document older than the setting must
+  not silently lose the memories it was already using — while an empty one sends
+  nothing, which is the user's own choice; the two are deliberately
+  distinguishable, and that migration path was measured against the real stored
+  settings document on this machine (2026-08-11 — see the ledger's "The two
+  privacy controls that had no state behind them"). **Still open** from this
+  bullet: automations, whose created entry freezes `effectiveAgentPermission` at
+  creation time, which is a product decision rather than a missing writer; and
+  sensitive-context exclusion as a *persistent* setting rather than the
+  per-request consent checkbox it is today, which would need to interact with
+  that consent rather than sit beside it;
 - final compact-width and complete keyboard/reduced-motion visual matrices.
 
 ## Track 4: unified Reading workspace

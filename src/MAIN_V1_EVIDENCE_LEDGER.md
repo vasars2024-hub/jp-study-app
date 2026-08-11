@@ -6037,3 +6037,151 @@ adopting i18n` and `does not let a date or time be formatted in the OS locale` f
 this slice. The parent run is the only thing that separates "this broke it" from "this is what
 the branch already was"; without it the first run reads as a three-test regression caused by a
 commit that adds a component and ten catalog keys.
+
+## The two privacy controls that had no state behind them — 2026-08-11
+
+The previous section closed permission, profile and the memory switch, and named the rest of
+that plan bullet as still open: "retained-chat policy and memory scope — untouched; neither has
+any state behind it yet. `memoryEnabled` is a switch, not a scope." Re-deriving both from source
+rather than trusting that sentence confirmed it and sharpened each into a different shape of
+gap.
+
+**Memory scope was a parameter nobody passed.** `selectAgentMemoryContext` has accepted a
+`categories` option since it was written (`shared/localAgentMemory.ts:143`). Grepping every call
+site returns two — the central Agent's planner and Blanc's `BlancReadyToolPanels` — and
+**neither passes it**. So the selector could already narrow by category, and no user could reach
+that ability from anywhere in the app.
+
+**Retained chat had no parameter at all.** `agentExecutionIpc` reads `conversation.messages`
+from the main-owned store and hands the whole array to the router, which replays up to a private
+`HISTORY_MESSAGE_LIMIT = 12` of them into every provider request. Nothing in the request, the
+policy or the settings could change that number. A user who wanted a cloud provider to see one
+question rather than the last twelve turns of their study conversation had no control, and the
+only workaround was deleting the conversation.
+
+### What the slice added
+
+Two settings — `memoryScope` and `chatHistory` — with the controls for them in
+`AgentGovernancePanel`, beside the three the previous section added. Three rules carry them,
+each pinned by a test proved to guard by positive control.
+
+**The retained-chat policy can only narrow.** `AgentProviderPolicy.historyTurns` crosses IPC
+from a renderer, so the router takes `Math.min(AGENT_HISTORY_TURN_CEILING, historyTurns)` rather
+than the value it is handed. Without that direction, a control the user reaches for privacy
+would double as the one way to make the app replay *more* of a conversation than it has ever
+sent. The bridge normalizer clamps to the same ceiling on the way in, and — the second half —
+**never invents a number**: an absent, non-numeric or `NaN` value stays absent, because the
+router reads absence as "the user expressed no policy" and a value fabricated at the boundary
+would be indistinguishable from one they chose.
+
+**The ceiling is one number, not two.** `AGENT_HISTORY_TURN_CEILING` moved out of the router
+into `shared/agentWorkspace.ts`, and `LOCAL_AGENT_CHAT_HISTORY_TURNS.full` *is* that constant
+rather than a second literal 12. A hand-written copy in the settings module is exactly the thing
+that drifts the first time the router's limit moves, leaving a control that claims to send more
+than it sends.
+
+**Memory scope is enforced in main, not at the producers.** `memoriesInAgentScope` is applied in
+`main/localAgent.ts`'s plan handler, which is the choke point the central Agent's planner and
+Blanc's separate shell both arrive at. Enforcing it only where the control lives would be a
+privacy setting with a second door standing open — the same shape of defect as the staging
+request that accepted `bytes` three sections ago. The planner also narrows its *selection* by
+the same scope, so an out-of-scope memory is not chosen in the first place; that half is an
+optimisation, the main-side filter is the rule. It is also what let the scope cover Blanc
+without editing `components/blanc/`, which is another track's directory.
+
+**An emptied scope is a choice, not a fault.** `normalizeLocalAgentSettings` distinguishes an
+absent `memoryScope` — a document written before this setting existed, which restores every
+category so nobody silently loses the memories they were already getting — from an empty array,
+which is the user unticking every box and means send nothing. Collapsing those two would break
+one direction or the other, and the panel's note states the equivalence rather than leaving an
+empty checkbox group implying the switch above it still applies.
+
+| test | run against | result |
+| --- | --- | --- |
+| the three history-narrowing tests | `Math.min` in the router changed to `Math.max` | **all three failed**, 3 of 25 |
+| `forwards the stored retained-chat policy on the request it sends` | the composer's `historyTurns` line commented out | **failed, alone** (1 of 55) |
+| the two emptied-scope tests plus the panel's note | `memoryScope: []` normalized back to the full set | **all three failed**, 3 of 19 |
+
+The second row is the one worth keeping. The governance panel writes `chatHistory` and main
+narrows on `policy.historyTurns`; nothing connects the two but one line in the composer, and
+this branch has now produced four separate sections about code that existed and was never
+reached. The pin reads the request out of the production execution client, so deleting that line
+fails a gate instead of quietly restoring a control that writes a setting nothing consumes.
+
+### Live acceptance, on a fresh boot
+
+The recorded `bridge.json` port refused connections — an unclean exit — so one was started.
+`/logs` reports **zero errors across the whole run** and no foreign `[vite] hot updated` paths.
+
+The panel lives behind Full mode inside a stacked `.fwin`, the known instrumentation limit, so
+the real component was again mounted into the running renderer from its real module URL and
+driven with real clicks against real `localStorage`. The app's UI language was Russian, which
+makes the i18n evidence stronger than a key count: **all 12 new keys came out of the live ru
+catalog at runtime, none as its own key.**
+
+| probe | result |
+| --- | --- |
+| six dynamic imports | panel, `memoriesInAgentScope`, `normalizeAgentExecutionRequest`, both stores — all `function` |
+| `LOCAL_AGENT_CHAT_HISTORY_TURNS` read live | `{off: 0, recent: 4, full: 12}` — the shared ceiling, not a copy |
+| `normalizeAgentExecutionRequest` live | `0→0`, `4→4`, **`500→12`**, `-3→0`, `'all'`→absent, `undefined`→absent |
+| untick «История занятий» | real storage scope becomes `['user-preference','application']` |
+| click «Не отправлять» | real storage `chatHistory: 'off'`; the note reads «никогда не отправляются модели повторно» |
+| untick the remaining two | scope `[]`; the note states nothing is attached; `memoriesInAgentScope` on the live settings returns **0 of 3**, and the turn count reads **0** |
+| toggle the memory switch off | all three scope boxes go `disabled`, and back on release |
+
+**The migration case was measured on the user's own document, not a fixture.** The stored
+settings blob on this machine genuinely predates both fields — `'memoryScope' in stored` and
+`'chatHistory' in stored` are both **false** — and normalizing it live returns all three
+categories and `'full'`. That is the direction that would have silently stopped attaching
+memories if absent and empty had been collapsed.
+
+The settings key was captured first and restored after: compared **identical** to the captured
+string. The probe host was removed and re-read as absent.
+
+### Gates
+
+`npx vitest run`: **510 passed / 1 skipped of 511 files**, **6,981 passed** / 6 skipped — up
+exactly 16 from the previous section's 6,965, which is the number of new tests in this one.
+`node tools/i18n-check.cjs`: clean, **9,286** English keys translated in ja/zh/ru, up exactly 12.
+`node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+`npx eslint` on all 18 touched paths: **0 errors, 0 warnings**.
+
+One pre-existing fixture needed a field. `agentConversationPlanner.test.ts`'s harness builds a
+`LocalAgentSettings` literal by hand, and the planner now reads `settings.memoryScope.length`;
+without the field, six of its tests failed with `planner-unavailable`, because the planner's own
+`try` swallows the throw. Completing the fixture is the fix — real callers only ever see a
+normalized object — but it is worth recording that the planner's error handling turns a missing
+settings field into a generic "planner unavailable".
+
+### Staged against a shared tree
+
+The four catalogs still carry several hundred lines of other tracks' uncommitted work and were
+committed as **reconstructed blobs** — HEAD verbatim plus this slice's block, lifted from the
+`agent.governance.memory.note` anchor to whatever line followed that anchor at HEAD, and spliced
+back in at the same place. The splice refuses unless HEAD has none of these keys already and
+unless the block is bounded by the exact first and last key this slice added; it accepted 18 /
+16 / 16 / 22 lines for en / ja / zh / ru, which is the 12 keys plus each language's own plural
+forms. The other 15 files were verified clean of foreign hunks before staging and carry nothing
+but this lane.
+
+### Still open
+
+- **Automations, the fourth word in the plan bullet.** Unchanged and still deliberately not
+  built: the entry `saveLocalAgentAutomation` writes freezes `effectiveAgentPermission(...)` at
+  creation time (`BlancReadyToolPanels.tsx:461`), so an automation created before a ceiling
+  change keeps the old authority, and whether that snapshot is the contract or a bug is a
+  **product decision**. This slice makes it sharper rather than softer: there are now three
+  governance values a user can change after an automation has frozen one of them.
+- **Sensitive-context exclusion as a persistent setting.** `allowSensitiveContext` is decided
+  per request by a visible consent checkbox, which is honest, but the plan's privacy bullet
+  lists it beside memory scope as something a user should be able to set once. Left out
+  deliberately: a persistent "never send sensitive context" has to interact with the per-request
+  consent rather than sit beside it, and building the second without settling that would give
+  one boundary two owners.
+- **Blanc's `changeProfile` still makes the naive write** (`BlancReadyToolPanels.tsx:476`) —
+  unchanged, another track's directory, named here for whoever owns it.
+- **The durability of the session-only activity/operation history** — unchanged product decision.
+- **The 340 non-`agent.*` catalog keys missing at HEAD** — unchanged, belonging to other tracks.
+- **`mediaCueAgentContext`'s identity ignores `mediaId`** — unchanged, seventh section running.
+- **The five untracked `src/shared/i18n/*/` directories** — unchanged; one of the four gates
+  still cannot run from the branch's own history because of them.

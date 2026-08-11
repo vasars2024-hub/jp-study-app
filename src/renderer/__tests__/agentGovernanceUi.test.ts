@@ -237,4 +237,50 @@ describe('AgentGovernancePanel writes the authority the main app could only read
     expect(effective).not.toContain('Full automation');
     expect(effective).toContain(getActiveAgentProfile(loadLocalAgentProfiles()).name);
   });
+
+  it('persists a narrowed memory scope and leaves the other categories alone', async () => {
+    const panel = await mountPanel();
+    expect(loadLocalAgentSettings().memoryScope)
+      .toEqual(['user-preference', 'learning', 'application']);
+
+    await panel.toggle('agent-governance-scope-learning');
+
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}').memoryScope)
+      .toEqual(['user-preference', 'application']);
+  });
+
+  /**
+   * The scope's one honest edge. Unticking every box is not a broken state to be
+   * repaired back to "everything" — it is the user saying to send nothing, and
+   * the note has to say that rather than leaving an empty group implying the
+   * memory switch above it still applies.
+   */
+  it('says an emptied scope attaches nothing rather than silently restoring every category', async () => {
+    const panel = await mountPanel();
+
+    await panel.toggle('agent-governance-scope-user-preference');
+    await panel.toggle('agent-governance-scope-learning');
+    await panel.toggle('agent-governance-scope-application');
+
+    expect(loadLocalAgentSettings().memoryScope).toEqual([]);
+    expect(panel.text('agent-governance-scope-note')).toContain('nothing stored is attached');
+  });
+
+  it('persists a retained-chat policy and states what it sends', async () => {
+    const panel = await mountPanel();
+    expect(loadLocalAgentSettings().chatHistory).toBe('full');
+    expect(panel.text('agent-governance-history-note')).toContain('12');
+
+    await panel.click('agent-governance-history-off');
+
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}').chatHistory).toBe('off');
+    // "Up to 0 turns" would be arithmetic, not an answer. The off state says what
+    // happens to the turns that are still stored, because that is the question a
+    // user turning this off is actually asking.
+    expect(panel.text('agent-governance-history-note')).toContain('never replayed');
+
+    await panel.click('agent-governance-history-recent');
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}').chatHistory).toBe('recent');
+    expect(panel.text('agent-governance-history-note')).toContain('4');
+  });
 });

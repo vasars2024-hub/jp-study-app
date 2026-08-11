@@ -10,7 +10,7 @@ import {
   normalizeAgentExecutionRequest,
   normalizeAgentExecutionResult,
 } from '../agentExecutionBridge';
-import { emptyAgentWorkspaceState } from '../agentWorkspace';
+import { AGENT_HISTORY_TURN_CEILING, emptyAgentWorkspaceState } from '../agentWorkspace';
 
 describe('Agent execution bridge contract', () => {
   it('builds an explicit local-only default policy', () => {
@@ -99,6 +99,33 @@ describe('Agent execution bridge contract', () => {
     });
     expect(local?.policy.pricing).toBeUndefined();
     expect(local?.policy.maxEstimatedCostUsd).toBeUndefined();
+  });
+
+  /**
+   * The retained-chat policy crosses IPC, so the normalizer has to keep two
+   * things straight that look similar. It must never invent a number — absence
+   * is what the router reads as "the user expressed no policy", and a value
+   * fabricated here would be indistinguishable from one the user chose. And it
+   * must never carry a number above the ceiling, so a control the user reaches
+   * for privacy cannot double as a way to replay more of the conversation.
+   */
+  it('carries a retained-chat policy only as stated, and never above the ceiling', () => {
+    const request = (historyTurns: unknown) => normalizeAgentExecutionRequest({
+      requestId: 'run-history',
+      conversationId: 'chat-history',
+      prompt: 'Continue',
+      policy: { ...defaultAgentExecutionPolicy(), historyTurns },
+      allowLocalFallback: false,
+    });
+
+    expect(request(0)?.policy.historyTurns).toBe(0);
+    expect(request(4)?.policy.historyTurns).toBe(4);
+    expect(request(500)?.policy.historyTurns).toBe(AGENT_HISTORY_TURN_CEILING);
+    expect(request(-3)?.policy.historyTurns).toBe(0);
+    expect(request(2.7)?.policy.historyTurns).toBe(2);
+    expect(request('all')?.policy.historyTurns).toBeUndefined();
+    expect(request(Number.NaN)?.policy.historyTurns).toBeUndefined();
+    expect(request(undefined)?.policy.historyTurns).toBeUndefined();
   });
 
   it('rejects empty, foreign-provider and persistent-cache requests', () => {

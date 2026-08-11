@@ -81,6 +81,8 @@ import {
 import { AgentConversationPlanQueue } from './AgentConversationPlanQueue';
 import { AgentCapabilityDirectory } from './AgentCapabilityDirectory';
 import { AgentGovernancePanel } from './AgentGovernancePanel';
+import { LOCAL_AGENT_CHAT_HISTORY_TURNS } from '../../../shared/localAgentSettings';
+import { loadLocalAgentSettings } from '../../localAgentSettingsStore';
 import { AgentPromptLibrary } from './AgentPromptLibrary';
 import { AgentContextSuggestions } from './AgentContextSuggestions';
 import { AgentPipelineTerminal } from './AgentPipelineTerminal';
@@ -1656,6 +1658,10 @@ export default function AgentWorkspaceShell() {
     ) return;
     const requestId = newExecutionId();
     const basePolicy = defaultAgentExecutionPolicy(target);
+    // Read at submit rather than held in state: this is the policy the user had
+    // set when they pressed send, and it cannot go stale behind a governance
+    // edit made in this window or a sibling one between renders.
+    const retainedChat = loadLocalAgentSettings().chatHistory;
     const request: AgentExecutionRequest = {
       requestId,
       conversationId: selected.id,
@@ -1663,6 +1669,7 @@ export default function AgentWorkspaceShell() {
       policy: {
         ...basePolicy,
         allowSensitiveContext: sensitiveConsentRequired && cloudSensitiveConsent,
+        historyTurns: LOCAL_AGENT_CHAT_HISTORY_TURNS[retainedChat],
         maxInputChars,
         maxOutputTokens,
         // Both or neither. The bridge normalizer drops a cap that arrives

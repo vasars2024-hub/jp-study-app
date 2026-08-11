@@ -224,8 +224,14 @@ export async function createAgentConversationPlan(
       settings,
       profile,
       availableOperations: authority.allowedOperations,
-      memories: settings.memoryEnabled
-        ? selectAgentMemoryContext(loadLocalAgentMemory(), objective, { maxCharacters: 4_000 })
+      // Narrowed by scope here so an out-of-scope memory is never selected in
+      // the first place, and enforced again in main, which is the choke point
+      // every producer shares. This half is selection; that half is the rule.
+      memories: settings.memoryEnabled && settings.memoryScope.length > 0
+        ? selectAgentMemoryContext(loadLocalAgentMemory(), objective, {
+          maxCharacters: 4_000,
+          categories: settings.memoryScope,
+        })
         : [],
       applicationState: disclosedContext.length > 0
         ? {

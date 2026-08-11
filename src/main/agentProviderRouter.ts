@@ -1,4 +1,5 @@
 import {
+  AGENT_HISTORY_TURN_CEILING,
   evaluateAgentProviderPrivacy,
   type AgentAttachment,
   type AgentContextItem,
@@ -100,7 +101,7 @@ export function agentModePreset(mode: AgentWorkspaceMode | undefined): string {
  * the disclosure and the input-budget check both count the preset rather than
  * quietly excluding it.
  */
-const HISTORY_MESSAGE_LIMIT = 12;
+const HISTORY_MESSAGE_LIMIT = AGENT_HISTORY_TURN_CEILING;
 const HISTORY_TEXT_LIMIT = 12_000;
 const HISTORY_MESSAGE_TEXT_LIMIT = 4_000;
 const HISTORY_HEADER = 'Conversation so far (oldest to newest):\n';
@@ -225,6 +226,7 @@ function promptWithContext(
   history: readonly AgentProviderHistoryMessage[] = [],
   attachments: readonly AgentExecutionAttachment[] = [],
   maxInputChars = Number.POSITIVE_INFINITY,
+  historyLimit = HISTORY_MESSAGE_LIMIT,
 ): { prompt: string; historyMessageIds: string[] } {
   const preset = agentModePreset(mode);
   const head = preset ? `${preset}\n\n${prompt}` : prompt;
@@ -241,6 +243,11 @@ function promptWithContext(
     : `\n\nSelected Study OS context:\n${rows.join('\n\n')}`;
   const attachmentsSuffix = attachmentSuffix(attachments);
   const withoutHistory = `${head}${contextSuffix}${attachmentsSuffix}`;
+  // The user's retained-chat policy narrows the built-in ceiling and never the
+  // other way round, so a policy value that arrived from a renderer cannot be
+  // used to replay more of the conversation than this router has ever sent.
+  const turns = Math.max(0, Math.min(HISTORY_MESSAGE_LIMIT, historyLimit));
+  if (turns === 0) return { prompt: withoutHistory, historyMessageIds: [] };
   const eligible = history
     .filter((message) => (
       message.status === 'complete'
@@ -248,7 +255,7 @@ function promptWithContext(
       && message.id.trim().length > 0
       && message.text.trim().length > 0
     ))
-    .slice(-HISTORY_MESSAGE_LIMIT);
+    .slice(-turns);
   const selected: Array<{ id: string; row: string; textLength: number }> = [];
   let selectedTextLength = 0;
   for (let index = eligible.length - 1; index >= 0; index -= 1) {
@@ -389,6 +396,7 @@ export async function runAgentProviderPrompt(
     options.history,
     accepted.input,
     policy.maxInputChars,
+    policy.historyTurns ?? HISTORY_MESSAGE_LIMIT,
   );
   const providerPrompt = assembled.prompt;
   if (providerPrompt.length > policy.maxInputChars) {
@@ -419,7 +427,12 @@ export async function runAgentProviderPrompt(
       apiKey: options.apiKey,
       prompt: providerPrompt,
       ...(images.length > 0 ? { images } : {}),
-      pricing: options.pricing,
+      // Conditional, not `pricing: options.pricing`. `runtime` already carries
+      // the policy's user-entered rates, and an unconditional assignment wrote
+      // `undefined` over them for every caller that does not inject pricing —
+      // which is every production caller. That is how the whole cost lane came
+      // to exist without ever producing an estimate.
+      ...(options.pricing ? { pricing: options.pricing } : {}),
       signal: options.signal,
       onEvent: options.onCloudEvent,
       onTextChunk: policy.streaming ? options.onTextChunk : undefined,

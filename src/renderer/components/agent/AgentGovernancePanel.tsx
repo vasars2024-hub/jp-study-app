@@ -5,7 +5,13 @@ import {
   getActiveAgentProfile,
   type AgentProfileStore,
 } from '../../../shared/localAgentProfiles';
-import type { LocalAgentSettings } from '../../../shared/localAgentSettings';
+import type { AgentMemoryCategory } from '../../../shared/localAgentMemory';
+import {
+  LOCAL_AGENT_CHAT_HISTORY_TURNS,
+  LOCAL_AGENT_MEMORY_CATEGORIES,
+  type LocalAgentChatHistory,
+  type LocalAgentSettings,
+} from '../../../shared/localAgentSettings';
 import {
   activateLocalAgentProfile,
   loadLocalAgentProfiles,
@@ -24,6 +30,8 @@ const PERMISSION_LEVELS: readonly AgentPermissionLevel[] = [
   'limited-actions',
   'full-automation',
 ];
+
+const CHAT_HISTORY_LEVELS: readonly LocalAgentChatHistory[] = ['off', 'recent', 'full'];
 
 export interface AgentGovernancePanelProps {
   /** Optional snapshots make the panel independently testable. Omit them in the live shell. */
@@ -87,6 +95,19 @@ export function AgentGovernancePanel({
     setLiveStore(next);
     onStoreChange?.(next);
   };
+
+  // Written as the full list minus the box, in the canonical order, so the
+  // stored scope never depends on the order the user clicked the boxes in.
+  const toggleScope = (category: AgentMemoryCategory, included: boolean): void => {
+    const chosen = new Set(settings.memoryScope);
+    if (included) chosen.add(category);
+    else chosen.delete(category);
+    writeSettings({
+      memoryScope: LOCAL_AGENT_MEMORY_CATEGORIES.filter((entry) => chosen.has(entry)),
+    });
+  };
+
+  const scopeEmpty = settings.memoryScope.length === 0;
 
   return (
     <section className="agent-governance" aria-labelledby="agent-governance-title">
@@ -166,6 +187,64 @@ export function AgentGovernancePanel({
           <span>{t('agent.governance.memory.label')}</span>
         </label>
         <p className="agent-governance-note">{t('agent.governance.memory.note')}</p>
+
+        <div
+          className="agent-governance-scope"
+          role="group"
+          aria-labelledby="agent-governance-scope-label"
+        >
+          <span className="agent-governance-label" id="agent-governance-scope-label">
+            {t('agent.governance.scope.label')}
+          </span>
+          {LOCAL_AGENT_MEMORY_CATEGORIES.map((category) => (
+            <label key={category} className="agent-governance-switch">
+              <input
+                type="checkbox"
+                data-testid={`agent-governance-scope-${category}`}
+                disabled={!settings.memoryEnabled}
+                checked={settings.memoryScope.includes(category)}
+                onChange={(event) => toggleScope(category, event.target.checked)}
+              />
+              <span>{t(`agent.governance.scope.${category}`)}</span>
+            </label>
+          ))}
+        </div>
+        <p className="agent-governance-note" data-testid="agent-governance-scope-note">
+          {scopeEmpty
+            ? t('agent.governance.scope.none')
+            : t('agent.governance.scope.note', { count: settings.memoryScope.length })}
+        </p>
+      </div>
+
+      <div className="agent-governance-field">
+        <span className="agent-governance-label" id="agent-governance-history-label">
+          {t('agent.governance.history.label')}
+        </span>
+        <div
+          className="agent-governance-choices"
+          role="group"
+          aria-labelledby="agent-governance-history-label"
+        >
+          {CHAT_HISTORY_LEVELS.map((level) => (
+            <button
+              key={level}
+              type="button"
+              data-testid={`agent-governance-history-${level}`}
+              className={`agent-governance-choice${settings.chatHistory === level ? ' is-selected' : ''}`}
+              aria-pressed={settings.chatHistory === level}
+              onClick={() => writeSettings({ chatHistory: level })}
+            >
+              {t(`agent.governance.history.${level}`)}
+            </button>
+          ))}
+        </div>
+        <p className="agent-governance-note" data-testid="agent-governance-history-note">
+          {settings.chatHistory === 'off'
+            ? t('agent.governance.history.noneNote')
+            : t('agent.governance.history.turnsNote', {
+              count: LOCAL_AGENT_CHAT_HISTORY_TURNS[settings.chatHistory],
+            })}
+        </p>
       </div>
     </section>
   );
