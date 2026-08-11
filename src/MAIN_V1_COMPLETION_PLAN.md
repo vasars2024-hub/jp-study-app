@@ -282,7 +282,32 @@ Still required before the Track 3 acceptance can be called complete:
   sensitive-context exclusion as a *persistent* setting rather than the
   per-request consent checkbox it is today, which would need to interact with
   that consent rather than sit beside it;
-- final compact-width and complete keyboard/reduced-motion visual matrices.
+- **Final compact-width and complete keyboard/reduced-motion visual matrices:
+  done.** Run for the first time — the only prior mention of this bullet in the
+  ledger is one line saying it "also remains required". Measured live at fifteen
+  widths from 1084 down to 320 against `.agent-root`'s own container (an
+  `@container` surface, so the width is drivable without resizing a window and
+  rewriting `desktop-layout.json`), in Full mode with all ten disclosures open —
+  1,201 descendants rather than Simple mode's 245, because a closed `<details>`
+  measures 0x0 and every check in the matrix scores 0x0 as a pass. Clean on
+  horizontal overflow, focus rings, positive `tabindex`, rail arrow keys and
+  smooth scrolling. Four defects fixed: three controls under the WCAG 2.5.8
+  24px target-size floor (`.agent-mode-select` at 94x19, and the request-limit
+  and plan-step summaries at 116x20 and 43x18), now floored through one
+  `--agent-hit-min` token and deliberately *not* blockified, because these
+  summaries have no chevron of their own and `display: flex` would drop the UA
+  disclosure triangle; and — the real one — a focus order that disagreed with
+  the rendered order at every width under 980, where the inspector was lifted
+  with `grid-row: 1` but follows the conversation in the DOM, so a keyboard user
+  saw it first and reached it last. Both `grid-row` overrides are gone and the
+  inspector stacks below, which is the accepted cost. 330 inversions before, 0
+  after, with the 330 reproduced as a positive control by re-applying the
+  deleted declarations inline. Twelve tests, each proved to guard by its own
+  mutation (2026-08-11 — see the ledger's "The matrix that had never been run").
+  **Still open** from this bullet: animation level *Reduced* does not reach this
+  surface, believed to be the design (`motion-system.css:216` calls Performance
+  the mode "where purposeful transitions still run"), and the inconsistency that
+  makes it ambiguous lives in another track's files.
 
 ## Track 4: unified Reading workspace
 

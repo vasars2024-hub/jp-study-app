@@ -6212,3 +6212,193 @@ the branch already was"; without it the first run reads as a three-test regressi
 commit that adds two settings and twelve catalog keys. This is the third consecutive section to
 record the same three, and they should be treated as a branch-level debt item rather than
 re-investigated per commit.
+
+## The matrix that had never been run, and the three sizes and one order it found — 2026-08-11
+
+This is the last unqualified bullet in Track 3's "still required" list — *final compact-width and
+complete keyboard/reduced-motion visual matrices* — and grepping the ledger for it returns one
+line, at `2982`, saying it "also remains required". No section has ever measured it. So the
+slice is the matrix itself, and the fixes are whatever the matrix turned up.
+
+### How it was driven, and the two instruments that were wrong first
+
+`.agent-root` declares `container-type: inline-size` and every responsive rule on this surface is
+an `@container` query, not an `@media` one — correctly, because the Agent also runs inside a
+floating desktop window whose width has nothing to do with the viewport. That makes the width
+axis drivable **without touching a window**: setting `root.style.width` moves the query's own
+container. Resizing the real `.fwin` would have rewritten `desktop-layout.json` synchronously,
+which is a persisted file with no restore point on this machine.
+
+Two instruments produced a false reading before they produced a true one, and both are worth
+recording because both failed in the silent direction.
+
+**The first sweep found nothing because nothing was mounted.** Simple mode renders 245
+descendants; the composer options, the request-limit grid, the plan queue, the capability
+directory, the prompt library and the governance panel are all behind `hidden={viewMode ===
+'simple'}` or inside a closed `<details>`. A closed `<details>` measures its children at 0x0,
+and every check in this matrix — "does it overflow?", "is it 24px?" — scores 0x0 as a pass.
+Full mode plus opening all ten disclosures took the surface to **1,201 descendants**, and that
+is the tree everything below was measured against.
+
+**The focus-rule sweep reported zero rules and 56 uncovered controls.** It walked the CSSOM with
+`if (r.cssRules) { walk(...); continue; }`, and in current Chromium **every `CSSStyleRule` has a
+`cssRules` property** — an empty list, for CSS nesting. So the walk recursed into nothing and
+skipped every style rule in the document. Corrected to test `selectorText` first, the same sweep
+finds **67** focus rules. A guard that reports total failure is as untrustworthy as one that
+always passes, and this one would have produced a fabricated finding against 56 controls.
+
+### What the matrix found clean
+
+Measured at 1084 / 1000 / 979 / 900 / 820 / 760 / 700 / 640 / 600 / 520 / 460 / 420 / 380 / 340 /
+320 px, Full mode, everything expanded:
+
+| axis | result |
+| --- | --- |
+| horizontal overflow | **none at any width** — `root.scrollWidth === clientWidth` throughout |
+| clipped text | only `.agent-capability-operation code`, which is a flex item carrying `text-overflow: ellipsis` — truncation the user can see, left alone |
+| focus rings | all 57 focusables, through the app's own `html[data-display-focus="normal"] :focus-visible` |
+| positive `tabindex` | **zero** on the surface |
+| rail arrow keys | `ArrowDown`/`ArrowUp`/`End`/`Home` all move focus correctly, driven as real `keydown` events |
+| smooth scrolling | both `scrollIntoView` calls already pass an explicit non-smooth `behavior` |
+
+The container queries themselves were confirmed to fire rather than assumed: `grid-template-columns`
+reads `264px 820px` at 1084 and `600px` at 600, and the workspace collapses from `474px 300px` to
+one column at 980.
+
+### The three controls under the target-size floor
+
+WCAG 2.5.8 asks for 24x24 CSS px. Three controls were under it **at every width**, so this is not
+strictly a compact-width defect — it is one the width matrix was simply the first thing to look
+for:
+
+| control | measured | what it is |
+| --- | --- | --- |
+| `.agent-mode-select` | **94x19** | the six workflow modes — the surface's primary preset control |
+| `.agent-execution-limits summary` | **116x20** | the request-limit disclosure the cost-control slice built |
+| `.agent-plan-details summary` | **43x18** | the per-step disclosure in the plan queue |
+
+`.agent-capability-group > summary` already sits at `padding: 7px 9px` and clears the floor, so
+the pattern existed and these three had missed it. The floor is now one token,
+`--agent-hit-min: 24px` on `.agent-shell`, rather than three literals that could drift apart.
+
+**The fix deliberately does not centre the labels.** `display: flex` would have vertically centred
+them and is the obvious tidy-up, but these two summaries carry **no chevron of their own** — they
+render the UA disclosure triangle, which only exists while the element stays a `list-item`.
+Blockifying them removes the only affordance that the row expands. Both were re-measured after
+the change as `display: list-item` with `list-style-type: disclosure-open`, and a test asserts
+the absence of `display: flex` so the tidy-up cannot be applied later without failing a gate.
+
+### The focus order that disagreed with the rendered order below 980
+
+The real finding. `.agent-inspector` **follows** `.agent-conversation-main` in the DOM, and the
+narrow block lifted it with `grid-row: 1` while pushing main to `grid-row: 2`. So under 980px a
+keyboard user was shown the inspector first and reached it **last**, after tabbing the entire
+conversation and composer.
+
+Quantified as pairs where a later-in-DOM control is painted entirely above an earlier one:
+
+| width | before | after |
+| --- | --- | --- |
+| 1084, 1000 | 77 / 81 — **all cross-column**; restricted to within-column pairs, **0** | 0 |
+| 979, 900, 700, 600, 500, 420, 340 | **330** | **0** |
+
+The 330 is a positive control rather than a description. Re-applying the two deleted `grid-row`
+declarations as inline style reproduced **exactly 330 at both 900 and 500**, and removing them
+returned to 0 — so the number is the defect's signature and not an artifact of how the pairs were
+counted. The wide layout was left alone precisely because its 77 disappears under the
+within-column restriction: two side-by-side columns are not a focus-order defect.
+
+Deleting the two overrides was chosen over the alternative — moving the inspector ahead of main
+in the DOM and placing it in column 2 at wide widths — because that fixes the narrow case by
+breaking the wide one, sending focus into a secondary right-hand panel before the primary column.
+**The cost of the chosen fix is real and is accepted here rather than hidden**: at narrow widths
+the context shelf now sits below the composer, so reaching it means scrolling past the
+conversation. In exchange a narrow Agent window opens on the conversation instead of on a panel,
+and rendered order, reading order and focus order became the same list. The conversation used to
+start 252px (at 979) to 275px (at 500) below the top of the panel it was supposed to lead.
+
+### The one transition that ignored the motion slider
+
+Reduced motion was in better shape than expected: all three transitions on the surface are named
+in its `prefers-reduced-motion` block, and `:root[data-motion-mode='disabled']`'s global override
+collapses them anyway. Driven live, `data-motion-mode='disabled'` and `data-motion-snap='1'` each
+take all three to `1e-06s`.
+
+But `.agent-inspector-chevron` hard-coded `transform 140ms ease` while the other two read
+`var(--dur-fast, …)`, which the motion-velocity slider rewrites. **Measured, not reasoned**: with
+`--dur-fast` driven to `500ms`, the pre-fix literal restored on that one element stays at
+**0.14s** while the action and rail transitions go to **0.5s**; through the token it follows to
+**0.5s**. Same default, now on the same clock as everything else.
+
+One switch is still not wired to this surface and is left alone on purpose. Animation level
+**Reduced** (Motion Mode *Performance*) sets `html.reduce-motion`, which zeroes `[class*='trans-']`
+and `[class*='anim-']` utilities — classes the Agent surface does not use. `motion-system.css:216`
+states the intent directly, that Performance is the mode "where purposeful transitions still run",
+so a 140ms hover fade continuing there is the design. Recorded because the app is internally
+inconsistent about it — `.trans-*` utilities *do* collapse under Reduced — and that inconsistency
+lives in another track's files.
+
+### Gates
+
+`npx vitest run`: **511 passed / 1 skipped of 512 files**, **6,993 passed** / 6 skipped — up
+exactly 12 from the previous section's 6,981, and one file, which is this slice's test and
+nothing else. `node tools/i18n-check.cjs`: clean, **9,286** English keys translated in ja/zh/ru —
+unchanged, because this slice adds no UI text. `node tools/architecture-audit.cjs`: exit 0,
+nothing new, the same 3 known pending findings. `npx eslint` on the test file: **0 errors, 0
+warnings**.
+
+**ESLint cannot lint `agent.css` and this is not new.** It reports `Parsing error: Declaration or
+statement expected` — no CSS parser is configured in this repo's flat config. The untouched
+`agentGovernance.css` produces the identical error at line 1, which is the control that separates
+"my edit broke it" from "this gate has never applied to `.css`".
+
+### Every assertion proved to guard, by mutation
+
+Twelve tests, and the file was mutated five times to check each one fails for its own reason.
+`agent.css` was captured as bytes first and restored as bytes after; the restore compared
+**byte-identical**.
+
+| mutation | result |
+| --- | --- |
+| `--agent-hit-min` removed from `.agent-shell` | **1 failed** of 12 |
+| `grid-row: 1` reinstated in the narrow block | **1 failed** of 12 |
+| chevron returned to the `140ms` literal | **1 failed** of 12 |
+| `display: flex` added to `.agent-plan-details summary` | **1 failed** of 12 |
+| `.agent-inspector-chevron` dropped from the reduced-motion block | **1 failed** of 12 |
+
+The last one is the one worth keeping. It asserts the **set** of selectors that declare a
+transition equals the set the reduced-motion block covers, rather than a count — so a new animated
+control added to this stylesheet without a reduced-motion line fails a gate instead of quietly
+making that block stale.
+
+### Live acceptance
+
+The recorded `bridge.json` port refused connections — an unclean exit — so an instance was
+started. `/logs` reports **zero errors across the run** and **no foreign `[vite] hot updated`
+paths**, so no other track was editing the tree during the measurement.
+
+Final pass on a fresh reload, Full mode, all disclosures open, nine widths: **0 controls under
+24px, 0 overflowing elements, 0 focus-order inversions at every width**, layout `side-by-side` at
+1084/1000 and `inspector-below` from 979 down to 340. The screenshot corroborates that the wide
+layout is unchanged and that the `1 шаг` disclosure triangle survived the target-size fix.
+
+Nothing persisted was written. The view toggle and all four inspector disclosures are plain
+`useState`, `<details>` open state is DOM-only, and the two probes that did touch document state
+— `data-motion-mode`/`data-motion-snap` and an inline `--dur-fast` — were captured first and
+asserted equal to the captured values afterwards.
+
+### Still open
+
+- **Automations, and sensitive-context exclusion as a persistent setting** — both unchanged from
+  the previous section, and both still product decisions rather than missing writers.
+- **Animation level *Reduced* does not reach this surface**, as described above — believed to be
+  the design, and the inconsistency that makes it ambiguous is in another track's files.
+- **The inspector is below the composer at narrow widths.** The accepted cost of the focus-order
+  fix. If it proves to hurt discoverability the answer is a sticky collapsed header, not
+  restoring the `grid-row` swap, which would restore the defect with it.
+- **The 340 non-`agent.*` catalog keys missing at HEAD**, **`mediaCueAgentContext`'s identity
+  ignoring `mediaId`**, **the durability of the session-only activity/operation history**, and
+  **the five untracked `src/shared/i18n/*/` directories** — all unchanged.
+- **The three inherited `i18n.test.ts` hygiene failures** — unchanged, and still a branch-level
+  debt item rather than something to re-investigate per commit. This slice adds no catalog keys
+  and no new component, so it cannot have touched them.

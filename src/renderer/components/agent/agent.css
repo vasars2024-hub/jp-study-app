@@ -40,6 +40,13 @@
   --agent-accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --agent-gap: var(--space-md, 12px);
 
+  /* WCAG 2.5.8 target-size floor, stated once. Every control on this surface
+     that is not already taller than this reaches it through this token, so the
+     minimum moves in one place rather than in each rule that happened to miss
+     it. Consumers keep a `24px` fallback: three of them sit in subtrees that a
+     future pop-out could mount outside `.agent-shell`. */
+  --agent-hit-min: 24px;
+
   display: grid;
   grid-template-columns: minmax(200px, 264px) minmax(0, 1fr);
   height: 100%;
@@ -415,9 +422,13 @@
   outline-offset: 2px;
 }
 
+/* The one transition on this surface that hard-coded its timing. The other two
+   already read `--dur-fast`, which the motion-velocity slider rewrites, so this
+   chevron was the only thing here that kept design timing when a user asked the
+   app to move faster or slower. Same 140ms default, now through the token. */
 .agent-inspector-chevron {
   flex: 0 0 auto;
-  transition: transform 140ms ease;
+  transition: transform var(--dur-fast, 140ms) var(--ease-standard, ease);
 }
 
 .agent-inspector-toggle[aria-expanded='true'] .agent-inspector-chevron {
@@ -502,8 +513,18 @@
   font-size: var(--font-size-xs, 0.75rem);
 }
 
+/*
+ * `width: fit-content` shrinks the hit target to the label, and at this font
+ * size the label alone measured 43x18 — under the 24px floor. The floor goes on
+ * the block axis only, so the disclosure does not become a full-bleed click
+ * strip. Deliberately NOT `display: flex`: these two summaries carry no chevron
+ * of their own, so blockifying them would drop the UA disclosure triangle and
+ * take away the only affordance that the row expands.
+ */
 .agent-plan-details summary {
   width: fit-content;
+  min-height: var(--agent-hit-min, 24px);
+  padding-block: 3px;
   cursor: pointer;
 }
 
@@ -770,8 +791,15 @@
   align-items: center;
 }
 
+/*
+ * The six workflow modes are the surface's primary preset control, and at
+ * `padding: 1px 7px` around an 11px label it measured 94x19 — the smallest
+ * target on the surface. A select is blockified already, so the floor can be
+ * stated directly.
+ */
 .agent-mode-select {
   appearance: none;
+  min-height: var(--agent-hit-min, 24px);
   padding: 1px 7px;
   border: 1px solid var(--agent-line);
   border-radius: var(--radius-pill, 999px);
@@ -1207,8 +1235,12 @@
   padding: 6px 0;
 }
 
+/* Same floor, same reason, same refusal to blockify — see `.agent-plan-details
+   summary`. Measured 116x20 before this. */
 .agent-execution-limits summary {
   width: fit-content;
+  min-height: var(--agent-hit-min, 24px);
+  padding-block: 2px;
   cursor: pointer;
   color: var(--agent-muted);
   font-size: var(--font-size-sm, 0.8125rem);
@@ -1362,22 +1394,35 @@
   }
 }
 
-/* The inspector becomes a normal stacked disclosure before either column gets
-   cramped. Its label stays visible here, including in the collapsed state. */
+/*
+ * The inspector becomes a normal stacked disclosure before either column gets
+ * cramped. Its label stays visible here, including in the collapsed state.
+ *
+ * It stacks BELOW the conversation, and the two `grid-row` overrides that used
+ * to put it above are deliberately gone. The inspector follows
+ * `.agent-conversation-main` in the DOM, so lifting it to row 1 made the
+ * rendered order disagree with the focus order at every width under 980: a
+ * keyboard user saw the inspector first and reached it last, after tabbing the
+ * whole conversation and composer. Measured before the change, in the default
+ * collapsed-nothing state — the inspector was 240-264px tall and the
+ * conversation started 252px (at 979) to 275px (at 500) below the top of a
+ * panel it was supposed to lead. Auto-placement now follows the DOM, so
+ * rendered order, reading order and focus order are the same list.
+ *
+ * The cost is real and accepted: the context shelf is below the composer at
+ * narrow widths, so reaching it means scrolling past the conversation. That is
+ * the conventional trade for a collapsible secondary panel, and it also means a
+ * narrow Agent window opens on the conversation rather than on the inspector.
+ */
 @container (max-width: 980px) {
   .agent-conversation-workspace,
   .agent-conversation-workspace.is-inspector-collapsed {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .agent-conversation-main {
-    grid-row: 2;
-  }
-
   .agent-inspector,
   .agent-inspector.is-collapsed {
     position: static;
-    grid-row: 1;
     width: auto;
     max-width: 100%;
   }
