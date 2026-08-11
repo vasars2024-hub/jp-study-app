@@ -6992,3 +6992,12 @@ assume the number.
 
 Three path-scoped commits: **92b5f05** (the six recovered slices), **478566f** (the i18n/tools
 files HEAD was already importing) and the cover-resolution commit that carries this entry.
+
+### Post-checkpoint: the cover slice verified from its own HEAD — 2026-08-11
+
+Measured after `fe1a198` landed, in a fresh detached worktree at that commit: **9 failed files /
+46 failed tests of 481 files / 6,523 tests** — byte-for-byte the same nine files as at
+`478566f`, with 6,471 passing instead of 6,463. The slice therefore adds its 8 tests and no new
+failure from HEAD, and the "does the branch build from its own HEAD" floor is unchanged at the
+nine other-track suites named above. The four verification worktrees under `~/.claude-runs/`
+were removed afterwards; `git worktree list` is back to the pre-existing set.
