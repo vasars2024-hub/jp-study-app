@@ -6185,3 +6185,30 @@ but this lane.
 - **`mediaCueAgentContext`'s identity ignores `mediaId`** — unchanged, seventh section running.
 - **The five untracked `src/shared/i18n/*/` directories** — unchanged; one of the four gates
   still cannot run from the branch's own history because of them.
+
+### Verified in a detached worktree — 2026-08-11
+
+`d2e8664` was checked out detached and exercised there rather than trusted from the tree it was
+built in, which is what this repository requires of a reconstructed blob. The two setup steps
+are unchanged from the previous two verifications (junction `node_modules` in; copy the five
+untracked `src/shared/i18n/*/` directories in, without which `i18n-check` cannot run from a
+clean checkout at all).
+
+**The reconstructed catalogs are sound.** `node tools/i18n-check.cjs` at `d2e8664` reports
+**8,946 English keys, all translated in ja/zh/ru, exit 0** — exactly the previous commit's 8,934
+plus this slice's 12, with no other key riding along. The working tree reads 9,286; that gap is
+the other tracks' uncommitted keys, unchanged by this lane.
+
+**All six touched suites pass from the commit**, 130 tests, so the two settings, the router's
+narrowing, the bridge clamp, the panel's controls and the composer's forwarding line do not
+depend on anything left uncommitted in the working tree.
+
+**The three `i18n.test.ts` hygiene failures are still inherited.** `does not let a new block of
+English be spread into every catalog`, `does not let a new component render UI text without
+adopting i18n` and `does not let a date or time be formatted in the OS locale` fail at
+`d2e8664` — and the **identical three fail at its parent `4b7980e`**, which contains none of
+this slice. The parent run is the only thing that separates "this broke it" from "this is what
+the branch already was"; without it the first run reads as a three-test regression caused by a
+commit that adds two settings and twelve catalog keys. This is the third consecutive section to
+record the same three, and they should be treated as a branch-level debt item rather than
+re-investigated per commit.
