@@ -10536,6 +10536,22 @@ other branch is live too, not just unreachable code.
   `slideIndex`) — the same four the previous entry recorded.
 - `tsc --noEmit` was not run; it is not a gate.
 
+### And the exported tree, because the shared one cannot answer this
+
+Per the correction that closed the previous hop: a green `npx vitest run` in the shared tree is
+not evidence about the branch. Measured in `~\jp-wt-head` (clean checkout, junctioned
+`node_modules`), baseline `6bc5cdc` versus this commit `78f84ba`:
+
+| | `6bc5cdc` | `78f84ba` |
+|---|---|---|
+| passed | 6,865 | **6,877** (+12, exactly the new tests) |
+| failed | **10** | **10** |
+
+Set-differenced on `basename(file) :: fullName`: **0 new, 0 fixed**. The ten are the same foreign
+set every recent entry names — `blancAgentStepConfirmGate` (5), `i18n` (2), `localAgentQueueRun`
+(1), `novelReaderProgressGuard` (1), `architectureBaseline` (1) — and none belong to this track.
+The worktree is left checked out at `78f84ba` for the next hop.
+
 ### The probe wrote, and it was put back
 
 `desktop-layout.json` copied byte-for-byte before the run (5,508 bytes, sha256 `836E8EC0…5836` —
