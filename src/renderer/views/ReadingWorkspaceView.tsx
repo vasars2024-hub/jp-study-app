@@ -1,6 +1,7 @@
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -10,10 +11,16 @@ import type { LibraryItem } from '../../shared/types';
 import {
   READING_WORKSPACE_SECTIONS,
   readingWorkspaceSurfaceForSection,
+  type ReadingWorkspaceRoute,
   type ReadingWorkspaceSection,
 } from '../../shared/readingWorkspace';
 import Icon from '../components/Icons';
 import { useT } from '../i18n';
+import {
+  consumePendingReadingWorkspaceRoute,
+  readingWorkspaceHostForSection,
+  subscribeReadingWorkspaceRoutes,
+} from '../readingWorkspaceNavigation';
 import './readingWorkspace.css';
 
 const ReadingFinderView = lazy(() => import('./ReadingFinderView'));
@@ -52,8 +59,38 @@ export default function ReadingWorkspaceView({
   const { t } = useT();
   const [section, setSection] = useState(initialSection);
   const tabsRef = useRef<Array<HTMLButtonElement | null>>([]);
+  const routeGenerationRef = useRef(0);
 
   useEffect(() => setSection(initialSection), [initialSection]);
+
+  const applyRoute = useCallback((route: ReadingWorkspaceRoute) => {
+    const generation = routeGenerationRef.current + 1;
+    routeGenerationRef.current = generation;
+    setSection(route.section);
+
+    // Resolve identity against the current library record instead of persisting
+    // a second copy in the handoff. Progress and import metadata therefore stay
+    // owned by library.json and cannot go stale inside a deep link.
+    if (route.intent !== 'open' || !route.itemId) return;
+    void Promise.resolve(window.api.listLibrary?.() ?? [])
+      .then((items) => {
+        if (routeGenerationRef.current !== generation || !Array.isArray(items)) return;
+        const item = items.find((candidate: LibraryItem) => candidate.id === route.itemId);
+        if (item) onOpenBook(item);
+      })
+      .catch(() => undefined);
+  }, [onOpenBook]);
+
+  useEffect(() => {
+    const host = readingWorkspaceHostForSection(initialSection);
+    const unsubscribe = subscribeReadingWorkspaceRoutes(host, applyRoute);
+    const pending = consumePendingReadingWorkspaceRoute(host);
+    if (pending) applyRoute(pending);
+    return () => {
+      routeGenerationRef.current += 1;
+      unsubscribe();
+    };
+  }, [applyRoute, initialSection]);
 
   const selectByKeyboard = (
     event: KeyboardEvent<HTMLButtonElement>,

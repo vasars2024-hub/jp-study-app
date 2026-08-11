@@ -73,6 +73,11 @@ import {
 } from '../wallpaperLibrary';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
+import {
+  isReadingWorkspaceOpenDetail,
+  publishReadingWorkspaceRoute,
+  resolveReadingWorkspaceOpenRequest,
+} from '../readingWorkspaceNavigation';
 
 type WinSection =
   | 'agent'
@@ -1167,7 +1172,22 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   };
 
   useEffect(() => {
-    const h = (e: Event) => openRef.current((e as CustomEvent<WinSection>).detail);
+    const h = (e: Event) => {
+      const detail = (e as CustomEvent<unknown>).detail;
+      const readingRequest = resolveReadingWorkspaceOpenRequest(detail);
+      if (readingRequest) {
+        // Publish before opening: a mounted host receives the route now; a lazy
+        // host consumes the retained handoff after its first render.
+        publishReadingWorkspaceRoute(readingRequest.route);
+        openRef.current(readingRequest.host);
+        return;
+      }
+      // A Reading-shaped handoff that failed schema validation is not a
+      // desktop window id. Ignore it rather than mounting an object/string as a
+      // section and leaving behind an empty persisted window.
+      if (isReadingWorkspaceOpenDetail(detail)) return;
+      openRef.current(detail as WinSection);
+    };
     window.addEventListener('os:open', h);
     return () => window.removeEventListener('os:open', h);
   }, []);

@@ -4,6 +4,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CATALOGS } from '../../shared/i18n/catalogs/all';
+import { READING_WORKSPACE_SCHEMA_VERSION } from '../../shared/readingWorkspace';
+import type { LibraryItem } from '../../shared/types';
 
 vi.mock('../i18n', () => ({
   useT: () => ({ t: (key: string) => key }),
@@ -26,11 +28,17 @@ vi.mock('../views/NovelsView', () => ({
 }));
 
 import ReadingWorkspaceView from '../views/ReadingWorkspaceView';
+import {
+  consumePendingReadingWorkspaceRoute,
+  publishReadingWorkspaceRoute,
+} from '../readingWorkspaceNavigation';
 
 let host: HTMLDivElement;
 let root: Root;
+let originalApiDescriptor: PropertyDescriptor | undefined;
 
 beforeEach(() => {
+  originalApiDescriptor = Object.getOwnPropertyDescriptor(window, 'api');
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   host = document.createElement('div');
   document.body.append(host);
@@ -40,13 +48,23 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  consumePendingReadingWorkspaceRoute('reading');
+  consumePendingReadingWorkspaceRoute('novels');
+  if (originalApiDescriptor) {
+    Object.defineProperty(window, 'api', originalApiDescriptor);
+  } else {
+    delete (window as unknown as { api?: unknown }).api;
+  }
 });
 
-async function render(initialSection: 'discover' | 'plan' = 'discover') {
+async function render(
+  initialSection: 'discover' | 'plan' = 'discover',
+  onOpenBook: (item: LibraryItem) => void = () => undefined,
+) {
   await act(async () => {
     root.render(createElement(ReadingWorkspaceView, {
       initialSection,
-      onOpenBook: () => undefined,
+      onOpenBook,
     }));
     await Promise.resolve();
   });
@@ -126,6 +144,43 @@ describe('ReadingWorkspaceView', () => {
 
     await act(async () => tab('continue').click());
     expect(host.querySelector('[data-surface="finder"]')?.getAttribute('data-mode')).toBe('continue');
+  });
+
+  it('consumes a route retained while its lazy desktop host was opening', async () => {
+    publishReadingWorkspaceRoute({
+      version: READING_WORKSPACE_SCHEMA_VERSION,
+      section: 'imports',
+      intent: 'import',
+    });
+    await render('plan');
+
+    expect(host.querySelector('[data-reading-section="imports"]')).not.toBeNull();
+    expect(host.querySelector('[data-surface="novels"]')?.getAttribute('data-mode')).toBe('imports');
+  });
+
+  it('responds to a deep link while mounted and opens its current library item', async () => {
+    const item = { id: 'book-1', title: '本', kind: 'book', createdAt: 1 } as LibraryItem;
+    const onOpenBook = vi.fn();
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { listLibrary: vi.fn().mockResolvedValue([item]) },
+    });
+    await render('discover', onOpenBook);
+
+    await act(async () => {
+      publishReadingWorkspaceRoute({
+        version: READING_WORKSPACE_SCHEMA_VERSION,
+        section: 'library',
+        intent: 'open',
+        workId: 'work-1',
+        editionId: 'edition-1',
+        itemId: 'book-1',
+      });
+      await Promise.resolve();
+    });
+
+    expect(host.querySelector('[data-reading-section="library"]')).not.toBeNull();
+    expect(onOpenBook).toHaveBeenCalledWith(item);
   });
 
   it('supports roving arrow, Home, and End keyboard navigation', async () => {

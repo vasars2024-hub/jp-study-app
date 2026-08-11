@@ -7279,3 +7279,133 @@ redo it. Tracks 5-9 and the fresh Main V1 audit remain after Track 4; do not adv
 ### Checkpoint
 
 One path-scoped commit: see the commit that carries this entry.
+
+
+## A route contract that finally routes — 2026-08-11
+
+State was re-derived from source before anything was written: there is no boss-audit file, this
+file's last section still placed Main V1 in **Track 4**, and the plan's dependency order still
+makes Blanc and Aero ineligible. The exact next action-host slice is already being changed by a
+concurrent track: `ReadingUnifiedDiscovery.tsx`, `ReadingFinderContent.tsx` and
+`NovelsContent.tsx` were all foreign-dirty, with a new untracked Discover host utility and
+tests in the shared worktree. Those files were not overwritten. The adjacent final Track 4
+bullet — preserved plans/imports/progress/deep links — was re-derived instead.
+
+### The dead contract
+
+The route vocabulary looked complete: `SECTION_ALIASES` mapped
+`reading-finder` / `readingfinder` to Discover,
+`normalizeReadingWorkspaceRoute` accepted typed objects and
+`reading://workspace/...`, serialization round-tripped every identity field, and tests
+covered all of that. But production had **zero callers** of either normalization or
+serialization. `DesktopShell` cast every `os:open` detail straight to `WinSection`,
+and `ReadingWorkspaceView` knew only its hard-coded initial section. The compatibility
+aliases and versioned deep links were therefore library code, not a feature.
+
+### What now carries a handoff
+
+`renderer/readingWorkspaceNavigation.ts` is the renderer-side boundary:
+
+- legacy Finder names, versioned `reading:` URLs and typed route objects normalize through
+  the existing shared contract;
+- ordinary desktop ids (`reading`, `novels`, `library`) are deliberately not
+  stolen from their compatibility windows;
+- Home/Discover/Library/Continue routes open the retained Reading host, while
+  Plan/Imports/Sources routes open the retained Novels host;
+- a one-route pending slot per host closes the event-before-lazy-mount race, while mounted
+  hosts receive the route directly;
+- Reading-shaped values that fail schema validation are refused rather than being persisted as
+  an object or URL-shaped empty desktop window.
+
+`ReadingWorkspaceView` subscribes to its host, consumes a pending route on mount and changes
+to the exact section. An `open` route with `itemId` resolves that id against the current
+`library.json` projection before calling the existing reader handoff. The route carries
+identity, never a stale duplicate of progress or import metadata.
+
+Sixteen focused tests cover both the pure boundary and the mounted workspace: legacy aliases,
+ordinary-id non-interception, URL identity preservation, host choice, lazy consumption,
+mounted delivery, malformed/future-version refusal, exact section transitions and current-item
+opening.
+
+### Gates
+
+- `npx vitest run`: **522 passed / 1 skipped of 523 files**, **7,107 passed / 6 skipped of
+  7,113 tests**.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending
+  findings.
+- `npx eslint <five touched paths>`: **0 errors**. The four warnings are pre-existing
+  foreign work in `DesktopShell.tsx` (`snapValue`, two `_desktopIndex` parameters
+  and `slideIndex`); the other four touched paths pass with
+  `--max-warnings 0`.
+- `node tools/i18n-check.cjs`: **not green in this worker environment**. Its esbuild child
+  is denied when it probes an ancestor outside the workspace and then reports that the existing,
+  directly readable `catalogs/all.ts` cannot be resolved. Retrying from the repo root and
+  the catalogs directory produced the same access-denied failure. No UI string was added; the
+  full suite's `src/shared/__tests__/i18n.test.ts` passed all 21 tests. This is recorded as
+  an infrastructure-blocked gate, not misreported as a pass.
+- `tsc --noEmit` was not run; it is not a gate in this repo.
+
+### Live Electron acceptance
+
+Driven through the authenticated debug bridge in the running Russian app, never mouse/keyboard
+automation and never Computer Use.
+
+The preload API is immutable, so an attempted no-op replacement of
+`desktopCommitLayout` correctly refused before any event was sent. The real persistence
+path was then handled with the shell's own 200 ms debounce: each probe installed a DOM observer,
+dispatched the route, recorded the rendered transition, and reloaded immediately when the
+target appeared. Reload destroys the pending renderer timer before it can invoke main. A full
+`desktopGetLayout` JSON snapshot was captured before each sequence and compared after the
+reload.
+
+- Existing Novels host: `plan -> sources -> imports` from a versioned URL and then a typed
+  object. A version-99 object was refused, the fake-window count stayed **9**, and no empty
+  window appeared.
+- Former Finder alias: `os:open('reading-finder')` mounted a tenth temporary window titled
+  **Поиск чтения** at `data-reading-section="discover"`.
+- Both probes compared the complete desktop snapshot **byte-for-byte equal** after reload
+  (including every window, z value and layout epoch), then restored the initial **9 windows**,
+  the mounted Novels host at **plan**, and the original empty `window.name`.
+- `/logs?level=error`: **0 entries**. No persisted setting, window layout or storage API
+  value changed.
+
+The first observer attempt after HMR intentionally did not count as acceptance: Fast Refresh
+had preserved the old empty-dependency event listener. Its safety reload also compared the
+desktop snapshot equal. The two passing sequences above ran only after that reload installed
+the new production handler.
+
+### Shared-tree staging note
+
+`DesktopShell.tsx` already carried a large foreign diff before this slice. Only this
+slice's import and guarded `os:open` handler will be staged from a HEAD-plus-this-edit blob;
+the foreign worktree hunks remain unstaged and untouched. The other four code/test paths and
+this ledger were clean/new for this slice.
+
+### Intended checkpoint snapshot
+
+Because this worker could not write Git metadata, the would-be commit was reconstructed in a
+temporary tree as **HEAD plus only these six paths**, with the repository's `node_modules`
+junctioned in and every foreign DesktopShell hunk excluded. The two focused files pass
+**16/16 tests** there. Its full suite reports **9 failed files / 46 failed tests, 475 passed
+files / 6,528 passed tests**: the same established clean-HEAD set from earlier ledger entries
+(`scraperQbittorrent`, `architectureBaseline`, `credentialRegistry`, `i18n`,
+`agentContextSuggestions`, `agentNavigationIndexMirror`,
+`blancAgentStepConfirmGate`, `localAgentQueueRun`,
+`novelReaderProgressGuard`). No new failing file belongs to this slice.
+
+### Still open in Track 4
+
+The concurrent action-host work must be re-derived after it lands; do not assume its dirty
+Discover/Finder/Novels implementation is complete. Saved-plan, generated-import and progress
+preservation still deserve one explicit integration proof across restart, while the deep-link
+half is now wired and live-verified. Track 5 and later, Blanc and Aero remain ineligible.
+
+### Checkpoint
+
+**Not created by this worker.** The session exposes `.git` read-only: `git add` failed
+before staging anything because Git could not create `.git/index.lock` (permission denied).
+The normal sandboxed shell could not provide an alternate path because its required
+`codex-windows-sandbox-setup.exe` helper is missing. All six paths remain as unstaged
+worktree changes. A relay with Git write access should stage the four clean/new code/test paths and this
+ledger normally, reconstruct `DesktopShell.tsx` as HEAD plus only the import/handler above,
+verify that snapshot, and create the required path-scoped checkpoint.
