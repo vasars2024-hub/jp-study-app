@@ -7691,3 +7691,86 @@ are this session's own edits propagating to importers of `coverArt`, not a forei
   clean.
 
 Track 5 and later, Blanc and Aero remain ineligible.
+
+
+## The fallback that stopped every uncovered book looking the same — 2026-08-11
+
+State was re-derived from source, not from the relay summary. The boss-audit file still does not
+exist. The dependency order remains on Track 4, and the final ledger section's only adjacent,
+decision-free gap was real: ReadingUnifiedDiscovery still rendered the same novels icon for every
+entry whose local/remote cover resolver returned null. The concurrent action-host work in that
+component is still uncommitted and was treated as foreign from the first status check.
+
+### What changed
+
+The discovery card now paints coverFallbackImage(result.entry.work.title) on its cover frame.
+A provider image, when one survives the existing CSP and negative-cache resolver, paints above that
+background; an entry without usable art leaves the deterministic title-derived gradient visible.
+The generic novels icon is gone from this cover branch. This reuses the Library's established
+fallback generator, adds no UI string, does not download anything, and does not change the existing
+remote-art privacy, disk-ownership or eviction boundary.
+
+renderer/__tests__/readingDiscoveryCoverFallback.test.ts holds the component seam: the shared
+fallback must be imported and wired to the entry title, optional provider art must remain optional,
+and the generic-icon branch may not return. As a negative control, the background wiring was
+temporarily removed; the new test failed 1/1 on that assertion, then the line was restored and the
+focused cover suite passed 3 files / 22 tests.
+
+### Required gates
+
+- npx vitest run: **524 passed / 1 skipped of 525 files**, **7,128 passed / 6 skipped of
+  7,134 tests**.
+- node tools/i18n-check.cjs: **exit 0**, all 9,299 English keys translated in ja/zh/ru. The
+  first invocation from the restricted Node fallback hit the known esbuild parent-directory ACL
+  artifact before catalog evaluation. The exact command was rerun with a temporary R: mapping
+  whose root was this workspace, passed, and the mapping was removed and verified absent.
+- node tools/architecture-audit.cjs: **exit 0**, 1,700 modules, nothing new, the same 3 known
+  pending findings.
+- npx eslint --max-warnings 0 on the component and the new test: **0 errors, 0 warnings**.
+- tsc --noEmit was not run; it is not a gate in this repository.
+
+### Live Electron acceptance
+
+Driven through the authenticated debug bridge against the running Russian app, never mouse or
+keyboard automation and never Computer Use. The renderer was reloaded first and became ready at
+**19 .os-set-nav-item elements**. A transient Reading Discover route was opened through the
+existing os:open contract, its controlled query was set to news, and the localized Search control
+ran the real provider pipeline.
+
+Library, local catalogue, Jiten and Reading Finder all settled succeeded with counts
+**0 / 1 / 0 / 2**. The three resulting uncovered cards — NHK News Web Easy, Todaii / Easy
+Japanese, and クライマーズ・ハイ — each had a non-empty computed linear-gradient(...), all
+three gradients were distinct, every cover contained **0 images**, and every cover contained
+**0 generic icon nodes**. /logs?level=error was 0 before and after. The transient Reading window
+was closed after the probe; the taskbar returned from ten windows to the original nine, with no
+Reading surface left mounted. No storage API, userData file or persisted setting was touched, and
+no probe global was created.
+
+### Shared-tree and checkpoint boundary
+
+ReadingUnifiedDiscovery.tsx was already dirty with another track's action-host work. Its
+checkpoint blob must therefore be reconstructed as **HEAD plus only the fallback import/markup
+change**; the working copy keeps the foreign action-host hunks exactly as found. The new test and
+this ledger were clean/new for this slice and can be staged directly. The temporary local
+sandbox-helper copy used while diagnosing the broken shell wrapper was removed before any source
+edit and was never staged.
+
+The path-scoped checkpoint was attempted. The reconstructed HEAD-plus-fallback content hashes
+successfully with git hash-object --stdin, but adding that object with -w fails:
+**insufficient permission for adding an object to repository database .git/objects**. Git's index
+remained empty, so there is no partial checkpoint or foreign staged path. A Git-writable relay must
+write that reconstructed component blob, stage the new test and this ledger, test the resulting
+commit in a detached worktree, and then create the checkpoint.
+
+### Track 4 disposition and next slice
+
+This closes bullet 5's designed-fallback requirement and therefore the remaining decision-free
+Track 4 implementation. Caching art for unplanned discovery results through main remains
+deliberately unbuilt: doing so requires a disk owner, retention duration and eviction policy.
+Likewise, repairing the four cross-wired importedLibraryItemId values in the user's jiten.json
+remains a user-data/product decision, not a migration to guess. The identical-branch ternary at
+shared/jiten.ts:343 remains harmless behind downstream validation and belongs with the foreign
+dirty work already in that file.
+
+The next eligible dependency-order stage is **Track 5, ReadingLens as Capture and Read**. Re-derive
+its first open slice from source and live behavior; do not jump to Blanc or Aero.

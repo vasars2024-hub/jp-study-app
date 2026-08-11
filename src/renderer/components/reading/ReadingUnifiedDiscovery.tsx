@@ -14,6 +14,7 @@ import {
   createReadingDiscoveryProviders,
   readingDiscoveryCoverUrl,
 } from '../../readingDiscoveryProviders';
+import { coverFallbackImage } from '../../utils/coverArt';
 import { useT } from '../../i18n';
 import Icon from '../Icons';
 import './readingUnifiedDiscovery.css';
@@ -186,10 +187,12 @@ export default function ReadingUnifiedDiscovery({
               data-recommendation-score={result.recommendation?.score}
               data-recommendation-reasons={result.recommendation?.reasons.join(' ')}
             >
-              <div className="reading-unified-card-cover" aria-hidden="true">
-                {coverUrl
-                  ? <img src={coverUrl} alt="" />
-                  : <Icon name="novels" size={24} />}
+              <div
+                className="reading-unified-card-cover"
+                aria-hidden="true"
+                style={{ backgroundImage: coverFallbackImage(result.entry.work.title) }}
+              >
+                {coverUrl ? <img src={coverUrl} alt="" /> : null}
               </div>
               <div className="reading-unified-card-copy">
                 <span className="reading-unified-meta">
