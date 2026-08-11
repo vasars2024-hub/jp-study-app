@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import {
   confirmDialog,
   AppChrome,
@@ -32,7 +39,7 @@ import {
   effectiveLevelEstimate,
   levelSortKey,
 } from '../../shared/libraryLevel';
-import { coverStyleFor } from '../utils/coverArt';
+import { useCoverArt } from '../utils/coverArt';
 import { takeHandoff } from '../pendingHandoff';
 
 interface Props {
@@ -974,7 +981,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                       }}
                     >
                       <span className="aero-library-title-cell">
-                        <span className="aero-library-thumb" style={coverStyle(it)} />
+                        <CoverThumb item={it} />
                         <span title={it.title}>{it.title}</span>
                       </span>
                       <span>
@@ -997,10 +1004,9 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
             <div className="aero-library-pane-title">{t('library.inspector.details')}</div>
             {selectedItem ? (
               <>
-                <div className="aero-library-preview" style={coverStyle(selectedItem)}>
-                  {!selectedItem.coverPath && <span>{selectedItem.title}</span>}
+                <CoverPreview item={selectedItem}>
                   <CoverLevelBadge estimate={bookLevels[selectedItem.id]} t={t} lang={lang} />
-                </div>
+                </CoverPreview>
                 <h3 title={selectedItem.title}>{selectedItem.title}</h3>
                 <dl className="aero-library-meta">
                   <div>
@@ -1295,8 +1301,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                   e.dataTransfer.effectAllowed = 'move';
                 }}
               >
-                <div className="cover" style={coverStyle(it)}>
-                  {!it.coverPath && <span className="cover-title">{it.title}</span>}
+                <CoverCard item={it}>
                   <span className="kind-badge">
                     {it.kind === 'book' ? t('library.kind.book') : t('library.kind.manga')}
                   </span>
@@ -1400,7 +1405,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                       )}
                     </div>
                   )}
-                </div>
+                </CoverCard>
                 <div className="card-title" title={it.title}>
                   {it.title}
                 </div>
@@ -1459,8 +1464,37 @@ function libraryKindLabel(
   return it.epubFile?.toLowerCase().endsWith('.pdf') ? t('library.kind.pdf') : t('library.kind.epub');
 }
 
-function coverStyle(it: LibraryItem): CSSProperties {
-  return coverStyleFor(it.title, it.coverPath, it.id);
+/**
+ * The three places a library cover is painted, each resolving through
+ * `useCoverArt` so a recorded-but-missing file degrades to the designed
+ * gradient — and, where there is room for it, to the title — instead of an
+ * empty bordered box. `data-cover` is what a live probe reads to tell an
+ * item that has art from one that only claims to.
+ */
+function CoverCard({ item, children }: { item: LibraryItem; children: ReactNode }) {
+  const { style, hasArt, resolution } = useCoverArt(item.title, item.coverPath, item.id);
+  return (
+    <div className="cover" style={style} data-cover={resolution}>
+      {!hasArt && <span className="cover-title">{item.title}</span>}
+      {children}
+    </div>
+  );
+}
+
+function CoverPreview({ item, children }: { item: LibraryItem; children: ReactNode }) {
+  const { style, hasArt, resolution } = useCoverArt(item.title, item.coverPath, item.id);
+  return (
+    <div className="aero-library-preview" style={style} data-cover={resolution}>
+      {!hasArt && <span>{item.title}</span>}
+      {children}
+    </div>
+  );
+}
+
+/** The compact-list thumbnail: too small for a title, so gradient-only. */
+function CoverThumb({ item }: { item: LibraryItem }) {
+  const { style, resolution } = useCoverArt(item.title, item.coverPath, item.id);
+  return <span className="aero-library-thumb" style={style} data-cover={resolution} />;
 }
 
 /** Bottom-right JLPT/HSK badge on a book cover; flashes once when it first appears. */

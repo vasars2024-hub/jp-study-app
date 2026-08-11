@@ -6881,3 +6881,114 @@ update. git diff --cached --name-only remains empty. The next repository-writabl
 reconstruct the earlier discovery-only Finder/ledger blobs rather than staging their foreign
 hunks wholesale, then include this ranking extension in the same coherent discovery checkpoint
 or in an immediately following path-scoped checkpoint.
+
+## The six slices that had nowhere to be written, and the import HEAD never got — 2026-08-11
+
+This worker has repository write, which the previous several did not. That changed what the
+useful work was. The ledger's final section and the plan's dependency order were re-read from
+source first: Main V1 is still in Track 4, Blanc remains ineligible.
+
+### Six implemented slices were one `git clean` from gone
+
+Every section from "The subtitle that belonged to two shows" onward closed with "No checkpoint
+commit exists" — six slices of implemented, gated, live-verified Track 3/4 work sitting in the
+working tree because `.git/objects` was read-only in those workers. `git hash-object -w` here
+returned an object and exit 0, so they are now commit **92b5f05**.
+
+The scope was derived, not assumed. Files touched after 826dc85's 08:54 timestamp are the six
+slices; files last written on 08-04 through 08-06 (`readingFetch.ts`, `readingSites.ts`,
+`ReadingFinderContent.tsx`, `NovelsContent.tsx`, the four i18n catalogs, `styles.css`) belong to
+a different concurrent track and were left exactly as found — which also means the one new key
+that track needs, `reading.controls.lastSwept`, was deliberately not committed with it. Every
+i18n key the six slices actually use was verified present in all four catalogs **at HEAD**, not
+merely in the working tree: 47 keys checked, 0 missing. `AppSection.tsx`, `NovelsView.tsx` and
+`ReadingFinderView.tsx` carried no foreign hunks, so a plain `git add` was correct for them.
+
+### The branch does not build from its own HEAD — and this time it was measured
+
+The ledger records that sentence three times without anyone measuring it. Measured here: a
+detached worktree at **826dc85** fails **57 test files / 192 tests**, and every resolve error
+names one of three imports.
+
+The cause is a split-brain commit from a concurrent track. HEAD's own
+`src/shared/i18n/catalogs/{en,ja,zh,ru}.ts` import `../gameArena/en`, `../mooncapLore/en`,
+`../miningUi/en`, `../malSync/en` and `../scraperUi/en`; those five directories were never
+committed. HEAD's own committed `src/shared/__tests__/i18n.test.ts` likewise reads
+`tools/i18n-untranslated-baseline.json` and requires `tools/i18n-hardcoded-check.cjs`, neither
+tracked. The importing half shipped; the imported half sat untracked.
+
+Commit **478566f** adds exactly those files, byte-identical to the working tree — nothing
+edited, nothing moved, no other track's dirty path touched (re-verified afterwards: all eight
+foreign paths still show the same status they had at session start, and `git diff` against the
+committed blobs is empty). Their exports match HEAD's import list one for one and they import
+nothing beyond `../core` and their own `./phase`.
+
+Re-measured in a fresh detached worktree at 478566f: **9 failed files / 46 failed tests**, zero
+resolve errors. The residual 9 belong to other tracks and were deliberately left — they need
+`credential.gemini.*` catalog keys, a `Lockscreen.tsx` locale-arg baseline entry, and
+architecture/agent-queue/shell-handoff state that lives in those tracks' own uncommitted work.
+`tools/.tmp-vn-wire.cjs` was left untracked; it reads as scratch.
+
+### Covers resolve to the designed fallback instead of a blank box
+
+Track 4's plan asks for "cached local art -> validated remote art -> designed fallback, with
+failure/negative caching". Only the two ends existed. `coverStyleFor` returned *either* a
+`media://` background image *or* the title gradient, never both, and a background image has no
+error event — so when the file behind a recorded `coverPath` went away, the card painted
+nothing. LibraryView made it worse by drawing the title only when `coverPath` was **absent**, so
+an item whose art was merely broken lost its title too and rendered as an unlabelled rectangle.
+
+`utils/coverArt.ts` now layers the art *over* the fallback, so a cover that fails to paint
+reveals the gradient without anyone probing anything. On top of that, `probeCover` validates
+each distinct URL once per session through an `Image` — the same request the background makes,
+so a success is served from the renderer's own image cache rather than doubling the read — and
+`useCoverArt` demotes the card to `data-cover="fallback"` with its title drawn. Failures are
+cached and successes are not: a missing cover is repaired by re-importing, which would outlive a
+persisted "broken" verdict, while a virtual list re-mounting the same broken card must not
+re-request it. The three LibraryView paint sites (grid card, inspector preview, compact-list
+thumbnail) all resolve through it. This slice adds no UI copy.
+
+### Gates and live Electron acceptance
+
+- Full `npx vitest run`: **516 passed / 1 skipped of 518 files**, **7,024 passed / 6 skipped of
+  7,031 tests**. The single failure was `scraperSources.test.ts` with
+  `ENOTEMPTY: rmdir .../scraper` — a temp-dir cleanup race under parallel load, which passed
+  13/13 on isolated re-run and had passed in this session's earlier full run.
+- New `coverArtResolution.test.ts`: 8/8, covering the layering, the fallback determinism, the
+  known-broken drop-out, single-flight sharing, and that success is *not* cached.
+- `node tools/i18n-check.cjs`: exit 0, all 9,286 English keys translated.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- `npx eslint --max-warnings 0` on the touched paths: 0 errors. The only warning is the
+  pre-existing `BookOcrPanel` named-as-default import on an untouched line.
+
+Live acceptance used the running Russian Electron app through the authenticated debug bridge,
+never mouse or keyboard automation. Across 24 rendered library covers, **every one** carried the
+new `data-cover` attribute: 22 `art`, 2 `fallback`, 0 missing. An `art` cover's computed
+`background-image` was
+`url("media://078d8fa0-.../cover.jpeg"), linear-gradient(135deg, rgb(45,100,118), rgb(23,27,69))`
+— both layers present, which is the whole fix. The two `fallback` covers (木村宗喜,
+アレン・K・オノ) drew their titles over distinct deterministic gradients.
+
+The middle link was proved against the real protocol handler rather than a mock: two `Image`
+loads in the live renderer, one at an existing `media://` cover and one at a deleted-file path
+under the same owner id, settled `load` and `error` respectively. That `error` is exactly what
+`imageLoader` resolves false on and what the negative cache keys. The probe global was deleted
+and verified gone. No window was moved, no persisted setting or storage API was touched, and the
+bridge error log stayed at 0 entries.
+
+### Still open
+
+Track 4 is not complete. Remaining: the cover-first Library grid with a strong compact list and
+contextual detail drawer (the covers now resolve honestly, but the dense three-pane table is
+still the primary shape), Jiten metadata/cover auto-resolution with its API key moved into the
+credential vault, the unified action set, and preserved plans/imports/progress/deep-links. Tracks
+5-9 and the fresh Main V1 audit remain after Track 4; do not advance to Blanc.
+
+The nine other-track failures from HEAD are now the honest floor for "does the branch build from
+its own HEAD". They are not Main V1's to fix, but the next worker should re-measure rather than
+assume the number.
+
+### Checkpoint
+
+Three path-scoped commits: **92b5f05** (the six recovered slices), **478566f** (the i18n/tools
+files HEAD was already importing) and the cover-resolution commit that carries this entry.
