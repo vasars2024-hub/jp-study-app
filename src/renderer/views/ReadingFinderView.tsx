@@ -23,14 +23,23 @@ import {
 } from '../components/reading/ReadingFinderContent';
 import type { LibraryItem } from '../../shared/types';
 import { useT } from '../i18n';
+import ReadingUnifiedDiscovery from '../components/reading/ReadingUnifiedDiscovery';
 
-export default function ReadingFinderView({ onOpenBook }: { onOpenBook: (item: LibraryItem) => void }) {
+export type ReadingFinderMode = 'home' | 'discover' | 'continue';
+
+export default function ReadingFinderView({
+  onOpenBook,
+  mode = 'discover',
+}: {
+  onOpenBook: (item: LibraryItem) => void;
+  mode?: ReadingFinderMode;
+}) {
   const { t } = useT();
   const aero = useAeroMaterials();
   const state = useReadingFinder();
   const { query, setQuery, levels, list, continueReading, selected, setSelected, surpriseMe, resetFilters, showAdult, setShowAdult } = state;
 
-  const menus: MenuBarMenu[] = [
+  const menus: MenuBarMenu[] = mode === 'discover' ? [
     {
       id: 'file',
       label: t('reading.menu.file'),
@@ -51,41 +60,60 @@ export default function ReadingFinderView({ onOpenBook }: { onOpenBook: (item: L
         },
       ],
     },
-  ];
+  ] : [];
 
   const status = (
     <>
-      <StatusBarField>{t('reading.count', { count: list.length })}</StatusBarField>
-      {continueReading.length > 0 && (
+      {mode === 'discover' && <StatusBarField>{t('reading.count', { count: list.length })}</StatusBarField>}
+      {mode !== 'discover' && (
         <StatusBarField>{t('reading.continue.count', { count: continueReading.length })}</StatusBarField>
       )}
       <StatusBarSpacer />
-      <StatusBarField>{t('reading.meta.level')}: {levelRangeLabel([...levels].length ? [...levels] : ALL_LEVELS)}</StatusBarField>
+      {mode === 'discover' && (
+        <StatusBarField>{t('reading.meta.level')}: {levelRangeLabel([...levels].length ? [...levels] : ALL_LEVELS)}</StatusBarField>
+      )}
     </>
   );
 
   return (
     <AppChrome menus={menus} status={status} className="aero-reading-chrome">
-      <div className={`rf-view${aero ? ' aero-reading' : ''}`}>
-        <div className="view-head">
-          <h1>{t('reading.title')}</h1>
-          <p className="muted">{t('reading.intro')}</p>
-        </div>
+      <div className={`rf-view rf-view-${mode}${aero ? ' aero-reading' : ''}`} data-reading-finder-mode={mode}>
+        {mode !== 'continue' && (
+          <div className="view-head">
+            <h1>{t('reading.title')}</h1>
+            <p className="muted">{t('reading.intro')}</p>
+          </div>
+        )}
 
-        {continueReading.length > 0 && (
+        {mode !== 'discover' && (
           <section className="rf-continue">
             <h2>{t('reading.continue.title')}</h2>
-            <ContinueReadingRow state={state} onOpenBook={onOpenBook} />
+            {continueReading.length > 0 ? (
+              <ContinueReadingRow state={state} onOpenBook={onOpenBook} />
+            ) : (
+              <div className="res-empty muted" aria-live="polite">
+                {t('reading.continue.count', { count: 0 })}
+              </div>
+            )}
           </section>
         )}
 
-        <ReadingFinderControls state={state} />
+        {mode === 'discover' && <ReadingFinderControls state={state} />}
 
-        <div className="gram-count muted">{t('reading.count', { count: list.length })}</div>
+        {mode === 'discover' && (
+          <div className="gram-count muted">{t('reading.count', { count: list.length })}</div>
+        )}
 
-        <ReadingSiteGrid state={state} />
+        {mode === 'discover' && (query.trim() ? (
+          <ReadingUnifiedDiscovery
+            query={query}
+            sites={list}
+            onOpenBook={onOpenBook}
+            onSelectSite={setSelected}
+          />
+        ) : <ReadingSiteGrid state={state} />)}
 
-        {selected && (
+        {mode === 'discover' && selected && (
           <ReadingSiteDetail site={selected} onClose={() => setSelected(null)} onOpenBook={onOpenBook} />
         )}
       </div>

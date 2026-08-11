@@ -32,6 +32,23 @@ export const READING_WORKSPACE_SECTIONS = [
 ] as const;
 export type ReadingWorkspaceSection = (typeof READING_WORKSPACE_SECTIONS)[number];
 
+/**
+ * The retained surface that currently owns each workspace destination.
+ *
+ * Keeping this mapping beside the route vocabulary prevents the two legacy
+ * desktop aliases from growing their own, contradictory navigation rules
+ * while the destination-specific workspace panels converge incrementally.
+ */
+export type ReadingWorkspaceSurface = 'finder' | 'library' | 'novels';
+
+export function readingWorkspaceSurfaceForSection(
+  section: ReadingWorkspaceSection,
+): ReadingWorkspaceSurface {
+  if (section === 'library') return 'library';
+  if (section === 'plan' || section === 'imports' || section === 'sources') return 'novels';
+  return 'finder';
+}
+
 export const READING_WORKSPACE_INTENTS = [
   'browse',
   'open',

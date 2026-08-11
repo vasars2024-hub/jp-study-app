@@ -511,6 +511,27 @@ describe('media cue as session-only context', () => {
     expect(wrapped?.id).toBe(folded?.id);
   });
 
+  it('keeps the same common subtitle in different media items as separate context', () => {
+    const first = createAgentContextItem(mediaCueAgentContext(LINE, SCENE, 'show-1', NOW));
+    const second = createAgentContextItem(mediaCueAgentContext(LINE, SCENE, 'show-2', NOW));
+    const rewind = createAgentContextItem(mediaCueAgentContext(LINE, SCENE, '  show-1  ', NOW + 1));
+
+    expect(first?.id).not.toBe(second?.id);
+    expect(rewind?.id).toBe(first?.id);
+    expect(rewind?.source.entityId).toBe('show-1');
+  });
+
+  it('namespaces a cue even when its player has no stable media id', () => {
+    const cue = createAgentContextItem(mediaCueAgentContext(LINE, SCENE, undefined, NOW));
+    const legacyLineOnly = createAgentContextItem({
+      ...mediaCueAgentContext(LINE, SCENE, undefined, NOW),
+      identity: LINE,
+    });
+
+    expect(cue?.id).not.toBe(legacyLineOnly?.id);
+    expect(cue?.source).toEqual({ app: 'media' });
+  });
+
   it('falls back to the line when the scene is empty, and never to an empty preview', () => {
     expect(createAgentContextItem(mediaCueAgentContext(LINE, '   ', 'ep-3', NOW))?.preview).toBe(LINE);
   });

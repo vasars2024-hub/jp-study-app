@@ -8,6 +8,7 @@ import {
   normalizeReadingWorkspaceLibrary,
   normalizeReadingWorkspaceRoute,
   readingWorkspaceEntryFromLibraryItem,
+  readingWorkspaceSurfaceForSection,
   routeForReadingWorkspaceEntry,
   serializeReadingWorkspaceRoute,
   type ReadingWorkspaceEntry,
@@ -44,6 +45,16 @@ describe('Reading workspace routes', () => {
     });
     expect(normalizeReadingWorkspaceRoute('reading')).toMatchObject({ section: 'discover' });
     expect(normalizeReadingWorkspaceRoute('novels')).toMatchObject({ section: 'plan' });
+  });
+
+  it('maps every workspace destination onto its retained production surface', () => {
+    expect(readingWorkspaceSurfaceForSection('home')).toBe('finder');
+    expect(readingWorkspaceSurfaceForSection('discover')).toBe('finder');
+    expect(readingWorkspaceSurfaceForSection('continue')).toBe('finder');
+    expect(readingWorkspaceSurfaceForSection('library')).toBe('library');
+    expect(readingWorkspaceSurfaceForSection('plan')).toBe('novels');
+    expect(readingWorkspaceSurfaceForSection('imports')).toBe('novels');
+    expect(readingWorkspaceSurfaceForSection('sources')).toBe('novels');
   });
 
   it('round-trips an encoded deep link with all identity fields', () => {

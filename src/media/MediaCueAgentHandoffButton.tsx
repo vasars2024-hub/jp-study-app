@@ -23,13 +23,11 @@
  *   renders surrounding Japanese.
  * - **No `entityId`.** `VideoCoreMiningSource.mediaId` is an AniList id;
  *   `MediaStudyMode`, the other `media-cue` producer, discloses a media-library
- *   item id. A shelf id is `kind:identity` and `media-cue` keys on the line alone,
- *   so the same line watched through both surfaces is one entry — and an id from
- *   whichever namespace happened to be last would be provenance that is wrong
- *   rather than merely absent. The show is still named: it titles the conversation,
- *   exactly as `MediaStudyMode` titles it. (That the two producers share one shelf
- *   id at all is the pre-existing looseness the evidence ledger records against
- *   `mediaCueAgentContext`; this deliberately does not widen it.)
+ *   item id. Passing one namespace as the other would be false provenance. The
+ *   producer still namespaces this anonymous cue, so it cannot replace a cue
+ *   carrying the library id; it simply makes no stronger identity claim than the
+ *   data this component has. The show is still named in the conversation title,
+ *   exactly as `MediaStudyMode` titles it.
  */
 
 import { useState } from 'react';

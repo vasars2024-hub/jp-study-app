@@ -6402,3 +6402,482 @@ asserted equal to the captured values afterwards.
 - **The three inherited `i18n.test.ts` hygiene failures** — unchanged, and still a branch-level
   debt item rather than something to re-investigate per commit. This slice adds no catalog keys
   and no new component, so it cannot have touched them.
+
+## The subtitle that belonged to two shows — 2026-08-11
+
+The relay hint was stale by seven ledger sections: the screenshot/OCR attachment lane and all
+three picture-producing gestures were already implemented, committed and verified. The literal
+last ledger section instead closed Track 3's compact-width, keyboard and reduced-motion matrix.
+Its remaining unqualified, decision-free defect was the line repeated there through seven
+sections: `mediaCueAgentContext` carried `source.entityId` but left that media id out of the
+identity from which the shelf id is made.
+
+### The collision was in the source contract, not the shelf
+
+`createAgentContextItem` hashes a personal context producer's `identity` into
+`media-cue:<opaque hash>`, and `attachAgentContext` retains one entry per id. The producer used
+only the whitespace-normalized subtitle line as that identity. Therefore 「行ってきます」 in
+two different shows produced the same id; the later gesture replaced the earlier item and made
+the shelf disclose the later show's `source.entityId`. Common short lines are the high-frequency
+case, not an edge fixture.
+
+This context is already refused retention (`media-cue` floors at `personal`), so correcting
+its id has no persisted-workspace migration. The identity is now a collision-safe tuple:
+`media\0<normalized media id>\0<normalized line>`. The producer marker also moves the player
+case, which truthfully has no stable library entity id, out of the old unnamespaced line-only
+space. Its source remains exactly `{ app: 'media' }`; the AniList id available in that player
+must not be presented as the media-library id used by the other producer. The separator is an
+escaped `\u0000` in source, not a raw NUL byte.
+
+Two tests hold the new rules: the same common line in `show-1` and `show-2` has different ids,
+while a whitespace-padded `show-1` rewinds to the first id; an anonymous player cue is
+namespaced but invents no `entityId`. The pre-existing hard-line-break test still proves SRT/ASS
+wrapping deduplicates against its folded form.
+
+### Gates and live Electron acceptance
+
+- Focused Vitest: `agentContextHandoff.test.ts`, **58 passed**.
+- Full `npx vitest run` equivalent invocation: **511 passed / 1 skipped of 512 files**,
+  **6,995 passed / 6 skipped** — exactly two tests above the previous section.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- ESLint on all three touched code/test paths: exit 0. The test file reports four
+  `no-non-null-assertion` warnings at its pre-existing later tests; linting the exact HEAD blob
+  through stdin reports the identical four warnings (21 lines earlier), proving this slice added
+  0 errors and 0 warnings.
+- The literal `node tools/i18n-check.cjs` was attempted twice and could not start its catalog
+  build: this worker's Windows sandbox denies esbuild's parent-directory probe and then reports
+  the existing `catalogs/all.ts` as unresolved. A temporary Vitest parity probe ran the check's
+  exact three predicates against the same aggregate and baseline through Vite's working
+  transformer: **9,286 English keys**, 0 missing, 0 orphaned and 0 newly untranslated in
+  ja/zh/ru. The probe file was removed and verified absent. This slice adds no UI text.
+
+Live acceptance used the already-running Electron app through the debug bridge only. A first
+dynamic import correctly exposed a stale Vite module instance by reproducing the old collision;
+it was not accepted as evidence. Cache-busted imports of the real
+`agentContextHandoff.ts` and `agentContext.ts` then returned:
+
+| probe | result |
+| --- | --- |
+| same line, `show-1` vs `show-2` | distinct ids |
+| same line, `show-1` vs whitespace-padded `show-1` | identical ids |
+| wrapped cue vs folded cue | identical ids |
+| anonymous player cue | distinct namespaced id, source exactly `{ app: 'media' }` |
+| `/logs?level=error` | 0 entries |
+
+The temporary renderer probe property was deleted after each pass. No storage API or persisted
+setting was touched.
+
+### Still open
+
+Track 3's remaining items are product decisions rather than missing writers: automation authority
+is frozen at creation time; a persistent sensitive-context exclusion must define precedence with
+the per-request consent checkbox; activity/operation-history durability is unsettled; and the
+Performance/Reduced motion-mode intent is ambiguous outside this surface. This slice does not
+force any of those. With the adjacent decision-free identity defect closed, the next source-derived
+work remains inside Main V1: reconcile the first incomplete requirement in dependency-order
+Track 4, the unified Reading workspace. Blanc is not yet eligible.
+
+## One Reading door, seven destinations — 2026-08-11
+
+The source-derived next slice was Track 4, not the relay's already-complete screenshot/OCR
+hint. The existing `readingWorkspace.ts` was a safe route and card contract only: the desktop's
+`reading` section still mounted Reading Finder, while `novels` mounted an unrelated Novels
+window. Therefore the first Track 4 requirement — one coherent Home / Discover / Library /
+Continue / Plan / Imports / Sources flow — had no rendered owner.
+
+### What now has one owner
+
+`ReadingWorkspaceView` is the first rendered owner of the contract's seven destinations. Both
+legacy desktop sections now enter that shell: Reading lands on Discover and Novels lands on
+Plan. One explicit mapping keeps the retained production surfaces honest during convergence:
+Home/Discover/Continue use Finder, Library uses Library, and Plan/Imports/Sources use Novels.
+The mapping lives beside the route vocabulary rather than in two shell branches, and every
+destination remains reachable without changing the dirty Finder, Novels or Library owners.
+
+The navigation is a compact Fluent tab strip with standard vector icons, localized labels,
+horizontal overflow at compact widths, a single selected tab stop, and ArrowLeft/ArrowRight/
+Home/End movement. The workspace adds no large internal title; its scoped CSS removes Finder's
+redundant heading because the window and selected destination already identify the surface.
+There is no transition to suppress in reduced-motion mode.
+
+No UI string was added. The shell reuses seven existing keys, and a focused test asserts each
+one exists in all four catalogs. Five renderer tests cover both compatibility landings, all
+seven destinations, retained-surface switching, roving keyboard focus and label coverage. The
+shared contract test pins every destination-to-surface mapping.
+
+### Gates and live Electron acceptance
+
+- Focused Vitest: **2 files / 15 tests passed**.
+- Full `npx vitest run`: **512 passed / 1 skipped of 513 files**,
+  **7,001 passed / 6 skipped of 7,007 tests**.
+- Touched-path ESLint: exit 0, no warnings or errors.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- The literal `node tools/i18n-check.cjs` was attempted twice after the code landed. As in the
+  preceding ledger slice, this worker's Windows environment denies esbuild's parent-directory
+  probe and then reports the existing `catalogs/all.ts` as unresolved before evaluating a
+  catalog. The full `i18n.test.ts` suite passed inside the 7,001-test run, including missing,
+  orphaned, untranslated and hardcoded-string checks; the new focused four-catalog label test
+  also passed. This slice adds no catalog key or literal UI message.
+
+Live acceptance ran in the already-running Russian Electron app at 1280×860, only through the
+debug bridge. After a renderer reload, the real open Novels window showed the unified shell with
+seven Russian labels, Plan selected, one tab stop and the real Novels catalogue beneath it. A
+non-persistent cache-busted `AppSection` mount proved the other compatibility branch: section
+`reading` selected Discover and mounted the real Finder. The temporary mount then exercised:
+
+| probe | observed result |
+| --- | --- |
+| Library tab | selected Library and rendered the real 24-item library |
+| keyboard from Discover + ArrowRight | focus and selection moved to Library |
+| accessibility relation | panel labelled by the selected tab id |
+| compact host, 560×620 | tab strip 560px client / 775px scroll width, one row; panel 560px client / 560px scroll width |
+| motion | selected-tab computed transition duration `0s` |
+| hierarchy | redundant Finder `h1` computed `display: none` |
+| `/logs?level=error` | 0 entries |
+
+The visual review found the inherited Finder heading redundant and removed it within this shell;
+the repeated screenshot then showed the compact tab strip and cover-first Finder grid without a
+second internal title. The probe root and every probe global were deleted, and the real Novels
+window was restored to Plan. No storage API or persisted setting was touched.
+
+### Still open
+
+This is a convergence shell, not completion of Track 4. Home, Discover and Continue currently
+share Finder; Plan, Imports and Sources currently share Novels. The next decision-free slice is
+still the first Track 4 requirement: make those destinations consume their route intent rather
+than act as aliases, beginning with dedicated Home/Continue composition and explicit Imports/
+Sources modes from the retained bodies. After that come unified search/ranking, the cover-first
+Library/detail drawer, cover resolution, Jiten credential cleanup and the preserved deep-link/
+progress/import behaviors listed later in Track 4. Blanc remains ineligible.
+
+Checkpoint note: this worker could not create the required path-scoped commit because the
+environment mounts `.git` read-only. `git add` failed creating `.git/index.lock`, and the
+safer staged-blob path failed writing `.git/objects`; both reported `Permission denied`. The
+index remained empty. The verified slice and this ledger entry remain in the working tree for
+the next worker with repository-write permission to checkpoint without staging foreign paths.
+
+## Reading destinations consume their intent — 2026-08-11
+
+The ledger's final section, checked against the Track 4 source, remained authoritative: the
+screenshot/OCR Agent context from the relay hint was already complete, while Home, Discover and
+Continue still rendered one undifferentiated Finder body. This slice completed the first
+decision-free part of the recorded next step. Blanc remains ineligible because Main V1 Track 4
+and the later dependency tracks are still open.
+
+### Destination-specific Finder composition
+
+`ReadingFinderView` now accepts an explicit `home | discover | continue` mode while retaining
+Discover as the compatibility default. The unified workspace supplies that mode from its
+selected destination:
+
+- Discover owns the site catalogue, filters, search, result count, detail dialog and Finder
+  menu commands.
+- Home is a compact overview: the localized Finder introduction plus real resumable reading.
+- Continue is a dedicated resume list without catalogue controls, site results or the Finder
+  introduction.
+
+Home and Continue report the existing localized in-progress count in the status bar and reuse
+that same localized zero-count form as their empty state, so no UI key or raw literal was added.
+Both destination panels have a shell-scoped scroll container and 12px/16px content inset. That
+inset was added only after live visual review exposed the legacy edge-to-edge Finder body
+clipping the Continue heading and first card at the left window edge.
+
+Six workspace tests now pin the distinct Finder mode passed by all three destinations. Three
+additional renderer tests mount the production Finder body with an in-progress web-library
+item and prove that Discover alone renders catalogue controls/results, Home renders its intro
+and resume card, and Continue renders only the resume composition. The legacy standalone Finder
+continues to default to Discover.
+
+### Gates and live Electron acceptance
+
+- Focused Vitest after the final CSS fix: **2 files / 9 tests passed**.
+- Final full `npx vitest run`: **513 passed / 1 skipped of 514 files**,
+  **7,005 passed / 6 skipped of 7,011 tests**.
+- Touched-path ESLint: exit 0, no warnings or errors.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- The literal `node tools/i18n-check.cjs` was run on the final source and failed before catalog
+  evaluation with this worker's documented Windows esbuild sandbox fault: parent-directory
+  `../..` access denied, followed by `catalogs/all.ts` unresolved. The full Vitest run passed
+  the repository i18n coverage; this slice changes no catalog and adds no literal UI message.
+
+Live acceptance used the already-running Russian Electron app at 1280×860, driven only through
+the authenticated debug bridge. The bridge log contained HMR only for this slice's Reading
+paths and no foreign live edit. Home selected `Главная`, carried mode `home`, showed the real
+localized introduction and two real resume cards, and contained neither `.rf-controls` nor the
+site catalogue. Continue selected `Продолжить чтение`, carried mode `continue`, and settled to
+the same two 29%/47% One Punch-Man entries without the intro, filters or catalogue.
+
+The final geometry pass measured a 1226×655 panel with `padding: 12px 16px 16px`; the first
+220×68 resume card began at x=35 while the panel began at x=19. There was no document overflow.
+The isolated bridge screenshot at
+`debug/shots/win1-1786430928864.png` visually confirms the heading and both cards are fully
+inset, with no large duplicate title. `/logs?level=error` returned 0 entries. Isolation changed
+only temporary inline DOM styles: all nine exact style attributes were restored, both probe
+globals were deleted, no window remained hidden, and the real Novels window was returned to
+Plan. No storage API or persisted setting was touched.
+
+### Still open
+
+Track 4 is not complete. The next decision-free slice is the other half of the prior ledger's
+destination convergence step: make Imports and Sources explicit modes of the retained Novels
+body instead of aliases of Plan. After that remain unified cross-source search/ranking, the
+cover-first Library/detail drawer, cover resolution, Jiten credential cleanup, and the preserved
+deep-link/progress/import behavior named in the plan. Tracks 5–9 and the fresh Main V1 audit also
+remain; do not advance to Blanc.
+
+Checkpoint note: the required exact-path checkpoint was attempted for the six Reading/ledger
+paths above. `git add -- <paths>` failed because this worker's environment cannot create
+`.git/index.lock` (`Permission denied`). `git diff --cached --name-only` remained empty, so no
+partial index state needs cleanup. The verified work remains in the shared working tree for the
+next worker with repository-write permission; do not stage unrelated dirty paths with it.
+
+## Imports and Sources consume their intent — 2026-08-11
+
+The ledger's final section and the plan's dependency order were re-read from source before work
+began. Main V1 remains in Track 4: the screenshot/OCR Agent slice was already complete, and the
+other half of the Reading destination-convergence step was still open. Blanc therefore remains
+ineligible.
+
+### Destination-specific Novels composition
+
+`ReadingWorkspaceView` now passes an explicit `plan | imports | sources` intent into the retained
+Novels body. `NovelsView` keeps Plan as its standalone compatibility default and derives the
+existing catalogue state from the selected destination without adding persistence or another
+source of truth:
+
+- Plan enables planned-only results with the full import filter.
+- Imports enables planned-only results and the existing `not-imported` filter, making the queue
+  actionable instead of repeating Plan.
+- Sources opens the existing source-profile editor and removes the unrelated catalogue table,
+  inspector, search commands and filter controls from that composition.
+
+The Sources body is a centered, scrollable 720px editor beneath the seven-destination strip. A
+first live visual pass caught the retained Novels toolbar leaving an empty row with duplicate
+Plan/Sources controls; the final source omits that toolbar in Sources mode. No new UI string or
+catalog key was added. One new two-test renderer suite pins the state policy and dedicated
+Sources composition, and the workspace suite now proves all three Novels intents are passed
+rather than aliased.
+
+### Gates and live Electron acceptance
+
+- Focused Vitest on the final source: **2 files / 9 tests passed**.
+- Final full `npx vitest run`: **514 passed / 1 skipped of 515 files**,
+  **7,008 passed / 6 skipped of 7,014 tests**.
+- Touched TS/TSX ESLint: exit 0, no warnings or errors. (The repository ESLint parser does not
+  accept CSS as an input, so the touched scoped stylesheet was not passed to it.)
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- The literal `node tools/i18n-check.cjs` was run twice, including on the final source, and failed
+  before catalog evaluation with the already-recorded Windows esbuild fault: parent-directory
+  `../..` access denied and `catalogs/all.ts` unresolved. The full Vitest run passed the repo's
+  i18n coverage, and this slice adds no UI message.
+
+Live acceptance used the already-running Russian Electron app at 1280x860, driven only through
+the authenticated debug bridge. Imports selected `Импорт`, carried mode `imports`, set the
+seven existing filters to `All / All / All / all / not-imported / all / difficulty`, and showed
+one real pending planned title with the table and inspector present. Sources selected
+`Источники`, carried mode `sources`, showed the three real source profiles in a 720px editor,
+and contained no catalogue table, inspector, catalogue toolbar or visible filter labels. The
+document and 1226px workspace panel had zero horizontal overflow.
+
+The isolated final bridge screenshot at `debug/shots/win1-1786431964929.png` visually confirms
+that the source editor begins directly below the compact workspace tabs, remains centered, and
+has no duplicate large title or empty command strip. `/logs?level=error` returned 0 entries.
+Isolation changed only temporary inline DOM styles: all eight exact style attributes were
+restored, the probe global was deleted, no internal window remained hidden, and the real Novels
+window returned to Plan. No storage API or persisted setting was touched.
+
+### Still open
+
+Track 4 is not complete. Source inspection still shows three separate discovery systems: Finder
+owns curated sites/web material, Novels owns local/Jiten candidates, and Library owns imported
+books. The next decision-free slice is the plan's unified cross-source search/ranking step:
+define one typed result contract and aggregate the existing local Library, local/Jiten and
+curated-site providers behind one cancellable query while preserving their current actions and
+source attribution. After that remain ranking by learner/history signals, the cover-first
+Library/detail drawer, cover resolution, Jiten credential cleanup, and the preserved deep-link,
+progress and import behaviors. Tracks 5-9 and the fresh Main V1 audit also remain; do not advance
+to Blanc.
+
+Checkpoint note: the required exact-path checkpoint was attempted first with only the brand-new
+`src/renderer/__tests__/novelsViewModes.test.ts`, before any dirty path could be staged. Git could
+not create `.git/index.lock` (`Permission denied`). `git diff --cached --name-only` was empty both
+before and after, so no partial index state exists. The verified Main V1 Reading work remains in
+the shared working tree for the next repository-writable worker; reconstruct dirty files rather
+than staging their foreign hunks wholesale.
+
+## Reading discovery crosses its source boundaries — 2026-08-11
+
+The ledger's final section and the plan's dependency order were re-read from source before work
+began. Main V1 remains in Track 4: screenshot/OCR attachment context and destination convergence
+were already complete, while the decision-free cross-source discovery step was still open.
+Blanc therefore remains ineligible.
+
+### One typed, cancellable query
+
+Discover now consumes the existing `ReadingWorkspaceEntry` card contract through one
+provider-attributed execution lifecycle. Four production adapters participate in a single
+explicit query:
+
+- the current Library snapshot, normalized by the retained Library -> Reading adapter;
+- the local novels catalogue;
+- Jiten's existing credential-vault-backed IPC search;
+- the currently filtered curated-site catalogue.
+
+Results retain their owning source and action instead of being flattened into anonymous text.
+Library entries still open the retained reader, curated sites still open the retained site
+detail, external catalogue links still use the protected external opener, and Jiten results
+without a usable link hand back to the retained Plan surface. The initial deterministic ordering
+is textual relevance, then provider priority, then title/key. This is intentionally not a claim
+that learner/history ranking is complete.
+
+The search starts only from the localized Search button. Typing does not transmit partial terms
+to Jiten. One `AbortController` owns the complete lifecycle; providers that honor the signal
+stop directly, while already-issued Electron IPC is detached by an abort race so a late Jiten
+response cannot mutate a cancelled or newer query. Provider failure remains isolated and partial
+results stay usable.
+
+No new UI copy or catalog key was added. The surface reuses existing localized Unified Search,
+Library, Jiten, Reading Finder, action and status messages in all four languages.
+
+### Gates and live Electron acceptance
+
+- Focused final Vitest: **3 files / 9 tests passed**.
+- Final full `npx vitest run`: **516 passed / 1 skipped of 517 files**,
+  **7,014 passed / 6 skipped of 7,020 tests**.
+- Touched TS/TSX ESLint with `--max-warnings 0`: exit 0, no warnings or errors.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- The literal `node tools/i18n-check.cjs` reproduced the already-recorded Windows esbuild
+  failure before catalog evaluation: parent-directory `../..` access denied and
+  `catalogs/all.ts` unresolved. The full suite's i18n source/copy coverage passed, and this
+  slice adds no UI message.
+
+Live acceptance used the already-running Russian Electron app at 1280x860, driven only through
+the authenticated debug bridge. `Kokoro` completed all four real providers and returned one
+local-catalogue plus nine Jiten entries. `悪の教典` returned two real Library items, one local
+catalogue item and one Jiten item; the cards retained separate `Открыть` and
+`Открыть источник` actions. A cancellation issued while Jiten was running completed with
+Library/local/site succeeded and Jiten cancelled; the same query then reran to four successful
+providers. `news` returned two curated sites plus one local catalogue match, and the NHK
+result opened the retained site detail with its `Открыть сайт` action.
+
+The 1226px Reading panel had zero horizontal overflow. Four result cards were equal-width
+300.5px columns and none crossed the panel bounds. Visual inspection caught local Library cover
+paths being sent to Chromium directly; the final source reuses the existing
+`media://<itemId>/<relative-cover>` route. Both real Library covers then completed at
+708x1024, the Jiten cover completed at 255x400, and the result grid had 0 broken images. The
+isolated final bridge screenshot at `debug/shots/win1-1786433775912.png` visually confirms
+the loaded covers, compact provider-status strip, source-labelled cards, localized actions and
+clean empty space below the result grid. The first capture exposed the focused Agent window
+rather than Reading; the final capture hid the other eight internal windows only through
+temporary inline DOM styles. All nine exact style
+attributes were restored, the probe global was deleted, no internal window remained hidden,
+and the real Novels window returned to Plan. No storage API or persisted setting was touched.
+`/logs?level=error` returned 0 entries.
+
+### Still open
+
+Track 4 is not complete. The next step is ranking/recommendation by learner and history signals:
+difficulty/level fit, known vocabulary, interests, availability/source quality, and reading
+history must refine the now-shared query without obscuring source attribution or action
+ownership. After that remain the cover-first Library/detail drawer, cover resolution and
+negative caching, Jiten credential cleanup, and the preserved deep-link, progress and import
+behaviors. Tracks 5-9 and the fresh Main V1 audit also remain; do not advance to Blanc.
+
+### Checkpoint
+
+The exact eight-path checkpoint was prepared with six brand-new paths plus reconstructed
+`HEAD + this slice` blobs for the already-dirty Finder view and evidence ledger. Git failed
+on the first object write before any index update: `insufficient permission for adding an
+object to repository database .git/objects`. `git diff --cached --name-only` was empty
+after the failure, so no partial staged state exists. The verified slice remains in the shared
+working tree for the next repository-writable worker. Stage the six new paths directly; rebuild
+the Finder and ledger blobs rather than staging their foreign hunks wholesale.
+
+## Discovery learns from the library without inventing a profile — 2026-08-11
+
+The ledger's final section and the plan's dependency order were re-read from source before work
+began. Main V1 remains in Track 4 and Blanc remains ineligible. The preceding cross-source
+discovery slice was still present exactly where its checkpoint note said it was, and its focused
+3-file / 9-test gate reproduced before this work began. Git object storage is still read-only in
+this worker, so that slice could not be checkpointed first; a one-line git hash-object probe
+failed before an index update with "insufficient permission for adding an object to repository
+database .git/objects", and the index stayed empty.
+
+### The recommendation is derived, not another setting
+
+The shared query now derives one ReadingDiscoveryLearnerContext from the retained Library
+snapshot already required by the Library provider. It creates no second preference document and
+touches no storage:
+
+- in-progress and completed entries supply recency-weighted reading history;
+- their analyzed level and known-word coverage supply the target fit;
+- when no reading history exists yet, analyzed unstarted records supply only that level/coverage
+  fallback, not a fictional interest;
+- retained tags (currently chiefly the user's Library folders) supply weighted interests;
+- recent work ids make a current reading distinguishable from an anonymous readable file.
+
+Each result receives a deterministic 0–100 recommendation and reason codes for continuation,
+level fit, known-vocabulary fit, interest match, immediate availability and trusted provenance.
+Availability and source quality participate directly; a completed work is demoted, while an
+in-progress local work is promoted. Text relevance deliberately remains the first sort key: a
+learner-fit heuristic may refine equal query matches, but it may not put a weak body match ahead
+of the exact title the user asked for. Provider identity and the provider-owned action remain on
+the original result.
+
+The renderer loads the Library once per submitted query, derives the context, and gives the same
+settled promise to the Library provider. It never doubles the IPC read. A generation token makes
+a late Library/context preflight inert after cancellation, unmount or query replacement. Cards
+show the score through the already-translated mediaWorkspace.study.matchScore message in all
+four languages, so this slice adds no UI copy; source labels and Open/Open source actions remain
+separate. Reason codes and the exact score are also exposed as card data attributes for
+deterministic live inspection.
+
+### Gates and live Electron acceptance
+
+- Focused final Vitest: **3 files / 12 tests passed** (7 shared discovery tests after the final
+  fallback case, 2 provider tests, 3 Finder-mode tests).
+- Final full npx vitest run: **516 passed / 1 skipped of 517 files**,
+  **7,017 passed / 6 skipped of 7,023 tests**.
+- Touched TS/TSX ESLint with --max-warnings 0: exit 0, no warnings or errors. CSS is outside
+  this repository's ESLint parser and was not passed as TypeScript.
+- node tools/architecture-audit.cjs: exit 0, nothing new, the same 3 known pending findings.
+- The literal node tools/i18n-check.cjs reproduced the already-recorded Windows esbuild
+  failure before catalog evaluation: parent-directory ../.. access denied and
+  catalogs/all.ts unresolved. This slice adds no message and reuses an existing translated
+  key verified in all four catalogs.
+
+Live acceptance used the running Russian Electron app at 1280x860, driven only through the
+authenticated debug bridge. The transient Reading window searched 悪の教典; Library,
+local catalogue, Jiten and curated sites all completed successfully with counts 2/1/1/0.
+The local and Jiten exact-title cards retained their separate source labels and Open source
+actions at 50. Both in-progress Library copies retained Open actions and scored 100 with
+available-now, trusted-source, continue-reading, level-fit and known-vocabulary-fit reasons.
+That live ordering also proves the load-bearing search rule: the exact external titles remained
+ahead of the prefix-matched Library titles even though the latter had the stronger learner score.
+
+The 782px discovery surface had zero horizontal overflow; all four cards stayed inside its
+bounds at two equal 387px columns. Both media:// Library covers completed at 708px natural
+width and the Jiten cover at 255px; no image remained broken after load. The isolated screenshot
+at debug/shots/win1-1786434582537.png shows the localized match score beside, not instead of,
+each source label. Ten internal windows were isolated only with temporary inline styles; every
+exact style attribute was restored, the probe global was deleted, zero windows remained hidden,
+and the transient Reading window was closed to return the desktop from ten windows to its prior
+nine. No persisted setting or storage API was touched. The bridge error log remained at 0.
+
+### Still open
+
+Track 4 is not complete. The shared query now uses every learner/history signal its card contract
+actually carries; richer explicit interests would be a product/profile decision, not a
+decision-free excuse to invent storage here. Next remain the cover-first Library with compact
+list and contextual detail drawer, complete cover resolution/negative caching, Jiten credential
+cleanup, and preserved deep-link, progress and import behaviors. Tracks 5-9 and the fresh Main
+V1 audit remain after Track 4; do not advance to Blanc.
+
+### Checkpoint
+
+No checkpoint commit exists. Repository metadata is read-only in this worker: the final
+git hash-object probe failed with the same .git/objects permission error before any index
+update. git diff --cached --name-only remains empty. The next repository-writable worker must
+reconstruct the earlier discovery-only Finder/ledger blobs rather than staging their foreign
+hunks wholesale, then include this ranking extension in the same coherent discovery checkpoint
+or in an immediately following path-scoped checkpoint.

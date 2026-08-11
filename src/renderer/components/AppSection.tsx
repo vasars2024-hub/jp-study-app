@@ -8,7 +8,7 @@ const ReadingGarden = lazy(() => import('./reading-garden/ReadingGarden'));
 
 const AgentWorkspaceShell = lazy(() => import('./agent/AgentWorkspaceShell'));
 const LibraryView = lazy(() => import('../views/LibraryView'));
-const NovelsView = lazy(() => import('../views/NovelsView'));
+const ReadingWorkspaceView = lazy(() => import('../views/ReadingWorkspaceView'));
 const MediaCenterView = lazy(() => import('../views/MediaCenterView'));
 // Retained as an exported compatibility surface for older deep links and
 // recovery callers. Primary player/video routes intentionally use MediaCenter.
@@ -25,7 +25,6 @@ const StatisticsView = lazy(() => import('../views/StatisticsView'));
 const ResourcesView = lazy(() => import('../views/ResourcesView'));
 const ImmersionView = lazy(() => import('../views/ImmersionView'));
 const CalendarView = lazy(() => import('../views/CalendarView'));
-const ReadingFinderView = lazy(() => import('../views/ReadingFinderView'));
 const YouTubePlaylistsView = lazy(() => import('../views/YouTubePlaylistsView'));
 const SettingsApp = lazy(() => import('./settings/SettingsApp'));
 
@@ -68,7 +67,7 @@ export default function AppSection({
       view = <LibraryView onOpen={onOpenBook} />;
       break;
     case 'novels':
-      view = <NovelsView />;
+      view = <ReadingWorkspaceView initialSection="plan" onOpenBook={onOpenBook} />;
       break;
     case 'player':
       // All Media entry points open the same shell. The shell owns local-library
@@ -128,7 +127,7 @@ export default function AppSection({
       view = <CalendarView />;
       break;
     case 'reading':
-      view = <ReadingFinderView onOpenBook={onOpenBook} />;
+      view = <ReadingWorkspaceView initialSection="discover" onOpenBook={onOpenBook} />;
       break;
     default:
       view = null;
