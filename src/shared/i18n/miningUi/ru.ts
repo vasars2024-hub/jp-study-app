@@ -1,0 +1,122 @@
+// Dictionary / mining UI chrome — Russian. See ./en.ts for the F7 note.
+//
+// The two `{count}` keys take CLDR plural objects; everything else is fixed
+// copy. ../core.ts:97 keys plural selection off `vars.count` specifically, so
+// `{mapped}`/`{total}` stay a plain string.
+import type { Catalog } from '../core';
+
+export const MINING_UI_RU: Catalog = {
+  'dict.view.menu.view': 'Вид',
+  'dict.view.menu.ja': 'Японский',
+  'dict.view.menu.zh': 'Китайский',
+  'dict.view.status.ja': 'Японский',
+  'dict.view.status.zh': 'Китайский',
+  'dict.view.source.ja': 'JMdict / Jisho',
+  'dict.view.source.zh': 'CC-CEDICT',
+  'dict.view.desc.ja': 'Поиск по японскому или английскому — на основе Jisho (JMdict).',
+  'dict.view.desc.zh': 'Поиск по китайскому или английскому — офлайн, на основе CC-CEDICT.',
+  'dict.view.placeholder.ja': 'Введите слово, например 食べる или «eat»…',
+  'dict.view.placeholder.zh': 'Введите слово, например 你好 или «hello»…',
+  'dict.view.search': 'Искать',
+  'dict.view.hint.ja':
+    'Совет: во время чтения книги выделите любое слово, чтобы сразу посмотреть его в словаре. Нажмите звёздочку у результата, чтобы сохранить его в карточки.',
+  'dict.view.hint.zh':
+    'Офлайновый китайско-английский словарь (CC-CEDICT). В результатах показывается пиньинь с тоновыми знаками. Выделите слово при чтении, чтобы найти его, или нажмите звёздочку, чтобы сохранить в карточки.',
+
+  'cardPreview.frameTitle': 'Предпросмотр стороны карточки',
+  'cardPreview.label': 'Предпросмотр карточки',
+  'cardPreview.empty': 'Настройте соответствие полей, чтобы увидеть, как будут выглядеть карточки.',
+  'cardPreview.profileHint': '{label} — {front} спереди / {back} сзади',
+  'cardPreview.fallbackToggle': 'Запасной вариант с выражением',
+  'cardPreview.front': 'Лицевая',
+  'cardPreview.back': 'Оборотная',
+  'cardPreview.hint':
+    'Примерное содержимое для этого профиля. В добытых карточках используются актуальные данные словаря и Tatoeba.',
+
+  'jiten.mining.title': 'Добыча лексики из Jiten',
+  'jiten.mining.desc': 'Добывайте медиа-колоду Jiten прямо в локальную библиотеку карточек.',
+  'jiten.mining.refresh': 'Обновить',
+  'jiten.mining.empty':
+    'Сначала запланируйте тайтл Jiten в разделе «Романы», затем вернитесь сюда, чтобы добыть его колоду.',
+  'jiten.mining.plannedTitle': 'Запланированный тайтл',
+  'jiten.mining.deckScope': 'Охват колоды',
+  'jiten.mining.cardOrder': 'Порядок карточек',
+  'jiten.mining.minOccurrences': 'Минимум вхождений',
+  'jiten.mining.maxOccurrences': 'Максимум вхождений',
+  'jiten.mining.noLimit': 'Без ограничения',
+  'jiten.mining.topWords': 'Первые N слов',
+  'jiten.mining.targetCoverage': 'Целевое покрытие, %',
+  'jiten.mining.excludeKana': 'Исключить слова только из каны',
+  'jiten.mining.skipExamples': 'Пропускать примеры предложений',
+  'jiten.mining.unknownDifficulty': 'Сложность неизвестна',
+  'jiten.mining.noTags': 'Нет тегов Jiten',
+  'jiten.mining.downloading': 'Загрузка колоды',
+  'jiten.mining.mine': 'Добыть лексику Jiten',
+  'jiten.mining.importedCount': {
+    one: 'В последнем импорте {count} карта.',
+    few: 'В последнем импорте {count} карты.',
+    many: 'В последнем импорте {count} карт.',
+    other: 'В последнем импорте {count} карты.',
+  },
+  'jiten.mining.saved': {
+    one: 'Сохранена {count} карта Jiten для «{title}».',
+    few: 'Сохранено {count} карты Jiten для «{title}».',
+    many: 'Сохранено {count} карт Jiten для «{title}».',
+    other: 'Сохранено {count} карты Jiten для «{title}».',
+  },
+  'jiten.mining.err.noDeck': 'Jiten не вернул колоду.',
+  'jiten.mining.err.noCards': 'В колоде Jiten не нашлось пригодных карточек.',
+
+  'jiten.downloadType.1': 'Вся колода',
+  'jiten.downloadType.2': 'Частотные слова (общая частота)',
+  'jiten.downloadType.3': 'Частотные слова (частота в колоде)',
+  'jiten.downloadType.4': 'Частотные слова (по порядку появления)',
+  'jiten.downloadType.5': 'Целевое покрытие, %',
+  'jiten.downloadType.6': 'По числу вхождений',
+  'jiten.order.1': 'По порядку появления',
+  'jiten.order.2': 'Общая частота',
+  'jiten.order.3': 'Частота в колоде',
+  'jiten.order.4': 'Порядок импорта',
+  'jiten.order.5': 'Случайный',
+
+  'fm.section.templates': 'Шаблоны полей',
+  'fm.summary.mapped': 'Сопоставлено полей: {mapped} из {total}',
+  'fm.lead.templates':
+    'Каждому полю Anki задаётся шаблон из переменных. Выберите поле, затем возьмите переменную из палитры ниже.',
+  'fm.placeholder.auto': 'Оставьте пустым для автоматического сопоставления',
+  'fm.btn.saving': 'Сохранение…',
+  'fm.btn.save': 'Сохранить соответствие',
+  'fm.btn.saved': 'Сохранено',
+  'fm.btn.reset': 'Вернуть автоматическое',
+  'fm.section.palette': 'Палитра переменных',
+  'fm.summary.palette': 'Вставка {placeholders} в поля',
+  'fm.lead.palette.before': 'Выберите поле выше, затем нажмите на тег. Языковые суффиксы вроде',
+  'fm.lead.palette.after':
+    'определяют, каким переводом заполнить это поле Anki — это отдельно от направления языка выше.',
+  'fm.aria.insertVar': 'Вставить переменную',
+  'fm.aria.insertTranslated': 'Вставить переведённую переменную',
+  'fm.aria.insertPair': 'Вставить парную переменную',
+  'fm.label.base': 'База',
+  'fm.label.translated': 'Перевод',
+  'fm.label.pairs': 'Пары',
+  'fm.title.translatedTo': '{base} в переводе на {lang}',
+  'fm.title.pairs.ru': 'Русский пример 1, затем японский пример 1, затем пара 2…',
+  'fm.title.pairs.en': 'Английский пример 1, затем японский пример 1, затем пара 2…',
+  'fm.title.pairs.zh': 'Китайский пример 1, затем японский пример 1, затем пара 2…',
+  'fm.section.examples': 'Примеры и запасной вариант',
+  'fm.summary.examplesOn': 'Автозагрузка Tatoeba + запасной вариант с выражением',
+  'fm.summary.examplesOff': 'Запасной вариант с выражением выключен',
+  'fm.aria.exampleCounts': 'Число автоматических примеров по языкам',
+  'fm.lead.examples':
+    'При добыче без вручную выбранных примеров загружать столько предложений Tatoeba на каждый язык. Примеры, выбранные в словаре, важнее этих чисел.',
+  'fm.toggle.fallback': 'Запасной вариант с выражением, когда примеров нет',
+  'fm.lead.fallback.before':
+    'Если у Tatoeba нет примеров, добывать по запасным шаблонам — например,',
+  'fm.lead.fallback.middle': 'вместо',
+  'fm.field.fallbackSuffix': '{field} (запасной)',
+  'fm.placeholder.fallbackEg': 'например, {expression:ru}',
+  'fm.msg.saved': 'Соответствие полей сохранено.',
+  'fm.msg.saveFailed': 'Не удалось сохранить соответствие полей.',
+  'fm.msg.reverted': 'Возвращено автоматическое сопоставление.',
+  'fm.msg.resetFailed': 'Не удалось сбросить соответствие полей.',
+};

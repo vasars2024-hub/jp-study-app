@@ -1,0 +1,8 @@
+[
+  "src/media/StudyPlayerSlice.tsx",
+  "src/renderer/components/GlobalDictionaryOverlay.tsx",
+  "src/renderer/components/SeanimeDevPanel.tsx",
+  "src/renderer/components/reading-garden/ReadingGardenSkyEvents.tsx",
+  "src/renderer/main.tsx",
+  "src/renderer/widgets/registry.tsx"
+]
