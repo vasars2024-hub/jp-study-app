@@ -364,15 +364,27 @@ export function useNovels() {
     } catch {
       ids = [];
     }
-    localStorage.removeItem(PLAN_KEY);
-    if (!ids.length) return;
+    if (!ids.length) {
+      localStorage.removeItem(PLAN_KEY);
+      return;
+    }
     void (async () => {
       const existing = new Set(store.plan.map((entry) => entry.id));
       let latest = store;
-      for (const id of ids) {
-        const novel = allLocalNovels.find((item) => item.id === id);
-        if (!novel || existing.has(`local-${novel.id}`)) continue;
-        latest = await window.api.jitenUpsertPlan(localPlanEntry(localCandidate(novel, latest.sourceProfiles)));
+      try {
+        for (const id of ids) {
+          const novel = allLocalNovels.find((item) => item.id === id);
+          if (!novel || existing.has(`local-${novel.id}`)) continue;
+          latest = await window.api.jitenUpsertPlan(localPlanEntry(localCandidate(novel, latest.sourceProfiles)));
+          existing.add(`local-${novel.id}`);
+        }
+        // The legacy key is this plan's only copy until every entry reaches the
+        // main-process store. Dropping it up front meant one failed upsert —
+        // an unavailable handler, a write error — silently destroyed a saved
+        // plan with nothing left to retry from.
+        localStorage.removeItem(PLAN_KEY);
+      } catch {
+        /* keep the legacy plan on disk so a later mount can migrate it again */
       }
       applyStore(latest);
     })();
@@ -547,8 +559,11 @@ export function useNovels() {
     const before = await window.api.listLibrary();
     const beforeIds = new Set(before.map((item) => item.id));
     const after = await window.api.importFiles();
-    const imported = after.find((item) => !beforeIds.has(item.id) && item.kind === 'book' && item.epubFile)
-      ?? after.find((item) => item.kind === 'book' && item.epubFile);
+    // `library:importFiles` answers a cancelled dialog with the whole existing
+    // library (main/library.ts), so "nothing new" is the ordinary cancel path.
+    // Falling back to the first EPUB in the library linked the plan entry to an
+    // unrelated book, flipped it to `imported`, and named that book as imported.
+    const imported = after.find((item) => !beforeIds.has(item.id) && item.kind === 'book' && item.epubFile);
     if (!imported) return null;
     await updatePlan(entry.id, {
       importedLibraryItemId: imported.id,

@@ -7409,3 +7409,126 @@ The normal sandboxed shell could not provide an alternate path because its requi
 worktree changes. A relay with Git write access should stage the four clean/new code/test paths and this
 ledger normally, reconstruct `DesktopShell.tsx` as HEAD plus only the import/handler above,
 verify that snapshot, and create the required path-scoped checkpoint.
+
+## The plan that could be deleted, and the import that named the wrong book — 2026-08-11
+
+State was re-derived from source first. There is no `docs/audit/RELAY_BOSS_AUDIT.md`, so no boss
+finding was outstanding. The previous section's checkpoint **did not exist**: that worker had no
+Git write access and left six paths unstaged. This session had write access, so the first act was
+to land that work as commit `b367ab5` — the four clean/new code and test paths plus the ledger
+staged normally, and `DesktopShell.tsx` reconstructed as HEAD plus only its import and guarded
+`os:open` handler (22 added lines; every foreign worktree hunk left unstaged and untouched).
+
+Its four gates were **re-run here rather than inherited**: `npx vitest run` 522 passed / 1 skipped
+of 523 files and 7,107 passed / 6 skipped of 7,113 tests; `node tools/i18n-check.cjs` exit 0 with
+all 9,299 keys translated; `node tools/architecture-audit.cjs` exit 0, nothing new; `npx eslint`
+0 errors on the five touched paths. `i18n-check` is **green in this environment** — the previous
+section's "infrastructure-blocked" reading was specific to that worker's sandbox, not to the tool.
+The commit was then checked out into a detached worktree: its two focused files pass 16/16 there,
+and the full suite reports the established clean-HEAD floor of 9 failed files / 46 failed tests
+against 475 passed files / 6,528 passed tests, with no new failing file.
+
+### The remaining half of the last Track 4 bullet
+
+"Preserve saved plans, imports, progress, and deep links" — the deep-link half landed in
+`b367ab5`. Re-deriving the preservation half against source found two defects, both of which have
+already damaged the real profile on this machine.
+
+**A migration that could delete the plan it was migrating.** `useNovels` migrates the legacy
+`jp-novels-planned` key into the main-process store. It called `localStorage.removeItem` **before**
+the upsert loop, and the loop had no `catch`. One failed `jitenUpsertPlan` — an unavailable
+handler, a write error — therefore destroyed the user's only copy of a saved plan and raised an
+unhandled rejection on the way out. The key is now removed only after every entry has landed; a
+failure leaves it on disk, and the partial store still reaches the UI, which re-runs the migration
+from the surviving key. Deduplication moved into the loop so one id listed twice cannot be
+upserted twice.
+
+**An import link that named a book nobody imported.** `library:importFiles` answers a **cancelled**
+dialog by returning the whole existing library (`src/main/library.ts:1228`). `importLocalEpub` read
+that as "no new item" and then fell back to `after.find(item => item.kind === 'book' && item.epubFile)`
+— the first EPUB in the library, which is the most recently imported book, because new items are
+`unshift`ed. Cancelling an import therefore linked the plan entry to an unrelated book, flipped it
+to `acquisitionStatus: 'imported'`, and reported that book's title as imported. The fallback is
+gone; nothing new means nothing linked, and `analyzeSelected`'s existing null branch already says
+so honestly.
+
+This is not hypothetical. `%APPDATA%\jp-study-app\jiten.json` on this machine holds six plan
+entries, four of which carry an `importedLibraryItemId`: `local-GOSICK` and `local-時をかける少女`
+both point at **悪の教典 02**, and `jiten-107646` and `local-遠野物語` both point at **木村宗喜** —
+two library items, four unrelated plan entries, exactly the shape the fallback produces.
+
+### Tests
+
+`renderer/__tests__/novelsPlanPreservation.test.ts`, nine tests driving the real `useNovels` in
+jsdom. Six cover the migration (success then removal, failure preserves, partial failure preserves
+and retries, no double upsert, unusable value dropped without touching the store, already-planned
+novel not re-planned) and three the import link (links the item the import produced, links nothing
+on cancel, ignores every pre-existing EPUB rather than just the first).
+
+The suite was run as a **negative control** against `b367ab5` in a detached worktree before being
+trusted: **5 of 9 failed there**, plus two unhandled rejections — the same rejections the migration
+fix removes. Against the fixed tree all nine pass.
+
+### Gates
+
+- `npx vitest run`: **523 passed / 1 skipped of 524 files**, **7,116 passed / 6 skipped of 7,122
+  tests** — one new file, nine new tests, nothing else moved.
+- `node tools/i18n-check.cjs`: exit 0, all 9,299 English keys translated in ja/zh/ru. No UI string
+  was added: both fixes are pure control flow, and the cancel path reuses `analyzeSelected`'s
+  existing message.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- `npx eslint --max-warnings 0` on both touched paths: **0 errors, 0 warnings**.
+- `tsc --noEmit` was not run; it is not a gate in this repo.
+
+### Live Electron acceptance
+
+Driven through the authenticated debug bridge in the running Russian app, never mouse or keyboard
+automation and never Computer Use.
+
+The saved-plan store was captured whole before anything was touched: `jiten:getStore` returned
+10,611 characters holding all six plan entries. The legacy key was absent, so its original state
+was "not present". It was then seeded with `["GOSICK","__no-such-novel__"]` — deliberately two ids
+that **cannot cause a write**: `local-GOSICK` is already in the plan so the loop skips it, and
+`__no-such-novel__` matches no novel. Leaving the Plan tab unmounts `NovelsView`; returning to it
+remounts `useNovels` and re-runs the migration. This is pure React state — no window moved and no
+layout was persisted.
+
+- After the remount the workspace was back at `data-reading-section="plan"` with its 4 local plan
+  rows, and `'jp-novels-planned' in localStorage` was **false** — the key was consumed and removed
+  only after the loop completed.
+- `jiten:getStore` afterwards was **string-identical** to the capture, 10,611 characters both
+  times.
+- `%APPDATA%\jp-study-app\jiten.json` still carries all six plan ids with an mtime of
+  **2026-07-24**, weeks before this session: the plan survives restart because it lives on disk in
+  main, and this run wrote nothing to it.
+- `/logs?level=error`: **0 entries**, before and after. 9 desktop windows throughout.
+
+**What was not live-driven, and why.** The import-link fix cannot be exercised through the bridge:
+`importLocalEpub` opens a real OS file dialog, and cancelling one needs OS-level input, which is
+forbidden here. Its proof is the nine-test suite plus the negative control plus the corrupted links
+already sitting in `jiten.json`. Similarly, the migration's *failure* branch was not live-driven:
+forcing `jitenUpsertPlan` to reject would mean writing to the user's real plan store, and the
+preload API is immutable so it cannot be stubbed. Both are recorded as test-proven, not claimed as
+live.
+
+### Shared-tree staging note
+
+`NovelsContent.tsx` carries a large foreign diff, including that track's in-progress i18n of this
+file's status strings. Both fixes were written so they are valid **at HEAD as well** — neither
+introduces a `t()` call that HEAD's `useNovels` could not resolve — and the file was staged as a
+HEAD-plus-these-two-edits blob. The test file is new. The working tree's other-track dirty state is
+unchanged.
+
+### Still open in Track 4
+
+The four cross-wired `importedLibraryItemId` values already in `jiten.json` are **not repaired
+here**. Deciding whether to unlink them, re-point them, or leave them is a product call about the
+user's own data, and a migration that guesses would be the same class of mistake as the bug. It is
+recorded here so the next worker does not rediscover it as new.
+
+The concurrent Discover/Finder/Novels action-host work — `src/renderer/utils/readingDiscoveryActions.ts`
+and its test are still untracked, with `ReadingUnifiedDiscovery.tsx`, `ReadingFinderContent.tsx` and
+`NovelsContent.tsx` dirty — belongs to another track and was left alone; re-derive it after it
+lands rather than assuming it is complete. Progress preservation itself was confirmed to live in
+`library.json` on disk and was not re-implemented. Track 5 and later, Blanc and Aero remain
+ineligible.
