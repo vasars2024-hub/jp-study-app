@@ -9673,3 +9673,147 @@ methods — `deskDragBegin` / `Move` / `End` / `Cancel` and `onDeskDrag` `Hover`
 `main/deskDrag.ts` (169 lines) + its test + a `main.ts` registration hunk + nine preload bindings +
 their `window.d.ts` declarations + the renderer module. `main.ts`, `preload.ts` and `window.d.ts`
 are all dirty with foreign hunks and need the same reconstruct-from-`HEAD` treatment used here.
+
+## The drag broker landed; its renderer client is an orphan until DesktopShell — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The previous entry's "Exact next slice" was the `deskDrag` subsystem, and every claim it made
+about that slice was re-derived from the tree this hop and held: `main/deskDrag.ts` (169 lines),
+`renderer/deskDrag.ts` (188), `main/__tests__/deskDrag.test.ts` (257) all untracked; `main.ts`
+carrying an import and a `registerDeskDragIpc()` call; all nine `window.api` drag methods absent
+from `HEAD`'s preload and `window.d.ts`. `main/deskDrag.ts`'s imports (`DesktopIndex`,
+`keyForPoint`, `onDisplaysChanged`, `desktopIndexForDisplayKey`, `windowForDisplayKey`) were each
+checked by name at `HEAD` and all resolve.
+
+### One correction to the previous entry, and one thing it did not know
+
+- **The previous entry called `window.d.ts` "dirty with foreign hunks" and left it there. It is
+  much emptier than that at `HEAD`:** `deskwin`, `DeskWindowInfo`, `fileDrop`, `DropPlan` and
+  `DisplaySummary` occur **zero** times in `HEAD:src/renderer/window.d.ts`. The whole
+  multi-monitor renderer vocabulary is still uncommitted there, in a single 65-line insertion
+  that interleaves three tracks. `preload.ts` is the opposite — `deskwin:retarget`,
+  `DeskWindowInfo` and `DropPlan` are all *already* at `HEAD`. So the two files are not
+  symmetric, and an anchor picked by reading `preload.ts` does not exist in `window.d.ts`. Two
+  anchors were picked that way this hop and both had to be discarded.
+
+- **`renderer/deskDrag.ts` could not ship in this commit.** It was in the previous entry's
+  slice definition, and the architecture gate rejected it: `DesktopShell.tsx` is its **only**
+  importer (verified by grep across `src/`), so landing it alone makes it an orphan module and
+  `tools/architecture-audit.cjs` reported exactly that as a **new unclassified finding** —
+  1652 -> 1655 modules, 19 -> **20** findings, `[orphan-module] src/renderer/deskDrag.ts`.
+  That was measured, not predicted: the six-path commit was built, run through the audit, and
+  rebuilt as five paths. It ships with `DesktopShell.tsx`.
+
+### Commit `6257433`, five paths, 576 insertions / 0 deletions
+
+- `src/main/deskDrag.ts` (new, 195 lines) and `src/main/__tests__/deskDrag.test.ts` (new, 292) —
+  untracked, taken whole apart from the eslint fixes below.
+- `src/main.ts`, `src/preload.ts`, `src/renderer/window.d.ts` — all dirty with foreign hunks,
+  so each was rebuilt as `git show HEAD:<path>` plus **only** this slice's insertions by a
+  throwaway script that asserts each anchor line's exact text and that no symbol absent from
+  `HEAD` leaked in. Result **+2 / +51 / +36, zero deletions**, confirmed by
+  `git diff --numstat HEAD:<path> <candidate-blob>`. The foreign hunks are still in the working
+  tree, unmoved: the three files' pending insertions went 25/153/137 -> **23/102/101**, i.e.
+  down by exactly 2/51/36.
+
+Staging used a **temporary index** (`GIT_INDEX_FILE`) plus `git hash-object -w --path=` and
+`git write-tree`/`git commit-tree`, so the shared index was never mutated at all. The branch was
+moved with `git update-ref`, then `git reset --` on those five paths only.
+
+### Four eslint warnings in this slice's own new file, all fixed
+
+The gate is "no new **errors**", and there were none. But `main/deskDrag.ts` arrived with four
+warnings that were worth not shipping, and one of them was a real defect of the kind this ledger
+keeps catching:
+
+- `BrowserWindow` imported and never used; `./displays` imported twice.
+- `unsubscribeDisplays` assigned and never read — the handle is genuinely dropped, so it is now
+  a `watchingDisplays` boolean with a comment saying the subscription is process-lifetime.
+- **`LiveDrag.originWebContentsId` was written from `e.sender.id` and read nowhere in the
+  repo.** A field that exists only to look wired. Removed, and the handler's `e` became `_e`.
+
+### Four gates, both sides measured in detached worktrees
+
+Baseline was `~\jp-wt-head` at `aaba84b`, which is code-identical to `HEAD` `b5e5b79`
+(`git diff --stat` between them is the ledger file alone). Candidate was a fresh
+`~\jp-wt-cand`, both with a junctioned `node_modules`.
+
+- `npx vitest run`: **10 failed / 5 files -> 10 failed / 5 files**, 6,830 -> **6,854 tests**.
+  Compared as a **set difference on file + full test name** from two JSON reports, not by count:
+  **0 new failures, 0 fixed**. The failing set is the same foreign five —
+  `blancAgentStepConfirmGate` (5), `localAgentQueueRun` (1), `novelReaderProgressGuard` (1),
+  `architectureBaseline` (1), `i18n` (2). The 24 new tests are `deskDrag.test.ts`, all green.
+- `node tools/i18n-check.cjs`: **exit 0** both sides, 9,137 English keys, unchanged — this slice
+  adds **no UI string at all**.
+- `node tools/architecture-audit.cjs`: exit 1 both sides (the pre-existing unclassified
+  `mooncapLore.ts` orphan). 1,652 -> **1,654** modules and the finding list is **byte-identical**
+  to baseline — 19 findings, one unclassified, the same one. `main/deskDrag.ts` is not an orphan,
+  which is the check that it is actually wired into `main.ts`.
+- `npx eslint --no-ignore` on all five paths: **identical to baseline** — the same two
+  pre-existing `window.d.ts` errors (`subtitleHarvestList` / `subtitleHarvestFetch` adjacency)
+  at 1438/1441 instead of 1402/1405, shifted by exactly the 36 lines this slice inserts, and the
+  same twelve `main.ts` non-null-assertion warnings shifted by exactly 1. `deskDrag.ts` and its
+  test are **silent**.
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance — the broker driven through five reason paths
+
+Existing bridge on 39273, one window, pid 17264, driven only through authenticated `/eval`.
+`/logs` showed no foreign `[vite] hot updated` since the renderer's last reload, so no other
+track was editing during the run.
+
+This is an `ipcMain.on` subsystem, not `invoke`, so "call it and read the return value" does not
+exist — the only honest probe is to **send and observe what main sends back**. All five
+`onDeskDrag*` listeners were subscribed through the preload bindings, the window's real
+`displayKey` was read from the app (`deskwinWhoAmI()` -> `display|1920x1080|1`), and each
+scenario was fired and then read back on a second round-trip:
+
+```
+begin(window/probe-A) + end(-99999,-99999) -> {cancelled, kind:window, id:probe-A, reason:same-display}
+begin(note/probe-B)   + cancel()           -> {cancelled, kind:note,   id:probe-B, reason:cancelled}
+begin(widget/probe-C) + end('nope', null)  -> {cancelled, kind:widget, id:probe-C, reason:bad-coordinates}
+begin(kind:'nonsense')+ end + cancel       -> []   (invalid kind never started a drag)
+begin(icon/probe-E)   + move(500,400)      -> []   (a move over the origin's own display is silent)
+```
+
+The three distinct `reason` strings are the point. A preload binding that reached no handler
+would have produced an empty log in **every** row — `ipcRenderer.send` on an unregistered
+channel is silently dropped. Instead main held state across two separate `/eval` calls,
+ran `keyForPoint`, resolved `windowForDisplayKey('display|1920x1080|1')` back to this very
+window, and picked a different branch each time. That is the main handler running live, which
+is the thing a grep for the channel name cannot establish.
+
+Probe E deliberately left a drag in flight; it was cancelled and the cancel confirmed. Both
+probe globals and all five listeners were removed and their absence asserted
+(`['__dd','__ddLog','__ddOff'].map(k => k in window)` -> `false,false,false`).
+
+**Nothing was persisted.** `%APPDATA%\jp-study-app\desktop-layout.json` had mtime 19:04:28
+before the run and 19:04:28 after, against probes that ran at 22:29 — and by construction, since
+every probe terminated in `cancelled`, which means "keep the item" and writes nothing. No
+`adopt` or `release` was emitted in any row, which matters because `DesktopShell.tsx` in the
+running renderer *is* subscribed to those channels and would have committed a real desktop.
+The bridge reported **0 error entries**. No userData backup was taken.
+
+### Exact next slice
+
+**`ToastHost.tsx` + `renderer/deskDrag.ts` + `DropRouter.tsx` + `DesktopShell.tsx`**, together —
+they are now mutually dependent and none of them can land alone:
+
+- `ToastHost.tsx`'s `showOsToast` has no consumer until `DropRouter.tsx`.
+- `renderer/deskDrag.ts` is an orphan until `DesktopShell.tsx` (measured this hop, above).
+- `DropRouter.tsx`'s two missing imports both landed in `aaba84b`, so it is otherwise clear.
+
+Also withheld and still owed: the 14 `fileDrop.affordance` / `triage` / `toast` / `action` keys
+and `desktop.task.onDesktop`, in all four catalogs.
+
+Two things to budget for, both measured rather than assumed:
+
+- **`window.d.ts` needs the multi-monitor block too.** Its 65-line insertion is one hunk
+  covering three tracks; this hop took the middle third. The `deskwin*` / `DisplaySummary` /
+  `DeskWindowInfo` declarations are still uncommitted, and `DesktopShell.tsx` uses them, so that
+  file needs a third reconstruct-from-`HEAD` pass, not a whole-file take.
+- **`DesktopShell.tsx` may still be takeable whole** — the previous entry's marker scan of its
+  22 hunks came back empty for `aero` / `blanc` / `nyaa` / `subtitle` / `lexicon` / `agent` /
+  `mooncap`, and `studyBlock` occurs 0 times. That remains a marker scan, not a line-by-line
+  read. Confirm per hunk before relying on it.
