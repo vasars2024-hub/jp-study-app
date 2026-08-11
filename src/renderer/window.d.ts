@@ -107,6 +107,7 @@ import type {
   DesktopLayout,
   DesktopLayoutSnapshot,
 } from '../shared/desktop';
+import type { DeskDragKind } from '../main/deskDrag';
 import type {
   ImmersionDayMetrics,
   ImmersionMetricsDelta,
@@ -380,6 +381,41 @@ declare global {
         wall?: unknown;
       }): Promise<DesktopLayoutSnapshot>;
       onDesktopChanged(cb: (snap: DesktopLayoutSnapshot) => void): () => void;
+
+      // Cross-monitor drag
+      deskDragBegin(payload: {
+        kind: DeskDragKind;
+        id: string;
+        payload: unknown;
+        displayKey: string;
+      }): void;
+      deskDragMove(screenX: number, screenY: number): void;
+      deskDragEnd(screenX: number, screenY: number): void;
+      deskDragCancel(): void;
+      onDeskDragHover(
+        cb: (p: {
+          kind: DeskDragKind;
+          screenX: number;
+          screenY: number;
+          desktopIndex: number | null;
+        }) => void,
+      ): () => void;
+      onDeskDragLeave(cb: (p: { kind: DeskDragKind }) => void): () => void;
+      onDeskDragAdopt(
+        cb: (p: {
+          kind: DeskDragKind;
+          id: string;
+          payload: unknown;
+          screenX: number;
+          screenY: number;
+          desktopIndex: number;
+        }) => void,
+      ): () => void;
+      onDeskDragRelease(cb: (p: { kind: DeskDragKind; id: string }) => void): () => void;
+      onDeskDragCancelled(
+        cb: (p: { kind: DeskDragKind; id: string; reason: string }) => void,
+      ): () => void;
+
       popOut(section: string): Promise<void>;
       popoutListOpen(): Promise<string[]>;
       onPopoutChanged(cb: (sections: string[]) => void): () => void;

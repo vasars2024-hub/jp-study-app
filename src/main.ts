@@ -20,6 +20,7 @@ import {
   registerDesktopWindowsIpc,
   syncDesktopWindows,
 } from './main/desktopWindows';
+import { registerDeskDragIpc } from './main/deskDrag';
 import { registerFileRouterIpc } from './main/fileRouter';
 import { registerTranslateIpc } from './main/translate';
 import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
@@ -1604,6 +1605,7 @@ app.whenReady().then(async () => {
     mainWindow: () => mainWindow,
   });
   registerDesktopWindowsIpc();
+  registerDeskDragIpc();
   registerFileRouterIpc();
   registerTranslateIpc();
   registerTranslateAnalysisIpc();

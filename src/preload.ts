@@ -140,6 +140,7 @@ import type {
 } from './shared/desktop';
 import type { DisplaySummary } from './main/displays';
 import type { DeskWindowInfo } from './main/desktopWindows';
+import type { DeskDragKind } from './main/deskDrag';
 import type { DropPlan } from './main/fileRouter';
 import type {
   ImmersionMetricsDelta,
@@ -609,6 +610,56 @@ const api = {
       cb(payload);
     ipcRenderer.on('deskwin:retarget', handler);
     return () => ipcRenderer.removeListener('deskwin:retarget', handler);
+  },
+
+  deskDragBegin: (payload: {
+    kind: DeskDragKind;
+    id: string;
+    payload: unknown;
+    displayKey: string;
+  }): void => ipcRenderer.send('deskdrag:begin', payload),
+  deskDragMove: (screenX: number, screenY: number): void =>
+    ipcRenderer.send('deskdrag:move', { screenX, screenY }),
+  deskDragEnd: (screenX: number, screenY: number): void =>
+    ipcRenderer.send('deskdrag:end', { screenX, screenY }),
+  deskDragCancel: (): void => ipcRenderer.send('deskdrag:cancel'),
+  onDeskDragHover: (
+    cb: (p: { kind: DeskDragKind; screenX: number; screenY: number; desktopIndex: number | null }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, p: Parameters<typeof cb>[0]): void => cb(p);
+    ipcRenderer.on('deskdrag:hover', handler);
+    return () => ipcRenderer.removeListener('deskdrag:hover', handler);
+  },
+  onDeskDragLeave: (cb: (p: { kind: DeskDragKind }) => void): (() => void) => {
+    const handler = (_e: unknown, p: { kind: DeskDragKind }): void => cb(p);
+    ipcRenderer.on('deskdrag:leave', handler);
+    return () => ipcRenderer.removeListener('deskdrag:leave', handler);
+  },
+  onDeskDragAdopt: (
+    cb: (p: {
+      kind: DeskDragKind;
+      id: string;
+      payload: unknown;
+      screenX: number;
+      screenY: number;
+      desktopIndex: number;
+    }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, p: Parameters<typeof cb>[0]): void => cb(p);
+    ipcRenderer.on('deskdrag:adopt', handler);
+    return () => ipcRenderer.removeListener('deskdrag:adopt', handler);
+  },
+  onDeskDragRelease: (cb: (p: { kind: DeskDragKind; id: string }) => void): (() => void) => {
+    const handler = (_e: unknown, p: { kind: DeskDragKind; id: string }): void => cb(p);
+    ipcRenderer.on('deskdrag:release', handler);
+    return () => ipcRenderer.removeListener('deskdrag:release', handler);
+  },
+  onDeskDragCancelled: (
+    cb: (p: { kind: DeskDragKind; id: string; reason: string }) => void,
+  ): (() => void) => {
+    const handler = (_e: unknown, p: { kind: DeskDragKind; id: string; reason: string }): void => cb(p);
+    ipcRenderer.on('deskdrag:cancelled', handler);
+    return () => ipcRenderer.removeListener('deskdrag:cancelled', handler);
   },
 
   // ----- Universal file drop routing -----
