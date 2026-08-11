@@ -4928,6 +4928,8 @@ export const ja: Catalog = {
   'aiStudio.generated.summary': {
     other: '{count} 語から {cards} カード',
   },
+  'aiStudio.agentBatch.note':
+    'エージェントが「{deck}」用に生成しました。まだ保存されていません。ここで確認してから「フラッシュカードに保存」を使ってください。',
   'aiStudio.hint.saveKey': '生成を有効にするには、上で API キーを保存してください。',
   'aiStudio.hint.localMissing':
     'オフライン生成には、翻訳ビューで Qwen3-1.7B をインストールするか Downloads に GGUF を置いてください。',

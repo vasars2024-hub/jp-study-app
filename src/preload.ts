@@ -85,6 +85,12 @@ import type {
   AgentImageStageResult,
   AgentImageTakeResult,
 } from './shared/agentImageStaging';
+import { AGENT_CARD_BATCH_STAGING_CHANNELS } from './shared/agentCardBatchStaging';
+import type {
+  AgentCardBatchStageRequest,
+  AgentCardBatchStageResult,
+  AgentCardBatchTakeResult,
+} from './shared/agentCardBatchStaging';
 import type { AgentWorkspaceState } from './shared/agentWorkspace';
 import type { AgentWorkspaceResult } from './shared/agentWorkspaceBridge';
 import type {
@@ -1397,6 +1403,23 @@ const api = {
     const handler = (_event: unknown, conversationId: string): void => cb(conversationId);
     ipcRenderer.on(AGENT_IMAGE_STAGING_CHANNELS.staged, handler);
     return () => ipcRenderer.removeListener(AGENT_IMAGE_STAGING_CHANNELS.staged, handler);
+  },
+  // The card-batch staging slot. `flashcard.generate-cards` stages the batch it
+  // produced; AI Card Studio claims it into its own preview editor. One slot,
+  // single-use, main memory only - see shared/agentCardBatchStaging.ts.
+  agentCardBatchStage: (
+    request: AgentCardBatchStageRequest,
+  ): Promise<AgentCardBatchStageResult> =>
+    ipcRenderer.invoke(AGENT_CARD_BATCH_STAGING_CHANNELS.stage, request),
+  agentCardBatchTake: (): Promise<AgentCardBatchTakeResult> =>
+    ipcRenderer.invoke(AGENT_CARD_BATCH_STAGING_CHANNELS.take),
+  // Fires for every accepted batch and carries NOTHING - the cards stay in main
+  // until a window claims them. It exists for the order the studio's own mount
+  // cannot cover: Flashcards already open while the Agent generates elsewhere.
+  onAgentCardBatchStaged: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on(AGENT_CARD_BATCH_STAGING_CHANNELS.staged, handler);
+    return () => ipcRenderer.removeListener(AGENT_CARD_BATCH_STAGING_CHANNELS.staged, handler);
   },
   // The main-owned Agent operational store: task queue, memory, automations.
   // Its only renderer consumer is `renderer/agentOperationalClient.ts`. The

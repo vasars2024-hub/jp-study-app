@@ -5417,6 +5417,8 @@ export const ru: Catalog = {
     many: '{cards} карт из {count} слов',
     other: '{cards} карт из {count} слов',
   },
+  'aiStudio.agentBatch.note':
+    'Сгенерировано Агентом для «{deck}». Пока ничего не сохранено — проверьте здесь, затем нажмите «Сохранить в карточки».',
   'aiStudio.hint.saveKey': 'Сохраните API-ключ выше, чтобы включить генерацию.',
   'aiStudio.hint.localMissing':
     'Для офлайн-генерации установите Qwen3-1.7B через «Перевод» или положите GGUF в Downloads.',

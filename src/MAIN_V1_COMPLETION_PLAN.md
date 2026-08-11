@@ -187,7 +187,14 @@ Still required before the Track 3 acceptance can be called complete:
   nothing. See the ledger's "The capture reaches the Agent, and two ways it did
   not". **Still open, and now a small edit rather than a design question**: the
   visual-novel surfaces produce nothing yet, though `visualNovels.ts:985` already
-  persists a capture screenshot via `saveCaptureScreenshot`;
+  persists a capture screenshot via `saveCaptureScreenshot`. **Superseded — the
+  vision lane is complete across all three producers that can carry a picture**:
+  the lens, the visual-novel library (`VisualNovelAgentHandoffButton`,
+  `ca938e1`/`05b673c`) and the media player (`MediaCueAgentHandoffButton`). The
+  note above described a file rather than a gesture and was already false when
+  written: `saveCaptureScreenshot` has exactly one caller, and its only renderer
+  entry point is ReadingLens, which already hands its capture over. See the
+  ledger's "The last capture surface, and the 27 MiB it would have sent";
 - **done.** All fourteen adapters are installed — five `visual-novel`, three
   `media`, six `anime` (`renderer/visualNovelAgentHandlers.ts`,
   `mediaAgentHandlers.ts`, `animeAgentHandlers.ts`, 2026-08-10; see the ledger's
@@ -200,7 +207,24 @@ Still required before the Track 3 acceptance can be called complete:
   needed no product decision after all — `jp-media-tracking-v1` already *is* the
   local tracked-anime record, which is recorded in the ledger so it is not
   re-litigated a fourth time;
-- AI Card Studio conversion to an Agent workflow while retaining its editor;
+- **AI Card Studio conversion to an Agent workflow while retaining its editor:
+  done.** `flashcard.generate-cards` runs the studio's pipeline, writes nothing,
+  and now **stages** its batch for the studio's own preview editor, which adopts
+  it into the same `batchResults` state a locally generated batch lands in — so
+  the preview strip, Save to flashcards, Send to Anki and Export CSV all work on
+  it identically. The transport (`shared/agentCardBatchStaging.ts` +
+  `main/agentCardBatchStaging.ts`) had been **written and left unreferenced by
+  any running code**; this slice registered it, bound it through preload, and
+  wired both ends. One slot, single-use, expiring at 30 minutes, main memory
+  only, `fs` untouched. The load-bearing fix was that the staged batch had to
+  carry `miningDeckIdentity`'s **book id** and not only its label:
+  `saveAiResultsToDeck` derives an id with `deckBookId`, whose ASCII-only slug
+  collapses every Japanese title to the same value, and `replaceImportedDeck`
+  deletes the matched group before inserting — so two Japanese-titled `book`
+  batches would have destroyed each other. See the ledger's "The transport that
+  had been written and never connected" (2026-08-11). **Deliberately not done:**
+  `AiCardStudio` was not mounted live, because its language-sync effect writes
+  the user's saved AI configuration on mount (`AiCardStudio.tsx:270`);
 - **broader Undo surfacing: done.** The feature was committed on 2026-08-10
   (`d13c770`/`c04bb60`) — it had never been in the repository despite being
   written up here as verified — and then widened from one inverse to four

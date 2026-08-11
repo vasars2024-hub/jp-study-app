@@ -48,6 +48,8 @@ const enrichment = (expression: string): AiEnrichmentResult =>
 
 let analyzeEpub: ReturnType<typeof vi.fn>;
 let generateDeck: ReturnType<typeof vi.fn>;
+let stageBatch: ReturnType<typeof vi.fn>;
+let listPresets: ReturnType<typeof vi.fn>;
 
 /**
  * Everything the renderer persists lives in `localStorage` — the deck store
@@ -63,6 +65,9 @@ const storageSnapshot = (): string => {
 beforeEach(() => {
   analyzeEpub = vi.fn(async () => analysis());
   generateDeck = vi.fn(async () => [enrichment('珈琲')]);
+  // Accepts by default. The failure and absent-bridge paths get their own tests.
+  stageBatch = vi.fn(async () => ({ ok: true, results: 1, cards: 1, replacedUnclaimed: false }));
+  listPresets = vi.fn(async () => []);
   (window as unknown as { api: Record<string, unknown> }).api = {
     aiGetConfig: async () => ({
       engine: 'cloud',
@@ -75,9 +80,10 @@ beforeEach(() => {
       reverse: false,
       backGlossLangs: [],
     }),
-    aiListPresets: async () => [],
+    aiListPresets: listPresets,
     aiListFormats: async () => [],
     aiGenerateDeck: generateDeck,
+    agentCardBatchStage: stageBatch,
     miningAnalyzeEpub: analyzeEpub,
     miningListEpubSections: async () => ({ itemId: 'item-1', title: '夜のカフェ', sections: [] }),
   };
@@ -292,5 +298,110 @@ describe('flashcard.generate-cards, the other two sources are unchanged', () => 
     expect(result.terms).toBe(2);
     expect(result.termsWithSentence).toBe(1);
     expect(result.bookId).toBeUndefined();
+  });
+});
+
+/**
+ * The half that makes this a *conversion* of AI Card Studio rather than a
+ * replacement of it. Rows in a chat reach no editor; a staged batch reaches the
+ * studio's own preview, where the user corrects it and presses Save.
+ *
+ * Staging is still not a write — the batch lives in main memory and expires —
+ * and the no-write assertions above run with staging enabled, so they cover
+ * this path too.
+ */
+describe('flashcard.generate-cards stages the batch for the studio', () => {
+  it('stages what it generated, with the source it reported', async () => {
+    await run({ source: 'preset', wordCount: 3 });
+    expect(stageBatch).toHaveBeenCalledTimes(1);
+    const staged = stageBatch.mock.calls[0][0];
+    expect(staged.source).toBe('preset');
+    expect(staged.results).toEqual([enrichment('珈琲')]);
+  });
+
+  it('reports where the user reviews it, and under what name', async () => {
+    listPresets.mockResolvedValueOnce([{ id: 'preset-a', label: 'Idioms' }]);
+    const result = await run({ source: 'preset' });
+    expect(result.stagedForReview).toBe(true);
+    expect(result.reviewAt).toBe('flashcards.aiStudio');
+    expect(result.deckLabel).toBe('Idioms studio');
+    expect(stageBatch.mock.calls[0][0].deckLabel).toBe('Idioms studio');
+  });
+
+  /**
+   * The studio's own Save button builds `<preset label> studio`. Naming an
+   * unresolvable preset after its id would name a deck after something the user
+   * has never seen in the UI.
+   */
+  it('falls back to the studio\'s own default rather than to a preset id', async () => {
+    const result = await run({ source: 'preset', presetId: 'not-a-preset' });
+    expect(result.deckLabel).toBe('AI studio');
+  });
+
+  it('does not fail the run when the preset list cannot be read', async () => {
+    listPresets.mockRejectedValueOnce(new Error('ipc down'));
+    const result = await run({ source: 'preset' });
+    expect(result.generated).toBe(true);
+    expect(result.deckLabel).toBe('AI studio');
+  });
+
+  /**
+   * The load-bearing one. `saveAiResultsToDeck` derives its group id with
+   * `deckBookId`, whose `[^\w]+` slug is ASCII-only — every Japanese title
+   * collapses to the same value, and `replaceImportedDeck` DELETES the matched
+   * group before inserting. So a `book` batch carries the id
+   * `miningDeckIdentity` derived from the library item instead.
+   */
+  it('carries the collision-free deck id for a book run', async () => {
+    // Main reports back the range it actually applied; the identity is built
+    // from that rather than from what was asked.
+    analyzeEpub.mockResolvedValueOnce(analysis({ range: { from: 2, to: 3 } }));
+    const result = await run({ source: 'book', itemId: 'item-1', chapterFrom: 2, chapterTo: 3 });
+    const staged = stageBatch.mock.calls[0][0];
+    expect(staged.deckLabel).toBe('夜のカフェ — Ch. 2–3');
+    expect(staged.deckBookId).toBe('ai-item-1-ch2-3');
+    expect(staged.deckBookId).toBe(result.bookId);
+    expect(staged.source).toBe('book');
+    // The preset list is not consulted for a book run — the identity names it.
+    expect(listPresets).not.toHaveBeenCalled();
+  });
+
+  it('omits the deck id for the two sources that have no item to derive one from', async () => {
+    await run({ source: 'dictionary', terms: [{ term: '猫' }] });
+    expect(stageBatch.mock.calls[0][0].deckBookId).toBeUndefined();
+  });
+
+  /**
+   * The provider call has already been made and paid for. Turning a staging
+   * failure into a failed generation would invite the model to retry it.
+   */
+  it('reports a refused stage without failing the generation', async () => {
+    stageBatch.mockResolvedValueOnce({ ok: false, code: 'too-large' });
+    const result = await run({ source: 'preset' });
+    expect(result.generated).toBe(true);
+    expect(result.stagedForReview).toBe(false);
+    expect(result.stageFailed).toBe('too-large');
+    expect(result.reviewAt).toBeUndefined();
+    expect(result.cards).toEqual(cardStudioCardRows([enrichment('珈琲')]));
+  });
+
+  it('survives a window whose preload has no staging bridge at all', async () => {
+    delete (window as unknown as { api: Record<string, unknown> }).api.agentCardBatchStage;
+    const result = await run({ source: 'preset' });
+    expect(result.generated).toBe(true);
+    expect(result.stagedForReview).toBe(false);
+    expect(result.stageFailed).toBe('bridge-unavailable');
+  });
+
+  it('tells the caller when it replaced a batch nobody had reviewed yet', async () => {
+    stageBatch.mockResolvedValueOnce({ ok: true, results: 1, cards: 1, replacedUnclaimed: true });
+    expect((await run({ source: 'preset' })).replacedUnreviewedBatch).toBe(true);
+    expect((await run({ source: 'preset' })).replacedUnreviewedBatch).toBeUndefined();
+  });
+
+  it('stages AFTER generation, so a refused batch cannot lose the rows', async () => {
+    generateDeck.mockRejectedValueOnce(new Error('provider down'));
+    await expect(run({ source: 'preset' })).rejects.toThrow('provider down');
+    expect(stageBatch).not.toHaveBeenCalled();
   });
 });

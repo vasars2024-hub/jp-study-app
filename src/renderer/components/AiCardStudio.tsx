@@ -34,6 +34,9 @@ import type { MappingPreviewState } from './AnkiCardPreview';
 import Icon from './Icons';
 import { addDeckCards } from '../flashcardDeck';
 import { saveAiResultsToDeck } from '../aiDeckSave';
+import { shouldClaimAgentCardBatch } from '../../shared/agentCardBatchStaging';
+import type { AgentStagedCardBatch } from '../../shared/agentCardBatchStaging';
+import { onAgentCardBatchStaged, takeAgentCardBatch } from '../agentCardBatchStagingClient';
 import { loadSaved, onSavedChanged, type SavedWord } from '../savedWords';
 import { getActiveProfile, getProfiles, onProfileChanged } from '../profileState';
 import type { AnkiStatus } from '../../shared/types';
@@ -114,6 +117,13 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
   const [genProgress, setGenProgress] = useState<AiGenerationProgress | null>(null);
   const [logLines, setLogLines] = useState<AiStudioLogLine[]>([]);
   const [batchResults, setBatchResults] = useState<AiEnrichmentResult[]>([]);
+  /**
+   * The Agent-generated batch this preview is showing, if it did not come from
+   * the form. Held only to name the deck and to label the preview — the cards
+   * themselves live in `batchResults`, the same state a local batch lands in, so
+   * every action the studio already offers works on it without knowing.
+   */
+  const [agentBatch, setAgentBatch] = useState<AgentStagedCardBatch | null>(null);
   const [status, setStatus] = useState('');
   const syncedPresetKey = useRef('');
   const studioSnapRef = useRef('');
@@ -146,6 +156,55 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
   }, []);
 
   useEffect(() => onSavedChanged(() => setSavedWords(loadSaved())), []);
+
+  /**
+   * Adopts a batch the Agent generated, so `flashcard.generate-cards` ends in
+   * this editor instead of as rows in a chat.
+   *
+   * Claimed on mount — which covers "the user walks to Flashcards afterwards" —
+   * and on main's announcement, which covers the other order: this window
+   * already open while the Agent generates in a pop-out. The claim is
+   * single-use, so both firing is harmless; the second finds the slot empty.
+   *
+   * `shouldClaimAgentCardBatch` is the whole rule and lives in shared code so a
+   * test holds it rather than this conditional: adopt only into an EMPTY
+   * preview, because replacing an unsaved local batch would delete work that is
+   * on screen and has never been written to a deck. `aiBusy` is checked for the
+   * same reason one step earlier — `runGenerate` empties the preview before it
+   * awaits, so an in-flight local generation looks empty and is not.
+   *
+   * The refs exist so this effect can read the current preview without being
+   * re-subscribed on every keystroke of generation progress. A batch that
+   * cannot be adopted stays in main for the next mount, or expires.
+   */
+  const batchCountRef = useRef(0);
+  const aiBusyRef = useRef(false);
+  batchCountRef.current = batchResults.length;
+  aiBusyRef.current = aiBusy;
+
+  useEffect(() => {
+    let cancelled = false;
+    const claim = async (): Promise<void> => {
+      if (aiBusyRef.current || !shouldClaimAgentCardBatch(batchCountRef.current)) return;
+      const result = await takeAgentCardBatch();
+      if (cancelled || !result.ok || !result.batch) return;
+      // Re-checked after the round trip. In the losing race the batch is
+      // dropped rather than shown, which is the same outcome as the local
+      // generation that won overwriting it a moment later — and unlike that, it
+      // cannot discard the preview the user is looking at.
+      if (aiBusyRef.current || !shouldClaimAgentCardBatch(batchCountRef.current)) return;
+      setAgentBatch(result.batch);
+      setBatchResults(result.batch.results);
+    };
+    void claim();
+    const unsubscribe = onAgentCardBatchStaged(() => {
+      void claim();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     void window.api.ankiStatus().then(setAnkiStatus);
@@ -392,6 +451,10 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
     setAiBusy(true);
     setStatus('');
     setBatchResults([]);
+    // A local run replaces the preview, so the adopted batch's label must go
+    // with it — leaving it would save the new cards under the Agent batch's
+    // deck name, and for a `book` batch under its book id too.
+    setAgentBatch(null);
     setGenProgress(null);
     setLogLines((lines) =>
       appendStudioLog(
@@ -486,7 +549,11 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
             front: card.front,
             back: card.back,
             source: 'epub-ai',
-            bookTitle: selectedPreset?.label ?? 'AI card studio',
+            // Same rule as the flashcards save: an adopted batch keeps its own
+            // deck name so the local mirror of an Anki send lands where the
+            // batch belongs. The existing fallback is left exactly as it was —
+            // changing it would regroup decks users already have.
+            bookTitle: agentBatch?.deckLabel ?? selectedPreset?.label ?? 'AI card studio',
           });
         }
       }
@@ -976,7 +1043,16 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               type="button"
               disabled={!batchResults.length}
               onClick={() => {
-                const n = saveAiResultsToDeck(batchResults, `${selectedPreset?.label ?? 'AI'} studio`);
+                // An adopted batch keeps the name its stager resolved, so an
+                // Agent chapter-range run saves into the same group a manual
+                // mining run of that range would. Its id is passed rather than
+                // re-derived: `deckBookId` cannot tell two Japanese titles
+                // apart. See `AgentStagedCardBatch.deckBookId`.
+                const n = saveAiResultsToDeck(
+                  batchResults,
+                  agentBatch?.deckLabel ?? `${selectedPreset?.label ?? 'AI'} studio`,
+                  agentBatch?.deckBookId,
+                );
                 if (n) {
                   onDeckImported?.();
                   setStatus(t('aiStudio.status.savedFlash', { count: n }));
@@ -1005,6 +1081,18 @@ export default function AiCardStudio({ onDeckImported }: AiCardStudioProps = {})
               {t('aiStudio.generated.summary', { cards: minedCardCount, count: batchResults.length })}
             </span>
           </div>
+          {agentBatch && (
+            // Says where this preview came from and, more importantly, that
+            // nothing has been written yet — the batch cost a provider call and
+            // reaches a deck only through the button above.
+            // `mining-preset-note` rather than a new class: it is the treatment
+            // this component already gives an explanatory line under a heading,
+            // and reusing it keeps a shared, foreign-modified stylesheet out of
+            // this slice's diff.
+            <p className="muted mining-preset-note">
+              {t('aiStudio.agentBatch.note', { deck: agentBatch.deckLabel })}
+            </p>
+          )}
           <div className="flash-strip" role="list">
             {batchResults.flatMap((result) =>
               result.cards.map((card, i) => (

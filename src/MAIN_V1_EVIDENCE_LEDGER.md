@@ -5405,3 +5405,244 @@ untouched.
   `src/shared/i18n/*/` directories the section above describes. Nothing here
   changes that, and this slice's four catalog edits sit in the same files whose
   imports point at them.
+
+## The transport that had been written and never connected — 2026-08-11
+
+The vision lane is finished: all three producers that can carry a picture — the
+lens, the visual-novel library, the media player — reach the Agent, and the plan
+records the screenshot/OCR attachment context as done. So the next Track 3 item
+is the one the plan words as "AI Card Studio conversion to an Agent workflow
+**while retaining its editor**".
+
+Re-deriving it turned up something the ledger's own "still open" lists would not
+have: **the transport for that conversion already existed in the working tree
+and nothing referenced it.**
+
+### Two finished modules, zero consumers
+
+`shared/agentCardBatchStaging.ts` (367 lines) and `main/agentCardBatchStaging.ts`
+(173 lines) were both present, both **untracked**, both carrying complete
+doc-comments arguing their own design against `agentImageStaging.ts`. A
+whole-tree search for the symbol found exactly five hits and every one of them
+was inside those two files:
+
+```
+main/agentCardBatchStaging.ts:5     (its own doc comment)
+main/agentCardBatchStaging.ts:34    (its own import of the shared half)
+shared/agentCardBatchStaging.ts:54,55,66  (the channel constants)
+```
+
+No `registerAgentCardBatchStagingIpc()` call. No preload binding. No renderer
+client. No `window.d.ts` type. The adapter did not stage and the studio did not
+claim. This is precisely the failure mode this repository's rules name — *a new
+i18n module is invisible until something actually imports/wires it* — one level
+up: a **whole IPC lane**, designed and written and argued for, that could not be
+reached from any running code. Every gate passed over it because a module
+nothing imports breaks nothing.
+
+A previous hop wrote the transport and stopped. This slice connects it.
+
+### What was added, and the one thing the design was missing
+
+Nine files: the two staging modules (extended, below), the registration in
+`main/localAgent.ts` beside the image lane's, three preload bindings and their
+`window.d.ts` types, a new `renderer/agentCardBatchStagingClient.ts` mirroring
+`agentImageStagingClient.ts` rung for rung, the stage call in
+`cardStudioAgentHandlers.ts`, and the claim in `AiCardStudio.tsx`.
+
+The design as written had **one hole, and it is destructive**. The staged batch
+carried a `deckLabel` and nothing else, and the studio's Save button routes
+through `saveAiResultsToDeck`, which derives its group id as
+`deckBookId(title)`. `deckBookId` slugs on `[^\w]+`, and `\w` is ASCII-only, so
+**every Japanese title collapses to the same id** — `chapterRange.ts` records
+this and `chapterRange.test.ts` already asserts it. That has never bitten the
+studio, because its own batches are titled after English preset labels. An Agent
+`book` batch is titled after the book. And `replaceImportedDeck` **deletes**
+every card in the matched `(bookId, bookTitle)` group before inserting.
+
+So saving an adopted batch for 『雪国』 would have destroyed the adopted batch a
+user had already saved for 『吾輩は猫である』. Two tests now pin both halves —
+that the collision is real when the id is left to the title, and that an
+explicit id keeps the two decks apart.
+
+The fix is not a new id scheme. `miningDeckIdentity` already derives a
+collision-free id from the library **item id** for exactly this reason, so the
+batch carries that id (`deckBookId`, optional — absent for `preset` and
+`dictionary` batches, whose labels are ASCII) and `saveAiResultsToDeck` takes it
+as an override rather than re-deriving one and losing it.
+
+### Three decisions worth not re-litigating
+
+- **Staging is not a write, and a failed stage is not a failed generation.** The
+  provider call has already been made and paid for by the time staging runs;
+  turning a refused stage into a thrown error would invite the model to retry a
+  generation that succeeded. It reports `stagedForReview: false` with the reason.
+  The rows are in the result either way.
+- **The claim rule lives in shared code, not in the component.**
+  `shouldClaimAgentCardBatch(count)` is `count === 0` — adopt only into an
+  **empty** preview, because the studio may be showing an unsaved local batch
+  that exists nowhere else. Putting it in `shared/` is what lets a test hold the
+  rule instead of a conditional that can drift. `aiBusy` is checked alongside it
+  for a reason the count alone cannot cover: `runGenerate` empties the preview
+  *before* it awaits, so an in-flight local generation looks empty and is not.
+- **A local run clears the adopted label.** Otherwise the next hand-made batch
+  would save under the Agent batch's deck name — and, for a `book` batch, under
+  its book id, into the group `replaceImportedDeck` is about to delete.
+
+### Live acceptance, on a fresh boot
+
+The recorded `bridge.json` port refused connections, so no dev instance was
+running and one was started. A fresh boot is also **required** here rather than
+convenient: `registerAgentCardBatchStagingIpc` runs in main, and a preload
+binding is not evidence a main handler exists — a window reload reloads the
+preload and leaves main untouched.
+
+The handler was **invoked**, not grepped. `window.api.agentCardBatchTake()`
+returned `{ok: true, batch: null}`. That is the load-bearing result: a missing
+main handler makes `ipcRenderer.invoke` reject, which the client converts to
+`{ok: false, code: 'bridge-unavailable'}` — indistinguishable from an old
+preload. An `ok` empty slot can only come from a registered handler that ran.
+
+The full round trip then ran in the real process, against the real normalizer:
+
+| step | result |
+| --- | --- |
+| `stage` a `book` batch, 2 cards, one with both faces blank | `{ok:true, results:1, cards:1, replacedUnclaimed:false}` |
+| broadcast listener | fired exactly **1** time |
+| `take` #1 | `deckLabel` `夜のカフェ — Ch. 2–3`, `deckBookId` `ai-item-1-ch2-3` |
+| — `rawJson` sent as 50,000 chars | came back **0** |
+| `take` #2 | `{ok:true, batch:null}` |
+
+Every bound proved itself on live data rather than in a fixture: the blank-faced
+card was dropped (2 in, 1 out), the 50 KB `rawJson` was dropped to empty, the em
+dash and en dash in the deck label survived IPC intact, and **single-use** is a
+property of the running process and not just of a unit test.
+
+The three new/edited modules were then imported in the **real renderer**, which
+vitest's module graph cannot substitute for — it would not catch an import path
+the bundler rejects. All three resolve; `AiCardStudio`'s default export is a
+function, so every import *it* names resolves too. `shouldClaimAgentCardBatch`
+evaluated in the running renderer: `0 → true`, `3 → false`.
+
+The new key resolves through the **running** catalogs in all four languages,
+with `{deck}` interpolating:
+
+| lang | `aiStudio.agentBatch.note` |
+| --- | --- |
+| en | `Generated by the Agent for “…”. Nothing is saved yet — review it here, then use Save to flashcards.` |
+| ja | `エージェントが「…」用に生成しました。まだ保存されていません。…` |
+| zh | `由智能体为“…”生成。尚未保存——请在此查看后使用“保存到卡片”。` |
+| ru | `Сгенерировано Агентом для «…». Пока ничего не сохранено — …` |
+
+No key rendered as its own text. `/logs` reports **zero errors** across the
+whole run and no foreign `[vite] hot updated` paths. Every probe global was
+deleted and re-read as absent.
+
+### A snapshot trap that nearly produced a false claim, and the fact behind it
+
+The first "wrote nothing" check compared a whole-`localStorage` snapshot across
+the probe run and came back **changed**. A 4-second idle control showed no
+churn, which made it look like the probe's own doing.
+
+It was not. Re-run on a fresh reload, each piece diffs **completely clean** —
+importing the two new modules: `{changed:[], added:[], removed:[]}`; importing
+`AiCardStudio.tsx`: the same; loading four catalogs and translating four times:
+the same. What actually moves is **`jp-os-environment-v1`, which the app
+rewrites on its own**, measured over 45 idle seconds with **no probe running at
+all**.
+
+So, for whoever writes the next live pass: **a whole-`localStorage` snapshot
+comparison is not a valid "this probe wrote nothing" assertion in this app over
+anything longer than a few seconds.** `jp-os-environment-v1` ticks by itself and
+will contaminate the diff. Exclude it, or scope the snapshot to the keys the
+probe could plausibly touch. The 4-second control that appeared to exonerate the
+app was simply shorter than the app's own write cadence — a control that is too
+short is worse than none, because it points at the wrong culprit.
+
+### What was deliberately not verified
+
+**`AiCardStudio` was not mounted live.** The other producers in this track were,
+so the divergence is deliberate: this component's language-sync effect calls
+`saveLanguageOptions(profileLangOptions)` on mount whenever the user's saved AI
+config diverges from the selected format's profile defaults
+(`AiCardStudio.tsx:270`). That is a **real write to the user's AI configuration**,
+and this repository has no userData restore point by standing instruction. A
+mount is not worth spending the user's saved settings on when the claim path is
+already covered by the shared rule's unit tests, the source-level guards, and a
+live proof that every module it imports resolves and that the IPC beneath it
+answers.
+
+**The broadcast was not observed crossing to a second window.** One window was
+open, and the listener that fired was in the staging window itself — which is
+the case the design explicitly calls out ("the Agent and Flashcards are
+frequently the same window"). The multi-window fan-out is covered by the main
+test's `getAllWindows` loop, including the destroyed-window skip.
+
+### The tests, proved to guard
+
+Two positive controls, each restored and verified byte-identical
+(`SequenceEqual === True`):
+
+- `carries the collision-free deck id for a book run` — run against a
+  `resolveBatchDeck` with `deckBookId` removed: **failed**, alone.
+- `saves an adopted batch under its own deck label and id` — run against an
+  `AiCardStudio` whose save passed `undefined` for the id: **failed**, alone.
+
+### Gates
+
+`npx vitest run`: **508 passed / 1 skipped of 509 files**, **6,937 passed** / 6
+skipped of 6,943 — up exactly 56 from `05b673c`'s 6,881, matching the 56 tests
+added (21 shared + 17 main + 10 adapter + 8 deck-save). `node
+tools/i18n-check.cjs`: clean, **9,253** English keys translated in ja/zh/ru — up
+1, matching the one key added. `node tools/architecture-audit.cjs`: exit 0,
+nothing new, the same 3 known pending findings — so the new client module is not
+an orphan. `npx eslint` on twelve of the thirteen touched paths: **0 errors, 0
+warnings**.
+
+`tsc --noEmit` is not a gate here and is **392**, the recorded baseline, exactly
+— with **0** errors in any file this slice touches. One new error was introduced
+and fixed rather than baselined (a `take()` result read twice without narrowing
+in the new main test).
+
+### The thirteenth path, and why it is not this slice's
+
+`npx eslint src/renderer/window.d.ts` reports **2 errors**:
+
+```
+1537:7  All subtitleHarvestList signatures should be adjacent
+1540:7  All subtitleHarvestFetch signatures should be adjacent
+```
+
+Both **pre-exist at branch HEAD** — `git show HEAD:src/renderer/window.d.ts`
+declares each of those two methods **twice**, at ~780 and ~1537. They belong to
+the `feat/nyaa-subtitles` track that owns this file, they are nowhere near this
+slice's insertion at ~1036, and the spliced commit carries only this slice's
+lines. Recorded rather than fixed: it is another track's duplicate to collapse,
+and collapsing it would mean choosing which of their two declarations survives.
+
+### Staged against a shared tree
+
+Six of the fifteen files carry another track's uncommitted work — `preload.ts`,
+`window.d.ts` and the four catalogs — and were committed as **reconstructed
+blobs**: HEAD plus this slice's lines only. Five files are new. The remaining
+four (`main/localAgent.ts`, `renderer/aiDeckSave.ts`,
+`renderer/cardStudioAgentHandlers.ts`, `renderer/components/AiCardStudio.tsx`)
+and both test files were verified clean before editing and staged normally. The
+working tree's foreign state is untouched.
+
+### Still open
+
+- **The Track 3 plan text lags the tree by three commits** and is corrected in
+  this commit: it still said "the visual-novel surfaces produce nothing yet",
+  which `ca938e1`, `05b673c` and the section above closed.
+- **`mediaCueAgentContext`'s identity ignores `mediaId`** — unchanged, fourth
+  section running, for the reasons already recorded.
+- **The branch still does not build from its own HEAD** — the five untracked
+  `src/shared/i18n/*/` directories, re-confirmed still untracked at this commit
+  (`git ls-tree HEAD` finds nothing for any of the five while all five exist on
+  disk). Unchanged and still not this track's to adopt.
+- **The studio's mount-time `saveLanguageOptions` write** (`AiCardStudio.tsx:270`)
+  is what stopped a live mount here. It is arguably a defect in its own right — a
+  form that rewrites saved configuration merely by being opened — but changing it
+  is a product decision about a shipped surface, so it is recorded rather than
+  taken.

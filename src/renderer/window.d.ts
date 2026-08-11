@@ -63,6 +63,11 @@ import type {
   AgentImageTakeResult,
 } from '../shared/agentImageStaging';
 import type {
+  AgentCardBatchStageRequest,
+  AgentCardBatchStageResult,
+  AgentCardBatchTakeResult,
+} from '../shared/agentCardBatchStaging';
+import type {
   AgentOperationalState,
   LegacyAgentOperationalPayload,
 } from '../shared/agentOperationalState';
@@ -899,6 +904,11 @@ declare global {
       agentImageStage(request: AgentImageStageRequest): Promise<AgentImageStageResult>;
       agentImageTake(conversationId: string): Promise<AgentImageTakeResult>;
       onAgentImageStaged(cb: (conversationId: string) => void): () => void;
+      agentCardBatchStage(
+        request: AgentCardBatchStageRequest,
+      ): Promise<AgentCardBatchStageResult>;
+      agentCardBatchTake(): Promise<AgentCardBatchTakeResult>;
+      onAgentCardBatchStaged(cb: () => void): () => void;
       agentOperationalLoad(): Promise<AgentOperationalResult>;
       agentOperationalSave(state: AgentOperationalState): Promise<AgentOperationalResult>;
       agentOperationalMigrateLegacy(

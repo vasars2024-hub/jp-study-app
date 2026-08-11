@@ -4903,6 +4903,8 @@ export const zh: Catalog = {
   'aiStudio.generated.summary': {
     other: '来自 {count} 个词的 {cards} 张卡',
   },
+  'aiStudio.agentBatch.note':
+    '由智能体为“{deck}”生成。尚未保存——请在此查看后使用“保存到卡片”。',
   'aiStudio.hint.saveKey': '请先在上方保存 API 密钥以启用生成。',
   'aiStudio.hint.localMissing':
     '离线生成请通过「翻译」安装 Qwen3-1.7B，或将 GGUF 放到 Downloads。',

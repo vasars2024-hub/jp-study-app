@@ -20,6 +20,7 @@ import type {
 } from '../shared/localAgentRuntime';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentImageStagingIpc } from './agentImageStaging';
+import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
 import { registerAgentNavigationIpc } from './agentNavigationIpc';
 import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 import { registerAgentOperationalIpc } from './agentOperationalIpc';
@@ -293,6 +294,11 @@ export function registerLocalAgentIpc(): void {
   // window reaches the Agent composer in another without entering the persisted
   // workspace the other three stores write to.
   registerAgentImageStagingIpc();
+  // And for the card-batch staging slot, the same shape one level up: a batch
+  // `flashcard.generate-cards` produced in the Agent window reaches AI Card
+  // Studio's own preview editor in the Flashcards window, so the user corrects
+  // it before anything is written.
+  registerAgentCardBatchStagingIpc();
 }
 
 const AGENT_OPERATION_IDS = new Set(AGENT_TOOL_OPERATIONS.map((entry) => entry.id));

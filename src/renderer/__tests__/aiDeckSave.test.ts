@@ -76,6 +76,40 @@ describe('saveAiResultsToDeck', () => {
     expect(loadDeck().map((card) => card.back).sort()).toEqual(['keep-me', 'second']);
   });
 
+  /**
+   * The reason the override exists. `deckBookId` slugs on `[^\w]+` and `\w` is
+   * ASCII-only, so two different Japanese titles derive the SAME id — and
+   * `replaceImportedDeck` matches on the `(bookId, bookTitle)` pair and deletes
+   * the match before inserting. That never bit the studio's own batches, whose
+   * titles are English preset labels, but an Agent `book` batch is named after
+   * the book.
+   */
+  it('two Japanese titles derive the same id when it is left to the title', () => {
+    saveAiResultsToDeck([result('猫', ['first'])], '吾輩は猫である');
+    const firstId = loadDeck()[0].bookId;
+    localStorage.clear();
+    saveAiResultsToDeck([result('犬', ['second'])], '雪国');
+    expect(loadDeck()[0].bookId).toBe(firstId);
+  });
+
+  it('an explicit id keeps two Japanese-titled decks apart', () => {
+    saveAiResultsToDeck([result('猫', ['first'])], '吾輩は猫である', 'ai-item-1-full');
+    saveAiResultsToDeck([result('犬', ['second'])], '雪国', 'ai-item-2-full');
+    expect(loadDeck().map((card) => card.back).sort()).toEqual(['first', 'second']);
+    expect(new Set(loadDeck().map((card) => card.bookId)).size).toBe(2);
+  });
+
+  it('an explicit id still replaces its own group, so re-saving updates in place', () => {
+    saveAiResultsToDeck([result('猫', ['old'])], '吾輩は猫である — Ch. 3–7', 'ai-item-1-ch3-7');
+    saveAiResultsToDeck([result('猫', ['new'])], '吾輩は猫である — Ch. 3–7', 'ai-item-1-ch3-7');
+    expect(loadDeck().map((card) => card.back)).toEqual(['new']);
+  });
+
+  it('a blank override falls back to the derived id rather than to an empty group key', () => {
+    saveAiResultsToDeck([result('猫', ['a'])], 'Studio', '   ');
+    expect(loadDeck()[0].bookId ?? '').toMatch(/^ai-/);
+  });
+
   it('does not disturb a hand-made card that shares neither id nor title', () => {
     replaceImportedDeck('hand-made', 'My deck', [
       { word: 'x', reading: '', meaning: '', front: 'x', back: 'mine', source: 'dictionary' },
@@ -139,5 +173,41 @@ describe('AiCardStudio generation does not write to the deck', () => {
     // The status string used to interpolate `{saved}`. Leaving that placeholder
     // in place would render it literally now that nothing is saved.
     expect(bodyOf('runGenerate')).not.toContain('saved');
+  });
+
+  /**
+   * The adoption half, guarded the same way and for the same reason: the
+   * property is structural and there is no React test renderer here.
+   *
+   * `shouldClaimAgentCardBatch` is the rule that stops an Agent batch replacing
+   * an unsaved local preview. It lives in shared code precisely so this file can
+   * assert the component asks it rather than re-deriving a conditional that
+   * could drift from the one the shared test pins.
+   */
+  it('adopts an Agent batch only through the shared claim rule', () => {
+    const body = stripComments(source);
+    expect(body).toContain('takeAgentCardBatch');
+    expect(body).toContain('shouldClaimAgentCardBatch');
+    // Not a hand-rolled emptiness check standing in for the rule.
+    expect(body).not.toContain('batchResults.length === 0');
+  });
+
+  it('subscribes to the staged announcement, so an open Flashcards window adopts too', () => {
+    expect(stripComments(source)).toContain('onAgentCardBatchStaged');
+  });
+
+  /**
+   * An adopted batch's deck name and id must reach the save. Dropping either
+   * would put a chapter-range batch in the wrong group — and, for two Japanese
+   * titles, in the SAME group, where the second save deletes the first.
+   */
+  it('saves an adopted batch under its own deck label and id', () => {
+    const body = stripComments(source);
+    expect(body).toContain('agentBatch?.deckLabel');
+    expect(body).toContain('agentBatch?.deckBookId');
+  });
+
+  it('drops the adopted label when a local run replaces the preview', () => {
+    expect(bodyOf('runGenerate')).toContain('setAgentBatch(null)');
   });
 });

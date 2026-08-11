@@ -22,6 +22,7 @@ import { DEFAULT_AI_PROVIDER_ID, providerKeyBucket } from '../shared/aiProviders
 import { miningDeckIdentity } from '../shared/chapterRange';
 import type { ChapterRange, MiningDeckIdentity } from '../shared/chapterRange';
 import { loadSaved } from './savedWords';
+import { stageAgentCardBatch } from './agentCardBatchStagingClient';
 
 export type CardStudioAgentTranslate = (key: string, vars?: TVars) => string;
 
@@ -309,6 +310,38 @@ export function cardStudioCardRows(results: readonly AiEnrichmentResult[]): Arra
 }
 
 /**
+ * The deck a generated batch belongs to, named exactly as the surface that will
+ * save it would name it.
+ *
+ * A `book` run takes `miningDeckIdentity`'s pair, so an agent batch reviewed in
+ * the studio saves into the same group a manual mining run of the same range
+ * would — and carries the id explicitly, because `saveAiResultsToDeck` derives
+ * one with `deckBookId`, whose ASCII-only slug collapses every Japanese title to
+ * the same value (see `AgentStagedCardBatch.deckBookId`).
+ *
+ * Everything else takes `<preset label> studio`, which is the literal string the
+ * studio's own Save button builds. The preset list is read over IPC rather than
+ * from `shared/aiMiningCatalog` for the reason at the top of this file. A preset
+ * that cannot be resolved falls back to `AI studio` — the studio's own fallback —
+ * rather than to the raw id, so a claimed batch never names a deck after
+ * something the user has not seen in the UI.
+ */
+async function resolveBatchDeck(
+  presetId: string,
+  book: CardStudioBookScope | undefined,
+): Promise<{ deckLabel: string; deckBookId?: string }> {
+  if (book) {
+    return { deckLabel: book.identity.deckTitle, deckBookId: book.identity.bookId };
+  }
+  try {
+    const preset = (await window.api.aiListPresets()).find((entry) => entry.id === presetId);
+    return { deckLabel: `${preset?.label ?? 'AI'} studio` };
+  } catch {
+    return { deckLabel: 'AI studio' };
+  }
+}
+
+/**
  * The AI Card Studio adapters.
  *
  * `list-card-presets` is capability discovery: it answers "what can you generate,
@@ -330,6 +363,19 @@ export function cardStudioCardRows(results: readonly AiEnrichmentResult[]): Arra
  * able to do. All three end in the same rows and the same no-write guarantee; the
  * `book` run additionally reports the deck identity its range belongs to, so the
  * `add-cards` step that follows lands in the right group.
+ *
+ * Every accepted run also **stages** its batch for AI Card Studio's own editor
+ * (`shared/agentCardBatchStaging.ts`). That is what makes this a conversion of
+ * the studio rather than a replacement of it: the plan asks for Agent skills
+ * "while preserving rich dedicated editors for preview and correction", and rows
+ * that only ever exist in a chat reach no editor. Staging is still not a write —
+ * the batch lives in main memory, expires, and reaches a deck only when the user
+ * presses the studio's own Save button against a visible preview.
+ *
+ * A failed stage does **not** fail the run. The provider call has already been
+ * made and paid for, and the rows are in the result either way; the outcome is
+ * reported as `stagedForReview: false` with its reason so the model can say so
+ * instead of retrying a generation that already succeeded.
  */
 export function createCardStudioAgentHandlers(t: CardStudioAgentTranslate): AgentToolHandlers {
   return {
@@ -422,9 +468,26 @@ export function createCardStudioAgentHandlers(t: CardStudioAgentTranslate): Agen
       const results = await window.api.aiGenerateDeck(request);
       const cards = cardStudioCardRows(results);
 
+      // Hand the batch to the studio's editor. Deliberately after the rows are
+      // built, so a normalizer that refuses the batch cannot also be the thing
+      // that loses the result the caller is owed.
+      const deck = await resolveBatchDeck(presetId, book);
+      const staged = await stageAgentCardBatch({ ...deck, source, results });
+
       return {
         generated: true,
         saved: false,
+        // Where the user reviews and corrects this batch before it becomes a
+        // deck. `reviewAt` is the studio's own route, so the model can point at
+        // it rather than describing a place the user has to find.
+        stagedForReview: staged.ok,
+        ...(staged.ok
+          ? {
+            reviewAt: 'flashcards.aiStudio',
+            deckLabel: deck.deckLabel,
+            ...(staged.replacedUnclaimed ? { replacedUnreviewedBatch: true } : {}),
+          }
+          : { stageFailed: staged.code }),
         source,
         presetId,
         formatId,

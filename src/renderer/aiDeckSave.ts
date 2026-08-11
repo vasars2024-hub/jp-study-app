@@ -2,12 +2,25 @@ import type { AiEnrichmentResult } from '../shared/mining';
 import { deckBookId } from '../shared/deckImport';
 import { replaceImportedDeck } from './flashcardDeck';
 
+/**
+ * @param bookId Overrides the id derived from the title.
+ *
+ * `deckBookId` slugs on `[^\w]+` and `\w` is ASCII-only, so every Japanese title
+ * collapses to the same id — `chapterRange.test.ts` asserts the collision. That
+ * has never bitten this function because its only caller passed an English
+ * preset label, but an Agent-generated `book` batch is named after the book, and
+ * `replaceImportedDeck` DELETES the matched `(bookId, bookTitle)` group before
+ * inserting. So a caller that already holds a collision-free id — the one
+ * `miningDeckIdentity` derives from the library item id — passes it rather than
+ * letting it be re-derived from the title and lost.
+ */
 export function saveAiResultsToDeck(
   results: AiEnrichmentResult[],
   deckTitle: string,
+  bookIdOverride?: string,
 ): number {
   const title = deckTitle.trim() || 'AI card studio';
-  const bookId = deckBookId(title).replace(/^import-/, 'ai-');
+  const bookId = bookIdOverride?.trim() || deckBookId(title).replace(/^import-/, 'ai-');
   const entries: Parameters<typeof replaceImportedDeck>[2] = [];
 
   for (const result of results) {
