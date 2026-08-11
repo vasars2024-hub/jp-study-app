@@ -65,6 +65,7 @@ import ScraperPage from './pages/ScraperPage';
 import StoragePage from './pages/StoragePage';
 import VisualizerPage from './pages/VisualizerPage';
 import DisplayPage from './pages/DisplayPage';
+import ApiKeysPage from './pages/ApiKeysPage';
 import MotionPage from './pages/MotionPage';
 import MemoryPage from './pages/MemoryPage';
 import MiniModePage from './pages/MiniModePage';
@@ -595,6 +596,7 @@ export default function SettingsApp(props: SettingsWallProps) {
               {page === 'scraper' && <ScraperPage />}
               {page === 'visualizer' && <VisualizerPage />}
               {page === 'special' && <SpecialPage />}
+              {page === 'api-keys' && <ApiKeysPage />}
               {page === 'display' && <DisplayPage />}
               {page === 'motion' && <MotionPage />}
               {page === 'storage' && <StoragePage />}

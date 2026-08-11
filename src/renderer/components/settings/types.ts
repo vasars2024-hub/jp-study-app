@@ -35,6 +35,8 @@ export type SettingsPageId =
   | 'transcription'
   | 'visualizer'
   | 'special'
+  // Phase 0 credentials vault — every API key in the app, one page.
+  | 'api-keys'
   | 'display'
   | 'motion'
   | 'storage'

@@ -6570,6 +6570,12 @@ export const ja: Catalog = {
   'agent.plan.stepStatus.skipped': 'スキップ',
   'agent.plan.arguments': '引数：{value}',
   'agent.plan.result': '結果：{value}',
+  // ---- 認証情報の保管庫（設定 → API キー） ----
+  'settings.nav.apiKeys': 'API キー',
+  'settings.nav.apiKeys.desc': 'アプリが保持できるキーをすべて一か所に。',
+  'apiKeys.overview.title': '認証情報',
+  'apiKeys.overview.desc': '{total} 件中 {configured} 件を設定済み。',
+  'apiKeys.optional': 'ここのキーはすべて任意です。ひとつも設定しなくてもアプリはオフラインで完全に動作します。キーは追加機能のためのもので、基本機能には不要です。',
   // ---- Credentials vault: every key `shared/credentials/registry.ts` names ----
   'credential.category.ai': 'AI プロバイダー',
   'credential.category.reading': '読書ソース',

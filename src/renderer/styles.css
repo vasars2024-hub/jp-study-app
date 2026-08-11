@@ -14752,6 +14752,26 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .unified-search-result-cover { width: 40px; height: 56px; flex: 0 0 auto; border-radius: 4px; object-fit: cover; }
 .unified-search-result-copy { display: grid; gap: 2px; min-width: 0; }
 .unified-search-result-copy strong, .unified-search-result-copy span { overflow-wrap: anywhere; }
+
+/* ---- Settings ▸ API keys (credentials vault) ------------------------------ */
+/* Follows the .unified-search-provider block above: one card per credential,
+   panel-tinted, with the secret never rendered — only its configured state. */
+.credential-list { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.credential-row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%); }
+.credential-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.credential-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.credential-row-text strong { font-size: 13px; }
+.credential-state-on, .credential-state-off { font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.credential-state-on { color: var(--ok, #4ade80); background: color-mix(in srgb, var(--ok, #4ade80) 16%, transparent); }
+.credential-state-off { color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.credential-used-by, .credential-free-tier, .credential-env { margin: 6px 0 0; font-size: 12px; }
+.credential-field { display: grid; gap: 4px; margin: 10px 0 0; }
+.credential-field label { font-size: 12px; color: var(--muted); }
+.credential-field input { width: 100%; }
+.credential-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
+/* A store that cannot encrypt is a security statement, not a hint: it reads as a
+   warning rather than as muted body text. */
+.credential-warning { margin: 10px 0 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--warn, #f59e0b) 45%, var(--border)); border-radius: 8px; background: color-mix(in srgb, var(--warn, #f59e0b) 12%, transparent); color: var(--warn, #f59e0b); font-size: 12px; }
 .tracking-management-list { display: grid; gap: 12px; }
 .tracking-management-record { display: grid; gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
 .tracking-management-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }

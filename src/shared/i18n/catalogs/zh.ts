@@ -6538,6 +6538,12 @@ export const zh: Catalog = {
   'agent.plan.stepStatus.skipped': '已跳过',
   'agent.plan.arguments': '参数：{value}',
   'agent.plan.result': '结果：{value}',
+  // ---- 凭据保险库（设置 → API 密钥） ----
+  'settings.nav.apiKeys': 'API 密钥',
+  'settings.nav.apiKeys.desc': '应用可保存的所有密钥，集中于一处。',
+  'apiKeys.overview.title': '凭据',
+  'apiKeys.overview.desc': '已配置 {configured} / {total}。',
+  'apiKeys.optional': '这里的密钥都是可选的。即使一个都不设置，应用也能完全离线运行——密钥只带来额外功能，从不影响核心功能。',
   // ---- Credentials vault: every key `shared/credentials/registry.ts` names ----
   'credential.category.ai': 'AI 提供方',
   'credential.category.reading': '阅读来源',

@@ -6909,6 +6909,12 @@ export const en: Catalog = {
   'agent.plan.stepStatus.skipped': 'Skipped',
   'agent.plan.arguments': 'Arguments: {value}',
   'agent.plan.result': 'Result: {value}',
+  // ---- Credentials vault (Settings → API keys) ----
+  'settings.nav.apiKeys': 'API keys',
+  'settings.nav.apiKeys.desc': 'Every key the app can hold, in one place.',
+  'apiKeys.overview.title': 'Credentials',
+  'apiKeys.overview.desc': '{configured} of {total} configured.',
+  'apiKeys.optional': 'Every key here is optional. The app works fully offline with none of them set — a key buys extra features, never core function.',
   // ---- Credentials vault: every key `shared/credentials/registry.ts` names ----
   'credential.category.ai': 'AI providers',
   'credential.category.reading': 'Reading sources',

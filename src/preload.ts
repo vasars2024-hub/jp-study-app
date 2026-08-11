@@ -1051,6 +1051,20 @@ const api = {
     settings: import('./shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings,
   ): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings> =>
     ipcRenderer.invoke('subtitleDiscovery:saveSettings', settings),
+  // ---- Phase 0 credentials vault ----
+  // Three channels, and no way to read a secret back. The renderer writes a key
+  // and is told whether one is configured; `main/credentials/vault.ts` is the
+  // only place the value exists in the clear.
+  credentialStatus: (): Promise<import('./main/credentials/ipc').CredentialVaultSnapshot> =>
+    ipcRenderer.invoke('credentials:status'),
+  setCredentialSecret: (
+    id: string,
+    field: string,
+    secret: string,
+  ): Promise<import('./main/credentials/ipc').CredentialWriteResponse> =>
+    ipcRenderer.invoke('credentials:set', id, field, secret),
+  clearCredential: (id: string): Promise<import('./main/credentials/ipc').CredentialVaultSnapshot> =>
+    ipcRenderer.invoke('credentials:clear', id),
   /** Which providers need a key and whether one is stored. Never the key itself. */
   subtitleProviderCredentials: (): Promise<import('./shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]> =>
     ipcRenderer.invoke('subtitleDiscovery:credentials'),

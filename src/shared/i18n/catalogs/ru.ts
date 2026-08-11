@@ -7196,6 +7196,12 @@ export const ru: Catalog = {
   'agent.plan.stepStatus.skipped': 'Пропущен',
   'agent.plan.arguments': 'Аргументы: {value}',
   'agent.plan.result': 'Результат: {value}',
+  // ---- Хранилище учётных данных (Настройки → Ключи API) ----
+  'settings.nav.apiKeys': 'Ключи API',
+  'settings.nav.apiKeys.desc': 'Все ключи, которые может хранить приложение, в одном месте.',
+  'apiKeys.overview.title': 'Учётные данные',
+  'apiKeys.overview.desc': 'Настроено {configured} из {total}.',
+  'apiKeys.optional': 'Все ключи здесь необязательны. Приложение полностью работает офлайн без единого ключа — ключ добавляет возможности, но никогда не требуется для основных функций.',
   // ---- Credentials vault: every key `shared/credentials/registry.ts` names ----
   'credential.category.ai': 'ИИ-провайдеры',
   'credential.category.reading': 'Источники для чтения',

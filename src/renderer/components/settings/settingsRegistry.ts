@@ -124,6 +124,13 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     advanced: true,
   },
   {
+    id: 'api-keys',
+    labelKey: 'settings.nav.apiKeys',
+    icon: 'lock',
+    group: 'System',
+    descKey: 'settings.nav.apiKeys.desc',
+  },
+  {
     id: 'display',
     labelKey: 'settings.nav.display',
     icon: 'eye',
@@ -742,6 +749,30 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
 
   // System
+  {
+    id: 'api-keys',
+    titleKey: 'settings.nav.apiKeys',
+    descKey: 'settings.nav.apiKeys.desc',
+    keywords: [
+      'api key',
+      'api keys',
+      'credentials',
+      'vault',
+      'secret',
+      'token',
+      'gemini',
+      'deepseek',
+      'jimaku',
+      'opensubtitles',
+      'jiten',
+      'myanimelist',
+      'mal',
+      'provider',
+      'revoke',
+    ],
+    pageId: 'api-keys',
+    group: 'System',
+  },
   {
     id: 'zoom',
     titleKey: 'search.zoom',

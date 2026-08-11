@@ -34,6 +34,7 @@ import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
 import { registerStatsIpc } from './main/stats';
 import { registerJitenIpc } from './main/jiten';
+import { registerCredentialIpc } from './main/credentials/ipc';
 import { initDownloads, registerDownloadIpc } from './main/downloads';
 import { registerMangaOcrIpc } from './main/mangaOcr';
 import { registerBookOcrIpc } from './main/bookOcrJob';
@@ -1612,6 +1613,9 @@ app.whenReady().then(async () => {
   registerCollectedToolsIpc();
   registerStatsIpc();
   registerJitenIpc();
+  // Phase 0 credentials vault — registered before nothing in particular, but it
+  // must exist before the Settings window can open its API Keys page.
+  registerCredentialIpc();
   registerDownloadIpc();
   registerMangaOcrIpc();
   registerBookOcrIpc();
