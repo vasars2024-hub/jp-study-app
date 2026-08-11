@@ -8588,3 +8588,302 @@ exactly what the app does by default and what retention prunes.
 3. The four inert Logging controls named under "Scope" above, which need `fields.ts` — and
    `fields.ts` needs the **export slice** (`exportBuilder.ts`'s `SCRAPER_EXPORT_COLUMNS`)
    committed first. That ordering is forced, not preference.
+
+## The credential vocabulary the registry had been naming into thin air — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding was outstanding.
+Main V1 remains the live stage; Blanc and Aero stay ineligible.
+
+### Re-derivation first — the previous section's numbers hold
+
+A detached worktree at `C:\Users\Arseniy\jp-wt-head`, checked out to `887d6ca` with
+`node_modules` junctioned in, reproduced the handoff exactly: **18 failing / 8 files**, and the
+eight names match the previous entry one for one. That is the first section in a while whose
+closing numbers survived re-measurement unchanged, so the "do not trust the attribution" warning
+was heeded and, this time, was not needed.
+
+Reading the actual error messages did change *which* item was cheapest, though. The handoff
+implied the next lump was the agent-navigation cluster (6 tests across two files). It is not
+tractable in one slice: `agentNavigationIndexMirror` fails because `AGENT_NAVIGATION_INDEX`
+(tracked) names a `monitors` page that `SETTINGS_NAV` does not have, and the working tree's
+`settingsRegistry.ts` diff that would add it also adds `file-drops`, `api-keys`, `help` and an
+`aero-safe-mode` card — four untracked page components, two of which (`MonitorsPage`,
+`FileDropsPage`) import `main/displays.ts` and `shared/fileRouting.ts`, **both untracked**. That
+is the `fields.ts`/`exportBuilder` trap from the last section, one layer deeper. Left alone
+deliberately.
+
+### What was stranded
+
+`src/shared/credentials/registry.ts` — sorry, `src/shared/credentialRegistry.ts` — is **tracked
+and complete at HEAD**. It names 34 i18n keys across `descKey`, `freeTierKey`, `usedByKeys`,
+every field's `labelKey`/`placeholderKey`, and the four category labels. **HEAD's four catalogs
+contained none of them.** Not a stale subset — zero. The working tree had all 43 `credential.*`
+keys, in a single contiguous run, in all four languages, and had had them for long enough that
+the gate failure looked like background noise.
+
+So the registry has been describing a vocabulary that did not exist since the day it landed.
+`credentialRegistry.test.ts`'s "resolves every catalog key an entry names" is the one test that
+noticed, and it is 1 of the 18.
+
+### Scope — what was left out on purpose
+
+The contiguous block in the working tree is preceded by `settings.nav.apiKeys`,
+`settings.nav.apiKeys.desc` and three `apiKeys.overview.*` keys. Those are **not** in this
+commit: they belong to the untracked `ApiKeysPage.tsx` and to the `settingsRegistry.ts` diff
+described above, and landing them here would pre-place chrome for a page that does not exist at
+HEAD. Only the 43 `credential.*` keys crossed, plus one comment line naming their owner.
+
+Stated plainly, so nobody reads more into this than it does: **this commit puts no text on
+screen.** Grepping the candidate tree, `CREDENTIAL_REGISTRY` has exactly four consumers —
+itself, its test, `main/credentials/vault.ts` and `main/credentials/ipc.ts` — and none of them
+render a label. It closes the drift gate and gives the future page a vocabulary that is already
+translated. The page is the next slice.
+
+### How the blobs were built
+
+The four catalogs carry several other tracks' uncommitted hunks, so `git add` was not available.
+A throwaway script reconstructed each file as **HEAD's blob plus the 43 lines lifted verbatim
+from the working tree**, inserted before `'agent.suggestions.title'` — an anchor that exists
+exactly once at HEAD in all four files and sits immediately after the block in all four working
+copies. It asserted contiguity, anchor uniqueness, and that HEAD had no `credential.` key before
+writing anything. Result: `git diff --cached --numstat` = **44 / 0 in each file** — 43 keys and
+the comment, zero deletions. A pure addition is the proof that no foreign hunk rode along.
+The script is deleted; it was scaffolding, not a tool.
+
+### Required gates — measured on the candidate tree, never the working tree
+
+Candidate `d178cb8` (tree `6d7576d`) built with `git commit-tree` and checked out in the
+detached worktree.
+
+- `npx vitest run`: **18 failing → 17**, 8 files → 7. `credentialRegistry.test.ts` is now green
+  in full. Test count unchanged at 6,717 — this slice adds no test, it satisfies one that
+  existed. **No suite that was green went red.**
+- The remaining 17 are the same names as at HEAD: `blancAgentStepConfirmGate` (5),
+  `agentNavigationIndexMirror` (4), `i18n` (2), `agentContextSuggestions` (2),
+  `architectureBaseline` (2), `localAgentQueueRun` (1), `novelReaderProgressGuard` (1).
+- `node tools/i18n-check.cjs`: **exit 0**, 8,983 → **9,026** keys. +43, exactly the block, with
+  ja/zh/ru complete — which is what makes it exit 0 rather than printing 43 untranslated keys.
+- `node tools/architecture-audit.cjs`: exit 1 with **exactly** HEAD's six unclassified findings,
+  by name. **0 new.**
+- `npx eslint --max-warnings 0` on all four catalogs: **exit 0, clean.**
+- `tsc --noEmit` not run; not a gate here.
+
+### Live Electron acceptance — the lazy loader, which no unit test covers
+
+The app was already up and healthy: bridge on 39273, pid 17264, one window at
+`http://localhost:5173/`, `visible: true`, Vite answering 200. Driven through the debug bridge
+only. No mouse or keyboard automation, no Computer Use. No `src` file was edited while it ran.
+
+The probe is aimed at the one thing vitest structurally cannot see. `catalogs.ts` loads English
+eagerly and **ja/zh/ru on demand**; the test suite reaches them through `catalogs/all.ts`, the
+static aggregate. So a green test proves the keys are in the source files and says nothing about
+whether the *shipped* lazy chunk carries them. The probe imported `credentialRegistry.ts`,
+`catalogs.ts` and `core.ts` live, derived the same 34 keys the test derives, and called
+`ensureCatalog()` for each language.
+
+- **ja and zh reported `loadedBefore: false`** — the running renderer had never fetched them.
+  The probe forced the real dynamic import over Vite, and both came back carrying **43
+  `credential.*` keys**. That is the loader path, exercised, not inferred.
+- **0 missing, in all four languages**, across all 34 registry-named keys.
+- **0 of 34 identical to English in ja, zh and ru.** The catalog-hygiene gate that forbids
+  spreading an English block into every language is satisfied by measurement, not just by the
+  test's own heuristic: `credential.gemini.desc` renders as
+  `AI カード作成・文解析・OCR 補正を支えるクラウドモデル。`,
+  `支撑 AI 制卡、句子分析和 OCR 校正的云端模型。` and
+  `Облачная модель для ИИ-карточек, разбора предложений и правки OCR.`
+
+**Honest limit on that evidence.** The live app runs the *working tree*, whose catalogs total
+9,324 keys against the candidate's 9,026 — other tracks' uncommitted keys. The probe therefore
+proves the 43 lines behave correctly through the loader; it does not by itself prove they are in
+the commit. What proves that is the 44/0 numstat plus the worktree gate run, and the two
+together are what this entry rests on. The lines were lifted verbatim from the same files the
+running app is serving.
+
+**Restoration.** One probe global, `window.__jpCred`; deleted and the deletion verified
+(`'__jpCred' in window` → `false`). Nothing was persisted, no setting was toggled, no userData
+backup was taken.
+
+### For whoever runs next
+
+1. **`agentContextSuggestions` (2) is the next cheap one** and is probably a sibling of this
+   slice — it fails on `expect(html).toContain('Dictionary')`, and the architecture audit
+   independently calls `AgentContextSuggestionSettings.tsx` a `test-only-module`, i.e. nothing
+   in production imports it. Check whether the missing half is a catalog block, a wiring line,
+   or both, before assuming either.
+2. **The Settings-pages lump is one commit or none.** `monitors` + `file-drops` + `api-keys` +
+   `help` need their four page components, `SettingsApp.tsx`, `types.ts`, `settingsRegistry.ts`,
+   the `settings.nav.*`/`apiKeys.*` catalog keys held back here — **and** `main/displays.ts` and
+   `shared/fileRouting.ts`, which are untracked. Splitting it leaves a route pointing at nothing.
+   Landing it closes 4 of the remaining 17 and puts the credential vocabulary on screen at last.
+3. `architectureBaseline` (2) and the audit's six findings remain the same object seen twice.
+   Three of the six are `credentials:*` dead-ipc — the same subsystem this commit touched, and
+   still not wired to a renderer.
+
+## The suggestion controls that only their test could reach — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The final section above, not the stale mid-file next-slice heading, made
+`agentContextSuggestions` the next item. Blanc and Aero remain ineligible.
+
+### Re-derived state — both missing halves were real
+
+HEAD already carries the context classifier, preference store, inert suggestion shelf, its
+central-Agent mount, and all 15 composer/action strings. It does **not** carry the settings half:
+
+- all four HEAD catalogs have zero `blanc.agent.suggestions.*` entries, while the shared dirty
+  copies have the same contiguous nine-key translated block;
+- `AgentContextSuggestionSettings.tsx` is imported only by its own renderer test at HEAD, which
+  is why the architecture audit reports it as `test-only-module`;
+- the dirty `BlancReadyToolPanels.tsx` does contain a proposed import and mount, but that file
+  also carries the queue-execution work responsible for five other red tests. It is a foreign
+  lump and was deliberately excluded.
+
+The production owner chosen here is the main Agent's existing `AgentGovernancePanel`. That is
+where the permission ceiling, active profile, memory scope and retained-chat policy already live,
+and the Main V1 contract calls this a *global off switch with per-surface controls*. Reaching the
+setting only through Blanc's separate shell would technically silence the architecture finding
+while leaving the app that owns the feature unable to configure it.
+
+### Implementation — one main-app writer, no new preference format
+
+`AgentGovernancePanel` now mounts the existing `AgentContextSuggestionSettings` below the
+other governance controls. The component continues to own its existing versioned preference store;
+no second setting, IPC route or migration was introduced. The governance UI test now asserts the
+production mount, all seven checkboxes (one global plus six sources), and representative
+Dictionary / Reading Lens / Settings labels.
+
+The catalog slice is exactly the nine existing `blanc.agent.suggestions.*` entries in each of
+en/ja/zh/ru. No English value was copied into a translated catalog. The four catalog working copies
+carry extensive foreign work, so the candidate was reconstructed as HEAD plus the prior credential
+candidate's 44-line additions and then these nine lines — never by staging a whole working file.
+
+### Required gates — isolated candidate, not the shared working tree
+
+The relay boundary left the previous section in a recoverable but unfinished state: HEAD is still
+`887d6ca`, the four 44-line credential catalog blobs remain staged, and its verified candidate
+object `d178cb8` exists. A temporary clone under the system temp root reconstructed:
+HEAD + that exact staged patch + this slice's two clean source/test patches + the 9 × 4 catalog
+additions. Its diff is 226 insertions over six paths: 176 from the prior candidate and 50 here.
+
+- `npx vitest run`: the previous candidate's **17 failing / 7 files becomes 15 / 6**.
+  Both `agentContextSuggestions` failures close and the new governance reachability test
+  passes. The remaining names are `agentNavigationIndexMirror` (4),
+  `blancAgentStepConfirmGate` (5), `localAgentQueueRun` (1),
+  `novelReaderProgressGuard` (1), `architectureBaseline` (2) and `i18n` (2).
+  No previously green suite went red.
+- The shared working tree's broader stranded work currently makes the full suite green:
+  **533 passed / 1 skipped files, 7,192 passed / 6 skipped tests**. That is useful corroboration,
+  not candidate evidence, and is not used to claim these other failures fixed.
+- `node tools/i18n-check.cjs`: **exit 0, 9,035 keys**, en/ja/zh/ru complete. This host's
+  sandbox account cannot let esbuild enumerate a parent directory from the normal repository path
+  (`Cannot read directory "../..": Access is denied`). The unchanged candidate was therefore
+  copied under the permitted temp root and exposed as a temporary `X:` drive; the real script
+  then passed. The mapping was removed immediately afterwards.
+- `node tools/architecture-audit.cjs`: the candidate has **five**, not six, unclassified
+  findings. `test-only-module:AgentContextSuggestionSettings.tsx` is gone. The remaining five
+  are the three `credentials:*` dead IPC channels plus orphan
+  `main/credentials/ipc.ts` and `shared/i18n/catalogs/mooncapLore.ts`.
+- `npx eslint --max-warnings 0` on the two source/test paths and four catalogs: **exit 0**.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance — the global controls in their owning app
+
+The existing dev app was healthy on bridge 39273, pid 17264, one real desktop window. Driven only
+through the authenticated HTTP debug bridge; no mouse/keyboard automation and no Computer Use.
+The central Agent was opened, its Russian `Разрешения и профиль` disclosure expanded,
+and the live DOM reported:
+
+- the settings section present with title `Настройки контекстных предложений`;
+- exactly seven checkboxes, all enabled and reflecting the saved true defaults;
+- labels `Контекстные предложения`, `Словарь`, `Чтение`, `Линза чтения`,
+  `Медиа`, `Карточки`, `Настройки`;
+- the existing suggestion shelf still showing the inert `Объяснить нюанс` action for the
+  attached `食べる` context;
+- **0 error log entries** in the bridge.
+
+No checkbox was toggled, no preference or userData file was written, and no backup was taken.
+The governance disclosure was restored closed and verified absent from the DOM.
+
+### Checkpoint blocker, and its resolution one hop later
+
+The worker that wrote everything above could not make the checkpoint: its managed permission
+profile exposed `.git` read-only, so `git write-tree` failed creating `.git/index.lock` with
+`Permission denied`. It changed no staged state, so the credential candidate's four staged
+catalog blobs survived intact — which is the only reason this was recoverable rather than lost.
+
+The next worker (**primary**, normal repository access) landed both slices. Everything below is
+**re-measured on this machine**, not inherited from the account above; the numbers agreed, which
+is worth stating precisely because the last few sections' did not.
+
+- The credential candidate was verified still exact before being advanced: `git write-tree` on
+  the found index returned **`6d7576d`**, byte-identical to `d178cb8`'s tree, parented on
+  `887d6ca`. Committed as **`a701ba8`**, and the resulting `HEAD^{tree}` compared **identical**
+  to `d178cb8^{tree}`. So the commit that shipped is the object the gates above were run against,
+  not a lookalike rebuilt from a dirty tree.
+- The nine `blanc.agent.suggestions.*` lines were staged by the same reconstruction discipline,
+  never `git add` — a throwaway script rebuilt each catalog as `a701ba8`'s blob plus the nine
+  lines lifted verbatim, inserted after `'agent.suggestions.prompt.settings'`. It asserted the
+  block was exactly 9 and contiguous, that the anchor occurred exactly once, and that HEAD
+  carried zero `blanc.agent.suggestions` keys, before writing. Result: **9/0 numstat in all
+  four** — pure additions, so no foreign hunk rode along. `AgentGovernancePanel.tsx` and
+  `agentGovernanceUi.test.ts` were dirty with *only* this slice (diffs read in full: a 1-line
+  import + 2-line mount, and one new test), so those two were a plain `git add`.
+
+Gates re-run on candidate `41048ae` in an isolated detached worktree (`~\jp-wt-head`), never the
+shared working tree:
+
+- `npx vitest run`: **15 failing / 6 files**, 6,718 tests. The six names are exactly
+  `agentNavigationIndexMirror` (4), `blancAgentStepConfirmGate` (5), `localAgentQueueRun` (1),
+  `novelReaderProgressGuard` (1), `architectureBaseline` (2), `i18n` (2) — the predicted set.
+  `agentContextSuggestions` is gone; run directly with `agentGovernanceUi`, the two are
+  **14 passed / 0 failed**. Nothing green went red.
+- `node tools/i18n-check.cjs`: **exit 0, 9,035 keys**, ja/zh/ru complete. The esbuild sandbox
+  workaround the previous worker needed was not required here.
+- `node tools/architecture-audit.cjs`: **5** unclassified. The same worktree checked out at
+  `a701ba8` reports **6**, and the 5 are a strict subset — the slice removed
+  `test-only-module:AgentContextSuggestionSettings.tsx` and introduced **0 new**. Exit 1 is the
+  pre-existing three `credentials:*` dead-ipc plus two orphan modules.
+- `npx eslint --max-warnings 0` on all six touched paths: **exit 0**.
+
+### Live acceptance, second time — and the one thing the tests still cannot see
+
+Bridge 39273, pid 17264, one visible window, driven only over authenticated HTTP. No mouse or
+keyboard automation, no Computer Use.
+
+Worth recording because it cost a detour: the governance disclosure is **not reachable from the
+Agent's default view**. `.agent-governance-open` exists in the DOM but measures 0×0 until the
+view toggle is switched from `Простой` to `Полный`. A probe that only queries for
+`.agent-context-suggestion-settings` gets `0` and reads as "the mount didn't land" when the
+mount is fine.
+
+With the view switched and the disclosure opened, the live DOM reported the section present,
+visible, and `closest()`-contained by the governance panel; **7 checkboxes, all enabled, all
+`true`**; the group label `Настройки контекстных предложений` and its description rendered; and
+labels `Контекстные предложения`, `Словарь`, `Чтение`, `Линза чтения`, `Медиа`, `Карточки`,
+`Настройки`. **No raw `blanc.agent.suggestions` key leaked into the text**, and the bridge
+reported **0 error entries**.
+
+That last point is the reason this probe exists at all. Six of the nine keys are built as a
+**template literal** — ``t(`blanc.agent.suggestions.source.${source}`)`` over
+`AGENT_CONTEXT_SUGGESTION_SOURCES`. A static key-count check cannot see a key that is never
+written as a literal, and the renderer test reads the eager English aggregate. Seven correct
+Russian labels are the evidence that all nine resolve through the *lazy* catalog path.
+
+**Restoration.** No checkbox was toggled and no preference or userData file was written. The
+disclosure was closed and the view returned to `Простой`, then verified: settings section absent
+from the DOM, `.agent-governance-open` back to 0-width, suggestion shelf still intact.
+
+### For whoever runs next
+
+1. **The Settings-pages/credential-IPC lump is the next architectural dependency** and is one
+   commit or none: `monitors` + `file-drops` + `api-keys` + `help` need their four page
+   components, `SettingsApp.tsx`, `types.ts`, `settingsRegistry.ts`, the withheld
+   `settings.nav.*`/`apiKeys.*` catalog keys — **and** untracked `main/displays.ts` and
+   `shared/fileRouting.ts`. Splitting it leaves a route pointing at nothing. Landing it closes
+   `agentNavigationIndexMirror` (4 of the remaining 15) and finally puts the credential
+   vocabulary on screen. Re-derive the whole set as one coherent candidate first.
+2. Three of the five architecture findings are `credentials:*` dead IPC — the subsystem both of
+   these commits touched, still not wired to a renderer. It closes with (1), not separately.
+3. The forced remaining candidate state is **15 failures / 6 files**. The shared working tree's
+   own suite currently runs green because of other tracks' stranded work; that is corroboration,
+   never candidate evidence, and does not belong to any commit.

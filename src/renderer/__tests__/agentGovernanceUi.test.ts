@@ -184,6 +184,17 @@ describe('activateLocalAgentProfile', () => {
 });
 
 describe('AgentGovernancePanel writes the authority the main app could only read', () => {
+  it('owns the global and per-surface context suggestion controls', async () => {
+    await mountPanel();
+
+    const suggestionSettings = container?.querySelector('.agent-context-suggestion-settings');
+    expect(suggestionSettings).not.toBeNull();
+    expect(suggestionSettings?.querySelectorAll('input[type="checkbox"]')).toHaveLength(7);
+    expect(suggestionSettings?.textContent).toContain('Dictionary');
+    expect(suggestionSettings?.textContent).toContain('Reading Lens');
+    expect(suggestionSettings?.textContent).toContain('Settings');
+  });
+
   it('persists a permission ceiling chosen in the panel', async () => {
     const panel = await mountPanel();
     expect(loadLocalAgentSettings().permission).toBe('read-only');

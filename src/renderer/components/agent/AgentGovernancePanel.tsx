@@ -23,6 +23,7 @@ import {
   saveLocalAgentSettings,
 } from '../../localAgentSettingsStore';
 import { useT } from '../../i18n';
+import { AgentContextSuggestionSettings } from './AgentContextSuggestionSettings';
 import './agentGovernance.css';
 
 const PERMISSION_LEVELS: readonly AgentPermissionLevel[] = [
@@ -246,6 +247,8 @@ export function AgentGovernancePanel({
             })}
         </p>
       </div>
+
+      <AgentContextSuggestionSettings />
     </section>
   );
 }
