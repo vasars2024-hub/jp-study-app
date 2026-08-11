@@ -7001,3 +7001,152 @@ Measured after `fe1a198` landed, in a fresh detached worktree at that commit: **
 failure from HEAD, and the "does the branch build from its own HEAD" floor is unchanged at the
 nine other-track suites named above. The four verification worktrees under `~/.claude-runs/`
 were removed afterwards; `git worktree list` is back to the pre-existing set.
+
+## The Library's two shapes, and the drawer that could not have closed — 2026-08-11
+
+State was re-derived from source before anything was written: this file's last section, then
+the plan's "Dependency order". Main V1 is still in **Track 4**; Blanc and Aero remain
+ineligible. The previous entry's "Still open" named the cover-first grid with a strong compact
+list and a contextual detail drawer as the next item, and the plan's Track 4 bullet says the
+same. That is what this is.
+
+### Which Library the plan is talking about
+
+`ReadingWorkspaceView.tsx:107` renders `LibraryView` for the workspace's `library` section, so
+LibraryView is Track 4's surface. But it has **two shells**, and "the dense permanent
+three-pane table" only fits one of them:
+
+- the **Aero workbench** (`aero ? …`, gated on `useAeroMaterials()`, i.e.
+  `documentElement[data-materials='aero']`) is the folder-tree / four-column-table / permanent
+  inspector layout the bullet describes;
+- the **Study OS shell** — measured live here as the one actually rendering, `data-materials`
+  is unset — already had a cover-first grid and had **no** compact list and **no** detail pane
+  at all.
+
+Aero is behind the secret material set, which is *stage 3* of this relay and which the bridge
+skill forbids entering to test. So the slice landed in both: the same two shapes and the same
+drawer, built from one `detailBody`, one `drawerHead` and one `layoutSwitch` value rather than
+a second copy per shell. A test asserts each of those three appears exactly twice, so the
+shells cannot drift apart silently.
+
+### The defect the drawer exposed
+
+`selectedItem` was `visible.find((it) => it.id === selectedId) ?? visible[0] ?? null`. For a
+pane that is always on screen that fallback is a kindness — the inspector always had something
+in it. Against a pane that *closes* it is fatal, and in two ways:
+
+1. `setSelectedId(null)` re-resolved to the first visible item, so a close button could never
+   close anything — the drawer would have looked broken rather than absent;
+2. a selection filtered out by a folder switch or a level chip did not clear, it **silently
+   re-pointed at whatever was now first**, detailing a different book under the same click.
+
+`resolveSelection` in the new `renderer/utils/libraryShelf.ts` drops the fallback and returns
+null unless the recorded id is still on screen. Five tests cover the three ways an id outlives
+its item (removed, folder switched, filter excluded) and that no substitute is ever returned.
+
+### What each shell got
+
+**Aero**: an `aero-library-tile` cover grid as the default, the four-column table kept as a
+peer shape, a switch that publishes `aria-pressed`, and the inspector demoted from a permanent
+third column to a conditional `<aside>`. The workbench publishes `data-drawer`, and
+`.aero-library-workbench[data-drawer='closed']` drops it to two columns.
+
+**Study OS**: the existing cover grid untouched, plus a compact list (title / type / progress /
+folder, thumbnail resolving through the same `useCoverArt` chain the covers slice built) and
+the drawer. The drawer is **list-only** there on purpose: `selectedId` doubles as the inline
+`BookOcrPanel` toggle on a grid card, so mounting a drawer on the same state would answer one
+click with two panels. `.lib-shell[data-drawer='open']` is what adds the 262px column.
+
+Three new i18n keys (`library.layout.{aria,grid,list}`) in all four catalogs.
+`library.inspector.selectHint` is now orphaned — the drawer's absence *is* the empty state —
+and was deliberately left in the catalogs rather than churn four foreign-dirty files to remove
+it.
+
+### Gates
+
+- `npx vitest run`: **518 passed / 1 skipped of 519 files**, **7,041 passed / 6 skipped of
+  7,047 tests**.
+- `node tools/i18n-check.cjs`: exit 0, all **9,289** English keys translated.
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending findings.
+- `npx eslint --max-warnings 0` on the touched paths: **0 errors**; the one warning is the
+  pre-existing `BookOcrPanel` named-as-default import on an untouched line.
+- Not a gate, but measured: `npx tsc --noEmit` names **zero** errors in any of the three files
+  this slice writes.
+
+Each source- and CSS-level assertion was proved to guard by its own mutation before being
+trusted: deleting the `[data-drawer='closed']` rule, deleting the `.aero-library-grid` rule,
+deleting the classic `.lib-shell[data-drawer='open']` and `.lib-list-title
+.aero-library-thumb` rules, un-conditioning the drawer, restoring the first-item fallback, and
+breaking one of the three shared values each flip their assertion to failing.
+
+### Live Electron acceptance
+
+Driven through the authenticated debug bridge against the running Russian app — never mouse or
+keyboard automation, never Computer Use. (The `mcp__jp-app__*` tools are permission-blocked for
+this worker; the skill's own `scripts/eval.ps1` reaches the same bridge and was used instead.)
+
+- Opening state: `data-drawer="closed"`, one **772px** column, **24** cover cards, **0** list
+  rows, **0** drawers. The switch renders **Обложки / Список** from the new keys with
+  `aria-pressed` on the grid button.
+- List mode: **24** rows, header track `408px 96px 92px 128px`, first row reading
+  `悪の教典 02 | JA · L7 | 2% | Без папки`, thumbnail **24×31** at `data-cover="art"` — so the
+  cover chain resolves in the new surface too, not just in the grid.
+- Selecting a row: columns become **494px 262px**, the drawer paints a **236×315** cover at
+  `data-cover="art"`, meta `Тип=17 страниц / Прогресс=0% / Папка=Manga / Добавлено=17.07.2026`,
+  actions `Открыть / Задать обложку со страницы / Удалить`, close control labelled `Закрыть`,
+  and the row carries `aria-pressed="true"` under the id that was clicked.
+- The close control **actually closes**: back to `data-drawer="closed"`, **772px**, 0 drawers,
+  0 active rows, 24 rows intact. This is the exact behaviour the old fallback made impossible.
+- Switching the folder chip away from the selected item (Manga → Без папки) dropped the drawer
+  rather than holding an empty column or re-pointing at another book: 21 rows, drawer closed.
+- Restored afterwards to the opening state (chip `Все 24`, grid, drawer closed, 24 cards), the
+  probe global was deleted and verified gone, no window was moved, no persisted setting or
+  storage API was touched, and the bridge error log stayed at **0** entries.
+
+**Not verified live: the Aero half.** Reaching it requires `data-materials='aero'`, and the
+bridge skill's §2 forbids entering Secret Aero to test something (it can arm the lockscreen and
+writes environment state), while forcing the attribute plus a synthetic theme event would run
+every `onThemeChanged` listener — several of which persist. The Aero markup and CSS are covered
+by tests and by the shared-value assertions; a future worker with an Aero harness should
+measure it.
+
+### Staging, on a shared tree
+
+Six of the nine files carry other tracks' uncommitted work. `LibraryView.tsx` was clean at HEAD
+and `utils/libraryShelf.ts` / `__tests__/libraryShelfLayout.test.ts` are new, so those three
+were plain `git add`. The two stylesheets and the four catalogs were staged as
+**HEAD-plus-this-edit blobs** (`git show HEAD:<path>` → apply the same edit → `git hash-object
+-w` → `git update-index --cacheinfo`), never the working-tree file. The staged diff is
+therefore 107 CSS lines in `aero-apps.css`, 180 in `styles.css` and 3 keys per language, with
+nothing foreign in it. Re-verified afterwards: all six files show byte-identical foreign diffs
+to what they had at session start (87/5, 203/0, 741/382, 732/379, 877/518, 731/379), `git
+status --short` is back to its opening 412 lines, and `tools/.tmp-vn-wire.cjs` is still
+untracked.
+
+### Does it build from its own HEAD
+
+Measured in a detached worktree at the checkpoint commit, with `node_modules` junctioned in:
+**9 failed files / 46 failed tests of 482 files / 6,539 tests**. The same nine files as at
+`fe1a198` — `scraperQbittorrent`, `agentContextSuggestions`, `agentNavigationIndexMirror`,
+`blancAgentStepConfirmGate`, `localAgentQueueRun`, `novelReaderProgressGuard`,
+`architectureBaseline`, `credentialRegistry`, `i18n` — all other tracks'. Passing went 6,471 →
+6,487, which is this slice's 16 tests and no new failure. The worktree was removed;
+`git worktree list` is back to the pre-existing set.
+
+Note for the next worker: a fresh worktree has no `node_modules`, and `npx vitest` there fails
+at config load with `Cannot find module 'vitest/config'` — which reads exactly like a broken
+commit and is not one. Junction the repo's `node_modules` in first.
+
+### Still open in Track 4
+
+Jiten metadata and cover auto-resolution with its API key moved into the credential vault; the
+unified action set (planning, import/download, web extraction, comprehension analysis, Novel
+Reader, progress, dictionary, mining, Jiten vocabulary as one set rather than per-surface
+buttons); preserved plans/imports/progress/deep-links with the former Reading Finder route kept
+as a Discover compatibility alias. The Aero half of this slice wants a live measurement it
+could not get here. Tracks 5-9 and the fresh Main V1 audit remain after Track 4; do not advance
+to Blanc.
+
+### Checkpoint
+
+One path-scoped commit: **3e6f4e0**.
