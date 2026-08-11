@@ -10,7 +10,7 @@
  * is unit-testable without mounting the shell" was wrong for exactly that reason.
  * Here it imports in node with no stubbing at all.
  */
-import type { DesktopLayout } from '../shared/desktop';
+import type { DesktopLayout, IconSnapshot, WidgetSnapshot, WindowSnapshot } from '../shared/desktop';
 
 /**
  * Pull a layout authored on one monitor into the viewport of another (B4).
@@ -117,4 +117,66 @@ export function clampLayoutToViewport(
     authoredW: rescaled || !known ? vw : layout.authoredW,
     authoredH: rescaled || !known ? vh : layout.authoredH,
   };
+}
+
+/** The subset of a layout whose numbers `authoredW/H` is a claim about. */
+export interface LayoutGeometry {
+  windows: WindowSnapshot[];
+  icons: IconSnapshot[];
+  widgets: WidgetSnapshot[];
+}
+
+/**
+ * Everything positional in a layout, and nothing else.
+ *
+ * Distinct from the shell's `layoutSignature`, which also covers notes text and
+ * the wallpaper so it can recognise a commit echoing back from main. Those are
+ * not geometry: picking a new wallpaper does not re-author a desk's coordinates,
+ * so it must not be allowed to move `authoredW/H`.
+ */
+export function layoutGeometrySignature(layout: LayoutGeometry): string {
+  return JSON.stringify({
+    windows: layout.windows.map((w) => [w.id, w.x, w.y, w.w, w.h, !!w.maximized]),
+    icons: layout.icons.map((i) => [i.id, i.x, i.y]),
+    widgets: layout.widgets.map((g) => [g.id, g.x, g.y, g.w, g.h]),
+  });
+}
+
+/**
+ * Which viewport a commit is allowed to claim these coordinates were authored in.
+ *
+ * `clampLayoutToViewport` already answers this correctly for the hydrate itself,
+ * but it is not the only writer: every commit rebuilds the layout from React
+ * state and stamps whatever viewport is live at that moment. The very first such
+ * commit fires immediately after hydrate (the `hydrating` guard is cleared in a
+ * microtask, before React runs the debounced commit effect), so a clamp-mode
+ * open used to re-stamp the desk anyway and undo the fit's careful answer.
+ *
+ * The rule, and the one genuine judgement call in it:
+ *
+ * - **Nothing hydrated, or a degenerate origin** — there is no origin to protect;
+ *   the live viewport is the best thing to record.
+ * - **Geometry unchanged since hydrate** — this is the post-hydrate echo. The
+ *   coordinates are still exactly the ones the fit returned, so they are still
+ *   in the space it said they were. Keep the hydrated origin.
+ * - **Geometry changed** — the user has arranged windows *in this viewport*, and
+ *   those coordinates really are this viewport's now. Stamp the live size. The
+ *   alternative (never re-stamping in clamp mode) would send a desk rearranged
+ *   on a 1920 monitor back to its 3440 origin unscaled the next time it opened
+ *   proportionally, which is the worse of the two failures: it discards work the
+ *   user can see, in exchange for bookkeeping only the opt-in proportional mode
+ *   ever reads.
+ */
+export function resolveAuthoredViewport(opts: {
+  /** `authoredW/H` as the fit returned it at the last hydrate, if there was one. */
+  hydrated: { w: number; h: number } | null;
+  /** The viewport right now. */
+  live: { w: number; h: number };
+  /** Has anything positional moved since that hydrate? */
+  geometryChanged: boolean;
+}): { w: number; h: number } {
+  const { hydrated, live, geometryChanged } = opts;
+  if (!hydrated || hydrated.w <= 0 || hydrated.h <= 0) return live;
+  if (geometryChanged) return live;
+  return hydrated;
 }

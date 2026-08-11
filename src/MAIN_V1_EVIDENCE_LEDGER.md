@@ -10447,3 +10447,114 @@ one of them belongs to a track other than this one.
 Practical consequence for the next hop: **a green `npx vitest run` in the shared tree is not
 evidence the branch is green.** Export and re-measure, and expect ten. `~\jp-wt-head` is left
 checked out at `73f7e2f` for exactly that purpose.
+
+## The commit path stopped re-stamping, and the evidence that had proved nothing — 2026-08-12
+
+The entry two above named the exact next slice: **make the commit path stop re-stamping
+`authoredW/H` on a hydrate it did not author.** Done, wired at all three `buildLayout` call
+sites, and proved live. But re-deriving it first turned up a defect in how the *previous* hop
+established the problem, and that correction is the more useful half of this entry.
+
+### Correction: the live pass that "showed a second writer" could not have shown one
+
+The previous hop opened desktop 2 (authored 944x453) in an 880x507 window, watched it come back
+claiming 880x507, and concluded a second writer — `buildLayout(…, deskSize())` — had done it.
+The conclusion was right. **The evidence was not**, and the same experiment re-run here proved
+nothing for the same reason before I noticed why.
+
+This profile has `jp-os-display-prefs-v1` = `{"remapLayoutProportionally":true}`. That routes
+`applyDesktopLayout` into `clampLayoutToViewport(…, 'proportional')`, and in proportional mode
+the fit **legitimately stamps the live viewport** — `rescaled` is true, so `authoredW: vw` is the
+documented, correct answer. So the observed re-stamp is exactly what a *correct* fit produces,
+with or without a second writer. Every measurement that hop took was in the mode where the two
+writers are indistinguishable.
+
+Repeating it here on desktop 3 (944x453, 0 windows, deliberately kept as the untouched control)
+reproduced the same 880x507 and, for a few minutes, read as "the fix does not work". It was the
+harness. Discriminating requires **clamp** mode, which had to be set deliberately.
+
+### The rule, and the product decision that is no longer deferred
+
+Two new pure functions in `src/renderer/desktopLayoutFit.ts`, both unit-tested in `node` with no
+stubbing (the shell still cannot be imported under vitest — see the entry two above):
+
+- `layoutGeometrySignature` — everything positional and nothing else. Deliberately narrower than
+  the shell's existing `layoutSignature`, which also covers notes text and the wallpaper so it
+  can recognise a commit echoing back from main. Picking a new wallpaper does not re-author a
+  desk's coordinates, so it must not be allowed to move `authoredW/H`. z-order, focus and
+  minimize are excluded for the same reason; a maximize is not, because it moves the box.
+- `resolveAuthoredViewport` — no hydrated origin, or a degenerate one, stamps the live viewport;
+  geometry unchanged since hydrate keeps the hydrated origin; geometry changed stamps live.
+
+That middle branch is the fix. The last branch is **the product question the previous two entries
+deferred, now answered**: if a user clamp-opens a 3440-authored desk on 1920 and rearranges the
+windows there, those coordinates really are 1920-space and the desk should say so. The
+alternative — never re-stamping in clamp mode — would send a rearranged desk back to its 3440
+origin unscaled on the next proportional open, discarding work the user can see in exchange for
+bookkeeping that only the opt-in proportional mode ever reads. Both failure modes are real; this
+one is smaller, and it is written down on the function rather than left implicit.
+
+`DesktopShell.tsx` carries the wiring: two refs (`authoredOrigin`, `hydratedGeometry`) written in
+`applyDesktopLayout` from what the fit returned, a small `authoredViewport(wins, icons, widgets)`
+helper next to `deskSize()`, and all three `buildLayout` call sites switched from `deskSize()` to
+it. The hydrate-side signature is built through the same `winToSnapshot`/`iconToSnapshot` mappers
+`buildLayout` uses, so an untouched commit produces a byte-identical string rather than a
+near-miss that would read as a user edit.
+
+### Live acceptance, in clamp mode, on a desk that could tell the difference
+
+Dev app started for this (bridge on 39273, no foreign `[vite] hot updated` in `/logs`).
+`jp-os-display-prefs-v1` captured, flipped to `{"remapLayoutProportionally":false}`, and restored
+at the end — verified `=== want` and `=== the captured blob`, not by eye.
+
+Desktop **4** is the fixture: authored **880x393**, one window, never opened this hop. Opened via
+`deskwinOpenDesktop(4)` into a secondary window whose `.os-desktop` measures 880x563, i.e.
+`deskSize()` = **880x507** — different from the authored size in one dimension, which is enough.
+
+| step | live `deskSize()` | stored `authoredW/H` | window rect |
+|---|---|---|---|
+| clamp hydrate, then the post-hydrate echo commit | 880x507 | **880x393** — held | `0,0,880,393` |
+| minimize (a commit that persisted, and is not geometry) | 880x507 | **880x393** — held | `visible: true → false` |
+| maximize toggle (a real geometry change) | 880x507 | **880x507** — re-stamped | `0,0,880,507` |
+
+The middle row is the one that makes this evidence rather than absence of evidence. "The value
+did not change" is worthless on its own — it is also what you get if no commit ever fired. The
+minimize flipped `visible` to `false` **and that flip reached the store**, so a commit demonstrably
+ran through `buildLayout` and reached main while `authoredW/H` stayed put. Before this change that
+same commit passed `deskSize()` and would have written 880x507. The third row proves the rule's
+other branch is live too, not just unreachable code.
+
+### Gates
+
+- `npx vitest run` (shared tree): **7,238 passed, 0 failed** — the previous entry's 7,226 plus the
+  12 new tests. Per the correction below that entry, this is *not* a claim about `HEAD`; the
+  exported-tree set-difference is in the next section.
+- `node tools/i18n-check.cjs`: **exit 0**, 9,324 keys. Pure geometry, no strings.
+- `node tools/architecture-audit.cjs`: **exit 0**, "Nothing new".
+- `npx eslint --no-ignore` on the three touched paths: **exit 0**, 4 warnings, all
+  `no-unused-vars` in `DesktopShell.tsx` and all pre-existing (`snapValue`, two `_desktopIndex`,
+  `slideIndex`) — the same four the previous entry recorded.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### The probe wrote, and it was put back
+
+`desktop-layout.json` copied byte-for-byte before the run (5,508 bytes, sha256 `836E8EC0…5836` —
+the same value the previous hop restored it to, so the baseline was intact). It changed during the
+run (sha256 `D4E3F8A1…5AB3`; desktops 3 and 4 both moved). The **app was stopped first**, then the
+file restored and checked with `SequenceEqual` over raw bytes: `True`, 5,508 = 5,508, sha back to
+`836E8EC0…5836`. Only that one 5 KB file was copied; no userData backup was taken.
+
+### Exact next slice
+
+The B4 authored-origin thread is now closed at both writers, so this is a fresh pick rather than a
+continuation. Before starting one, note the trap this hop paid for and the next one will too:
+
+- **Any live pass touching desktop layout must check `remapLayoutProportionally` first.** This
+  profile ships it **on**, and in that mode the fit and the commit path are indistinguishable —
+  every measurement of `authoredW/H` is uninformative until it is flipped off. It is one
+  `localStorage` key, it must be captured and restored, and it silently invalidates otherwise
+  careful evidence. This is what made a correct fix read as a failure here.
+- Desktop **3** is no longer a pristine control — it was opened in proportional mode and is back
+  at 944x453 only because the file was restored. Desktop **4** was driven hardest. Either is
+  usable; neither is virgin.
+

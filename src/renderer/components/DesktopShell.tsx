@@ -21,7 +21,7 @@ import type {
   WindowSnapshot,
 } from '../../shared/desktop';
 import { DESKTOP_STUDY } from '../../shared/desktop';
-import { clampLayoutToViewport } from '../desktopLayoutFit';
+import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
 import { loadDisplayPrefs } from '../displayPrefs';
 import DropRouter from './DropRouter';
 import {
@@ -624,6 +624,13 @@ export default function DesktopShell({
   const deskRef = useRef<HTMLDivElement>(null);
   const taskbarRef = useRef<HTMLDivElement>(null);
   const hydrating = useRef(true);
+  // B4, second half: `clampLayoutToViewport` decides which viewport the fitted
+  // coordinates are expressed in, and the commit path must not overwrite that
+  // answer with the live viewport on an echo it did not author. These two carry
+  // the fit's verdict — the origin it returned, and the geometry it returned it
+  // for — from `applyDesktopLayout` to every `buildLayout` call site.
+  const authoredOrigin = useRef<{ w: number; h: number } | null>(null);
+  const hydratedGeometry = useRef<string | null>(null);
   const winsRef = useRef<Win[]>([]);
   const notesRef = useRef<Record<string, NoteData>>({});
   const openRef = useRef<(section: WinSection) => void>(() => undefined);
@@ -740,6 +747,19 @@ export default function DesktopShell({
         ? clampLayoutToViewport(stored, viewport, loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp')
         : stored;
     const next = hydrateLayout(fitted);
+    // Remember what the fit concluded, and the geometry it concluded it for.
+    // The signature is built through the same snapshot mappers `buildLayout`
+    // uses, so a commit that changed nothing produces a byte-identical string
+    // and is recognised as this hydrate's own echo rather than a user edit.
+    authoredOrigin.current =
+      typeof fitted.authoredW === 'number' && typeof fitted.authoredH === 'number'
+        ? { w: fitted.authoredW, h: fitted.authoredH }
+        : null;
+    hydratedGeometry.current = layoutGeometrySignature({
+      windows: next.wins.map(winToSnapshot),
+      icons: next.icons.map(iconToSnapshot),
+      widgets: next.widgets,
+    });
     setActiveDesktop(desktopIndex);
     setWins(next.wins);
     setIcons(next.icons);
@@ -783,7 +803,15 @@ export default function DesktopShell({
       if (document.documentElement.classList.contains('os-interacting')) {
         commitTimer.current = setTimeout(() => {
           commitTimer.current = null;
-          const nextLayout = buildLayout(activeDesktop, wins, icons, notes, widgets, wall, deskSize());
+          const nextLayout = buildLayout(
+            activeDesktop,
+            wins,
+            icons,
+            notes,
+            widgets,
+            wall,
+            authoredViewport(wins, icons, widgets),
+          );
           rememberSignature(layoutSignature(nextLayout));
           void commitLayout(activeDesktop, nextLayout).catch((err) => {
             if (err instanceof Error && err.message === 'desktop-switch-in-progress') return;
@@ -792,7 +820,15 @@ export default function DesktopShell({
         }, 280);
         return;
       }
-      const nextLayout = buildLayout(activeDesktop, wins, icons, notes, widgets, wall, deskSize());
+      const nextLayout = buildLayout(
+        activeDesktop,
+        wins,
+        icons,
+        notes,
+        widgets,
+        wall,
+        authoredViewport(wins, icons, widgets),
+      );
       rememberSignature(layoutSignature(nextLayout));
       void commitLayout(activeDesktop, nextLayout).catch((err) => {
         if (err instanceof Error && err.message === 'desktop-switch-in-progress') return;
@@ -1231,6 +1267,32 @@ export default function DesktopShell({
     w: deskRef.current?.clientWidth ?? 1200,
     h: (deskRef.current?.clientHeight ?? 720) - taskbarH(deskPrefs),
   });
+
+  /**
+   * The `authored` argument for a `buildLayout` about to be committed (B4).
+   *
+   * Not simply `deskSize()`: a desk hydrated in clamp mode still holds the
+   * coordinates of the monitor it was authored on, and the commit that fires
+   * moments later must say so rather than re-labelling them with whatever
+   * window happens to be showing them. Once the geometry actually moves, this
+   * viewport is the honest answer again. See `resolveAuthoredViewport`.
+   */
+  const authoredViewport = (
+    nextWins: Win[],
+    nextIcons: DeskIcon[],
+    nextWidgets: WidgetSnapshot[],
+  ): { w: number; h: number } => {
+    const signature = layoutGeometrySignature({
+      windows: nextWins.map(winToSnapshot),
+      icons: nextIcons.map(iconToSnapshot),
+      widgets: nextWidgets,
+    });
+    return resolveAuthoredViewport({
+      hydrated: authoredOrigin.current,
+      live: deskSize(),
+      geometryChanged: hydratedGeometry.current === null || signature !== hydratedGeometry.current,
+    });
+  };
 
   const desktopApps = useMemo(() => appListForDesktop(activeDesktop), [activeDesktop]);
   // Grouping is pure data (ids only); labels are resolved with t() at render, so
@@ -2128,7 +2190,15 @@ export default function DesktopShell({
       commitTimer.current = null;
     }
     try {
-      const outgoing = buildLayout(activeDesktop, wins, icons, notes, widgets, wall, deskSize());
+      const outgoing = buildLayout(
+        activeDesktop,
+        wins,
+        icons,
+        notes,
+        widgets,
+        wall,
+        authoredViewport(wins, icons, widgets),
+      );
       rememberSignature(layoutSignature(outgoing));
       await commitLayout(activeDesktop, outgoing);
       const res = await switchDesktopState(target);
