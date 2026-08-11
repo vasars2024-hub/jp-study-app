@@ -754,6 +754,13 @@
   border-color: color-mix(in srgb, var(--agent-accent) 35%, var(--agent-line));
 }
 
+/* Deliberately quieter than the provider chip beside it. What a turn cost is
+   worth being able to read, not worth competing with what it was sent to. */
+.agent-chip-cost {
+  color: var(--agent-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The mode picker reads as the chip it replaced until it is used: same pill,
    same muted weight, so the header does not gain a second heavy control beside
    the title. It is a real `select`, so keyboard and screen-reader behaviour come
@@ -1228,6 +1235,15 @@
 
 .agent-budget-note {
   opacity: 0.82;
+}
+
+/* Separated from the character/token budgets above by a rule rather than a
+   heading: these are the same kind of control, but they are the only ones in the
+   panel that reach outside the app and spend money. */
+.agent-cost-controls {
+  margin-top: var(--space-sm, 8px);
+  padding-top: var(--space-sm, 8px);
+  border-top: 1px solid var(--agent-line);
 }
 
 .agent-check {

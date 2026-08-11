@@ -5646,3 +5646,198 @@ working tree's foreign state is untouched.
   form that rewrites saved configuration merely by being opened — but changing it
   is a product decision about a shipped surface, so it is recorded rather than
   taken.
+
+## The cost control that had been written and never committed — 2026-08-11
+
+With the AI Card Studio conversion closed, the next Track 3 item is the plan's
+"Full-mode memory/profile/permission/automation and **real provider-cost
+controls**, retained-chat policy and memory scope". Re-deriving it turned up the
+same shape of thing as the previous slice, one step further along:
+**the whole provider-cost lane already existed in the working tree, fully wired,
+and had never been committed.**
+
+That is a different failure from the card-batch transport. That transport had no
+consumers, so nothing referenced it. This one is referenced everywhere it should
+be — the composer imports it, the bridge normalizes it, `providerRuntime`
+enforces it — and it still does not exist in the branch, because no commit ever
+carried it:
+
+```
+?? src/shared/agentProviderPricing.ts          (129 lines)
+?? src/renderer/agentProviderPricingStore.ts    (75 lines)
+?? src/shared/__tests__/agentProviderPricing.test.ts  (17 tests)
+ M src/main/providerRuntime.ts  agentExecutionBridge.ts  agentWorkspace.ts
+ M src/renderer/agentExecutionPolicyDraft.ts  AgentWorkspaceShell.tsx  agent.css
+```
+
+This ledger's own 2026-08-05 checkpoint says "Provider cost UI remains deferred
+until the request path supplies real pricing estimates" (line 2883). The request
+path has supplied them since the disclosure gained `estimatedCostUsd`; someone
+then built the deferred UI and stopped one command short. **A gate cannot catch
+this.** Every gate runs on the working tree, so all four were green over code
+that a fresh clone does not have.
+
+### What the lane does, and the one rule everything else rests on
+
+The user enters their own per-million-token rates. Nothing is shipped — a
+hard-coded price table is a temporally unstable fact that becomes a confident lie
+the first time a provider re-prices, and the runtime already refused to guess.
+From those rates the composer shows a **floor** for the run in front of it
+(labelled as one: it prices what it can see and assumes the whole output budget
+is spent), each finished turn reports its actual charge from the provider's
+returned usage, and a cost limit can refuse a run outright.
+
+The rule the rest of it rests on is that **the cap travels only with a complete
+pair of rates**. `providerRuntime`'s preflight refusal is skipped whenever the
+estimate is `undefined`, and the estimate is `undefined` without rates — so a cap
+forwarded unpriced is a control that refuses nothing while telling the user it
+will, which is worse than no control because the user stops watching.
+`normalizePolicy` drops the cap alongside the price, in shared code, so both ends
+and a test agree rather than leaving it to whichever composer built the request.
+A half-entered price is dropped by the same rule: it is not a cheaper price, it
+is an estimate that under-reports every request.
+
+### What this slice added
+
+The lane arrived without a test for either of its two load-bearing rules — the
+17 tests it did carry are all on the pure pricing helpers. Both are now pinned,
+and both pins were proved to guard by positive control, each file restored and
+verified byte-identical (`SequenceEqual === True`):
+
+| test | run against | result |
+| --- | --- | --- |
+| `carries a cost cap only alongside the rates that can evaluate it` | `maxEstimatedCostUsd = requestedCostBudget` (the drop removed) | **failed, alone** (1 of 13) |
+| `reads a price out of a rate draft only once both halves parse` | `\|\|` → `&&` in the empty-field guard | **failed, alone** (1 of 6) |
+
+### Live acceptance, on a fresh boot
+
+The recorded `bridge.json` port refused connections, so no dev instance was
+running and one was started. `/logs` was clean on arrival and reports **zero
+errors** across the whole run, with no foreign `[vite] hot updated` paths.
+
+Four probes, every one against the running process rather than a fixture.
+
+**The modules resolve in the real renderer**, which vitest's module graph cannot
+substitute for, and the store round-trips against real `localStorage`:
+
+| probe | result |
+| --- | --- |
+| four dynamic imports | all four named exports are `function` |
+| save a price, re-read it | round-trips exactly |
+| clear it | key removed, not zeroed |
+| `jp-agent-provider-pricing-v1` restored | **identical** to the captured value (absent, and absent again) |
+| `AgentWorkspaceShell.tsx` imported | default export is a function; three watched keys unchanged |
+
+**The bridge rule, evaluated in the renderer:** cap `0.05` with rates survives as
+`0.05`; the same cap with no rates comes back **dropped**; with half a price,
+**dropped**; and a local target drops *both* halves.
+
+**The refusal is real in main, and it is discriminating.** A throwaway
+conversation was created, three runs were made against `deepseek-v4-flash`
+(chosen because `aiGetConfig` reports `{gemini: true, deepseek: false}` — a
+Gemini run that cleared the gate would have made a real, paid API call), and the
+workspace was then restored:
+
+| run | policy | result |
+| --- | --- | --- |
+| cap exceeded | rates `1000/1000`, cap `$0.0001` | **`cost-budget`** |
+| cap generous | rates `1000/1000`, cap `$100` | `missing-credential` |
+| cap without rates | cap `$0.0001`, no rates | `missing-credential` |
+
+The first line is the refusal, and the second and third are what make it
+evidence. `capGenerous` reaching `missing-credential` proves the gate is not a
+blanket refusal — it let a priced request through. `capNoPricing` reaching the
+same place proves the *reason the cap is dropped*: an unpriced cap forwarded to
+main would have refused nothing at all. And because `missing-credential` is read
+at `providerRuntime.ts:619` while the cost gate is at `:612`, `cost-budget`
+arriving first is proof the refusal happens **before any credential is read and
+before anything leaves the machine**.
+
+The workspace was restored and checked three ways: the probe conversation is
+gone, the conversation array is byte-identical to the captured one, and the whole
+state matches except `revision` — which cannot match, because it is the store's
+own compare-and-swap counter and a restore is a write.
+
+**The 11 new keys resolve through the running catalogs** in all four languages,
+`11/11` differing from English in each of ja/zh/ru, none rendering as its own
+key, and `{amount}` intact. Every probe global was deleted and re-read as absent.
+
+### The 55 keys the branch was already missing
+
+Measuring the catalogs to stage them turned up something larger than this slice.
+Counting top-level entries with a string-aware scanner (naive brace counting
+mis-measures a plural entry, because catalog values contain `{count}`):
+
+**HEAD's `en.ts` has 7,470 keys; the working tree has 7,865. 395 keys have never
+been committed, and 55 of them are `agent.*`.**
+
+Those 55 are not this lane's. They belong to Agent surfaces that *are* in the
+branch — `agent.view.simple`/`agent.view.full` (the Simple/Full toggle),
+`agent.inspector.title`, the whole `agent.execute.limits` budget block, thirteen
+`agent.undo.error.*` codes, `agent.card.undo.*`. So a fresh checkout of
+`feat/nyaa-subtitles` renders the committed Agent's view toggle, inspector,
+request limits and every undo failure message **as raw key strings**. This is the
+same disease as the two "the branch does not build from its own HEAD" sections
+above, in a third organ.
+
+All 55 are committed here, as reconstructed blobs, because they are Track 3's own
+and because leaving them out would land this lane's 11 keys into a catalog whose
+neighbours are still missing. The other 340 belong to other tracks and are left
+exactly as they are.
+
+### Staged against a shared tree
+
+The four catalogs carry several hundred lines of other tracks' uncommitted work
+and were committed as **reconstructed blobs** — HEAD verbatim plus the 55 named
+entries, lifted with the scanner above and spliced before the closing `};`. The
+other ten files were each read hunk by hunk first and carry nothing but this
+lane; both test files were clean before editing. The working tree's foreign state
+is untouched.
+
+### What was deliberately not verified
+
+**No paid request was made, and none should be.** The negative direction in main
+— "a request that clears the cost gate proceeds" — is proved only up to the
+credential check, on the provider that has no key. Proving it further means
+paying a provider to answer a probe, and the two lines that stop short of it
+already discriminate the gate from a blanket refusal.
+
+**The composer was not driven by hand.** The cost fields live behind Full mode
+inside the Agent's composer, and the click path through a stacked `.fwin` surface
+is a known instrumentation limit in this repo, not a product one. What a click
+would have established — that the fields reach the store and that the policy
+reaches main — is exactly what the store round-trip and the three live runs
+establish directly.
+
+### Gates
+
+`npx vitest run`: **509 passed / 1 skipped of 510 files**, **6,958 passed** / 6
+skipped of 6,964 — up 21 from `c7d9d63`'s 6,937: the 17 the lane already carried
+plus the 4 added here. `node tools/i18n-check.cjs`: clean, **9,264** English keys
+translated in ja/zh/ru, up 11 for the 11 cost keys. `node
+tools/architecture-audit.cjs`: exit 0, nothing new, the same 3 known pending
+findings — so neither new module is an orphan. `npx eslint` on all fourteen
+touched paths: **0 errors, 0 warnings**.
+
+### Still open
+
+- **Full-mode memory/profile/permission/automation controls** — the other half of
+  the plan bullet, and larger than it reads. In the **main app** there is no
+  writer for `localAgentSettings` or for the agent profile store at all: the only
+  one in the repository is `BlancReadyToolPanels`, in Blanc's separate shell. So
+  the central Agent's permission ceiling, its active profile, its memory switch
+  and its automations are all read-only from the app that owns the Agent, and
+  `buildAgentCapabilityDirectory` can tell a user an operation is unavailable for
+  `permission-insufficient` or `profile-operation-disabled` while offering no
+  route to resolve it — which the plan asks for by name. Note before building it
+  that `normalizeAgentProfiles` forces `activeProfileId` back to `study-tutor`
+  whenever the named profile is not `enabled`, so a picker that lists disabled
+  profiles will silently do nothing when one is chosen.
+- **Retained-chat policy and memory scope** — untouched; neither has any state
+  behind it yet.
+- **The 340 non-`agent.*` catalog keys missing at HEAD** — measured above,
+  belonging to other tracks, deliberately not adopted.
+- **`mediaCueAgentContext`'s identity ignores `mediaId`** — unchanged, fifth
+  section running.
+- **The five untracked `src/shared/i18n/*/` directories** — unchanged and still
+  not this track's to adopt.

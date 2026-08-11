@@ -238,8 +238,25 @@ Still required before the Track 3 acceptance can be called complete:
   the entity alive, so the removal check and the `deleted` claim both misdescribe
   it). **Still open**: the product decision on whether the session-only
   activity/operation history becomes durable;
-- Full-mode memory/profile/permission/automation and real provider-cost
-  controls, retained-chat policy and memory scope;
+- **Real provider-cost controls: done.** The composer prices a request from the
+  user's own per-million-token rates — never a shipped table, which would rot
+  into a confident lie the first time a provider re-priced — shows a labelled
+  floor for the run in front of it, reports the actual charge per turn from the
+  provider's returned usage, and can refuse a run above a cost limit. The
+  refusal is main's, and it fires in the preflight before any credential is read
+  or any request leaves the machine. The load-bearing rule is that the cap is
+  carried **only** alongside a complete pair of rates: `providerRuntime` skips
+  its refusal whenever the estimate is `undefined`, so a cap forwarded without
+  pricing would be a control that refuses nothing while telling the user it
+  will. `normalizePolicy` drops it, in shared code, so both ends agree. The lane
+  was found already written and **entirely uncommitted** — two untracked
+  modules, six modified files and 44 catalog entries that had never been in the
+  branch's history; this commit verified and landed it, and added the two tests
+  that hold its rules (2026-08-11 — see the ledger's "The cost control that had
+  been written and never committed"). **Still open** from this bullet:
+  Full-mode memory/profile/permission/automation controls — the main app has no
+  writer for `localAgentSettings` or the agent profile store at all, only Blanc
+  does — plus retained-chat policy and memory scope;
 - final compact-width and complete keyboard/reduced-motion visual matrices.
 
 ## Track 4: unified Reading workspace

@@ -31,6 +31,76 @@ describe('Agent execution bridge contract', () => {
     });
   });
 
+  /**
+   * The cost cap's one load-bearing property, and the only way it can fail while
+   * still looking enforced.
+   *
+   * `providerRuntime`'s preflight refusal is skipped whenever the estimate is
+   * `undefined`, and the estimate is `undefined` without a complete pair of
+   * rates. So a cap that reaches main without pricing is a control that refuses
+   * nothing while telling the user it will — worse than no control, because the
+   * user stops watching. `normalizePolicy` drops the cap alongside the price it
+   * would have been evaluated against; this pins that in shared code so both
+   * ends agree, rather than leaving it to whichever composer built the request.
+   */
+  it('carries a cost cap only alongside the rates that can evaluate it', () => {
+    const cloud = {
+      requestId: 'run-cost',
+      conversationId: 'chat-cost',
+      prompt: 'Explain this',
+      policy: defaultAgentExecutionPolicy('gemini-2.5-flash'),
+      allowLocalFallback: false,
+    };
+
+    const priced = normalizeAgentExecutionRequest({
+      ...cloud,
+      policy: {
+        ...cloud.policy,
+        pricing: { inputPerMillionTokens: 0.3, outputPerMillionTokens: 2.5 },
+        maxEstimatedCostUsd: 0.05,
+      },
+    });
+    expect(priced?.policy.pricing).toEqual({
+      inputPerMillionTokens: 0.3,
+      outputPerMillionTokens: 2.5,
+    });
+    expect(priced?.policy.maxEstimatedCostUsd).toBe(0.05);
+
+    // A half-entered price is not a cheaper price — it under-reports every
+    // request — so it is no price at all, and the cap goes with it.
+    const halfPriced = normalizeAgentExecutionRequest({
+      ...cloud,
+      policy: {
+        ...cloud.policy,
+        pricing: { inputPerMillionTokens: 0.3 },
+        maxEstimatedCostUsd: 0.05,
+      },
+    });
+    expect(halfPriced?.policy.pricing).toBeUndefined();
+    expect(halfPriced?.policy.maxEstimatedCostUsd).toBeUndefined();
+
+    const unpriced = normalizeAgentExecutionRequest({
+      ...cloud,
+      policy: { ...cloud.policy, maxEstimatedCostUsd: 0.05 },
+    });
+    expect(unpriced?.policy.maxEstimatedCostUsd).toBeUndefined();
+
+    // A local run is never billed, so neither half survives it.
+    const local = normalizeAgentExecutionRequest({
+      requestId: 'run-local',
+      conversationId: 'chat-cost',
+      prompt: 'Explain this',
+      policy: {
+        ...defaultAgentExecutionPolicy(),
+        pricing: { inputPerMillionTokens: 0.3, outputPerMillionTokens: 2.5 },
+        maxEstimatedCostUsd: 0.05,
+      },
+      allowLocalFallback: false,
+    });
+    expect(local?.policy.pricing).toBeUndefined();
+    expect(local?.policy.maxEstimatedCostUsd).toBeUndefined();
+  });
+
   it('rejects empty, foreign-provider and persistent-cache requests', () => {
     const base = {
       requestId: 'run-1',

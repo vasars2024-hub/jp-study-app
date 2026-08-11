@@ -50,9 +50,29 @@ import {
 } from '../../agentExecutionClient';
 import {
   agentKnownInputChars,
+  agentPriceFromRateDraft,
+  agentRateDraftFromPrice,
   agentSensitiveContextKey,
+  clampAgentCostBudgetUsd,
   clampAgentExecutionBudget,
+  type AgentProviderRateDraft,
 } from '../../agentExecutionPolicyDraft';
+import {
+  AGENT_COST_BUDGET_DEFAULT_USD,
+  AGENT_COST_BUDGET_MAX_USD,
+  AGENT_COST_BUDGET_MIN_USD,
+  AGENT_PROVIDER_PRICE_MAX,
+  agentEstimatedTokens,
+  agentProviderPrice,
+  estimateAgentProviderCostUsd,
+  formatAgentCostUsd,
+  type AgentProviderPricingTable,
+} from '../../../shared/agentProviderPricing';
+import {
+  loadAgentProviderPricing,
+  onAgentProviderPricingChanged,
+  saveAgentProviderPrice,
+} from '../../agentProviderPricingStore';
 import {
   AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT,
   createAgentConversationPlan,
@@ -192,11 +212,14 @@ function executionErrorKey(code: AgentExecutionFailureCode): string {
   // Deliberately not folded into `privacy`: this is a capability of the chosen
   // model, and the fix is to switch target rather than to grant consent.
   if (code === 'vision-unsupported') return 'agent.attachment.visionUnsupported';
+  // Split out of `privacy` now that a cost cap can actually be set: the generic
+  // "privacy or budget policy" wording names no control the user can reach, and
+  // this refusal has exactly one remedy.
+  if (code === 'cost-budget') return 'agent.execute.error.costBudget';
   if (
     code === 'cloud-disabled'
     || code === 'sensitive-context'
     || code === 'input-budget'
-    || code === 'cost-budget'
     || code === 'persistent-cache-unavailable'
   ) {
     return 'agent.execute.error.privacy';
@@ -639,6 +662,18 @@ function MessageRow({
             {provider.cloud && provider.target.kind === 'cloud'
               ? t('agent.message.providerCloud', { provider: provider.target.providerId })
               : t('agent.message.providerLocal')}
+          </span>
+        ) : null}
+        {/*
+          Only ever present when the provider returned real token usage and the
+          user had entered rates for it. An absent figure is left absent rather
+          than shown as zero — this run's cost is unknown, not free.
+        */}
+        {provider?.estimatedCostUsd !== undefined ? (
+          <span className="agent-chip agent-chip-cost">
+            {t('agent.message.estimatedCost', {
+              amount: formatAgentCostUsd(provider.estimatedCostUsd),
+            })}
           </span>
         ) : null}
       </div>
@@ -1261,6 +1296,21 @@ export default function AgentWorkspaceShell() {
   const [planQueueFailure, setPlanQueueFailure] = useState<string | null>(null);
   const [maxInputChars, setMaxInputChars] = useState(AGENT_EXECUTION_DEFAULT_INPUT_BUDGET);
   const [maxOutputTokens, setMaxOutputTokens] = useState(AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET);
+  /**
+   * The user's per-provider rates, and whether a cap is being enforced from them.
+   *
+   * The rates persist; the cap is session-only like the two budgets above it,
+   * because it is a decision about the run in front of the user. `costCapOn` is
+   * separate from the amount so that turning the cap off does not throw away the
+   * figure the user chose, and so that "no cap" is never expressed as a cap of
+   * zero — which the runtime would read as "refuse everything".
+   */
+  const [pricingTable, setPricingTable] = useState<AgentProviderPricingTable>(() => (
+    loadAgentProviderPricing()
+  ));
+  const [costCapOn, setCostCapOn] = useState(false);
+  const [costCapUsd, setCostCapUsd] = useState(AGENT_COST_BUDGET_DEFAULT_USD);
+  const [rateDraft, setRateDraft] = useState<AgentProviderRateDraft>({ input: '', output: '' });
   const [attachments, setAttachments] = useState<AgentExecutionAttachment[]>([]);
   /**
    * Bumped by main's "a capture is waiting" announcement, and the reason the
@@ -1469,12 +1519,52 @@ export default function AgentWorkspaceShell() {
   const knownInputChars = agentKnownInputChars(draft, attachments);
   const knownInputOverBudget = knownInputChars > maxInputChars;
   const planObjectiveTooLong = draft.trim().length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT;
+  const selectedPrice = agentProviderPrice(pricingTable, target);
+  /**
+   * A floor, not a forecast, and labelled as one.
+   *
+   * It is computed from what the composer can measure — the same characters
+   * `agentKnownInputChars` counts — while main additionally prices conversation
+   * history, the mode preset and context labels. It also assumes the whole output
+   * budget is spent, which is the honest direction for a number a spending
+   * decision is made from: the part it cannot see only pushes the real figure up.
+   */
+  const estimatedCostUsd = estimateAgentProviderCostUsd(
+    agentEstimatedTokens(knownInputChars),
+    maxOutputTokens,
+    selectedPrice,
+  );
+  const costCapActive = costCapOn && Boolean(selectedPrice);
 
   // Consent is scoped to this exact conversation/sensitive-context snapshot.
   // A context shelf update or conversation switch must require a fresh choice.
   useEffect(() => {
     setCloudSensitiveConsent(false);
   }, [sensitiveContextKey]);
+
+  // A rate entered in the pop-out Agent has to reach the docked one, and the
+  // reverse. Rates are the only piece of this panel that is not per-window.
+  useEffect(() => onAgentProviderPricingChanged(setPricingTable), []);
+
+  /**
+   * The two rate fields show the *selected* provider's price. Keyed on the target
+   * alone rather than on the table: re-seeding on every table change would
+   * overwrite the digits being typed with the committed value on each keystroke.
+   */
+  useEffect(() => {
+    setRateDraft(agentRateDraftFromPrice(agentProviderPrice(loadAgentProviderPricing(), target)));
+  }, [target]);
+
+  /**
+   * Persisting from the event handler rather than from inside the state updater:
+   * an updater has to stay pure, and React invokes it twice under StrictMode.
+   */
+  const editRate = useCallback((half: 'input' | 'output', text: string): void => {
+    if (target === 'local') return;
+    const next: AgentProviderRateDraft = { ...rateDraft, [half]: text };
+    setRateDraft(next);
+    setPricingTable(saveAgentProviderPrice(target, agentPriceFromRateDraft(next)));
+  }, [rateDraft, target]);
 
   /**
    * The composer's own attachments, readable from an effect that must not re-run
@@ -1573,6 +1663,11 @@ export default function AgentWorkspaceShell() {
         allowSensitiveContext: sensitiveConsentRequired && cloudSensitiveConsent,
         maxInputChars,
         maxOutputTokens,
+        // Both or neither. The bridge normalizer drops a cap that arrives
+        // without rates anyway; sending them together is what makes the
+        // refusal the user was promised actually reachable.
+        ...(selectedPrice ? { pricing: selectedPrice } : {}),
+        ...(costCapActive ? { maxEstimatedCostUsd: costCapUsd } : {}),
       },
       allowLocalFallback: target === 'local' ? false : allowLocalFallback,
       attachments,
@@ -1613,6 +1708,9 @@ export default function AgentWorkspaceShell() {
     target,
     maxInputChars,
     maxOutputTokens,
+    selectedPrice,
+    costCapActive,
+    costCapUsd,
   ]);
 
   const cancelExecution = useCallback(() => {
@@ -2195,6 +2293,78 @@ export default function AgentWorkspaceShell() {
                     })}
                   </p>
                   <p className="agent-budget-note">{t('agent.execute.inputBudgetNote')}</p>
+
+                  {target !== 'local' ? (
+                    <div className="agent-cost-controls">
+                      <p className="agent-budget-note">{t('agent.execute.costRatesNote')}</p>
+                      <div className="agent-execution-limit-grid">
+                        <label className="agent-field agent-budget-field">
+                          <span>{t('agent.execute.costInputRate')}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={AGENT_PROVIDER_PRICE_MAX}
+                            step={0.01}
+                            value={rateDraft.input}
+                            placeholder={t('agent.execute.costRateUnset')}
+                            onChange={(event) => editRate('input', event.currentTarget.value)}
+                            disabled={blocked}
+                          />
+                        </label>
+                        <label className="agent-field agent-budget-field">
+                          <span>{t('agent.execute.costOutputRate')}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={AGENT_PROVIDER_PRICE_MAX}
+                            step={0.01}
+                            value={rateDraft.output}
+                            placeholder={t('agent.execute.costRateUnset')}
+                            onChange={(event) => editRate('output', event.currentTarget.value)}
+                            disabled={blocked}
+                          />
+                        </label>
+                      </div>
+
+                      {selectedPrice ? (
+                        <>
+                          <p className="agent-budget-usage">
+                            {t('agent.execute.costEstimate', {
+                              amount: formatAgentCostUsd(estimatedCostUsd ?? 0),
+                            })}
+                          </p>
+                          <label className="agent-check">
+                            <input
+                              type="checkbox"
+                              checked={costCapOn}
+                              onChange={(event) => setCostCapOn(event.target.checked)}
+                              disabled={blocked}
+                            />
+                            <span>{t('agent.execute.costCapEnable')}</span>
+                          </label>
+                          {costCapOn ? (
+                            <label className="agent-field agent-budget-field">
+                              <span>{t('agent.execute.costCap')}</span>
+                              <input
+                                type="number"
+                                min={AGENT_COST_BUDGET_MIN_USD}
+                                max={AGENT_COST_BUDGET_MAX_USD}
+                                step={0.01}
+                                value={costCapUsd}
+                                onChange={(event) => setCostCapUsd(clampAgentCostBudgetUsd(
+                                  event.currentTarget.valueAsNumber,
+                                ))}
+                                disabled={blocked}
+                              />
+                            </label>
+                          ) : null}
+                          <p className="agent-budget-note">{t('agent.execute.costEstimateNote')}</p>
+                        </>
+                      ) : (
+                        <p className="agent-budget-note">{t('agent.execute.costUnpriced')}</p>
+                      )}
+                    </div>
+                  ) : null}
                 </details>
 
                 {target !== 'local' ? (

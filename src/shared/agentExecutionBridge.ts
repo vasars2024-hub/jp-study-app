@@ -1,4 +1,5 @@
 import type { AiProviderId } from './aiProviders';
+import { normalizeAgentProviderPrice } from './agentProviderPricing';
 import {
   AGENT_WORKSPACE_SCHEMA_VERSION,
   normalizeAgentWorkspaceState,
@@ -379,11 +380,21 @@ function normalizePolicy(value: unknown): AgentProviderPolicy | null {
   }
   if (!normalizedTarget || raw.cache === 'persistent') return null;
   const cache = raw.cache === 'session' ? 'session' : 'off';
-  const maxEstimatedCostUsd = typeof raw.maxEstimatedCostUsd === 'number'
+  // A local target has no dollar price, so neither a rate nor a cap survives it.
+  const pricing = normalizedTarget.kind === 'cloud'
+    ? normalizeAgentProviderPrice(raw.pricing)
+    : undefined;
+  const requestedCostBudget = typeof raw.maxEstimatedCostUsd === 'number'
     && Number.isFinite(raw.maxEstimatedCostUsd)
     && raw.maxEstimatedCostUsd >= 0
     ? raw.maxEstimatedCostUsd
     : undefined;
+  // The cap is only carried when there is a price to evaluate it against. The
+  // runtime skips its preflight refusal when the estimate is `undefined`, so
+  // forwarding a cap without pricing would put a control in front of the user
+  // that silently refuses nothing — the exact false assurance this lane was held
+  // back for. Dropped here, in shared code, so both ends and a test agree.
+  const maxEstimatedCostUsd = pricing ? requestedCostBudget : undefined;
   return {
     target: normalizedTarget,
     allowCloud: raw.allowCloud === true,
@@ -401,6 +412,7 @@ function normalizePolicy(value: unknown): AgentProviderPolicy | null {
       AGENT_EXECUTION_OUTPUT_BUDGET_MAX,
     ),
     ...(maxEstimatedCostUsd !== undefined ? { maxEstimatedCostUsd } : {}),
+    ...(pricing ? { pricing } : {}),
     cache,
     retryAttempts: boundedInteger(raw.retryAttempts, 1, 0, 3),
     timeoutMs: boundedInteger(raw.timeoutMs, 120_000, 1_000, 600_000),

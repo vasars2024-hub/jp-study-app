@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import type { AiProviderId, AiProviderKeyBucket } from '../shared/aiProviders';
 import { providerAcceptsImageInput, providerKeyBucket } from '../shared/aiProviders';
 import type { AgentProviderPolicy } from '../shared/agentWorkspace';
+import type { AgentProviderPrice } from '../shared/agentProviderPricing';
+import { agentEstimatedTokens, estimateAgentProviderCostUsd } from '../shared/agentProviderPricing';
 import { readAiProviderSecret } from './credentials/ai';
 
 export const AI_PROVIDER_TIMEOUT_MS = 120_000;
@@ -42,10 +44,12 @@ export class AiProviderRuntimeError extends Error {
   }
 }
 
-export interface AiProviderPricing {
-  inputPerMillionTokens: number;
-  outputPerMillionTokens: number;
-}
+/**
+ * Aliased rather than redeclared. The composer previews a cost with the same
+ * shape the runtime refuses on, and two structurally identical interfaces in two
+ * files are two things that can drift.
+ */
+export type AiProviderPricing = AgentProviderPrice;
 
 export interface AiProviderUsage {
   inputTokens?: number;
@@ -114,6 +118,7 @@ export type AgentCloudRuntimeOptions = Pick<
   | 'maxInputChars'
   | 'maxOutputTokens'
   | 'maxEstimatedCostUsd'
+  | 'pricing'
   | 'cache'
   | 'retryAttempts'
   | 'timeoutMs'
@@ -165,6 +170,7 @@ export function agentCloudRuntimeOptions(policy: AgentProviderPolicy): AgentClou
     ...(policy.maxEstimatedCostUsd !== undefined
       ? { maxEstimatedCostUsd: policy.maxEstimatedCostUsd }
       : {}),
+    ...(policy.pricing ? { pricing: policy.pricing } : {}),
     cache: policy.cache,
     retryAttempts: policy.retryAttempts,
     timeoutMs: policy.timeoutMs,
@@ -176,23 +182,14 @@ function boundedInteger(value: number | undefined, fallback: number, min: number
   return Math.min(max, Math.max(min, Math.floor(value as number)));
 }
 
-function estimatedTokens(chars: number): number {
-  return Math.max(1, Math.ceil(chars / 4));
-}
+const estimatedTokens = agentEstimatedTokens;
 
 export function estimateAiProviderCostUsd(
   inputTokens: number,
   outputTokens: number,
   pricing?: AiProviderPricing,
 ): number | undefined {
-  if (!pricing) return undefined;
-  if (!Number.isFinite(pricing.inputPerMillionTokens) || !Number.isFinite(pricing.outputPerMillionTokens)) {
-    return undefined;
-  }
-  return (
-    Math.max(0, inputTokens) * Math.max(0, pricing.inputPerMillionTokens)
-    + Math.max(0, outputTokens) * Math.max(0, pricing.outputPerMillionTokens)
-  ) / 1_000_000;
+  return estimateAgentProviderCostUsd(inputTokens, outputTokens, pricing);
 }
 
 function cacheKey(request: AiProviderRequest, model: string, maxOutputTokens: number): string {

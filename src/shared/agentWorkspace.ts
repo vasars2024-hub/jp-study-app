@@ -1,4 +1,5 @@
 import type { AiProviderId } from './aiProviders';
+import type { AgentProviderPrice } from './agentProviderPricing';
 
 export const AGENT_WORKSPACE_SCHEMA_VERSION = 1 as const;
 
@@ -69,6 +70,13 @@ export interface AgentProviderPolicy {
   maxInputChars: number;
   maxOutputTokens: number;
   maxEstimatedCostUsd?: number;
+  /**
+   * The user's own per-million-token rates for this target. Absent for a local
+   * target and for a cloud target the user has not priced; `maxEstimatedCostUsd`
+   * is dropped alongside it, because a cap that can never be evaluated is a
+   * control that claims to protect a budget it does not read.
+   */
+  pricing?: AgentProviderPrice;
   cache: 'off' | 'session' | 'persistent';
   retryAttempts: number;
   timeoutMs: number;
