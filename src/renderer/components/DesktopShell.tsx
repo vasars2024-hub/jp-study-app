@@ -22,6 +22,7 @@ import type {
 } from '../../shared/desktop';
 import { DESKTOP_STUDY } from '../../shared/desktop';
 import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
+import { collectForeignWindows } from '../foreignWindows';
 import { loadDisplayPrefs } from '../displayPrefs';
 import DropRouter from './DropRouter';
 import {
@@ -1166,21 +1167,41 @@ export default function DesktopShell({
   }, [wins, activeDesktop, myDisplayKey]);
 
   /**
+   * Bumped on every desktop-layout broadcast, so `foreignWins` below can depend
+   * on the store it reads.
+   *
+   * Without this the memo listed windows off *other* desktops while depending on
+   * nothing that changes when another desktop is edited. Measured live on a
+   * simulated second display: dragging a window here from desktop 0 left it in
+   * the taskbar twice — once correctly as this desktop's own, and once as a
+   * foreign entry still badged with the desktop it had already left, whose click
+   * raised the wrong monitor.
+   *
+   * Subscribed only while the list is actually shown. The broadcast fires on
+   * every layout commit, and the default taskbar renders none of this, so a
+   * shell that is not opted in must not pay a re-render for it.
+   */
+  const [layoutRevision, setLayoutRevision] = useState(0);
+  useEffect(() => {
+    if (!myAssignment?.showAllWindows) return;
+    return onDesktopChanged(() => setLayoutRevision((n) => n + 1));
+  }, [myAssignment?.showAllWindows]);
+
+  /**
    * Windows living on *other* desktops, shown with a monitor badge when the
    * user has asked this taskbar to list everything (Windows 11 style).
    */
-  const foreignWins = useMemo(() => {
-    if (!myAssignment?.showAllWindows) return [];
-    const out: { win: WindowSnapshot; desktopIndex: DesktopIndex; desktopName: string }[] = [];
-    for (let index = 0; index < getDesktopCount(); index += 1) {
-      if (index === activeDesktop) continue;
-      for (const win of getDesktopLayout(index).windows) {
-        if (!win.visible) continue;
-        out.push({ win, desktopIndex: index, desktopName: getDesktopName(index) });
-      }
-    }
-    return out;
-  }, [myAssignment?.showAllWindows, activeDesktop, deskPrefs]);
+  const foreignWins = useMemo(
+    () =>
+      collectForeignWindows({
+        showAllWindows: myAssignment?.showAllWindows === true,
+        activeDesktop,
+        desktopCount: getDesktopCount(),
+        windowsOn: (index) => getDesktopLayout(index).windows,
+        nameOf: getDesktopName,
+      }),
+    [myAssignment?.showAllWindows, activeDesktop, deskPrefs, layoutRevision],
+  );
 
   /** Ghost shown on the receiving desktop while an item hovers over it. */
   const [dragGhost, setDragGhost] = useState<{ kind: DeskDragKind; x: number; y: number } | null>(null);

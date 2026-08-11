@@ -778,6 +778,29 @@ function SecondaryDesktopWindow({
     });
   }, [displayKey]);
 
+  /**
+   * The query string names the desktop this window was *created* for, and a
+   * retarget deliberately does not rebuild the window — so after any reload the
+   * URL names a desktop this display no longer shows.
+   *
+   * Measured on a simulated second display: assigned desktop index 2, reloaded,
+   * and the shell came back showing index 1 — the value baked into its URL —
+   * while the store, main's registry and Settings -> Monitors all still said 2.
+   *
+   * Main owns the assignment, so ask it instead of trusting the URL. The URL
+   * stays the seed, which keeps the first paint right in the ordinary case where
+   * nothing has been retargeted.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void window.api.deskwinWhoAmI().then((who) => {
+      if (!cancelled && typeof who.desktopIndex === 'number') setIndex(who.desktopIndex);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [displayKey]);
+
   useEffect(() => {
     const read = (): void => {
       setAero(getAssignment(displayKey)?.aero !== false);
