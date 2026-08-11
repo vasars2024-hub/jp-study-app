@@ -8427,3 +8427,40 @@ For whoever runs next, in order:
 3. A caveat worth not rediscovering: `lineCount` was `0` on the live probe. That is correct
    behaviour, not a defect — the probe's `lines[]` used a `bbox` key that `normalizeLines`
    rightly rejects, and the text survived because it was passed explicitly. Do not "fix" it.
+
+## `lensOpen('clipboard')`, driven at last — 2026-08-11
+
+Item 1 of the list immediately above is **closed**, in the same hop that wrote it, because the
+app was already up. It had been outstanding for four hops purely because three workers in a row
+could not restart Electron.
+
+`window.api.lensOpen('clipboard')` was invoked from the main window through the bridge. Main
+built the overlay: a second window appeared at `http://localhost:5173/?readingLens=1`, maximized
+1920×1080, visible and focused. Its rendered body text was
+
+> `В буфере обмена нет текста для чтения. / Новая область / Закрыть линзу`
+
+which settles three things at once that no unit test covers together:
+
+- **`lens:open` reached the main handler and `openLens('clipboard')` ran** — the overlay window
+  is created by main, so its existence is the proof. This is the binding-versus-handler
+  distinction the repo rules insist on, and it is now on the handler side.
+- **The clipboard slice's catalogs are wired live in a non-English UI.** The strings rendered as
+  real Russian, not as raw `lens.clipboard.empty` key text. A key-count check cannot see this;
+  only rendering it in the running app can.
+- **The empty-clipboard path degrades correctly.** The host clipboard genuinely held no text, so
+  `createReadingLensClipboardCapture` returned `null` and the renderer showed the empty state
+  with its retry and close controls, rather than losing the Lens. `/logs?level=error` was
+  **empty** across the whole probe.
+
+`reading-lens-history.json` was **still absent afterwards** — correct, and a real assertion about
+the commit above: the clipboard path's now-unconditional `lensHistoryRecord` call sits after the
+empty-clipboard early return, so a null capture records nothing instead of persisting a blank.
+
+One thing that looks like a defect and is not: after `lensClose()` the window is still listed by
+`/health` with `visible:false`. `closeLens()` is `lens.hide()` (`main/readingLens.ts:215-217`) —
+the overlay is pooled and reused by the next `openLens`, deliberately. Do not file it.
+
+Renumbered for whoever runs next: **the 46 red tests at HEAD** are now item 1, with
+`credentials/ipc.ts` the largest lump at 28 of the 46 and the source of three of the
+architecture gate's six findings. Nothing else changed.
