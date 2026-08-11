@@ -9527,3 +9527,149 @@ and the consumer for the 14 withheld `fileDrop.affordance` / `triage` / `toast` 
 subsystem, `deskDrag`, `studyBlockWindows`), so it needs hunk-level reconstruction against
 `HEAD` rather than a file copy. `DropRouter.tsx` is untracked and should be checked for its own
 foreign dependencies first — `onboardingStore.ts` was that surprise this hop.
+
+## The prerequisite the next-slice note did not know it had — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist, so no boss finding pre-empted Main V1.
+The previous entry's "Exact next slice" was `DesktopShell.tsx` + `DropRouter.tsx`, with the
+instruction to check `DropRouter.tsx` for its own foreign dependencies first. That check is what
+this hop did, and it came back non-empty: **the named slice could not have compiled.**
+
+### What re-deriving found
+
+`DropRouter.tsx` (untracked, 372 lines) imports ten symbols. Eight resolve at `HEAD`. Two do not:
+
+- **`importApkgCards` from `renderer/apkgImport.ts`** — absent at `HEAD`, and behind it a whole
+  uncommitted chain: `shared/apkgCards.ts` (untracked), an `apkg:importCards` main handler, a
+  preload binding and a `window.d.ts` declaration.
+- **`showOsToast` from `components/ToastHost.tsx`** — absent at `HEAD` (`ToastHost` exports only
+  its default component there).
+
+So the DropRouter hop is really two hops, and this is the first: **the Anki-cards import chain**,
+which is a capability in its own right and has its own unit test already written. `ToastHost.tsx`
+was deliberately *not* included — its `showOsToast` has no consumer until `DropRouter.tsx` lands,
+and landing an export ahead of its only caller is the defect `a701ba8` was criticised for here.
+The apkg chain is the opposite case: it is executable code with tests and a live IPC surface, and
+every piece of it is consumed by the piece above it.
+
+### The six paths, and how each was decided
+
+Commit `aaba84b`, six paths, **604 insertions / 19 deletions**.
+
+- `src/shared/apkgCards.ts` (new, 195 lines) and `src/shared/__tests__/apkgCards.test.ts` (new,
+  163 lines) — untracked, taken whole.
+- `src/main/anki/apkgImport.ts` (+178/-19) and `src/renderer/apkgImport.ts` (+62/-0) — dirty, but
+  **every hunk in both is this subsystem**; each diff was read line by line before that was
+  claimed, not sampled.
+- `src/preload.ts` and `src/renderer/window.d.ts` — dirty with **foreign hunks** (`DeskDragKind`,
+  `DisplayAssignment`, `DisplaySummary`, `DeskWindowInfo`, `DropPlan`, and eight more blocks
+  between them). These were reconstructed as `git show HEAD:<path>` plus **two insertions each**,
+  by a build script that asserts every anchor occurs **exactly once** and that the result contains
+  **none** of the foreign symbols. Result: `+4/-0` and `+2/-0`. The foreign hunks are still in the
+  working tree, unmoved.
+
+Staging used `git hash-object -w --path=<p>` on the candidate's own bytes plus
+`git update-index --cacheinfo` for those two, never `git add` of the shared tree.
+
+### Four gates, both sides measured at `b243ef0`
+
+Baseline was re-measured this hop in a second detached worktree (`~\jp-wt-base2`), not taken from
+the previous entry.
+
+- `npx vitest run`: **10 failed / 5 files -> 10 failed / 5 files**, 6,815 -> **6,830 tests**. The
+  failing set is byte-identical and all foreign: `blancAgentStepConfirmGate` (5),
+  `localAgentQueueRun` (1), `novelReaderProgressGuard` (1), `architectureBaseline` (1), `i18n` (2).
+  The 15 new tests are `apkgCards.test.ts`, all green.
+- `node tools/i18n-check.cjs`: **exit 0**, 9,137 English keys — unchanged, because this slice adds
+  **no UI string at all**. The two dialog keys the main handler uses
+  (`dialog.importAnkiDeck.title`, `dialog.filter.ankiDeck`) already exist at `HEAD`.
+- `node tools/architecture-audit.cjs`: 1,650 -> **1,652 modules**, and the finding list is
+  **identical to baseline** — 19 findings, one unclassified, the same foreign
+  `orphan-module:src/shared/i18n/catalogs/mooncapLore.ts`. `apkgCards.ts` is not an orphan, which
+  is the check that the module is actually wired.
+- `npx eslint --no-ignore` on all six paths: the only output is the **pre-existing pair** in
+  `window.d.ts` (`subtitleHarvestList` / `subtitleHarvestFetch` adjacency). Measured at baseline on
+  the same file: the same two errors, at lines 1400/1403 instead of 1402/1405 — shifted by exactly
+  the two lines this slice inserts. **No new error**; the four other files are silent.
+
+`tsc --noEmit` was not run; it is not a gate.
+
+### Live Electron acceptance — a real .apkg, built to fail the old code
+
+Existing bridge on 39273, one window, driven only through authenticated `/eval`. The running main
+process already carried the working-tree handler, which is why this could be invoked at all — and
+invoking it is the point: a preload binding is not proof of a main handler.
+
+First probe, a nonexistent path, returned `{ok:false,error:"ADM-ZIP: Invalid filename"}` — i.e. it
+reached `new AdmZip(file)` inside the handler. `No handler registered for 'apkg:importCards'` is
+what the absence of the handler would have looked like, and that is not what came back.
+
+Then a **purpose-built fixture** (`$TEMP/jp-apkg-fixture/probe-deck.apkg`, 978 bytes, generated
+with the repo's own `sql.js` + `adm-zip`), shaped to exercise the parts that could silently do the
+wrong thing:
+
+- `col.models = '{}'` — **the narrow door** the `readModels` refactor exists to close: non-blank,
+  so `HEAD`'s `modelsJson.trim() ? ...` test takes the legacy branch, parses to an empty model map,
+  and never reads the normalized tables.
+- Fields deliberately ordered **Meaning / Expression / Reading / Sentence**, so a positional guess
+  imports the English gloss as the studied word.
+- Four notes: one normal, one plain, one `(word, reading)` duplicate, one with an empty expression.
+
+Live result, verbatim from the bridge:
+
+```
+{"ok":true,"noteCount":4,"fileName":"probe-deck.apkg","cards":[
+ {"word":"食べる","reading":"たべる","meaning":"to eat","sentence":"寿司を食べる。",
+  "deck":"Japanese::Core 2k::Stage 1","tags":["verb","n5"]},
+ {"word":"水","reading":"みず","meaning":"water","sentence":"水を飲む。",
+  "deck":"Japanese::Core 2k::Stage 1","tags":["noun"]}]}
+```
+
+`word` is `食べる`, not `to eat` — so the normalized `notetypes`/`fields` tables **were** consulted
+past the `'{}'` blob, which is the refactor working in the live process rather than in a fixture.
+`<b>` stripped, `[sound:a.mp3]` stripped, `食べる[たべる]` reduced to `食べる`, the deck name read
+through `cards.did` -> `decks.name`, tags split, the duplicate collapsed and the empty-expression
+note dropped while `noteCount` still honestly reports **4** scanned for **2** cards.
+
+The bridge reported **0 error entries**. Both probe globals were deleted and their absence
+asserted. **Nothing was persisted**: the main handler only reads the zip, and the renderer helper —
+the half that writes to the deck — was never invoked, so no capture-patch-restore was needed and no
+userData backup was taken.
+
+### What is deliberately open
+
+- **`renderer/apkgImport.ts`'s `importApkgCards` has no committed consumer yet.** It is the typed
+  client for the handler above it and `DropRouter.tsx` is its caller; it ships here because
+  splitting a two-line preload binding from the function that calls it would leave both halves
+  meaningless. It has **no unit test** — its logic is four lines of glue over `notesToCards` (which
+  has 15) and `addDeckCardsTracked` (already covered) — and that is a real, named gap, not an
+  oversight.
+- **`ToastHost.tsx` (+55/-7) stays in the working tree**, for the reason above.
+
+### Exact next slice
+
+**`main/deskDrag.ts` + `renderer/deskDrag.ts` + their preload/`window.d.ts` bindings** — the drag
+subsystem, which is now the only thing standing between `HEAD` and the last three renderer files.
+Then, as a second hop, `ToastHost.tsx` + `DropRouter.tsx` + `DesktopShell.tsx` with the 14 withheld
+`fileDrop.affordance` / `triage` / `toast` / `action` keys and `desktop.task.onDesktop`.
+
+Two corrections to the previous entry's sizing of this, both measured rather than assumed:
+
+- **`DesktopShell.tsx` does not interleave three tracks. It interleaves two, and one of them is
+  `deskDrag`.** `studyBlock` / `StudyBlockWindows` occurs **0 times** in the file; that track
+  touches `main.ts`, `preload.ts` and `window.d.ts` only. A marker scan of all 22 hunks for
+  `aero` / `blanc` / `nyaa` / `subtitle` / `lexicon` / `agent` / `mooncap` also came back **empty**.
+  So once `deskDrag` lands, `DesktopShell.tsx` is plausibly takeable **whole** rather than
+  hunk-by-hunk — that is a marker scan, not a line-by-line read, so confirm per hunk before
+  relying on it, but do not budget a whole hop for a reconstruction that may not be needed.
+- **Only ONE of `DesktopShell.tsx`'s new imports is missing at `HEAD`: `renderer/deskDrag.ts`.**
+  `displayPrefs.ts`, `DESKTOP_STUDY`, `TaskbarMode`, `DisplayAssignment`, `authoredW`,
+  `getAssignment`, `getAssignments`, `getDesktopCount` and `getDesktopName` all landed in `c5d92d4`
+  / `b63846e` and were each checked by name at `HEAD` this hop.
+
+`renderer/deskDrag.ts` (188 lines, untracked) is not free-standing: it calls **nine** `window.api`
+methods — `deskDragBegin` / `Move` / `End` / `Cancel` and `onDeskDrag` `Hover` / `Leave` / `Adopt` /
+`Release` / `Cancelled` — and **all nine are absent from `HEAD`'s preload**. So that hop is
+`main/deskDrag.ts` (169 lines) + its test + a `main.ts` registration hunk + nine preload bindings +
+their `window.d.ts` declarations + the renderer module. `main.ts`, `preload.ts` and `window.d.ts`
+are all dirty with foreign hunks and need the same reconstruct-from-`HEAD` treatment used here.
