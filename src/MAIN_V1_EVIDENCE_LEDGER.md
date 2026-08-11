@@ -10417,3 +10417,33 @@ Two cautions for whoever takes it:
   natural fixture: it was the control here and was never opened. Desktop 2 is also usable — the
   restore above put it back to 944x453 — but it is the one this hop already re-stamped once, so
   prefer 3 and keep 2 as a second shot.
+
+## Correction: "nothing is red" was true of the tree, not of HEAD — 2026-08-12
+
+Both entries above say the suite is green and that no set-difference was needed. That is true of
+the **shared working tree** and it is the wrong tree to say it about. Exported into
+`~\jp-wt-head` — clean checkout, junctioned `node_modules` — both commits from this hop were
+re-measured against the commit before them:
+
+| | `c0ff7e6` (baseline) | `73f7e2f` (this hop's HEAD) |
+|---|---|---|
+| test files | 511, 1 skipped | 511, 1 skipped |
+| failures | **10** | **10** |
+
+Set-differenced on `basename(file) :: fullName` from two JSON reports: **0 new, 0 fixed**. So the
+commits are clean — which is the claim that matters — but the branch is *not* green at `HEAD`,
+and the 7,226-passing/0-failing number recorded above only exists because the shared tree carries
+other tracks' uncommitted fixes and 26 extra untracked test files. This is the
+`gates-measure-exported-tree` trap, walked into and then caught.
+
+The ten are the same foreign set earlier entries name: `blancAgentStepConfirmGate` (5),
+`i18n` (2), `localAgentQueueRun` (1), `novelReaderProgressGuard` (1), `architectureBaseline` (1).
+One of them is worth flagging as *not* a real product failure in that worktree:
+`novelReaderProgressGuard` dies on `Denied ID …/pdfjs-dist/build/pdf.worker.min.mjs?url`, which
+is the junctioned `node_modules` resolving outside the worktree root — an artifact of how the
+worktree is set up, not a defect at that commit. The other nine are genuine at `HEAD`, and every
+one of them belongs to a track other than this one.
+
+Practical consequence for the next hop: **a green `npx vitest run` in the shared tree is not
+evidence the branch is green.** Export and re-measure, and expect ten. `~\jp-wt-head` is left
+checked out at `73f7e2f` for exactly that purpose.
