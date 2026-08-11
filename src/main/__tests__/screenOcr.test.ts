@@ -323,6 +323,19 @@ describe('ocrRegion — DIP mapping', () => {
     const on = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1, { includeScreenshot: true });
     expect(on.screenshotDataUrl).toMatch(/^data:image\/jpeg;base64,/);
   });
+
+  it('repairs provider line order in both hotspots and downstream text', async () => {
+    ocr.impl = () => result([
+      line([10, 80, 180, 100], '三'),
+      line([10, 10, 180, 30], '一'),
+      line([10, 45, 180, 65], '二'),
+    ]);
+
+    const res = await ocrRegion({ x: 0, y: 0, width: 300, height: 160 }, 1);
+
+    expect(res.lines.map((item) => item.text)).toEqual(['一', '二', '三']);
+    expect(res.text).toBe('一\n二\n三');
+  });
 });
 
 // ---- adaptive zoom ------------------------------------------------------

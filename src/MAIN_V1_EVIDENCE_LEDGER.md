@@ -7774,3 +7774,109 @@ dirty work already in that file.
 
 The next eligible dependency-order stage is **Track 5, ReadingLens as Capture and Read**. Re-derive
 its first open slice from source and live behavior; do not jump to Blanc or Aero.
+
+## The passage now follows the boxes on screen — 2026-08-11
+
+State was re-derived from source before editing: there is no boss-audit file, the previous final
+section advances Main V1 to **Track 5**, and the plan's dependency order makes ReadingLens the only
+eligible stage. Track 5 remains open. The shared tree already carried a foreign, uncommitted
+capture-history slice in `main/readingLens.ts`, preload, the Lens overlay, Settings, all four
+catalogs, and two new history modules; none of those paths or hunks was touched here.
+
+### The ordering contract the OCR result did not have
+
+`screenOcr.ocrRegion` converted provider boxes into display-relative DIP but returned the line
+array and `result.text` in whatever order the selected OCR engine supplied. The renderer painted
+that array, the reusable ReadingLens capture adopted its text, and Agent/Workbench handoffs read
+it. A provider returning bottom-to-top horizontal lines or left-to-right tategaki columns therefore
+produced a grammatically plausible passage in the wrong order even though every line already
+carried the geometry needed to repair it.
+
+`shared/readingLensLineOrder.ts` is the new pure boundary. Homogeneous horizontal captures are
+clustered into rows, rows read top-to-bottom, and fragments within a row read left-to-right.
+Homogeneous vertical captures are clustered into columns, columns read right-to-left, and
+fragments within one column read top-to-bottom. The small centre-distance cluster tolerates the
+baseline skew OCR commonly gives fragments without chaining neighbouring rows together.
+
+Two cases deliberately retain provider order:
+
+- mixed horizontal/vertical layouts, because a manga panel's dialogue, title and sound-effect
+  sequence is not derivable safely from geometry alone;
+- invalid geometry, because a correction that starts from non-finite or degenerate boxes is a
+  plausible corruption rather than a repair.
+
+That is a product boundary, not an unfinished branch hidden behind a fallback. A future mixed-panel
+order needs an explicit panel/balloon model.
+
+`screenOcr.ocrRegion` applies the orderer after mapping boxes into the same DIP coordinate space
+the Lens paints. When order changes, it rebuilds `text` from that exact array, so the hotspots on
+screen and the passage sent downstream cannot tell two different stories. When provider order was
+already sound, its original whitespace is preserved.
+
+### Tests and negative control
+
+- `shared/__tests__/readingLensLineOrder.test.ts`: 6 cases cover shuffled horizontal rows,
+  same-row baseline skew, right-to-left vertical columns, top-to-bottom fragments within a
+  column, mixed-orientation preservation and invalid-geometry preservation.
+- `main/__tests__/screenOcr.test.ts`: the real OCR boundary now proves both the emitted hotspot
+  array and downstream `text` are repaired together.
+- Focused result: **2 files / 48 tests passed**.
+- Negative control: replacing `orderReadingLensLines(mappedLines)` with `mappedLines` made
+  exactly the new boundary assertion fail (received `三, 一, 二` instead of `一, 二, 三`);
+  the integration call was restored and the focused 48 tests passed again.
+
+### Required gates
+
+- `npx vitest run`: **525 passed / 1 skipped of 526 files**, **7,135 passed / 6 skipped of
+  7,141 tests**.
+- `node tools/i18n-check.cjs`: **exit 0**, all **9,299** English keys translated in ja/zh/ru.
+  The direct invocation hit the known esbuild parent-directory ACL artifact before catalog
+  evaluation; the exact command passed from a temporary `R:` mapping rooted at this workspace,
+  and the mapping was removed and verified absent.
+- `node tools/architecture-audit.cjs`: **exit 0**, 1,702 modules, nothing new, the same 3 known
+  pending findings.
+- `npx eslint` on only the four touched implementation/test paths: **exit 0, 0 errors**. The
+  four warnings are pre-existing non-null assertions at `screenOcr.test.ts:172-174`; the two new
+  paths and new hunks add none.
+- `tsc --noEmit` was not run; it is not a gate in this repository.
+
+### Live Electron acceptance
+
+Driven through the authenticated debug bridge, never mouse/keyboard automation and never Computer
+Use. Recent foreign ReadingLens HMR activity had ended more than 30 minutes before measurement,
+and no source edit occurred during the probe.
+
+The running renderer loaded the actual new Vite module and returned:
+
+- horizontal shuffle: `first -> second -> third`;
+- vertical shuffle: `right -> middle -> left`;
+- mixed orientation: original `horizontal -> vertical` order;
+- the live dev-server transform of `main/screenOcr.ts` contains both the orderer import and the
+  order-changed text rebuild.
+
+The probe global was deleted and verified gone. `/logs?level=error` remained at **0**. No storage
+API, userData file, persisted setting, window position, capture or OCR model was touched.
+
+The existing main process could not be restarted: Windows denied `Stop-Process` for its recorded
+bridge PID under this worker's permission profile. The attempted replacement had no second bridge
+or window (the original bridge still reports one window and the same PID). Consequently a real
+screen capture was not claimed live against the newly loaded main module; it will load on the next
+ordinary app restart. The main integration is covered by the boundary test and the live-served
+source check, while the ordering behavior itself was executed inside the live Electron renderer.
+
+### Track 5 disposition and next slice
+
+This closes the unambiguous **line-order correction** portion of Track 5's OCR-quality bullet.
+Confidence presentation, editable text, alternate candidates and an explicit mixed-panel model
+remain open. Region capture, same-region rescan and engine retry already exist; clipboard and
+persistent pinned captures remain open too. The foreign capture-history slice should be
+re-derived after it lands rather than assumed complete. Blanc and Aero remain ineligible.
+
+### Checkpoint
+
+The path-scoped checkpoint was attempted after all gates. Git could not create
+`.git/index.lock` under this worker's permission profile (`Permission denied`), before any path
+was staged. The index remained empty, so there is no partial checkpoint and no foreign staged
+work. A Git-writable relay must stage the four clean/new implementation-test paths and a
+reconstructed `HEAD + only this section` ledger blob, verify the resulting commit in a detached
+worktree, and create the checkpoint.

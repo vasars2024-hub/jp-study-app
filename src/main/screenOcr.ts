@@ -17,6 +17,7 @@ import crypto from 'node:crypto';
 import { paddleOcrAvailable, type PaddleLang } from './paddleOcr';
 import { mangaOcrAvailable } from './mangaOcr';
 import { ocrAuto, type AutoOcrLine, type AutoOcrResult, type OcrEngineChoice } from './ocrAuto';
+import { orderReadingLensLines } from '../shared/readingLensLineOrder';
 
 export interface LensOcrLine {
   text: string;
@@ -290,7 +291,7 @@ export async function ocrRegion(
     });
   }
 
-  const lines: LensOcrLine[] = result.lines.map((l: AutoOcrLine) => {
+  const mappedLines: LensOcrLine[] = result.lines.map((l: AutoOcrLine) => {
     const [x0, y0, x1, y1] = l.box; // original crop-pixel coords
     return {
       text: l.text,
@@ -299,12 +300,17 @@ export async function ocrRegion(
       confidence: l.confidence,
     };
   });
+  const lines = orderReadingLensLines(mappedLines);
+  const orderChanged = lines.some((line, index) => line !== mappedLines[index]);
   return {
     ok: true,
     engine: result.engine,
     lang: result.lang,
     lines,
-    text: result.text,
+    // Preserve an engine's own whitespace when its order was already sound.
+    // Once geometry repairs the order, the passage must follow the same array
+    // the renderer paints or downstream analysis would read a different story.
+    text: orderChanged ? lines.map((line) => line.text).join('\n') : result.text,
     available: true,
     hash,
     zoom,
