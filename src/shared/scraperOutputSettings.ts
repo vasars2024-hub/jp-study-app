@@ -171,13 +171,40 @@ export function validateScraperPerformanceSettings(
 export const SCRAPER_LOG_LEVELS = ['silent', 'error', 'warn', 'info', 'debug', 'trace'] as const;
 export type ScraperLogLevel = (typeof SCRAPER_LOG_LEVELS)[number];
 
+/**
+ * The channels `scraperLog()` is actually called with, derived from the tree
+ * rather than imagined.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-05: this list used to be
+ * `['network', 'browser', 'extraction', 'torrent', 'qbit', 'scheduler']`, and
+ * only two of those six — `qbit` and `scheduler` — were ever passed to
+ * `scraperLog`. `browser` named a subsystem this project does not have (the
+ * same phantom that cost `set.browser` its nine controls on 2026-08-02).
+ *
+ * That mattered the moment the setting stopped being inert: the default was
+ * `['network', 'extraction']`, so wiring `channels` as an allow-list against the
+ * old vocabulary would have silently discarded **every log line the app
+ * produces**. A filter is only as honest as the vocabulary it filters on.
+ * ---------------------------------------------------------------------------
+ */
 export const SCRAPER_LOG_CHANNELS = [
-  'network',
-  'browser',
-  'extraction',
-  'torrent',
+  'catalogue',
+  'credentials',
+  'engine',
+  'export',
+  'history',
+  'http',
+  'notify',
+  'plugins',
   'qbit',
+  'schedule',
   'scheduler',
+  'seanime-acquisition',
+  'seanime-sources',
+  'sources',
+  'system',
+  'torrents',
 ] as const;
 export type ScraperLogChannel = (typeof SCRAPER_LOG_CHANNELS)[number];
 
@@ -202,7 +229,11 @@ export const DEFAULT_SCRAPER_LOGGING_SETTINGS: ScraperLoggingSettings = {
   redactCredentials: true,
   captureHar: false,
   captureScreenshotsOnError: true,
-  channels: ['network', 'extraction'],
+  // Empty means every channel. Was `['network', 'extraction']`, which named two
+  // channels that do not exist — see SCRAPER_LOG_CHANNELS. An empty default is
+  // also the only one that stays correct when a new channel is added: an
+  // enumerated default would start silently dropping it.
+  channels: [],
 };
 
 export function validateScraperLoggingSettings(
@@ -212,7 +243,9 @@ export function validateScraperLoggingSettings(
   p: string,
 ): ScraperLoggingSettings {
   const s = isRecord(input) ? input : {};
-  const channels = stringListValue(s.channels, fallback.channels, `${p}.channels`, issues, 12)
+  // Bound raised 12 → 32 with the vocabulary: 16 real channels would not fit
+  // under the old cap, so "select them all" was unrepresentable.
+  const channels = stringListValue(s.channels, fallback.channels, `${p}.channels`, issues, 32)
     .filter((c): c is ScraperLogChannel => (SCRAPER_LOG_CHANNELS as readonly string[]).includes(c));
   return {
     level: enumValue(s.level, SCRAPER_LOG_LEVELS, fallback.level, `${p}.level`, issues),

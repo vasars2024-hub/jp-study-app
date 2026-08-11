@@ -20,6 +20,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ScraperSettings } from '../../shared/scraperSettings';
 import { cachePolicyFrom, type ScraperCachePolicy } from './httpCache';
+import { configureScraperLogging } from './logBus';
 import { networkPolicyFrom, type ScraperNetworkPolicy } from './networkPolicy';
 import { HostGovernor, safetyPolicyFrom } from './safetyPolicy';
 import { sessionStateFrom, type ScraperSessionState } from './session';
@@ -38,6 +39,13 @@ export interface ScraperRuntime {
 const storage = new AsyncLocalStorage<ScraperRuntime>();
 
 export function scraperRuntimeFor(settings: ScraperSettings, correlationId = ''): ScraperRuntime {
+  // Logging is the one group that is NOT carried in the returned scope. It has
+  // to apply to lines written outside any job too — a source probe, an export,
+  // the HTTP Inspector — and logBus is imported by the modules below, so
+  // reaching back into the runtime from there would close an import cycle. The
+  // trade is stated in full at the top of logBus.ts: the policy is process-wide,
+  // so concurrent jobs on differing profiles share whichever built last.
+  configureScraperLogging(settings.logging);
   return {
     network: networkPolicyFrom(settings.network),
     cache: cachePolicyFrom(settings.cache, settings.metadata),

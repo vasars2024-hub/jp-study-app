@@ -89,10 +89,23 @@ describe('logging settings', () => {
   it('drops an unknown log channel', () => {
     const { value } = run(
       validateScraperLoggingSettings,
-      { channels: ['network', 'telepathy', 'qbit'] },
+      { channels: ['engine', 'telepathy', 'qbit'] },
       DEFAULT_SCRAPER_LOGGING_SETTINGS,
     );
-    expect(value.channels).toEqual(['network', 'qbit']);
+    expect(value.channels).toEqual(['engine', 'qbit']);
+  });
+
+  it('drops the pre-2026-08-05 channel names, which named nothing real', () => {
+    // 'network' and 'extraction' were the shipped default and no call site has
+    // ever passed either to scraperLog. They are unknown values now, which is
+    // the correct reading — and the reason the default is [] (= every channel)
+    // rather than an enumerated list.
+    const { value } = run(
+      validateScraperLoggingSettings,
+      { channels: ['network', 'extraction', 'browser'] },
+      DEFAULT_SCRAPER_LOGGING_SETTINGS,
+    );
+    expect(value.channels).toEqual([]);
   });
 
   it('rejects an unknown level', () => {

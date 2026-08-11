@@ -8464,3 +8464,127 @@ the overlay is pooled and reused by the next `openLens`, deliberately. Do not fi
 Renumbered for whoever runs next: **the 46 red tests at HEAD** are now item 1, with
 `credentials/ipc.ts` the largest lump at 28 of the 46 and the source of three of the
 architecture gate's six findings. Nothing else changed.
+
+## 46 red at HEAD became 18, and the log channel that named nothing real — 2026-08-11
+
+`docs/audit/RELAY_BOSS_AUDIT.md` still does not exist — checked, and `git log` shows it has
+never existed on this branch, so no boss finding was outstanding. Main V1 is still Track 5, so
+Blanc and Aero remain ineligible.
+
+### One correction to the section above, which mattered
+
+The previous entry sent the next worker after "`credentials/ipc.ts`, the largest lump at 28 of
+the 46". **That attribution is wrong.** `src/main/credentials/ipc.ts` is *tracked and clean* at
+HEAD, and `credentialRegistry.test.ts` contributes exactly **1** of the 46. The 28-test lump is
+`scraperQbittorrent.test.ts`, and its cause is not credentials at all: the suite imports
+`flushScraperLogWrites` from `../scraper/logBus`, and at HEAD that export does not exist. Every
+one of the 28 died on `TypeError: flushScraperLogWrites is not a function` before reaching an
+assertion — which is why a suite whose name is about qBittorrent was failing on a logging seam.
+The `credentials:*` dead-ipc findings are real, but they belong to the *architecture* gate, not
+to these tests. Two separate things had been fused into one item.
+
+Re-derivation is also what caught that **the working tree is entirely green** — 533 files /
+7,191 tests, 0 failing — while HEAD is red. A gate run in this repo's working tree says nothing
+about the branch; that is now three sections in a row making the same point.
+
+### What was actually stranded
+
+`src/main/scraper/logBus.ts` carried a complete, uncommitted implementation of the **Logging
+settings group**, which the scraper audit had recorded as INERT IN FULL — nine fields on screen,
+none read by production code. Five now act: `level` and `channels` gate whether a line is
+recorded, and `persistToDisk`/`maxFileSizeMb`/`retentionDays` own a real file sink under
+`<userData>/scraper/logs`. `runtime.ts` pushes the active profile's group as each job scope is
+built.
+
+The load-bearing part is not the sink, it is **the channel vocabulary**. `SCRAPER_LOG_CHANNELS`
+used to be `['network', 'browser', 'extraction', 'torrent', 'qbit', 'scheduler']`, and only
+`qbit` and `scheduler` were ever passed to `scraperLog` — `browser` named a subsystem this
+project does not have. The shipped default was `channels: ['network', 'extraction']`. So
+committing `logBus.ts`'s filter **without** `scraperOutputSettings.ts` would have shipped an
+allow-list matching nothing, silently discarding every log line the app produces. The two files
+are one commit for that reason, and the default is now `[]` (= every channel), which is also the
+only default that stays correct when a new channel is added.
+
+### Scope — three dirty files were deliberately left out
+
+`fields.ts`, `featureStatus.ts` and the rest of the scraper-settings dirty set are **not** in
+this commit, and excluding `fields.ts` was not a judgement call: it imports
+`SCRAPER_EXPORT_COLUMNS` from `../data/exportBuilder`, which **does not exist at HEAD**
+(`git show HEAD:…` returns nothing for that symbol). Committing it would have broken the build.
+`featureStatus.ts`'s diff is comments only, and its other hunks assert that
+`main/scraper/episodeProcessingRules.ts` is wired — that file is *untracked*, so those comments
+would have been false the moment they landed. Consequence, stated plainly: the four removed
+Logging controls (`redactCookies`, `redactCredentials`, `captureHar`,
+`captureScreenshotsOnError`) are **still on screen at HEAD** and still inert. That is unchanged
+from before this commit, not a regression it introduces, and it is the next worker's item.
+
+### Required gates — measured on the exported commit tree
+
+Detached worktree at `C:\Users\Arseniy\jp-wt-head`, checked out to the candidate commit built
+with `git commit-tree` (tree `6d347d3`), `node_modules` junctioned in. The working tree was
+never the measurement surface.
+
+- `npx vitest run`: **46 failing → 18 failing**, 8 files. The 28 that closed are exactly
+  `scraperQbittorrent`. Test count rose 6,703 → 6,717: the slice's own 14 new
+  `scraperLogBus.test.ts` cases all pass. **No suite that was green went red.**
+- The remaining 18 are the same names as at HEAD: `blancAgentStepConfirmGate` (5),
+  `agentNavigationIndexMirror` (4), `i18n` (2), `agentContextSuggestions` (2),
+  `architectureBaseline` (2), `credentialRegistry` (1), `localAgentQueueRun` (1),
+  `novelReaderProgressGuard` (1). Other tracks' stranded work, untouched.
+- `node tools/i18n-check.cjs`: **exit 0**, 8,983 keys — identical to HEAD. This slice adds no UI
+  string; the scraper settings labels are plain English by that track's own pre-existing pattern,
+  which is a debt this commit neither creates nor pays.
+- `node tools/architecture-audit.cjs`: exit 1 with **exactly** HEAD's six unclassified findings,
+  by name. **0 new.**
+- `npx eslint --max-warnings 0` on all five touched paths: **exit 0, clean.**
+- `tsc --noEmit` not run; not a gate here.
+
+### Live Electron acceptance — the policy driven end to end
+
+The app was down and `debug/bridge.json` was stale (pid 88116, dead) — an unclean exit from the
+previous hop, not a husk this time. `npm start` came up clean; bridge on 39273, one window at
+`http://localhost:5173/`, `readyState: complete`, 10 shell elements. Driven through the debug
+bridge only. No mouse or keyboard automation, no Computer Use.
+
+The probe exploits a real property of the design: `scraperStartScrape` takes `settings` **as an
+argument from the renderer**, so the whole policy could be exercised without touching a single
+persisted setting. Target was `http://127.0.0.1:9/…` (discard port).
+
+- **The vocabulary is real, and the old one was not.** The app's own startup line is
+  `[system] Scraper backend ready.` — `system` is in the new list and was **absent from the
+  old one**. A `trace` job then produced 11 lines on `engine`, `http` and `catalogue`:
+  **none of those three existed in the old vocabulary either.** Under the shipped default this
+  commit replaces, every one of those lines would have been discarded. That is the claim no
+  unit test can make, and it is now measured against a running app.
+- **`level` gates recording, live.** The *identical* job produced **11 lines at `trace` and 1 at
+  `silent`** — and that one is the `Job … queued` line, which `engine.ts:925` emits *before*
+  `start()` calls `configureScraperLogging`. Silence then held for the job's whole life
+  (ECONNREFUSED, three Jikan retries, AniList) — still 1 line twelve seconds later.
+- **`persistToDisk` is honoured, confirmed independently from disk.** Both probe jobs ran with
+  `persistToDisk: false`. On disk afterwards: silent job **0** lines, trace job **exactly 1** —
+  again its pre-`configureScraperLogging` queued line — and the restore job, run with the true
+  defaults, **14**. The disk side and the ring side found the same policy boundary by different
+  routes.
+- The sink is not new-in-theory: `<userData>/scraper/logs/` already held seven days of files,
+  and today's carried this session's own startup line at `14:20:48.765Z`. Lines land with
+  timestamp, level, channel and correlation id.
+- `/logs?level=error` was **empty** (`total: 0`) across the entire probe.
+
+**Restoration.** The process policy was put back to `DEFAULT_SCRAPER_SETTINGS.logging` by
+running one final job with it, and logging was confirmed flowing again. `history.json` is
+**byte-identical** (3,305 bytes, mtime 7/29) — a failed job records nothing. No userData backup
+was taken. All eight `window.__jp*` probe globals were deleted and the deletion verified. The
+one deliberate write: ~14 lines appended to today's scraper log by the restore job, which is
+exactly what the app does by default and what retention prunes.
+
+### For whoever runs next
+
+1. **The remaining 18 red tests at HEAD**, same method: find the stranded file, check its diff is
+   free of foreign hunks, build a candidate with `commit-tree`, gate it in the worktree. Do not
+   trust the previous section's attribution of a lump to a file — this hop's first finding was
+   that the last one's was wrong. Re-derive from the actual error message.
+2. `architectureBaseline` (2 fails) and the architecture gate's six findings are the same object
+   seen twice; fixing the `credentials:*` dead-ipc and the two orphan modules closes both.
+3. The four inert Logging controls named under "Scope" above, which need `fields.ts` — and
+   `fields.ts` needs the **export slice** (`exportBuilder.ts`'s `SCRAPER_EXPORT_COLUMNS`)
+   committed first. That ordering is forced, not preference.
