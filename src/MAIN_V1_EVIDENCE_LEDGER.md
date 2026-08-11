@@ -6013,3 +6013,27 @@ is 64 insertions and 0 deletions.
 - **`mediaCueAgentContext`'s identity ignores `mediaId`** — unchanged, sixth section running.
 - **The five untracked `src/shared/i18n/*/` directories** — unchanged; one of the four gates
   still cannot run from the branch's own history because of them.
+
+### Verified in a detached worktree — 2026-08-11
+
+`ecf609f` was checked out detached and exercised there rather than trusted from the tree it
+was built in, which is what this repository requires of a reconstructed blob. The two setup
+steps are unchanged from the previous verification (junction `node_modules` in; copy the five
+untracked `src/shared/i18n/*/` directories in, without which `i18n-check` cannot run from a
+clean checkout at all).
+
+**The reconstructed catalogs are sound.** `node tools/i18n-check.cjs` at `ecf609f` reports
+**8,934 English keys, all translated in ja/zh/ru, exit 0** — exactly the previous commit's
+8,924 plus this slice's 10, with no other key riding along. The four spliced files parse and
+every key this commit adds is present in all four languages at the commit.
+
+**Both new suites pass from the commit**, 60 tests, so the panel and its shell wiring do not
+depend on anything left uncommitted in the working tree.
+
+**The three `i18n.test.ts` hygiene failures are still inherited.** `does not let a new block
+of English be spread into every catalog`, `does not let a new component render UI text without
+adopting i18n` and `does not let a date or time be formatted in the OS locale` fail at
+`ecf609f` — and the **identical three fail at its parent `5696d39`**, which contains none of
+this slice. The parent run is the only thing that separates "this broke it" from "this is what
+the branch already was"; without it the first run reads as a three-test regression caused by a
+commit that adds a component and ten catalog keys.
