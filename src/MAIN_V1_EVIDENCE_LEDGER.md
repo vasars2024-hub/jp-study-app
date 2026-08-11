@@ -7532,3 +7532,162 @@ and its test are still untracked, with `ReadingUnifiedDiscovery.tsx`, `ReadingFi
 lands rather than assuming it is complete. Progress preservation itself was confirmed to live in
 `library.json` on disk and was not re-implemented. Track 5 and later, Blanc and Aero remain
 ineligible.
+
+## The cover art the shipped build could never have painted — 2026-08-11
+
+State was re-derived from source before anything was written. `docs/audit/RELAY_BOSS_AUDIT.md`
+still does not exist (checked from PowerShell, not the Bash overlay), so no boss finding was
+outstanding. Walking Track 4's nine bullets against the tree rather than against the previous
+section's summary: bullets 1-4 and 7-9 have their own ledger sections and hold up; bullet 6 holds
+too — the Jiten API key genuinely lives in the credentials vault now (`main/jiten.ts`'s
+`migrateLegacyApiKey` / `readVaultSecret`, module id `jiten`), and `cacheDeckCover` caches a
+planned deck's art. **Bullet 5 was the open one**, and only half-open in a way a reader of the
+plan would not guess.
+
+### The half that was there, and the half that could not work
+
+`renderer/utils/coverArt.ts` already implemented `cached local art -> art that actually loads ->
+designed fallback` with session-scoped failure caching, and `LibraryView` uses it. That is the
+`media://` half.
+
+The **remote** half had no resolution at all. `ReadingUnifiedDiscovery` renders
+`<img src={readingDiscoveryCoverUrl(result.entry)}>`, and for a Jiten deck that function returned
+the provider's URL verbatim. Measured against the live app through the bridge:
+`jitenSearchDecks({query:'kokoro'})` returns covers on **`https://cdn.jiten.moe/<deckId>/cover.jpg`**
+(four real URLs captured). The packaged CSP's `img-src`
+(`shared/contentSecurityPolicy.ts`) listed exactly `https://cdn.myanimelist.net` and
+`https://*.anilist.co`. `cdn.jiten.moe` was on neither, so **every Jiten discovery card in a
+packaged build painted a CSP-blocked broken image**, one console violation each.
+
+This is the failure mode that never shows up locally: the policy is registered on the `app:`
+origin, which only exists in production, and a dev run serves off the Vite origin the policy
+never touches. `main/jiten.ts:398` even documents the boundary — "the production CSP's img-src
+has no https: entry, so a raw remote URL can't be rendered directly" — written when Jiten art was
+only ever cached through main. Jiten became a *renderer-side discovery provider* in this track,
+and the renderer path was never given the same treatment.
+
+### What was decided, and why it is the narrow choice
+
+Two routes existed. Caching every searched deck's cover through main would serve `media://` and
+work offline, but it downloads art for results the user never planned, and that needs an
+eviction/disk-ownership policy this session is not positioned to invent. The other is to name the
+host. The `img-src` comment already sanctions exactly that — "Discovery artwork is provider-owned
+and rendered directly. Keep this allow-list narrow rather than opening all HTTPS image hosts" —
+and the two hosts already there are the same kind of entry for the same kind of feature. So
+`https://cdn.jiten.moe` was added as **one named provider host**, not a step toward blanket
+`https:`. Main's caching is untouched and still gives planned decks offline art.
+
+### The part that matters more than the host
+
+A host list that the renderer does not consult is how this defect happened in the first place, so
+the fix is not the CSP line. `remoteCoverIsRenderable(url)` in `coverArt.ts` **asks
+`cspDirectiveSources('img-src')`** and implements CSP host-source semantics: exact host match,
+`*.example.com` matches a subdomain but not the bare domain, scheme must match, everything else
+refused. `readingDiscoveryCoverUrl` now returns `null` — the card's designed fallback — for any
+remote URL the policy will not render, and for one the session has already watched fail.
+
+Because it reads the live policy, adding or dropping a provider host changes what the renderer
+offers with no second edit, and the two can no longer drift apart. It is deliberately applied in
+**dev as well**, where nothing is enforced: dev painting art the shipped build drops is precisely
+the shape of defect that reaches a user without ever failing locally.
+
+### Tests
+
+- `renderer/__tests__/coverArtResolution.test.ts`: six new cases for `remoteCoverIsRenderable` —
+  listed host accepted, unlisted refused, substring near-misses (`cdn.jiten.moe.evil.example`,
+  `notcdn.jiten.moe`) refused, wildcard subdomain accepted while the bare domain is refused,
+  scheme honoured, non-http/unparseable refused. The last case walks the **live** `img-src` list
+  and asserts each entry resolves, so dropping a host from the policy fails the test instead of
+  silently passing against a copy.
+- `renderer/__tests__/readingDiscoveryProviders.test.ts`: five new cases for
+  `readingDiscoveryCoverUrl` — local cache wins, a renderable remote URL is offered, a blocked one
+  falls back, a URL marked broken stops being offered, and no-art/no-owner fall back.
+- `shared/__tests__/contentSecurityPolicy.test.ts`: the exact-list assertion updated to three
+  hosts, plus a new assertion that every entry is a concrete `https://` host — a bare `https:`
+  would undo the directive and reads almost identically in a diff.
+
+**Negative control.** The resolver was temporarily reverted to its previous body (return the
+remote ref unconditionally) and the new suite run against it: **2 of 7 failed** — the CSP-blocked
+fallback case and the negative-cache case — then the fix was restored and all 7 pass. The
+`remoteCoverIsRenderable` cases cannot be run against HEAD at all, since the export did not exist.
+
+### Gates
+
+- `npx vitest run`: **523 passed / 1 skipped of 524 files**, **7,127 passed / 6 skipped of 7,133
+  tests**. Exactly +11 tests over the previous section's 7,116 and no new file, which is the
+  count these three edited suites add.
+- `node tools/i18n-check.cjs`: exit 0, all 9,299 English keys translated in ja/zh/ru. No UI string
+  was added — the change only decides whether an existing card paints art or its existing
+  fallback.
+- `node tools/architecture-audit.cjs`: exit 0, 1,697 modules, nothing new, the same 3 known
+  pending findings.
+- `npx eslint --max-warnings 0` on all six touched paths: **0 errors, 0 warnings**. (One warning —
+  a non-null assertion in the new test helper — was found and removed rather than suppressed.)
+- `tsc --noEmit` was not run; it is not a gate in this repo.
+
+### Live Electron acceptance
+
+Driven through the authenticated debug bridge, never mouse or keyboard automation and never
+Computer Use. The window was reloaded first so every module instantiated once; `debug/wait-ready.ps1`
+reported `19 x .os-set-nav-item` rather than a fixed sleep.
+
+- `remoteCoverIsRenderable` **is present in the running renderer**, so the probe measured this
+  change and not a stale bundle.
+- The live `img-src` read back through the app's own module carries all three hosts.
+- A real `jitenSearchDecks` call returned four `https://cdn.jiten.moe/...` covers, and the live
+  `readingDiscoveryCoverUrl` **offered all four**.
+- `https://images.example.com/...` resolved to `null` (fallback); `https://s4.anilist.co/...`
+  resolved (wildcard) while `https://anilist.co/...` did not; `cdn.jiten.moe.evil.example` did
+  not; a `local-cache` entry resolved to `media://jiten-7/cover.jpg`, confirming local art still
+  wins.
+- Negative cache live: the URL was offered, `markCoverBroken` made it resolve `null`, and
+  `resetCoverArtCache` restored it. The cache was left empty.
+- `/logs?level=error`: **0 entries**. Probe globals were deleted and verified gone.
+
+**A probe artifact worth recording, because it looked exactly like a defect.** The negative-cache
+check first appeared to fail live — marking a URL broken did not change what the resolver
+returned, and it survived a full reload, which ruled out the obvious HMR explanation. The cause
+was the measurement: in Vite dev, `/src/renderer/utils/coverArt.ts`,
+`/src/renderer/utils/coverArt` and `/src/renderer/utils/coverArt.ts?t=<stamp>` are **three
+different module objects with three different `brokenCovers` Sets**, and the app's own graph
+imports the `?t=` form once a file has been hot-updated. Fetching the transformed module from
+Vite (`curl localhost:5173/src/renderer/readingDiscoveryProviders.ts`) showed the exact specifier,
+and probing that instance passed. **Any future live probe of module-level state in this repo must
+read the specifier out of the transformed source rather than guessing it** — the wrong instance
+answers plausibly instead of erroring.
+
+**What was not live-driven, and why.** The CSP block itself cannot be reproduced in a dev run: the
+policy binds to `app://`, which only exists in a packaged build. Its proof is the policy module,
+its tests, and the measured host mismatch. The discovery cards were not driven in the UI either —
+`ReadingUnifiedDiscovery.tsx` is mid-edit by a concurrent track (see below), and rendering their
+in-progress code would have measured their work, not this change. The resolver every card calls
+was driven directly instead, with live provider data.
+
+### Shared-tree note
+
+All six touched paths were **clean before this session and are staged whole**; none carries a
+foreign hunk, so no blob reconstruction was needed. The concurrent Discover/Finder/Novels
+action-host track is still live — `renderer/utils/readingDiscoveryActions.ts` untracked, with
+`ReadingUnifiedDiscovery.tsx`, `ReadingFinderContent.tsx` and `NovelsContent.tsx` dirty — and was
+left exactly as found. HMR entries for `LibraryView` and `ReadingUnifiedDiscovery` during this run
+are this session's own edits propagating to importers of `coverArt`, not a foreign editor.
+
+### Still open
+
+- **The discovery card still falls back to a generic icon, not the designed gradient.** When a
+  cover resolves to `null` the card paints `<Icon name="novels">`, which is the same for every
+  item, where `coverFallbackImage()` would give the title-derived gradient the Library already
+  uses. That is a three-line change inside `ReadingUnifiedDiscovery.tsx` and was deliberately not
+  made here, because that file is mid-edit by another track. **Do this once their work lands** —
+  it is the last piece of bullet 5's "designed fallback".
+- **Caching discovery art through main** (so a not-yet-planned deck's cover works offline) remains
+  unbuilt, and needs a disk-ownership/eviction decision before it should be.
+- The four cross-wired `importedLibraryItemId` values in `jiten.json` are still unrepaired, for
+  the reason the previous section gives.
+- `shared/jiten.ts:343` reads `coverName && isHttpUrl(coverName) ? coverName : coverName` — a
+  ternary whose branches are identical, so the guard it looks like it performs does not happen.
+  Harmless today (`safeRemoteCover` and `cacheDeckCover` both re-validate downstream), and left
+  alone only because that file is dirty from another track. Worth deleting or fixing when it is
+  clean.
+
+Track 5 and later, Blanc and Aero remain ineligible.

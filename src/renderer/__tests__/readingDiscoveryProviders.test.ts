@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { JitenDeck } from '../../shared/jiten';
+import type { ReadingWorkspaceEntry } from '../../shared/readingWorkspace';
 import type { LibraryItem } from '../../shared/types';
+import { markCoverBroken, resetCoverArtCache } from '../utils/coverArt';
 import type { Novel } from '../data/novels';
 import type { ReadingSite } from '../data/readingSites';
 import {
@@ -108,5 +110,57 @@ describe('Reading discovery providers', () => {
       ...values[0][0].entry,
       cover: { state: 'local-cache', ref: 'cover.jpg' },
     })).toBe('media://book-1/cover.jpg');
+  });
+});
+
+/**
+ * `cached local art -> validated remote art -> designed fallback`. Null is how
+ * this function says "fallback", and the card paints its gradient instead of an
+ * `<img>` pointed at something that cannot load.
+ */
+describe('discovery cover resolution', () => {
+  // Built from a real Jiten result rather than a hand-written literal, so a
+  // change to the entry contract reaches these cases instead of passing over a
+  // shape that no provider actually emits.
+  const jitenResult = jitenDiscoveryResult(deck, 'cat');
+  if (!jitenResult) throw new Error('jitenDiscoveryResult scored the fixture deck as no match');
+
+  const entryWith = (cover: ReadingWorkspaceEntry['cover'], itemId: string | null = null) =>
+    ({ ...jitenResult.entry, itemId, cover }) as ReadingWorkspaceEntry;
+
+  beforeEach(() => {
+    resetCoverArtCache();
+  });
+
+  it('prefers locally cached art, which is the only art that survives offline', () => {
+    expect(readingDiscoveryCoverUrl(entryWith({ state: 'local-cache', ref: 'cover.jpg' }, 'jiten-7')))
+      .toBe('media://jiten-7/cover.jpg');
+  });
+
+  it('offers remote art whose host the CSP will actually render', () => {
+    const url = 'https://cdn.jiten.moe/7/cover.jpg';
+    expect(readingDiscoveryCoverUrl(entryWith({ state: 'remote', ref: url }))).toBe(url);
+  });
+
+  it('falls back rather than painting art the CSP blocks', () => {
+    // The defect this closes: a raw provider URL went straight to an <img>, so a
+    // packaged build showed a broken box and logged a CSP violation per card.
+    expect(readingDiscoveryCoverUrl(entryWith({
+      state: 'remote',
+      ref: 'https://images.example.com/7/cover.jpg',
+    }))).toBeNull();
+  });
+
+  it('stops offering a remote URL once the session has seen it fail', () => {
+    const url = 'https://cdn.jiten.moe/7/cover.jpg';
+    expect(readingDiscoveryCoverUrl(entryWith({ state: 'remote', ref: url }))).toBe(url);
+    markCoverBroken(url);
+    expect(readingDiscoveryCoverUrl(entryWith({ state: 'remote', ref: url }))).toBeNull();
+  });
+
+  it('falls back when there is no art, or no owner to resolve a cached path against', () => {
+    expect(readingDiscoveryCoverUrl(entryWith({ state: 'fallback', ref: null }))).toBeNull();
+    expect(readingDiscoveryCoverUrl(entryWith({ state: 'local-cache', ref: 'cover.jpg' }, null)))
+      .toBeNull();
   });
 });

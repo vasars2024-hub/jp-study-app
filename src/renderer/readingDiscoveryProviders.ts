@@ -11,15 +11,32 @@ import {
   type ReadingDiscoveryResult,
 } from '../shared/readingDiscovery';
 import type { LibraryItem } from '../shared/types';
+import { isCoverBroken, remoteCoverIsRenderable } from './utils/coverArt';
 import type { Novel } from './data/novels';
 import type { ReadingSite } from './data/readingSites';
 
 
+/**
+ * The URL a discovery card should paint, or null to mean "use the designed
+ * fallback" — the plan's `cached local art -> validated remote art -> designed
+ * fallback` chain, resolved at the one point every card goes through.
+ *
+ * Local cache wins because it is the only art that survives offline. A remote
+ * URL is returned only when it passes both filters that can rule it out without
+ * a request: the CSP will render its host at all (`remoteCoverIsRenderable` —
+ * before this, a Jiten deck's `cdn.jiten.moe` cover was handed straight to an
+ * `<img>` and blocked in every packaged build), and the session has not already
+ * watched that URL fail to load. Returning null rather than a doomed URL is
+ * what turns a broken-image box back into the fallback.
+ */
 export function readingDiscoveryCoverUrl(entry: ReadingWorkspaceEntry): string | null {
   if (!entry.cover.ref) return null;
-  if (entry.cover.state === 'remote') return entry.cover.ref;
   if (entry.cover.state === 'local-cache' && entry.itemId) {
     return `media://${entry.itemId}/${entry.cover.ref}`;
+  }
+  if (entry.cover.state === 'remote') {
+    if (!remoteCoverIsRenderable(entry.cover.ref)) return null;
+    return isCoverBroken(entry.cover.ref) ? null : entry.cover.ref;
   }
   return null;
 }

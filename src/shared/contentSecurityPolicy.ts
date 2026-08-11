@@ -26,7 +26,19 @@ export const CONTENT_SECURITY_POLICY_DIRECTIVES: readonly string[] = [
   "style-src 'self' 'unsafe-inline'",
   // Discovery artwork is provider-owned and rendered directly. Keep this
   // allow-list narrow rather than opening all HTTPS image hosts.
-  "img-src 'self' app: media: playfile: localfile: data: blob: https://cdn.myanimelist.net https://*.anilist.co",
+  //
+  // `cdn.jiten.moe` joined the two media-discovery hosts when Jiten became a
+  // Reading-workspace discovery provider: a deck search returns cover URLs on
+  // that host (measured live — `https://cdn.jiten.moe/<deckId>/cover.jpg`), and
+  // `ReadingUnifiedDiscovery` paints them directly. Without it every Jiten
+  // result renders a CSP-blocked broken image in a PACKAGED build only, which
+  // a dev run cannot show because this policy never binds to the Vite origin.
+  // It is one more NAMED provider host, which is what the rule above permits;
+  // it is not a step toward blanket `https:`. Art for a deck the user has
+  // actually planned is still downloaded by main and served over `media://`
+  // (`main/jiten.ts`'s `cacheDeckCover`) so it survives offline — this entry is
+  // for the not-yet-planned search results that have no local copy to serve.
+  "img-src 'self' app: media: playfile: localfile: data: blob: https://cdn.myanimelist.net https://*.anilist.co https://cdn.jiten.moe",
   // The sidecar origin appears here as well as in `connect-src`, and the two are
   // NOT interchangeable: `connect-src` governs the `fetch()` that prepares the
   // stream, `media-src` governs the `<video>` element that then loads it from

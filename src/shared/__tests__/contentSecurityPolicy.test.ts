@@ -50,10 +50,21 @@ describe('packaged Content-Security-Policy', () => {
     expect(offMachine.some(WILDCARD_HOST.test.bind(WILDCARD_HOST))).toBe(false);
   });
 
-  it('keeps the image allow-list to the two named providers', () => {
+  it('keeps the image allow-list to the named providers', () => {
     const sources = cspDirectiveSources('img-src') ?? [];
     const remote = sources.filter((source) => source.startsWith('https:'));
-    expect(remote).toEqual(['https://cdn.myanimelist.net', 'https://*.anilist.co']);
+    // The exact list, not a `toContain`: the property worth guarding is that
+    // nothing gets added without someone editing this line and justifying it.
+    // `cdn.jiten.moe` serves Jiten deck covers for Reading discovery results
+    // that have no locally cached art yet.
+    expect(remote).toEqual([
+      'https://cdn.myanimelist.net',
+      'https://*.anilist.co',
+      'https://cdn.jiten.moe',
+    ]);
+    // Every entry is still a concrete host. A bare `https:` here would silently
+    // undo the whole directive, and reads almost identically in a diff.
+    expect(remote.every((source) => source.startsWith('https://'))).toBe(true);
   });
 
   it('lets the player load its stream from the loopback sidecar', () => {

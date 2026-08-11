@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
+import { cspDirectiveSources } from '../../shared/contentSecurityPolicy';
 
 /**
  * Cover resolution for anything backed by a `media://<ownerId>/<relPath>` file
@@ -55,6 +56,49 @@ export function markCoverBroken(url: string): void {
 export function resetCoverArtCache(): void {
   brokenCovers.clear();
   inFlight.clear();
+}
+
+/**
+ * Whether the packaged CSP will actually paint a given remote cover.
+ *
+ * "Validated remote art" cannot mean "it parsed as a URL". The policy in
+ * `shared/contentSecurityPolicy.ts` is the thing that decides whether an
+ * `<img src="https://…">` ever reaches the network, and it lists named provider
+ * hosts only. A URL outside that list is not slow or unreliable art — it is art
+ * that provably cannot render, and offering it produces a broken image plus a
+ * console CSP violation instead of the designed fallback.
+ *
+ * This asks the policy rather than repeating its hosts, so adding or removing a
+ * provider there changes what the renderer offers with no edit here. It is also
+ * why the check is deliberately applied in DEV too, where no CSP is bound: dev
+ * would otherwise paint art that the shipped build silently drops, which is the
+ * exact shape of defect that reaches a user without ever failing locally.
+ *
+ * Host matching follows CSP host-source semantics: an exact host matches
+ * itself, and `*.example.com` matches any subdomain but NOT `example.com`.
+ */
+export function remoteCoverIsRenderable(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+
+  const host = parsed.hostname.toLowerCase();
+  return (cspDirectiveSources('img-src') ?? []).some((source) => {
+    // A bare scheme source (`https:`) allows every host on it. Not currently in
+    // the policy, and a test guards that, but the reading has to be correct.
+    if (source === `${parsed.protocol}`) return true;
+    if (!source.startsWith(`${parsed.protocol}//`)) return false;
+    const pattern = source.slice(parsed.protocol.length + 2).toLowerCase();
+    if (pattern.startsWith('*.')) {
+      const suffix = pattern.slice(1); // ".example.com"
+      return host.endsWith(suffix) && host.length > suffix.length;
+    }
+    return host === pattern;
+  });
 }
 
 export type CoverLoader = (url: string) => Promise<boolean>;

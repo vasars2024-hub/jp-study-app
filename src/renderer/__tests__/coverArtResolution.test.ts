@@ -6,8 +6,10 @@ import {
   isCoverBroken,
   markCoverBroken,
   probeCover,
+  remoteCoverIsRenderable,
   resetCoverArtCache,
 } from '../utils/coverArt';
+import { cspDirectiveSources } from '../../shared/contentSecurityPolicy';
 
 /**
  * The resolution chain the Reading-workspace plan asks for: cached local art ->
@@ -96,5 +98,55 @@ describe('cover resolution', () => {
     expect(isCoverBroken('media://a/z.jpg')).toBe(false);
     expect(await probeCover('media://a/z.jpg', ok)).toBe(true);
     expect(calls).toBe(2);
+  });
+});
+
+/**
+ * The other half of the chain: art whose host the packaged CSP will refuse can
+ * never paint, so it must resolve to the fallback rather than to a broken
+ * image. This is invisible in a dev run — the policy binds to `app://`, never
+ * to the Vite origin — which is exactly why it needs a test.
+ */
+describe('remote cover validation against the app CSP', () => {
+  it('accepts a host the policy names', () => {
+    expect(remoteCoverIsRenderable('https://cdn.jiten.moe/105895/cover.jpg')).toBe(true);
+    expect(remoteCoverIsRenderable('https://cdn.myanimelist.net/images/x.jpg')).toBe(true);
+  });
+
+  it('rejects any host the policy does not name', () => {
+    expect(remoteCoverIsRenderable('https://evil.example/cover.jpg')).toBe(false);
+    // A near-miss on a listed host must not pass on a substring.
+    expect(remoteCoverIsRenderable('https://cdn.jiten.moe.evil.example/c.jpg')).toBe(false);
+    expect(remoteCoverIsRenderable('https://notcdn.jiten.moe/c.jpg')).toBe(false);
+  });
+
+  it('applies CSP wildcard semantics: a subdomain matches, the bare domain does not', () => {
+    expect(remoteCoverIsRenderable('https://s4.anilist.co/file/cover.jpg')).toBe(true);
+    expect(remoteCoverIsRenderable('https://anilist.co/cover.jpg')).toBe(false);
+  });
+
+  it('honours the scheme, so a listed https host is not reachable over http', () => {
+    expect(remoteCoverIsRenderable('http://cdn.jiten.moe/105895/cover.jpg')).toBe(false);
+  });
+
+  it('rejects non-http schemes and unparseable values outright', () => {
+    expect(remoteCoverIsRenderable('javascript:alert(1)')).toBe(false);
+    expect(remoteCoverIsRenderable('data:image/png;base64,AAAA')).toBe(false);
+    expect(remoteCoverIsRenderable('media://item-1/cover.jpg')).toBe(false);
+    expect(remoteCoverIsRenderable('not a url')).toBe(false);
+    expect(remoteCoverIsRenderable('')).toBe(false);
+  });
+
+  it('reads the live policy rather than a copy of its hosts', () => {
+    // If someone drops a host from `img-src`, this must stop accepting it —
+    // a hardcoded list here would keep passing and hide the regression.
+    const listed = (cspDirectiveSources('img-src') ?? []).filter((source) =>
+      source.startsWith('https://'),
+    );
+    expect(listed.length).toBeGreaterThan(0);
+    for (const source of listed) {
+      const host = source.slice('https://'.length).replace(/^\*\./, 'sub.');
+      expect(remoteCoverIsRenderable(`https://${host}/cover.jpg`)).toBe(true);
+    }
   });
 });
