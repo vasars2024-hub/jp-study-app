@@ -10,7 +10,28 @@ import {
   type ReactNode,
 } from 'react';
 import type { LibraryItem } from '../../shared/types';
-import type { DesktopIndex, DesktopLayout, IconSnapshot, NoteSnapshot, WidgetSnapshot, WindowSnapshot } from '../../shared/desktop';
+import type {
+  DesktopIndex,
+  DesktopLayout,
+  DisplayAssignment,
+  IconSnapshot,
+  NoteSnapshot,
+  TaskbarMode,
+  WidgetSnapshot,
+  WindowSnapshot,
+} from '../../shared/desktop';
+import { DESKTOP_STUDY } from '../../shared/desktop';
+import { loadDisplayPrefs } from '../displayPrefs';
+import DropRouter from './DropRouter';
+import {
+  beginDeskDrag,
+  endDeskDrag,
+  moveDeskDrag,
+  registerDeskContext,
+  screenToDeskPoint,
+  subscribeDeskDrag,
+  type DeskDragKind,
+} from '../deskDrag';
 import VisualizerCanvas from './VisualizerCanvas';
 import WidgetFrame from './WidgetFrame';
 import WidgetGallery, { noteWidgetUsed } from './WidgetGallery';
@@ -33,10 +54,15 @@ import { ContextMenu, confirmDialog, alertDialog, useAppMaterialSet } from './ui
 import {
   commitLayout,
   getActiveDesktopIndex,
+  getAssignment,
+  getAssignments,
+  getDesktopCount,
   getDesktopLayout,
+  getDesktopName,
   onDesktopChanged,
   switchDesktop as switchDesktopState,
 } from '../desktopState';
+import { showOsToast } from './ToastHost';
 import {
   ICON_METRICS,
   loadDesktopPrefs,
@@ -523,9 +549,13 @@ function buildLayout(
   notes: Record<string, NoteData>,
   widgets: WidgetSnapshot[],
   wall: WallChoice & { path?: string },
+  /** Viewport this geometry was authored against, for the B4 remap on hydrate. */
+  authored?: { w: number; h: number },
 ): DesktopLayout {
   return {
     desktopIndex,
+    authoredW: authored && authored.w > 0 ? authored.w : undefined,
+    authoredH: authored && authored.h > 0 ? authored.h : undefined,
     windows: wins.map(winToSnapshot),
     icons: icons.map(iconToSnapshot),
     notes: Object.fromEntries(
@@ -560,7 +590,113 @@ function layoutSignature(layout: DesktopLayout): string {
   });
 }
 
-export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: LibraryItem) => void }) {
+/**
+ * Pull a layout authored on one monitor into the viewport of another (B4).
+ *
+ * Geometry here is absolute pixels. Hydrating a 3440x1440 layout onto a 1920x1080
+ * monitor would otherwise put half the windows and every right-hand icon off
+ * screen with no way to reach them. Two modes:
+ *
+ * - `proportional` — scale positions by the viewport ratio, preserving the
+ *   arrangement. Sizes are scaled too, but never below their minimums.
+ * - `clamp` (default) — keep sizes, just pull anything out of bounds back in.
+ *   Less clever, but it never shrinks a window the user sized deliberately.
+ */
+export function clampLayoutToViewport(
+  layout: DesktopLayout,
+  viewport: { w: number; h: number },
+  mode: 'clamp' | 'proportional' = 'clamp',
+): DesktopLayout {
+  const { w: vw, h: vh } = viewport;
+  if (vw <= 0 || vh <= 0) return layout;
+
+  /*
+   * A layout that has never recorded the viewport it was authored against still
+   * has to FIT. Treating "unknown" as "same as here" and returning early let a
+   * 1264x773 window sit inside an 880x563 desktop, overflowing it with no way to
+   * reach the far edge — seen on a desktop torn off the taskbar, whose window
+   * geometry came from a much larger shell.
+   *
+   * Unknown origin means proportional scaling is not available (there is no
+   * ratio to scale by), but clamping into the viewport always is.
+   */
+  const known = typeof layout.authoredW === 'number' && typeof layout.authoredH === 'number';
+  const authoredW = layout.authoredW ?? vw;
+  const authoredH = layout.authoredH ?? vh;
+  const sameViewport = known && authoredW === vw && authoredH === vh;
+
+  /*
+   * No early return on `sameViewport`.
+   *
+   * `authoredW/H` is bookkeeping, and bookkeeping can be wrong: a hydrate that
+   * ran before the desk had been laid out skipped the fit but still committed
+   * the current viewport as the authored size. The layout then claims "authored
+   * at 880x515" while holding a 1264px window, and an early return trusts the
+   * claim and leaves the window overflowing its desk permanently.
+   *
+   * The bound below is an invariant — nothing may be wider or taller than the
+   * desk it lives on — so it is enforced every time. The maps preserve object
+   * identity when nothing changes, so re-running costs nothing.
+   */
+  const effectiveMode = known && !sameViewport ? mode : 'clamp';
+  const sx = effectiveMode === 'proportional' ? vw / Math.max(1, authoredW) : 1;
+  const sy = effectiveMode === 'proportional' ? vh / Math.max(1, authoredH) : 1;
+
+  const MIN_W = 240;
+  const MIN_H = 140;
+
+  const windows = layout.windows.map((win) => {
+    const w = Math.max(MIN_W, Math.min(vw, Math.round(win.w * sx)));
+    const h = Math.max(MIN_H, Math.min(vh, Math.round(win.h * sy)));
+    // Keep at least a title bar's worth reachable, never a negative origin.
+    const x = Math.max(0, Math.min(Math.round(win.x * sx), Math.max(0, vw - w)));
+    const y = Math.max(0, Math.min(Math.round(win.y * sy), Math.max(0, vh - h)));
+    return win.x === x && win.y === y && win.w === w && win.h === h ? win : { ...win, x, y, w, h };
+  });
+
+  const icons = layout.icons.map((icon) => {
+    const x = Math.max(0, Math.min(Math.round(icon.x * sx), Math.max(0, vw - 72)));
+    const y = Math.max(0, Math.min(Math.round(icon.y * sy), Math.max(0, vh - 88)));
+    return icon.x === x && icon.y === y ? icon : { ...icon, x, y };
+  });
+
+  const widgets = layout.widgets.map((widget) => {
+    const w = Math.max(120, Math.min(vw, Math.round(widget.w * sx)));
+    const h = Math.max(80, Math.min(vh, Math.round(widget.h * sy)));
+    const x = Math.max(0, Math.min(Math.round(widget.x * sx), Math.max(0, vw - w)));
+    const y = Math.max(0, Math.min(Math.round(widget.y * sy), Math.max(0, vh - h)));
+    return widget.x === x && widget.y === y && widget.w === w && widget.h === h
+      ? widget
+      : { ...widget, x, y, w, h };
+  });
+
+  return { ...layout, windows, icons, widgets, authoredW: vw, authoredH: vh };
+}
+
+export interface DesktopShellProps {
+  onOpenBook: (item: LibraryItem) => void;
+  /**
+   * Desktop this shell renders. Omitted in the main window, which follows the
+   * store's `activeDesktopIndex` and can slide between desktops. A secondary
+   * window passes its assigned index and stays pinned to it — that pinning is
+   * what makes the single-writer rule hold (B2): two shells never own one
+   * desktop, so neither ever sees a foreign edit to its own layout.
+   */
+  desktopIndex?: DesktopIndex;
+  /** Display this shell is on. Needed to address it in a cross-monitor drag. */
+  displayKey?: string;
+  /** True in a per-monitor window; false/undefined in the main Study OS window. */
+  secondary?: boolean;
+}
+
+export default function DesktopShell({
+  onOpenBook,
+  desktopIndex: pinnedDesktopProp,
+  displayKey,
+  secondary = false,
+}: DesktopShellProps) {
+  // A secondary shell is pinned; the main shell follows the active desktop.
+  const pinnedDesktop = secondary ? (pinnedDesktopProp ?? DESKTOP_STUDY) : null;
   // No useMemo/useCallback here caches a translated string, so `t` alone is
   // enough — every call site below reads it fresh at render time, unlike the
   // CommandPalette/SettingsSearch memos that needed `lang` as an explicit dep.
@@ -573,7 +709,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   const winsRef = useRef<Win[]>([]);
   const notesRef = useRef<Record<string, NoteData>>({});
   const openRef = useRef<(section: WinSection) => void>(() => undefined);
-  const activeDesktopRef = useRef<DesktopIndex>(getActiveDesktopIndex());
+  const activeDesktopRef = useRef<DesktopIndex>(pinnedDesktop ?? getActiveDesktopIndex());
   // Ring buffer of the last few layout signatures WE committed. commitLayout
   // round-trips through the main process and echoes back to us; every such
   // echo must be recognized as our own and ignored. Remembering only the
@@ -589,7 +725,9 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     arr.push(sig);
     if (arr.length > 16) arr.shift();
   };
-  const [activeDesktop, setActiveDesktop] = useState<DesktopIndex>(getActiveDesktopIndex());
+  const [activeDesktop, setActiveDesktop] = useState<DesktopIndex>(
+    pinnedDesktop ?? getActiveDesktopIndex(),
+  );
   const [wins, setWins] = useState<Win[]>([]);
   // Window lifecycle phases (WIRED_BESPOKE_SPEC §2). Theme-neutral and purely
   // additive: only wired gets a non-zero phase duration, so aero/base keep
@@ -666,7 +804,24 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
 
   const applyDesktopLayout = (desktopIndex: DesktopIndex): void => {
     hydrating.current = true;
-    const next = hydrateLayout(getDesktopLayout(desktopIndex));
+    // B4: a layout authored on another monitor arrives in that monitor's pixels.
+    // Pull it into this viewport before hydrating, or windows and icons land
+    // off-screen with no way to reach them.
+    // The desk element is not laid out yet on the first hydrate, so reading it
+    // alone yields 0 and the fit below is skipped entirely — which is how a
+    // 1264px window ended up inside an 880px desktop and stayed there. Fall back
+    // to the window's own size, which is always known by the time this runs.
+    const deskEl = deskRef.current;
+    const viewport = {
+      w: deskEl?.clientWidth || window.innerWidth,
+      h: (deskEl?.clientHeight || window.innerHeight) - taskbarH(loadDesktopPrefs()),
+    };
+    const stored = getDesktopLayout(desktopIndex);
+    const fitted =
+      viewport.w > 0 && viewport.h > 0
+        ? clampLayoutToViewport(stored, viewport, loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp')
+        : stored;
+    const next = hydrateLayout(fitted);
     setActiveDesktop(desktopIndex);
     setWins(next.wins);
     setIcons(next.icons);
@@ -680,22 +835,22 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
   };
 
   useEffect(() => {
-    applyDesktopLayout(getActiveDesktopIndex());
+    applyDesktopLayout(pinnedDesktop ?? getActiveDesktopIndex());
     return onDesktopChanged((snap) => {
-      const nextLayout = getDesktopLayout(snap.activeDesktopIndex);
+      // A secondary shell ignores `activeDesktopIndex` entirely — that field is
+      // what the MAIN window shows. This one owns exactly its assigned desktop.
+      const target = pinnedDesktop ?? snap.activeDesktopIndex;
+      const nextLayout = getDesktopLayout(target);
       const nextSignature = layoutSignature(nextLayout);
       // Same desktop + a signature we just committed → this is our own echo,
       // ignore it. Only re-hydrate on a real desktop switch or a genuinely
       // external change.
-      if (
-        snap.activeDesktopIndex === activeDesktopRef.current &&
-        committedSignatures.current.includes(nextSignature)
-      ) {
+      if (target === activeDesktopRef.current && committedSignatures.current.includes(nextSignature)) {
         return;
       }
-      applyDesktopLayout(snap.activeDesktopIndex);
+      applyDesktopLayout(target);
     });
-  }, []);
+  }, [pinnedDesktop]);
 
   useEffect(() => {
     if (hydrating.current) return;
@@ -710,7 +865,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       if (document.documentElement.classList.contains('os-interacting')) {
         commitTimer.current = setTimeout(() => {
           commitTimer.current = null;
-          const nextLayout = buildLayout(activeDesktop, wins, icons, notes, widgets, wall);
+          const nextLayout = buildLayout(activeDesktop, wins, icons, notes, widgets, wall, deskSize());
           rememberSignature(layoutSignature(nextLayout));
           void commitLayout(activeDesktop, nextLayout).catch((err) => {
             if (err instanceof Error && err.message === 'desktop-switch-in-progress') return;
@@ -719,7 +874,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         }, 280);
         return;
       }
-      const nextLayout = buildLayout(activeDesktop, wins, icons, notes, widgets, wall);
+      const nextLayout = buildLayout(activeDesktop, wins, icons, notes, widgets, wall, deskSize());
       rememberSignature(layoutSignature(nextLayout));
       void commitLayout(activeDesktop, nextLayout).catch((err) => {
         if (err instanceof Error && err.message === 'desktop-switch-in-progress') return;
@@ -949,10 +1104,209 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     [],
   );
   // L4: mirror companions onto the real Windows desktop when opted in.
+  // B9: main window only. Two shells running this would fight over
+  // `companionHost:setSpan`, each resetting the other's span every tick.
   useEffect(() => {
+    if (secondary) return;
     startCompanionOsBridge();
     return () => stopCompanionOsBridge();
-  }, []);
+  }, [secondary]);
+
+  // ----- Cross-monitor drag (Phase 2) -----
+
+  /** Which display this shell is on. Secondaries know from their URL; the main
+   *  window has to ask, because the user can move it between monitors. */
+  const [myDisplayKey, setMyDisplayKey] = useState<string>(displayKey ?? '');
+  useEffect(() => {
+    if (displayKey) {
+      setMyDisplayKey(displayKey);
+      return;
+    }
+    let cancelled = false;
+    const refresh = (): void => {
+      void window.api.deskwinWhoAmI().then((who) => {
+        if (!cancelled && who.displayKey) setMyDisplayKey(who.displayKey);
+      });
+    };
+    refresh();
+    // Dragging the main window to another monitor changes the answer.
+    const off = window.api.onDisplaysChanged(refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      cancelled = true;
+      off();
+      window.removeEventListener('focus', refresh);
+    };
+  }, [displayKey]);
+
+  useEffect(() => {
+    if (!myDisplayKey) return;
+    return registerDeskContext({ displayKey: myDisplayKey, deskEl: () => deskRef.current });
+  }, [myDisplayKey]);
+
+  /** This display's own assignment, for taskbar mode and the window list. */
+  const [myAssignment, setMyAssignment] = useState<DisplayAssignment | null>(null);
+  useEffect(() => {
+    if (!myDisplayKey) return;
+    const read = (): void => setMyAssignment(getAssignment(myDisplayKey));
+    read();
+    return onDesktopChanged(read);
+  }, [myDisplayKey]);
+
+  const taskbarMode: TaskbarMode = myAssignment?.taskbar ?? 'full';
+
+  /**
+   * Keyboard: move the focused window to the desktop on the neighbouring
+   * monitor, and raise a neighbouring monitor.
+   *
+   * Uses the same single-writer discipline as the drag: this shell commits the
+   * removal from its own desktop, and `desktop:commitLayout` for the target
+   * index is a *different* desktop that no other shell owns concurrently —
+   * the target window re-hydrates from the broadcast.
+   */
+  useEffect(() => {
+    const enabledKeys = (): string[] =>
+      getAssignments()
+        .filter((a) => a.enabled)
+        .map((a) => a.displayKey);
+
+    const neighbourDesktop = (dir: number): DesktopIndex | null => {
+      const keys = enabledKeys();
+      if (keys.length < 2 || !myDisplayKey) return null;
+      const here = keys.indexOf(myDisplayKey);
+      if (here < 0) return null;
+      const next = (here + dir + keys.length) % keys.length;
+      return getAssignment(keys[next])?.desktopIndex ?? null;
+    };
+
+    const onMove = (e: Event): void => {
+      const dir = (e as CustomEvent<number>).detail ?? 1;
+      const target = neighbourDesktop(dir);
+      if (target == null || target === activeDesktop) return;
+      const top = wins.filter((w) => !w.min).sort((a, b) => b.z - a.z)[0];
+      if (!top) return;
+      const layout = getDesktopLayout(target);
+      void commitLayout(target, {
+        ...layout,
+        windows: [
+          ...layout.windows.filter((w) => w.id !== top.id),
+          { ...winToSnapshot(top), x: 40, y: 40 },
+        ],
+      });
+      setWins((prev) => prev.filter((w) => w.id !== top.id));
+      void window.api.deskwinFocusDesktop(target);
+    };
+
+    const onFocusMonitor = (e: Event): void => {
+      const target = neighbourDesktop((e as CustomEvent<number>).detail ?? 1);
+      if (target == null) return;
+      void window.api.deskwinFocusDesktop(target);
+    };
+
+    window.addEventListener('os:move-to-monitor', onMove);
+    window.addEventListener('os:focus-monitor', onFocusMonitor);
+    return () => {
+      window.removeEventListener('os:move-to-monitor', onMove);
+      window.removeEventListener('os:focus-monitor', onFocusMonitor);
+    };
+  }, [wins, activeDesktop, myDisplayKey]);
+
+  /**
+   * Windows living on *other* desktops, shown with a monitor badge when the
+   * user has asked this taskbar to list everything (Windows 11 style).
+   */
+  const foreignWins = useMemo(() => {
+    if (!myAssignment?.showAllWindows) return [];
+    const out: { win: WindowSnapshot; desktopIndex: DesktopIndex; desktopName: string }[] = [];
+    for (let index = 0; index < getDesktopCount(); index += 1) {
+      if (index === activeDesktop) continue;
+      for (const win of getDesktopLayout(index).windows) {
+        if (!win.visible) continue;
+        out.push({ win, desktopIndex: index, desktopName: getDesktopName(index) });
+      }
+    }
+    return out;
+  }, [myAssignment?.showAllWindows, activeDesktop, deskPrefs]);
+
+  /** Ghost shown on the receiving desktop while an item hovers over it. */
+  const [dragGhost, setDragGhost] = useState<{ kind: DeskDragKind; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    return subscribeDeskDrag({
+      onHover: ({ kind, screenX, screenY }) => {
+        const p = screenToDeskPoint(screenX, screenY, deskRef.current, desktopPointerScale(deskRef.current));
+        setDragGhost({ kind, x: p.x, y: p.y });
+      },
+      onLeave: () => setDragGhost(null),
+      onAdopt: ({ kind, payload, screenX, screenY }) => {
+        setDragGhost(null);
+        const p = screenToDeskPoint(screenX, screenY, deskRef.current, desktopPointerScale(deskRef.current));
+        const { w: dw, h: dh } = deskSize();
+        if (kind === 'window' && payload.kind === 'window') {
+          const snap = payload.snapshot;
+          const w = Math.min(snap.w, dw);
+          const h = Math.min(snap.h, dh);
+          setWins((prev) => [
+            ...prev.filter((existing) => existing.id !== snap.id),
+            {
+              ...winFromSnapshot(snap),
+              x: Math.max(0, Math.min(p.x, dw - 60)),
+              y: Math.max(0, Math.min(p.y, dh - 36)),
+              w,
+              h,
+              z: ++zTop.current,
+              min: false,
+            },
+          ]);
+        } else if (kind === 'icon' && payload.kind === 'icon') {
+          const snap = payload.snapshot;
+          const { w: ICON_W, h: ICON_H } = iconMetrics(deskPrefs);
+          const sn = snapClamp(p.x, p.y, ICON_W, ICON_H, dw, dh, deskPrefs.snapGrid);
+          setIcons((prev) => [
+            ...prev.filter((existing) => existing.id !== snap.id),
+            { ...iconFromSnapshot(snap), x: sn.x, y: sn.y },
+          ]);
+        } else if (kind === 'widget' && payload.kind === 'widget') {
+          const snap = payload.snapshot;
+          setWidgets((prev) => [
+            ...prev.filter((existing) => existing.id !== snap.id),
+            {
+              ...snap,
+              x: Math.max(0, Math.min(p.x, dw - snap.w)),
+              y: Math.max(0, Math.min(p.y, dh - snap.h)),
+              z: ++zTop.current,
+            },
+          ]);
+        } else if (kind === 'note' && payload.kind === 'note') {
+          const snap = payload.snapshot;
+          setNotes((prev) => ({ ...prev, [snap.id]: { text: snap.text, color: snap.color } }));
+          if (payload.icon) {
+            const { w: ICON_W, h: ICON_H } = iconMetrics(deskPrefs);
+            const sn = snapClamp(p.x, p.y, ICON_W, ICON_H, dw, dh, deskPrefs.snapGrid);
+            const icon = payload.icon;
+            setIcons((prev) => [
+              ...prev.filter((existing) => existing.id !== icon.id),
+              { ...iconFromSnapshot(icon), x: sn.x, y: sn.y },
+            ]);
+          }
+        }
+      },
+      onRelease: ({ kind, id }) => {
+        if (kind === 'window') setWins((prev) => prev.filter((w) => w.id !== id));
+        else if (kind === 'icon') setIcons((prev) => prev.filter((i) => i.id !== id));
+        else if (kind === 'widget') setWidgets((prev) => prev.filter((w) => w.id !== id));
+        else if (kind === 'note') {
+          setNotes((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+          setIcons((prev) => prev.filter((i) => i.id !== id && i.target !== id));
+        }
+      },
+      onCancelled: () => setDragGhost(null),
+    });
+  }, [deskPrefs]);
   // L5: streak / daily-volume celebrations → companion events.
   useEffect(() => startAchievementWatcher(), []);
   const deskSize = () => ({
@@ -1410,40 +1764,33 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     };
   }, []);
 
+  // File drops are handled by <DropRouter/>, rendered below. The handler that
+  // used to live here understood two extensions and dropped everything else on
+  // the floor without telling anyone.
+
+  // DropRouter asks for a desktop shortcut when a .lnk/.url is dropped.
   useEffect(() => {
-    const onOver = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+    const onAddShortcut = (e: Event): void => {
+      const detail = (e as CustomEvent<{ target?: string; name?: string }>).detail;
+      if (!detail?.target) return;
+      const { w: dw, h: dh } = deskSize();
+      const { w: ICON_W, h: ICON_H } = iconMetrics(deskPrefs);
+      const sn = snapClamp(48, 48, ICON_W, ICON_H, dw, dh, deskPrefs.snapGrid);
+      setIcons((prev) => [
+        ...prev,
+        {
+          id: `sc-${Date.now()}`,
+          kind: 'shortcut',
+          target: detail.target,
+          name: detail.name || detail.target,
+          x: sn.x,
+          y: sn.y,
+        } as DeskIcon,
+      ]);
     };
-    const onDrop = (e: DragEvent) => {
-      const files = Array.from(e.dataTransfer?.files ?? []);
-      if (!files.length) return;
-      e.preventDefault();
-      const paths = files
-        .map((f) => {
-          try {
-            return window.api.getFilePath(f);
-          } catch {
-            return '';
-          }
-        })
-        .filter(Boolean);
-      const ext = (p: string) => p.slice(p.lastIndexOf('.')).toLowerCase();
-      const books = paths.filter((p) => BOOK_DROP.has(ext(p)));
-      const media = paths.filter((p) => MEDIA_DROP.has(ext(p)));
-      void (async () => {
-        if (books.length) await window.api.importPaths(books);
-        if (media.length) await window.api.addMediaPaths(media);
-        if (media.length) open('player');
-        else if (books.length) open('library');
-      })();
-    };
-    window.addEventListener('dragover', onOver);
-    window.addEventListener('drop', onDrop);
-    return () => {
-      window.removeEventListener('dragover', onOver);
-      window.removeEventListener('drop', onDrop);
-    };
-  }, [activeDesktop]);
+    window.addEventListener('desktop:add-shortcut', onAddShortcut);
+    return () => window.removeEventListener('desktop:add-shortcut', onAddShortcut);
+  }, [deskPrefs]);
 
   const toggleMax = (id: string) => {
     setWins((ws) =>
@@ -1717,7 +2064,9 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     // Compositor-only transform during gesture; snap live so the grid feels solid.
     el.style.willChange = 'transform';
     perfSetInteracting(true);
+    beginDeskDrag('icon', ic.id, { kind: 'icon', snapshot: iconToSnapshot(ic) });
     const move = (ev: PointerEvent) => {
+      moveDeskDrag(ev);
       const local = clientToDeskLocal(desk, ev.clientX, ev.clientY);
       const rawX = local.x - grabX;
       const rawY = local.y - grabY;
@@ -1731,7 +2080,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         el.style.transform = `translate3d(${curX - ox}px, ${curY - oy}px, 0)`;
       });
     };
-    const up = () => {
+    const up = (ev: PointerEvent) => {
       el.releasePointerCapture(e.pointerId);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
@@ -1739,6 +2088,8 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       perfSetInteracting(false);
       el.style.transform = '';
       el.style.willChange = '';
+      // Dropped on another monitor — the release message removes it from here.
+      if (endDeskDrag(ev)) return;
       if (moved) {
         const sn = snapClamp(curX, curY, ICON_W, ICON_H, dw, dh, grid);
         setIcons((prev) => prev.map((p) => (p.id === ic.id ? { ...p, x: sn.x, y: sn.y } : p)));
@@ -1859,7 +2210,7 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       commitTimer.current = null;
     }
     try {
-      const outgoing = buildLayout(activeDesktop, wins, icons, notes, widgets, wall);
+      const outgoing = buildLayout(activeDesktop, wins, icons, notes, widgets, wall, deskSize());
       rememberSignature(layoutSignature(outgoing));
       await commitLayout(activeDesktop, outgoing);
       const res = await switchDesktopState(target);
@@ -1871,6 +2222,55 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
     }
   };
   switchDesktopRef.current = switchDesktop;
+
+  /**
+   * Tear one app off the taskbar into a desktop of its own.
+   *
+   * Distinct from "move to the next monitor": that hands a window to a desktop
+   * something else is already showing. This claims a desktop nothing owns, puts
+   * exactly the dragged app on it, and opens a window for it — so the new
+   * desktop carries that one app and nothing else.
+   *
+   * Main allocates the index and opens the window; both layout writes stay here,
+   * because this shell owns the desktop the app is leaving and the freshly
+   * claimed desktop has no other shell showing it (B2).
+   */
+  const tearOffToNewDesktop = async (w: Win): Promise<void> => {
+    let target: number;
+    try {
+      const res = await window.api.deskwinAllocateDesktop();
+      if (!res.ok || typeof res.desktopIndex !== 'number') {
+        showOsToast(t('desktop.tearOff.noneFree'));
+        return;
+      }
+      target = res.desktopIndex;
+    } catch {
+      showOsToast(t('desktop.tearOff.failed'));
+      return;
+    }
+
+    try {
+      const layout = getDesktopLayout(target);
+      await commitLayout(target, {
+        ...layout,
+        // Exactly one app, at a predictable origin — the desktop was empty.
+        // Forced visible: tearing off a minimized taskbar button must not open
+        // a new desktop that looks empty.
+        windows: [{ ...winToSnapshot(w), x: 40, y: 40, visible: true }],
+      });
+      setWins((prev) => prev.filter((x) => x.id !== w.id));
+      await window.api.deskwinOpenDesktop(target);
+    } catch (err) {
+      console.error('[desktopState] tear-off failed:', err);
+      showOsToast(t('desktop.tearOff.failed'));
+    }
+  };
+
+  /** Pointer bookkeeping for the taskbar tear-off gesture. */
+  const taskDrag = useRef<{ id: string; x: number; y: number; fired: boolean } | null>(null);
+  const suppressTaskClick = useRef(false);
+  /** Upward travel that separates a tear-off from a sloppy click. */
+  const TEAR_OFF_PX = 56;
 
   const sleepSecretOs = () => {
     setStartOpen(false);
@@ -1924,6 +2324,16 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
       onDrop={(e) => dropStartAppOnDesktop(e)}
       onContextMenu={onDesktopContextMenu}
     >
+      <DropRouter onOpenSection={(section) => open(section as WinSection)} />
+      {/* An item from another monitor is hovering here. Purely an affordance —
+          nothing is committed until main sends `deskdrag:adopt`. */}
+      {dragGhost && (
+        <div
+          className={`deskdrag-ghost deskdrag-ghost-${dragGhost.kind}`}
+          style={{ left: dragGhost.x, top: dragGhost.y }}
+          aria-hidden
+        />
+      )}
       {hasRasterWall && wallImage && (
         <img
           className="os-wall-image"
@@ -2393,23 +2803,39 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
         </>
       )}
 
-      <div className="os-taskbar" ref={taskbarRef}>
-        <button
-          className={`os-start-btn ${startOpen ? 'active' : ''}`}
-          title={wired ? 'NODE ROUTER' : t('desktop.start')}
-          onClick={() => setStartOpen((o) => !o)}
-        >
-          <Icon name="logo" size={22} />
-          <span>{wired ? 'NODE' : t('desktop.start')}</span>
-        </button>
-        <div className="os-desktop-switches">
-          <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} onClick={() => void switchDesktop(0)}>
-            {wired ? 'LOCAL NODE' : t('desktop.desktopN', { n: 1 })}
-          </button>
-          <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} onClick={() => void switchDesktop(1)}>
-            {wired ? 'REMOTE FEED' : t('desktop.desktopN', { n: 2 })}
-          </button>
-        </div>
+      {/* Per-display taskbar mode. 'none' hides it entirely; 'windows-only'
+          drops the Start button and desktop switcher and keeps the window
+          list, which is what a secondary monitor usually wants. */}
+      <div
+        className={`os-taskbar os-taskbar-${taskbarMode}`}
+        ref={taskbarRef}
+        hidden={taskbarMode === 'none'}
+      >
+        {taskbarMode === 'full' && (
+          <>
+            <button
+              className={`os-start-btn ${startOpen ? 'active' : ''}`}
+              title={wired ? 'NODE ROUTER' : t('desktop.start')}
+              onClick={() => setStartOpen((o) => !o)}
+            >
+              <Icon name="logo" size={22} />
+              <span>{wired ? 'NODE' : t('desktop.start')}</span>
+            </button>
+            {/* A secondary window is pinned to one desktop by its assignment —
+                switching would put two shells on the same desktop, which is
+                exactly the ownership collision the single-writer rule avoids. */}
+            {!secondary && (
+              <div className="os-desktop-switches">
+                <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} onClick={() => void switchDesktop(0)}>
+                  {wired ? 'LOCAL NODE' : t('desktop.desktopN', { n: 1 })}
+                </button>
+                <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} onClick={() => void switchDesktop(1)}>
+                  {wired ? 'REMOTE FEED' : t('desktop.desktopN', { n: 2 })}
+                </button>
+              </div>
+            )}
+          </>
+        )}
         <div className="os-task-wins">
           {wins.map((w) => {
             const app = APPS.find((a) => a.id === w.section);
@@ -2428,7 +2854,39 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 key={w.id}
                 className={`os-task-win app-${w.section} ${w.z === topZ && !w.min ? 'active' : ''} ${w.min ? 'min' : ''} ${winAnim[w.id] ? `anim-${winAnim[w.id]}` : ''}`}
                 title={wired ? wiredModuleLabel(w.section) : label}
-                onClick={() => taskClick(w)}
+                // Drag a taskbar button up and off the bar to give that app a
+                // desktop of its own. Pointer events rather than HTML5 drag:
+                // the shell already drives every other drag this way, and HTML5
+                // drag images do not survive a frameless window.
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  // The close affordance is a child of this button.
+                  if ((e.target as HTMLElement).closest('.os-task-close')) return;
+                  taskDrag.current = { id: w.id, x: e.clientX, y: e.clientY, fired: false };
+                }}
+                onPointerMove={(e) => {
+                  const d = taskDrag.current;
+                  if (!d || d.id !== w.id || d.fired) return;
+                  // The taskbar sits at the bottom, so a tear-off travels up.
+                  if (d.y - e.clientY < TEAR_OFF_PX) return;
+                  d.fired = true;
+                  suppressTaskClick.current = true;
+                  void tearOffToNewDesktop(w);
+                }}
+                onPointerUp={() => {
+                  taskDrag.current = null;
+                }}
+                onPointerCancel={() => {
+                  taskDrag.current = null;
+                }}
+                onClick={() => {
+                  // A completed tear-off still ends in a click on this button.
+                  if (suppressTaskClick.current) {
+                    suppressTaskClick.current = false;
+                    return;
+                  }
+                  taskClick(w);
+                }}
                 // Middle-click closes, as it does on a real taskbar / browser tab.
                 onAuxClick={(e) => {
                   if (e.button !== 1) return;
@@ -2464,6 +2922,25 @@ export default function DesktopShell({ onOpenBook }: { onOpenBook: (item: Librar
                 >
                   ×
                 </span>
+              </button>
+            );
+          })}
+          {/* Windows on other monitors. Badged with the desktop they live on;
+              clicking raises that monitor's window rather than pretending to
+              open a second copy here. */}
+          {foreignWins.map(({ win: fw, desktopIndex, desktopName }) => {
+            const app = APPS.find((a) => a.id === fw.section);
+            const label = app ? t(app.labelKey) : fw.section;
+            return (
+              <button
+                key={`foreign-${desktopIndex}-${fw.id}`}
+                className={`os-task-win os-task-win-foreign app-${fw.section}`}
+                title={t('desktop.task.onDesktop', { name: label, desktop: desktopName })}
+                onClick={() => void window.api.deskwinFocusDesktop(desktopIndex)}
+              >
+                <Icon name={app?.glyph ?? 'app'} size={18} />
+                <span>{label}</span>
+                <span className="os-task-monitor-badge">{desktopName}</span>
               </button>
             );
           })}
@@ -2706,7 +3183,13 @@ const FloatingWindow = memo(function FloatingWindow({
     // translate() only moves the already-painted layer on the compositor.
     if (winRef.current) winRef.current.style.willChange = 'transform';
     perfSetInteracting(true);
+    // Multi-monitor: the pointer capture above means this window keeps getting
+    // pointermove even once the cursor is over another display, and screenX/Y
+    // are virtual-screen coordinates. That is the whole mechanism — nothing is
+    // sent to main until the cursor actually leaves this desk.
+    beginDeskDrag('window', win.id, { kind: 'window', snapshot: winToSnapshot(win) });
     const move = (ev: PointerEvent) => {
+      moveDeskDrag(ev);
       curX = Math.min(Math.max(ox + (ev.clientX - sx) / z, -win.w + 90), dw - 60);
       curY = Math.min(Math.max(oy + (ev.clientY - sy) / z, 0), dh - 36);
       // RAF throttle — one visual update per frame regardless of mouse Hz.
@@ -2733,6 +3216,10 @@ const FloatingWindow = memo(function FloatingWindow({
         node.style.transform = '';
         node.style.willChange = '';
       }
+      // Released over another monitor: that desktop adopts the window and this
+      // one gets a `deskdrag:release`. Committing the local position here as
+      // well would leave a copy on both desktops.
+      if (endDeskDrag(ev)) return;
       const rect = desk?.getBoundingClientRect();
       const half = Math.max(MIN_W, Math.floor(dw / 2) - 10);
       // Commit once: an edge-snap if applicable, else the dragged position.

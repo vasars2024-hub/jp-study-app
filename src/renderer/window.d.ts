@@ -106,8 +106,12 @@ import type {
   DesktopIndex,
   DesktopLayout,
   DesktopLayoutSnapshot,
+  DisplayAssignment,
 } from '../shared/desktop';
+import type { DisplaySummary } from '../main/displays';
+import type { DeskWindowInfo } from '../main/desktopWindows';
 import type { DeskDragKind } from '../main/deskDrag';
+import type { DropPlan } from '../main/fileRouter';
 import type {
   ImmersionDayMetrics,
   ImmersionMetricsDelta,
@@ -381,6 +385,31 @@ declare global {
         wall?: unknown;
       }): Promise<DesktopLayoutSnapshot>;
       onDesktopChanged(cb: (snap: DesktopLayoutSnapshot) => void): () => void;
+      desktopSetAssignment(
+        patch: Partial<DisplayAssignment> & { displayKey: string },
+      ): Promise<DesktopLayoutSnapshot>;
+      desktopRename(index: DesktopIndex, name: string): Promise<DesktopLayoutSnapshot>;
+      desktopResetAssignments(): Promise<DesktopLayoutSnapshot>;
+
+      // Multi-monitor
+      displayList(): Promise<DisplaySummary[]>;
+      displaySetVirtualCount(count: number): Promise<DisplaySummary[]>;
+      displayGetVirtualCount(): Promise<number>;
+      onDisplaysChanged(cb: (displays: DisplaySummary[]) => void): () => void;
+      deskwinAssign(displayKey: string, desktopIndex: number): Promise<{ ok: boolean }>;
+      deskwinSetOptions(
+        patch: Partial<DisplayAssignment> & { displayKey: string },
+      ): Promise<{ ok: boolean }>;
+      deskwinList(): Promise<DeskWindowInfo[]>;
+      deskwinAllocateDesktop(): Promise<{ ok: boolean; desktopIndex?: number }>;
+      deskwinOpenDesktop(desktopIndex: number): Promise<{ ok: boolean }>;
+      deskwinFocusDesktop(desktopIndex: number): Promise<{ ok: boolean }>;
+      deskwinSync(): Promise<DeskWindowInfo[]>;
+      deskwinWhoAmI(): Promise<{ displayKey: string | null; desktopIndex: DesktopIndex | null }>;
+      onDeskWindowsChanged(cb: (info: DeskWindowInfo[]) => void): () => void;
+      onDeskRetarget(
+        cb: (payload: { desktopIndex: DesktopIndex; displayKey: string }) => void,
+      ): () => void;
 
       // Cross-monitor drag
       deskDragBegin(payload: {
@@ -415,6 +444,11 @@ declare global {
       onDeskDragCancelled(
         cb: (p: { kind: DeskDragKind; id: string; reason: string }) => void,
       ): () => void;
+
+      // File drop routing
+      fileDropClassify(paths: string[]): Promise<DropPlan[]>;
+      fileDropFolderImages(dirPath: string): Promise<string[]>;
+      fileDropFolderFiles(dirPath: string): Promise<string[]>;
 
       popOut(section: string): Promise<void>;
       popoutListOpen(): Promise<string[]>;

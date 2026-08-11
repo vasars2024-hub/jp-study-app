@@ -14,6 +14,43 @@
   overflow: hidden;
 }
 
+/* ---------- Per-display taskbar mode ---------- */
+
+/*
+ * `taskbar: 'none'` renders the bar with the `hidden` attribute, and that alone
+ * does nothing here: `styles.css` sets `.os-taskbar { display: flex }`, which
+ * beats the UA sheet's `[hidden] { display: none }` on specificity. Without this
+ * rule the "no taskbar on this monitor" setting is a control that changes a
+ * class name and nothing else.
+ */
+.os-taskbar[hidden] {
+  display: none;
+}
+
+/*
+ * A window living on another monitor's desktop. Dimmer than a local button and
+ * carrying the desktop's name, because clicking it raises that monitor rather
+ * than opening anything here.
+ */
+.os-task-win-foreign {
+  opacity: 0.62;
+  border-style: dashed;
+}
+
+.os-task-win-foreign:hover {
+  opacity: 0.9;
+}
+
+.os-task-monitor-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  background: color-mix(in srgb, var(--accent, #b03040) 22%, transparent);
+  white-space: nowrap;
+}
+
 /* ---------- Cross-monitor drag ghost ---------- */
 
 /*
@@ -232,6 +269,15 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  /*
+   * `.os-toast-host` is `pointer-events: none` (styles.css) so a purely
+   * informational toast never swallows a click meant for the desktop under it.
+   * `pointer-events` inherits, so this — the first interactive element ever put
+   * inside a toast — has to opt back in. Without it the button paints normally
+   * and hit-tests to whatever sits behind the toast, which is an Undo the user
+   * can see and cannot press.
+   */
+  pointer-events: auto;
 }
 
 .os-toast-action:hover {
