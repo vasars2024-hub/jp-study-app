@@ -230,12 +230,29 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // entries in SCRAPER_FIELDS because its controls do not live in the settings
   // document. ScraperSettingsDrawer.tsx renders them by hand — compact window,
   // collapsed rail, advanced controls, result density, rows per page, default
-  // result tab — and each writes ScraperShellState through the controller, which
+  // result tab. 'Recent destinations' in that panel is a readout, not a setting.
+  //
+  // Five of the six write ScraperShellState through the controller, which
   // `shared/scraperShell.ts` validates and `shell.persistence` (ready) stores.
-  // 'Recent destinations' in that panel is a readout, not a setting. Held at
-  // untested rather than promoted on shell.persistence's dot: this panel's own
-  // controls have not been driven end to end.
-  'set.ui': 'untested',
+  // The sixth does not: 'Advanced controls' is renderer-local state with its own
+  // key, `jp-scraper-advanced-v1` (ScraperApp.tsx's writeAdvancedMode). An
+  // earlier version of this note claimed all six went through the shell
+  // document; they do not, and the two are restored separately.
+  //
+  // Driven live 2026-08-12 through the running scraper pop-out at 900x640, each
+  // with a witness that a no-op control could not produce: compact window
+  // (`.scr-compact-tabs` 0 -> 4 buttons), collapsed rail (52px vs 205px with the
+  // drawer closed, labels `display:none`), advanced controls (the Network group
+  // loses its one `advanced: true` field, 13 -> 12), and density / rows-per-page
+  // / default-tab (the persisted value and this panel's own readout follow).
+  // Both storage keys were restored and asserted byte-identical afterwards.
+  //
+  // Two traps for whoever measures here next. `.scr-body` transitions
+  // `grid-template-columns`, so a single round-trip after a click reads a
+  // mid-transition width; and `@container scr-shell (max-width: 1100px)`
+  // (scraper.css) pins the rail to 52px whenever the drawer is open, so rail
+  // width only discriminates with the drawer closed.
+  'set.ui': 'ready',
   // 'set.browser' used to sit here. The category was deleted from
   // settings/fields.ts rather than promoted — see the dated note above.
 };

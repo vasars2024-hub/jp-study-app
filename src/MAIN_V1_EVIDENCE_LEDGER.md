@@ -11078,3 +11078,136 @@ The next worker's **first action** is to create the one path-scoped checkpoint c
 ledger section and only the `page.script-console` promotion/comment hunk. Do not sweep in the
 foreign +33 comment lines from `featureStatus.ts`. Only after that checkpoint exists should
 the `set.ui` live-acceptance slice begin.
+
+## The six controls that were never driven, and the one that does not live where the note said — 2026-08-12
+
+Main V1 remains in dependency-order item 8. The previous section's first instruction was that the
+next worker's **first action** is the checkpoint its own hop could not create. That was done
+before anything else: `84a12b8` carries the `page.script-console` promotion and that section's
+ledger prose, and nothing else.
+
+### The checkpoint that was blocked, and how it was staged
+
+`featureStatus.ts` was dirty with two independent changes: the previous hop's five-line promotion
+hunk and **+33 comment-only lines from a concurrent settings-group track**. Confirmed still
+uncommitted before staging, exactly as that section warned. The index was reconstructed as HEAD
+plus the one hunk via `git apply --cached` on a patch sliced at the second `@@` header, which is
+safe here because the index matched HEAD for that path. Afterwards `git diff --cached` showed
+precisely the 5-added/1-removed promotion, and the unstaged remainder measured **33 insertions** —
+the foreign lines, left in the working tree exactly as found. `MAIN_V1_EVIDENCE_LEDGER.md` was a
+pure 102-line append with no deletions and no foreign hunks, so a plain `git add` was correct for
+it.
+
+The four gates were re-run on the shared tree before that commit, not inherited from the blocked
+hop: vitest **538 files passed / 1 skipped, 7,251 passed / 6 skipped**, i18n-check exit 0 (9,324
+keys), architecture-audit exit 0 (17 findings, 2 pending, nothing new), eslint exit 0.
+
+### The slice: `set.ui`, all six controls, driven live
+
+The already-running scraper pop-out (window 2, 900x640) was driven only through the authenticated
+debug bridge. It was **not restarted or stopped** — another relay track owns that process. `/logs`
+showed the newest `[vite] hot updated` lines were 17 minutes old and were the previous hop's own
+`featureStatus.ts` cascade, so no foreign track was editing the tree during the pass.
+
+Both storage keys were captured verbatim first. The drawer was opened through the top bar's own
+`Advanced settings` button and the UI category through the drawer's own nav; every click was
+hit-tested with `elementFromPoint` and the resolved control's own label was asserted before the
+click was sent.
+
+| control | driven by | witness a no-op control could not produce |
+| --- | --- | --- |
+| Compact scraper window | real click on the toggle track | `.scr-compact-tabs` **0 to 4** buttons; `.scr-shell` gains `is-compact`; panel readout `Full` to `Compact` |
+| Collapsed navigation rail | real click | rail **205px to 52px** with the drawer closed and the grid transition settled; `.scr-rail-label` computes `display:none` |
+| Advanced controls | real click | Network group **13 to 12** fields; its one `advanced: true` field, Proxy Rotation, disappears; `jp-scraper-advanced-v1` `1` to `0` |
+| Result density | its own `change` handler | persisted `density`, the shell's `data-density`, and the panel readout all follow `cozy` to `compact` |
+| Rows per page | its own `change` handler | persisted `pageSize` and the panel's `Page size` readout follow `10` to `25` |
+| Default result tab | its own `change` handler | persisted `resultTab` follows `episodes` to `details` |
+
+**Stated plainly: the three `<select>`s were driven through their own React `onChange`, not through
+a native dropdown**, which the bridge cannot open. Each expression queried the shipped element,
+assigned to it and dispatched a bubbling `change`; propagation to the React root was separately
+confirmed with a temporary capture listener. The three toggles were real synthesized clicks.
+
+Every value was put back through the same controls, the drawer category returned to `developer`
+and the drawer closed. The restore was asserted **inside the app** with `===` on the whole blob:
+identical, 586 characters both ways, and `jp-scraper-advanced-v1` back at `1`. `/logs?level=error`
+returned **0** across the pass. The one probe global was deleted and its absence confirmed. No
+screenshot was taken, no userData file was read or written, and no page was navigated.
+
+### Three things the run corrected
+
+1. **The entry's own note was wrong about where one control lives.** It said all six "write
+   `ScraperShellState` through the controller". Five do. `Advanced controls` does not — it is
+   renderer-local state under its own key `jp-scraper-advanced-v1`, written by `writeAdvancedMode`
+   in `ScraperApp.tsx`. The comment now says so, because the two are restored separately and a
+   future run that trusts the old sentence would restore only half of what it changed.
+2. **Rail width is not a witness while the drawer is open.** `@container scr-shell
+   (max-width: 1100px)` (`scraper.css:4887`) pins the rail to 52px, hides `.scr-main` and moves the
+   drawer into column 2 whenever the drawer is open below that width — and this window is 864px of
+   container. Measured with the drawer open, the collapsed and expanded states are **both** 52px.
+   Only with the drawer closed does 205 vs 52 discriminate.
+3. **`.scr-body` transitions `grid-template-columns`.** A single round-trip after a click reads a
+   mid-transition width; 52px, then 106.125px, then the true value, were all read from the same
+   settled state at different delays. Every width in the table above was taken after ten
+   round-trips and confirmed stable across three consecutive samples.
+
+### A dead filter, found on the way and deliberately not fixed
+
+The Advanced toggle was expected to change the rail's page count. It does not, and the reason is
+not a defect in `set.ui`: **no entry in `scraperPages.ts` declares `advanced` at all**, so
+`ScraperNav.tsx:28`'s `(ctl.advancedMode || !p.advanced)` filter and the strand-guard at
+`ScraperApp.tsx:239-243` are both no-ops today. Nav count is 17 in either mode. The flag is live on
+the *search* path — `scraperRegistry.ts:34` marks `build-status` advanced — so this is an unused
+capability, not a broken one, and deciding whether any page should be advanced-only is a product
+call, not this slice's. Recorded, not "fixed".
+
+### One thing that is not claimed
+
+The first of five `change` dispatches produced no state change and could not be reproduced; the
+four that followed, including a repeat of the same control in the same direction, all landed
+deterministically. It is recorded as an instrumentation flake with no cause established. **It is
+not offered as a product finding** — one unreproducible miss is not evidence of a defect.
+
+Density's real downstream consumer is `EpisodeTable`'s `ROW_HEIGHT[density]`, and rows-per-page and
+default-tab are consumed by `NewScrapePage`. None of those were rendered, because reaching them
+needs a page navigation and `navigateScraperShell` pushes onto an **8-slot** MRU that is already
+full — one navigation would evict `dashboard` permanently, and no sequence of navigations restores
+the original order. The control's own contract is that it writes the validated shell document; that
+is what was exercised, and the consumers are wired in source.
+
+### Changed paths
+
+- `src/renderer/components/scraper/featureStatus.ts` — promote `set.ui`, correct the
+  where-it-persists claim, record the acceptance and the two measurement traps.
+- `src/MAIN_V1_EVIDENCE_LEDGER.md` — this evidence.
+
+No UI string was added.
+
+### Gates
+
+- `npx vitest run` — **538 files passed / 1 skipped; 7,251 passed / 6 skipped; 0 failed.**
+- `node tools/i18n-check.cjs` — exit 0, all **9,324** English keys translated in ja/zh/ru.
+- `node tools/architecture-audit.cjs` — exit 0, **17 findings, 2 pending**, nothing new.
+- `npx eslint src/renderer/components/scraper/featureStatus.ts` — exit 0, no output.
+- `tsc --noEmit` was not run; it is not a gate.
+- A cache-busted import from Vite's running served graph returned `statusOf('set.ui') === 'ready'`
+  and **19** remaining `untested` entries, so the edit reached the graph and not just the disk.
+
+### Exact next slice
+
+There are now **19** `untested` entries and Main V1 remains in dependency-order item 8. Do not move
+to Blanc.
+
+The next clean acceptance member is **`set.logging`**. Its own comment already states the exact
+gap — `scraperLogBus.test.ts` covers the rollover and retention paths and both halves were seen red
+under a positive control, but *no line has been written through a running app*. That is one
+bounded live check: drive a real job scope, confirm `main/scraper/logBus.ts` records according to
+the active profile's `level` and `channels`, and confirm the file sink under
+`<userData>/scraper/logs` respects `persistToDisk`. **Note the standing constraint before starting:
+that sink writes into the 8.6 GB userData tree with no restore point, so read what is there first
+and add rather than rewrite** — if the check cannot be made additive, take `set.network` instead
+and say why.
+
+`featureStatus.ts` is still dirty with the same foreign +33 comment lines, which are *not* in
+either of this hop's commits. Keep using reconstruct-HEAD-plus-your-own-hunk staging until that
+track lands them; re-check first, because once it does, the file is clean and the caution is void.
