@@ -102,3 +102,24 @@ safe, and integration is real work that belongs in a normal turn with gates run
 properly. No claim in sections 2 or 3 was verified; they are recorded as leads
 with their provenance so the next worker can falsify them cheaply instead of
 rediscovering them.
+
+### 6. Integration progress — updated by each worker that lands one
+
+Append to this table when you integrate one. Evidence lives in
+`src/MAIN_V1_EVIDENCE_LEDGER.md`, not here.
+
+| commit | state | landed as | notes |
+|---|---|---|---|
+| `27c74b6` | **integrated** 2026-08-12 | `4e5ea28` | Orphan had zero importers and was the stale copy (`a empire` vs canonical `an empire`). Deletion was already live on disk, so no runtime delta. Parity test added. |
+| `9c046cc` | **integrated** 2026-08-12 | `a2bbdb5` | Acceptance criterion re-run against a real temp SQLite dictionary and passes. Foundation only — **no IPC channel, no renderer consumer**. Its session's "105 tests" was really 8; 125 is the surrounding area. |
+| `2545cd5` | open | — | Collides with the four dirty `catalogs/{en,ja,zh,ru}.ts`. Needs reconstruct-HEAD-plus-edit staging. |
+| `28a239c` | open | — | Same catalog collision, plus `styles.css`. |
+| `c3ae5b6` | open | — | Same catalog collision. |
+| `20f72eb` | open, **re-derive first** | — | Touches `scraper/featureStatus.ts` and `scraper/settings/fields.ts`, which `bfac09d` rewrote after this commit was made. |
+| `c48b266` | open | — | Touches `preload.ts`; invoke the handler live, do not grep the channel. |
+| `87dd97c` | open, partly absorbed | — | `shared/readingIpc.ts` is byte-identical at HEAD; `readingWorkspace.ts` is 462 lines there vs **493 at HEAD**. Per-hunk salvage only. |
+| `9e6e82d` | **likely obsolete** | — | Both shared files byte-identical at HEAD, and `git diff HEAD 9e6e82d` on the rest is **+8 / −54** — applying it would delete branch work. Confirm, then close it rather than integrating. |
+| `99c8747` | open, partly absorbed | — | `mediaCenter.css` identical at HEAD; the three renderer files look genuinely unlanded. |
+
+Method worth reusing: `git rev-parse <commit>:<path>` against `git rev-parse HEAD:<path>`
+falsifies "is this still needed?" in one command per file, before any merge is attempted.
