@@ -277,10 +277,17 @@ Still required before the Track 3 acceptance can be called complete:
   distinguishable, and that migration path was measured against the real stored
   settings document on this machine (2026-08-11 — see the ledger's "The two
   privacy controls that had no state behind them"). **Persistent sensitive-context
-  exclusion is implemented; live acceptance remains.** The setting defaults on
+  exclusion: done, live acceptance included.** The setting defaults on
   for older documents and removes sensitive context and attachments at the main
   provider boundary. Turning it off only makes that material eligible: each
-  cloud request still requires the existing explicit consent. **Still open**
+  cloud request still requires the existing explicit consent. Both halves were
+  driven live on 2026-08-12 against a real staged capture in the active
+  conversation: with exclusion on the composer states the material stays local
+  and asks for nothing, with it off the consent checkbox appears naming
+  `gemini-2.5-flash` by name, and the switch renders checked with **no persisted
+  settings document in existence** — which is the default-on migration claim
+  measured rather than reasoned (see the ledger's "Three live-acceptance debts
+  paid in one session"). **Still open**
   from this bullet: automations, whose created entry freezes
   `effectiveAgentPermission` at creation time, which is a product decision
   rather than a missing writer;

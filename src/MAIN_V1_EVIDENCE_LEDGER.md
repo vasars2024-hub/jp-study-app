@@ -13474,3 +13474,140 @@ Not run, and not claimed: no Electron token here, as recorded in the entry above
 natural live check for this fix — opening the Scraper settings drawer — is exactly what cannot be
 performed from a clean checkout without it, so the next worker with a token should open that
 drawer first and confirm it renders.
+
+## Three live-acceptance debts paid in one session, and the two overlays that stand in front of every one of them — 2026-08-12
+
+This hop had a working Electron token, which the previous three did not. It spent it on the
+**three live checks other entries had explicitly deferred** rather than on new source, so the
+deliverable here is evidence, not a feature. Nothing in `src/` changed.
+
+### First: the boss audit's instruction was already satisfied — re-derived, not assumed
+
+`docs/audit/RELAY_BOSS_AUDIT.md`'s last section (14:36 MSK) tells the next worker to close two
+clean-HEAD failures before resuming the ladder. Both were already closed by `bef3b2e`, which
+landed *after* the audited HEAD `d0d1be0` — so the instruction was stale by one commit.
+
+Verified rather than taken on trust:
+
+- `npx vitest run` on the two named files: **29 passed / 0 failed** (`agentSessionContext.test.ts`,
+  `monitorsPage.test.ts`).
+- `settingsCatalog.ts:109` carries `lsKeys: ['jp-os-filedrop-prefs-v1']` — the production hunk the
+  audit said was missing.
+- The in-situ pass is **valid evidence for these two identities specifically**, which is the part
+  worth stating: all three files are clean at HEAD (`git status --short` empty), and so are the
+  only modules they import (`main/agentSessionContext.ts`, `shared/agentWorkspace.ts`). There is
+  no dirty dependency left to mask the result. That reasoning does not generalise to the suite —
+  it is a per-identity argument about a closed import set.
+- `node tools/i18n-check.cjs` exits **0** here (9,340 keys translated). The audit's failure to run
+  it was an esbuild sandbox traversal block in that worker, as it suspected — not a product fact.
+
+### The vision slice named as "next" in the relay ladder is finished
+
+The dispatch prompt names the screenshot/OCR attachment context as the likely next slice, citing
+`FORBIDDEN_ATTACHMENT_FIELDS`. It is **done across all three producers** — the plan's own Track 3
+bullet says so and `agentExecutionBridge.ts:209` shows the set extended, not weakened. This is the
+same failure mode as the async-resolver correction: a prompt naming completed work as remaining.
+Re-derive the ladder position from the plan, not from the hand-off sentence.
+
+### Two overlays block every hit-test in this profile, and answering them is not the harness's call
+
+The reason a live pass costs more here than the endpoint list suggests: this profile's **renderer
+localStorage carries no keys at all**, so a cold start raises the telemetry-consent screen
+(`.consent`, 1264x821, covering everything) and then the 8-step onboarding tour
+(`.tour-bubble`). `click.ps1`'s hit-test correctly refused three separate clicks against
+`div.consent` and `.tour-bubble__step` — those refusals were the harness working, not a defect.
+
+Both were set aside with `style.display='none'` **in the DOM only**. That is deliberate:
+`ConsentScreen.tsx:18-26` persists a choice on either button and sends a country ping on "yes",
+so clicking either would answer a privacy question on the user's behalf and leave it answered.
+The DOM route persists nothing and a reload restores both. Confirmed at the end of the run:
+`jp-telemetry-consent` still absent, no `consent`/`telemetry` key in localStorage at all.
+
+### Debt 1 — the Scraper settings drawer renders (the check the previous entry asked for by name)
+
+The entry above this one asks the next worker with a token to open that drawer first. Done:
+`aria-label="Advanced settings"` opens it, `.scr-shell is-drawer-open`, 782x519,
+**86 controls**, 12 `fields.ts`-driven rows, no error-boundary text.
+
+Driven to the section that actually consumes the symbol that was missing at HEAD. The Export
+category's Columns hint renders the real vocabulary:
+
+    index, title, type, language, resolution, source, size, season, duration, airDate, status, url
+
+**Twelve names, byte-identical to `git show HEAD:…/data/exportBuilder.ts`'s
+`SCRAPER_EXPORT_COLUMNS`.** Stating the limit of this evidence precisely: the live run is *in
+situ*, and the tree still holds the Export track's unlanded rewrite of that same file, so the
+render alone cannot distinguish committed from uncommitted. What makes it evidence about the
+**commit** is the pair — the committed blob exports the constant (`exportBuilder.ts:19` at HEAD)
+and `fields.ts` at HEAD imports it, so the graph is closed there — plus the previous entry's
+clean-worktree run. Screenshot: `debug/shots/win1-1786538277858.png`.
+
+**A near-miss finding that was not one.** Eight drawer categories, `Export` among them, failed
+`elementFromPoint` against `.scr-statusbar` — which reads exactly like "six settings sections are
+unclickable". They are not. `.scr-drawer-rail` is `overflow-y: auto` with `scrollHeight` **492**
+against `clientHeight` **281**; the rows are scroll-clipped, and `getBoundingClientRect()` still
+reports a rect for a clipped child. After `scrollIntoView` the hit-test matched and the click
+worked. Measure the scroll container before reporting an occlusion.
+
+### Debt 2 — the vision staging lane, driven through the real main handler
+
+The boss audit recorded that the vision lane's claims were **not** re-verified live. They are now,
+by invoking `window.api.agentImageStage`/`agentImageTake` — the real `ipcMain` handlers, not a
+preload binding — with a 1x1 PNG. No network, no `fs`, nothing persisted:
+
+| probe | result |
+|---|---|
+| valid `image/png` stage | `{ok: true, sizeBytes: 70}` — arithmetic size, matching the payload |
+| same request plus a `bytes` field | **`{ok: false, code: 'invalid-request'}`** — refused, not silently dropped |
+| `image/gif` | `{ok: false, code: 'invalid-request'}` |
+| `take` twice | first returns the image, second returns `images: []` |
+
+That is the second-door claim (`hasForbiddenAttachmentField` consulted by the staging normalizer),
+the format restriction, and single-use expiry, all confirmed against the running main process.
+
+### Debt 3 — persistent sensitive-context exclusion: live acceptance, which the plan still listed as open
+
+Track 3's bullet said "implemented; live acceptance remains". Paid, end to end, using the app's
+own transport rather than injected state: staging a capture into the **active** conversation
+(`agent-fcea48bb…`) made the open Agent claim it into the composer as `relay-capture.png 70 bytes`.
+That is the ReadingLens hand-off path, so the attachment is real sensitive material
+(`agentAttachments.ts:223` forces `sensitivity: 'sensitive'`), not a fixture.
+
+With target switched to `gemini-2.5-flash` (session-only `useState`, so nothing persisted):
+
+| exclusion | composer shows |
+|---|---|
+| **on** (default) | "Sensitive context and attachments will stay local because persistent exclusion is on." — and **no** consent checkbox |
+| **off** | exclusion note gone; consent checkbox appears: "Send selected sensitive context and attached file contents to **gemini-2.5-flash** for this request." |
+
+Both halves of the documented policy are therefore live-true: turning it off only makes the
+material *eligible*, and the per-request consent is still demanded and still names the actual
+provider. **No request was ever sent** — the consent box was left unchecked and Send never clicked.
+
+The strongest single observation is the default: the switch rendered **checked with no persisted
+settings document in existence** (`jp-study-local-agent-settings-v1` absent). That is the
+"defaults on for an older document" migration claim, measured rather than reasoned.
+
+**Restoration, asserted not eyeballed.** The captured pre-state was *absent*. Toggling wrote a
+full document with `"excludeSensitiveContext":false`; the switch was returned to on through its
+own control and the key then removed, so the final state is `getItem(...) === null` — identical to
+capture. Probe globals deleted. `agent-mode-select` and the target select were left as found.
+
+### One correction for future probes
+
+`window.api.agentWorkspaceLoad()` resolves `{ok, state}`, **not** the workspace document. Reading
+`d.activeConversationId` off it yields `undefined` and looks exactly like "the workspace is empty"
+while the UI shows three conversations. That was my own misread, caught by dumping the shape
+before trusting it — do the same.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `node tools/architecture-audit.cjs` | exit 0 — 1,732 modules, 17 findings, "Nothing new", same 2 known pending |
+| `node tools/i18n-check.cjs` | exit 0 — 9,340 keys; no UI string added |
+| `npx vitest run --testTimeout=60000` | exit 0 — 548 files passed / 1 skipped; **7,330 passed, 0 failed, 6 skipped**, 7,336 collected. The collected total matches the boss audit's in-situ figure exactly, so there is no new collection hole (the check that caught the five dead scraper suites one entry above) |
+| `npx eslint` | **not applicable and not claimed** — this commit touches no `.ts`/`.tsx` file |
+
+No new UI text, so no catalog work. The two i18n hygiene failures at clean HEAD remain owned by
+the scraper/VN i18n track, exactly as the earlier boss-audit section instructs.
