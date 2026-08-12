@@ -59,12 +59,18 @@ import {
   searchDeckCards,
   setBookGroupFolder,
   setDeckCardFolder,
-  setDeckCardKnown,
+  reviewDeckCard,
   setDeckFolders,
   type DeckFlashcard,
   type DeckFolderFilter,
   type BookGroup,
 } from '../../flashcardDeck';
+import {
+  filterLocalReviewsDue,
+  LOCAL_SRS_RELEARN_MINUTES,
+  scheduleLocalReview,
+  type LocalSrsState,
+} from '../../../shared/localSrs';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -99,6 +105,7 @@ export interface ReviewCard {
   word: string;
   reading: string;
   meaning: string;
+  srs?: LocalSrsState;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -174,8 +181,8 @@ export interface FlashcardsState {
   sessionStartedAt: number;
   reviewBookKey: string;
   setReviewBookKey: (v: string) => void;
-  reviewUnknownOnly: boolean;
-  setReviewUnknownOnly: (v: boolean) => void;
+  reviewDueOnly: boolean;
+  setReviewDueOnly: (v: boolean) => void;
   bookFolderMenu: string | null;
   deckMenuGroup: BookGroup | null;
   setDeckMenuGroup: (g: BookGroup | null) => void;
@@ -191,6 +198,7 @@ export interface FlashcardsState {
   filteredDeck: DeckFlashcard[];
   bookGroups: BookGroup[];
   epubReviewBooks: BookGroup[];
+  epubDueCards: DeckFlashcard[];
   epubReviewCandidates: DeckFlashcard[];
   filteredSaved: SavedWord[];
   unknownReviewCards: ReviewCard[];
@@ -267,7 +275,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewSource, setReviewSource] = useState<'dictionary' | 'epub'>('dictionary');
   const [sessionStartedAt, setSessionStartedAt] = useState(0);
   const [reviewBookKey, setReviewBookKey] = useState<string>('all');
-  const [reviewUnknownOnly, setReviewUnknownOnly] = useState(true);
+  const [reviewDueOnly, setReviewDueOnly] = useState(true);
   const [bookFolderMenu] = useState<string | null>(null);
   const [deckMenuGroup, setDeckMenuGroup] = useState<BookGroup | null>(null);
   const [epubMiningUi, setEpubMiningUi] = useState<EpubMiningUi>('simple');
@@ -353,11 +361,15 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }, [saved, search]);
   const bookGroups = useMemo(() => groupDeckByBook(filteredDeck), [filteredDeck]);
   const epubReviewBooks = useMemo(() => groupDeckByBook(epubCards), [epubCards]);
+  const epubReviewPool = useMemo(
+    () => filterDeckCards(epubCards, folderFilter),
+    [epubCards, folderFilter],
+  );
+  const epubDueCards = useMemo(() => filterLocalReviewsDue(epubReviewPool), [epubReviewPool]);
   const epubReviewCandidates = useMemo(() => {
-    const pool = filterDeckByBook(filterDeckCards(epubCards, folderFilter), reviewBookKey);
-    if (!reviewUnknownOnly) return pool;
-    return pool.filter((c) => !c.known);
-  }, [epubCards, folderFilter, reviewBookKey, reviewUnknownOnly]);
+    const pool = filterDeckByBook(epubReviewPool, reviewBookKey);
+    return reviewDueOnly ? filterLocalReviewsDue(pool) : pool;
+  }, [epubReviewPool, reviewBookKey, reviewDueOnly]);
 
   // Seed deck level badges from cache, then idle-enrich missing estimates.
   useEffect(() => {
@@ -420,6 +432,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       word: c.word,
       reading: c.reading,
       meaning: c.meaning || c.back || '',
+      srs: c.srs,
     }));
   }
 
@@ -466,7 +479,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   function startEpubReview(): void {
     const pool = epubReviewCandidates;
-    const initialMastered = reviewUnknownOnly
+    const initialMastered = reviewDueOnly
       ? new Set<string>()
       : new Set(pool.filter((c) => c.known).map((c) => c.id));
     startReviewSession(deckToReviewCards(pool), 'epub', initialMastered);
@@ -474,11 +487,10 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   function restartReview(): void {
     if (reviewSource === 'epub') {
-      const pool = epubReviewCandidates;
-      const initialMastered = reviewUnknownOnly
-        ? new Set<string>()
-        : new Set(pool.filter((c) => c.known).map((c) => c.id));
-      startReviewSession(deckToReviewCards(pool), 'epub', initialMastered);
+      // The done-state action repeats this sitting's cards even though Good has
+      // just moved them beyond the due filter. Starting from candidates here
+      // made the button inert as soon as a scheduled session completed.
+      startReviewSession(sessionCards, 'epub');
       return;
     }
     startReviewSession(savedToReviewCards(loadSaved()), 'dictionary');
@@ -525,7 +537,16 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setMasteredIds(nextMastered);
     setReviewed((n) => n + 1);
     setFlipped(false);
-    if (reviewSource === 'epub') setDeck(setDeckCardKnown(card.id, true));
+    if (reviewSource === 'epub') {
+      const nextDeck = reviewDeckCard(card.id, 'good');
+      const reviewedCard = nextDeck.find((candidate) => candidate.id === card.id);
+      setDeck(nextDeck);
+      if (reviewedCard) {
+        setSessionCards((cards) => cards.map((candidate) => (
+          candidate.id === card.id ? { ...candidate, srs: reviewedCard.srs } : candidate
+        )));
+      }
+    }
     setSessionCards((cards) => {
       const unknown = cards.filter((c) => !nextMastered.has(c.id));
       const known = cards.filter((c) => nextMastered.has(c.id));
@@ -539,14 +560,23 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   function again(): void {
     const card = sessionCards[reviewIndex];
-    if (!card || sessionCards.length < 2) return;
+    if (!card) return;
     fireCardFx('resync', 260);
+    if (reviewSource === 'epub') {
+      const nextDeck = reviewDeckCard(card.id, 'again');
+      const reviewedCard = nextDeck.find((candidate) => candidate.id === card.id);
+      setDeck(nextDeck);
+      if (reviewedCard) {
+        setSessionCards((cards) => cards.map((candidate) => (
+          candidate.id === card.id ? { ...candidate, srs: reviewedCard.srs } : candidate
+        )));
+      }
+    }
     if (masteredIds.has(card.id)) {
       const nextMastered = new Set(masteredIds);
       nextMastered.delete(card.id);
       setMasteredIds(nextMastered);
       setReviewed((n) => Math.max(0, n - 1));
-      if (reviewSource === 'epub') setDeck(setDeckCardKnown(card.id, false));
       setSessionCards((cards) => {
         const unknown = cards.filter((c) => !nextMastered.has(c.id));
         const known = cards.filter((c) => nextMastered.has(c.id));
@@ -671,7 +701,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
 
   function startReviewForGroup(group: BookGroup): void {
     setReviewBookKey(`${group.bookId}::${group.bookTitle}`);
-    setReviewUnknownOnly(false);
+    setReviewDueOnly(false);
     const initialMastered = new Set(group.cards.filter((c) => c.known).map((c) => c.id));
     startReviewSession(deckToReviewCards(group.cards), 'epub', initialMastered);
     setDeckMenuGroup(null);
@@ -789,8 +819,8 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     sessionStartedAt,
     reviewBookKey,
     setReviewBookKey,
-    reviewUnknownOnly,
-    setReviewUnknownOnly,
+    reviewDueOnly,
+    setReviewDueOnly,
     bookFolderMenu,
     deckMenuGroup,
     setDeckMenuGroup,
@@ -805,6 +835,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     filteredDeck,
     bookGroups,
     epubReviewBooks,
+    epubDueCards,
     epubReviewCandidates,
     filteredSaved,
     unknownReviewCards,
@@ -936,6 +967,9 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   }
 
   const pct = total ? (reviewed / total) * 100 : 0;
+  const nextGoodInterval = reviewSource === 'epub'
+    ? scheduleLocalReview(current.srs, 'good').intervalDays
+    : null;
   const reviewTitle =
     reviewSource === 'epub' && reviewBookKey !== 'all'
       ? epubReviewBooks.find((g) => `${g.bookId}::${g.bookTitle}` === reviewBookKey)?.bookTitle
@@ -1034,9 +1068,19 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
           <div className="flash-actions">
             <button className="btn flash-again" onClick={state.again}>
               {t('flash.dontKnow')}
+              {reviewSource === 'epub' && (
+                <span className="flash-srs-hint">
+                  {t('flash.srs.againDue', { minutes: LOCAL_SRS_RELEARN_MINUTES })}
+                </span>
+              )}
             </button>
             <button className="btn primary flash-got" onClick={state.gotIt}>
               {t('flash.know')}
+              {nextGoodInterval != null && (
+                <span className="flash-srs-hint">
+                  {t('flash.srs.goodDue', { days: nextGoodInterval })}
+                </span>
+              )}
             </button>
           </div>
         ) : (
@@ -1237,7 +1281,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     epubReviewCandidates,
     recentStrip,
     reviewBookKey,
-    reviewUnknownOnly,
+    reviewDueOnly,
     collapsedBooks,
     creatingFolder,
     newFolderName,
@@ -1382,10 +1426,10 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
               <label className="flash-review-setup-check">
                 <input
                   type="checkbox"
-                  checked={reviewUnknownOnly}
-                  onChange={(e) => state.setReviewUnknownOnly(e.target.checked)}
+                  checked={reviewDueOnly}
+                  onChange={(e) => state.setReviewDueOnly(e.target.checked)}
                 />
-                {t('flash.unknownOnly')}
+                {t('flash.dueOnly')}
               </label>
               <button
                 type="button"

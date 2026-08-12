@@ -10,6 +10,12 @@ export type FlashcardSource =
   | 'extension'
   | 'media';
 
+import {
+  scheduleLocalReview,
+  type LocalSrsRating,
+  type LocalSrsState,
+} from '../shared/localSrs';
+
 export interface DeckFlashcard {
   id: string;
   word: string;
@@ -36,8 +42,10 @@ export interface DeckFlashcard {
   audioPath?: string;
   /** Managed VN capture image, loaded on demand to avoid localStorage bloat. */
   imagePath?: string;
-  /** Persisted study state — marked via review "Got it". */
+  /** Backward-compatible last-result rollup used by knowledge surfaces. */
   known?: boolean;
+  /** Local-copy schedule; an exported Anki copy remains owned by Anki's scheduler. */
+  srs?: LocalSrsState;
   addedAt: number;
   /** Anki export status for reader collection. */
   ankiExported?: boolean;
@@ -244,8 +252,27 @@ export function setDeckCardFolder(id: string, folder: string | null): DeckFlashc
 }
 
 export function setDeckCardKnown(id: string, known: boolean): DeckFlashcard[] {
+  return reviewDeckCard(id, known ? 'good' : 'again');
+}
+
+/** Persist one local review judgement and its next due time atomically. */
+export function reviewDeckCard(
+  id: string,
+  rating: LocalSrsRating,
+  reviewedAt = Date.now(),
+): DeckFlashcard[] {
   const store = readStore();
-  store.cards = store.cards.map((c) => (c.id === id ? { ...c, known: known || undefined } : c));
+  let reviewed = false;
+  store.cards = store.cards.map((card) => {
+    if (card.id !== id) return card;
+    reviewed = true;
+    return {
+      ...card,
+      known: rating === 'good' || undefined,
+      srs: scheduleLocalReview(card.srs, rating, reviewedAt),
+    };
+  });
+  if (!reviewed) return store.cards;
   writeStore(store);
   // A real review action ("Got it"), distinct from folder/import edits — the
   // one flashcard-deck event the city bridge's telemetry collector counts.

@@ -48,10 +48,11 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
     filteredDeck,
     bookGroups,
     epubReviewBooks,
+    epubDueCards,
     epubReviewCandidates,
     recentStrip,
     reviewBookKey,
-    reviewUnknownOnly,
+    reviewDueOnly,
     collapsedBooks,
     creatingFolder,
     newFolderName,
@@ -351,7 +352,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                     {t('flash.aero.meter.known')}
                   </span>
                   <span>
-                    <strong>{epubReviewCandidates.length}</strong>
+                    <strong>{epubDueCards.length}</strong>
                     {t('flash.aero.meter.due')}
                   </span>
                 </div>
@@ -527,10 +528,10 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                 <label className="aero-flash-check">
                   <input
                     type="checkbox"
-                    checked={reviewUnknownOnly}
-                    onChange={(e) => state.setReviewUnknownOnly(e.target.checked)}
+                    checked={reviewDueOnly}
+                    onChange={(e) => state.setReviewDueOnly(e.target.checked)}
                   />
-                  {t('flash.unknownOnly')}
+                  {t('flash.dueOnly')}
                 </label>
                 <Button
                   variant="primary"

@@ -12675,3 +12675,102 @@ Five integrated (`27c74b6`, `9c046cc`, `20f72eb`, `2545cd5`, `c3ae5b6`), one clo
 (`9e6e82d`), four open. `28a239c` is the last of the cheap base-`732f30b` five and additionally
 touches `styles.css`. `c48b266` touches `preload.ts` — invoke its main handler live, do not grep
 the channel. `87dd97c` and `99c8747` remain per-hunk salvage only.
+
+## Rescued commit 6 of 10 landed: local decks now have a real schedule, not a binary flag — 2026-08-12
+
+`28a239c` ("feat(study): persist local review schedule") is integrated as the last of the cheap
+base-`732f30b` five. It replaces the local deck's binary `known` flag with a persisted two-rating
+SM-2-style schedule (`shared/localSrs.ts`), and rewires the Flashcards review surface from
+"unknown cards only" to "due cards only".
+
+### Integration method — 3 clean adds, 4 blob-identical takes, 5 hand-applied
+
+Per-file `git rev-parse <commit>:<path>` vs `git rev-parse HEAD:<path>` before touching anything:
+
+- **New files, no collision possible**: `shared/localSrs.ts`, `shared/__tests__/localSrs.test.ts`,
+  `renderer/__tests__/flashcardDeckSrs.test.ts` — absent at both `28a239c^` and HEAD.
+- **Base blob == HEAD blob, and clean in the worktree**: `FlashcardsContent.tsx`,
+  `flashcardDeck.ts`, `FlashcardsView.tsx`, `reviewForecast.ts` — taken whole at the commit blob
+  via `git checkout 28a239c -- <paths>`, no hand-merge and no risk of dropping other tracks' work.
+- **Genuine collisions, hand-applied**: `styles.css` and the four catalogs, all dirty from other
+  tracks. Each hunk is small and additive; the anchors (`.flash-review-shell .flash-actions .btn`,
+  `'flash.know'`, `'flash.unknownOnly'`) were confirmed present in the *worktree* files first, and
+  the other tracks' edits in those files were left untouched.
+
+The `flash.unknownOnly` → `flash.dueOnly` rename was safe to take because its only two consumers
+at HEAD (`FlashcardsContent.tsx:1388`, `FlashcardsView.tsx:533`) are both in the blob-identical
+set, so they were replaced wholesale in the same operation. `grep -rn 'flash.unknownOnly\|reviewUnknownOnly' src/`
+returns nothing afterwards.
+
+### What the schedule actually is
+
+`scheduleLocalReview` is deliberately small and matches the two judgements the review surface
+already had — there is no third/fourth button and none was invented:
+
+- **Again** → due in `LOCAL_SRS_RELEARN_MINUTES` (10 min), `intervalDays: 0`, ease −0.2 floored at
+  1.3, `lapses + 1`, `repetitions` reset to 0, and `known` cleared.
+- **Good** → 1 day, then 3 days, then `round(intervalDays × ease)` capped at 36 500 days; ease is
+  carried, not raised.
+
+The honesty point is `isLocalReviewDue`: an unscheduled legacy card (no `srs`) counts as **due**,
+so all 3 218 existing epub cards enter the schedule rather than being hidden by the new filter.
+`reviewForecast.ts`'s header comment, which previously stated flatly that "There is NO in-app
+SM-2/FSRS scheduler", is corrected in the same commit — it now scopes that claim to the *Anki*
+forecast, which still refuses to derive a due date from an interval length. That remains true.
+
+Scope is honest in the other direction too: this schedules only the card in `jp-flashcard-deck`.
+An Anki-exported copy is still owned by Anki's scheduler, and `localBacklog` stays separate from
+the Anki forecast for that reason.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | **546 files passed**, 1 skipped; **7291 tests passed**, 6 skipped; exit 0 |
+| `node tools/i18n-check.cjs` | exit 0 — all 9337 English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | exit 0 — 1730 modules, 17 known findings, **nothing new** (`localSrs.ts` is not an orphan) |
+| `npx eslint <11 touched paths>` | exit 0 |
+
+### Live Electron acceptance through the debug bridge
+
+Bridge on port 39273, main window. The new modules were confirmed *live in the running renderer*
+(`import('/src/shared/localSrs.ts')` returns all seven exports; `flashcardDeck.reviewDeckCard` is
+a function), against the real deck: **3 221 cards, 3 218 epub, and 0 carrying `srs`** — i.e. the
+exact legacy state the "unscheduled means due" rule exists to handle.
+
+Rather than patch the user's real cards, acceptance ran a synthetic probe card through the app's
+own supported write path (`addDeckCardsTracked` → `reviewDeckCard` → `removeDeckCard`), each of
+which goes through `writeStore` and therefore the IndexedDB mirror and the deck event too. Fixed
+`reviewedAt` of `1700000000000` so the arithmetic is checkable:
+
+| step | persisted result | due-filter effect |
+|---|---|---|
+| card added, no `srs` | `srs: null` | `isLocalReviewDue` → **true** (legacy cards are due) |
+| `reviewDeckCard(id,'good')` | `dueAt` **+1.0 day exactly**, `intervalDays 1`, `ease 2.5`, `repetitions 1`, `lapses 0`, `known true` | `filterLocalReviewsDue` at +1 min → **0 cards**; no longer due |
+| `reviewDeckCard(id,'again')` | `dueAt` **+10.0 min exactly**, `intervalDays 0`, `ease 2.3` (dropped from 2.5), `lapses 1`, `repetitions 0`, `known` cleared | due again at +11 min → **true** |
+
+**Restore verified, not assumed**: after `removeDeckCard`, the raw `jp-flashcard-deck` string is
+`=== ` the captured baseline — 1 320 982 bytes both sides — and the probe id is absent. The user's
+deck is byte-identical to how this hop found it.
+
+The UI surface was checked live too: all three keys resolve in **all four languages** from the
+running renderer's catalogs (`Again in 10 min` / `10分後に再表示` / `10 分钟后再复习` /
+`Повтор через 10 мин`), `flash.unknownOnly` is absent from every catalog, and `.flash-srs-hint`
+is a real rule in the live stylesheet (`color: currentcolor; font-size: 11px; font-weight: 400;
+opacity: 0.72`) — no dead class introduced.
+
+### One behavioural change worth flagging, taken deliberately
+
+`again()` previously bailed out on `sessionCards.length < 2` and only wrote to the deck when the
+card was already mastered. It now always persists the rating, so pressing "Don't know" on a
+single-card session is no longer a no-op. Relatedly, `restartReview()` for an epub session now
+replays `sessionCards` instead of recomputing `epubReviewCandidates` — without that, the button
+went inert the moment a scheduled session completed, because every card had just been pushed
+past the due filter by the Good ratings that ended it.
+
+### What is left of the ten
+
+Six integrated (`27c74b6`, `9c046cc`, `20f72eb`, `2545cd5`, `c3ae5b6`, `28a239c`), one closed
+obsolete (`9e6e82d`), **three open**: `c48b266` (ReadingLens pinned captures — touches
+`preload.ts`; invoke its main handler live, do not grep the channel), and `87dd97c` / `99c8747`,
+both 148–152 behind and per-hunk salvage only.

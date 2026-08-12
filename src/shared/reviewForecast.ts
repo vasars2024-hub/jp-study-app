@@ -3,16 +3,16 @@
 // Study-native track item 7. The honest data picture matters more here than the
 // feature, so it is worth stating plainly:
 //
-// There is NO in-app SM-2/FSRS scheduler. Local decks carry a binary `known`
-// flag (flashcardDeck.ts), and the Anki interval snapshot (intervals.ts) records
-// how long a card's current interval is — NOT when it is next due. An interval
-// length cannot be turned into a due date without knowing when the card was last
-// reviewed, so this module never tries.
+// Local decks have their own persisted two-rating schedule (`localSrs.ts`). The
+// Anki interval snapshot (intervals.ts), however, records how long a card's
+// current interval is — NOT when it is next due. An interval length cannot be
+// turned into a due date without knowing when the card was last reviewed, so
+// this module never tries to derive an Anki date from it.
 //
-// A real day-by-day forecast therefore comes from exactly one place: Anki's own
-// scheduler, queried through AnkiConnect with `prop:due=N` searches. Anki decides
-// what is due when; we only count. When Anki is not connected there is no
-// forecast — the panel says so rather than fabricating one from interval lengths.
+// The Anki forecast in this module therefore comes from Anki's own scheduler,
+// queried through AnkiConnect with `prop:due=N` searches. Anki decides what is
+// due when; we only count. When Anki is not connected there is no Anki forecast
+// — the panel says so rather than fabricating one from interval lengths.
 //
 // This file holds the pure parts (bucketing, summary, local backlog) so they test
 // without Electron or a live collection.
@@ -159,9 +159,9 @@ export interface LocalBacklog {
 }
 
 /**
- * Local deck backlog. "Unknown" is the same pool the Flashcards view treats as
- * due — a binary flag, not a schedule, which is why this is reported separately
- * from the Anki forecast rather than merged into it.
+ * Local deck knowledge rollup. This older panel groups the last review result;
+ * Flashcards itself uses the persisted local SRS due time. It remains separate
+ * from the Anki forecast because the two schedulers own different cards.
  */
 export function localBacklog(cards: BacklogCard[]): LocalBacklog {
   let known = 0;
