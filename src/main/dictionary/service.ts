@@ -49,6 +49,7 @@ import {
   buildOfflineInterlinear,
   type LexiconInterlinearOptions,
   type LexiconInterlinearResult,
+  type LexiconLookupResult,
 } from '../../shared/lexiconInterlinear';
 
 export interface DictionaryStatus {
@@ -157,29 +158,52 @@ export function lookupInDictionaryDb(query: LookupQuery): LookupResult {
  * This remains a service function rather than a new IPC channel until a
  * first-class Workbench renderer consumer exists. It is intentionally read-only
  * and uses the same SQLite lookup path as individual dictionary queries.
+ *
+ * `legacyFallback` is the same additive concession `lookupTerm` makes, for the
+ * same reason and no other: the migration above still has nowhere to run, so on
+ * a current installation this database is empty and a database-only interlinear
+ * reports every token of every passage as ungrounded while the legacy stores sit
+ * on disk answering the pop-up dictionary. It is consulted only when SQLite
+ * returned nothing, so an imported dictionary always wins.
  */
 export function lookupOfflineInterlinear(
   db: SqliteDb,
   text: string,
   options: LexiconInterlinearOptions = {},
+  legacyFallback?: (query: string) => LexiconLookupResult,
 ): LexiconInterlinearResult {
   return buildOfflineInterlinear(
     text,
-    (query) => lookup(db, {
-      text: query,
-      sourceLangs: options.sourceLangs ? [...options.sourceLangs] : undefined,
-      limit: 8,
-    }),
+    (query) => {
+      const unified = lookup(db, {
+        text: query,
+        sourceLangs: options.sourceLangs ? [...options.sourceLangs] : undefined,
+        limit: 8,
+      });
+      if (unified.entries.length || !legacyFallback) return unified;
+      const legacy = legacyFallback(query);
+      if (!legacy.entries.length) return unified;
+      // The detected languages are read off the query's script, not off the
+      // rows, so they survive a miss and must not be dropped with it.
+      return { ...legacy, detectedLangs: unified.detectedLangs };
+    },
     options,
   );
 }
 
-/** Main-process entry point for the renderer bridge, using the managed database. */
+/**
+ * Main-process entry point for the renderer bridge, using the managed database.
+ *
+ * The fallback is passed in rather than built here on purpose: `yomitan.ts`
+ * imports this module, so reaching back into it from the service would close an
+ * import cycle. `dictionary.ts` already owns both sides and composes them.
+ */
 export function lookupOfflineInterlinearFromStore(
   text: string,
   options: LexiconInterlinearOptions = {},
+  legacyFallback?: (query: string) => LexiconLookupResult,
 ): LexiconInterlinearResult {
-  return lookupOfflineInterlinear(dictionaryDb(), text, options);
+  return lookupOfflineInterlinear(dictionaryDb(), text, options, legacyFallback);
 }
 
 // ----- the Chinese surface's lookup path -------------------------------------

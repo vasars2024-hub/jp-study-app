@@ -774,12 +774,13 @@ function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
   };
 }
 
-function lookupOffline(query: string): DictEntry[] {
+function lookupOffline(query: string, exactOnly = false): DictEntry[] {
   const q = normalizeQuery(query);
   if (!q) return [];
 
   const direct = glossaryByTerm.get(q);
   if (direct?.length) return direct.map(enrichEntry);
+  if (exactOnly) return [];
 
   // Prefix scan for partial selections (cap at 8).
   const out: DictEntry[] = [];
@@ -804,18 +805,25 @@ export function lookupGlossary(term: string): DictEntry[] {
  * path. This is what makes 食べさせられた resolve to 食べる offline; before it,
  * only the online Jisho fallback deinflected, so offline conjugated lookups
  * silently failed.
+ *
+ * `exactOnly` drops the prefix scan. A pop-up over a partial selection wants it
+ * — a near miss is better than nothing when a human is reading the list. A
+ * per-token interlinear gloss must never have it: grounding 猫 on 猫舌 because
+ * one starts with the other writes a definition the passage does not mean, and
+ * the caller cannot tell the two apart afterwards because `DictEntry` does not
+ * record how it was reached.
  */
-export function lookupOfflineDeinflected(query: string): {
+export function lookupOfflineDeinflected(query: string, exactOnly = false): {
   entries: DictEntry[];
   deinflection?: DeinflectionInfo;
 } {
   const q = normalizeQuery(query);
   if (!q) return { entries: [] };
-  const direct = lookupOffline(q);
+  const direct = lookupOffline(q, exactOnly);
   if (direct.length) return { entries: direct };
   for (const cand of deinflect(q)) {
     if (cand.reasons.length === 0) continue; // identity == the exact miss above
-    const hit = lookupOffline(cand.term);
+    const hit = lookupOffline(cand.term, exactOnly);
     if (hit.length) {
       return { entries: hit, deinflection: { source: q, term: cand.term, reasons: cand.reasons } };
     }

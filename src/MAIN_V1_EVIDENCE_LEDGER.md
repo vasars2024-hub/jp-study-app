@@ -14322,3 +14322,91 @@ composition checking, difficulty scoring (still blocked on a real frequency sour
 concordance, and the grounded AI enrichment bullets. Before more Workbench surface is built, the
 dictionary-migration data gap above is worth closing — three slices in a row can now only be
 accepted on their negative branch.
+
+## The Workbench was not blocked on the dictionary migration — it was missing one fallback — 2026-08-13
+
+The previous entry closed by naming the dictionary-migration data gap as the thing to fix before
+more Workbench surface is built: `dictListYomitan()` reports `hasTerms: true` for three bundled
+dictionaries, yet a live lookup of `猫を見た。` matched **0 of 4** tokens, and it had blocked three
+consecutive slices on their negative branch. That diagnosis was one layer off, and re-deriving it
+rather than inheriting it is what this hop turned up.
+
+The stores are not missing. `userData/yomitan/` holds four legacy indices — `bundled-jmdict-en`
+alone is **97 MB** — and the pop-up dictionary answers from them correctly today. What was missing
+is a *call path*. `service.ts` explains at length why `migrateLegacyStoresNow()` is never called on
+boot (synchronous `better-sqlite3`, minutes of blocking, and the `utilityProcess` that would host
+it needs a build-config entry point CLAUDE.md puts out of scope), and `lookupTerm` compensates for
+the resulting empty database with an additive legacy fallback that is documented in its own
+comment. `lookupOfflineInterlinear` never got that fallback. So the passage-level path asked SQLite,
+got nothing, and reported every token of every passage as ungrounded — a code gap in one function,
+not the data prerequisite it was being read as. No migration, no worker and no build-config change
+was needed.
+
+Three pieces, and the reason each is where it is:
+
+- **`legacyInterlinear.ts`** converts a legacy `DictEntry[]` into the Workbench's
+  `LexiconLookupResult`. It is pure — entries and registry in, result out — so it is tested without
+  Electron, a database, or a 97 MB file. Two fields are honest approximations and say so in the
+  module header: `enrichEntry` already collapsed the stored numeric score into the boolean
+  `isCommon` before this layer sees it, and entries are tagged with the dictionary's *title* rather
+  than its id, so the id is resolved back through the registry with the title itself as the
+  last-resort value. Headword ids are negative and sequential: they only need to be distinct
+  (`sameHeadword` falls back to text/reading), and negative means they can never collide with a
+  SQLite rowid.
+- **`lookupOfflineDeinflected(query, exactOnly)`** is the load-bearing correctness change.
+  `lookupOffline` falls back to "any headword starting with the query, capped at 8", which is right
+  for a pop-up over a partial selection and wrong for a per-token gloss — and `DictEntry` records no
+  `via`, so a caller cannot filter a prefix hit out afterwards. Without the opt-out, the interlinear
+  would have written definitions the passage does not mean. Default stays `false`; nothing else
+  changed behaviour.
+- **The composition lives in `dictionary.ts`, not in `service.ts`.** `yomitan.ts` imports
+  `service.ts`, so building the fallback inside the service would have closed an import cycle.
+  `dictionary.ts` already owns both sides. `initYomitan()` is awaited there because the legacy maps
+  load lazily while `buildOfflineInterlinear`'s lookup callback is synchronous, and a legacy store
+  that will not load falls back to the database-only path rather than taking it down.
+
+SQLite is still consulted first and a legacy hit is used only when it returned nothing, so importing
+a dictionary later changes the source without changing the result shape. One subtlety worth the
+line it costs: `detectedLangs` is read off the query's script rather than off the rows, so it
+survives a miss — the fallback carries the database's value forward instead of dropping it with the
+empty result.
+
+Gates: full Vitest **7,405 passed / 11 skipped**, one suite red — `visualNovelI18n.test.tsx` timed
+out in a 10 s `beforeAll` under full-suite load and passes alone in 10.7 s, which is the known
+load-not-regression shape and touches nothing in this change; its 5 tests bring the total to
+**7,410 = the previous entry's 7,397 + the 13 added here**. i18n check exit 0, 9,369 English keys
+complete in ja/zh/ru — no new UI string exists in this slice. Architecture **1,749 modules / 17
+findings, nothing new**, the same two pending. ESLint over the seven touched paths: **0 errors**;
+the 9 warnings are all pre-existing lines outside the edited hunks.
+
+Live Electron acceptance, and this one needed a restart: the change is in the main process, and the
+instance left running since `20:37` the previous day predates it. `/logs` showed only the previous
+hop's own Lexicon HMR paths, so no foreign track was mid-edit; that tree was stopped by pid and a
+fresh `npm start` was taken. **Before the restart**, on the old main process, `猫を見た。` returned
+`tokenCount: 4, matchedCount: 0` — the ledger's own "0 of 4", reproduced live rather than quoted.
+**After**, the same call returned `tokenCount: 3, matchedCount: 3`: 猫 (`exact`, ねこ), を (`exact`),
+and 見た → 見る (`deinflected`, みる), every one attributed to `bundled-jmdict-en`. The token count
+drops because grounding changes the merge — 見 and た now resolve as one word instead of two
+fragments, which is the segmentation working, not a loss.
+
+Asking for `['en', 'ru']` proved the cross-dictionary sibling path against real data: 猫 came back
+with `en@bundled-jmdict-en` → "cat (esp. the domestic cat, Felis catus)" and
+`ru@bundled-jmdict-ru` → "1) кошка, кот". The exact-only guarantee was proven by divergence rather
+than by assertion: for the query `ぽ`, `lookupTermOffline` returns **8 entries, none of them `ぽ`**
+(ぽん酢, ぽん — all prefix hits), while the interlinear returns **0 matched**. Every stray kana in a
+passage would otherwise have been glossed as ぽん酢. A genuine miss (`ヷヸヹ`) still reports 0
+matched, so the negative branch the last three slices were accepted on is intact.
+
+Two limits, both deliberate. Nothing was clicked and no card was mined: `ankiStatus()` still reports
+`connected: true` against the user's real collection, and an unattended relay hop has no
+authorization to write user study data — the positive branch of the mine button from the previous
+entry is now *reachable* on this installation, but proving it still needs an interactive session
+with the user present. And the dev app was restarted, so it is running on this hop's build; the
+next worker inherits a live bridge on port 39273 rather than a stale one. No persisted setting was
+written, no userData backup was taken, all four probe globals were deleted and their absence
+verified, and no other track's dirty paths were touched.
+
+Track 2 remains open, but no longer on this blocker. Still source-derived: sense
+pinning/retranslation, round-trip semantic diff, composition checking, difficulty scoring (still
+blocked on a real frequency source), personal concordance, and the grounded AI enrichment bullets.
+Any of them can now be accepted on a grounded passage instead of an empty one.

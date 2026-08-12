@@ -95,6 +95,71 @@ describe('lookupOfflineInterlinear', () => {
     expect(after.count).toBe(before.count);
   });
 
+  it('grounds a token the database does not have from the legacy fallback', () => {
+    const asked: string[] = [];
+    const result = lookupOfflineInterlinear(
+      db,
+      '犬',
+      { sourceLangs: ['ja'], glossLangs: ['en'] },
+      (query) => {
+        asked.push(query);
+        return {
+          query,
+          entries: [{
+            headwordId: -1,
+            dictId: 'legacy-jmdict',
+            dictTitle: 'Legacy JMdict',
+            text: '犬',
+            reading: 'いぬ',
+            via: 'exact',
+            score: 1,
+            senses: [{ glosses: [{ lang: 'en', text: 'dog' }] }],
+          }],
+        };
+      },
+    );
+
+    expect(asked).toEqual(['犬']);
+    expect(result.matchedCount).toBe(1);
+    expect(result.parts[0]).toMatchObject({
+      kind: 'token',
+      match: { text: '犬', reading: 'いぬ', dictId: 'legacy-jmdict', glosses: [{ lang: 'en', text: 'dog' }] },
+    });
+    // Script detection belongs to the query, not to the rows, so a fallback hit
+    // must not drop what the database already worked out about the passage.
+    expect(result.detectedLangs).toContain('ja');
+  });
+
+  it('never consults the legacy fallback for a token the database can answer', () => {
+    const asked: string[] = [];
+    const result = lookupOfflineInterlinear(
+      db,
+      '猫',
+      { sourceLangs: ['ja'], glossLangs: ['en'] },
+      (query) => {
+        asked.push(query);
+        return { query, entries: [] };
+      },
+    );
+
+    expect(asked).toEqual([]);
+    expect(result.parts[0]).toMatchObject({
+      match: { dictId: 'jmdict-en', glosses: [{ lang: 'en', text: 'cat' }] },
+    });
+  });
+
+  it('reports a token neither store knows as ungrounded', () => {
+    const result = lookupOfflineInterlinear(
+      db,
+      '未知',
+      { sourceLangs: ['ja'], glossLangs: ['en'] },
+      (query) => ({ query, entries: [] }),
+    );
+
+    expect(result.matchedCount).toBe(0);
+    expect(result.parts.every((part) => part.kind !== 'token' || !part.match)).toBe(true);
+  });
+
   it('exposes the managed database through the renderer-facing service entry point', () => {
     const result = lookupOfflineInterlinearFromStore('猫', {
       sourceLangs: ['ja'],

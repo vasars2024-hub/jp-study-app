@@ -37,6 +37,7 @@ import {
   searchOffline,
 } from './dictionary/tatoebaOffline';
 import { enrichLexiconResultMetadata, lookupResultToDictResult } from './dictionary/lexiconAdapter';
+import { legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import {
   lookupChineseInDictionary,
   lookupInDictionaryDb,
@@ -167,6 +168,36 @@ export async function lookupTermOffline(query: string): Promise<DictResult> {
   if (!q) return { query: q, entries: [] };
   const local = lookupOfflineDeinflected(q);
   return { query: q, entries: local.entries, deinflection: local.deinflection };
+}
+
+/**
+ * The Workbench's interlinear, over both dictionary stores.
+ *
+ * `lookupTerm` above is additive during the migration and never had to say so
+ * twice; this is the same concession for the passage-level path, which did not
+ * have it. SQLite answers first and a legacy hit is used only when it returned
+ * nothing, so importing a dictionary changes the source without changing the
+ * result shape.
+ *
+ * `initYomitan()` is awaited here because the legacy maps are loaded lazily and
+ * `buildOfflineInterlinear`'s lookup callback is synchronous — the index has to
+ * already be in memory by the time the first token is probed. The lookup itself
+ * is exact-only: a prefix hit would ground a token on a word the passage never
+ * contained.
+ */
+export async function lookupOfflineInterlinearMerged(
+  text: string,
+  options: LexiconInterlinearOptions = {},
+): Promise<LexiconInterlinearResult> {
+  try {
+    await initYomitan();
+  } catch {
+    // A legacy store that will not load must not take the database path down.
+    return lookupOfflineInterlinearFromStore(text, options);
+  }
+  const dicts = listYomitanDicts();
+  return lookupOfflineInterlinearFromStore(text, options, (query) =>
+    legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
 }
 
 // ----- Persistent gloss cache ----------------------------------------------
@@ -404,7 +435,7 @@ export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));
   ipcMain.handle(
     'dict:lookupOfflineInterlinear',
-    (_e, text: unknown, options?: unknown): LexiconInterlinearResult => {
+    (_e, text: unknown, options?: unknown): Promise<LexiconInterlinearResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -434,7 +465,7 @@ export function registerDictionaryIpc(): void {
       const boundedText = typeof text === 'string'
         ? text.slice(0, MAX_OFFLINE_INTERLINEAR_CHARS * 2)
         : '';
-      return lookupOfflineInterlinearFromStore(boundedText, boundedOptions);
+      return lookupOfflineInterlinearMerged(boundedText, boundedOptions);
     },
   );
   ipcMain.handle(
