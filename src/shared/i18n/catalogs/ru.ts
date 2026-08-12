@@ -9117,4 +9117,10 @@ export const ru: Catalog = {
   'lexicon.harvest.occurrences': 'Вхождений: {count}',
   'lexicon.harvest.ungrounded': 'Нет в ваших словарях',
   'lexicon.harvest.noGloss': 'Нет перевода на выбранные языки',
+  'lexicon.harvest.mine': 'Добавить в Anki',
+  'lexicon.harvest.mineWord': '{word}: {action}',
+  'lexicon.harvest.mining': 'Добавление…',
+  'lexicon.harvest.mined': 'Добавлено',
+  'lexicon.harvest.mineDuplicate': 'Уже в Anki',
+  'lexicon.harvest.mineFailed': 'Не удалось добавить карточку.',
 };

@@ -108,6 +108,34 @@
   font-size: 0.85rem;
 }
 
+/* Sits after the occurrence badge, at the end of the row. 28px keeps a usable
+   hit target in a list this dense without making the row taller than the word. */
+.lexicon-harvest-mine {
+  order: 4;
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+}
+
+.lexicon-harvest-mine:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+/* A failure takes the whole next line so the AnkiConnect message is readable
+   rather than crushed between the gloss and the button. */
+.lexicon-harvest-mine-error {
+  order: 5;
+  flex: 1 0 100%;
+  color: var(--danger, #c0392b);
+  font-size: 0.78rem;
+}
+
 .lexicon-lens-picker {
   display: flex;
   gap: 6px;

@@ -8327,4 +8327,10 @@ export const ja: Catalog = {
   'lexicon.harvest.occurrences': '出現回数：{count}',
   'lexicon.harvest.ungrounded': '辞書に見つかりません',
   'lexicon.harvest.noGloss': '選択した言語の訳がありません',
+  'lexicon.harvest.mine': 'Ankiに追加',
+  'lexicon.harvest.mineWord': '{word}：{action}',
+  'lexicon.harvest.mining': '追加中…',
+  'lexicon.harvest.mined': '追加しました',
+  'lexicon.harvest.mineDuplicate': 'すでにAnkiにあります',
+  'lexicon.harvest.mineFailed': 'カードを追加できませんでした。',
 };

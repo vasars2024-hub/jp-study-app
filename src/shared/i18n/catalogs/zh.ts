@@ -8292,4 +8292,10 @@ export const zh: Catalog = {
   'lexicon.harvest.occurrences': '出现次数：{count}',
   'lexicon.harvest.ungrounded': '你的词典中没有',
   'lexicon.harvest.noGloss': '所选语言没有释义',
+  'lexicon.harvest.mine': '添加到 Anki',
+  'lexicon.harvest.mineWord': '{word}：{action}',
+  'lexicon.harvest.mining': '正在添加…',
+  'lexicon.harvest.mined': '已添加',
+  'lexicon.harvest.mineDuplicate': '已在 Anki 中',
+  'lexicon.harvest.mineFailed': '无法添加卡片。',
 };

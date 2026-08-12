@@ -4,7 +4,12 @@ import {
   type LexiconInterlinearResult,
   type LexiconInterlinearMatch,
 } from '../../../shared/lexiconInterlinear';
-import { MAX_HARVEST_ITEMS, harvestLexiconVocabulary } from '../../../shared/lexiconHarvest';
+import {
+  MAX_HARVEST_ITEMS,
+  harvestLexiconVocabulary,
+  type LexiconVocabularyItem,
+} from '../../../shared/lexiconHarvest';
+import { buildHarvestMineRequest, canMineHarvestItem } from '../../../shared/lexiconHarvestMining';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { useT } from '../../i18n';
@@ -12,6 +17,21 @@ import './lexiconWorkbench.css';
 
 /** Gloss targets follow the imported dictionaries, not the source-side DictLang pair. */
 type GlossLang = string;
+
+/**
+ * Per-row mining state. `dup` is a success for the learner — the word is
+ * already studied — so it is kept distinct from `error`, which is the only
+ * state that stays retryable.
+ */
+type MineState = 'adding' | 'added' | 'dup' | 'error';
+
+const MINE_LABEL_KEYS: Record<MineState, string> = {
+  adding: 'lexicon.harvest.mining',
+  added: 'lexicon.harvest.mined',
+  dup: 'lexicon.harvest.mineDuplicate',
+  // A failure returns the button to its offer: this is the one retryable state.
+  error: 'lexicon.harvest.mine',
+};
 
 const LENS_OPTIONS = ['auto', 'lookup', 'translate'] as const;
 
@@ -61,6 +81,8 @@ export default function LexiconWorkbenchResults({
   const interlinear = resolution.kind !== 'empty' && resolution.lens === 'translate';
   const [result, setResult] = useState<LexiconInterlinearResult | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [mined, setMined] = useState<Record<string, MineState>>({});
+  const [mineError, setMineError] = useState<Record<string, string>>({});
 
   useEffect(() => setSelectedLens(lens), [lens]);
 
@@ -68,15 +90,25 @@ export default function LexiconWorkbenchResults({
   // rather than a second bridge call.
   const harvest = useMemo(() => (result ? harvestLexiconVocabulary(result) : null), [result]);
 
+  // A row's mine state belongs to the passage it was harvested from, so a new
+  // lookup clears it rather than letting "Added" carry over onto a different
+  // word that happens to land in the same position.
+  function clearMineState() {
+    setMined({});
+    setMineError({});
+  }
+
   useEffect(() => {
     if (!interlinear) {
       setResult(null);
       setState('idle');
+      clearMineState();
       return;
     }
     let alive = true;
     setState('loading');
     setResult(null);
+    clearMineState();
     const primary = glossLang.trim().toLowerCase() || 'en';
     // The extra targets are whatever the installed dictionaries can actually
     // answer offline, so a user with only one dictionary keeps the exact
@@ -98,6 +130,39 @@ export default function LexiconWorkbenchResults({
       });
     return () => { alive = false; };
   }, [glossLang, interlinear, lang, lookupAttempt, query]);
+
+  /**
+   * Mine one harvested word. The request is built from the passage the row was
+   * folded out of, so the card carries the sentence the learner actually met the
+   * word in, and it routes through the same mining rules a dictionary mine uses.
+   */
+  async function mineHarvestItem(item: LexiconVocabularyItem) {
+    if (!result || mined[item.key] === 'adding') return;
+    setMined((prev) => ({ ...prev, [item.key]: 'adding' }));
+    setMineError((prev) => {
+      const next = { ...prev };
+      delete next[item.key];
+      return next;
+    });
+    const fail = (error: string) => {
+      setMined((prev) => ({ ...prev, [item.key]: 'error' }));
+      setMineError((prev) => ({ ...prev, [item.key]: error }));
+    };
+    try {
+      const res = await window.api.ankiMineNote(buildHarvestMineRequest(item, result, { lang }));
+      if (res.ok) {
+        setMined((prev) => ({ ...prev, [item.key]: 'added' }));
+      } else if (res.error === 'duplicate') {
+        setMined((prev) => ({ ...prev, [item.key]: 'dup' }));
+      } else {
+        // AnkiConnect's own message is more useful than a generic one; the
+        // generic string only covers a mine that threw before answering.
+        fail(res.error ?? t('lexicon.harvest.mineFailed'));
+      }
+    } catch {
+      fail(t('lexicon.harvest.mineFailed'));
+    }
+  }
 
   return (
     <section className="lexicon-workbench" aria-label={t('lexicon.workbench.interlinear')}>
@@ -149,27 +214,55 @@ export default function LexiconWorkbenchResults({
                 {harvest.capped ? ` ${t('lexicon.harvest.capped', { max: MAX_HARVEST_ITEMS })}` : ''}
               </p>
               <ul className="lexicon-harvest-list">
-                {harvest.items.map((item) => (
-                  <li className={item.grounded ? 'is-grounded' : undefined} key={item.key}>
-                    <span className="lexicon-harvest-word" lang={lang}>{item.text}</span>
-                    {item.reading && (
-                      <span className="lexicon-harvest-reading" lang={lang}>{item.reading}</span>
-                    )}
-                    <span
-                      aria-label={t('lexicon.harvest.occurrences', { count: item.count })}
-                      className="lexicon-harvest-count"
-                    >
-                      {t('lexicon.harvest.occurrenceBadge', { count: item.count })}
-                    </span>
-                    <span className="lexicon-harvest-gloss">
-                      {!item.grounded
-                        ? t('lexicon.harvest.ungrounded')
-                        : item.glosses.length
-                          ? item.glosses.map((gloss) => gloss.text).join('; ')
-                          : t('lexicon.harvest.noGloss')}
-                    </span>
-                  </li>
-                ))}
+                {harvest.items.map((item) => {
+                  const mineState = mined[item.key];
+                  const mineLabel = t(
+                    mineState ? MINE_LABEL_KEYS[mineState] : 'lexicon.harvest.mine',
+                  );
+                  return (
+                    <li className={item.grounded ? 'is-grounded' : undefined} key={item.key}>
+                      <span className="lexicon-harvest-word" lang={lang}>{item.text}</span>
+                      {item.reading && (
+                        <span className="lexicon-harvest-reading" lang={lang}>{item.reading}</span>
+                      )}
+                      <span
+                        aria-label={t('lexicon.harvest.occurrences', { count: item.count })}
+                        className="lexicon-harvest-count"
+                      >
+                        {t('lexicon.harvest.occurrenceBadge', { count: item.count })}
+                      </span>
+                      <span className="lexicon-harvest-gloss">
+                        {!item.grounded
+                          ? t('lexicon.harvest.ungrounded')
+                          : item.glosses.length
+                            ? item.glosses.map((gloss) => gloss.text).join('; ')
+                            : t('lexicon.harvest.noGloss')}
+                      </span>
+                      {/* A row with no reading and no gloss would mine a card with a
+                          blank back, so it offers no button; the gloss cell above
+                          already says which of the two is missing. */}
+                      {canMineHarvestItem(item) && (
+                        <button
+                          aria-label={t('lexicon.harvest.mineWord', {
+                            word: item.text,
+                            action: mineLabel,
+                          })}
+                          className="lexicon-harvest-mine"
+                          disabled={mineState === 'adding' || mineState === 'added' || mineState === 'dup'}
+                          onClick={() => void mineHarvestItem(item)}
+                          type="button"
+                        >
+                          {mineLabel}
+                        </button>
+                      )}
+                      {mineState === 'error' && (
+                        <span className="lexicon-harvest-mine-error" role="alert">
+                          {mineError[item.key]}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </details>
           )}

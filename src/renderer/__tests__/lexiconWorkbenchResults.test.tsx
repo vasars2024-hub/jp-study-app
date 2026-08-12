@@ -197,6 +197,140 @@ describe('LexiconWorkbenchResults', () => {
       .toBe('lexicon.harvest.summary:2,1');
   });
 
+  it('mines a harvested word with its passage sentence, and only offers rows it can answer', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫を見た。ヌルポ。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 3,
+      matchedCount: 1, truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+        { kind: 'separator', text: 'を見た。', start: 1, end: 5 },
+        { kind: 'token', text: 'ヌルポ', start: 5, end: 8 },
+        { kind: 'separator', text: '。', start: 8, end: 9 },
+      ],
+    });
+    const ankiMineNote = vi.fn().mockResolvedValue({ ok: true, noteId: 11 });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。ヌルポ。" lang="ja" lookupAttempt={5} />);
+      await Promise.resolve();
+    });
+
+    const rows = [...host.querySelectorAll('.lexicon-harvest-list li')];
+    expect(rows).toHaveLength(2);
+    // The ungrounded row would mine a card with a blank back, so it has no button.
+    expect(rows[1].querySelector('.lexicon-harvest-mine')).toBeNull();
+
+    const mine = rows[0].querySelector<HTMLButtonElement>('.lexicon-harvest-mine');
+    expect(mine?.textContent).toBe('lexicon.harvest.mine');
+    await act(async () => {
+      mine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(ankiMineNote).toHaveBeenCalledTimes(1);
+    expect(ankiMineNote.mock.calls[0][0]).toEqual({
+      route: { source: 'dictionary', cardKind: 'word', language: 'ja' },
+      term: '猫',
+      reading: 'ねこ',
+      meaning: 'cat',
+      sentence: '猫を見た。',
+    });
+    expect(rows[0].querySelector('.lexicon-harvest-mine')?.textContent)
+      .toBe('lexicon.harvest.mined');
+    expect(rows[0].querySelector<HTMLButtonElement>('.lexicon-harvest-mine')?.disabled).toBe(true);
+  });
+
+  it('keeps a failed mine retryable and shows the reason Anki gave', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+        { kind: 'separator', text: 'を見た。', start: 1, end: 5 },
+      ],
+    });
+    const ankiMineNote = vi.fn().mockResolvedValue({ ok: false, error: 'Anki is not running' });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={6} />);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      host.querySelector('.lexicon-harvest-mine')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const alert = host.querySelector('.lexicon-harvest-mine-error');
+    expect(alert?.getAttribute('role')).toBe('alert');
+    expect(alert?.textContent).toBe('Anki is not running');
+    const mine = host.querySelector<HTMLButtonElement>('.lexicon-harvest-mine');
+    expect(mine?.disabled).toBe(false);
+    expect(mine?.textContent).toBe('lexicon.harvest.mine');
+  });
+
+  it('reports a duplicate as a settled state rather than a failure', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+        { kind: 'separator', text: 'を見た。', start: 1, end: 5 },
+      ],
+    });
+    const ankiMineNote = vi.fn().mockResolvedValue({ ok: false, error: 'duplicate' });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={7} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('.lexicon-harvest-mine')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const mine = host.querySelector<HTMLButtonElement>('.lexicon-harvest-mine');
+    expect(mine?.textContent).toBe('lexicon.harvest.mineDuplicate');
+    expect(mine?.disabled).toBe(true);
+    expect(host.querySelector('.lexicon-harvest-mine-error')).toBeNull();
+  });
+
   it('leaves the harvest out entirely when nothing was segmented', async () => {
     const lookup = vi.fn().mockResolvedValue({
       text: '。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 0, matchedCount: 0,
@@ -235,6 +369,13 @@ describe('LexiconWorkbenchResults', () => {
       'lexicon.harvest.occurrences',
       'lexicon.harvest.ungrounded',
       'lexicon.harvest.noGloss',
+      // Every mining state a harvest row can reach.
+      'lexicon.harvest.mine',
+      'lexicon.harvest.mineWord',
+      'lexicon.harvest.mining',
+      'lexicon.harvest.mined',
+      'lexicon.harvest.mineDuplicate',
+      'lexicon.harvest.mineFailed',
     ];
     const catalog = en as Record<string, string>;
     expect(keys.filter((key) => !catalog[key])).toEqual([]);

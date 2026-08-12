@@ -14227,3 +14227,98 @@ composition checking, difficulty scoring (blocked on a real frequency source —
 concordance, and the grounded AI enrichment bullets. The natural next slice on top of this one is
 mining the harvest — a row is already carrying everything a Flashcards/Anki card needs — which the
 plan lists under Track 2's exports bullet.
+
+## Mining a harvested word carries the sentence it was met in — 2026-08-13
+
+Recovery hop. The previous worker stopped on a usage limit at 01:02 with `src/shared/
+lexiconHarvestMining.ts` and its test written but **untracked and unimported** — a module ahead of
+its only importer, which is exactly the shape `tools/architecture-audit.cjs` fails as an
+orphan. Re-deriving rather than trusting: the module's 9 tests were already green, every symbol it
+imports resolves (`MineNoteRequest` in `shared/anki.ts`, `detectMineLanguage`/`MineLanguage` in
+`shared/profileRules.ts`, `sentenceAt` in `shared/sentenceBounds.ts`), and its logic matched the
+previous entry's stated next slice. So this hop finished that slice rather than starting one:
+the renderer wiring, the i18n, the gates and the acceptance it never reached.
+
+`docs/audit/RELAY_BOSS_AUDIT.md`'s last dated section (2026-08-12, Phase 9.75) records a relay
+directive, not a finding; the standing instruction from its 14:36 section was already discharged by
+`bef3b2e`/`c68ffb7`. Nothing there was open, so the ladder stayed on Track 2.
+
+What the shared module decides, and why the renderer only decides *when* to call it:
+
+- The context sentence is sliced out of `result.text` at the row's `firstStart` — the same
+  normalized passage the parts were segmented from — so the card carries the sentence the learner
+  actually met the word in rather than a reconstruction or a second lookup. A "sentence" that turns
+  out to be only the word itself is dropped, so a one-word passage mines the card a dictionary
+  lookup would.
+- `surface` is the form the passage wrote (食べた for 食べる) and is sent only alongside a sentence,
+  because its only job is letting cloze splitting find the word inside that sentence.
+- The `route` is `{source: 'dictionary', cardKind: 'word'}` — identical to a dictionary mine — so
+  mining rules, field mapping and duplicate detection behave the same no matter which surface the
+  user clicked. No new IPC channel and no new main handler: this rides `anki:mineNote`.
+- `canMineHarvestItem` refuses an ungrounded row and a grounded row with no gloss in the chosen
+  targets. Both would write a card with a blank back that the user has to repair inside Anki. The
+  row stays visible — not knowing a word is information — but offers no button, and the gloss cell
+  above it already says which of the two is missing, so the UI never fails after the click.
+
+In `LexiconWorkbenchResults`, per-row state is `adding | added | dup | error`. A duplicate is a
+settled state, not a failure: the word is already studied, so the button disables and says so
+without an alert. `error` is the only retryable state, and it renders AnkiConnect's own message
+(the generic catalog string covers only a mine that threw before answering). Mine state is keyed by
+the harvest row key and cleared on every new lookup, so "Added" cannot carry over onto a different
+word that lands in the same position.
+
+Six new i18n keys in all four catalogs. `lexicon.harvest.mineWord` is the button's accessible name,
+`'{word}: {action}'`, where `{action}` is the current visible label — that keeps every row's button
+distinguishable while keeping the visible label inside the accessible name (WCAG 2.5.3). It is a
+pure format string and is byte-identical in ru, so it is baselined in
+`tools/i18n-untranslated-baseline.json`, one entry, the mechanism the check prescribes; ja/zh
+differ genuinely (full-width `：`).
+
+Gates: full Vitest **7,397 passed / 6 skipped / 0 failed** (556 files passed, 1 skipped). i18n check
+exit 0, 9,369 English keys complete in ja/zh/ru. Architecture **1,746 modules / 17 findings, nothing
+new**, the same two pending — the orphan the module would have been never materializes because this
+commit lands it with its importer. ESLint clean over the four touched source paths. One earlier
+full-suite run failed `i18n.test.ts` on `lexicon.harvest.mineWord`; that run started before the
+baseline entry was written, and the three files it flagged pass together in 4.7 s.
+
+Live Electron acceptance used the dev instance and bridge already running on port 39273 (started
+`20:37` by another track; driven read-only, never stopped). `/logs` showed only this track's own
+`[vite] hot updated:` paths for `LexiconWorkbenchResults.tsx` and `lexiconWorkbench.css` followed by
+a reconnect, so the running renderer is this code and no foreign track was mid-edit. The Translate
+window was driven through React's own native value setter with `猫を見た。`; the harvest panel
+rendered live, summary **"4 words, 0 found in your dictionaries"**, and **every row correctly
+offered no mine button** while saying "Not in your dictionaries". The negative branch is therefore
+proven live against real segmentation. Importing the module into the live renderer through the dev
+server's own module graph and folding the **real** lookup result through it agreed exactly:
+`canMineHarvestItem` false for all four rows, and a grounded row built
+`{route:{source:'dictionary',cardKind:'word',language:'ja'}, term:'猫', reading:'ねこ',
+meaning:'cat', sentence:'猫を見た。'}` — the sentence sliced from the live passage.
+
+Three honest limits, two of them deliberate.
+
+1. **The button's positive branch was not shown live.** Re-derived here rather than inherited:
+   `dictListYomitan()` reports `bundled-jmdict-en`, `-ru` and `-zh` all with `hasTerms: true`, yet a
+   live lookup of `猫を見た。` matches **0 of 4** tokens. The registrations exist and the term rows do
+   not. No grounded row can exist on this installation until the dictionary migration populates the
+   SQLite term database. That is a data prerequisite, not a UI task, and it now blocks a third
+   consecutive slice of this track.
+2. **The click was deliberately not performed, and would not have been even with a grounded row.**
+   `ankiStatus()` reports `connected: true` with the user's real collection (90+ decks). Clicking
+   mine writes a real note into that collection. An unattended relay hop has no authorization to
+   write user study data, so the mine call was never invoked. Whoever wants live proof of the
+   written card should do it interactively, with the user present, and prefer a scratch profile.
+3. ja/zh/ru were not switched on live, for the same reason as the previous entry: `ui-lang` is unset
+   here and changing it means a persisted write plus a reload in another track's window.
+
+State was left as found, with one correction. Clicking Translate appended one entry to
+`jp-grammarx-translation-history-v1` (the translation itself ran and returned "I saw a cat."); that
+single entry was identified by its id and removed, leaving `[]`, which is the store's own empty
+state. The textarea was restored to empty and asserted, all three probe globals were deleted and
+their absence verified, no persisted setting was touched, no userData backup was taken, and no
+process was started or stopped.
+
+Track 2 remains open. Still source-derived: sense pinning/retranslation, round-trip semantic diff,
+composition checking, difficulty scoring (still blocked on a real frequency source), personal
+concordance, and the grounded AI enrichment bullets. Before more Workbench surface is built, the
+dictionary-migration data gap above is worth closing — three slices in a row can now only be
+accepted on their negative branch.

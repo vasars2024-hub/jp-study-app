@@ -8733,4 +8733,13 @@ export const en: Catalog = {
   'lexicon.harvest.occurrences': 'Occurrences: {count}',
   'lexicon.harvest.ungrounded': 'Not in your dictionaries',
   'lexicon.harvest.noGloss': 'No gloss in the selected languages',
+  'lexicon.harvest.mine': 'Add to Anki',
+  // The accessible name of a harvest row's button: the word plus whatever the
+  // button currently offers, so every row's button is distinguishable and the
+  // visible label stays inside the accessible name.
+  'lexicon.harvest.mineWord': '{word}: {action}',
+  'lexicon.harvest.mining': 'Adding…',
+  'lexicon.harvest.mined': 'Added',
+  'lexicon.harvest.mineDuplicate': 'Already in Anki',
+  'lexicon.harvest.mineFailed': 'Could not add the card.',
 };
