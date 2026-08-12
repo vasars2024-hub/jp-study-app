@@ -3113,7 +3113,17 @@ export const ja: Catalog = {
   'perf.hint': 'Ctrl+Shift+F で非表示 · 目標 60 FPS',
   'common.back': '戻る',
   'bundleDetail.beginnerChecklist': '初心者向けチェックリスト',
-  'bundleDetail.oneClickSetup': 'ワンクリック設定',
+  'bundleDetail.checklistProgress': '進捗：{done}/{total}',
+  'bundleDetail.checklistCardProgress': 'チェックリスト {done}/{total}',
+  'bundleDetail.setupLinks': 'セットアップ用リンク',
+  'bundleDetail.setupExplanation':
+    'リンクを選ぶと「マイツール」への保存を試み、ブラウザで開きます。保存できない場合もリンクは開きます。このアプリはインストールやインポートを行いません。',
+  'bundleDetail.saveAndOpen': 'リンクを保存してブラウザで開く',
+  'bundleDetail.resourceLinks': 'リソース',
+  'bundleDetail.linkCount': {
+    other: '{count}件のリンク',
+  },
+  'bundleDetail.savedToolNote': '{bundle}バンドルのセットアップ用リンクから保存：{description}',
   'mediaLibActions.removedCount': { other: '見つからない項目を{count}件削除しました。' },
   'mediaLibActions.noneMissing': '見つからないファイルはありません — ライブラリは最新です。',
   'mediaLibActions.pruneFailed': '見つからないファイルを削除できませんでした: {error}',

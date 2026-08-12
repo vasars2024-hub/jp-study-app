@@ -8112,6 +8112,12 @@ mark.lookup-mark,
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 10px;
 }
+.bundle-setup-explanation {
+  max-width: 760px;
+  margin: -4px 0 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
 .bundle-download-card {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);

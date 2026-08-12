@@ -3100,7 +3100,17 @@ export const zh: Catalog = {
   'perf.hint': 'Ctrl+Shift+F 隐藏 · 目标 60 FPS',
   'common.back': '返回',
   'bundleDetail.beginnerChecklist': '新手清单',
-  'bundleDetail.oneClickSetup': '一键设置',
+  'bundleDetail.checklistProgress': '进度：{done}/{total}',
+  'bundleDetail.checklistCardProgress': '清单 {done}/{total}',
+  'bundleDetail.setupLinks': '设置链接',
+  'bundleDetail.setupExplanation':
+    '选择链接后，应用会尝试将其保存到“我的工具”，并在浏览器中打开。即使无法保存，链接仍会打开。本应用不会执行安装或导入。',
+  'bundleDetail.saveAndOpen': '保存链接并在浏览器中打开',
+  'bundleDetail.resourceLinks': '资源',
+  'bundleDetail.linkCount': {
+    other: '{count} 个链接',
+  },
+  'bundleDetail.savedToolNote': '从 {bundle} 合集的设置链接保存：{description}',
   'mediaLibActions.removedCount': { other: '已移除 {count} 个缺失条目。' },
   'mediaLibActions.noneMissing': '没有缺失文件 — 媒体库是最新的。',
   'mediaLibActions.pruneFailed': '无法移除缺失文件：{error}',

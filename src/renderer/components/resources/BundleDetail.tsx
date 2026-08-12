@@ -1,16 +1,6 @@
 import Icon, { type IconName } from '../Icons';
 import type { Bundle } from '../../../shared/resourcesCatalog';
-
-const DIRECT_DOWNLOAD_EXTENSIONS = [
-  '.apkg',
-  '.crx',
-  '.dmg',
-  '.exe',
-  '.tar.gz',
-  '.whl',
-  '.xpi',
-  '.zip',
-];
+import { useT } from '../../i18n';
 
 function hostOf(url: string): string {
   try {
@@ -18,11 +8,6 @@ function hostOf(url: string): string {
   } catch {
     return url;
   }
-}
-
-function isDirectDownload(url: string): boolean {
-  const lower = url.toLowerCase();
-  return DIRECT_DOWNLOAD_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
 // Full sub-screen for one bundle: checklist (ticks persisted by the parent via
@@ -35,18 +20,21 @@ export default function BundleDetail({
   onToggle,
   onBack,
   onOpenLink,
-  onDownload,
+  onOpenSetupLink,
 }: {
   bundle: Bundle;
   checkedIds: string[];
   onToggle: (itemId: string) => void;
   onBack: () => void;
   onOpenLink: (url: string) => void;
-  onDownload: (download: NonNullable<Bundle['downloads']>[number]) => void;
+  onOpenSetupLink: (link: NonNullable<Bundle['downloads']>[number]) => void;
 }) {
+  const { t } = useT();
   const checked = new Set(checkedIds);
   const checklist = bundle.checklist ?? [];
-  const downloads = bundle.downloads ?? [];
+  // `downloads` is the remote-catalog schema field. On this surface these are
+  // setup links: the app saves the URL to My tools and opens it externally.
+  const setupLinks = bundle.downloads ?? [];
   const done = checklist.filter((c) => checked.has(c.id)).length;
 
   return (
@@ -54,7 +42,7 @@ export default function BundleDetail({
       <div className="bundle-detail-head">
         <button className="bundle-back" onClick={onBack}>
           <Icon name="chevron" size={14} />
-          Back
+          {t('common.back')}
         </button>
         <div className="bundle-detail-title">
           <span className="bundle-detail-icon" aria-hidden="true">
@@ -73,9 +61,9 @@ export default function BundleDetail({
       {checklist.length > 0 ? (
         <section className="bundle-checklist">
           <div className="bundle-section-head">
-            <h3>Beginner checklist</h3>
+            <h3>{t('bundleDetail.beginnerChecklist')}</h3>
             <span className="muted">
-              {done}/{checklist.length} done
+              {t('bundleDetail.checklistProgress', { done, total: checklist.length })}
             </span>
           </div>
           <ul>
@@ -100,7 +88,7 @@ export default function BundleDetail({
                       onClick={() => onOpenLink(item.url as string)}
                       title={item.url}
                     >
-                      Open <Icon name="external" size={11} />
+                      {t('common.open')} <Icon name="external" size={11} />
                     </button>
                   ) : null}
                 </li>
@@ -110,28 +98,33 @@ export default function BundleDetail({
         </section>
       ) : null}
 
-      {downloads.length > 0 ? (
+      {setupLinks.length > 0 ? (
         <section className="bundle-downloads">
           <div className="bundle-section-head">
-            <h3>One-click setup</h3>
-            <span className="muted">{downloads.length} downloads</span>
+            <h3>{t('bundleDetail.setupLinks')}</h3>
+            <span className="muted">
+              {t('bundleDetail.linkCount', { count: setupLinks.length })}
+            </span>
           </div>
+          <p className="bundle-setup-explanation muted">
+            {t('bundleDetail.setupExplanation')}
+          </p>
           <div className="bundle-download-list">
-            {downloads.map((download) => (
+            {setupLinks.map((link) => (
               <button
-                key={download.id}
-                className={`bundle-download-card ${isDirectDownload(download.url) ? 'direct' : ''}`}
-                onClick={() => onDownload(download)}
-                title={download.url}
+                key={link.id}
+                className="bundle-download-card"
+                onClick={() => onOpenSetupLink(link)}
+                title={link.url}
               >
                 <span className="bundle-download-icon" aria-hidden="true">
-                  <Icon name="download" size={15} />
+                  <Icon name="external" size={15} />
                 </span>
                 <span>
-                  <span className="bundle-download-name">{download.name}</span>
-                  <span className="bundle-download-desc">{download.description}</span>
+                  <span className="bundle-download-name">{link.name}</span>
+                  <span className="bundle-download-desc">{link.description}</span>
                   <span className="bundle-download-host">
-                    {isDirectDownload(download.url) ? 'direct download' : download.kind} · {hostOf(download.url)}
+                    {t('bundleDetail.saveAndOpen')} · {hostOf(link.url)}
                   </span>
                 </span>
               </button>
@@ -142,8 +135,10 @@ export default function BundleDetail({
 
       <section className="bundle-detail-links">
         <div className="bundle-section-head">
-          <h3>Resources</h3>
-          <span className="muted">{bundle.items.length} links</span>
+          <h3>{t('bundleDetail.resourceLinks')}</h3>
+          <span className="muted">
+            {t('bundleDetail.linkCount', { count: bundle.items.length })}
+          </span>
         </div>
         <div className="res-grid">
           {bundle.items.map((r) => (

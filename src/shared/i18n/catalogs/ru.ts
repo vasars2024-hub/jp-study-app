@@ -3331,7 +3331,21 @@ export const ru: Catalog = {
   'perf.hint': 'Ctrl+Shift+F — скрыть · цель 60 FPS',
   'common.back': 'Назад',
   'bundleDetail.beginnerChecklist': 'Список для начинающих',
-  'bundleDetail.oneClickSetup': 'Настройка в один клик',
+  'bundleDetail.checklistProgress': 'Прогресс: {done}/{total}',
+  'bundleDetail.checklistCardProgress': 'Чек-лист {done}/{total}',
+  'bundleDetail.setupLinks': 'Ссылки для настройки',
+  'bundleDetail.setupExplanation':
+    'При выборе ссылки приложение попытается сохранить её в «Мои инструменты», а затем откроет в браузере. Если сохранить не удастся, ссылка всё равно откроется. Приложение ничего не устанавливает и не импортирует.',
+  'bundleDetail.saveAndOpen': 'Сохранить ссылку и открыть в браузере',
+  'bundleDetail.resourceLinks': 'Ресурсы',
+  'bundleDetail.linkCount': {
+    one: '{count} ссылка',
+    few: '{count} ссылки',
+    many: '{count} ссылок',
+    other: '{count} ссылки',
+  },
+  'bundleDetail.savedToolNote':
+    'Сохранено из ссылок для настройки набора «{bundle}»: {description}',
   'mediaLibActions.removedCount': {
     one: 'Удалена {count} отсутствующая запись.',
     few: 'Удалено {count} отсутствующие записи.',

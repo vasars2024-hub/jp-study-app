@@ -112,7 +112,7 @@ Append to this table when you integrate one. Evidence lives in
 |---|---|---|---|
 | `27c74b6` | **integrated** 2026-08-12 | `4e5ea28` | Orphan had zero importers and was the stale copy (`a empire` vs canonical `an empire`). Deletion was already live on disk, so no runtime delta. Parity test added. |
 | `9c046cc` | **integrated** 2026-08-12 | `a2bbdb5` | Acceptance criterion re-run against a real temp SQLite dictionary and passes. Foundation only — **no IPC channel, no renderer consumer**. Its session's "105 tests" was really 8; 125 is the surrounding area. |
-| `2545cd5` | open | — | Collides with the four dirty `catalogs/{en,ja,zh,ru}.ts`. Needs reconstruct-HEAD-plus-edit staging. |
+| `2545cd5` | **integrated** 2026-08-12 | `<pending>` | Every one of its eight pre-existing files had base blob == HEAD, so the six colliding ones were staged straight at the commit blob; `git diff --cached HEAD` came out byte-identical to `git diff 2545cd5^ 2545cd5`. `BundleDetail.tsx` was the one real conflict — another track's partial i18n pass there is a **strict subset**, so the rescued file was taken whole with nothing lost. `oneClickSetup` had no other consumer and the dropped `.direct` class had no CSS rule. |
 | `28a239c` | open | — | Same catalog collision, plus `styles.css`. |
 | `c3ae5b6` | open | — | Same catalog collision. |
 | `20f72eb` | **integrated** 2026-08-12 | `e4ad781` | Re-derived: `bfac09d` only touched the images/performance groups, so no real conflict. Seven of nine files applied verbatim (base blob == HEAD); `featureStatus.ts` and `fields.ts` hand-applied. Both honesty claims confirmed against source — `run-all` really does coalesce, `requireUnmeteredNetwork` really has no reader. |

@@ -12485,3 +12485,105 @@ The four catalog-colliding ones (`2545cd5`, `28a239c`, `c3ae5b6`, `c48b266`) all
 reconstruct-HEAD-plus-edit staging path, since `catalogs/{en,ja,zh,ru}.ts` carry another track's
 hunks. `c48b266` additionally touches `preload.ts` (also dirty) and needs its main handler invoked
 live rather than grepped. `87dd97c` and `99c8747` remain per-hunk salvage only.
+
+## Rescued commit 4 of 10 landed: bundle "One-click setup" was never a setup, and now does not claim to be — 2026-08-12
+
+Integrated `2545cd5` (`fix(resources): make bundle setup links truthful`) onto
+`feat/nyaa-subtitles`. One rescued commit per turn, per the boss audit's instruction.
+
+### The defect it fixes, re-derived from source rather than trusted
+
+The Resources bundle detail advertised a section headed **"One-click setup"**, listed its entries
+as **"N downloads"** on cards bearing a **download glyph**, and labelled any URL ending in
+`.apkg`/`.crx`/`.exe`/`.zip`/… as a **"direct download"** — via a local `isDirectDownload()`
+extension sniff. None of that was true. The handler underneath (`setupBundleDownload`, now
+`openBundleSetupLink`) does exactly two things: `window.api.toolsAdd(...)` to save a link record
+into My tools, then `openExternal(url)`. There is no downloader, no installer and no importer on
+that path — the browser gets the URL. The extension sniff was pure string inspection of the URL and
+never touched the network, so "direct download" was a claim derived from a filename.
+
+So the fix is a rename to what the code does: **"Setup links"**, `bundleDetail.linkCount`, an
+`external` glyph, a per-row **"Save link & open in browser"**, and a new explanatory paragraph
+stating in full that the app saves the link, opens it in the browser, and *does not install or
+import it*. `DIRECT_DOWNLOAD_EXTENSIONS` and `isDirectDownload` are deleted, not just unused.
+
+`bundleDetail.oneClickSetup` was checked for other consumers before its removal: repo-wide it
+appeared only in `BundleDetail.tsx` and the four catalogs. The dropped `direct` CSS class was
+likewise checked — `styles.css` has `.bundle-download-card` and `.bundle-download-card:hover` and
+never had a `.direct` rule, so it was styling nothing.
+
+### The `t` dependency was reviewed, and is deliberately left alone
+
+`openBundleSetupLink` lists `t` in its `useCallback` deps, which reads like the repo's #1 i18n
+review item. It is not one here. `useT`'s `t` is `useCallback(..., [])` — permanently stable — and
+its body calls the module-level `t()`, which reads the *current* language at call time
+(`renderer/i18n.ts`). The staleness trap applies to memoized translated **results**; this callback
+translates on invocation, so it always produces the live language. No change made.
+
+### Staging, given the collision the audit warned about
+
+All six of `ResourcesContent.tsx`, `styles.css` and `catalogs/{en,ja,zh,ru}.ts` carry another
+track's uncommitted hunks. Every one of the commit's eight pre-existing files nonetheless has a
+**base blob identical to HEAD**, so the commit blob *is* HEAD-plus-this-change, and those six were
+staged with `git update-index --cacheinfo` at exactly that blob. Proof rather than assertion:
+`git diff --cached HEAD` is **byte-identical (SHA-256 match) to `git diff 2545cd5^ 2545cd5`** over
+the same paths — the commit carries zero foreign hunks.
+
+`BundleDetail.tsx` was the one real conflict, and needed a judgement rather than a patch. The
+shared tree already held a *partial* i18n pass on that file from another track. Diffed against the
+rescued version, that partial work is a **strict subset**: both add `useT`, `common.back`,
+`common.open` and `bundleDetail.beginnerChecklist`; the rescued version additionally does
+everything above, and replaces the other track's `palette.section.resources` with a
+purpose-made `bundleDetail.resourceLinks`. Nothing is lost by taking the rescued file whole, so the
+worktree copy was replaced with it (verified byte-identical to the commit blob by `hash-object`)
+rather than left to diverge. Every other track's dirty state is untouched.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | **544 files passed**, 1 skipped; **7275 tests passed**, 6 skipped; exit 0 |
+| `node tools/i18n-check.cjs` | exit 0 — all 9331 English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | exit 0 — 1727 modules, 17 known findings, **nothing new** |
+| `npx eslint <4 touched paths>` | exit 0 |
+
+The new `renderer/__tests__/resourcesBundleSetup.test.ts` is 5 of those tests. Its most useful
+assertion is not the string checks but the `t()` mock that **throws if a catalogue value is passed
+to it** — that is what pins the scope rule (chrome translated, remote content verbatim) as a test
+rather than a convention.
+
+### Live Electron acceptance through the debug bridge
+
+Bridge on port 39273. The only live window belonged to another track's scraper session
+(`?popout=scraper`), so it was not driven or reloaded; instead the **real `BundleDetail.tsx`** was
+imported in that live renderer and mounted off-screen against the **real catalogs and real
+`styles.css`**. React and `react-dom/client` were reached at `/node_modules/.vite/deps/react.js`
+and `react-dom_client.js` — bare specifiers do not resolve through `/eval`, and that dep module
+exports `createRoot` under `default`, not as a named export.
+
+The live UI is currently set to Russian, which made the run stronger than the jsdom test: the
+rendered DOM returned
+
+- `Ссылки для настройки` where "One-click setup" used to be, and
+  `Сохранить ссылку и открыть в браузере` where "direct download" used to be;
+- **`1 ссылка`** for `bundleDetail.linkCount` — the real CLDR `one` form, chosen by the real plural
+  machinery rather than a mocked `t()`;
+- `Прогресс: 0/1` and `Назад`/`Открыть` from the existing keys;
+- the new paragraph present with **computed** `font-size: 12.5px` and `max-width: 760px`, i.e. the
+  `.bundle-setup-explanation` rule added to `styles.css` is live;
+- `className` exactly `bundle-download-card` — no `direct`;
+- `onOpenSetupLink` fired with the link id on click, so the renamed prop is really wired;
+- and `ProbeGem` / `ProbeLink` / `ProbeDesc` / `ProbeRes` rendered **verbatim**, untranslated,
+  against a Russian UI — the scope rule holding live.
+
+Probe globals were deleted and the off-screen host removed; a follow-up eval confirms
+`typeof window.__bd === 'undefined'` and zero `.bundle-download-card` nodes left in the document.
+
+### What is left of the ten
+
+Four integrated (`27c74b6`, `9c046cc`, `20f72eb`, `2545cd5`), one closed obsolete (`9e6e82d`),
+five open. `28a239c` and `c3ae5b6` still need the reconstruct-HEAD-plus-edit path for the catalogs;
+worth re-running the base-blob-vs-HEAD check on them first, because for `2545cd5` every base blob
+still matched HEAD and that made the staging mechanical. `c48b266` additionally touches `preload.ts`
+and needs its main handler invoked live rather than grepped. `87dd97c` and `99c8747` remain
+per-hunk salvage only.

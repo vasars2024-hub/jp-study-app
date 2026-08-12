@@ -42,10 +42,6 @@ export function openLink(url: string): void {
   void window.api.openExternal(url);
 }
 
-function toolNoteForDownload(download: BundleDownload, bundle: Bundle): string {
-  return `Added from the ${bundle.gem} bundle setup: ${download.description}`;
-}
-
 function matchesResource(r: Resource, q: string): boolean {
   return `${r.name} ${r.description}`.toLowerCase().includes(q);
 }
@@ -94,7 +90,34 @@ function catalogCategories(catalog: ResourcesCatalog): ResourceCategory[] {
 
 export type ResourcesState = ReturnType<typeof useResources>;
 
+/**
+ * The complete setup-link side effect: save a web link to My tools when that
+ * store is available, refresh the visible list, then open the URL externally.
+ * There is deliberately no downloader or installer on this path.
+ */
+export async function saveAndOpenBundleLink(
+  bundle: Bundle,
+  link: BundleDownload,
+  note: string,
+  reloadTools: () => Promise<void>,
+): Promise<void> {
+  try {
+    await window.api.toolsAdd({
+      name: link.name,
+      url: link.url,
+      note,
+      tags: ['bundle', bundle.id, link.kind, ...(link.tags ?? [])],
+      source: 'app',
+    });
+    await reloadTools();
+  } catch {
+    /* the external link still opens if the local tools store is unavailable */
+  }
+  openLink(link.url);
+}
+
 export function useResources() {
+  const { t } = useT();
   const [filter, setFilter] = useState<Filter>('All');
   const [query, setQuery] = useState('');
 
@@ -243,23 +266,15 @@ export function useResources() {
 
   const openBundle = useCallback((b: Bundle) => setSelectedBundle(b), []);
   const closeBundle = useCallback(() => setSelectedBundle(null), []);
-  const setupBundleDownload = useCallback(
-    async (bundle: Bundle, download: BundleDownload) => {
-      try {
-        await window.api.toolsAdd({
-          name: download.name,
-          url: download.url,
-          note: toolNoteForDownload(download, bundle),
-          tags: ['bundle', bundle.id, download.kind, ...(download.tags ?? [])],
-          source: 'app',
-        });
-        await reloadTools();
-      } catch {
-        /* setup still opens even if the local tools store is unavailable */
-      }
-      openLink(download.url);
+  const openBundleSetupLink = useCallback(
+    async (bundle: Bundle, link: BundleDownload) => {
+      const note = t('bundleDetail.savedToolNote', {
+        bundle: bundle.gem,
+        description: link.description,
+      });
+      await saveAndOpenBundleLink(bundle, link, note, reloadTools);
     },
-    [reloadTools],
+    [reloadTools, t],
   );
 
   return {
@@ -274,7 +289,7 @@ export function useResources() {
     closeBundle,
     checklists,
     toggleChecklistItem,
-    setupBundleDownload,
+    openBundleSetupLink,
     tools,
     removeTool,
     editingTool,
@@ -469,7 +484,7 @@ export function ResourceBundleDetail({ state }: { state: ResourcesState }) {
       onToggle={(itemId) => state.toggleChecklistItem(bundle.id, itemId)}
       onBack={state.closeBundle}
       onOpenLink={openLink}
-      onDownload={(download) => void state.setupBundleDownload(bundle, download)}
+      onOpenSetupLink={(link) => void state.openBundleSetupLink(bundle, link)}
     />
   );
 }
