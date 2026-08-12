@@ -396,6 +396,8 @@ const TEXT = {
   // Why the runner is not firing anything right now. One per `heldBy` value in
   // shared/scraperCron.ts; 'nothing-due' reads as Armed because from the user's
   // side an armed scheduler with no slot due is not being held by anything.
+  'set.inert': 'Not wired',
+  'set.inertHint': 'This setting is saved, but nothing reads it yet — changing it will not change how the scraper behaves.',
   'sched.held.armed': 'Armed',
   'sched.held.disabled': 'Scheduler off',
   'sched.held.quietHours': 'Held — quiet hours',

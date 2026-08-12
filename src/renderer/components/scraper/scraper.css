@@ -3722,6 +3722,34 @@
   font-size: var(--font-size-xs);
 }
 
+/*
+ * "Not wired" — a setting that persists but that nothing reads (audit F5).
+ *
+ * Quiet on purpose: this is a disclosure, not a warning. It must be legible
+ * enough that a user stops expecting the control to do something, without
+ * reading as an error on a screen where nothing is broken.
+ */
+.scr-field-inert {
+  display: inline-block;
+  margin-inline-start: var(--space-xs);
+  padding: 0 var(--space-2xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* The control still works — it writes the value — so it is dimmed, not
+   disabled. Disabling it would claim the setting is unavailable, which is a
+   different and equally untrue statement. */
+.scr-field.is-inert .scr-field-control {
+  opacity: 0.72;
+}
+
 .scr-field-control {
   display: flex;
   align-items: center;

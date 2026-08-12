@@ -73,6 +73,17 @@ export interface ScraperFieldDef {
   advanced?: boolean;
   /** Extra search terms, deliberately literal English. */
   keywords?: string[];
+  /**
+   * This field persists but nothing reads it yet.
+   *
+   * The drawer renders a visible marker for it. A control that edits a stored
+   * value while changing no behaviour is the defect the audit called F5 — the
+   * value really is saved, so the settings document is not lying; the *screen*
+   * was, by presenting the control exactly like the ones that work. Marking it
+   * is not a substitute for wiring it, but an unmarked inert control is
+   * indistinguishable from a broken one, and a user cannot tell which.
+   */
+  inert?: boolean;
 }
 
 // 2026-08-02: 'browser' was removed from this union. It offered nine
@@ -265,11 +276,11 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'images.downloadThumbnails', group: 'images', kind: 'toggle', label: 'Download Thumbnails' },
   { path: 'images.downloadPosters', group: 'images', kind: 'toggle', label: 'Download Posters' },
   { path: 'images.downloadBanners', group: 'images', kind: 'toggle', label: 'Download Banners' },
-  { path: 'images.minWidth', toPath: 'images.minHeight', group: 'images', kind: 'range', label: 'Minimum Size', min: 0, max: 7_680, step: 10, unit: 'px', hint: 'Rejects tracking pixels and broken placeholders.' },
+  { path: 'images.minWidth', toPath: 'images.minHeight', group: 'images', kind: 'range', label: 'Minimum Size', min: 0, max: 7_680, step: 10, unit: 'px', hint: 'Stored for a future downloader. Catalogue providers currently expose URLs without measured pixel dimensions.', inert: true },
   { path: 'images.preferredFormat', group: 'images', kind: 'select', label: 'Preferred Format', options: opts(SCRAPER_IMAGE_FORMATS, { original: 'Keep original', webp: 'WebP', jpg: 'JPEG', png: 'PNG' }) },
   { path: 'images.maxPerEntry', group: 'images', kind: 'number', label: 'Max Images Per Entry', min: 0, max: 200 },
-  { path: 'images.skipDuplicatesByHash', group: 'images', kind: 'toggle', label: 'Skip Duplicates by Hash' },
-  { path: 'images.namingTemplate', group: 'images', kind: 'text', label: 'Naming Template', advanced: true },
+  { path: 'images.skipDuplicatesByHash', group: 'images', kind: 'toggle', label: 'Skip Duplicates by Hash', hint: 'Stored for a future downloader. No image bytes are downloaded or hashed by the scraper yet.', inert: true },
+  { path: 'images.namingTemplate', group: 'images', kind: 'text', label: 'Naming Template', hint: 'Stored for a future downloader. The current scraper returns image URLs and does not write artwork files.', advanced: true, inert: true },
 
   // ------------------------------------------------------------ metadata ---
   { path: 'metadata.providerOrder', group: 'metadata', kind: 'tags', label: 'Provider Order', hint: 'Ordered. The first provider with a value wins.' },

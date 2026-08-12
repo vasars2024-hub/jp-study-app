@@ -12209,3 +12209,45 @@ was deleted.
 Take `page.images` and `set.images` together. Verify preview/fallback and image-output settings
 without public provider traffic, then restore exact profile state. Metadata remains amber until
 its catalogue-provider runtime can be accepted deterministically.
+
+## Images pre-acceptance now distinguishes working and inert controls — 2026-08-12
+
+`result.images` and `set.images` deliberately remain `untested`; the Scraper registry therefore
+stays at **39 ready / 10 untested / 49 total (79.6%)**. This pass improved the implementation and
+evidence without converting partial coverage into a false green.
+
+### What is implemented and observed
+
+`imageSet.ts` has five settings with runtime effects: the three collection switches remove or add
+thumbnail/poster/banner rows, `preferredFormat` selects a provider-published variant with a safe
+fallback, and `maxPerEntry` caps the ordered row set. The running Images drawer exercised all five,
+saved them as `false / false / true / png / 3`, and read the same values back from the active
+profile. No public provider was contacted.
+
+The remaining four stored values still require an image downloader or byte inspector that does not
+exist: `minWidth`, `minHeight`, `skipDuplicatesByHash`, and `namingTemplate`. Their three drawer
+rows now carry the existing visible **Not wired** badge and precise explanations instead of looking
+like working controls. A focused regression locks the five-active/four-inert boundary.
+
+Automated gates:
+
+- `scraperImages.test.ts`, `scraperImageWorkspace.test.ts`, and
+  `scraperImageFieldTruth.test.ts`: **3 files / 27 tests passed**;
+- focused ESLint for the new truthfulness regression: clean;
+- focused `git diff --check`: clean.
+
+At **900 x 640**, the active format/cap controls, inert badges, explanations, profile identity and
+save actions remained legible in the real drawer; the debug bridge error ring remained **0**. The
+inspected screenshot was deleted. The complete settings and shell strings were then restored and
+reloaded byte-for-byte; `relay-probe` is active again with its original image settings and the
+drawer closed.
+
+### Why the result tab stays amber
+
+The main process reports stored catalogue jobs with one real poster row, and the Images workspace
+has filtering, virtual-grid, preview, copy-source and download actions with focused unit coverage.
+However, the historical Results and History inspectors do not reopen a completed job inside
+`NewScrapePage`, which is the only mounted owner of `ImageGrid`. Starting a new catalogue request
+only to reach that transient tab would spend public-provider traffic. Accept the result workspace
+with a deterministic local catalogue fixture or first add a truthful reopen-result handoff; until
+then `result.images` remains amber.
