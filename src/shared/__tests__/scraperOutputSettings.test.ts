@@ -56,7 +56,7 @@ describe('metadata settings', () => {
       { providerOrder: ['Jikan!', 'Ani List', ...Array.from({ length: 20 }, (_, i) => `p${i}`)] },
       DEFAULT_SCRAPER_METADATA_SETTINGS,
     );
-    expect(value.providerOrder.slice(0, 2)).toEqual(['jikan', 'ani-list']);
+    expect(value.providerOrder.slice(0, 2)).toEqual(['jikan', 'anilist']);
     expect(value.providerOrder.length).toBeLessThanOrEqual(10);
   });
 

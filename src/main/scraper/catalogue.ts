@@ -423,9 +423,19 @@ export async function searchCatalogue(
 
   for (const [index, provider] of order.entries()) {
     const label = PROVIDER_LABELS[provider];
-    const works = provider === 'anilist'
-      ? await searchAnilist(query, correlationId, limit)
-      : await searchJikan(query, correlationId, limit);
+    let works: CatalogueWork[] = [];
+    try {
+      works = provider === 'anilist'
+        ? await searchAnilist(query, correlationId, limit)
+        : await searchJikan(query, correlationId, limit);
+    } catch (error) {
+      // A refused connection, DNS failure or timeout is exactly when the next
+      // configured provider matters. Keep the failure visible in logs, but do
+      // not turn a fallback order into a single point of failure.
+      scraperLog('warn', 'catalogue', `${label} request failed: ${String(error)}`, {
+        correlationId,
+      });
+    }
     if (works.length) {
       scraperLog('info', 'catalogue', `${works.length} candidate title(s) from ${label}.`, {
         correlationId,

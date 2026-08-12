@@ -26,6 +26,7 @@ vi.mock('electron', () => ({
 const asked: string[] = [];
 let jikanHasResults = true;
 let anilistHasResults = true;
+let throwingProvider: 'jikan' | 'anilist' | null = null;
 
 vi.mock('../scraper/http', () => ({
   MAX_BODY_BYTES: 4 * 1024 * 1024,
@@ -36,6 +37,8 @@ vi.mock('../scraper/http', () => ({
     throw new Error('not used here');
   },
   scraperRequest: async (url: string) => {
+    const provider = url.includes('anilist') ? 'anilist' : 'jikan';
+    if (throwingProvider === provider) throw new Error(`${provider} is offline`);
     const body = url.includes('anilist')
       ? JSON.stringify({
         data: {
@@ -56,7 +59,7 @@ vi.mock('../scraper/http', () => ({
           ? [{ mal_id: 52991, title: 'Jikan Romaji', title_english: 'Jikan English', title_japanese: 'ジカン' }]
           : [],
       });
-    asked.push(url.includes('anilist') ? 'anilist' : 'jikan');
+    asked.push(provider);
     return {
       status: 200,
       statusText: 'OK',
@@ -78,6 +81,7 @@ beforeEach(() => {
   asked.length = 0;
   jikanHasResults = true;
   anilistHasResults = true;
+  throwingProvider = null;
   resetScraperLogs();
 });
 
@@ -131,6 +135,16 @@ describe('metadata.providerOrder', () => {
     const works = await searchCatalogue('frieren', 'job', 5, ['jikan', 'anilist']);
     expect(asked).toEqual(['jikan', 'anilist']);
     expect(works[0].provider).toBe('anilist');
+  });
+
+  it('falls through when the first provider throws a network error', async () => {
+    throwingProvider = 'jikan';
+    const works = await searchCatalogue('frieren', 'job', 5, ['jikan', 'anilist']);
+    expect(asked).toEqual(['anilist']);
+    expect(works[0].provider).toBe('anilist');
+    const logged = recentScraperLogs().map((line) => line.message).join('\n');
+    expect(logged).toContain('Jikan request failed');
+    expect(logged).toContain('jikan is offline');
   });
 
   it('never asks a provider the profile left out', async () => {

@@ -12079,3 +12079,35 @@ title-language choice, optional native title, field-fetch toggles and cache dura
 or deterministic provider fixture where possible; do not spend credentials or call a real cloud
 provider. Keep any schema-only or provider-unobservable fields named rather than forcing a false
 green.
+
+## Metadata pre-acceptance found three correctness defects — 2026-08-12
+
+`set.metadata` remains `untested`. The source-derived audit separated its ten fields into eight
+with runtime consumers (`providerOrder`, `titleLanguage`, `alsoStoreNativeTitle`, the four field
+projection toggles, and `cacheHours`) and two explicitly inert controls (`mergeStrategy` and
+`fetchStaff`). The deterministic provider/projection/cache suites now pass **83/83** assertions,
+but this is not represented as live provider acceptance.
+
+The pre-acceptance pass fixed three defects before they could be hidden by a green marker:
+
+- a natural `Ani List` tag normalized to `ani-list`, while the runtime recognized only `anilist`;
+- a thrown connection/DNS/timeout error aborted the catalogue search instead of advancing to the
+  next configured provider;
+- the Metadata result panel displayed studio provenance from the genres provenance key.
+
+The running settings drawer was also exercised across all ten controls, persisted, reloaded and
+read back. That proved the renderer/store transport but not the catalogue runtime. The temporary
+profile mutations were then removed: active profile `relay-probe` is back on `balanced`, its
+original metadata values and original single revision are restored, and its prior `updatedAt`
+timestamp is restored.
+
+Automated gates:
+
+- `scraperMetadataSettings.test.ts`, `scraperHttpCache.test.ts`, and
+  `scraperOutputSettings.test.ts`: **3 files / 83 tests passed**;
+- focused ESLint: clean;
+- focused `git diff --check`: clean.
+
+Next acceptance decision: either use the strict loopback provider-proxy design recorded by the
+audit, or leave Metadata amber and take the completely read-only Dashboard slice. Do not contact
+public catalogue providers merely to turn the status green.

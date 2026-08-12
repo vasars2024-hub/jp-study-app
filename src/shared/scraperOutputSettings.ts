@@ -110,10 +110,23 @@ export function validateScraperMetadataSettings(
   p: string,
 ): ScraperMetadataSettings {
   const s = isRecord(input) ? input : {};
+  const providerOrder = stringListValue(
+    s.providerOrder,
+    fallback.providerOrder,
+    `${p}.providerOrder`,
+    issues,
+    10,
+  )
+    .map((value) => {
+      const id = safeId(value, '');
+      // Provider labels are user-entered tags. Treat the natural spaced or
+      // hyphenated spelling of AniList as the provider id the runtime knows,
+      // rather than accepting a tag that will only be ignored later.
+      return id.replace(/-/g, '') === 'anilist' ? 'anilist' : id;
+    })
+    .filter(Boolean);
   return {
-    providerOrder: stringListValue(s.providerOrder, fallback.providerOrder, `${p}.providerOrder`, issues, 10)
-      .map((v) => safeId(v, ''))
-      .filter(Boolean),
+    providerOrder,
     fetchSynopsis: booleanValue(s.fetchSynopsis, fallback.fetchSynopsis, `${p}.fetchSynopsis`, issues),
     fetchGenres: booleanValue(s.fetchGenres, fallback.fetchGenres, `${p}.fetchGenres`, issues),
     fetchStaff: booleanValue(s.fetchStaff, fallback.fetchStaff, `${p}.fetchStaff`, issues),

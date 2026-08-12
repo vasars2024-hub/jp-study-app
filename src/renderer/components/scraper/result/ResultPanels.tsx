@@ -619,7 +619,7 @@ export function MetadataPanel({ metadata }: { metadata: SeriesMetadata }) {
     { label: sx('result.meta.episodes'), value: String(metadata.episodeCount), source: metadata.provenance.episodeCount ?? '—' },
     { label: sx('result.meta.duration'), value: formatDuration(metadata.averageDurationSec), source: metadata.provenance.episodeCount ?? '—' },
     { label: sx('result.meta.genres'), value: metadata.genres.join(', '), source: metadata.provenance.genres ?? '—' },
-    { label: sx('result.meta.studios'), value: metadata.studios.join(', '), source: metadata.provenance.genres ?? '—' },
+    { label: sx('result.meta.studios'), value: metadata.studios.join(', '), source: metadata.provenance.studios ?? '—' },
     { label: sx('result.meta.rating'), value: `${metadata.communityRating} / 10`, source: metadata.provenance.communityRating ?? '—' },
     { label: sx('result.meta.mal'), value: metadata.malId ? `#${metadata.malId}` : '—', source: 'MyAnimeList' },
     { label: sx('result.meta.anilist'), value: metadata.aniListId ? `#${metadata.aniListId}` : '—', source: 'AniList' },
