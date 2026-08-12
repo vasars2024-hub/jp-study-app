@@ -10790,3 +10790,42 @@ Two decision-free items are now derived and waiting, in this order:
 `TASKS.md` is stale as a source of open work — its "Task 4: UI Emoji Eradication" was checked
 against the tree this hop and the only pictographs left in `src/` are minimalist glyph icons
 (`✓ ✕ ★ ♪ ▢`), which the project style calls for. Do not re-run that sweep.
+
+### Addendum, same hop: the branch's own HEAD is red on two gates, and neither is this slice
+
+The gates above ran on the shared working tree, which carries ~380 dirty paths from other
+tracks. That is the exact shape the "green suite was the working tree, not the branch"
+correction warned about, so `61add20` was re-run in a detached worktree with a `node_modules`
+junction, **with the mandatory control run at its parent `39a04b6`**. The control is what makes
+the result readable:
+
+| gate | at parent `39a04b6` | at `61add20` |
+| --- | --- | --- |
+| `i18n-missing-key-check` | exit 1, **2** offenders | exit 1, **1** offender |
+| `architecture-audit` | exit 1, 1 unclassified | exit 1, the same 1 unclassified |
+| `readingLensModes` + `readingLensClipboardPassage` | — | 2 files, 7 tests, 0 failed |
+
+So this slice removed exactly the offender it claimed to (`lens.mode.` is gone at `61add20`
+and present at the parent) and introduced nothing. What it did not do — and could not have,
+being scoped elsewhere — is make either gate green at HEAD. Two inherited failures are live on
+this branch right now, and both have the same cause: **a module is committed while the file
+that satisfies it is only in someone's uncommitted working tree.**
+
+1. `i18n-missing-key-check`: `src/renderer/agentToolRegistry.ts` asks for
+   `blanc.agent.error.cardNotFound`, which no committed catalog defines. Anyone checking out
+   this branch gets the raw key string rendered at the user on that path. It passes in the
+   shared tree only because an uncommitted catalog file defines it.
+2. `architecture-audit`: `src/shared/i18n/catalogs/mooncapLore.ts` is committed and
+   **nothing committed imports it** — flagged unclassified, i.e. a fresh finding, not a
+   baselined one. Its importer is likewise uncommitted.
+
+This is the failure `commit-slices-must-close-import-graph` describes, twice, and it is
+someone else's lane to close — the fix is for whoever owns those uncommitted files to land
+them, not for a passing worker to invent a catalog entry or classify away a finding that will
+resolve itself on their next commit. Recorded rather than fixed, deliberately.
+
+**What this means for the next worker:** running the four gates from the shared tree will show
+you green and tell you nothing about the branch. `i18n-missing-key-check` and
+`architecture-audit` are both **red at HEAD before you start**, so treat "exit 1" from either
+as a question — diff the offender list against the parent commit — rather than as evidence
+your slice broke something.
