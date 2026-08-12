@@ -8742,4 +8742,9 @@ export const en: Catalog = {
   'lexicon.harvest.mined': 'Added',
   'lexicon.harvest.mineDuplicate': 'Already in Anki',
   'lexicon.harvest.mineFailed': 'Could not add the card.',
+  'lexicon.sense.choose': 'Choose the sense of {word} used here',
+  'lexicon.sense.group': 'Senses of {word}',
+  'lexicon.sense.none': 'No pinned sense',
+  'lexicon.sense.use': 'Use sense {index}: {gloss}',
+  'lexicon.sense.close': 'Close',
 };

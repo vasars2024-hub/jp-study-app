@@ -8333,4 +8333,9 @@ export const ja: Catalog = {
   'lexicon.harvest.mined': '追加しました',
   'lexicon.harvest.mineDuplicate': 'すでにAnkiにあります',
   'lexicon.harvest.mineFailed': 'カードを追加できませんでした。',
+  'lexicon.sense.choose': 'ここで使われている{word}の語義を選ぶ',
+  'lexicon.sense.group': '{word}の語義',
+  'lexicon.sense.none': '語義を固定しない',
+  'lexicon.sense.use': '語義{index}を使う：{gloss}',
+  'lexicon.sense.close': '閉じる',
 };

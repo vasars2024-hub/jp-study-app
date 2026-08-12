@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_PINNABLE_SENSES,
   buildOfflineInterlinear,
   parallelGlossTargets,
   segmentLexiconText,
@@ -216,6 +217,85 @@ describe('Lexicon Workbench offline interlinear', () => {
       { lang: 'en', dictId: 'jmdict-en', dictTitle: 'JMdict (English)', glosses: [{ lang: 'en', text: 'cat' }] },
     ]);
     expect(match?.glosses).toEqual([{ lang: 'en', text: 'cat' }]);
+  });
+
+  it('carries the pinnable senses of a polysemous entry, keeping their source index', () => {
+    const result = buildOfflineInterlinear('見た', () => hit('見た', {
+      text: '見る',
+      reading: 'みる',
+      senses: [
+        { glosses: [{ lang: 'ru', text: 'смотреть' }] },
+        { glosses: [{ lang: 'en', text: 'to look after' }] },
+        { glosses: [{ lang: 'ru', text: 'считать' }, { lang: 'en', text: 'to judge' }] },
+      ],
+    }), { glossLangs: ['ru'] });
+
+    const match = (result.parts[0] as LexiconInterlinearToken).match;
+    // The English-only sense is dropped, but sense 2 keeps index 2 so a pin
+    // still names the same sense when the target languages change.
+    expect(match?.senses).toEqual([
+      { index: 0, glosses: [{ lang: 'ru', text: 'смотреть' }] },
+      { index: 2, glosses: [{ lang: 'ru', text: 'считать' }] },
+    ]);
+  });
+
+  it('omits the sense list when the entry offers no choice in the requested targets', () => {
+    const single = buildOfflineInterlinear('猫', () => twoDictionaries(), { glossLangs: ['en'] });
+    expect((single.parts[0] as LexiconInterlinearToken).match).not.toHaveProperty('senses');
+
+    const filtered = buildOfflineInterlinear('見た', () => hit('見た', {
+      senses: [
+        { glosses: [{ lang: 'ru', text: 'смотреть' }] },
+        { glosses: [{ lang: 'en', text: 'to look after' }] },
+      ],
+    }), { glossLangs: ['ru'] });
+    expect((filtered.parts[0] as LexiconInterlinearToken).match).not.toHaveProperty('senses');
+  });
+
+  it('collects senses split across sibling entries, which is how the legacy stores answer', () => {
+    // The shape a live probe of 見る returned: JMdict's senses arrive as separate
+    // entries of one sense each, never as one entry with a sense list.
+    const sibling = (id: number, definition: string) => ({
+      headwordId: -id,
+      dictId: 'bundled-jmdict-en',
+      dictTitle: 'JMdict (Japanese–English)',
+      text: '見る',
+      reading: 'みる',
+      via: 'deinflected' as const,
+      score: 1,
+      senses: [{ glosses: [{ lang: 'en', text: definition }] }],
+    });
+    const result = buildOfflineInterlinear('見た', () => ({
+      query: '見た',
+      detectedLangs: ['ja'],
+      entries: [
+        sibling(1, 'to see'),
+        sibling(2, 'to examine'),
+        // Neither a different headword nor a different dictionary may be folded
+        // in: their sense numbering is not this dictionary's.
+        { ...sibling(3, 'to look after'), text: '観る' },
+        { ...sibling(4, 'смотреть'), dictId: 'bundled-jmdict-ru' },
+      ],
+    }), { glossLangs: ['en'] });
+
+    const match = (result.parts[0] as LexiconInterlinearToken).match;
+    expect(match?.senses).toEqual([
+      { index: 0, glosses: [{ lang: 'en', text: 'to see' }] },
+      { index: 1, glosses: [{ lang: 'en', text: 'to examine' }] },
+    ]);
+    // The unpinned line keeps showing only the entry the lookup chose.
+    expect(match?.glosses).toEqual([{ lang: 'en', text: 'to see' }]);
+  });
+
+  it('bounds how many senses one token can carry into a passage-scale result', () => {
+    const senses = Array.from({ length: MAX_PINNABLE_SENSES + 4 }, (_unused, index) => ({
+      glosses: [{ lang: 'en', text: `sense ${index}` }],
+    }));
+    const result = buildOfflineInterlinear('見た', () => hit('見た', { senses }), { glossLangs: ['en'] });
+
+    const match = (result.parts[0] as LexiconInterlinearToken).match;
+    expect(match?.senses).toHaveLength(MAX_PINNABLE_SENSES);
+    expect(match?.senses?.at(-1)?.index).toBe(MAX_PINNABLE_SENSES - 1);
   });
 
   it('derives parallel targets from the installed dictionaries, primary first', () => {

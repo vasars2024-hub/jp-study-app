@@ -331,6 +331,114 @@ describe('LexiconWorkbenchResults', () => {
     expect(host.querySelector('.lexicon-harvest-mine-error')).toBeNull();
   });
 
+  it('pins the sense a passage used, through the gloss line, the harvest row and the card', async () => {
+    const senses = [
+      { index: 0, glosses: [{ lang: 'en', text: 'to see' }] },
+      { index: 2, glosses: [{ lang: 'en', text: 'to look after' }] },
+    ];
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 2, matchedCount: 1,
+      truncated: false,
+      parts: [
+        { kind: 'separator', text: '猫を', start: 0, end: 2 },
+        {
+          kind: 'token', text: '見た', start: 2, end: 4,
+          match: {
+            text: '見る', reading: 'みる', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 3,
+            glosses: [{ lang: 'en', text: 'to see' }, { lang: 'en', text: 'to look after' }],
+            senses,
+          },
+        },
+        { kind: 'separator', text: '。', start: 4, end: 5 },
+      ],
+    });
+    const ankiMineNote = vi.fn().mockResolvedValue({ ok: true, noteId: 12 });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, ankiMineNote },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={8} />);
+      await Promise.resolve();
+    });
+
+    expect(host.querySelector('.lexicon-harvest-gloss')?.textContent).toBe('to see; to look after');
+    // The picker only opens on demand, so the flow is not covered by a panel.
+    expect(host.querySelector('.lexicon-sense-panel')).toBeNull();
+
+    const token = host.querySelector<HTMLButtonElement>('.lexicon-sense-token');
+    expect(token?.getAttribute('aria-label')).toBe('lexicon.sense.choose:見た');
+    await act(async () => {
+      token?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const options = [...host.querySelectorAll('.lexicon-sense-list button')];
+    expect(options.map((option) => option.textContent))
+      .toEqual(['lexicon.sense.none', '1to see', '3to look after']);
+    // Nothing is pinned yet, so "all senses" is the pressed option.
+    expect(options[0].getAttribute('aria-pressed')).toBe('true');
+    // The gloss is the visible label, so it has to reach the accessible name too.
+    expect(options[2].getAttribute('aria-label')).toBe('lexicon.sense.use:3,to look after');
+
+    await act(async () => {
+      options[2].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(host.querySelector('ruby.is-pinned rt')?.textContent).toBe('to look after');
+    expect(host.querySelector('.lexicon-harvest-gloss')?.textContent).toBe('to look after');
+    expect([...host.querySelectorAll('.lexicon-sense-list button')]
+      .map((option) => option.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
+
+    await act(async () => {
+      host.querySelector('.lexicon-harvest-mine')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(ankiMineNote.mock.calls[0][0]).toMatchObject({
+      term: '見る',
+      meaning: 'to look after',
+      sentence: '猫を見た。',
+    });
+
+    // Clearing the pin returns the token to every sense the dictionary supplied.
+    await act(async () => {
+      host.querySelector('.lexicon-sense-list button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(host.querySelector('ruby.is-pinned')).toBeNull();
+    expect(host.querySelector('.lexicon-harvest-gloss')?.textContent).toBe('to see; to look after');
+  });
+
+  it('leaves a single-sense token as plain reading flow rather than a control', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [{
+        kind: 'token', text: '猫', start: 0, end: 1,
+        match: {
+          text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+          headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+        },
+      }],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫" lang="ja" lookupAttempt={9} lens="translate" />);
+      await Promise.resolve();
+    });
+
+    expect(host.querySelector('.lexicon-sense-token')).toBeNull();
+    expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
+  });
+
   it('leaves the harvest out entirely when nothing was segmented', async () => {
     const lookup = vi.fn().mockResolvedValue({
       text: '。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 0, matchedCount: 0,
@@ -376,6 +484,12 @@ describe('LexiconWorkbenchResults', () => {
       'lexicon.harvest.mined',
       'lexicon.harvest.mineDuplicate',
       'lexicon.harvest.mineFailed',
+      // Every string the sense picker can render.
+      'lexicon.sense.choose',
+      'lexicon.sense.group',
+      'lexicon.sense.none',
+      'lexicon.sense.use',
+      'lexicon.sense.close',
     ];
     const catalog = en as Record<string, string>;
     expect(keys.filter((key) => !catalog[key])).toEqual([]);

@@ -8298,4 +8298,9 @@ export const zh: Catalog = {
   'lexicon.harvest.mined': '已添加',
   'lexicon.harvest.mineDuplicate': '已在 Anki 中',
   'lexicon.harvest.mineFailed': '无法添加卡片。',
+  'lexicon.sense.choose': '选择{word}在此处使用的义项',
+  'lexicon.sense.group': '{word}的义项',
+  'lexicon.sense.none': '不固定义项',
+  'lexicon.sense.use': '使用义项{index}：{gloss}',
+  'lexicon.sense.close': '关闭',
 };

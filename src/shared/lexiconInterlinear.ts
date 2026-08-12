@@ -101,6 +101,26 @@ export function parallelGlossTargets(
   return out;
 }
 
+/**
+ * One sense of the matched headword, restricted to the requested target languages.
+ *
+ * `index` is the sense's position in the dictionary's own sequence for that
+ * headword rather than in this filtered array, so a pin recorded against it
+ * still names the same sense when the passage is looked up again with a
+ * different set of gloss targets.
+ */
+export interface LexiconInterlinearSense {
+  index: number;
+  glosses: LexiconLookupGloss[];
+}
+
+/**
+ * Past this many senses a picker stops being a choice and becomes the dictionary
+ * page the Lookup lens already renders. The cap also bounds what a passage-scale
+ * result has to carry per token.
+ */
+export const MAX_PINNABLE_SENSES = 8;
+
 export interface LexiconInterlinearMatch {
   query: string;
   headwordId: number;
@@ -119,6 +139,17 @@ export interface LexiconInterlinearMatch {
    * caller sees exactly the shape it saw before parallel targets existed.
    */
   parallel?: LexiconInterlinearParallelGloss[];
+  /**
+   * The chosen entry's senses, present only when it offers more than one in the
+   * requested targets. A single-sense token has nothing to pin, so it pays no
+   * payload for the field and consumers keep the shape they had before.
+   */
+  senses?: LexiconInterlinearSense[];
+  /**
+   * The sense a reader pinned for this token. Written only by the pin layer —
+   * a lookup never decides which sense a passage meant.
+   */
+  pinnedSense?: number;
   /** True when the database matched the token but no requested gloss exists. */
   hasTargetGloss: boolean;
 }
@@ -268,7 +299,7 @@ export function segmentLexiconText(
   }
 }
 
-function uniqueGlosses(glosses: readonly LexiconLookupGloss[]): LexiconLookupGloss[] {
+export function uniqueGlosses(glosses: readonly LexiconLookupGloss[]): LexiconLookupGloss[] {
   const seen = new Set<string>();
   const out: LexiconLookupGloss[] = [];
   for (const gloss of glosses) {
@@ -288,6 +319,53 @@ function entryGlosses(entry: LexiconLookupEntry, targetLangs: readonly string[])
   if (!targetLangs.length) return all;
   const wanted = new Set(targetLangs.map((lang) => lang.trim().toLowerCase()).filter(Boolean));
   return all.filter((gloss) => wanted.has(gloss.lang));
+}
+
+/**
+ * The senses a reader could pin for this token.
+ *
+ * Where the senses live depends on the store, and both shapes are real on this
+ * installation. A migrated SQLite row carries every sense of a headword in one
+ * entry. The legacy Yomitan stores — which is what answers today, and what a
+ * live probe of 見る actually returned — split each JMdict sense into its own
+ * `DictEntry`, so the entry the lookup chose holds exactly one sense and the
+ * rest arrive as siblings. Reading only `entry.senses` therefore finds one sense
+ * for every word in the user's real dictionaries and the picker never appears.
+ *
+ * So a sense list is collected across the chosen entry and its same-dictionary
+ * siblings for the same headword, in result order. A different dictionary's
+ * entry is never folded in: its sense numbering is its own, and mixing the two
+ * would put a number on a sense the source dictionary never gave it.
+ *
+ * Senses that say nothing in the requested targets are skipped but still consume
+ * their ordinal, so a pin keeps naming the same sense when the gloss targets
+ * change. One surviving sense is not a choice, so nothing is returned.
+ */
+function pinnableSenses(
+  result: LexiconLookupResult,
+  entry: LexiconLookupEntry,
+  targetLangs: readonly string[],
+): LexiconInterlinearSense[] {
+  const wanted = targetLangs.length
+    ? new Set(targetLangs.map((lang) => lang.trim().toLowerCase()).filter(Boolean))
+    : undefined;
+  const out: LexiconInterlinearSense[] = [];
+  let index = 0;
+
+  for (const candidate of result.entries) {
+    if (candidate.via === 'prefix') continue;
+    if (candidate !== entry && (candidate.dictId !== entry.dictId || !sameHeadword(entry, candidate))) {
+      continue;
+    }
+    for (const sense of candidate.senses) {
+      if (out.length >= MAX_PINNABLE_SENSES) return out;
+      const glosses = uniqueGlosses(sense.glosses).filter((gloss) => !wanted || wanted.has(gloss.lang));
+      if (glosses.length) out.push({ index, glosses });
+      index += 1;
+    }
+  }
+
+  return out.length > 1 ? out : [];
 }
 
 /** Prefix hits are useful in a search list, but are not a grounded token gloss. */
@@ -347,6 +425,7 @@ function toMatch(
   const glosses = parallel.length
     ? uniqueGlosses(parallel.flatMap((group) => group.glosses))
     : entryGlosses(entry, targetLangs);
+  const senses = pinnableSenses(result, entry, targetLangs);
   return {
     query,
     headwordId: entry.headwordId,
@@ -359,6 +438,7 @@ function toMatch(
     ...(entry.reasons?.length ? { reasons: [...entry.reasons] } : {}),
     glosses,
     ...(parallel.length ? { parallel } : {}),
+    ...(senses.length ? { senses } : {}),
     hasTargetGloss: glosses.length > 0,
   };
 }

@@ -14410,3 +14410,108 @@ Track 2 remains open, but no longer on this blocker. Still source-derived: sense
 pinning/retranslation, round-trip semantic diff, composition checking, difficulty scoring (still
 blocked on a real frequency source), personal concordance, and the grounded AI enrichment bullets.
 Any of them can now be accepted on a grounded passage instead of an empty one.
+
+## The reader pins which sense the passage meant — 2026-08-13
+
+Recovery hop, `primary`. The previous worker stopped on a usage limit at 01:52 with the sense-pinning
+slice written but uncommitted and unverified: `src/shared/lexiconSensePin.ts` and its test untracked,
+five catalog keys added in all four languages, and the interlinear, the renderer and the stylesheet
+modified. Nothing in `docs/audit/RELAY_BOSS_AUDIT.md` was open — its last dated section is the Phase
+9.75 directive, and the 14:36 section's instruction was discharged by `bef3b2e`/`c68ffb7` — so the
+ladder stayed on Track 2, and this hop finished the interrupted slice rather than starting one.
+
+Re-derived rather than inherited: the module's symbols all resolve, the three touched test files were
+already green at 34 tests, and the slice is the first item the previous entry named as still
+source-derived. So it was finished, not restarted.
+
+What the pin layer decides, and why each choice is where it is:
+
+- A pin is keyed by `[dictId, text, reading]` through `JSON.stringify`, not by offset, so pinning 見る
+  once applies to every occurrence in the passage and no headword containing a separator character
+  can collide with a different one. Sense indices belong to one dictionary's numbering, which is why
+  the dictionary is part of the key.
+- `applySensePin` narrows a parallel group **only** when it is the chosen entry's own dictionary and
+  the pinned sense actually speaks that language. A sibling dictionary's line is a sourced gloss for
+  the same headword that the pin says nothing about, so it is left alone rather than dropped. This is
+  the behaviour that was proven live below, and it is the one most likely to be misread as a bug.
+- An index naming no sense returns the match unchanged, so a stale pin degrades to "not pinned"
+  instead of blanking a token; `applySensePins` returns the result by identity when nothing changed,
+  so the common unpinned passage costs one map and no downstream recomputation.
+- Pins are session state, cleared with mine state on every new lookup. A reader's "here, this word
+  means X" belongs to the passage it was said about.
+
+`pinnableSenses` in `lexiconInterlinear.ts` is the part that only a live probe could have got right.
+A migrated SQLite row carries every sense of a headword in one entry; the legacy Yomitan stores —
+which is what actually answers on this installation — split each JMdict sense into its own
+`DictEntry`. Reading `entry.senses` alone would have found exactly one sense for every word in the
+user's real dictionaries and the picker would never have appeared. So senses are collected across the
+chosen entry and its same-dictionary siblings for the same headword, in result order, capped at
+`MAX_PINNABLE_SENSES = 8`. A sense that says nothing in the requested targets is skipped but still
+consumes its ordinal, so a pin keeps naming the same sense when the gloss targets change.
+
+One correctness change this hop made to the inherited work: each sense option's accessible name was
+`Use sense {index}` while its visible label is the index *and the gloss* — the text the reader is
+actually choosing between. That is a WCAG 2.5.3 failure of exactly the kind the mine button's
+`'{word}: {action}'` format was built to avoid two entries ago. `lexicon.sense.use` now takes
+`{gloss}` in all four catalogs, the renderer passes the joined gloss it already renders, and the
+renderer test asserts the resulting name. No new key: the format string changed in place.
+
+Gates, all four, on the full shared tree: Vitest **7,423 passed / 6 skipped / 0 failed** across 559
+files (+13 over the previous entry's 7,410, and no suite red this time — the `visualNovelI18n`
+timeout the last entry recorded did not recur). `node tools/i18n-check.cjs` exit 0, **9,374** English
+keys complete in ja/zh/ru, the previous 9,369 plus these five. `node tools/architecture-audit.cjs`
+exit 0, **1,751 modules / 17 findings, nothing new**, the same two pending — `lexiconSensePin.ts`
+lands with its importer so it never exists as an orphan. `npx eslint` over the six touched source
+paths: exit 0, no output.
+
+Live Electron acceptance needed a fresh app: no Electron process existed and `debug/bridge.json` was
+stale at pid 96184 from the instance the previous entry left running. `npm start` from this hop, new
+bridge on port 39273, pid 67652, renderer on Vite port 5174 because another track already owns 5173.
+The Translate window was already open behind the first-run country-consent dialog, which was **not
+answered** — that is a persisted privacy decision and not a relay hop's to make. The Workbench renders
+as soon as the textarea is non-empty, so `猫を見た。` was written through React's own native value
+setter and no translation was run: `jp-grammarx-translation-history-v1` was `0` entries before and
+after, unlike the entry two hops ago that had to remove one.
+
+What the live run proved, against the user's real 97 MB JMdict:
+
+- The main-process interlinear returned `tokenCount: 3, matchedCount: 3` with **7 senses for 猫, 6 for
+  を and 7 for 見る**, each carrying JMdict's own sense sequence. The sibling-collection path is
+  therefore correct on real data, not only on the constructed fixture.
+- All three tokens rendered as controls named "Choose the sense of 猫/を/見た used here"; the picker
+  opened on 見た labelled "Senses of 見る" and attributed to "JMdict (Japanese–English)".
+- Pinning sense 3 narrowed the EN line to "to look after; to attend to; …" **and left the whole
+  `bundled-jmdict-ru` line intact** — the documented sibling behaviour, read off the two
+  `.lexicon-gloss-line` nodes rather than off a truncated `innerText`, which on first read looked
+  like a dropped line and was a slice artifact, not a defect.
+- The harvest row for 見る followed the pin to the same narrowed gloss, so the pin reaches the card
+  path and not only the ruby.
+- Unpinning restored every sense and removed `ruby.is-pinned`, so the reverse transition is proven,
+  not assumed. Zero error entries in `/logs` across the whole drive.
+
+Three honest limits.
+
+1. **Nothing was mined.** `ankiStatus()` still reports `connected: true` against the user's real
+   collection — 84 decks, read back live this hop. The mine button's positive branch is now visibly *reachable* — all three grounded rows
+   rendered an enabled "Add to Anki" — which closes the "not reachable on this installation" limit
+   the last two entries carried, but the click itself still needs an interactive session with the
+   user present.
+2. **JMdict's headword-forms entry appears as a pinnable sense.** Live, 見る's option 7 is
+   `見る（★）; 観る（★）; 視る` — kanji spellings, not a sense. It is a real entry in the user's store
+   with the same title and headword, and the pop-up dictionary already shows it today, so this slice
+   did not introduce it. Filtering it would need a heuristic ("every definition is a Japanese word
+   form") that a Japanese–Japanese dictionary's genuine senses would trip. That is a product decision
+   about dictionary data, recorded here rather than guessed at; pinning it is recoverable in one
+   click.
+3. ja/zh/ru were not switched on live, for the third entry running: `ui-lang` is unset here and
+   changing it is a persisted write plus a reload.
+
+State was left as found: textarea restored to empty and asserted, the picker closed, all five probe
+globals deleted and their absence verified, no persisted setting written, no userData backup taken,
+no other track's dirty paths touched. The dev app started by this hop is left running, so the next
+worker inherits a live bridge on 39273 for this build.
+
+Track 2 remains open. Still source-derived, minus the item this entry closed: retranslation of a
+pinned passage, round-trip semantic diff, composition checking, difficulty scoring (still blocked on
+a real frequency source), personal concordance, and the grounded AI enrichment bullets. Retranslation
+is the natural next one — the pins now exist and nothing yet feeds them back to the model.

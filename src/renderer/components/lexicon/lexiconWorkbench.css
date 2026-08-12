@@ -46,6 +46,107 @@
   font-size: 0.85em;
   letter-spacing: 0.04em;
 }
+/* A pinnable token has to stay part of the reading flow, so the control is an
+   inline button with no box of its own — only an underline that says it can be
+   opened. `font: inherit` keeps the passage's own type scale. */
+.lexicon-sense-token {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.lexicon-sense-token ruby.is-grounded {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.25em;
+}
+
+.lexicon-interlinear-flow ruby.is-pinned {
+  background: color-mix(in srgb, var(--accent, #5588cc) 26%, transparent);
+  text-decoration-style: solid;
+}
+
+/* Reading a sense list is dense work, so the picker sits on the anchor surface
+   below the flow rather than floating over the passage it describes. */
+.lexicon-sense-panel {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.28));
+  border-radius: 12px;
+}
+
+.lexicon-sense-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.lexicon-sense-word {
+  font-size: 1.05rem;
+}
+
+.lexicon-sense-dict {
+  color: var(--text-muted, currentColor);
+  font-size: 0.78rem;
+}
+
+.lexicon-sense-close {
+  min-height: 28px;
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+}
+
+.lexicon-sense-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-sense-list button {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.lexicon-sense-list button[aria-pressed='true'] {
+  border-color: var(--accent, #5588cc);
+  background: color-mix(in srgb, var(--accent, #5588cc) 14%, transparent);
+}
+
+.lexicon-sense-index {
+  flex: 0 0 auto;
+  color: var(--text-muted, currentColor);
+  font-variant-numeric: tabular-nums;
+}
+
+.lexicon-sense-gloss {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* The harvest is a dense study list, so it stays on the anchor surface. */
 .lexicon-harvest {
   margin-top: 20px;

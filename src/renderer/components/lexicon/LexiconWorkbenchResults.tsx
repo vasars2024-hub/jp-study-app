@@ -10,6 +10,12 @@ import {
   type LexiconVocabularyItem,
 } from '../../../shared/lexiconHarvest';
 import { buildHarvestMineRequest, canMineHarvestItem } from '../../../shared/lexiconHarvestMining';
+import {
+  applySensePins,
+  canPinSense,
+  sensePinKey,
+  type LexiconSensePins,
+} from '../../../shared/lexiconSensePin';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { useT } from '../../i18n';
@@ -60,6 +66,12 @@ function glossRt(match: LexiconInterlinearMatch | undefined) {
   return match.glosses.map((gloss) => gloss.text).join('; ') || match.reading || '';
 }
 
+/** A pinned token stays grounded; the extra class only marks the reader's choice. */
+function rubyClass(match: LexiconInterlinearMatch | undefined): string | undefined {
+  if (!match) return undefined;
+  return match.pinnedSense === undefined ? 'is-grounded' : 'is-grounded is-pinned';
+}
+
 interface Props {
   query: string;
   lang: DictLang;
@@ -83,32 +95,61 @@ export default function LexiconWorkbenchResults({
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [mined, setMined] = useState<Record<string, MineState>>({});
   const [mineError, setMineError] = useState<Record<string, string>>({});
+  const [pins, setPins] = useState<LexiconSensePins>({});
+  const [openSense, setOpenSense] = useState<string | null>(null);
 
   useEffect(() => setSelectedLens(lens), [lens]);
 
+  // The pinned result is what the rest of the surface reads, so a pinned sense
+  // reaches the ruby line, the harvest row and the mined card from one place.
+  const pinned = useMemo(() => (result ? applySensePins(result, pins) : null), [pins, result]);
+
   // Purely derived from the grounded result, so it costs one pass per lookup
   // rather than a second bridge call.
-  const harvest = useMemo(() => (result ? harvestLexiconVocabulary(result) : null), [result]);
+  const harvest = useMemo(() => (pinned ? harvestLexiconVocabulary(pinned) : null), [pinned]);
 
-  // A row's mine state belongs to the passage it was harvested from, so a new
-  // lookup clears it rather than letting "Added" carry over onto a different
-  // word that happens to land in the same position.
-  function clearMineState() {
+  // The sense picker is one contextual panel rather than a popover per token, so
+  // the open token is looked up by its pin key instead of held as a second copy.
+  const openMatch = useMemo(() => {
+    if (!openSense || !pinned) return null;
+    for (const part of pinned.parts) {
+      if (part.kind === 'token' && part.match && sensePinKey(part.match) === openSense) {
+        return part.match;
+      }
+    }
+    return null;
+  }, [openSense, pinned]);
+
+  // A row's mine state and a reader's sense choices both belong to the passage
+  // they were made in, so a new lookup clears them rather than letting "Added"
+  // or a pinned sense carry over onto a different word in the same position.
+  function clearPassageState() {
     setMined({});
     setMineError({});
+    setPins({});
+    setOpenSense(null);
+  }
+
+  function pinSense(key: string, senseIndex: number | null) {
+    setPins((prev) => {
+      const next = { ...prev };
+      if (senseIndex === null) delete next[key];
+      else next[key] = senseIndex;
+      return next;
+    });
   }
 
   useEffect(() => {
     if (!interlinear) {
       setResult(null);
       setState('idle');
-      clearMineState();
+      clearPassageState();
       return;
     }
     let alive = true;
     setState('loading');
     setResult(null);
-    clearMineState();
+    clearPassageState();
     const primary = glossLang.trim().toLowerCase() || 'en';
     // The extra targets are whatever the installed dictionaries can actually
     // answer offline, so a user with only one dictionary keeps the exact
@@ -137,7 +178,7 @@ export default function LexiconWorkbenchResults({
    * word in, and it routes through the same mining rules a dictionary mine uses.
    */
   async function mineHarvestItem(item: LexiconVocabularyItem) {
-    if (!result || mined[item.key] === 'adding') return;
+    if (!pinned || mined[item.key] === 'adding') return;
     setMined((prev) => ({ ...prev, [item.key]: 'adding' }));
     setMineError((prev) => {
       const next = { ...prev };
@@ -149,7 +190,7 @@ export default function LexiconWorkbenchResults({
       setMineError((prev) => ({ ...prev, [item.key]: error }));
     };
     try {
-      const res = await window.api.ankiMineNote(buildHarvestMineRequest(item, result, { lang }));
+      const res = await window.api.ankiMineNote(buildHarvestMineRequest(item, pinned, { lang }));
       if (res.ok) {
         setMined((prev) => ({ ...prev, [item.key]: 'added' }));
       } else if (res.error === 'duplicate') {
@@ -191,16 +232,85 @@ export default function LexiconWorkbenchResults({
           </div>
           {state === 'loading' && <p className="muted">{t('common.loading')}</p>}
           {state === 'error' && <p role="alert">{t('lexicon.workbench.offlineFailed')}</p>}
-          {result && (
+          {pinned && (
             <div className="lexicon-interlinear-flow" lang={lang}>
-              {result.parts.map((part) => part.kind === 'separator' ? (
-                <span key={`${part.start}-${part.end}`}>{part.text}</span>
-              ) : (
-                <ruby className={part.match ? 'is-grounded' : undefined} key={`${part.start}-${part.end}`}>
-                  {part.text}
-                  <rt>{glossRt(part.match)}</rt>
-                </ruby>
-              ))}
+              {pinned.parts.map((part) => {
+                const key = `${part.start}-${part.end}`;
+                if (part.kind === 'separator') return <span key={key}>{part.text}</span>;
+                const match = part.match;
+                const ruby = (
+                  <ruby className={rubyClass(match)}>
+                    {part.text}
+                    <rt>{glossRt(match)}</rt>
+                  </ruby>
+                );
+                // Only a token whose entry offers a real choice becomes a
+                // control; a single-sense token stays plain text so the flow
+                // does not fill up with buttons that do nothing.
+                if (!match || !canPinSense(match)) return <span key={key}>{ruby}</span>;
+                const pinKey = sensePinKey(match);
+                return (
+                  <button
+                    aria-expanded={openSense === pinKey}
+                    aria-label={t('lexicon.sense.choose', { word: part.text })}
+                    className="lexicon-sense-token"
+                    key={key}
+                    onClick={() => setOpenSense((prev) => (prev === pinKey ? null : pinKey))}
+                    type="button"
+                  >
+                    {ruby}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {openMatch && openSense && (
+            <div
+              aria-label={t('lexicon.sense.group', { word: openMatch.text })}
+              className="lexicon-sense-panel"
+              role="group"
+            >
+              <div className="lexicon-sense-head">
+                <span className="lexicon-sense-word" lang={lang}>{openMatch.text}</span>
+                <span className="lexicon-sense-dict">{openMatch.dictTitle}</span>
+                <button
+                  className="lexicon-sense-close"
+                  onClick={() => setOpenSense(null)}
+                  type="button"
+                >
+                  {t('lexicon.sense.close')}
+                </button>
+              </div>
+              <ul className="lexicon-sense-list">
+                <li>
+                  <button
+                    aria-pressed={openMatch.pinnedSense === undefined}
+                    onClick={() => pinSense(openSense, null)}
+                    type="button"
+                  >
+                    <span className="lexicon-sense-gloss">{t('lexicon.sense.none')}</span>
+                  </button>
+                </li>
+                {openMatch.senses?.map((sense) => {
+                  const gloss = sense.glosses.map((entry) => entry.text).join('; ');
+                  return (
+                    <li key={sense.index}>
+                      {/* The gloss is part of the accessible name, not only of the
+                          visible row: an option named "Use sense 3" alone would drop
+                          the very text the reader is choosing between (WCAG 2.5.3). */}
+                      <button
+                        aria-label={t('lexicon.sense.use', { index: sense.index + 1, gloss })}
+                        aria-pressed={openMatch.pinnedSense === sense.index}
+                        onClick={() => pinSense(openSense, sense.index)}
+                        type="button"
+                      >
+                        <span className="lexicon-sense-index">{sense.index + 1}</span>
+                        <span className="lexicon-sense-gloss">{gloss}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
           {harvest && harvest.items.length > 0 && (

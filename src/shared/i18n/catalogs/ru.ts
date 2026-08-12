@@ -9123,4 +9123,9 @@ export const ru: Catalog = {
   'lexicon.harvest.mined': 'Добавлено',
   'lexicon.harvest.mineDuplicate': 'Уже в Anki',
   'lexicon.harvest.mineFailed': 'Не удалось добавить карточку.',
+  'lexicon.sense.choose': 'Выбрать значение слова {word} в этом месте',
+  'lexicon.sense.group': 'Значения слова {word}',
+  'lexicon.sense.none': 'Значение не закреплено',
+  'lexicon.sense.use': 'Использовать значение {index}: {gloss}',
+  'lexicon.sense.close': 'Закрыть',
 };
