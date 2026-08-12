@@ -280,6 +280,52 @@ describe('Reading Lens history — search', () => {
     expect(searchReadingLensHistory(corpus, { limit: 2 })).toHaveLength(2);
     expect(searchReadingLensHistory(corpus, { limit: 1e9 })).toHaveLength(3);
   });
+
+  describe('pinned-only', () => {
+    // `a` and `c` are pinned; `b` is not. Pinning is what exempts a row from
+    // the rolling limit, so "show me only those" is the query that makes the
+    // feature usable once the history is full.
+    const mixed = [
+      entry({ captureId: 'a', hash: 'ha', text: 'カタカナの行', sourceLabel: 'YouTube', source: 'screen', pinned: true }),
+      entry({ captureId: 'b', hash: 'hb', text: 'plain english line', source: 'clipboard', pinned: false }),
+      entry({ captureId: 'c', hash: 'hc', text: '漢字の勉強', source: 'image', pinned: true }),
+    ];
+
+    it('keeps only pinned rows when asked, and every row when not', () => {
+      expect(searchReadingLensHistory(mixed, { pinnedOnly: true }).map((e) => e.captureId)).toEqual(['a', 'c']);
+      expect(searchReadingLensHistory(mixed, { pinnedOnly: false })).toHaveLength(3);
+      expect(searchReadingLensHistory(mixed, {})).toHaveLength(3);
+    });
+
+    it('only narrows on a literal true, so a stray value cannot hide captures', () => {
+      // The renderer sends this across IPC; a string "false" or a 0 must not be
+      // read as "filter on" and quietly drop rows the user asked to see.
+      for (const loose of ['false', 'true', 1, 0, null, undefined]) {
+        expect(searchReadingLensHistory(mixed, { pinnedOnly: loose as never })).toHaveLength(3);
+      }
+    });
+
+    it('intersects with the other two filters rather than widening them', () => {
+      expect(searchReadingLensHistory(mixed, { pinnedOnly: true, source: 'clipboard' })).toEqual([]);
+      expect(
+        searchReadingLensHistory(mixed, { pinnedOnly: true, source: 'screen' }).map((e) => e.captureId),
+      ).toEqual(['a']);
+      expect(
+        searchReadingLensHistory(mixed, { pinnedOnly: true, query: '勉強' }).map((e) => e.captureId),
+      ).toEqual(['c']);
+      // `b` matches the text query but is unpinned, so the intersection is empty.
+      expect(searchReadingLensHistory(mixed, { pinnedOnly: true, query: 'english' })).toEqual([]);
+    });
+
+    it('applies the limit to the matches, not to the candidates it searched', () => {
+      // If `limit` were applied before the pin filter, taking 1 from the whole
+      // corpus would yield `a` and then filter it — or worse, yield nothing
+      // when the newest row happened to be unpinned. It bounds the result.
+      const newestUnpinned = [entry({ captureId: 'z', hash: 'hz', pinned: false }), ...mixed];
+      expect(searchReadingLensHistory(newestUnpinned, { pinnedOnly: true, limit: 1 }).map((e) => e.captureId))
+        .toEqual(['a']);
+    });
+  });
 });
 
 describe('Reading Lens history — remove', () => {

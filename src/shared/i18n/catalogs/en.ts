@@ -3212,6 +3212,9 @@ export const en: Catalog = {
   'settings.lens.history.source.clipboard': 'Clipboard',
   'settings.lens.history.source.image': 'Image',
   'settings.lens.history.source.text': 'Text',
+  'settings.lens.history.source.all': 'All sources',
+  'settings.lens.history.filter.source': 'Filter by source',
+  'settings.lens.history.filter.pinnedOnly': 'Pinned only',
 
   'search.reading': 'Reading settings',
   'search.reading.desc': 'Reader typography and layout',

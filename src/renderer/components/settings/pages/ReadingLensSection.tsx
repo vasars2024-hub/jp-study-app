@@ -43,50 +43,68 @@ function chordFromEvent(e: KeyboardEvent): string | null {
  *
  * Search runs in main against the whole history rather than filtering a page
  * that was already fetched, so a match older than the visible window is still
- * findable.
+ * findable. The source and pinned-only filters go the same way and for the same
+ * reason — narrowing an already-truncated 50-row page would silently answer
+ * "no captures from the clipboard" whenever the newest 50 happened to be
+ * screen captures.
  */
 function LensCaptureHistory() {
   const { t, lang } = useT();
   const [entries, setEntries] = useState<ReadingLensHistoryEntry[]>([]);
   const [query, setQuery] = useState('');
+  const [source, setSource] = useState<ReadingLensSource | 'all'>('all');
+  const [pinnedOnly, setPinnedOnly] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const refresh = useCallback(async (search: string) => {
-    try {
-      setEntries(await window.api.lensHistoryList({ query: search, limit: 50 }));
-    } catch {
-      setEntries([]);
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
+  /** True whenever the list shown is narrower than the whole history. */
+  const filtered = Boolean(query) || source !== 'all' || pinnedOnly;
 
-  // Debounced so typing a query does not cross IPC on every keystroke.
+  const refresh = useCallback(
+    async (search: string, forSource: ReadingLensSource | 'all', onlyPinned: boolean) => {
+      try {
+        setEntries(await window.api.lensHistoryList({
+          query: search,
+          source: forSource,
+          pinnedOnly: onlyPinned,
+          limit: 50,
+        }));
+      } catch {
+        setEntries([]);
+      } finally {
+        setLoaded(true);
+      }
+    },
+    [],
+  );
+
+  // Debounced so typing a query does not cross IPC on every keystroke. The two
+  // filters are single clicks, so they only pay the debounce a query already
+  // owes.
   useEffect(() => {
-    const id = window.setTimeout(() => void refresh(query), query ? 180 : 0);
+    const id = window.setTimeout(() => void refresh(query, source, pinnedOnly), query ? 180 : 0);
     return () => window.clearTimeout(id);
-  }, [query, refresh]);
+  }, [query, source, pinnedOnly, refresh]);
 
   const remove = useCallback(
     async (captureId: string) => {
       await window.api.lensHistoryRemove(captureId);
-      await refresh(query);
+      await refresh(query, source, pinnedOnly);
     },
-    [query, refresh],
+    [query, source, pinnedOnly, refresh],
   );
 
   const setPinned = useCallback(
     async (captureId: string, pinned: boolean) => {
       await window.api.lensHistoryPin(captureId, pinned);
-      await refresh(query);
+      await refresh(query, source, pinnedOnly);
     },
-    [query, refresh],
+    [query, source, pinnedOnly, refresh],
   );
 
   const clear = useCallback(async () => {
     await window.api.lensHistoryClear();
-    await refresh(query);
-  }, [query, refresh]);
+    await refresh(query, source, pinnedOnly);
+  }, [query, source, pinnedOnly, refresh]);
 
   const formatWhen = useMemo(
     () => (at: number) => new Date(at).toLocaleString(LANG_TAGS[lang]),
@@ -109,16 +127,38 @@ function LensCaptureHistory() {
         <button
           type="button"
           className="btn small"
-          disabled={!entries.length && !query}
+          disabled={!entries.length && !filtered}
           onClick={() => void clear()}
         >
           {t('settings.lens.history.clear')}
         </button>
       </div>
 
+      <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 6 }}>
+        <select
+          className="os-input"
+          value={source}
+          onChange={(e) => setSource(e.target.value as ReadingLensSource | 'all')}
+          aria-label={t('settings.lens.history.filter.source')}
+        >
+          <option value="all">{t('settings.lens.history.source.all')}</option>
+          {(Object.keys(SOURCE_LABEL_KEYS) as ReadingLensSource[]).map((id) => (
+            <option key={id} value={id}>{t(SOURCE_LABEL_KEYS[id])}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="btn small"
+          aria-pressed={pinnedOnly}
+          onClick={() => setPinnedOnly((on) => !on)}
+        >
+          {t('settings.lens.history.filter.pinnedOnly')}
+        </button>
+      </div>
+
       {loaded && !entries.length && (
         <p className="muted os-set-hint">
-          {query ? t('settings.lens.history.noMatches') : t('settings.lens.history.empty')}
+          {filtered ? t('settings.lens.history.noMatches') : t('settings.lens.history.empty')}
         </p>
       )}
 

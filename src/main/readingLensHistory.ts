@@ -86,6 +86,11 @@ export function listCaptures(query: unknown): ReadingLensHistoryEntry[] {
   return searchReadingLensHistory(load(), {
     query: typeof raw.query === 'string' ? raw.query : '',
     source: typeof raw.source === 'string' ? (raw.source as ReadingLensHistoryQuery['source']) : 'all',
+    // Strict `=== true`, so an absent or garbage value from IPC widens the
+    // result rather than narrowing it: a filter that switches itself on
+    // because a renderer sent `"false"` would hide captures the user asked to
+    // see, and silently.
+    pinnedOnly: raw.pinnedOnly === true,
     limit: typeof raw.limit === 'number' ? raw.limit : undefined,
   });
 }

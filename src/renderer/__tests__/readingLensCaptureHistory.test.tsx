@@ -53,10 +53,19 @@ function installApiStub(): void {
       registered: true,
       open: false,
     }),
+    // Stands in for main, and applies the same three filters main does — the
+    // panel must not be able to pass a test by narrowing its own already
+    // truncated page instead of asking for the narrower set.
     lensHistoryList: async (query: unknown) => {
       calls.list.push(query);
-      const needle = (query as { query?: string } | undefined)?.query ?? '';
-      return needle ? stored.filter((item) => item.text.includes(needle)) : stored;
+      const q = (query ?? {}) as { query?: string; source?: string; pinnedOnly?: boolean };
+      const needle = q.query ?? '';
+      return stored.filter((item) => {
+        if (needle && !item.text.includes(needle)) return false;
+        if (q.source && q.source !== 'all' && item.source !== q.source) return false;
+        if (q.pinnedOnly === true && !item.pinned) return false;
+        return true;
+      });
     },
     lensHistoryRemove: async (captureId: unknown) => {
       calls.remove.push(captureId);
@@ -162,6 +171,22 @@ async function type(value: string): Promise<void> {
   });
 }
 
+const sourceSelect = (): HTMLSelectElement => {
+  const found = host.querySelector<HTMLSelectElement>('select');
+  if (!found) throw new Error('no source filter rendered');
+  return found;
+};
+
+/** Choose a capture source the way a click on the native select would. */
+async function pick(value: string): Promise<void> {
+  const select = sourceSelect();
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    setter?.call(select, value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 describe('Reading Lens capture history panel', () => {
   it('renders one row per capture, newest-first as main returned them', async () => {
     await render();
@@ -193,7 +218,7 @@ describe('Reading Lens capture history panel', () => {
     await type('犬');
     await settle(200);
 
-    expect(calls.list).toEqual([{ query: '犬', limit: 50 }]);
+    expect(calls.list).toEqual([{ query: '犬', source: 'all', pinnedOnly: false, limit: 50 }]);
     expect(rows()).toHaveLength(1);
     expect(rows()[0].textContent).toContain('犬も好きです');
   });
@@ -208,7 +233,7 @@ describe('Reading Lens capture history panel', () => {
     await settle(200);
 
     expect(calls.list).toHaveLength(1);
-    expect(calls.list[0]).toEqual({ query: '猫が好', limit: 50 });
+    expect(calls.list[0]).toEqual({ query: '猫が好', source: 'all', pinnedOnly: false, limit: 50 });
   });
 
   it('forgets one capture and re-reads the list rather than trusting its own state', async () => {
@@ -261,5 +286,90 @@ describe('Reading Lens capture history panel', () => {
     await render();
 
     expect(buttonWith('Clear all').disabled).toBe(true);
+  });
+
+  describe('source and pinned-only filters', () => {
+    beforeEach(() => {
+      stored = [
+        entry({ captureId: 'a', hash: 'ha', text: '猫が好きです', source: 'screen', pinned: true }),
+        entry({ captureId: 'b', hash: 'hb', text: '犬も好きです', source: 'clipboard', pinned: false }),
+        entry({ captureId: 'c', hash: 'hc', text: '鳥を見ました', source: 'clipboard', pinned: true }),
+      ];
+    });
+
+    it('offers every capture source plus an explicit "all", so the filter can be cleared', async () => {
+      await render();
+
+      expect([...sourceSelect().options].map((o) => o.value))
+        .toEqual(['all', 'screen', 'clipboard', 'image', 'text']);
+      expect(sourceSelect().value).toBe('all');
+      // Translated, not raw keys — the same leak this file exists to catch.
+      expect([...sourceSelect().options].map((o) => o.textContent))
+        .toEqual(['All sources', 'Screen', 'Clipboard', 'Image', 'Text']);
+    });
+
+    it('asks main for one source rather than filtering the page it already has', async () => {
+      await render();
+      calls.list = [];
+
+      await pick('clipboard');
+      await settle(200);
+
+      expect(calls.list).toEqual([{ query: '', source: 'clipboard', pinnedOnly: false, limit: 50 }]);
+      expect(rows()).toHaveLength(2);
+      expect(host.textContent).not.toContain('猫が好きです');
+    });
+
+    it('asks main for pinned captures only, which is what pinning them was for', async () => {
+      await render();
+      calls.list = [];
+
+      await act(async () => buttonWith('Pinned only').click());
+      await settle(200);
+
+      expect(calls.list).toEqual([{ query: '', source: 'all', pinnedOnly: true, limit: 50 }]);
+      expect(buttonWith('Pinned only').getAttribute('aria-pressed')).toBe('true');
+      expect(rows()).toHaveLength(2);
+      expect(host.textContent).not.toContain('犬も好きです');
+    });
+
+    it('intersects both filters with the text query in a single request', async () => {
+      await render();
+
+      await pick('clipboard');
+      await act(async () => buttonWith('Pinned only').click());
+      await type('鳥');
+      await settle(200);
+
+      expect(calls.list.at(-1)).toEqual({ query: '鳥', source: 'clipboard', pinnedOnly: true, limit: 50 });
+      expect(rows()).toHaveLength(1);
+      expect(rows()[0].textContent).toContain('鳥を見ました');
+    });
+
+    it('keeps the active filters when a row is forgotten or pinned', async () => {
+      await render();
+      await pick('clipboard');
+      await settle(200);
+      calls.list = [];
+
+      await act(async () => buttonWith('Forget').click());
+      await settle();
+
+      // The refresh after a mutation must re-ask with the same narrowing; if it
+      // reset to "all", forgetting a row would silently widen the list back out.
+      expect(calls.list.at(-1)).toEqual({ query: '', source: 'clipboard', pinnedOnly: false, limit: 50 });
+      expect(calls.remove).toEqual(['b']);
+    });
+
+    it('reports a filtered miss as a miss, not as an empty history', async () => {
+      await render();
+
+      await pick('image');
+      await settle(200);
+
+      expect(rows()).toHaveLength(0);
+      expect(host.textContent).toContain('No capture matches that search');
+      expect(host.textContent).not.toContain('Nothing captured yet');
+    });
   });
 });

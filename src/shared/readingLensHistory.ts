@@ -62,6 +62,15 @@ export interface ReadingLensHistoryQuery {
   query?: string;
   /** Restrict to one capture source. */
   source?: ReadingLensSource | 'all';
+  /**
+   * Restrict to pinned entries only.
+   *
+   * Pinning is what exempts a capture from the rolling limit, so the set of
+   * pinned rows is the part of the history the user chose to keep. Without a
+   * way to ask for just that set, they can only be found by scrolling past the
+   * ~200 unpinned rows they were pinned to outlive.
+   */
+  pinnedOnly?: boolean;
   /** Max entries returned; clamped to the history limit. */
   limit?: number;
 }
@@ -266,6 +275,12 @@ export function removeReadingLensHistoryEntry(
  * "ka" find "Ka", "ｶﾀｶﾅ" find "カタカナ", and a kanji fragment find the line it
  * came from. Text, label and ref are all searched: "youtube" should find the
  * captures taken from a video even though the word appears in none of them.
+ *
+ * The three filters intersect rather than widen: a pinned-only search inside
+ * one source for a word returns the entries that satisfy all three. `limit` is
+ * applied last, so it bounds the result and never the candidate set — a match
+ * ranked below the limit is excluded because it is older, never because a
+ * non-matching row consumed its slot.
  */
 export function searchReadingLensHistory(
   entries: readonly ReadingLensHistoryEntry[],
@@ -279,6 +294,7 @@ export function searchReadingLensHistory(
 
   const matched = entries.filter((entry) => {
     if (source && entry.source !== source) return false;
+    if (query.pinnedOnly === true && !entry.pinned) return false;
     if (!needle) return true;
     const haystack = `${entry.text}\n${entry.sourceLabel}\n${entry.sourceRef}`.toLowerCase();
     return haystack.includes(needle);
