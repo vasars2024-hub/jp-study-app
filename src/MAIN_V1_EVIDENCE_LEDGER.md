@@ -12390,3 +12390,98 @@ blind.
 `87dd97c`'s `readingWorkspace.ts` is **462 lines at the commit and 493 at HEAD**, the same shape of
 "already landed and extended". `99c8747` is the only one of the three whose renderer changes look
 genuinely unlanded. Treat all three as per-hunk salvage, never as cherry-picks.
+
+## Rescued commit 3 of 10 landed: scheduler/notifications field truth, and `9e6e82d` closed as obsolete — 2026-08-12
+
+Integrated `20f72eb` (`test(scraper): accept scheduler and notifications`) onto
+`feat/nyaa-subtitles`, and separately confirmed the boss audit's suspicion that `9e6e82d` is
+obsolete. One rescued commit per turn, per the audit's instruction.
+
+### Why `20f72eb` was the right one to take next
+
+It is the only open rescued commit with **zero dirty-file collisions** — every path it touches was
+clean in the shared tree, so none of the reconstruct-HEAD-plus-edit staging the catalog-touching
+commits (`2545cd5`, `28a239c`, `c3ae5b6`, `c48b266`) still need. The audit flagged it
+"re-derive first" because `bfac09d` rewrote `featureStatus.ts` and `settings/fields.ts` after this
+commit was made. Re-derived: of its nine source/test files, **seven have a base blob identical to
+HEAD** and applied verbatim; only `featureStatus.ts` and `fields.ts` diverged, and their hunks were
+applied by hand. `bfac09d` added the `note` kind and `inert: true` to the *images*/*performance*
+groups — it never touched the scheduler or notifications groups, so there was no real conflict.
+
+### The two honesty claims, re-derived from source rather than trusted
+
+Both were checked against the tree before the status flip, not taken from the commit message.
+
+**`run-all` never replayed a backlog.** `shared/scraperCron.ts` branches on `missedRunPolicy` in
+exactly one place (`=== 'skip'`, line 303); `'run-once'` and `'run-all'` fall through to the same
+path and each overdue entry fires once. The UI was labelling that value "Run every missed job"
+(`fields.ts`) and "Run all" (`scraperUi` × 4) — a promise the scheduler has never kept. Now
+"Run once after downtime (legacy)", which describes the behavior that actually exists and keeps the
+persisted value readable.
+
+**`requireUnmeteredNetwork` is genuinely inert.** Its only consumers repo-wide are the settings
+schema (`scraperOutputSettings.ts` — default, validate, persist) and its own UI row. There is no
+reader in `main/`. `main/scraper/scheduler.ts:195` says so explicitly and explains why: Electron
+exposes no metered-connection signal, and inferring one from interface type would be a guess
+presented as a fact. So it gets `inert: true` plus a hint, matching the established
+images/performance pattern — the control keeps saving, and stops looking like it does something.
+
+**The `set.notifications: 'ready'` comment was audited before letting it stand**, because a status
+flip resting on tests that do not exist is exactly the failure this ledger is for. Its claims —
+every toggle, all four channels, system-banner support/failure isolation, sound, digest
+timing/grouping, history deltas, job correlation — are carried by
+`main/__tests__/scraperNotifications.test.ts`, **37 tests** present at HEAD. The claim is accurate.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | **543 files passed**, 1 skipped; **7270 tests passed**, 6 skipped; exit 0 |
+| `node tools/i18n-check.cjs` | exit 0 — all 9324 English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | exit 0 — 1726 modules, 17 known findings, **nothing new** |
+| `npx eslint <9 touched paths>` | exit 0 |
+
+The three targeted suites alone are 77 passing, including the new
+`renderer/__tests__/scraperSchedulerNotificationsFieldTruth.test.ts`.
+
+### Live Electron acceptance through the debug bridge
+
+Bridge on port 39273, renderer reloaded first so Vite re-served the edited modules (remount takes
+~15s, not 6 — a 6s check reads as a dead app).
+
+The edited modules, imported **in the live renderer**, return: inert scheduler fields
+`['scheduler.requireUnmeteredNetwork']`, run-all label `Run once after downtime (legacy)`, and the
+hint text. All four `scraperUi` catalogs return the new label live —
+ja `復帰後に1回実行（旧設定）`, ru `Запустить один раз после простоя (старый режим)`,
+zh `恢复后运行一次（旧设置）`.
+
+Then the real `FieldRow.tsx` was mounted off-screen against the real catalog (React and
+`react-dom/client` reached by the transformed-source trick — bare specifiers do not resolve through
+`/eval`) and the **rendered DOM** asserted:
+
+- `scheduler.requireUnmeteredNetwork` row: `data-inert="true"`, `is-inert` class, and a **visible**
+  `.scr-field-inert` badge reading **"Not wired"**, title *"This setting is saved, but nothing reads
+  it yet — changing it will not change how the scraper behaves."*
+- its hint renders below the label;
+- `scheduler.missedRunPolicy` row: **not** inert (correct — it works), and its real `<select>`
+  renders `run-all=Run once after downtime (legacy)`.
+
+Field *data* is what changed here; `FieldRow`'s inert rendering is pre-existing, already-tested
+code. The host was unmounted and removed; no persisted setting and no userData was touched.
+
+### `9e6e82d` is obsolete — closed, not integrated
+
+Confirmed the audit's read. `git diff HEAD 9e6e82d` over its three differing files is
+**+9 / −69**: applying it would *delete* `enrichLexiconResultMetadata` from
+`main/dictionary/lexiconAdapter.ts`, which restores legacy pitch/frequency metadata and has a
+**live consumer at `main/dictionary.ts:140`** plus its own test coverage. HEAD is the later
+evolution of that adapter. Cherry-picking it would have been a silent regression dressed as a
+rescue. Closed in the boss-audit table; no code change.
+
+### What is left of the ten
+
+Three integrated (`27c74b6`, `9c046cc`, `20f72eb`), one closed obsolete (`9e6e82d`), six open.
+The four catalog-colliding ones (`2545cd5`, `28a239c`, `c3ae5b6`, `c48b266`) all need the
+reconstruct-HEAD-plus-edit staging path, since `catalogs/{en,ja,zh,ru}.ts` carry another track's
+hunks. `c48b266` additionally touches `preload.ts` (also dirty) and needs its main handler invoked
+live rather than grepped. `87dd97c` and `99c8747` remain per-hunk salvage only.

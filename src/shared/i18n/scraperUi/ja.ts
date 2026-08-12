@@ -393,7 +393,7 @@ export const SCRAPER_UI_JA: Catalog = {
   'scraperMgmt.policy.missedRun': '実行を逃したときの扱い',
   'scraperMgmt.policy.missed.skip': '飛ばす',
   'scraperMgmt.policy.missed.run-once': '1 回だけ実行',
-  'scraperMgmt.policy.missed.run-all': 'すべて実行',
+  'scraperMgmt.policy.missed.run-all': '復帰後に1回実行（旧設定）',
   'scraperMgmt.policy.quietHours': '静音時間帯',
   'scraperMgmt.policy.runningNow': '実行中',
   'scraperMgmt.policy.enableLabel': 'スケジューラーを有効にする',

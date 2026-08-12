@@ -419,7 +419,7 @@ export const SCRAPER_UI_EN: Catalog = {
   'scraperMgmt.policy.missedRun': 'Missed run policy',
   'scraperMgmt.policy.missed.skip': 'Skip',
   'scraperMgmt.policy.missed.run-once': 'Run once',
-  'scraperMgmt.policy.missed.run-all': 'Run all',
+  'scraperMgmt.policy.missed.run-all': 'Run once after downtime (legacy)',
   'scraperMgmt.policy.quietHours': 'Quiet hours',
   'scraperMgmt.policy.runningNow': 'Running now',
   'scraperMgmt.policy.enableLabel': 'Enable the scheduler',

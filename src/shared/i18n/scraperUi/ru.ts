@@ -408,7 +408,7 @@ export const SCRAPER_UI_RU: Catalog = {
   'scraperMgmt.policy.missedRun': 'Что делать с пропущенным запуском',
   'scraperMgmt.policy.missed.skip': 'Пропустить',
   'scraperMgmt.policy.missed.run-once': 'Запустить один раз',
-  'scraperMgmt.policy.missed.run-all': 'Запустить все',
+  'scraperMgmt.policy.missed.run-all': 'Запустить один раз после простоя (старый режим)',
   'scraperMgmt.policy.quietHours': 'Тихие часы',
   'scraperMgmt.policy.runningNow': 'Выполняется сейчас',
   'scraperMgmt.policy.enableLabel': 'Включить планировщик',

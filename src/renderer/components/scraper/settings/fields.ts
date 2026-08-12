@@ -376,10 +376,10 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'scheduler.entries', group: 'scheduler', kind: 'counted', label: 'Schedules', action: 'schedules' },
   { path: 'scheduler.maxConcurrentScheduled', group: 'scheduler', kind: 'number', label: 'Max Concurrent Scheduled Runs', min: 1, max: 8 },
   { path: 'scheduler.skipIfRunning', group: 'scheduler', kind: 'toggle', label: 'Skip If Already Running' },
-  { path: 'scheduler.missedRunPolicy', group: 'scheduler', kind: 'select', label: 'Missed Runs', options: opts(SCRAPER_MISSED_RUN_POLICIES, { skip: 'Skip them', 'run-once': 'Run once on return', 'run-all': 'Run every missed job' }) },
+  { path: 'scheduler.missedRunPolicy', group: 'scheduler', kind: 'select', label: 'Missed Runs', options: opts(SCRAPER_MISSED_RUN_POLICIES, { skip: 'Skip them', 'run-once': 'Run once on return', 'run-all': 'Run once after downtime (legacy)' }) },
   { path: 'scheduler.quietHoursStart', toPath: 'scheduler.quietHoursEnd', group: 'scheduler', kind: 'range', label: 'Quiet Hours', hint: 'Leave empty to disable. 24-hour clock.' },
   { path: 'scheduler.requireExternalPower', group: 'scheduler', kind: 'toggle', label: 'Only on External Power' },
-  { path: 'scheduler.requireUnmeteredNetwork', group: 'scheduler', kind: 'toggle', label: 'Only on an Unmetered Network' },
+  { path: 'scheduler.requireUnmeteredNetwork', group: 'scheduler', kind: 'toggle', label: 'Only on an Unmetered Network', hint: 'Stored for a future network-cost signal. Electron does not currently expose whether the active Windows connection is metered.', inert: true },
 
   // ------------------------------------------------------- notifications ---
   { path: 'notifications.channel', group: 'notifications', kind: 'select', label: 'Deliver Via', options: opts(SCRAPER_NOTIFY_CHANNELS, { toast: 'In-app', system: 'System notifications', both: 'Both', none: 'Nothing' }) },

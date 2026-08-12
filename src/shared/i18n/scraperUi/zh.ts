@@ -393,7 +393,7 @@ export const SCRAPER_UI_ZH: Catalog = {
   'scraperMgmt.policy.missedRun': '错过运行的处理方式',
   'scraperMgmt.policy.missed.skip': '跳过',
   'scraperMgmt.policy.missed.run-once': '运行一次',
-  'scraperMgmt.policy.missed.run-all': '全部运行',
+  'scraperMgmt.policy.missed.run-all': '恢复后运行一次（旧设置）',
   'scraperMgmt.policy.quietHours': '静默时段',
   'scraperMgmt.policy.runningNow': '正在运行',
   'scraperMgmt.policy.enableLabel': '启用调度器',

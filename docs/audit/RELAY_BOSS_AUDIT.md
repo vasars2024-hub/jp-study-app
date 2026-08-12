@@ -115,10 +115,10 @@ Append to this table when you integrate one. Evidence lives in
 | `2545cd5` | open | — | Collides with the four dirty `catalogs/{en,ja,zh,ru}.ts`. Needs reconstruct-HEAD-plus-edit staging. |
 | `28a239c` | open | — | Same catalog collision, plus `styles.css`. |
 | `c3ae5b6` | open | — | Same catalog collision. |
-| `20f72eb` | open, **re-derive first** | — | Touches `scraper/featureStatus.ts` and `scraper/settings/fields.ts`, which `bfac09d` rewrote after this commit was made. |
+| `20f72eb` | **integrated** 2026-08-12 | `<this commit>` | Re-derived: `bfac09d` only touched the images/performance groups, so no real conflict. Seven of nine files applied verbatim (base blob == HEAD); `featureStatus.ts` and `fields.ts` hand-applied. Both honesty claims confirmed against source — `run-all` really does coalesce, `requireUnmeteredNetwork` really has no reader. |
 | `c48b266` | open | — | Touches `preload.ts`; invoke the handler live, do not grep the channel. |
 | `87dd97c` | open, partly absorbed | — | `shared/readingIpc.ts` is byte-identical at HEAD; `readingWorkspace.ts` is 462 lines there vs **493 at HEAD**. Per-hunk salvage only. |
-| `9e6e82d` | **likely obsolete** | — | Both shared files byte-identical at HEAD, and `git diff HEAD 9e6e82d` on the rest is **+8 / −54** — applying it would delete branch work. Confirm, then close it rather than integrating. |
+| `9e6e82d` | **closed obsolete** 2026-08-12 | — | Confirmed. `git diff HEAD 9e6e82d` over its three differing files is **+9 / −69**; applying it would delete `enrichLexiconResultMetadata`, which has a live consumer at `main/dictionary.ts:140` and its own tests. HEAD is the later evolution. No code change — do not revisit. |
 | `99c8747` | open, partly absorbed | — | `mediaCenter.css` identical at HEAD; the three renderer files look genuinely unlanded. |
 
 Method worth reusing: `git rev-parse <commit>:<path>` against `git rev-parse HEAD:<path>`

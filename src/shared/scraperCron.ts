@@ -258,9 +258,9 @@ export interface SchedulerTickOptions {
   onBattery: boolean;
   /**
    * 'skip' abandons runs missed while the app was closed; 'run-once' fires a
-   * single catch-up run; 'run-all' is treated as 'run-once' because this
-   * scheduler coalesces — replaying a week of missed nightly scrapes at boot
-   * is never what someone wants.
+   * single catch-up run. 'run-all' is a legacy persisted alias for 'run-once':
+   * the UI names that compatibility behavior explicitly instead of promising
+   * a backlog replay this scheduler has never performed.
    */
   missedRunPolicy: 'skip' | 'run-once' | 'run-all';
 }

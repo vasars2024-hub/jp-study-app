@@ -13,6 +13,7 @@ import path from 'node:path';
 import type { ScrapeJobEvent } from '../../shared/scraperResults';
 import type { ScraperSchedulerSyncInput } from '../../shared/scraperIpc';
 import type { ScraperScheduleEntry } from '../../shared/scraperOutputSettings';
+import type { ScraperNotice } from '../../shared/scraperNotices';
 
 let tempRoot = '';
 /** What `powerMonitor.isOnBatteryPower()` answers this test. */
@@ -44,6 +45,7 @@ vi.mock('../scraper/engine', () => ({
 }));
 
 const scheduler = await import('../scraper/scheduler');
+const notifications = await import('../scraper/notifications');
 const { setScraperStoreRoot, scraperStorePath } = await import('../scraper/store');
 const { DEFAULT_SCRAPER_SETTINGS } = await import('../../shared/scraperSettings');
 const { DEFAULT_SCRAPER_SCHEDULER_SETTINGS } = await import('../../shared/scraperOutputSettings');
@@ -75,6 +77,7 @@ beforeEach(async () => {
   jobSeq = 0;
   onBattery = false;
   scheduler.resetScheduler();
+  notifications.resetScraperNotifications();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   await fsp.rm(scraperStorePath('scheduler-state.json'), { force: true });
@@ -82,6 +85,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   scheduler.stopScheduler();
+  notifications.resetScraperNotifications();
   await scheduler.whenSchedulerPersisted();
   vi.useRealTimers();
 });
@@ -225,6 +229,36 @@ describe('runScheduleNow', () => {
     expect(record?.lastJobId).toBe('job-test-1');
     expect(record?.lastRunAt).toBeTruthy();
     expect(scheduler.schedulerState().runningJobIds).toEqual(['job-test-1']);
+  });
+
+  it('raises the enabled schedule-start notice with the schedule label and job id', async () => {
+    const notices: ScraperNotice[] = [];
+    notifications.setScraperNoticeSink((notice) => notices.push(notice));
+    attach();
+    await scheduler.syncScheduler({
+      scheduler: {
+        ...DEFAULT_SCRAPER_SCHEDULER_SETTINGS,
+        enabled: true,
+        entries: [entry()],
+      },
+      settings: {
+        ...DEFAULT_SCRAPER_SETTINGS,
+        notifications: {
+          ...DEFAULT_SCRAPER_SETTINGS.notifications,
+          channel: 'toast',
+          onScheduleRun: true,
+        },
+      },
+    });
+
+    scheduler.runScheduleNow('nightly');
+
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({
+      kind: 'schedule-run',
+      body: 'Nightly refresh',
+      correlationId: 'job-test-1',
+    });
   });
 
   it('runs a paused entry when asked explicitly', async () => {

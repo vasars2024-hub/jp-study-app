@@ -409,16 +409,24 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // pixel size), skipDuplicatesByHash (there are no bytes to hash) and
   // namingTemplate (it names files nothing writes).
   'set.images': 'untested',
-  // quietHours, maxConcurrentScheduled, skipIfRunning, missedRunPolicy and
-  // requireExternalPower are all read by `main/scraper/scheduler.ts`. Cron
-  // arithmetic moved to `shared/scraperCron.ts` so main and the Scheduled Tasks
-  // screen cannot disagree about what "next run" means.
-  'set.scheduler': 'untested',
+  // Deterministic acceptance 2026-08-12: enabled/entries, quiet hours,
+  // concurrency, skip-if-running, missed-run coalescing and external-power
+  // holds all reach `main/scraper/scheduler.ts`; records survive a runner
+  // restart, terminal events release slots, and manual schedule starts enter
+  // the notification lane. Cron arithmetic is shared with the Scheduled Tasks
+  // screen. `requireUnmeteredNetwork` is the one inert field and is marked as
+  // such in the drawer because Electron exposes no metered-network signal.
+  // The legacy `run-all` value is truthfully labelled as the coalesced
+  // run-once behavior the runtime has always provided.
+  'set.scheduler': 'ready',
   // Five events a run can genuinely observe — complete, error, new-episode
   // (compared by episode id, not by count), schedule-run and study-ready (a real
-  // subtitle track, not what a torrent index advertises). The decision half is
-  // `shared/scraperNotices.ts` and testable without Electron.
-  'set.notifications': 'untested',
+  // subtitle track, not what a torrent index advertises). Deterministic
+  // acceptance 2026-08-12 covers each toggle, all four channels, system-banner
+  // support/failure isolation, sound, digest timing/grouping, history deltas,
+  // job correlation and the scheduler integration. The decision half is
+  // `shared/scraperNotices.ts` and is tested without external traffic.
+  'set.notifications': 'ready',
   // Not empty after all, and the previous note here was wrong: 'ui' has no
   // entries in SCRAPER_FIELDS because its controls do not live in the settings
   // document. ScraperSettingsDrawer.tsx renders them by hand — compact window,
